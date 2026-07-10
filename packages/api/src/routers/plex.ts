@@ -4,34 +4,9 @@ import { z } from "zod";
 import { adminProcedure, router } from "../index";
 import * as plex from "../services/plex/client";
 import { importPlexUsers } from "../services/plex/import-users";
+import { syncLibraries } from "../services/plex/sync-libraries";
 
 export const plexRouter = router({
-  /** Current connected Plex server (no token), for the Settings page status. */
-  currentSource: adminProcedure.query(async ({ ctx }) => {
-    const source = await ctx.prisma.mediaSource.findFirst({
-      where: { type: "PLEX" },
-      orderBy: { createdAt: "asc" },
-    });
-    if (!source) return null;
-    return {
-      id: source.id,
-      name: source.name,
-      baseUrl: source.baseUrl,
-      machineIdentifier: source.machineIdentifier,
-      webAppUrl: source.webAppUrl,
-    };
-  }),
-
-  /** Libraries (sections) on the connected server — the basis for channels. */
-  libraries: adminProcedure.query(async ({ ctx }) => {
-    const source = await ctx.prisma.mediaSource.findFirst({
-      where: { type: "PLEX" },
-      orderBy: { createdAt: "asc" },
-    });
-    if (!source?.baseUrl) return [];
-    return plex.getLibraries(source.baseUrl, source.token);
-  }),
-
   /** Begin "Sign in with Plex": create a pin + the hosted auth URL. */
   createAuthPin: adminProcedure.mutation(async () => {
     const clientId = crypto.randomUUID();
@@ -52,11 +27,9 @@ export const plexRouter = router({
   /** List the Plex servers this token can reach (owned + shared). */
   listServers: adminProcedure
     .input(z.object({ clientId: z.string(), token: z.string() }))
-    .query(async ({ input }) => {
-      return plex.getServers(input.clientId, input.token);
-    }),
+    .query(async ({ input }) => plex.getServers(input.clientId, input.token)),
 
-  /** Save the chosen server as the (owner) MediaSource used for all content. */
+  /** Save the chosen server as a MediaSource + sync its libraries. */
   saveConnection: adminProcedure
     .input(
       z.object({
@@ -87,7 +60,8 @@ export const plexRouter = router({
       const source = existing
         ? await ctx.prisma.mediaSource.update({ where: { id: existing.id }, data })
         : await ctx.prisma.mediaSource.create({ data });
-      return { id: source.id, name: source.name, baseUrl: source.baseUrl };
+      await syncLibraries(ctx.prisma, source);
+      return { id: source.id, name: source.name };
     }),
 
   /** Import the connected server's shared users as Viewer accounts. */

@@ -22,11 +22,32 @@ model MediaSource {
   ownerUserId String?
   owner       User?   @relation("MediaSourceOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
 
-  channels Channel[]
+  channels  Channel[]
+  libraries MediaLibrary[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([ownerUserId])
   @@map("media_source")
+}
+
+/// A library (section) on a connected media server. Synced from Plex; the admin
+/// enables/disables which ones feed channels (Overseerr-style).
+model MediaLibrary {
+  id            String      @id @default(cuid())
+  mediaSourceId String
+  mediaSource   MediaSource @relation(fields: [mediaSourceId], references: [id], onDelete: Cascade)
+  key           String // media-server section key
+  title         String
+  type          String // "movie" | "show" | …
+  enabled       Boolean     @default(true)
+  lastScanAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([mediaSourceId, key])
+  @@index([mediaSourceId])
+  @@map("media_library")
 }

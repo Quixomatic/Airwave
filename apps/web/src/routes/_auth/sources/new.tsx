@@ -1,3 +1,4 @@
+import { Button } from "@ChannelGuide/ui/components/button";
 import {
   Card,
   CardContent,
@@ -5,28 +6,24 @@ import {
   CardHeader,
   CardTitle,
 } from "@ChannelGuide/ui/components/card";
-import { Button } from "@ChannelGuide/ui/components/button";
 import { Input } from "@ChannelGuide/ui/components/input";
 import { Label } from "@ChannelGuide/ui/components/label";
-import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, Loader2, Tv } from "lucide-react";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ArrowLeft, Loader2, Tv } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { trpc, trpcClient } from "@/utils/trpc";
+import { trpcClient } from "@/utils/trpc";
 
-export const Route = createFileRoute("/_auth/sources")({
-  component: SourcesPage,
+export const Route = createFileRoute("/_auth/sources/new")({
+  component: NewSource,
 });
 
 type PlexServer = Awaited<ReturnType<typeof trpcClient.plex.listServers.query>>[number];
 type PlexAuth = { clientId: string; token: string; email: string };
 
-function SourcesPage() {
-  const currentSource = useQuery(trpc.plex.currentSource.queryOptions());
-  const libraries = useQuery(trpc.plex.libraries.queryOptions());
-
+function NewSource() {
+  const navigate = useNavigate();
   const [connecting, setConnecting] = useState(false);
   const [auth, setAuth] = useState<PlexAuth | null>(null);
   const [servers, setServers] = useState<PlexServer[]>([]);
@@ -46,8 +43,6 @@ function SourcesPage() {
     if (conn) {
       setHost(conn.address);
       setPort(String(conn.port));
-      // Default SSL OFF (Overseerr behavior). Plex reports local connections as
-      // https via *.plex.direct certs, but a raw-IP LAN connection is plain http.
       setSsl(false);
     }
   };
@@ -105,7 +100,7 @@ function SourcesPage() {
     }
     setSaving(true);
     try {
-      await trpcClient.plex.saveConnection.mutate({
+      const result = await trpcClient.plex.saveConnection.mutate({
         clientId: auth.clientId,
         token: auth.token,
         name: server.name,
@@ -114,9 +109,7 @@ function SourcesPage() {
         webAppUrl: webAppUrl.trim() || undefined,
       });
       toast.success("Plex server connected.");
-      setAuth(null);
-      setServers([]);
-      await currentSource.refetch();
+      navigate({ to: "/sources/$sourceId", params: { sourceId: result.id } });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save connection");
     } finally {
@@ -126,39 +119,23 @@ function SourcesPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="text-2xl font-semibold tracking-tight">Sources</h1>
-      <p className="text-muted-foreground mt-1 text-sm">
-        Connect the Plex Media Server that ChannelGuide builds channels from and serves content to.
-      </p>
+      <Link
+        to="/sources"
+        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
+      >
+        <ArrowLeft className="h-4 w-4" /> Sources
+      </Link>
 
-      <Card className="mt-6">
+      <Card className="mt-4">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Tv className="text-primary h-5 w-5" /> Plex
+            <Tv className="text-primary h-5 w-5" /> Add a Plex server
           </CardTitle>
           <CardDescription>
             Sign in with Plex, pick your server, and confirm the connection details.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {currentSource.data && !auth && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 rounded-md border p-3 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                <span>
-                  Connected to <strong>{currentSource.data.name}</strong> (
-                  {currentSource.data.baseUrl})
-                </span>
-              </div>
-              {libraries.data && libraries.data.length > 0 && (
-                <p className="text-muted-foreground text-xs">
-                  <span className="font-medium">Libraries:</span>{" "}
-                  {libraries.data.map((l) => l.title).join(" · ")}
-                </p>
-              )}
-            </div>
-          )}
-
           {!auth ? (
             <Button size="lg" onClick={signInWithPlex} disabled={connecting}>
               {connecting ? (
@@ -166,7 +143,7 @@ function SourcesPage() {
               ) : (
                 <Tv className="mr-2 h-4 w-4" />
               )}
-              {currentSource.data ? "Reconnect / change server" : "Sign in with Plex"}
+              Sign in with Plex
             </Button>
           ) : (
             <div className="space-y-5">
@@ -231,7 +208,11 @@ function SourcesPage() {
                   {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Save connection
                 </Button>
-                <Button variant="ghost" onClick={() => setAuth(null)} disabled={saving}>
+                <Button
+                  variant="ghost"
+                  render={<Link to="/sources" />}
+                  disabled={saving}
+                >
                   Cancel
                 </Button>
               </div>

@@ -2,6 +2,21 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.1.1] - 2026-07-10
+
+Sources management + per-library enable/disable (Overseerr-style).
+
+### What ships
+
+- **Multi-source Sources UX**: `/sources` (list) → `/sources/new` (connect flow) → `/sources/$id` (manage). Each source is renamable.
+- **`MediaLibrary`** model + sync: connecting a server (or Rescan) syncs its libraries from Plex; each library has an **`enabled`** toggle — the admin picks which libraries (Movies, TV, …) feed channels.
+- **`sources` tRPC router**: `list` / `get` / `updateLabel` / `rescan` / `setLibraryEnabled` / `remove` (admin). `plex.saveConnection` now syncs libraries + returns the new source id; removed the single-source `currentSource` / `libraries` procedures.
+- Detail page: rename label, connection info, per-library enable checkboxes + Rescan, remove source.
+
+### Verification
+
+- `pnpm check-types` (all packages) passes. Needs live testing against your libraries.
+
 ## [0.1.0] - 2026-07-10
 
 Channel engine — foundation: Plex Media Server access.
