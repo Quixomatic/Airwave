@@ -241,3 +241,55 @@ export async function getSectionItems(
     durationMs: m.duration ?? 0,
   }));
 }
+
+/**
+ * Filtered query with raw Plex filter params (`field=value`, `year>=1990`, …).
+ * Operators are sent literally; only values should be pre-encoded by the caller.
+ */
+export async function getSectionItemsRaw(
+  baseUrl: string,
+  token: string,
+  sectionKey: string,
+  type: 1 | 2 | 4,
+  filterParams: string[],
+  sort = "titleSort",
+  limit = 800,
+): Promise<PlexItem[]> {
+  const qs = [
+    `type=${type}`,
+    `sort=${encodeURIComponent(sort)}`,
+    `X-Plex-Container-Size=${limit}`,
+    ...filterParams,
+  ].join("&");
+  const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/all?${qs}`, {
+    headers: pmsHeaders(token),
+  });
+  if (!res.ok) throw new Error(`Plex filtered query failed (${res.status})`);
+  const data = (await res.json()) as {
+    MediaContainer?: {
+      Metadata?: Array<{ ratingKey: string | number; title: string; duration?: number }>;
+    };
+  };
+  return (data.MediaContainer?.Metadata ?? []).map((m) => ({
+    ratingKey: String(m.ratingKey),
+    title: m.title,
+    durationMs: m.duration ?? 0,
+  }));
+}
+
+/** Available values for a tag filter field (genre/studio/director/actor/…). */
+export async function getFilterValues(
+  baseUrl: string,
+  token: string,
+  sectionKey: string,
+  field: string,
+): Promise<PlexTag[]> {
+  const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/${field}`, {
+    headers: pmsHeaders(token),
+  });
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    MediaContainer?: { Directory?: Array<{ key: string; title: string }> };
+  };
+  return (data.MediaContainer?.Directory ?? []).map((d) => ({ id: d.key, title: d.title }));
+}

@@ -1,18 +1,79 @@
 import type { PrismaClient } from "@ChannelGuide/db";
 
-import { type PlexItem, getSectionGenres, getSectionItems } from "./client";
+import { type PlexItem, getFilterValues, getSectionItemsRaw } from "./client";
+import { type FilterCondition, type FilterNode, buildParam } from "./filter-fields";
 
-type ChannelFilter = {
-  mediaTypes?: string[]; // "movie" | "show" — which enabled libraries to draw from
-  genreTitle?: string; // resolved to each library's own genre id
-  unwatched?: boolean;
+type LibCtx = {
+  baseUrl: string;
+  token: string;
+  sectionKey: string;
+  type: 1 | 4;
+  sort: string;
+  tagCache: Map<string, Promise<Map<string, string>>>;
 };
 
+async function resolveTag(ctx: LibCtx, plexField: string, title: string): Promise<string | undefined> {
+  let p = ctx.tagCache.get(plexField);
+  if (!p) {
+    p = getFilterValues(ctx.baseUrl, ctx.token, ctx.sectionKey, plexField).then(
+      (vals) => new Map(vals.map((v) => [v.title.toLowerCase(), v.id])),
+    );
+    ctx.tagCache.set(plexField, p);
+  }
+  return (await p).get(title.toLowerCase());
+}
+
+function toMap(items: PlexItem[]): Map<string, PlexItem> {
+  return new Map(items.map((i) => [i.ratingKey, i]));
+}
+
+async function queryParams(ctx: LibCtx, params: string[]): Promise<Map<string, PlexItem>> {
+  return toMap(await getSectionItemsRaw(ctx.baseUrl, ctx.token, ctx.sectionKey, ctx.type, params, ctx.sort));
+}
+
+async function resolveNode(node: FilterNode, ctx: LibCtx): Promise<Map<string, PlexItem>> {
+  if (node.type === "condition") {
+    const param = await buildParam(node, (f, t) => resolveTag(ctx, f, t));
+    if (!param) return new Map();
+    return queryParams(ctx, [param]);
+  }
+
+  // Fast path: an AND group of only conditions → one Plex query (params ANDed).
+  if (node.combinator === "and" && node.children.every((c) => c.type === "condition")) {
+    const params: string[] = [];
+    for (const c of node.children as FilterCondition[]) {
+      const p = await buildParam(c, (f, t) => resolveTag(ctx, f, t));
+      if (!p) return new Map(); // a tag value missing → AND yields nothing here
+      params.push(p);
+    }
+    return queryParams(ctx, params);
+  }
+
+  const childMaps: Map<string, PlexItem>[] = [];
+  for (const child of node.children) childMaps.push(await resolveNode(child, ctx));
+
+  if (node.combinator === "or") {
+    const out = new Map<string, PlexItem>();
+    for (const m of childMaps) for (const [k, v] of m) out.set(k, v);
+    return out;
+  }
+  // AND: intersect
+  if (childMaps.length === 0) return queryParams(ctx, []);
+  let acc = childMaps[0]!;
+  for (let i = 1; i < childMaps.length; i++) {
+    const next = childMaps[i]!;
+    const inter = new Map<string, PlexItem>();
+    for (const [k, v] of acc) if (next.has(k)) inter.set(k, v);
+    acc = inter;
+  }
+  return acc;
+}
+
+type ChannelFilter = { mediaTypes?: string[]; filter?: FilterNode };
+
 /**
- * Resolve a channel's candidate pool across ALL enabled libraries of the chosen
- * content type(s) — a channel can mix movies + TV. Genre is matched by TITLE and
- * resolved to each library's own genre id (ids differ per library). Movie libs
- * yield movies (type 1); show libs yield episodes (type 4).
+ * Resolve a channel's candidate pool across all enabled libraries of the chosen
+ * content type(s), applying the predicate tree. Items are de-duped by ratingKey.
  */
 export async function resolveChannel(
   prisma: PrismaClient,
@@ -28,11 +89,11 @@ export async function resolveChannel(
 
   const filter = (def.plexFilter as unknown as ChannelFilter | null) ?? {};
   const mediaTypes = filter.mediaTypes?.length ? filter.mediaTypes : ["movie", "show"];
+  const tree = filter.filter;
 
   const libs = await prisma.mediaLibrary.findMany({
     where: { mediaSourceId: source.id, enabled: true, type: { in: mediaTypes } },
   });
-
   const sort =
     channel.ordering === "SHUFFLE"
       ? "random"
@@ -40,24 +101,18 @@ export async function resolveChannel(
         ? "originallyAvailableAt"
         : "titleSort";
 
-  const out: PlexItem[] = [];
+  const out = new Map<string, PlexItem>();
   for (const lib of libs) {
-    let genreId: string | undefined;
-    if (filter.genreTitle) {
-      const genres = await getSectionGenres(source.baseUrl, source.token, lib.key);
-      genreId = genres.find(
-        (g) => g.title.toLowerCase() === filter.genreTitle!.toLowerCase(),
-      )?.id;
-      if (!genreId) continue; // this library has no such genre — skip it
-    }
-    const type: 1 | 4 = lib.type === "movie" ? 1 : 4;
-    const items = await getSectionItems(source.baseUrl, source.token, lib.key, {
-      type,
-      genreId,
-      unwatched: filter.unwatched,
+    const ctx: LibCtx = {
+      baseUrl: source.baseUrl,
+      token: source.token,
+      sectionKey: lib.key,
+      type: lib.type === "movie" ? 1 : 4,
       sort,
-    });
-    out.push(...items);
+      tagCache: new Map(),
+    };
+    const items = tree ? await resolveNode(tree, ctx) : await queryParams(ctx, []);
+    for (const [k, v] of items) out.set(k, v);
   }
-  return out;
+  return [...out.values()];
 }

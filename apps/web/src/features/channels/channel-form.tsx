@@ -7,6 +7,8 @@ import { toast } from "sonner";
 
 import { trpc } from "@/utils/trpc";
 
+import { FilterBuilder, type FilterGroup, emptyGroup } from "./filter-builder";
+
 export type Ordering = "SHUFFLE" | "IN_ORDER" | "BY_AIR_DATE";
 export type MediaType = "movie" | "show";
 
@@ -14,15 +16,14 @@ export type ChannelFormValues = {
   name: string;
   number: string;
   mediaTypes: MediaType[];
-  genreTitle: string;
-  unwatched: boolean;
+  filter: FilterGroup;
   ordering: Ordering;
 };
 
 /**
  * Channel create/edit fields as a `<form id={formId}>` with NO submit button —
- * the submit/save button lives in the route header (HeaderRight). A channel can
- * mix Movies + TV; genre is by title (resolved per library at query time).
+ * the save button lives in the route header (HeaderRight). A channel mixes
+ * Movies + TV and filters via the nested predicate builder.
  */
 export function ChannelForm({
   initial,
@@ -41,19 +42,13 @@ export function ChannelForm({
   const [number, setNumber] = useState(initial?.number ?? "");
   const [movies, setMovies] = useState(initialTypes.includes("movie"));
   const [tv, setTv] = useState(initialTypes.includes("show"));
-  const [genreTitle, setGenreTitle] = useState(initial?.genreTitle ?? "");
-  const [unwatched, setUnwatched] = useState(initial?.unwatched ?? false);
   const [ordering, setOrdering] = useState<Ordering>(initial?.ordering ?? "SHUFFLE");
+  const [filter, setFilter] = useState<FilterGroup>(() => initial?.filter ?? emptyGroup());
 
   const mediaTypes: MediaType[] = [
     ...(movies ? (["movie"] as const) : []),
     ...(tv ? (["show"] as const) : []),
   ];
-
-  const genres = useQuery({
-    ...trpc.channels.contentGenres.queryOptions({ mediaSourceId: sourceId, mediaTypes }),
-    enabled: !!sourceId && mediaTypes.length > 0,
-  });
 
   if (sources.data && !sourceId) {
     return (
@@ -77,7 +72,7 @@ export function ChannelForm({
       toast.error("Pick at least one content type.");
       return;
     }
-    onSubmit({ name, number, mediaTypes, genreTitle, unwatched, ordering, mediaSourceId: sourceId });
+    onSubmit({ name, number, mediaTypes, filter, ordering, mediaSourceId: sourceId });
   };
 
   return (
@@ -118,42 +113,29 @@ export function ChannelForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label htmlFor="cgenre">Genre (optional)</Label>
-          <select
-            id="cgenre"
-            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-            value={genreTitle}
-            onChange={(e) => setGenreTitle(e.target.value)}
-          >
-            <option value="">Any genre</option>
-            {genres.data?.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="cord">Ordering</Label>
-          <select
-            id="cord"
-            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-            value={ordering}
-            onChange={(e) => setOrdering(e.target.value as Ordering)}
-          >
-            <option value="SHUFFLE">Shuffle</option>
-            <option value="IN_ORDER">In order</option>
-            <option value="BY_AIR_DATE">By air date</option>
-          </select>
-        </div>
+      <div className="space-y-2">
+        <Label>Filter</Label>
+        <FilterBuilder
+          value={filter}
+          onChange={setFilter}
+          mediaSourceId={sourceId}
+          mediaTypes={mediaTypes}
+        />
       </div>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={unwatched} onChange={(e) => setUnwatched(e.target.checked)} />
-        Unwatched only
-      </label>
+      <div className="space-y-2">
+        <Label htmlFor="cord">Ordering</Label>
+        <select
+          id="cord"
+          className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+          value={ordering}
+          onChange={(e) => setOrdering(e.target.value as Ordering)}
+        >
+          <option value="SHUFFLE">Shuffle</option>
+          <option value="IN_ORDER">In order</option>
+          <option value="BY_AIR_DATE">By air date</option>
+        </select>
+      </div>
     </form>
   );
 }

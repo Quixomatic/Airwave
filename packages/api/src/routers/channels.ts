@@ -2,11 +2,37 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
-import { getSectionGenres } from "../services/plex/client";
+import { getFilterValues } from "../services/plex/client";
+import { FILTER_FIELDS, OPS_FOR_KIND, fieldMeta } from "../services/plex/filter-fields";
 import { resolveChannel } from "../services/plex/resolve";
 
 const orderingEnum = z.enum(["SHUFFLE", "IN_ORDER", "BY_AIR_DATE"]);
 const mediaTypeEnum = z.enum(["movie", "show"]);
+const opEnum = z.enum(["is", "isNot", "gte", "lte"]);
+
+const conditionSchema = z.object({
+  type: z.literal("condition"),
+  id: z.string().optional(),
+  field: z.string(),
+  op: opEnum,
+  value: z.string(),
+});
+
+type FilterNodeInput =
+  | z.infer<typeof conditionSchema>
+  | { type: "group"; id?: string; combinator: "and" | "or"; children: FilterNodeInput[] };
+
+const nodeSchema: z.ZodType<FilterNodeInput> = z.lazy(() =>
+  z.union([
+    conditionSchema,
+    z.object({
+      type: z.literal("group"),
+      id: z.string().optional(),
+      combinator: z.enum(["and", "or"]),
+      children: z.array(nodeSchema),
+    }),
+  ]),
+);
 
 export const channelsRouter = router({
   list: adminProcedure.query(async ({ ctx }) => {
@@ -26,8 +52,7 @@ export const channelsRouter = router({
     const filter =
       (def?.plexFilter as unknown as {
         mediaTypes?: string[];
-        genreTitle?: string;
-        unwatched?: boolean;
+        filter?: FilterNodeInput;
       } | null) ?? {};
     return {
       id: channel.id,
@@ -36,15 +61,32 @@ export const channelsRouter = router({
       ordering: channel.ordering,
       mediaSourceId: channel.mediaSourceId,
       mediaTypes: filter.mediaTypes ?? ["movie", "show"],
-      genreTitle: filter.genreTitle ?? "",
-      unwatched: filter.unwatched ?? false,
+      filter: filter.filter ?? null,
     };
   }),
 
-  /** Union of genre titles across the enabled libraries of the given types. */
-  contentGenres: adminProcedure
-    .input(z.object({ mediaSourceId: z.string(), mediaTypes: z.array(mediaTypeEnum) }))
+  /** Static filter field catalog (field + label + kind + operators). */
+  filterFields: adminProcedure.query(() =>
+    FILTER_FIELDS.map((f) => ({
+      field: f.field,
+      label: f.label,
+      kind: f.kind,
+      operators: OPS_FOR_KIND[f.kind],
+    })),
+  ),
+
+  /** Values for a tag field, unioned across the enabled libraries of the given types. */
+  filterValues: adminProcedure
+    .input(
+      z.object({
+        mediaSourceId: z.string(),
+        mediaTypes: z.array(mediaTypeEnum),
+        field: z.string(),
+      }),
+    )
     .query(async ({ ctx, input }) => {
+      const meta = fieldMeta(input.field);
+      if (!meta?.tagId) return [];
       const source = await ctx.prisma.mediaSource.findUnique({
         where: { id: input.mediaSourceId },
       });
@@ -54,8 +96,8 @@ export const channelsRouter = router({
       });
       const titles = new Set<string>();
       for (const lib of libs) {
-        const genres = await getSectionGenres(source.baseUrl, source.token, lib.key);
-        for (const g of genres) titles.add(g.title);
+        const vals = await getFilterValues(source.baseUrl, source.token, lib.key, meta.plex);
+        for (const v of vals) titles.add(v.title);
       }
       return [...titles].sort((a, b) => a.localeCompare(b));
     }),
@@ -67,8 +109,7 @@ export const channelsRouter = router({
         number: z.number().int().optional(),
         mediaSourceId: z.string(),
         mediaTypes: z.array(mediaTypeEnum).min(1),
-        genreTitle: z.string().optional(),
-        unwatched: z.boolean().optional(),
+        filter: nodeSchema.optional(),
         ordering: orderingEnum.default("SHUFFLE"),
       }),
     )
@@ -77,6 +118,11 @@ export const channelsRouter = router({
         input.number ??
         ((await ctx.prisma.channel.aggregate({ _max: { number: true } }))._max.number ?? 0) + 1;
 
+      const plexFilter = {
+        mediaTypes: input.mediaTypes,
+        ...(input.filter ? { filter: JSON.parse(JSON.stringify(input.filter)) } : {}),
+      };
+
       const channel = await ctx.prisma.channel.create({
         data: {
           name: input.name,
@@ -84,16 +130,7 @@ export const channelsRouter = router({
           mediaSourceId: input.mediaSourceId,
           ordering: input.ordering,
           createdById: ctx.session.user.id,
-          definitions: {
-            create: {
-              kind: "PREDICATE",
-              plexFilter: {
-                mediaTypes: input.mediaTypes,
-                unwatched: input.unwatched ?? false,
-                ...(input.genreTitle ? { genreTitle: input.genreTitle } : {}),
-              },
-            },
-          },
+          definitions: { create: { kind: "PREDICATE", plexFilter } },
         },
       });
       return { id: channel.id };
@@ -106,8 +143,7 @@ export const channelsRouter = router({
         name: z.string().min(1),
         number: z.number().int(),
         mediaTypes: z.array(mediaTypeEnum).min(1),
-        genreTitle: z.string().optional(),
-        unwatched: z.boolean().optional(),
+        filter: nodeSchema.optional(),
         ordering: orderingEnum,
       }),
     )
@@ -125,8 +161,7 @@ export const channelsRouter = router({
 
       const plexFilter = {
         mediaTypes: input.mediaTypes,
-        unwatched: input.unwatched ?? false,
-        ...(input.genreTitle ? { genreTitle: input.genreTitle } : {}),
+        ...(input.filter ? { filter: JSON.parse(JSON.stringify(input.filter)) } : {}),
       };
       const def = channel.definitions[0];
       if (def) {

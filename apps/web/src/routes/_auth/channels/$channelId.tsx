@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { HeaderRight } from "@/context/header-provider";
 import { ChannelForm, type MediaType, type Ordering } from "@/features/channels/channel-form";
+import type { FilterGroup } from "@/features/channels/filter-builder";
 import { trpc, trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/channels/$channelId")({
@@ -83,8 +84,7 @@ function ChannelDetail() {
               name: channel.data.name,
               number: String(channel.data.number),
               mediaTypes: channel.data.mediaTypes as MediaType[],
-              genreTitle: channel.data.genreTitle,
-              unwatched: channel.data.unwatched,
+              filter: (channel.data.filter as FilterGroup | null) ?? undefined,
               ordering: channel.data.ordering as Ordering,
             }}
             onSubmit={async (v) => {
@@ -95,8 +95,7 @@ function ChannelDetail() {
                   name: v.name,
                   number: Number(v.number),
                   mediaTypes: v.mediaTypes,
-                  genreTitle: v.genreTitle || undefined,
-                  unwatched: v.unwatched,
+                  filter: v.filter,
                   ordering: v.ordering,
                 });
                 toast.success("Saved.");

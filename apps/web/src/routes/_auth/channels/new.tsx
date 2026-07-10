@@ -50,8 +50,7 @@ function NewChannel() {
                   number: v.number ? Number(v.number) : undefined,
                   mediaSourceId: v.mediaSourceId,
                   mediaTypes: v.mediaTypes,
-                  genreTitle: v.genreTitle || undefined,
-                  unwatched: v.unwatched,
+                  filter: v.filter,
                   ordering: v.ordering,
                 });
                 toast.success("Channel created.");
