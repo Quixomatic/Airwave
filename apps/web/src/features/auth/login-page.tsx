@@ -12,44 +12,40 @@ import {
   CardTitle,
 } from "@ChannelGuide/ui/components/card";
 import { Input } from "@ChannelGuide/ui/components/input";
-import { Label } from "@ChannelGuide/ui/components/label";
 
-import { signIn, signUp } from "@/lib/auth-client";
+import { signIn } from "@/lib/auth-client";
 
-type Mode = "signin" | "signup" | "magic";
+type Mode = "password" | "magic";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<Mode>("signin");
-  const [name, setName] = useState("");
+  const [mode, setMode] = useState<Mode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
 
-  const callbackURL = `${window.location.origin}/dashboard`;
+  const callbackURL = `${window.location.origin}/post-login`;
 
   const handlePlex = () => {
     // TODO(plex): kick off the Plex PIN flow once the custom provider is wired
-    // (v0.0.5). For now this is a visible-but-inert primary CTA.
+    // (v0.0.6). For now this is a visible-but-inert primary CTA.
     toast.info("Sign in with Plex is coming soon.");
   };
 
-  const handleEmailPassword = async (e: React.FormEvent) => {
+  const handlePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res =
-        mode === "signup"
-          ? await signUp.email({ email, password, name: name || email })
-          : await signIn.email({ email, password });
-      if (res?.error) {
-        toast.error(res.error.message || "Something went wrong");
+      const response = await signIn.email({ email, password });
+      if (response?.error) {
+        toast.error(response.error.message || "Invalid email or password");
         return;
       }
-      navigate({ to: "/dashboard" });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
+      navigate({ to: "/post-login" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to sign in";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -59,22 +55,24 @@ export function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await signIn.magicLink({ email, callbackURL });
-      if (res?.error) {
-        toast.error(res.error.message || "Failed to send sign-in link");
+      const response = await signIn.magicLink({ email, callbackURL });
+      if (response?.error) {
+        toast.error(response.error.message || "Failed to send sign-in link");
         return;
       }
       setMagicLinkSent(true);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to send sign-in link");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to send sign-in link";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
+  // ── "check your email" screen after a magic link was sent ─────────
   if (magicLinkSent) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-background p-4">
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <Card className="w-full max-w-sm">
           <CardHeader className="text-center">
             <div className="bg-primary/10 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full">
@@ -94,7 +92,7 @@ export function LoginPage() {
               className="w-full"
               onClick={() => {
                 setMagicLinkSent(false);
-                setMode("signin");
+                setMode("password");
               }}
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -106,114 +104,96 @@ export function LoginPage() {
     );
   }
 
+  // ── Default: Plex + email sign-in ─────────────────────────────────
   return (
-    <div className="flex min-h-svh items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl">ChannelGuide</CardTitle>
+          <CardTitle className="text-3xl">Sign In</CardTitle>
           <CardDescription className="text-base">
-            {mode === "signup" ? "Create your account" : "Sign in to your account"}
+            Sign in with Plex, or with your email.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button
-            variant="outline"
-            size="lg"
-            className="mb-6 w-full justify-center"
-            onClick={handlePlex}
-            disabled={loading}
-          >
-            <Tv className="mr-2 h-5 w-5" />
-            Sign in with Plex
-          </Button>
+          <div className="mb-6 flex flex-col gap-3">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={handlePlex}
+              disabled={loading}
+              className="w-full justify-start"
+            >
+              <Tv className="mr-2 h-5 w-5" />
+              Continue with Plex
+            </Button>
+          </div>
 
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card text-muted-foreground px-2">or</span>
+              <span className="bg-card text-muted-foreground px-2">OR</span>
             </div>
           </div>
 
           {mode === "magic" ? (
             <form className="space-y-4" onSubmit={handleMagicLink}>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  disabled={loading}
-                />
-              </div>
-              <Button type="submit" size="lg" className="w-full" disabled={loading}>
-                {loading ? "Sending…" : "Email me a magic link"}
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="Enter your email…"
+                disabled={loading}
+                className="h-12 text-base"
+              />
+              <Button type="submit" size="lg" disabled={loading} className="w-full">
+                {loading ? "Sending…" : "Continue"}
               </Button>
             </form>
           ) : (
-            <form className="space-y-4" onSubmit={handleEmailPassword}>
-              {mode === "signup" && (
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input
-                    id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name"
-                    disabled={loading}
-                  />
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  disabled={loading}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  disabled={loading}
-                />
-              </div>
-              <Button type="submit" size="lg" className="w-full" disabled={loading}>
-                {loading ? "Please wait…" : mode === "signup" ? "Create account" : "Sign In"}
+            <form className="space-y-4" onSubmit={handlePassword}>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="Enter your email…"
+                disabled={loading}
+                className="h-12 text-base"
+              />
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                placeholder="Password"
+                disabled={loading}
+                className="h-12 text-base"
+              />
+              <Button type="submit" size="lg" disabled={loading} className="w-full">
+                {loading ? "Signing in…" : "Sign In"}
               </Button>
             </form>
           )}
 
-          <div className="mt-6 flex flex-col items-center gap-2 text-sm">
+          <p className="text-muted-foreground mt-6 text-center text-sm">
+            {mode === "magic"
+              ? "We'll email you a magic link to sign in."
+              : "Use the email and password your admin issued you."}
+          </p>
+
+          <div className="mt-4 text-center text-sm">
             <button
               type="button"
               className="text-muted-foreground hover:text-foreground"
-              onClick={() => setMode(mode === "magic" ? "signin" : "magic")}
+              onClick={() => setMode(mode === "magic" ? "password" : "magic")}
             >
               {mode === "magic" ? "Use email & password" : "Email me a magic link instead"}
-            </button>
-            <button
-              type="button"
-              className="text-primary hover:underline"
-              onClick={() => setMode(mode === "signup" ? "signin" : "signup")}
-            >
-              {mode === "signup"
-                ? "Already have an account? Sign in"
-                : "Need an account? Create one"}
             </button>
           </div>
         </CardContent>

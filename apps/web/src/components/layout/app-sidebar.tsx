@@ -29,7 +29,7 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" variant="inset">
       <SidebarHeader className="h-14 justify-center px-3">
-        <Link to="/dashboard" className="flex items-center gap-2 font-semibold">
+        <Link to="/" className="flex items-center gap-2 font-semibold">
           <Radio className="text-primary size-5 shrink-0" />
           <span className="truncate group-data-[collapsible=icon]:hidden">ChannelGuide</span>
         </Link>

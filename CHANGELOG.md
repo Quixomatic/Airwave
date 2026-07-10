@@ -2,6 +2,21 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.0.5] - 2026-07-10
+
+Routing cleanup and login refinements.
+
+### What ships
+
+- `/` is now the guarded dashboard itself (`_auth/index.tsx`) — no more `/` → `/dashboard` → `/login` redirect chain.
+- Added a `/post-login` route (BasicTimeTracker-style landing seam; the future hook for a "link Plex" gate). Password sign-in + magic-link callbacks point here.
+- Login page restyled to match BasicTimeTracker's sign-in exactly: centered Card `max-w-sm`, `text-3xl` title, `text-base` description, outline `lg` provider button (`justify-start` + icon), the OR divider, bare `h-12 text-base` inputs, `lg` full-width submit, `mt-6` muted helper text — with the Plex CTA + email/password + a magic-link toggle.
+- Removed self-service sign-up — accounts are admin-issued or via Plex (Overseerr-style).
+
+### Verification
+
+- `pnpm -F web check-types` passes.
+
 ## [0.0.4] - 2026-07-10
 
 Ported BasicTimeTracker's authenticated app layout, de-workspaced to single-tenant.

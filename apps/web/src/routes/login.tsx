@@ -7,7 +7,7 @@ export const Route = createFileRoute("/login")({
   beforeLoad: async () => {
     const session = await authClient.getSession();
     if (session?.data?.user) {
-      throw redirect({ to: "/dashboard" });
+      throw redirect({ to: "/" });
     }
   },
   component: LoginPage,
