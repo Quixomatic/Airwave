@@ -1,0 +1,98 @@
+enum OrderingStrategy {
+  SHUFFLE
+  IN_ORDER
+  BY_AIR_DATE
+}
+
+enum ChannelDefinitionKind {
+  PREDICATE // metadata predicate groups (resolved against Plex's API for Plex sources)
+  PLEX_COLLECTION
+  PLEX_PLAYLIST
+  MANUAL_ITEMS // explicit include/exclude of specific media items
+}
+
+enum DefinitionMode {
+  INCLUDE
+  EXCLUDE
+}
+
+/// A guide package — the toggleable grouping of channels (e.g. "Time Machine").
+model ChannelPackage {
+  id          String    @id @default(cuid())
+  key         String    @unique // stable slug
+  name        String
+  description String?
+  sortIndex   Int       @default(0)
+  channels    Channel[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("channel_package")
+}
+
+/// A live channel. Its candidate pool comes from one or more ChannelDefinitions;
+/// ordering + a stable shuffle seed make the materialized schedule deterministic.
+model Channel {
+  id          String           @id @default(cuid())
+  number      Int              @unique // guide channel number
+  name        String
+  description String?
+  iconUrl     String?
+  color       String?
+  enabled     Boolean          @default(true)
+  sortIndex   Int              @default(0)
+  ordering    OrderingStrategy @default(SHUFFLE)
+  shuffleSeed Int? // stable seed for deterministic shuffle
+
+  mediaSourceId String
+  mediaSource   MediaSource @relation(fields: [mediaSourceId], references: [id], onDelete: Cascade)
+
+  packageId String?
+  package   ChannelPackage? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?   @relation("ChannelCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  definitions   ChannelDefinition[]
+  scheduleItems ScheduleItem[]
+  bumperConfig  BumperConfig?
+  favorites     Favorite[]
+  watchStates   ChannelWatchState[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([packageId])
+  @@index([mediaSourceId])
+  @@map("channel")
+}
+
+/// One clause of a channel's candidate pool. Multiple clauses combine
+/// (INCLUDE/EXCLUDE) to support refinement + manual inclusions/exclusions.
+model ChannelDefinition {
+  id        String                @id @default(cuid())
+  channelId String
+  channel   Channel               @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  kind      ChannelDefinitionKind
+  mode      DefinitionMode        @default(INCLUDE)
+  sortIndex Int                   @default(0)
+
+  // PREDICATE — a Plex filter query (resolved against Plex's API).
+  // Jellyfin/Emby get our own filtering engine over a local metadata cache later.
+  plexFilter     Json?
+  plexLibraryKey String?
+
+  // PLEX_COLLECTION / PLEX_PLAYLIST
+  plexCollectionKey String?
+  plexPlaylistKey   String?
+
+  // MANUAL_ITEMS — explicit media-server item ids (ratingKeys)
+  manualItemKeys String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([channelId])
+  @@map("channel_definition")
+}

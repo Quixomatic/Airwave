@@ -1,0 +1,26 @@
+enum ScheduleItemKind {
+  PROGRAM
+  BUMPER
+}
+
+/// The materialized, server-authoritative timeline for a channel. Clients compute
+/// "what's on now" as (now - startsAt). Regenerated on a rolling horizon.
+model ScheduleItem {
+  id        String           @id @default(cuid())
+  channelId String
+  channel   Channel          @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  kind      ScheduleItemKind @default(PROGRAM)
+
+  startsAt        DateTime
+  durationSeconds Int
+  // offset into the underlying media file where playback begins (usually 0)
+  startOffsetSeconds Int @default(0)
+
+  ratingKey String // media-server item id to play
+  guideData Json? // denormalized display data (title, art, 4K/HDR/audio badges, chapters ref)
+
+  createdAt DateTime @default(now())
+
+  @@index([channelId, startsAt])
+  @@map("schedule_item")
+}

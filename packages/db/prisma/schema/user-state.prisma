@@ -1,0 +1,40 @@
+/// A user's favorited channel (powers the "Favorites Only" guide filter). Stored
+/// server-side so it syncs across all the user's devices/platforms.
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, channelId])
+  @@index([userId])
+  @@map("favorite")
+}
+
+/// Per-user, per-channel playback state — powers cross-device resume and DVR
+/// (whether the user is following the live edge or behind it).
+model ChannelWatchState {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channelId String
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  // true = following the live timeline; false = behind live (paused/rewound/from start)
+  atLiveEdge Boolean @default(true)
+  // When behind live: the wall-clock instant on the channel timeline the user's
+  // playback maps to — lets any device resume the exact spot.
+  positionAt DateTime?
+  // Denormalized convenience so a client can resume without recomputing.
+  lastRatingKey     String?
+  lastOffsetSeconds Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, channelId])
+  @@index([userId])
+  @@map("channel_watch_state")
+}

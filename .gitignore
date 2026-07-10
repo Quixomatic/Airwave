@@ -53,3 +53,10 @@ coverage
 .cache
 tmp
 temp
+
+# Local-only docs and plans (design notes, project plan, scratch SQL, etc.)
+.docs/
+.plans/
+
+# Local reference repos (sibling sources cloned for design reference)
+.tmp/

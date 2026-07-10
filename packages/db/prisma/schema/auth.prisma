@@ -8,6 +8,19 @@ model User {
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
+  deviceCodes   DeviceCode[]
+
+  // admin plugin
+  role       String?
+  banned     Boolean?
+  banReason  String?
+  banExpires DateTime?
+
+  // domain back-relations
+  mediaSources    MediaSource[]       @relation("MediaSourceOwner")
+  channelsCreated Channel[]           @relation("ChannelCreatedBy")
+  favorites       Favorite[]
+  watchStates     ChannelWatchState[]
 
   @@unique([email])
   @@map("user")
@@ -23,6 +36,9 @@ model Session {
   userAgent String?
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // admin plugin
+  impersonatedBy String?
 
   @@unique([token])
   @@index([userId])
@@ -59,4 +75,23 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+// deviceAuthorization plugin (RFC 8628 device grant) — matches GuideEngine's proven schema
+model DeviceCode {
+  id              String    @id @default(cuid())
+  deviceCode      String    @unique
+  userCode        String    @unique
+  userId          String?
+  user            User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId        String?
+  scope           String?
+  status          String    @default("pending") // pending | approved | denied
+  expiresAt       DateTime
+  lastPolledAt    DateTime?
+  pollingInterval Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("device_code")
 }

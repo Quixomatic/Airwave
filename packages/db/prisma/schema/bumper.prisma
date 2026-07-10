@@ -1,0 +1,29 @@
+enum BumperSource {
+  PLEX_PLAYLIST
+  PLEX_COLLECTION
+  LOCAL_DIR
+}
+
+/// Commercial/bumper interstitial config. A null channelId is the global default;
+/// a set channelId is a per-channel override (1:1). The scheduler inserts
+/// minPerBreak..maxPerBreak (1–5) fillers between programs.
+model BumperConfig {
+  id        String   @id @default(cuid())
+  channelId String?  @unique
+  channel   Channel? @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  enabled Boolean      @default(false)
+  source  BumperSource @default(PLEX_PLAYLIST)
+
+  plexPlaylistKey   String?
+  plexCollectionKey String?
+  localDirPath      String? // server-readable dir of clips (served via a small static endpoint)
+
+  minPerBreak Int @default(1)
+  maxPerBreak Int @default(1) // clamp 1–5 in app logic
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("bumper_config")
+}

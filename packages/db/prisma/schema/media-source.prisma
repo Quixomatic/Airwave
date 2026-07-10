@@ -1,0 +1,30 @@
+enum MediaSourceType {
+  PLEX
+  JELLYFIN
+  EMBY
+}
+
+/// A connected media server (configured once by an admin, Overseerr-style).
+/// Holds the owner token used for metadata scraping + as the playback fallback
+/// for users who haven't linked their own account.
+model MediaSource {
+  id                String          @id @default(cuid())
+  type              MediaSourceType @default(PLEX)
+  name              String
+  baseUrl           String? // resolved/pinned connection URI
+  machineIdentifier String? // Plex server clientIdentifier
+  token             String // owner/admin token — encrypted at rest
+  enabled           Boolean         @default(true)
+  isDefault         Boolean         @default(false)
+
+  ownerUserId String?
+  owner       User?   @relation("MediaSourceOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  channels Channel[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerUserId])
+  @@map("media_source")
+}
