@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.0.15] - 2026-07-10
+
+### Fixed
+
+- Plex login redirected to `/post-login` on the auth-server origin (`:3000`) → 404. Now passes an absolute web-app `callbackURL` (like the Google/GitHub buttons already do), so it lands on the web app after sign-in.
+
 ## [0.0.14] - 2026-07-10
 
 ### Fixed

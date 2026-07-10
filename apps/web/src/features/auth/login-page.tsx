@@ -33,8 +33,8 @@ export function LoginPage() {
     try {
       await signIn.oauth2({
         providerId: "plex",
-        callbackURL: "/post-login",
-        errorCallbackURL: "/login",
+        callbackURL, // absolute web URL — better-auth redirects here after the callback
+        errorCallbackURL: `${window.location.origin}/login`,
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Plex sign-in failed");
