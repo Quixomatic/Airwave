@@ -2,6 +2,23 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.0.4] - 2026-07-10
+
+Ported BasicTimeTracker's authenticated app layout, de-workspaced to single-tenant.
+
+### What ships
+
+- Copied the base-lyra sidebar primitives verbatim into `packages/ui` (`sidebar`, `sheet`, `separator`, + the `use-mobile` hook; icons via `@phosphor-icons/react`).
+- `apps/web` layout: `app-layout` (SidebarProvider + collapsible icon sidebar + sticky header + content), `app-sidebar` with the ChannelGuide nav (Channels, Packages, Sources, Bumpers, Users, Settings), and a `user-menu` (initials/avatar, theme submenu, sign out) replacing BTT's workspace menu.
+- Portal-based `header-provider` (HeaderLeft/Center/Right slots) — no setState-slot loops.
+- Stub routes for each nav item; `_auth` renders the layout.
+- `/` now redirects into `/dashboard` (→ `/login` when unauthenticated) — fixes the scaffold's public home page not guarding.
+- Removed the scaffold's global header, home page, old user-menu, and mode-toggle.
+
+### Verification
+
+- `pnpm -F web build` and `check-types` pass.
+
 ## [0.0.3] - 2026-07-10
 
 Ported a de-workspaced login page in BasicTimeTracker's Card aesthetic.
