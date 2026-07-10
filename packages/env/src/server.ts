@@ -14,6 +14,12 @@ export const env = createEnv({
     // admin account on server startup.
     ADMIN_EMAIL: z.string().min(1).optional(),
     ADMIN_PASSWORD: z.string().min(1).optional(),
+
+    // Social OAuth — a provider is enabled only when both id + secret are set.
+    GOOGLE_CLIENT_ID: z.string().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().optional(),
+    GITHUB_CLIENT_ID: z.string().optional(),
+    GITHUB_CLIENT_SECRET: z.string().optional(),
   },
   runtimeEnv: process.env,
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,

@@ -7,6 +7,22 @@ import { admin, deviceAuthorization, magicLink } from "better-auth/plugins";
 export function createAuth() {
   const prisma = createPrismaClient();
 
+  // Social providers are enabled only when BOTH the id + secret are set
+  // (matches the BasicTimeTracker pattern). Add a provider = add an if-block.
+  const socialProviders: Record<string, { clientId: string; clientSecret: string }> = {};
+  if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
+    socialProviders.google = {
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
+    };
+  }
+  if (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
+    socialProviders.github = {
+      clientId: env.GITHUB_CLIENT_ID,
+      clientSecret: env.GITHUB_CLIENT_SECRET,
+    };
+  }
+
   return betterAuth({
     database: prismaAdapter(prisma, { provider: "postgresql" }),
 
@@ -21,11 +37,14 @@ export function createAuth() {
       requireEmailVerification: false,
     },
 
+    ...(Object.keys(socialProviders).length > 0 && { socialProviders }),
+
     account: {
-      // We store users' Plex tokens on their linked account row — encrypt at rest.
+      // We store users' OAuth/Plex tokens on their linked account row — encrypt.
       encryptOAuthTokens: true,
       accountLinking: {
         enabled: true,
+        trustedProviders: ["google", "github"],
       },
     },
 
@@ -44,9 +63,7 @@ export function createAuth() {
 
     plugins: [
       // Roles + user management. Built-in roles are "admin"/"user"; we treat
-      // "user" as Viewer for now. Custom access-control roles (a named "viewer"
-      // + granular permission statements) can be layered later with no schema
-      // change. See .docs/architecture.md §10.
+      // "user" as Viewer for now. See .docs/architecture.md §10.
       admin({
         defaultRole: "user",
         adminRoles: ["admin"],
@@ -60,9 +77,8 @@ export function createAuth() {
         interval: "5s",
       }),
 
-      // Passwordless email login. Optional in practice — real delivery needs
-      // SMTP/Resend configured; dev just logs the link.
-      // TODO(email): wire a real sender before relying on this in prod.
+      // Passwordless email login. Optional — real delivery needs SMTP/Resend;
+      // dev just logs the link. TODO(email): wire a real sender for prod.
       magicLink({
         expiresIn: 300,
         sendMagicLink: async ({ email, url }) => {
@@ -70,10 +86,9 @@ export function createAuth() {
         },
       }),
 
-      // TODO(plex): custom "Sign in with Plex" provider implementing the
-      // plex.tv/pins PIN flow (Overseerr-style) for admin + TV. Yields the
-      // user's Plex identity + token, stored as a linked account (providerId
-      // "plex"). Added in the Plex-connection step; see .docs/architecture.md §10.
+      // TODO(plex): web Plex sign-in via a custom redirect flow (create pin →
+      // app.plex.tv/auth?forwardUrl=... → callback fetches the token by pin id →
+      // create/link user + session). The PIN/poll variant is TV-only, separate.
     ],
   });
 }

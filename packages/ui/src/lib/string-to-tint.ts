@@ -45,7 +45,7 @@ export function stringToTint(seed: string | null | undefined): TintedIconTileTin
     hash |= 0; // force 32-bit int
   }
   const index = Math.abs(hash) % HASHABLE_TINTS.length;
-  return HASHABLE_TINTS[index];
+  return HASHABLE_TINTS[index] ?? "gray";
 }
 
 /**

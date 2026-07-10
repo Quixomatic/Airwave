@@ -13,6 +13,8 @@ import {
 } from "@ChannelGuide/ui/components/card";
 import { Input } from "@ChannelGuide/ui/components/input";
 
+import { GithubIcon } from "@/components/icons/github-icon";
+import { GoogleIcon } from "@/components/icons/google-icon";
 import { signIn } from "@/lib/auth-client";
 
 type Mode = "password" | "magic";
@@ -28,9 +30,17 @@ export function LoginPage() {
   const callbackURL = `${window.location.origin}/post-login`;
 
   const handlePlex = () => {
-    // TODO(plex): kick off the Plex PIN flow once the custom provider is wired
-    // (v0.0.6). For now this is a visible-but-inert primary CTA.
+    // TODO(plex): kick off the web Plex redirect flow once wired (v0.0.9). For
+    // now this is a visible-but-inert primary CTA.
     toast.info("Sign in with Plex is coming soon.");
+  };
+
+  const handleSocial = async (provider: "google" | "github") => {
+    try {
+      await signIn.social({ provider, callbackURL });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : `Failed to sign in with ${provider}`);
+    }
   };
 
   const handlePassword = async (e: React.FormEvent) => {
@@ -104,7 +114,7 @@ export function LoginPage() {
     );
   }
 
-  // ── Default: Plex + email sign-in ─────────────────────────────────
+  // ── Default: Plex / social + email sign-in ────────────────────────
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
@@ -125,6 +135,26 @@ export function LoginPage() {
             >
               <Tv className="mr-2 h-5 w-5" />
               Continue with Plex
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => handleSocial("google")}
+              disabled={loading}
+              className="w-full justify-start"
+            >
+              <GoogleIcon className="mr-2 h-5 w-5" />
+              Continue with Google
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => handleSocial("github")}
+              disabled={loading}
+              className="w-full justify-start"
+            >
+              <GithubIcon className="mr-2 h-5 w-5" />
+              Continue with GitHub
             </Button>
           </div>
 

@@ -2,6 +2,26 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.0.9] - 2026-07-10
+
+Google + GitHub OAuth (env-gated) on the login page.
+
+### What ships
+
+- `packages/auth`: env-gated social providers — Google and GitHub are enabled only when both `*_CLIENT_ID` + `*_CLIENT_SECRET` are set (BasicTimeTracker's conditional-enable pattern), with `account.accountLinking.trustedProviders`.
+- `packages/env`: added `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` (optional).
+- Login page: "Continue with Google" / "Continue with GitHub" buttons with inline brand-SVG icons (lucide 1.x dropped brand icons).
+- Fixed a strict-tsconfig error in the copied `string-to-tint` (`noUncheckedIndexedAccess`) so `packages/ui` typechecks cleanly.
+
+### Notes
+
+- Set a provider's `*_CLIENT_ID` / `*_CLIENT_SECRET` in `apps/server/.env` to enable its button. OAuth app callback URL: `http://localhost:3000/api/auth/callback/{google,github}`.
+- Plex web sign-in (redirect flow) and the TV PIN/device flow are separate, upcoming.
+
+### Verification
+
+- `pnpm check-types` (all packages) passes.
+
 ## [0.0.8] - 2026-07-10
 
 Authenticated layout now matches BasicTimeTracker's exactly.
