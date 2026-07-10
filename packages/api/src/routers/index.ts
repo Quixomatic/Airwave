@@ -1,4 +1,5 @@
 import { protectedProcedure, publicProcedure, router } from "../index";
+import { channelsRouter } from "./channels";
 import { plexRouter } from "./plex";
 import { sourcesRouter } from "./sources";
 import { usersRouter } from "./users";
@@ -13,6 +14,7 @@ export const appRouter = router({
       user: ctx.session.user,
     };
   }),
+  channels: channelsRouter,
   plex: plexRouter,
   sources: sourcesRouter,
   users: usersRouter,

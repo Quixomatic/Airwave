@@ -183,3 +183,61 @@ export async function getLibraries(baseUrl: string, token: string): Promise<Plex
     type: d.type,
   }));
 }
+
+export type PlexTag = { id: string; title: string };
+
+/** The genres available in a section (for building genre filters). */
+export async function getSectionGenres(
+  baseUrl: string,
+  token: string,
+  sectionKey: string,
+): Promise<PlexTag[]> {
+  const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/genre`, {
+    headers: pmsHeaders(token),
+  });
+  if (!res.ok) throw new Error(`Plex genres failed (${res.status})`);
+  const data = (await res.json()) as {
+    MediaContainer?: { Directory?: Array<{ key: string; title: string }> };
+  };
+  return (data.MediaContainer?.Directory ?? []).map((d) => ({ id: d.key, title: d.title }));
+}
+
+export type PlexItem = { ratingKey: string; title: string; durationMs: number };
+
+export type SectionQuery = {
+  type: 1 | 2 | 4; // 1=movie, 2=show, 4=episode
+  genreId?: string;
+  unwatched?: boolean;
+  sort?: string;
+  limit?: number;
+};
+
+/** Resolve a section's items against a filter — the channel candidate pool. */
+export async function getSectionItems(
+  baseUrl: string,
+  token: string,
+  sectionKey: string,
+  q: SectionQuery,
+): Promise<PlexItem[]> {
+  const params = new URLSearchParams({
+    type: String(q.type),
+    sort: q.sort ?? "titleSort",
+    "X-Plex-Container-Size": String(q.limit ?? 500),
+  });
+  if (q.genreId) params.set("genre", q.genreId);
+  if (q.unwatched) params.set("unwatched", "1");
+  const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/all?${params.toString()}`, {
+    headers: pmsHeaders(token),
+  });
+  if (!res.ok) throw new Error(`Plex items failed (${res.status})`);
+  const data = (await res.json()) as {
+    MediaContainer?: {
+      Metadata?: Array<{ ratingKey: string | number; title: string; duration?: number }>;
+    };
+  };
+  return (data.MediaContainer?.Metadata ?? []).map((m) => ({
+    ratingKey: String(m.ratingKey),
+    title: m.title,
+    durationMs: m.duration ?? 0,
+  }));
+}
