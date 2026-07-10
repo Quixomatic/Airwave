@@ -1,6 +1,7 @@
 import { createContext } from "@ChannelGuide/api/context";
 import { appRouter } from "@ChannelGuide/api/routers/index";
 import { auth } from "@ChannelGuide/auth";
+import { seedAdmin } from "@ChannelGuide/auth/lib/seed-admin";
 import { env } from "@ChannelGuide/env/server";
 import { trpcServer } from "@hono/trpc-server";
 import { Hono } from "hono";
@@ -35,5 +36,12 @@ app.use(
 app.get("/", (c) => {
   return c.text("OK");
 });
+
+// Bootstrap the first admin from env (idempotent; no-op if ADMIN_* unset).
+try {
+  await seedAdmin();
+} catch (err) {
+  console.error("Admin seeding failed:", err);
+}
 
 export default app;

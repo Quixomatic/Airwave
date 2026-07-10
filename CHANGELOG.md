@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.0.7] - 2026-07-10
+
+Env-based admin seeding (Overseerr-style).
+
+### What ships
+
+- On server startup, `seedAdmin()` (`packages/auth`) bootstraps the first admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD`: creates the account (password hashed via better-auth `signUpEmail`) and sets the `admin` role, then verifies email. Idempotent — promotes an existing account to admin, and is a no-op if the env vars are unset (e.g. a pure Plex/OAuth deployment).
+- Added `ADMIN_EMAIL` / `ADMIN_PASSWORD` to the server env schema; called from `apps/server` startup.
+
+### Verification
+
+- Server startup logs `✅ Seeded/Promoted <email> to admin`; the account signs in with email + password.
+
 ## [0.0.6] - 2026-07-10
 
 Fixed the admin UI to actually match BasicTimeTracker.
