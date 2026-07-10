@@ -17,6 +17,7 @@
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
     "dotenv": "catalog:",
+    "fast-xml-parser": "^4.5.0",
     "zod": "catalog:"
   },
   "devDependencies": {

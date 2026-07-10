@@ -1,7 +1,9 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
 import * as plex from "../services/plex/client";
+import { importPlexUsers } from "../services/plex/import-users";
 
 export const plexRouter = router({
   /** Current connected Plex server (no token), for the Settings page status. */
@@ -77,4 +79,19 @@ export const plexRouter = router({
         : await ctx.prisma.mediaSource.create({ data });
       return { id: source.id, name: source.name, baseUrl: source.baseUrl };
     }),
+
+  /** Import the connected server's shared users as Viewer accounts. */
+  importUsers: adminProcedure.mutation(async ({ ctx }) => {
+    const source = await ctx.prisma.mediaSource.findFirst({
+      where: { type: "PLEX" },
+      orderBy: { createdAt: "asc" },
+    });
+    if (!source) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "Connect a Plex server first.",
+      });
+    }
+    return importPlexUsers(ctx.prisma, source);
+  }),
 });

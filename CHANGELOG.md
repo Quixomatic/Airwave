@@ -2,6 +2,24 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.0.12] - 2026-07-10
+
+Import Plex Users (Overseerr-style).
+
+### What ships
+
+- **`getSharedUsers`** (Plex client) — reads the connected server's shared users via `plex.tv/api/users` (XML, filtered by the server's `machineIdentifier`) using `fast-xml-parser`.
+- **`plex.importUsers`** (admin) + the `importPlexUsers` service — creates a Viewer account for each shared Plex user (matched by email); idempotent (skips existing).
+- **`users.list`** procedure + **Users page** — lists ChannelGuide users with their roles and an **"Import Plex Users"** button.
+
+### Notes
+
+- Provisioned users have no password; they sign in via Plex/Google/GitHub (matched by email) or magic link. Plex login itself is next (v0.0.13).
+
+### Verification
+
+- `pnpm check-types` (all packages) passes. Needs live testing against your shared users.
+
 ## [0.0.11] - 2026-07-10
 
 ### Fixed

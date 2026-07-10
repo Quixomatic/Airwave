@@ -12,3 +12,5 @@ export function createPrismaClient() {
 
 const prisma = createPrismaClient();
 export default prisma;
+
+export type { PrismaClient };

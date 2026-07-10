@@ -4,6 +4,8 @@
  * `X-Plex-*` headers; the token, when present, authenticates as the user.
  */
 
+import { XMLParser } from "fast-xml-parser";
+
 const PLEX_TV = "https://plex.tv/api/v2";
 const PRODUCT = "ChannelGuide";
 const VERSION = "0.0.10";
@@ -103,4 +105,55 @@ export async function getServers(clientId: string, token: string): Promise<PlexS
       owned: r.owned,
       connections: r.connections ?? [],
     }));
+}
+
+export type PlexSharedUser = {
+  plexId: string;
+  email: string | null;
+  username: string;
+  thumb?: string;
+};
+
+const xml = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" });
+
+/**
+ * The users the owner has shared this specific server with. Uses the classic
+ * `plex.tv/api/users` XML endpoint (same as Overseerr/Tautulli): each <User> has
+ * nested <Server> elements listing the servers they can reach — filter by ours.
+ */
+export async function getSharedUsers(
+  clientId: string,
+  token: string,
+  machineIdentifier: string,
+): Promise<PlexSharedUser[]> {
+  const res = await fetch("https://plex.tv/api/users", {
+    headers: plexHeaders(clientId, token),
+  });
+  if (!res.ok) throw new Error(`Plex getUsers failed (${res.status})`);
+  const parsed = xml.parse(await res.text()) as {
+    MediaContainer?: { User?: unknown };
+  };
+  const raw = parsed.MediaContainer?.User;
+  const users = (Array.isArray(raw) ? raw : raw ? [raw] : []) as Array<{
+    id?: string;
+    email?: string;
+    username?: string;
+    title?: string;
+    thumb?: string;
+    Server?: unknown;
+  }>;
+
+  const hasAccess = (u: { Server?: unknown }) => {
+    const servers = (Array.isArray(u.Server) ? u.Server : u.Server ? [u.Server] : []) as Array<{
+      machineIdentifier?: string;
+    }>;
+    return servers.some((s) => s.machineIdentifier === machineIdentifier);
+  };
+
+  return users.filter(hasAccess).map((u) => ({
+    plexId: String(u.id ?? ""),
+    email: u.email ?? null,
+    username: u.username || u.title || u.email || "Plex user",
+    thumb: u.thumb,
+  }));
 }
