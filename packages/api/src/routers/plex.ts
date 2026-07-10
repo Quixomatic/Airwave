@@ -22,6 +22,16 @@ export const plexRouter = router({
     };
   }),
 
+  /** Libraries (sections) on the connected server — the basis for channels. */
+  libraries: adminProcedure.query(async ({ ctx }) => {
+    const source = await ctx.prisma.mediaSource.findFirst({
+      where: { type: "PLEX" },
+      orderBy: { createdAt: "asc" },
+    });
+    if (!source?.baseUrl) return [];
+    return plex.getLibraries(source.baseUrl, source.token);
+  }),
+
   /** Begin "Sign in with Plex": create a pin + the hosted auth URL. */
   createAuthPin: adminProcedure.mutation(async () => {
     const clientId = crypto.randomUUID();

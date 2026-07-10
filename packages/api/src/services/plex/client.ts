@@ -157,3 +157,29 @@ export async function getSharedUsers(
     thumb: u.thumb,
   }));
 }
+
+// ── Plex Media Server (the connected server itself, not plex.tv) ──────────
+
+function pmsHeaders(token: string): Record<string, string> {
+  return { Accept: "application/json", "X-Plex-Token": token };
+}
+
+export type PlexLibrary = {
+  key: string;
+  title: string;
+  type: string; // "movie" | "show" | "artist" | "photo" | …
+};
+
+/** The libraries (sections) on the connected server. */
+export async function getLibraries(baseUrl: string, token: string): Promise<PlexLibrary[]> {
+  const res = await fetch(`${baseUrl}/library/sections`, { headers: pmsHeaders(token) });
+  if (!res.ok) throw new Error(`Plex libraries failed (${res.status})`);
+  const data = (await res.json()) as {
+    MediaContainer?: { Directory?: Array<{ key: string; title: string; type: string }> };
+  };
+  return (data.MediaContainer?.Directory ?? []).map((d) => ({
+    key: d.key,
+    title: d.title,
+    type: d.type,
+  }));
+}

@@ -2,6 +2,20 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.1.0] - 2026-07-10
+
+Channel engine — foundation: Plex Media Server access.
+
+### What ships
+
+- **Plex PMS client** — `getLibraries(baseUrl, token)` queries the *connected server itself* (not just plex.tv) for its libraries (sections), confirming the ChannelGuide server can reach the PMS over the LAN.
+- **`plex.libraries`** tRPC procedure (admin) reads the connected `MediaSource` and returns its libraries.
+- **Sources page** lists the connected server's libraries under the connection status.
+
+### Verification
+
+- `pnpm check-types` (all packages) passes.
+
 ## [0.0.15] - 2026-07-10
 
 ### Fixed

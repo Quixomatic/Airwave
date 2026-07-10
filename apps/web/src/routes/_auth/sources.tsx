@@ -25,6 +25,7 @@ type PlexAuth = { clientId: string; token: string; email: string };
 
 function SourcesPage() {
   const currentSource = useQuery(trpc.plex.currentSource.queryOptions());
+  const libraries = useQuery(trpc.plex.libraries.queryOptions());
 
   const [connecting, setConnecting] = useState(false);
   const [auth, setAuth] = useState<PlexAuth | null>(null);
@@ -141,11 +142,20 @@ function SourcesPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           {currentSource.data && !auth && (
-            <div className="flex items-center gap-2 rounded-md border p-3 text-sm">
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              <span>
-                Connected to <strong>{currentSource.data.name}</strong> ({currentSource.data.baseUrl})
-              </span>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 rounded-md border p-3 text-sm">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                <span>
+                  Connected to <strong>{currentSource.data.name}</strong> (
+                  {currentSource.data.baseUrl})
+                </span>
+              </div>
+              {libraries.data && libraries.data.length > 0 && (
+                <p className="text-muted-foreground text-xs">
+                  <span className="font-medium">Libraries:</span>{" "}
+                  {libraries.data.map((l) => l.title).join(" · ")}
+                </p>
+              )}
             </div>
           )}
 
