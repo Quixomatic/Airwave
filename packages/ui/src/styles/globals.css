@@ -51,6 +51,9 @@
   --sidebar-accent-foreground: oklch(0.31 0 0);
   --sidebar-border: oklch(0.92 0 0);
   --sidebar-ring: oklch(0.705 0 0);
+  /* Tiled noise texture (Twenty parity) — applied to the sidebar wrapper so the
+     sidebar and the inset content card float over the same textured surface. */
+  --t-background-noisy: url("/textures/noisy-light.png");
 }
 
 .dark {
@@ -85,6 +88,7 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.552 0.016 285.938);
+  --t-background-noisy: url("/textures/noisy-dark.jpg");
 }
 
 @theme inline {
@@ -158,4 +162,10 @@
   html {
     @apply font-sans;
   }
+}
+
+/* Twenty CRM's tiled noise texture, exposed as a Tailwind utility so it
+   composes with other bg-* classes. Used by the SidebarProvider wrapper. */
+@utility bg-noisy {
+  background-image: var(--t-background-noisy);
 }
