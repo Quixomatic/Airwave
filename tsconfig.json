@@ -1,0 +1,3 @@
+{
+  "extends": "@ChannelGuide/config/tsconfig.base.json"
+}

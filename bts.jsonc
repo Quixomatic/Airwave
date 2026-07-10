@@ -1,0 +1,31 @@
+// Better-T-Stack
+//
+// Website: https://www.better-t-stack.dev/
+// Stack Builder: https://www.better-t-stack.dev/new
+// Analytics: https://www.better-t-stack.dev/analytics
+// Showcase: https://www.better-t-stack.dev/showcase
+// Sponsor: https://github.com/sponsors/AmanVarshney01
+//
+// Add new addons with: pnpm dlx create-better-t-stack add
+// This file is safe to delete
+
+{
+  "$schema": "https://r2.better-t-stack.dev/schema.json",
+  "version": "3.36.3",
+  "createdAt": "2026-07-10T14:50:31.600Z",
+  "reproducibleCommand": "pnpm create better-t-stack@latest . --frontend tanstack-router --backend hono --runtime bun --database postgres --orm prisma --api trpc --auth better-auth --payments none --addons turborepo --examples none --db-setup none --web-deploy none --server-deploy none --git --package-manager pnpm --install",
+  "database": "postgres",
+  "orm": "prisma",
+  "backend": "hono",
+  "runtime": "bun",
+  "frontend": ["tanstack-router"],
+  "addons": ["turborepo"],
+  "examples": [],
+  "auth": "better-auth",
+  "payments": "none",
+  "packageManager": "pnpm",
+  "dbSetup": "none",
+  "api": "trpc",
+  "webDeploy": "none",
+  "serverDeploy": "none",
+}

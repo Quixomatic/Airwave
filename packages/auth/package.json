@@ -1,0 +1,24 @@
+{
+  "name": "@ChannelGuide/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@ChannelGuide/db": "workspace:*",
+    "@ChannelGuide/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@ChannelGuide/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

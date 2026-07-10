@@ -1,0 +1,33 @@
+{
+  "name": "@ChannelGuide/db",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "postinstall": "prisma generate",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@ChannelGuide/env": "workspace:*",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "dotenv": "catalog:",
+    "pg": "^8.22.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@ChannelGuide/config": "workspace:*",
+    "@types/pg": "^8.20.0",
+    "prisma": "^7.8.0",
+    "typescript": "catalog:"
+  }
+}

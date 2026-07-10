@@ -1,0 +1,32 @@
+{
+  "name": "ChannelGuide",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "check-types": "turbo run check-types",
+    "dev:web": "turbo run dev -F web",
+    "dev:server": "turbo run dev -F server",
+    "db:push": "turbo run db:push -F @ChannelGuide/db",
+    "db:studio": "turbo run db:studio -F @ChannelGuide/db",
+    "db:generate": "turbo run db:generate -F @ChannelGuide/db",
+    "db:migrate": "turbo run db:migrate -F @ChannelGuide/db"
+  },
+  "dependencies": {
+    "@ChannelGuide/env": "workspace:*",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@ChannelGuide/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "turbo": "^2.10.2",
+    "typescript": "catalog:"
+  },
+  "packageManager": "pnpm@10.11.0"
+}
