@@ -45,7 +45,9 @@ function SourcesPage() {
     if (conn) {
       setHost(conn.address);
       setPort(String(conn.port));
-      setSsl(conn.protocol === "https");
+      // Default SSL OFF (Overseerr behavior). Plex reports local connections as
+      // https via *.plex.direct certs, but a raw-IP LAN connection is plain http.
+      setSsl(false);
     }
   };
 

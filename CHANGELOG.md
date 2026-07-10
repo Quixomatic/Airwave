@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.0.11] - 2026-07-10
+
+### Fixed
+
+- Sources: "Use SSL" no longer defaults on when a Plex server is selected. Plex reports local connections as `https` via its `*.plex.direct` certs, but a raw-IP LAN connection is plain http — so SSL now defaults off (Overseerr behavior); toggle it on if your server needs it.
+
 ## [0.0.10] - 2026-07-10
 
 Admin Plex media-server connection (Overseerr-style).
