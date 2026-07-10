@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.0.14] - 2026-07-10
+
+### Fixed
+
+- Plex login: added the `tokenUrl` + `userInfoUrl` that genericOAuth's config validation requires (both overridden at runtime by `getToken` / `getUserInfo`). Fixes the `INVALID_OAUTH_CONFIGURATION` (400) when clicking "Continue with Plex".
+
 ## [0.0.13] - 2026-07-10
 
 Plex login (web) + all OAuth login-only.

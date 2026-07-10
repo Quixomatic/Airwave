@@ -108,6 +108,10 @@ export function createAuth() {
             clientId: PLEX_CLIENT_ID,
             clientSecret: "unused", // Plex issues no client secret
             authorizationUrl: `${env.BETTER_AUTH_URL}/api/plex/authorize`,
+            // Required by genericOAuth's config validation, but both are overridden
+            // at runtime by getToken / getUserInfo below (Plex isn't standard OAuth2).
+            tokenUrl: "https://plex.tv/api/v2/pins",
+            userInfoUrl: "https://plex.tv/api/v2/user",
             pkce: false,
             disableSignUp: true, // login-only — provisioning is via Import Plex Users
             getToken: async ({ code }) => {
