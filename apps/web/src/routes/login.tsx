@@ -1,19 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import SignInForm from "@/components/sign-in-form";
-import SignUpForm from "@/components/sign-up-form";
+import { LoginPage } from "@/features/auth/login-page";
+import { authClient } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/login")({
-  component: RouteComponent,
+  beforeLoad: async () => {
+    const session = await authClient.getSession();
+    if (session?.data?.user) {
+      throw redirect({ to: "/dashboard" });
+    }
+  },
+  component: LoginPage,
 });
-
-function RouteComponent() {
-  const [showSignIn, setShowSignIn] = useState(false);
-
-  return showSignIn ? (
-    <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
-  ) : (
-    <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
-  );
-}

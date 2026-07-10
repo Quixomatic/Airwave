@@ -2,6 +2,21 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.0.3] - 2026-07-10
+
+Ported a de-workspaced login page in BasicTimeTracker's Card aesthetic.
+
+### What ships
+
+- `apps/web/src/features/auth/login-page.tsx`: centered Card login with a primary "Sign in with Plex" CTA (placeholder — wired in v0.0.5), email/password sign-in + sign-up, and a magic-link option with a "check your email" confirmation. Redirects to `/dashboard` on success — no workspace/org coupling.
+- `apps/web/src/lib/auth-client.ts`: single-surface better-auth client with the `admin`, `deviceAuthorization`, and `magicLink` client plugins; re-exports `signIn` / `signUp` / `signOut` / `useSession` / `getSession`.
+- `/login` redirects already-authenticated users to `/dashboard`.
+- Removed the scaffold's `sign-in-form` / `sign-up-form` (superseded).
+
+### Verification
+
+- `pnpm -F web build` succeeds.
+
 ## [0.0.2] - 2026-07-10
 
 Ported BasicTimeTracker's design system into the admin UI (`apps/web` / `packages/ui`).

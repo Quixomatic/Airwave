@@ -1,4 +1,9 @@
 import { env } from "@ChannelGuide/env/web";
+import {
+  adminClient,
+  deviceAuthorizationClient,
+  magicLinkClient,
+} from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
 function getServerUrl(url: string) {
@@ -28,8 +33,14 @@ function getServerUrl(url: string) {
 
   return `http://localhost:3000${normalized}`;
 }
+
+// Single source of truth for the better-auth React client. Components import
+// `signIn`/`useSession`/etc. from here, never from `better-auth/react` directly.
 export const authClient = createAuthClient({
   // better-auth derives its route-matching base from this URL's path, so the
-  // public auth path must equal the server-side mount (/api/auth everywhere)
+  // public auth path must equal the server-side mount (/api/auth everywhere).
   baseURL: new URL("/api/auth", getServerUrl(env.VITE_SERVER_URL)).toString(),
+  plugins: [adminClient(), deviceAuthorizationClient(), magicLinkClient()],
 });
+
+export const { signIn, signUp, signOut, useSession, getSession } = authClient;
