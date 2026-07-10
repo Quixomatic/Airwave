@@ -1,0 +1,19 @@
+import { Clapperboard, LayoutGrid, Server, Settings, Tv, Users } from "lucide-react";
+
+import type { SidebarData } from "./types";
+
+export const sidebarData: SidebarData = {
+  navGroups: [
+    {
+      title: "Manage",
+      items: [
+        { title: "Channels", url: "/channels", icon: Tv, iconTint: "indigo" },
+        { title: "Packages", url: "/packages", icon: LayoutGrid, iconTint: "violet" },
+        { title: "Sources", url: "/sources", icon: Server, iconTint: "sky" },
+        { title: "Bumpers", url: "/bumpers", icon: Clapperboard, iconTint: "amber" },
+        { title: "Users", url: "/users", icon: Users, iconTint: "emerald" },
+        { title: "Settings", url: "/settings", icon: Settings, iconTint: "rose" },
+      ],
+    },
+  ],
+};

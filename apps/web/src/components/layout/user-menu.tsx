@@ -16,11 +16,12 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@ChannelGuide/ui/components/sidebar";
-import { Skeleton } from "@ChannelGuide/ui/components/skeleton";
+import { tintClassesForSeed } from "@ChannelGuide/ui/lib/string-to-tint";
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronsUpDown, LogOut, Monitor, Moon, Sun } from "lucide-react";
+import { ChevronsUpDown, LogOut, Monitor, Moon, Sun, User } from "lucide-react";
 
 import { useTheme } from "@/components/theme-provider";
+import { cn } from "@/lib/utils";
 import { authClient, useSession } from "@/lib/auth-client";
 
 function getInitials(value: string): string {
@@ -30,9 +31,9 @@ function getInitials(value: string): string {
 }
 
 export function UserMenu() {
-  const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const { data: session, isPending } = useSession();
+  const navigate = useNavigate();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
 
@@ -46,10 +47,11 @@ export function UserMenu() {
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton size="lg" disabled>
-            <Skeleton className="size-7 rounded-md" />
-            <div className="grid flex-1 gap-1 group-data-[collapsible=icon]:hidden">
-              <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-2.5 w-32" />
+            <div className="bg-muted flex aspect-square size-7 items-center justify-center rounded-md border">
+              <User className="size-4" />
+            </div>
+            <div className="grid flex-1 text-start text-sm leading-tight">
+              <span className="truncate font-semibold">Loading…</span>
             </div>
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -58,7 +60,7 @@ export function UserMenu() {
   }
 
   const user = session.user;
-  const label = user.name || user.email;
+  const displayName = user.name || user.email;
 
   return (
     <SidebarMenu>
@@ -68,37 +70,45 @@ export function UserMenu() {
             render={
               <SidebarMenuButton
                 size="lg"
-                tooltip={label}
-                className="h-12 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                tooltip={displayName}
+                className="h-10 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               />
             }
           >
-            <div className="bg-primary/10 flex aspect-square size-8 items-center justify-center overflow-hidden rounded-md border">
+            <div
+              className={cn(
+                "flex aspect-square size-7 items-center justify-center overflow-hidden rounded-md border",
+                user.image ? "bg-background" : tintClassesForSeed(user.id),
+              )}
+            >
               {user.image ? (
-                <img src={user.image} alt={label} className="size-8 object-cover" />
+                <img src={user.image} alt={displayName} className="size-7 object-cover" />
               ) : (
-                <span className="text-xs font-semibold">{getInitials(label)}</span>
+                <span className="text-xs font-semibold">{getInitials(displayName)}</span>
               )}
             </div>
             {!isCollapsed && (
               <>
-                <div className="grid flex-1 text-start leading-tight">
-                  <span className="truncate text-sm font-medium">{user.name || "Account"}</span>
-                  <span className="text-muted-foreground truncate text-xs">{user.email}</span>
-                </div>
-                <ChevronsUpDown className="ms-auto size-4" />
+                <span className="flex-1 truncate text-start text-sm font-semibold">
+                  {user.name || "Account"}
+                </span>
+                <ChevronsUpDown className="ms-auto" />
               </>
             )}
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent className="w-60" align="start" side="right">
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col gap-0.5">
-                <p className="text-sm font-medium">{user.name || "Account"}</p>
-                <p className="text-muted-foreground text-xs">{user.email}</p>
-              </div>
-            </DropdownMenuLabel>
+          <DropdownMenuContent className="w-64" align="start">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm font-medium">{user.name || "Account"}</p>
+                  <p className="text-muted-foreground text-xs">{user.email}</p>
+                </div>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
+
             <DropdownMenuSeparator />
+
             <DropdownMenuGroup>
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
@@ -124,11 +134,15 @@ export function UserMenu() {
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
             </DropdownMenuGroup>
+
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleSignOut}>
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Sign out</span>
-            </DropdownMenuItem>
+
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={handleSignOut}>
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Sign Out</span>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
