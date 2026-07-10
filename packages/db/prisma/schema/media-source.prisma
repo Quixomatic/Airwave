@@ -14,6 +14,8 @@ model MediaSource {
   baseUrl           String? // resolved/pinned connection URI
   machineIdentifier String? // Plex server clientIdentifier
   token             String // owner/admin token — encrypted at rest
+  clientIdentifier  String? // the X-Plex-Client-Identifier used to obtain the token
+  webAppUrl         String? // optional Plex web-app URL override
   enabled           Boolean         @default(true)
   isDefault         Boolean         @default(false)
 

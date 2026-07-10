@@ -23,3 +23,14 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
     },
   });
 });
+
+export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
+  const role = (ctx.session.user as { role?: string | null }).role ?? null;
+  if (role !== "admin") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Admin access required",
+    });
+  }
+  return next({ ctx });
+});

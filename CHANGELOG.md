@@ -2,6 +2,26 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.0.10] - 2026-07-10
+
+Admin Plex media-server connection (Overseerr-style).
+
+### What ships
+
+- **Plex API client** (`packages/api/src/services/plex/client.ts`): the "Sign in with Plex" handshake — `createPin` → hosted auth URL → `getPinToken` (poll) → `getPlexUser` (email) → `getServers` (owned + shared).
+- **Plex tRPC router** (admin-only): `createAuthPin`, `checkAuthPin`, `listServers`, `saveConnection`, `currentSource` — thin procedures over the service. Added `adminProcedure` (role check) and `prisma` on the tRPC context.
+- **Sources page** matching Overseerr: Sign in with Plex (popup) → **Load available servers** dropdown → **Hostname/IP · Port · Use SSL · Web App URL** → Save.
+- Persists the chosen server as the owner **`MediaSource`** (added `clientIdentifier` + `webAppUrl` fields).
+
+### Notes
+
+- The admin's Plex token currently transits the browser during connect (self-hosted single-admin); harden to server-side later.
+- "Import Plex Users" (provisioning) + Plex login are separate upcoming tasks.
+
+### Verification
+
+- `pnpm check-types` (all packages) passes. Needs live testing against a real Plex server.
+
 ## [0.0.9] - 2026-07-10
 
 Google + GitHub OAuth (env-gated) on the login page.
