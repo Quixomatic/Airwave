@@ -20,6 +20,9 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     GITHUB_CLIENT_ID: z.string().optional(),
     GITHUB_CLIENT_SECRET: z.string().optional(),
+
+    // Stable X-Plex-Client-Identifier for the Plex login handshake.
+    PLEX_CLIENT_IDENTIFIER: z.string().optional(),
   },
   runtimeEnv: process.env,
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,

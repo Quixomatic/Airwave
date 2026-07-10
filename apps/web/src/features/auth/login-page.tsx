@@ -29,10 +29,16 @@ export function LoginPage() {
 
   const callbackURL = `${window.location.origin}/post-login`;
 
-  const handlePlex = () => {
-    // TODO(plex): kick off the web Plex redirect flow once wired (v0.0.9). For
-    // now this is a visible-but-inert primary CTA.
-    toast.info("Sign in with Plex is coming soon.");
+  const handlePlex = async () => {
+    try {
+      await signIn.oauth2({
+        providerId: "plex",
+        callbackURL: "/post-login",
+        errorCallbackURL: "/login",
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Plex sign-in failed");
+    }
   };
 
   const handleSocial = async (provider: "google" | "github") => {

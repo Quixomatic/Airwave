@@ -1,6 +1,8 @@
 import { createContext } from "@ChannelGuide/api/context";
 import { appRouter } from "@ChannelGuide/api/routers/index";
+import { buildAuthUrl, createPin } from "@ChannelGuide/api/services/plex/client";
 import { auth } from "@ChannelGuide/auth";
+import { PLEX_CLIENT_ID } from "@ChannelGuide/auth/lib/plex-login";
 import { seedAdmin } from "@ChannelGuide/auth/lib/seed-admin";
 import { env } from "@ChannelGuide/env/server";
 import { trpcServer } from "@hono/trpc-server";
@@ -22,6 +24,21 @@ app.use(
 );
 
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+
+// Plex login authorize-proxy. better-auth's genericOAuth "plex" provider points
+// its authorizationUrl here (with better-auth's redirect_uri + state). We create a
+// pin, then bounce to Plex, setting forwardUrl back to better-auth's callback with
+// the pin id smuggled in as `code` so getToken can retrieve the token.
+app.get("/api/plex/authorize", async (c) => {
+  const redirectUri = c.req.query("redirect_uri");
+  const state = c.req.query("state");
+  if (!redirectUri || !state) {
+    return c.text("Missing redirect_uri or state", 400);
+  }
+  const { id: pinId, code } = await createPin(PLEX_CLIENT_ID);
+  const forwardUrl = `${redirectUri}?code=${pinId}&state=${encodeURIComponent(state)}`;
+  return c.redirect(buildAuthUrl(PLEX_CLIENT_ID, code, forwardUrl));
+});
 
 app.use(
   "/trpc/*",

@@ -2,6 +2,24 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.0.13] - 2026-07-10
+
+Plex login (web) + all OAuth login-only.
+
+### What ships
+
+- **"Continue with Plex" now works** via better-auth's `genericOAuth` `plex` provider. Plex has no static authorize URL or callback `code`, so its `authorizationUrl` points at a new **`GET /api/plex/authorize`** proxy that creates a pin and bounces to `app.plex.tv/auth`, smuggling the pin id back as the OAuth `code`. `getToken` then fetches the real Plex token by pin id and `getUserInfo` reads the Plex account email — better-auth handles the session, email-linking, and login-only enforcement.
+- **`disableSignUp: true`** on Google + GitHub (and Plex): all OAuth is login-only — it links to an existing account by email and never creates one.
+- Stable `X-Plex-Client-Identifier` (env `PLEX_CLIENT_IDENTIFIER`); `genericOAuthClient` added to the auth client; `signIn.oauth2({ providerId: "plex" })` wired to the button.
+
+### Notes
+
+- Sign-in only succeeds for an existing account (admin-seeded or Import Plex Users) whose email matches the provider's.
+
+### Verification
+
+- `pnpm check-types` (all packages) passes. Needs live testing of the Plex login round-trip.
+
 ## [0.0.12] - 2026-07-10
 
 Import Plex Users (Overseerr-style).

@@ -2,24 +2,34 @@ import { createPrismaClient } from "@ChannelGuide/db";
 import { env } from "@ChannelGuide/env/server";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { admin, deviceAuthorization, magicLink } from "better-auth/plugins";
+import { admin, deviceAuthorization, genericOAuth, magicLink } from "better-auth/plugins";
+
+import { PLEX_CLIENT_ID, getPinToken, getPlexAccount } from "./lib/plex-login";
 
 export function createAuth() {
   const prisma = createPrismaClient();
 
   // Social providers are enabled only when BOTH the id + secret are set
   // (matches the BasicTimeTracker pattern). Add a provider = add an if-block.
-  const socialProviders: Record<string, { clientId: string; clientSecret: string }> = {};
+  // `disableSignUp: true` = login-only. A social sign-in only works if an
+  // account with that email already exists (via `accountLinking`); it never
+  // creates one. Provisioning happens via "Import Plex Users".
+  const socialProviders: Record<
+    string,
+    { clientId: string; clientSecret: string; disableSignUp: boolean }
+  > = {};
   if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
     socialProviders.google = {
       clientId: env.GOOGLE_CLIENT_ID,
       clientSecret: env.GOOGLE_CLIENT_SECRET,
+      disableSignUp: true,
     };
   }
   if (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
     socialProviders.github = {
       clientId: env.GITHUB_CLIENT_ID,
       clientSecret: env.GITHUB_CLIENT_SECRET,
+      disableSignUp: true,
     };
   }
 
@@ -86,9 +96,38 @@ export function createAuth() {
         },
       }),
 
-      // TODO(plex): web Plex sign-in via a custom redirect flow (create pin →
-      // app.plex.tv/auth?forwardUrl=... → callback fetches the token by pin id →
-      // create/link user + session). The PIN/poll variant is TV-only, separate.
+      // Web "Sign in with Plex". genericOAuth drives the standard OAuth machinery
+      // (session, email-linking, login-only); the `plex` provider's authorizationUrl
+      // points at our /api/plex/authorize proxy, which creates a pin and bounces to
+      // Plex, smuggling the pin id back as the `code`. getToken then fetches the real
+      // Plex token by that pin id; getUserInfo reads the Plex account (email).
+      genericOAuth({
+        config: [
+          {
+            providerId: "plex",
+            clientId: PLEX_CLIENT_ID,
+            clientSecret: "unused", // Plex issues no client secret
+            authorizationUrl: `${env.BETTER_AUTH_URL}/api/plex/authorize`,
+            pkce: false,
+            disableSignUp: true, // login-only — provisioning is via Import Plex Users
+            getToken: async ({ code }) => {
+              const token = await getPinToken(Number(code));
+              if (!token) throw new Error("Plex authorization was not completed.");
+              return { accessToken: token };
+            },
+            getUserInfo: async (tokens) => {
+              const account = await getPlexAccount(tokens.accessToken as string);
+              return {
+                id: String(account.id),
+                email: account.email,
+                name: account.username,
+                image: account.thumb ?? undefined,
+                emailVerified: true,
+              };
+            },
+          },
+        ],
+      }),
     ],
   });
 }
