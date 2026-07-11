@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.1.4] - 2026-07-10
+
+### Fixed
+
+- Filter builder: capped grouping at **one level** to match Plex's actual filter UI — the top level ("Match all / any") holds conditions + groups, but a group holds conditions only (no groups-within-groups). The resolver still handles arbitrary depth; this only constrains the builder UI.
+
 ## [0.1.3] - 2026-07-10
 
 Channel filters — true Plex-parity predicate builder (nested AND/OR).

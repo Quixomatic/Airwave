@@ -151,13 +151,15 @@ function GroupEditor({
         >
           <Plus className="mr-1 h-3.5 w-3.5" /> Condition
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onChange({ ...group, children: [...group.children, emptyGroup()] })}
-        >
-          <Plus className="mr-1 h-3.5 w-3.5" /> Group
-        </Button>
+        {isRoot && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onChange({ ...group, children: [...group.children, emptyGroup()] })}
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" /> Group
+          </Button>
+        )}
       </div>
     </div>
   );
