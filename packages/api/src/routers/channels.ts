@@ -5,6 +5,11 @@ import { adminProcedure, router } from "../index";
 import { getFilterValues } from "../services/plex/client";
 import { FILTER_FIELDS, OPS_FOR_KIND, fieldMeta } from "../services/plex/filter-fields";
 import { resolveChannel } from "../services/plex/resolve";
+import {
+  generateChannelSchedule,
+  getChannelTimeline,
+  getNowNext,
+} from "../services/schedule/generate";
 
 const orderingEnum = z.enum(["SHUFFLE", "IN_ORDER", "BY_AIR_DATE"]);
 const mediaTypeEnum = z.enum(["movie", "show"]);
@@ -181,6 +186,37 @@ export const channelsRouter = router({
   resolve: adminProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
     const items = await resolveChannel(ctx.prisma, input.id);
     return { count: items.length, sample: items.slice(0, 8).map((i) => i.title) };
+  }),
+
+  /** (Re)materialize the channel's schedule timeline over a rolling horizon. */
+  generateSchedule: adminProcedure
+    .input(z.object({ id: z.string(), horizonHours: z.number().int().min(1).max(720).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const result = await generateChannelSchedule(ctx.prisma, input.id, {
+        horizonSeconds: input.horizonHours ? input.horizonHours * 3600 : undefined,
+      });
+      return result;
+    }),
+
+  /** The materialized timeline over a window (default: next 24h) for the guide grid. */
+  schedule: adminProcedure
+    .input(z.object({ id: z.string(), hours: z.number().int().min(1).max(720).default(24) }))
+    .query(async ({ ctx, input }) => {
+      const from = new Date();
+      const to = new Date(from.getTime() + input.hours * 3600 * 1000);
+      const rows = await getChannelTimeline(ctx.prisma, input.id, from, to);
+      return rows.map((r) => ({
+        id: r.id,
+        startsAt: r.startsAt,
+        durationSeconds: r.durationSeconds,
+        ratingKey: r.ratingKey,
+        title: (r.guideData as { title?: string } | null)?.title ?? "",
+      }));
+    }),
+
+  /** "What's on now" (+ live offset) and what's next, from the materialized timeline. */
+  nowNext: adminProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
+    return getNowNext(ctx.prisma, input.id);
   }),
 
   remove: adminProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {

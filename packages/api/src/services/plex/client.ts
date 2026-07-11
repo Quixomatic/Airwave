@@ -202,7 +202,31 @@ export async function getSectionGenres(
   return (data.MediaContainer?.Directory ?? []).map((d) => ({ id: d.key, title: d.title }));
 }
 
-export type PlexItem = { ratingKey: string; title: string; durationMs: number };
+export type PlexItem = {
+  ratingKey: string;
+  title: string;
+  durationMs: number;
+  year?: number;
+  originallyAvailableAt?: string;
+};
+
+type PlexMetadata = {
+  ratingKey: string | number;
+  title: string;
+  duration?: number;
+  year?: number;
+  originallyAvailableAt?: string;
+};
+
+function toPlexItem(m: PlexMetadata): PlexItem {
+  return {
+    ratingKey: String(m.ratingKey),
+    title: m.title,
+    durationMs: m.duration ?? 0,
+    year: m.year,
+    originallyAvailableAt: m.originallyAvailableAt,
+  };
+}
 
 export type SectionQuery = {
   type: 1 | 2 | 4; // 1=movie, 2=show, 4=episode
@@ -232,14 +256,10 @@ export async function getSectionItems(
   if (!res.ok) throw new Error(`Plex items failed (${res.status})`);
   const data = (await res.json()) as {
     MediaContainer?: {
-      Metadata?: Array<{ ratingKey: string | number; title: string; duration?: number }>;
+      Metadata?: Array<PlexMetadata>;
     };
   };
-  return (data.MediaContainer?.Metadata ?? []).map((m) => ({
-    ratingKey: String(m.ratingKey),
-    title: m.title,
-    durationMs: m.duration ?? 0,
-  }));
+  return (data.MediaContainer?.Metadata ?? []).map(toPlexItem);
 }
 
 /**
@@ -267,14 +287,10 @@ export async function getSectionItemsRaw(
   if (!res.ok) throw new Error(`Plex filtered query failed (${res.status})`);
   const data = (await res.json()) as {
     MediaContainer?: {
-      Metadata?: Array<{ ratingKey: string | number; title: string; duration?: number }>;
+      Metadata?: Array<PlexMetadata>;
     };
   };
-  return (data.MediaContainer?.Metadata ?? []).map((m) => ({
-    ratingKey: String(m.ratingKey),
-    title: m.title,
-    durationMs: m.duration ?? 0,
-  }));
+  return (data.MediaContainer?.Metadata ?? []).map(toPlexItem);
 }
 
 /** Available values for a tag filter field (genre/studio/director/actor/…). */

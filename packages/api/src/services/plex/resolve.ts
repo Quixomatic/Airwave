@@ -94,12 +94,11 @@ export async function resolveChannel(
   const libs = await prisma.mediaLibrary.findMany({
     where: { mediaSourceId: source.id, enabled: true, type: { in: mediaTypes } },
   });
-  const sort =
-    channel.ordering === "SHUFFLE"
-      ? "random"
-      : channel.ordering === "BY_AIR_DATE"
-        ? "originallyAvailableAt"
-        : "titleSort";
+  // Stable sort only — the schedule engine owns deterministic ordering (seeded
+  // shuffle / by-air-date). A stable Plex sort also keeps the candidate pool
+  // deterministic under the query size cap (a `random` sort would return a
+  // different subset each call).
+  const sort = channel.ordering === "BY_AIR_DATE" ? "originallyAvailableAt" : "titleSort";
 
   const out = new Map<string, PlexItem>();
   for (const lib of libs) {
