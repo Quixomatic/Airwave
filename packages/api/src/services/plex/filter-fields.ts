@@ -111,6 +111,32 @@ export const FILTER_FIELDS: FieldMeta[] = [
   { field: "inProgress", label: "In progress", kind: "bool", plex: "inProgress", tvScope: "episode" },
   { field: "hdr", label: "HDR", kind: "bool", plex: "hdr", tvScope: "episode" },
   { field: "dovi", label: "Dolby Vision", kind: "bool", plex: "dovi", tvScope: "episode" },
+  // Personal / playback state
+  { field: "userRating", label: "Personal rating (0–10)", kind: "int", plex: "userRating" },
+  { field: "viewCount", label: "Play count", kind: "int", plex: "viewCount" },
+  { field: "lastViewedAt", label: "Last watched (date)", kind: "date", plex: "lastViewedAt" },
+  {
+    field: "unwatchedLeaves",
+    label: "Has unwatched episodes",
+    kind: "bool",
+    plex: "unwatchedLeaves",
+    appliesTo: ["show"],
+  },
+  {
+    field: "episodeYear",
+    label: "Episode year",
+    kind: "int",
+    plex: "year",
+    tvScope: "episode",
+    appliesTo: ["show"],
+  },
+  { field: "contentRatingAge", label: "Common Sense age", kind: "int", plex: "contentRatingAge" },
+  { field: "editionTitle", label: "Edition", kind: "tag", plex: "editionTitle", tagId: true },
+  { field: "location", label: "Folder location", kind: "tag", plex: "location", tagId: true, tvScope: "episode" },
+  // Library maintenance
+  { field: "unmatched", label: "Unmatched", kind: "bool", plex: "unmatched" },
+  { field: "duplicate", label: "Duplicate", kind: "bool", plex: "duplicate", tvScope: "episode" },
+  { field: "trash", label: "In trash", kind: "bool", plex: "trash", tvScope: "episode" },
 ];
 
 export const OPS_FOR_KIND: Record<FieldKind, FilterOp[]> = {

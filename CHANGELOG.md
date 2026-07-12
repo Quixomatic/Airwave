@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.1.17] - 2026-07-12
+
+Complete filter parity — every field Plex exposes in advanced filtering is now available.
+
+### Added
+
+- The remaining Plex advanced-filter fields, for completeness: **Personal rating**, **Play count**, **Last watched**, **Common Sense age**, **Edition**, **Folder location**, **Has unwatched episodes** (`unwatchedLeaves`, TV), **Episode year**, and the maintenance flags **Unmatched / Duplicate / In trash**. Each carries its level (`show.`/`episode.`) and applicable media types like the rest.
+
+### Verification
+
+- `pnpm check-types` passes.
+
 ## [0.1.16] - 2026-07-12
 
 Filter catalog expanded to Plex parity (was a hardcoded subset).
