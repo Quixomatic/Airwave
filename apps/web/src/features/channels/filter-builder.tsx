@@ -5,7 +5,7 @@ import { Plus, X } from "lucide-react";
 
 import { trpc } from "@/utils/trpc";
 
-export type FilterOp = "is" | "isNot" | "gte" | "lte";
+export type FilterOp = "is" | "isNot" | "gte" | "lte" | "contains" | "notContains";
 export type FilterCondition = {
   type: "condition";
   id: string;
@@ -31,7 +31,14 @@ export const emptyGroup = (): FilterGroup => ({
   children: [],
 });
 
-const OP_LABEL: Record<FilterOp, string> = { is: "is", isNot: "is not", gte: "≥", lte: "≤" };
+const OP_LABEL: Record<FilterOp, string> = {
+  is: "is",
+  isNot: "is not",
+  gte: "≥",
+  lte: "≤",
+  contains: "contains",
+  notContains: "does not contain",
+};
 const SELECT =
   "border-input bg-background h-8 rounded-md border px-2 text-sm";
 

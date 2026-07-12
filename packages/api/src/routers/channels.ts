@@ -14,7 +14,7 @@ import {
 
 const orderingEnum = z.enum(["SHUFFLE", "IN_ORDER", "BY_AIR_DATE"]);
 const mediaTypeEnum = z.enum(["movie", "show"]);
-const opEnum = z.enum(["is", "isNot", "gte", "lte"]);
+const opEnum = z.enum(["is", "isNot", "gte", "lte", "contains", "notContains"]);
 
 const conditionSchema = z.object({
   type: z.literal("condition"),

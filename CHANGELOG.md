@@ -2,6 +2,25 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.1.15] - 2026-07-12
+
+**Fix TV filtering** (it was silently resolving to zero) + richer filter primitives.
+
+### Fixed
+
+- **TV filters now work.** Genre (and every show-level attribute) is stored on the *show* in Plex, but the resolver was querying *episodes* — so genre-filtered TV channels resolved to **0 items**. TV now resolves at `type=4` (episodes) using Plex's **dotted advanced-filter syntax** (`show.genre`, `episode.resolution`), which filters episodes by both show-level and episode-level fields in one query. Verified against the library (e.g. `Animation` TV → 7,276 episodes; `show.genre` + `episode.resolution` combine correctly). Each field carries a `tvScope` (`show` / `episode`); movies are self-contained and unprefixed.
+
+### Added
+
+- **String operators** — `contains` / `does not contain` on text fields, plus a **Title** field (Plex `title=value` is a substring match). Covers franchise/keyword-style channels the practical way.
+- **Label** field — filter by your Plex labels (e.g. shows tagged `Anime` / `Kids`). `show.label` for TV.
+- **Content rating** and **Resolution** are now **value-list dropdowns** (load the actual ratings/resolutions present, like genre/studio) instead of free-text — filtered by the value key (`contentRating=TV-G`, `resolution=1080`).
+- Collection filtering already works as a tag field (`show.collection`), so collection-based channels need no extra machinery.
+
+### Verification
+
+- `pnpm check-types` passes; every primitive verified against the live Plex library via the filter-value + dotted-query diagnostics.
+
 ## [0.1.14] - 2026-07-12
 
 ### Added

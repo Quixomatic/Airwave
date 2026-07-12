@@ -7,7 +7,11 @@ type LibCtx = {
   baseUrl: string;
   token: string;
   sectionKey: string;
+  // Movies resolve at type=1. TV resolves at type=4 (episodes) using Plex's dotted
+  // advanced-filter syntax (`show.genre`, `episode.resolution`) so show-level and
+  // episode-level fields both work in one query. `tv` toggles the field prefixing.
   type: 1 | 4;
+  tv: boolean;
   sort: string;
   tagCache: Map<string, Promise<Map<string, string>>>;
 };
@@ -32,8 +36,9 @@ async function queryParams(ctx: LibCtx, params: string[]): Promise<Map<string, P
 }
 
 async function resolveNode(node: FilterNode, ctx: LibCtx): Promise<Map<string, PlexItem>> {
+  const opts = { tv: ctx.tv };
   if (node.type === "condition") {
-    const param = await buildParam(node, (f, t) => resolveTag(ctx, f, t));
+    const param = await buildParam(node, (f, t) => resolveTag(ctx, f, t), opts);
     if (!param) return new Map();
     return queryParams(ctx, [param]);
   }
@@ -42,7 +47,7 @@ async function resolveNode(node: FilterNode, ctx: LibCtx): Promise<Map<string, P
   if (node.combinator === "and" && node.children.every((c) => c.type === "condition")) {
     const params: string[] = [];
     for (const c of node.children as FilterCondition[]) {
-      const p = await buildParam(c, (f, t) => resolveTag(ctx, f, t));
+      const p = await buildParam(c, (f, t) => resolveTag(ctx, f, t), opts);
       if (!p) return new Map(); // a tag value missing → AND yields nothing here
       params.push(p);
     }
@@ -102,16 +107,18 @@ export async function resolveChannel(
 
   const out = new Map<string, PlexItem>();
   for (const lib of libs) {
+    const isShow = lib.type !== "movie";
     const ctx: LibCtx = {
       baseUrl: source.baseUrl,
       token: source.token,
       sectionKey: lib.key,
-      type: lib.type === "movie" ? 1 : 4,
+      type: isShow ? 4 : 1, // TV resolves to episodes directly via dotted filters
+      tv: isShow,
       sort,
       tagCache: new Map(),
     };
-    const items = tree ? await resolveNode(tree, ctx) : await queryParams(ctx, []);
-    for (const [k, v] of items) out.set(k, v);
+    const matched = tree ? await resolveNode(tree, ctx) : await queryParams(ctx, []);
+    for (const [k, v] of matched) out.set(k, v);
   }
   return [...out.values()];
 }
