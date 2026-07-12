@@ -7,7 +7,8 @@ import { Plus, Tv } from "lucide-react";
 
 import { resolveTile } from "@/features/icons/app-icon";
 import { HeaderRight } from "@/context/header-provider";
-import { trpc } from "@/utils/trpc";
+import { trpc, trpcClient } from "@/utils/trpc";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_auth/channels/")({
   component: ChannelsList,
@@ -15,6 +16,15 @@ export const Route = createFileRoute("/_auth/channels/")({
 
 function ChannelsList() {
   const channels = useQuery(trpc.channels.list.queryOptions());
+
+  const toggle = async (id: string, enabled: boolean) => {
+    try {
+      await trpcClient.channels.setEnabled.mutate({ id, enabled });
+      await channels.refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update channel");
+    }
+  };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -44,15 +54,20 @@ function ChannelsList() {
                 defaultIcon: Tv,
               });
               return (
-              <li key={c.id}>
+              <li key={c.id} className="flex items-center">
                 <Link
                   to="/channels/$channelId"
                   params={{ channelId: c.id }}
-                  className="hover:bg-muted/50 flex items-center gap-3 px-4 py-3"
+                  className={`hover:bg-muted/50 flex flex-1 items-center gap-3 px-4 py-3 ${c.enabled ? "" : "opacity-50"}`}
                 >
                   <span className="text-muted-foreground w-8 text-sm tabular-nums">{c.number}</span>
                   <TintedIconTile icon={tile.Icon} tint={tile.tint} size="lg" />
                   <span className="flex-1 truncate text-sm font-medium">{c.name}</span>
+                  {!c.enabled && (
+                    <span className="border-border text-muted-foreground rounded border px-1.5 py-0.5 text-xs">
+                      Inactive
+                    </span>
+                  )}
                   {c.package && (
                     <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-xs">
                       {c.package.name}
@@ -62,6 +77,16 @@ function ChannelsList() {
                     {c.ordering.toLowerCase().replace("_", " ")}
                   </span>
                 </Link>
+                <label
+                  className="px-4"
+                  title={c.enabled ? "Active — click to deactivate" : "Inactive — click to activate"}
+                >
+                  <input
+                    type="checkbox"
+                    checked={c.enabled}
+                    onChange={(e) => toggle(c.id, e.target.checked)}
+                  />
+                </label>
               </li>
               );
             })}

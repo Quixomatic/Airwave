@@ -2,6 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.2.0] - 2026-07-12
+
+Opens the 0.2.x line. Channel **active/inactive** toggle.
+
+### Added
+
+- **Channel active flag** wired through (the `Channel.enabled` field already existed and the schedule-refresh job already skips disabled channels — it just had no UI): an **Active** checkbox on the channel form, a per-row **quick toggle** + dimmed "Inactive" state on the channels list, and `channels.setEnabled`. Inactive channels won't be selectable in the guide.
+
 ## [0.1.17] - 2026-07-12
 
 Complete filter parity — every field Plex exposes in advanced filtering is now available.

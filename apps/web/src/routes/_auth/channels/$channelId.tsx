@@ -129,6 +129,7 @@ function ChannelDetail() {
               icon: channel.data.icon,
               tint: channel.data.tint,
               description: channel.data.description,
+              enabled: channel.data.enabled,
             }}
             onSubmit={async (v) => {
               setSubmitting(true);
@@ -144,6 +145,7 @@ function ChannelDetail() {
                   icon: v.icon,
                   tint: v.tint,
                   description: v.description,
+                  enabled: v.enabled,
                 });
                 toast.success("Saved.");
                 await channel.refetch();

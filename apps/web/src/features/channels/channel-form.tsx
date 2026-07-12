@@ -25,6 +25,7 @@ export type ChannelFormValues = {
   icon: string | null;
   tint: string | null;
   description: string | null;
+  enabled: boolean;
 };
 
 /**
@@ -55,6 +56,7 @@ export function ChannelForm({
   const [icon, setIcon] = useState<string | null>(initial?.icon ?? null);
   const [tint, setTint] = useState<string | null>(initial?.tint ?? null);
   const [description, setDescription] = useState(initial?.description ?? "");
+  const [enabled, setEnabled] = useState(initial?.enabled ?? true);
   const [filter, setFilter] = useState<FilterGroup>(() => initial?.filter ?? emptyGroup());
 
   const selectedPackage = packages.data?.find((p) => p.id === packageId);
@@ -96,6 +98,7 @@ export function ChannelForm({
       icon,
       tint,
       description: description.trim() || null,
+      enabled,
       mediaSourceId: sourceId,
     });
   };
@@ -189,6 +192,14 @@ export function ChannelForm({
           </select>
         </div>
       </div>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+        Active
+        <span className="text-muted-foreground text-xs">
+          — inactive channels aren't selectable in the guide
+        </span>
+      </label>
 
       <div className="space-y-2">
         <Label>Appearance</Label>

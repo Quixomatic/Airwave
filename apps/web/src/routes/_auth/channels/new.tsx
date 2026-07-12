@@ -57,6 +57,7 @@ function NewChannel() {
                   icon: v.icon,
                   tint: v.tint,
                   description: v.description,
+                  enabled: v.enabled,
                 });
                 toast.success("Channel created.");
                 navigate({ to: "/channels/$channelId", params: { channelId: res.id } });

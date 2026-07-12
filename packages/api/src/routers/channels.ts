@@ -74,6 +74,7 @@ export const channelsRouter = router({
       number: channel.number,
       name: channel.name,
       ordering: channel.ordering,
+      enabled: channel.enabled,
       description: channel.description,
       mediaSourceId: channel.mediaSourceId,
       packageId: channel.packageId,
@@ -134,6 +135,7 @@ export const channelsRouter = router({
         icon: z.string().nullish(),
         tint: z.string().nullish(),
         description: z.string().nullish(),
+        enabled: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -156,6 +158,7 @@ export const channelsRouter = router({
           icon: input.icon ?? null,
           tint: input.tint ?? null,
           description: input.description ?? null,
+          enabled: input.enabled ?? true,
           createdById: ctx.session.user.id,
           definitions: { create: { kind: "PREDICATE", plexFilter } },
         },
@@ -176,6 +179,7 @@ export const channelsRouter = router({
         icon: z.string().nullish(),
         tint: z.string().nullish(),
         description: z.string().nullish(),
+        enabled: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -195,6 +199,7 @@ export const channelsRouter = router({
           icon: input.icon ?? null,
           tint: input.tint ?? null,
           description: input.description ?? null,
+          ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
         },
       });
 
@@ -254,6 +259,17 @@ export const channelsRouter = router({
   nowNext: adminProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
     return getNowNext(ctx.prisma, input.id);
   }),
+
+  /** Quick active/inactive toggle — inactive channels aren't selectable in the guide. */
+  setEnabled: adminProcedure
+    .input(z.object({ id: z.string(), enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.channel.update({
+        where: { id: input.id },
+        data: { enabled: input.enabled },
+      });
+      return { ok: true };
+    }),
 
   remove: adminProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
     await ctx.prisma.channel.delete({ where: { id: input.id } });
