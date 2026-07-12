@@ -246,12 +246,21 @@ function ConditionEditor({
             </option>
           ))}
         </select>
+      ) : meta?.kind === "date" ? (
+        <Input
+          type="date"
+          className="h-8 flex-1"
+          value={condition.value}
+          onChange={(e) => onChange({ ...condition, value: e.target.value })}
+        />
       ) : (
         <Input
           className="h-8 flex-1"
           value={condition.value}
           onChange={(e) => onChange({ ...condition, value: e.target.value })}
-          placeholder={meta?.kind === "int" ? "number" : "value"}
+          placeholder={
+            meta?.kind === "recency" ? "days" : meta?.kind === "int" ? "number" : "value"
+          }
         />
       )}
 

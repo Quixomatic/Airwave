@@ -36,7 +36,7 @@ async function queryParams(ctx: LibCtx, params: string[]): Promise<Map<string, P
 }
 
 async function resolveNode(node: FilterNode, ctx: LibCtx): Promise<Map<string, PlexItem>> {
-  const opts = { tv: ctx.tv };
+  const opts = { libType: ctx.tv ? ("show" as const) : ("movie" as const) };
   if (node.type === "condition") {
     const param = await buildParam(node, (f, t) => resolveTag(ctx, f, t), opts);
     if (!param) return new Map();

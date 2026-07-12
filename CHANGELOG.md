@@ -2,6 +2,23 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.1.16] - 2026-07-12
+
+Filter catalog expanded to Plex parity (was a hardcoded subset).
+
+### Added
+
+- Filter fields now mirror Plex's advanced-filter set, each with the correct level + applicable media types:
+  - **Show title vs Episode title** (the split Plex exposes for TV): `title` → movie title / `show.title`; new `episodeTitle` → `episode.title`.
+  - **Network** (TV), **Writer**, **Producer**, **Audio language**, **Subtitle language**.
+  - **Release / air date** (`originallyAvailableAt`, episode-level for TV) and **Added within N days** (`addedAt>=-Nd` — Plex relative-date recency, for "fresh/just added" channels).
+  - **HDR**, **Dolby Vision**, **In progress** booleans (episode-level for TV).
+- Fields carry an `appliesTo` so a filter that can't apply to a library type is skipped (e.g. Network on movies, Duration on TV — Plex has no TV duration filter). New `date` + `recency` field kinds (date-picker / days input in the builder).
+
+### Verified
+
+- Every new primitive checked live: `addedAt>=-30d` (3 movies / 379 eps), `originallyAvailableAt>=2020` (127 / 4304), `hdr` (228 / 619), `audienceRating`/`decade` on movies + TV, and dotted prefixing (`episode.hdr`, `show.network`, `episode.title`). `pnpm check-types` passes.
+
 ## [0.1.15] - 2026-07-12
 
 **Fix TV filtering** (it was silently resolving to zero) + richer filter primitives.
