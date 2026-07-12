@@ -43,14 +43,22 @@ model MediaItem {
   mediaSource   MediaSource @relation(fields: [mediaSourceId], references: [id], onDelete: Cascade)
 
   ratingKey String // media-server item id
-  type      String // "movie" | "episode"
+  type      String // "show" | "movie" | "episode"
   title     String
   durationMs Int    @default(0)
   year      Int?
   airDate   String? // originallyAvailableAt — for by-air-date ordering
 
-  /// Full denormalized display bundle (GuideMeta): rating, summary, genres,
-  /// directors, cast, badges, episode context, art, …
+  // An episode references its parent show (which holds the show-level metadata —
+  // genres, cast, studio, art). Movies have no parent. The effective guide for a
+  // slot is the item's own bundle merged over its parent's.
+  parentId String?
+  parent   MediaItem?  @relation("MediaItemChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children MediaItem[] @relation("MediaItemChildren")
+
+  /// This item's own display bundle (GuideMeta). For an episode: title, summary,
+  /// season/episode, badges. For a show: genres, cast, studio, art, … (shared by
+  /// its episodes via `parent`).
   guide Json
 
   /// Whether the item is still present on the media server (for the missing-media
@@ -65,6 +73,7 @@ model MediaItem {
 
   @@unique([mediaSourceId, ratingKey])
   @@index([mediaSourceId, type])
+  @@index([parentId])
   @@map("media_item")
 }
 

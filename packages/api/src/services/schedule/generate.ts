@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@ChannelGuide/db";
 
 import type { GuideMeta } from "../plex/client";
-import { guideMetaOf, upsertPoolItems } from "../media/media-item";
+import { guideMetaOf, mediaItemGuideInclude, upsertPoolItems } from "../media/media-item";
 import { resolveChannel } from "../plex/resolve";
 import { type BuildResult, type OrderingStrategy, buildSchedule } from "./timeline";
 
@@ -180,7 +180,7 @@ export async function getChannelTimeline(
   const rows = await prisma.scheduleItem.findMany({
     where: { channelId, startsAt: { lt: to } },
     orderBy: { startsAt: "asc" },
-    include: { mediaItem: { select: { guide: true } } },
+    include: mediaItemGuideInclude,
   });
   return rows
     // Drop rows that already ended before the window (can't express endsAt in the where).
@@ -214,17 +214,16 @@ export async function getNowNext(
   channelId: string,
   at: Date = new Date(),
 ): Promise<NowNext> {
-  const withGuide = { mediaItem: { select: { guide: true } } } as const;
   const [row, nextRow, lastRow] = await Promise.all([
     prisma.scheduleItem.findFirst({
       where: { channelId, startsAt: { lte: at } },
       orderBy: { startsAt: "desc" },
-      include: withGuide,
+      include: mediaItemGuideInclude,
     }),
     prisma.scheduleItem.findFirst({
       where: { channelId, startsAt: { gt: at } },
       orderBy: { startsAt: "asc" },
-      include: withGuide,
+      include: mediaItemGuideInclude,
     }),
     prisma.scheduleItem.findFirst({ where: { channelId }, orderBy: { startsAt: "desc" } }),
   ]);

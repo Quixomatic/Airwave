@@ -3,7 +3,11 @@ import type { PrismaClient } from "@ChannelGuide/db";
 import type { GuideMeta, PlexItem } from "../plex/client";
 
 /** Prisma create/update payload for a MediaItem row from a resolved Plex item. */
-export function toMediaItemData(mediaSourceId: string, item: PlexItem) {
+export function toMediaItemData(
+  mediaSourceId: string,
+  item: PlexItem,
+  parentId: string | null = null,
+) {
   return {
     mediaSourceId,
     ratingKey: item.ratingKey,
@@ -12,20 +16,48 @@ export function toMediaItemData(mediaSourceId: string, item: PlexItem) {
     durationMs: item.durationMs,
     year: item.year ?? null,
     airDate: item.originallyAvailableAt ?? null,
+    parentId,
     guide: item.guide as object,
   };
 }
 
-/** The stored guide bundle for a row, with a safe fallback for unlinked/removed media. */
-export function guideMetaOf(row: { mediaItem?: { guide: unknown } | null }): GuideMeta {
-  const guide = row.mediaItem?.guide as GuideMeta | null | undefined;
-  return guide ?? { title: "Unavailable" };
+/** Merge `over` onto `base`, ignoring `undefined` in `over` so it never wipes an inherited field. */
+export function mergeGuide(base: GuideMeta, over: GuideMeta): GuideMeta {
+  const out: GuideMeta = { ...base };
+  for (const [key, value] of Object.entries(over)) {
+    if (value !== undefined) (out as Record<string, unknown>)[key] = value;
+  }
+  return out;
+}
+
+type RowWithMedia = {
+  mediaItem?: { guide: unknown; parent?: { guide: unknown } | null } | null;
+};
+
+/** How to `include` a slot's metadata (own bundle + parent show) for the merge. */
+export const mediaItemGuideInclude = {
+  mediaItem: { select: { guide: true, parent: { select: { guide: true } } } },
+} as const;
+
+/**
+ * The effective guide bundle for a slot: the item's own metadata merged over its
+ * parent show's (so episodes inherit genres/cast/studio). Falls back safely when the
+ * media has been unlinked/removed.
+ */
+export function guideMetaOf(row: RowWithMedia): GuideMeta {
+  const mi = row.mediaItem;
+  if (!mi) return { title: "Unavailable" };
+  const own = (mi.guide as GuideMeta | null) ?? { title: "Unavailable" };
+  const parent = (mi.parent?.guide as GuideMeta | null | undefined) ?? undefined;
+  return parent ? mergeGuide(parent, own) : own;
 }
 
 /**
  * Ensure a MediaItem exists for every item in a resolved pool (create-only, so a
- * later enrichment sync is never clobbered), and return a `ratingKey → id` map so
- * schedule slots can be linked. This is the gap-fill run at generation time.
+ * later enrichment sync is never clobbered), linking episodes to their parent show
+ * when that show is already cached. Returns a `ratingKey → id` map so schedule slots
+ * can reference the rows. This is the gap-fill run at generation time; a full
+ * `syncMediaItems` is what actually builds the show hierarchy.
  */
 export async function upsertPoolItems(
   prisma: PrismaClient,
@@ -33,11 +65,29 @@ export async function upsertPoolItems(
   pool: PlexItem[],
 ): Promise<Map<string, string>> {
   if (pool.length > 0) {
+    const showKeys = [
+      ...new Set(pool.map((p) => p.guide.showRatingKey).filter((k): k is string => !!k)),
+    ];
+    const shows = showKeys.length
+      ? await prisma.mediaItem.findMany({
+          where: { mediaSourceId, type: "show", ratingKey: { in: showKeys } },
+          select: { id: true, ratingKey: true },
+        })
+      : [];
+    const showIds = new Map(shows.map((s) => [s.ratingKey, s.id]));
+
     await prisma.mediaItem.createMany({
-      data: pool.map((item) => toMediaItemData(mediaSourceId, item)),
+      data: pool.map((item) =>
+        toMediaItemData(
+          mediaSourceId,
+          item,
+          item.guide.showRatingKey ? (showIds.get(item.guide.showRatingKey) ?? null) : null,
+        ),
+      ),
       skipDuplicates: true,
     });
   }
+
   const rows = await prisma.mediaItem.findMany({
     where: { mediaSourceId, ratingKey: { in: pool.map((p) => p.ratingKey) } },
     select: { id: true, ratingKey: true },

@@ -1,36 +1,20 @@
 import type { PrismaClient } from "@ChannelGuide/db";
 
-import { type GuideMeta, type PlexItem, getAllSectionItems } from "../plex/client";
+import { type PlexItem, getAllSectionItems } from "../plex/client";
 import { toMediaItemData } from "./media-item";
 
-/**
- * Episodes only carry their own fields; genres/cast/studio live on the parent show.
- * Fill the episode's gaps from its show so a TV slot is as rich as a movie slot.
- */
-function enrichEpisode(ep: GuideMeta, show: GuideMeta | undefined): GuideMeta {
-  if (!show) return ep;
-  return {
-    ...ep,
-    genres: ep.genres ?? show.genres,
-    cast: ep.cast ?? show.cast,
-    studio: ep.studio ?? show.studio,
-    directors: ep.directors ?? show.directors,
-    contentRating: ep.contentRating ?? show.contentRating,
-  };
-}
-
-/** Full upsert (refresh + enrich) of a batch of items into the metadata cache. */
+/** Full upsert (refresh) of a batch of items, each with an optional parent-show id. */
 async function upsertMany(
   prisma: PrismaClient,
   mediaSourceId: string,
-  items: PlexItem[],
-): Promise<number> {
+  entries: Array<{ item: PlexItem; parentId: string | null }>,
+): Promise<void> {
   const now = new Date();
   const chunk = 20;
-  for (let i = 0; i < items.length; i += chunk) {
+  for (let i = 0; i < entries.length; i += chunk) {
     await prisma.$transaction(
-      items.slice(i, i + chunk).map((item) => {
-        const data = toMediaItemData(mediaSourceId, item);
+      entries.slice(i, i + chunk).map(({ item, parentId }) => {
+        const data = toMediaItemData(mediaSourceId, item, parentId);
         return prisma.mediaItem.upsert({
           where: { mediaSourceId_ratingKey: { mediaSourceId, ratingKey: item.ratingKey } },
           create: data,
@@ -39,14 +23,41 @@ async function upsertMany(
       }),
     );
   }
-  return items.length;
 }
 
-export type SyncResult = { libraries: number; items: number };
+/** Upsert shows and return a `showRatingKey → mediaItemId` map for linking episodes. */
+async function upsertShows(
+  prisma: PrismaClient,
+  mediaSourceId: string,
+  shows: PlexItem[],
+): Promise<Map<string, string>> {
+  const now = new Date();
+  const map = new Map<string, string>();
+  const chunk = 20;
+  for (let i = 0; i < shows.length; i += chunk) {
+    const slice = shows.slice(i, i + chunk);
+    const rows = await prisma.$transaction(
+      slice.map((item) => {
+        const data = toMediaItemData(mediaSourceId, item, null);
+        return prisma.mediaItem.upsert({
+          where: { mediaSourceId_ratingKey: { mediaSourceId, ratingKey: item.ratingKey } },
+          create: data,
+          update: { ...data, available: true, lastSyncedAt: now },
+          select: { id: true, ratingKey: true },
+        });
+      }),
+    );
+    for (const r of rows) map.set(r.ratingKey, r.id);
+  }
+  return map;
+}
+
+export type SyncResult = { libraries: number; shows: number; items: number };
 
 /**
- * Refresh the metadata cache for a source's enabled libraries. Movies map straight
- * through; episodes are enriched from their parent show's metadata. Upsert-only —
+ * Refresh the metadata cache for a source's enabled libraries. Builds the show
+ * hierarchy: shows are upserted first, then episodes are linked to their parent show
+ * (which holds the shared genres/cast/studio). Movies are standalone. Upsert-only —
  * never deletes, so schedules built on now-removed media still render.
  */
 export async function syncMediaItems(prisma: PrismaClient, sourceId: string): Promise<SyncResult> {
@@ -57,25 +68,36 @@ export async function syncMediaItems(prisma: PrismaClient, sourceId: string): Pr
   if (!source?.baseUrl) throw new Error("Source is not connected.");
   const { baseUrl, token } = source;
 
+  let shows = 0;
   let items = 0;
   for (const lib of source.libraries) {
     if (lib.type === "show") {
-      const shows = await getAllSectionItems(baseUrl, token, lib.key, 2);
-      const showGuides = new Map(shows.map((s) => [s.ratingKey, s.guide]));
+      const showItems = await getAllSectionItems(baseUrl, token, lib.key, 2);
+      const showIds = await upsertShows(prisma, source.id, showItems);
+      shows += showItems.length;
+
       const episodes = await getAllSectionItems(baseUrl, token, lib.key, 4);
-      const enriched = episodes.map((ep) => ({
-        ...ep,
-        guide: enrichEpisode(
-          ep.guide,
-          ep.guide.showRatingKey ? showGuides.get(ep.guide.showRatingKey) : undefined,
-        ),
-      }));
-      items += await upsertMany(prisma, source.id, enriched);
+      await upsertMany(
+        prisma,
+        source.id,
+        episodes.map((item) => ({
+          item,
+          parentId: item.guide.showRatingKey
+            ? (showIds.get(item.guide.showRatingKey) ?? null)
+            : null,
+        })),
+      );
+      items += episodes.length;
     } else {
       const movies = await getAllSectionItems(baseUrl, token, lib.key, 1);
-      items += await upsertMany(prisma, source.id, movies);
+      await upsertMany(
+        prisma,
+        source.id,
+        movies.map((item) => ({ item, parentId: null })),
+      );
+      items += movies.length;
     }
   }
 
-  return { libraries: source.libraries.length, items };
+  return { libraries: source.libraries.length, shows, items };
 }

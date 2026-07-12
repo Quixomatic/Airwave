@@ -53,7 +53,8 @@ function SourceDetail() {
     setSyncing(true);
     try {
       const r = await trpcClient.sources.syncMetadata.mutate({ id: sourceId });
-      toast.success(`Synced ${r.items} items across ${r.libraries} libraries.`);
+      const showNote = r.shows > 0 ? `, ${r.shows} shows` : "";
+      toast.success(`Synced ${r.items} items${showNote} across ${r.libraries} libraries.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Metadata sync failed");
     } finally {
