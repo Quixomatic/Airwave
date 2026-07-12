@@ -1,4 +1,5 @@
-import { SidebarProvider, SidebarTrigger } from "@ChannelGuide/ui/components/sidebar";
+// SidebarTrigger temporarily hidden from the TopHeader — re-add the import to restore it.
+import { SidebarProvider } from "@ChannelGuide/ui/components/sidebar";
 import { Outlet, useMatches } from "@tanstack/react-router";
 
 import {
@@ -64,7 +65,7 @@ function TopHeader() {
   return (
     <header className="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center px-3">
       <TopHeaderLeftSlot className="flex items-center gap-2 justify-self-start">
-        <SidebarTrigger />
+        {/* <SidebarTrigger /> */}
         <Breadcrumbs />
       </TopHeaderLeftSlot>
       <TopHeaderCenterSlot className="justify-self-center" />
