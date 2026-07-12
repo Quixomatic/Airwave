@@ -408,6 +408,43 @@ export async function getAllSectionItems(
   return out;
 }
 
+/** The most-recently-added items of a type in a section (for the incremental scan). */
+export async function getRecentlyAdded(
+  baseUrl: string,
+  token: string,
+  sectionKey: string,
+  type: 1 | 2 | 4,
+  limit = 50,
+): Promise<PlexItem[]> {
+  const qs = [
+    `type=${type}`,
+    "sort=addedAt:desc",
+    `X-Plex-Container-Start=0`,
+    `X-Plex-Container-Size=${limit}`,
+  ].join("&");
+  const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/all?${qs}`, {
+    headers: pmsHeaders(token),
+  });
+  if (!res.ok) throw new Error(`Plex recently-added query failed (${res.status})`);
+  const data = (await res.json()) as { MediaContainer?: { Metadata?: Array<PlexMetadata> } };
+  return (data.MediaContainer?.Metadata ?? []).map(toPlexItem);
+}
+
+/** Full metadata for a single item by ratingKey (e.g. to backfill a missing parent show). */
+export async function getMetadata(
+  baseUrl: string,
+  token: string,
+  ratingKey: string,
+): Promise<PlexItem | null> {
+  const res = await fetch(`${baseUrl}/library/metadata/${ratingKey}`, {
+    headers: pmsHeaders(token),
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { MediaContainer?: { Metadata?: Array<PlexMetadata> } };
+  const m = data.MediaContainer?.Metadata?.[0];
+  return m ? toPlexItem(m) : null;
+}
+
 /** Available values for a tag filter field (genre/studio/director/actor/…). */
 export async function getFilterValues(
   baseUrl: string,

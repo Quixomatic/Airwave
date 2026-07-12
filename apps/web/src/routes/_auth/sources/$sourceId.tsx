@@ -20,7 +20,11 @@ function SourceDetail() {
   const source = useQuery(trpc.sources.get.queryOptions({ id: sourceId }));
   const [name, setName] = useState("");
   const [rescanning, setRescanning] = useState(false);
-  const [syncing, setSyncing] = useState(false);
+
+  // The metadata sync runs as a background job; poll it for live status/progress.
+  const jobs = useQuery({ ...trpc.jobs.list.queryOptions(), refetchInterval: 2000 });
+  const syncJob = jobs.data?.find((j) => j.id === "metadata-sync");
+  const syncing = syncJob?.running ?? false;
 
   useEffect(() => {
     if (source.data) setName(source.data.name);
@@ -50,15 +54,12 @@ function SourceDetail() {
   };
 
   const syncMetadata = async () => {
-    setSyncing(true);
     try {
-      const r = await trpcClient.sources.syncMetadata.mutate({ id: sourceId });
-      const showNote = r.shows > 0 ? `, ${r.shows} shows` : "";
-      toast.success(`Synced ${r.items} items${showNote} across ${r.libraries} libraries.`);
+      await trpcClient.jobs.run.mutate({ id: "metadata-sync" });
+      toast.success("Metadata sync started.");
+      await jobs.refetch();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Metadata sync failed");
-    } finally {
-      setSyncing(false);
+      toast.error(err instanceof Error ? err.message : "Failed to start metadata sync");
     }
   };
 
@@ -125,7 +126,7 @@ function SourceDetail() {
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={syncMetadata} disabled={syncing}>
               {syncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Sync metadata
+              {syncing ? "Syncing…" : "Sync metadata"}
             </Button>
             <Button variant="outline" size="sm" onClick={rescan} disabled={rescanning}>
               {rescanning ? (
@@ -137,6 +138,7 @@ function SourceDetail() {
             </Button>
           </div>
         </CardHeader>
+        {syncing && <SyncProgress progress={syncJob?.progress ?? null} />}
         <CardContent className="p-0">
           <ul className="divide-y">
             {source.data.libraries.map((lib) => (
@@ -167,6 +169,32 @@ function SourceDetail() {
       <Button variant="ghost" className="text-destructive" onClick={remove}>
         Remove source
       </Button>
+    </div>
+  );
+}
+
+function SyncProgress({
+  progress,
+}: {
+  progress: { current: number; total: number; label: string } | null;
+}) {
+  const pct = progress && progress.total > 0 ? (progress.current / progress.total) * 100 : null;
+  return (
+    <div className="border-b px-4 py-3">
+      <div className="text-muted-foreground mb-1.5 flex items-center justify-between text-xs">
+        <span>{progress?.label ?? "Starting…"}</span>
+        {progress && progress.total > 0 && (
+          <span className="tabular-nums">
+            {progress.current} / {progress.total}
+          </span>
+        )}
+      </div>
+      <div className="bg-muted h-1.5 overflow-hidden rounded-full">
+        <div
+          className={`bg-primary h-full rounded-full transition-all ${pct == null ? "w-1/3 animate-pulse" : ""}`}
+          style={pct == null ? undefined : { width: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 }

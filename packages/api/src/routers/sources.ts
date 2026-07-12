@@ -2,7 +2,6 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
-import { syncMediaItems } from "../services/media/sync-media";
 import { syncLibraries } from "../services/plex/sync-libraries";
 
 export const sourcesRouter = router({
@@ -63,13 +62,6 @@ export const sourcesRouter = router({
     if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "Source not found." });
     return syncLibraries(ctx.prisma, source);
   }),
-
-  /** Refresh the metadata cache (movies + episodes enriched from their shows). */
-  syncMetadata: adminProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      return syncMediaItems(ctx.prisma, input.id);
-    }),
 
   setLibraryEnabled: adminProcedure
     .input(z.object({ libraryId: z.string(), enabled: z.boolean() }))

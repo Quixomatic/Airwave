@@ -1,10 +1,16 @@
 import prisma from "@ChannelGuide/db";
 
-import { extendChannelSchedule } from "../schedule/generate";
+import type { SyncProgress } from "../media/media-item";
 import { syncMediaItems } from "../media/sync-media";
+import { syncRecentlyAdded } from "../media/sync-recent";
+import { getPlexUser } from "../plex/client";
 import { syncLibraries } from "../plex/sync-libraries";
+import { extendChannelSchedule } from "../schedule/generate";
 
 export type JobInterval = "seconds" | "minutes" | "hours" | "days" | "fixed";
+
+/** Passed to a job's `run` so it can report live progress to the scheduler. */
+export type JobContext = { progress: SyncProgress };
 
 /**
  * A background job definition. The name, cadence, and the work live in code; the
@@ -16,28 +22,40 @@ export type JobDefinition = {
   name: string;
   interval: JobInterval;
   defaultCron: string;
-  run: (signal: AbortSignal) => Promise<void>;
+  run: (signal: AbortSignal, ctx: JobContext) => Promise<void>;
 };
 
 const throwIfAborted = (signal: AbortSignal) => {
   if (signal.aborted) throw new Error("Job canceled");
 };
 
+const enabledSources = () =>
+  prisma.mediaSource.findMany({ where: { enabled: true } });
+
 export const JOB_DEFINITIONS: JobDefinition[] = [
   {
     id: "metadata-sync",
     name: "Metadata Sync",
     interval: "hours",
-    // every day at 03:00
+    // full refresh + removal detection — every day at 03:00
     defaultCron: "0 0 3 * * *",
-    run: async (signal) => {
-      const sources = await prisma.mediaSource.findMany({
-        where: { enabled: true },
-        select: { id: true },
-      });
-      for (const source of sources) {
+    run: async (signal, ctx) => {
+      for (const source of await enabledSources()) {
         throwIfAborted(signal);
-        await syncMediaItems(prisma, source.id);
+        await syncMediaItems(prisma, source.id, ctx.progress);
+      }
+    },
+  },
+  {
+    id: "recently-added-scan",
+    name: "Recently Added Scan",
+    interval: "minutes",
+    // cheap incremental — every 5 minutes
+    defaultCron: "0 */5 * * * *",
+    run: async (signal, ctx) => {
+      for (const source of await enabledSources()) {
+        throwIfAborted(signal);
+        await syncRecentlyAdded(prisma, source.id, ctx.progress);
       }
     },
   },
@@ -48,8 +66,7 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
     // every day at 04:00
     defaultCron: "0 0 4 * * *",
     run: async (signal) => {
-      const sources = await prisma.mediaSource.findMany({ where: { enabled: true } });
-      for (const source of sources) {
+      for (const source of await enabledSources()) {
         throwIfAborted(signal);
         await syncLibraries(prisma, source);
       }
@@ -69,6 +86,23 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
       for (const channel of channels) {
         throwIfAborted(signal);
         await extendChannelSchedule(prisma, channel.id);
+      }
+    },
+  },
+  {
+    id: "plex-token-check",
+    name: "Plex Token Check",
+    interval: "days",
+    // once a day at 05:00 — verify each source's owner token still works
+    defaultCron: "0 0 5 * * *",
+    run: async (signal) => {
+      for (const source of await enabledSources()) {
+        throwIfAborted(signal);
+        try {
+          await getPlexUser(source.clientIdentifier ?? "channelguide-server", source.token);
+        } catch {
+          console.warn(`[jobs] Plex token check failed for source "${source.name}"`);
+        }
       }
     },
   },

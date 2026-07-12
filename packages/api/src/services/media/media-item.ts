@@ -2,6 +2,9 @@ import type { PrismaClient } from "@ChannelGuide/db";
 
 import type { GuideMeta, PlexItem } from "../plex/client";
 
+/** Progress callback shared by the sync services (fed to the job scheduler's progress). */
+export type SyncProgress = (p: { current: number; total: number; label: string }) => void;
+
 /** Prisma create/update payload for a MediaItem row from a resolved Plex item. */
 export function toMediaItemData(
   mediaSourceId: string,

@@ -3,12 +3,15 @@ import schedule, { rescheduleJob } from "node-schedule";
 
 import { JOB_DEFINITIONS, type JobDefinition, jobDefinition } from "./definitions";
 
+export type JobProgress = { current: number; total: number; label: string };
+
 type LiveJob = {
   def: JobDefinition;
   job: schedule.Job;
   cronSchedule: string;
   running: boolean;
   controller?: AbortController;
+  progress: JobProgress | null;
 };
 
 /** In-memory registry (single-instance). Rebuilt from the DB on each server start. */
@@ -30,7 +33,13 @@ export async function startJobs(): Promise<void> {
       console.error(`[jobs] invalid cron for "${def.id}": ${row.cronSchedule}`);
       continue;
     }
-    live.set(def.id, { def, job, cronSchedule: row.cronSchedule, running: false });
+    live.set(def.id, {
+      def,
+      job,
+      cronSchedule: row.cronSchedule,
+      running: false,
+      progress: null,
+    });
   }
   console.log(`[jobs] scheduled ${live.size} job(s)`);
 }
@@ -43,10 +52,11 @@ export async function runJob(id: string): Promise<void> {
   const controller = new AbortController();
   l.running = true;
   l.controller = controller;
+  l.progress = null;
   await prisma.job.update({ where: { id }, data: { lastRunAt: new Date() } }).catch(() => {});
 
   try {
-    await l.def.run(controller.signal);
+    await l.def.run(controller.signal, { progress: (p) => (l.progress = p) });
     await prisma.job
       .update({
         where: { id },
@@ -65,6 +75,7 @@ export async function runJob(id: string): Promise<void> {
   } finally {
     l.running = false;
     l.controller = undefined;
+    l.progress = null;
   }
 }
 
@@ -95,6 +106,7 @@ export type JobStatus = {
   cronSchedule: string;
   nextRunAt: Date | null;
   running: boolean;
+  progress: JobProgress | null;
   lastRunAt: Date | null;
   lastFinishedAt: Date | null;
   lastStatus: string | null;
@@ -115,6 +127,7 @@ export async function listJobs(): Promise<JobStatus[]> {
       cronSchedule: l?.cronSchedule ?? row?.cronSchedule ?? def.defaultCron,
       nextRunAt: l?.job.nextInvocation() ?? null,
       running: l?.running ?? false,
+      progress: l?.progress ?? null,
       lastRunAt: row?.lastRunAt ?? null,
       lastFinishedAt: row?.lastFinishedAt ?? null,
       lastStatus: row?.lastStatus ?? null,
