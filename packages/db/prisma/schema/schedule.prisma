@@ -17,10 +17,14 @@ model ScheduleItem {
   startOffsetSeconds Int @default(0)
 
   ratingKey String // media-server item id to play
-  guideData Json? // denormalized display data (title, art, 4K/HDR/audio badges, chapters ref)
+
+  // Metadata for display lives in the central MediaItem cache; slots point at it.
+  mediaItemId String?
+  mediaItem   MediaItem? @relation(fields: [mediaItemId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 
   @@index([channelId, startsAt])
+  @@index([mediaItemId])
   @@map("schedule_item")
 }

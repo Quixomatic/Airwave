@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@ChannelGuide/db";
 
 import type { GuideMeta } from "../plex/client";
+import { guideMetaOf, upsertPoolItems } from "../media/media-item";
 import { resolveChannel } from "../plex/resolve";
 import { type BuildResult, type OrderingStrategy, buildSchedule } from "./timeline";
 
@@ -33,7 +34,7 @@ async function ensureSeed(prisma: PrismaClient, channelId: string, current: numb
   return seed;
 }
 
-function toRows(channelId: string, build: BuildResult) {
+function toRows(channelId: string, build: BuildResult, itemIds: Map<string, string>) {
   return build.entries.map((e) => ({
     channelId,
     kind: "PROGRAM" as const,
@@ -41,7 +42,7 @@ function toRows(channelId: string, build: BuildResult) {
     durationSeconds: e.durationSeconds,
     startOffsetSeconds: e.startOffsetSeconds,
     ratingKey: e.ratingKey,
-    guideData: e.guide as object,
+    mediaItemId: itemIds.get(e.ratingKey) ?? null,
   }));
 }
 
@@ -93,11 +94,12 @@ export async function generateChannelSchedule(
   const seed = await ensureSeed(prisma, channelId, channel.shuffleSeed);
 
   const pool = await resolveChannel(prisma, channelId);
+  const itemIds = await upsertPoolItems(prisma, channel.mediaSourceId, pool);
   const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, from, min);
 
   await prisma.$transaction([
     prisma.scheduleItem.deleteMany({ where: { channelId } }),
-    prisma.scheduleItem.createMany({ data: toRows(channelId, build) }),
+    prisma.scheduleItem.createMany({ data: toRows(channelId, build, itemIds) }),
   ]);
 
   return summarize(channelId, pool.length, build, from);
@@ -141,12 +143,13 @@ export async function extendChannelSchedule(
   const min = opts.minDurationSeconds ?? DEFAULT_MIN_HORIZON_SECONDS;
   const seed = await ensureSeed(prisma, channelId, channel.shuffleSeed);
   const pool = await resolveChannel(prisma, channelId);
+  const itemIds = await upsertPoolItems(prisma, channel.mediaSourceId, pool);
   const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, tailEnd, min);
 
   const pruneBefore = new Date(now.getTime() - HISTORY_KEEP_SECONDS * 1000);
   await prisma.$transaction([
     prisma.scheduleItem.deleteMany({ where: { channelId, startsAt: { lt: pruneBefore } } }),
-    prisma.scheduleItem.createMany({ data: toRows(channelId, build) }),
+    prisma.scheduleItem.createMany({ data: toRows(channelId, build, itemIds) }),
   ]);
 
   const newLast = build.entries[build.entries.length - 1];
@@ -159,19 +162,36 @@ export async function extendChannelSchedule(
   };
 }
 
-/** Timeline rows overlapping [from, to), ordered by start. */
+export type TimelineSlot = {
+  id: string;
+  ratingKey: string;
+  startsAt: Date;
+  durationSeconds: number;
+  guide: GuideMeta;
+};
+
+/** Timeline slots overlapping [from, to) with joined guide metadata, ordered by start. */
 export async function getChannelTimeline(
   prisma: PrismaClient,
   channelId: string,
   from: Date,
   to: Date,
-) {
+): Promise<TimelineSlot[]> {
   const rows = await prisma.scheduleItem.findMany({
     where: { channelId, startsAt: { lt: to } },
     orderBy: { startsAt: "asc" },
+    include: { mediaItem: { select: { guide: true } } },
   });
-  // Drop rows that already ended before the window (can't express endsAt in the where).
-  return rows.filter((r) => r.startsAt.getTime() + r.durationSeconds * 1000 > from.getTime());
+  return rows
+    // Drop rows that already ended before the window (can't express endsAt in the where).
+    .filter((r) => r.startsAt.getTime() + r.durationSeconds * 1000 > from.getTime())
+    .map((r) => ({
+      id: r.id,
+      ratingKey: r.ratingKey,
+      startsAt: r.startsAt,
+      durationSeconds: r.durationSeconds,
+      guide: guideMetaOf(r),
+    }));
 }
 
 export type NowNextSlot = {
@@ -188,23 +208,23 @@ export type NowNext = {
   endsAt: Date | null;
 };
 
-const guideOf = (r: { guideData: unknown }): GuideMeta =>
-  (r.guideData as GuideMeta | null) ?? { title: "" };
-
 /** "What's on now" (+ the live offset to seek to) and what's next, from materialized rows. */
 export async function getNowNext(
   prisma: PrismaClient,
   channelId: string,
   at: Date = new Date(),
 ): Promise<NowNext> {
+  const withGuide = { mediaItem: { select: { guide: true } } } as const;
   const [row, nextRow, lastRow] = await Promise.all([
     prisma.scheduleItem.findFirst({
       where: { channelId, startsAt: { lte: at } },
       orderBy: { startsAt: "desc" },
+      include: withGuide,
     }),
     prisma.scheduleItem.findFirst({
       where: { channelId, startsAt: { gt: at } },
       orderBy: { startsAt: "asc" },
+      include: withGuide,
     }),
     prisma.scheduleItem.findFirst({ where: { channelId }, orderBy: { startsAt: "desc" } }),
   ]);
@@ -213,7 +233,7 @@ export async function getNowNext(
     ratingKey: r.ratingKey,
     startsAt: r.startsAt,
     durationSeconds: r.durationSeconds,
-    guide: guideOf(r),
+    guide: guideMetaOf(r),
   });
 
   let current: NowNext["current"] = null;

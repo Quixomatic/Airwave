@@ -227,6 +227,7 @@ export type GuideMeta = {
   audioChannels?: number; // 6 → 5.1, 8 → 7.1
   // episode context
   showTitle?: string; // grandparentTitle
+  showRatingKey?: string; // grandparentRatingKey — links an episode to its parent show
   season?: number;
   episode?: number;
 };
@@ -258,6 +259,7 @@ type PlexMetadata = {
   thumb?: string;
   art?: string;
   grandparentTitle?: string;
+  grandparentRatingKey?: string | number;
   parentIndex?: number;
   index?: number;
   Director?: PlexTagRef[];
@@ -293,6 +295,7 @@ function toGuideMeta(m: PlexMetadata): GuideMeta {
     resolution: media?.videoResolution,
     audioChannels: media?.audioChannels,
     showTitle: m.grandparentTitle,
+    showRatingKey: m.grandparentRatingKey != null ? String(m.grandparentRatingKey) : undefined,
     season: m.parentIndex,
     episode: m.index,
   };
@@ -372,6 +375,37 @@ export async function getSectionItemsRaw(
     };
   };
   return (data.MediaContainer?.Metadata ?? []).map(toPlexItem);
+}
+
+/** Every item of a given type in a section, paged through in full — for metadata sync. */
+export async function getAllSectionItems(
+  baseUrl: string,
+  token: string,
+  sectionKey: string,
+  type: 1 | 2 | 4,
+): Promise<PlexItem[]> {
+  const pageSize = 500;
+  const out: PlexItem[] = [];
+  for (let start = 0; ; start += pageSize) {
+    const qs = [
+      `type=${type}`,
+      "sort=titleSort",
+      `X-Plex-Container-Start=${start}`,
+      `X-Plex-Container-Size=${pageSize}`,
+    ].join("&");
+    const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/all?${qs}`, {
+      headers: pmsHeaders(token),
+    });
+    if (!res.ok) throw new Error(`Plex listing failed (${res.status})`);
+    const data = (await res.json()) as {
+      MediaContainer?: { totalSize?: number; size?: number; Metadata?: Array<PlexMetadata> };
+    };
+    const batch = data.MediaContainer?.Metadata ?? [];
+    for (const m of batch) out.push(toPlexItem(m));
+    const total = data.MediaContainer?.totalSize ?? out.length;
+    if (batch.length < pageSize || out.length >= total) break;
+  }
+  return out;
 }
 
 /** Available values for a tag filter field (genre/studio/director/actor/…). */

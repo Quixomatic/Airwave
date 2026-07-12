@@ -1,15 +1,13 @@
-import type { GuideMeta, PlexItem } from "../plex/client";
+import type { PlexItem } from "../plex/client";
 
 export type OrderingStrategy = "SHUFFLE" | "IN_ORDER" | "BY_AIR_DATE";
 
-/** One materialized slot on a channel's timeline. */
+/** One materialized slot on a channel's timeline. Display metadata is joined via MediaItem. */
 export type TimelineEntry = {
   ratingKey: string;
   startsAt: Date;
   durationSeconds: number;
   startOffsetSeconds: number;
-  /** Denormalized display bundle for the guide. */
-  guide: GuideMeta;
 };
 
 export type BuildResult = {
@@ -131,7 +129,6 @@ export function buildSchedule(
         startsAt: new Date(cursorSec * 1000),
         durationSeconds: dur,
         startOffsetSeconds: 0,
-        guide: item.guide,
       });
       cursorSec += dur;
       coveredSeconds += dur;

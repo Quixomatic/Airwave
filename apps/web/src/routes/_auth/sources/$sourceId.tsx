@@ -20,6 +20,7 @@ function SourceDetail() {
   const source = useQuery(trpc.sources.get.queryOptions({ id: sourceId }));
   const [name, setName] = useState("");
   const [rescanning, setRescanning] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     if (source.data) setName(source.data.name);
@@ -45,6 +46,18 @@ function SourceDetail() {
       toast.error(err instanceof Error ? err.message : "Rescan failed");
     } finally {
       setRescanning(false);
+    }
+  };
+
+  const syncMetadata = async () => {
+    setSyncing(true);
+    try {
+      const r = await trpcClient.sources.syncMetadata.mutate({ id: sourceId });
+      toast.success(`Synced ${r.items} items across ${r.libraries} libraries.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Metadata sync failed");
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -108,14 +121,20 @@ function SourceDetail() {
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle>Libraries</CardTitle>
-          <Button variant="outline" size="sm" onClick={rescan} disabled={rescanning}>
-            {rescanning ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            Rescan
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={syncMetadata} disabled={syncing}>
+              {syncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Sync metadata
+            </Button>
+            <Button variant="outline" size="sm" onClick={rescan} disabled={rescanning}>
+              {rescanning ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Rescan
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <ul className="divide-y">

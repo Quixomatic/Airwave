@@ -22,14 +22,50 @@ model MediaSource {
   ownerUserId String?
   owner       User?   @relation("MediaSourceOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
 
-  channels  Channel[]
-  libraries MediaLibrary[]
+  channels   Channel[]
+  libraries  MediaLibrary[]
+  mediaItems MediaItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([ownerUserId])
   @@map("media_source")
+}
+
+/// Cached metadata for one media-server item (movie or episode). Populated when a
+/// channel's content is resolved and refreshed by metadata sync; the central place
+/// to enrich (e.g. episodes inheriting genres/cast from their parent show). Schedule
+/// slots point here via `mediaItemId` instead of copying metadata onto every row.
+model MediaItem {
+  id            String      @id @default(cuid())
+  mediaSourceId String
+  mediaSource   MediaSource @relation(fields: [mediaSourceId], references: [id], onDelete: Cascade)
+
+  ratingKey String // media-server item id
+  type      String // "movie" | "episode"
+  title     String
+  durationMs Int    @default(0)
+  year      Int?
+  airDate   String? // originallyAvailableAt — for by-air-date ordering
+
+  /// Full denormalized display bundle (GuideMeta): rating, summary, genres,
+  /// directors, cast, badges, episode context, art, …
+  guide Json
+
+  /// Whether the item is still present on the media server (for the missing-media
+  /// edge case — sync flips this instead of hard-deleting so built schedules render).
+  available    Boolean  @default(true)
+  lastSyncedAt DateTime @default(now())
+
+  scheduleItems ScheduleItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([mediaSourceId, ratingKey])
+  @@index([mediaSourceId, type])
+  @@map("media_item")
 }
 
 /// A library (section) on a connected media server. Synced from Plex; the admin

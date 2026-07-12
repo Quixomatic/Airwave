@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
-import { type GuideMeta, getFilterValues } from "../services/plex/client";
+import { getFilterValues } from "../services/plex/client";
 import { FILTER_FIELDS, OPS_FOR_KIND, fieldMeta } from "../services/plex/filter-fields";
 import { resolveChannel } from "../services/plex/resolve";
 import {
@@ -214,14 +214,7 @@ export const channelsRouter = router({
     .query(async ({ ctx, input }) => {
       const from = new Date();
       const to = new Date(from.getTime() + input.hours * 3600 * 1000);
-      const rows = await getChannelTimeline(ctx.prisma, input.id, from, to);
-      return rows.map((r) => ({
-        id: r.id,
-        startsAt: r.startsAt,
-        durationSeconds: r.durationSeconds,
-        ratingKey: r.ratingKey,
-        guide: (r.guideData as GuideMeta | null) ?? { title: "" },
-      }));
+      return getChannelTimeline(ctx.prisma, input.id, from, to);
     }),
 
   /** "What's on now" (+ live offset) and what's next, from the materialized timeline. */
