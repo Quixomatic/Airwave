@@ -50,7 +50,7 @@ export async function generateLineup(
     const survivors: (typeof pkg.channels)[number][] = [];
     for (const ch of pkg.channels) {
       onProgress?.({ current: done++, total, label: ch.name });
-      const items = await resolveFilter(prisma, src, ch.mediaTypes, ch.filter, ch.ordering);
+      const items = await resolveFilter(prisma, src, ch.mediaTypes, ch.filter, "titleSort");
       if (items.length < ch.minItems) {
         skipped.push({ name: ch.name, count: items.length, needed: ch.minItems });
         continue;

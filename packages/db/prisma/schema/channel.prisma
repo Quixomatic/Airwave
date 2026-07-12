@@ -51,6 +51,10 @@ model Channel {
   sortIndex   Int              @default(0)
   ordering    OrderingStrategy @default(SHUFFLE)
   shuffleSeed Int? // stable seed for deterministic shuffle
+  // When ordering != SHUFFLE, Plex sorts the pool by this field/direction and the
+  // scheduler preserves that order. `sortField` is a SORT_FIELDS key.
+  sortField   String           @default("title")
+  sortDir     String           @default("asc")
 
   // Provenance: auto-generated channels carry `generated=true` + the `presetKey`
   // they came from, so a regen deletes + rebuilds them without wiping manual channels.

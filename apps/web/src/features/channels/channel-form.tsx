@@ -21,6 +21,8 @@ export type ChannelFormValues = {
   mediaTypes: MediaType[];
   filter: FilterGroup;
   ordering: Ordering;
+  sortField: string;
+  sortDir: "asc" | "desc";
   packageId: string | null;
   icon: string | null;
   tint: string | null;
@@ -45,6 +47,7 @@ export function ChannelForm({
   const sources = useQuery(trpc.sources.list.queryOptions());
   const sourceId = sources.data?.[0]?.id ?? "";
   const packages = useQuery(trpc.packages.list.queryOptions());
+  const sortFields = useQuery(trpc.channels.sortFields.queryOptions());
 
   const initialTypes = initial?.mediaTypes ?? ["movie", "show"];
   const [name, setName] = useState(initial?.name ?? "");
@@ -52,6 +55,8 @@ export function ChannelForm({
   const [movies, setMovies] = useState(initialTypes.includes("movie"));
   const [tv, setTv] = useState(initialTypes.includes("show"));
   const [ordering, setOrdering] = useState<Ordering>(initial?.ordering ?? "SHUFFLE");
+  const [sortField, setSortField] = useState(initial?.sortField ?? "title");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(initial?.sortDir ?? "asc");
   const [packageId, setPackageId] = useState<string>(initial?.packageId ?? "");
   const [icon, setIcon] = useState<string | null>(initial?.icon ?? null);
   const [tint, setTint] = useState<string | null>(initial?.tint ?? null);
@@ -94,6 +99,8 @@ export function ChannelForm({
       mediaTypes,
       filter,
       ordering,
+      sortField,
+      sortDir,
       packageId: packageId || null,
       icon,
       tint,
@@ -167,12 +174,11 @@ export function ChannelForm({
           <select
             id="cord"
             className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-            value={ordering}
-            onChange={(e) => setOrdering(e.target.value as Ordering)}
+            value={ordering === "SHUFFLE" ? "SHUFFLE" : "SORTED"}
+            onChange={(e) => setOrdering(e.target.value === "SHUFFLE" ? "SHUFFLE" : "IN_ORDER")}
           >
             <option value="SHUFFLE">Shuffle</option>
-            <option value="IN_ORDER">In order</option>
-            <option value="BY_AIR_DATE">By air date</option>
+            <option value="SORTED">Sorted by…</option>
           </select>
         </div>
         <div className="space-y-2">
@@ -192,6 +198,38 @@ export function ChannelForm({
           </select>
         </div>
       </div>
+
+      {ordering !== "SHUFFLE" && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label htmlFor="csort">Sort by</Label>
+            <select
+              id="csort"
+              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              value={sortField}
+              onChange={(e) => setSortField(e.target.value)}
+            >
+              {sortFields.data?.map((s) => (
+                <option key={s.field} value={s.field}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="cdir">Direction</Label>
+            <select
+              id="cdir"
+              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              value={sortDir}
+              onChange={(e) => setSortDir(e.target.value as "asc" | "desc")}
+            >
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />

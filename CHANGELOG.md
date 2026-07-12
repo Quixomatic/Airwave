@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.2.2] - 2026-07-12
+
+Channel **sort ordering** — Plex's full sort set, not just shuffle.
+
+### Added
+
+- A channel is now **Shuffle** (seeded, as before) or **Sorted by…** a Plex sort field with a direction: **Title, Year, Release date, Critic rating, Audience rating, Personal rating, Content rating, Duration, Plays, Date added, Date viewed, Resolution, Bitrate**. `SORT_FIELDS` catalog + `channels.sortFields`; `Channel.sortField` + `sortDir` on the schema; sort controls on the channel form (shown when not shuffling).
+- How it fits the engine: **Plex does the sort** (`resolveFilter` passes `sort=field:dir`), and the **schedule engine preserves that order** for non-shuffle channels (shuffle still reshuffles per pass, seeded). `resolveChannel` now shares `resolveFilter` and computes the sort via `channelSortParam`.
+
+### Verified
+
+- `year:desc` returns newest-first; sort-param building checked for all fields. `pnpm check-types` passes.
+
 ## [0.2.1] - 2026-07-12
 
 **Auto-lineup generator** — foundation (BunnyEars' headline "machine-learned" feature, done as deterministic presets).

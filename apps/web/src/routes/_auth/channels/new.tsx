@@ -53,6 +53,8 @@ function NewChannel() {
                   mediaTypes: v.mediaTypes,
                   filter: v.filter,
                   ordering: v.ordering,
+                  sortField: v.sortField,
+                  sortDir: v.sortDir,
                   packageId: v.packageId,
                   icon: v.icon,
                   tint: v.tint,

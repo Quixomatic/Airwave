@@ -5,6 +5,7 @@ import { adminProcedure, router } from "../index";
 import { getFilterValues } from "../services/plex/client";
 import { FILTER_FIELDS, OPS_FOR_KIND, fieldMeta } from "../services/plex/filter-fields";
 import { resolveChannel } from "../services/plex/resolve";
+import { SORT_FIELDS } from "../services/plex/sort-fields";
 import {
   extendChannelSchedule,
   generateChannelSchedule,
@@ -74,6 +75,8 @@ export const channelsRouter = router({
       number: channel.number,
       name: channel.name,
       ordering: channel.ordering,
+      sortField: channel.sortField,
+      sortDir: channel.sortDir,
       enabled: channel.enabled,
       description: channel.description,
       mediaSourceId: channel.mediaSourceId,
@@ -84,6 +87,11 @@ export const channelsRouter = router({
       filter: filter.filter ?? null,
     };
   }),
+
+  /** Sort options for a channel's ordering (Plex sort fields). */
+  sortFields: adminProcedure.query(() =>
+    SORT_FIELDS.map((s) => ({ field: s.field, label: s.label })),
+  ),
 
   /** Static filter field catalog (field + label + kind + operators). */
   filterFields: adminProcedure.query(() =>
@@ -131,6 +139,8 @@ export const channelsRouter = router({
         mediaTypes: z.array(mediaTypeEnum).min(1),
         filter: nodeSchema.optional(),
         ordering: orderingEnum.default("SHUFFLE"),
+        sortField: z.string().optional(),
+        sortDir: z.enum(["asc", "desc"]).optional(),
         packageId: z.string().nullish(),
         icon: z.string().nullish(),
         tint: z.string().nullish(),
@@ -154,6 +164,8 @@ export const channelsRouter = router({
           number,
           mediaSourceId: input.mediaSourceId,
           ordering: input.ordering,
+          sortField: input.sortField ?? "title",
+          sortDir: input.sortDir ?? "asc",
           packageId: input.packageId ?? null,
           icon: input.icon ?? null,
           tint: input.tint ?? null,
@@ -175,6 +187,8 @@ export const channelsRouter = router({
         mediaTypes: z.array(mediaTypeEnum).min(1),
         filter: nodeSchema.optional(),
         ordering: orderingEnum,
+        sortField: z.string().optional(),
+        sortDir: z.enum(["asc", "desc"]).optional(),
         packageId: z.string().nullish(),
         icon: z.string().nullish(),
         tint: z.string().nullish(),
@@ -195,6 +209,8 @@ export const channelsRouter = router({
           name: input.name,
           number: input.number,
           ordering: input.ordering,
+          sortField: input.sortField ?? "title",
+          sortDir: input.sortDir ?? "asc",
           packageId: input.packageId ?? null,
           icon: input.icon ?? null,
           tint: input.tint ?? null,

@@ -2,6 +2,7 @@ import type { PrismaClient } from "@ChannelGuide/db";
 
 import { type PlexItem, getFilterValues, getSectionItemsRaw } from "./client";
 import { type FilterCondition, type FilterNode, buildParam } from "./filter-fields";
+import { channelSortParam } from "./sort-fields";
 
 type LibCtx = {
   baseUrl: string;
@@ -89,14 +90,11 @@ export async function resolveFilter(
   source: ResolveSource,
   mediaTypes: string[],
   tree: FilterNode | undefined,
-  ordering: string,
+  sort: string,
 ): Promise<PlexItem[]> {
   const libs = await prisma.mediaLibrary.findMany({
     where: { mediaSourceId: source.id, enabled: true, type: { in: mediaTypes } },
   });
-  // Stable sort only — the schedule engine owns deterministic ordering; a stable Plex
-  // sort also keeps the pool deterministic under the query size cap.
-  const sort = ordering === "BY_AIR_DATE" ? "originallyAvailableAt" : "titleSort";
 
   const out = new Map<string, PlexItem>();
   for (const lib of libs) {
@@ -134,11 +132,12 @@ export async function resolveChannel(
 
   const filter = (def.plexFilter as unknown as ChannelFilter | null) ?? {};
   const mediaTypes = filter.mediaTypes?.length ? filter.mediaTypes : ["movie", "show"];
+  const sort = channelSortParam(channel.ordering, channel.sortField, channel.sortDir);
   return resolveFilter(
     prisma,
     { id: source.id, baseUrl: source.baseUrl, token: source.token },
     mediaTypes,
     filter.filter,
-    channel.ordering,
+    sort,
   );
 }

@@ -48,25 +48,9 @@ function itemSeconds(i: PlexItem): number {
   return Math.max(MIN_ITEM_SECONDS, Math.round(i.durationMs / 1000));
 }
 
-/** Sortable air-date key; unknown dates sort last. */
-function airKey(i: PlexItem): string {
-  if (i.originallyAvailableAt) return i.originallyAvailableAt;
-  if (i.year) return `${i.year}-00-00`;
-  return "9999-99-99";
-}
-
-/** A stable base order (ratingKey ascending) so results never depend on Plex's return order. */
+/** A stable base order (ratingKey ascending) so a shuffle never depends on Plex's return order. */
 function stableBase(pool: PlexItem[]): PlexItem[] {
   return [...pool].sort((a, b) => a.ratingKey.localeCompare(b.ratingKey, undefined, { numeric: true }));
-}
-
-/** The fixed (non-shuffled) orders — the same every pass. */
-function orderedStable(pool: PlexItem[], ordering: OrderingStrategy): PlexItem[] {
-  const base = stableBase(pool);
-  if (ordering === "BY_AIR_DATE") {
-    return base.sort((a, b) => airKey(a).localeCompare(airKey(b)) || a.title.localeCompare(b.title));
-  }
-  return base.sort((a, b) => a.title.localeCompare(b.title));
 }
 
 /** Seeded Fisher–Yates over the stable base. */
@@ -82,7 +66,11 @@ function seededShuffle(pool: PlexItem[], seed: number): PlexItem[] {
   return arr;
 }
 
-/** The item order for one pass. SHUFFLE reshuffles per pass; others repeat the same order. */
+/**
+ * The item order for one pass. SHUFFLE reshuffles per pass (seeded); any other
+ * ordering preserves the pool's incoming order — which is Plex's sort (year, rating,
+ * date added, …), applied at resolve time.
+ */
 function passOrder(
   pool: PlexItem[],
   ordering: OrderingStrategy,
@@ -90,7 +78,7 @@ function passOrder(
   passIndex: number,
 ): PlexItem[] {
   if (ordering === "SHUFFLE") return seededShuffle(pool, mix(baseSeed, passIndex));
-  return orderedStable(pool, ordering);
+  return pool;
 }
 
 /**
