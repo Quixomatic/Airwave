@@ -125,6 +125,7 @@ function ChannelDetail() {
               mediaTypes: channel.data.mediaTypes as MediaType[],
               filter: (channel.data.filter as FilterGroup | null) ?? undefined,
               ordering: channel.data.ordering as Ordering,
+              packageId: channel.data.packageId,
             }}
             onSubmit={async (v) => {
               setSubmitting(true);
@@ -136,6 +137,7 @@ function ChannelDetail() {
                   mediaTypes: v.mediaTypes,
                   filter: v.filter,
                   ordering: v.ordering,
+                  packageId: v.packageId,
                 });
                 toast.success("Saved.");
                 await channel.refetch();

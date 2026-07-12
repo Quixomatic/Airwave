@@ -18,6 +18,7 @@ export type ChannelFormValues = {
   mediaTypes: MediaType[];
   filter: FilterGroup;
   ordering: Ordering;
+  packageId: string | null;
 };
 
 /**
@@ -36,6 +37,7 @@ export function ChannelForm({
 }) {
   const sources = useQuery(trpc.sources.list.queryOptions());
   const sourceId = sources.data?.[0]?.id ?? "";
+  const packages = useQuery(trpc.packages.list.queryOptions());
 
   const initialTypes = initial?.mediaTypes ?? ["movie", "show"];
   const [name, setName] = useState(initial?.name ?? "");
@@ -43,6 +45,7 @@ export function ChannelForm({
   const [movies, setMovies] = useState(initialTypes.includes("movie"));
   const [tv, setTv] = useState(initialTypes.includes("show"));
   const [ordering, setOrdering] = useState<Ordering>(initial?.ordering ?? "SHUFFLE");
+  const [packageId, setPackageId] = useState<string>(initial?.packageId ?? "");
   const [filter, setFilter] = useState<FilterGroup>(() => initial?.filter ?? emptyGroup());
 
   const mediaTypes: MediaType[] = [
@@ -72,7 +75,15 @@ export function ChannelForm({
       toast.error("Pick at least one content type.");
       return;
     }
-    onSubmit({ name, number, mediaTypes, filter, ordering, mediaSourceId: sourceId });
+    onSubmit({
+      name,
+      number,
+      mediaTypes,
+      filter,
+      ordering,
+      packageId: packageId || null,
+      mediaSourceId: sourceId,
+    });
   };
 
   return (
@@ -123,18 +134,36 @@ export function ChannelForm({
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="cord">Ordering</Label>
-        <select
-          id="cord"
-          className="border-input bg-background h-9 rounded-md border px-3 text-sm"
-          value={ordering}
-          onChange={(e) => setOrdering(e.target.value as Ordering)}
-        >
-          <option value="SHUFFLE">Shuffle</option>
-          <option value="IN_ORDER">In order</option>
-          <option value="BY_AIR_DATE">By air date</option>
-        </select>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <Label htmlFor="cord">Ordering</Label>
+          <select
+            id="cord"
+            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+            value={ordering}
+            onChange={(e) => setOrdering(e.target.value as Ordering)}
+          >
+            <option value="SHUFFLE">Shuffle</option>
+            <option value="IN_ORDER">In order</option>
+            <option value="BY_AIR_DATE">By air date</option>
+          </select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="cpkg">Package</Label>
+          <select
+            id="cpkg"
+            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+            value={packageId}
+            onChange={(e) => setPackageId(e.target.value)}
+          >
+            <option value="">None</option>
+            {packages.data?.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
     </form>
   );

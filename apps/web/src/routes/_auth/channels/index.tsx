@@ -42,6 +42,11 @@ function ChannelsList() {
                 >
                   <span className="text-muted-foreground w-8 text-sm tabular-nums">{c.number}</span>
                   <span className="flex-1 truncate text-sm font-medium">{c.name}</span>
+                  {c.package && (
+                    <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-xs">
+                      {c.package.name}
+                    </span>
+                  )}
                   <span className="text-muted-foreground text-xs capitalize">
                     {c.ordering.toLowerCase().replace("_", " ")}
                   </span>

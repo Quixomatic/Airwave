@@ -44,7 +44,14 @@ export const channelsRouter = router({
   list: adminProcedure.query(async ({ ctx }) => {
     return ctx.prisma.channel.findMany({
       orderBy: { number: "asc" },
-      select: { id: true, number: true, name: true, ordering: true, enabled: true },
+      select: {
+        id: true,
+        number: true,
+        name: true,
+        ordering: true,
+        enabled: true,
+        package: { select: { id: true, name: true } },
+      },
     });
   }),
 
@@ -66,6 +73,7 @@ export const channelsRouter = router({
       name: channel.name,
       ordering: channel.ordering,
       mediaSourceId: channel.mediaSourceId,
+      packageId: channel.packageId,
       mediaTypes: filter.mediaTypes ?? ["movie", "show"],
       filter: filter.filter ?? null,
     };
@@ -117,6 +125,7 @@ export const channelsRouter = router({
         mediaTypes: z.array(mediaTypeEnum).min(1),
         filter: nodeSchema.optional(),
         ordering: orderingEnum.default("SHUFFLE"),
+        packageId: z.string().nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -135,6 +144,7 @@ export const channelsRouter = router({
           number,
           mediaSourceId: input.mediaSourceId,
           ordering: input.ordering,
+          packageId: input.packageId ?? null,
           createdById: ctx.session.user.id,
           definitions: { create: { kind: "PREDICATE", plexFilter } },
         },
@@ -151,6 +161,7 @@ export const channelsRouter = router({
         mediaTypes: z.array(mediaTypeEnum).min(1),
         filter: nodeSchema.optional(),
         ordering: orderingEnum,
+        packageId: z.string().nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -162,7 +173,12 @@ export const channelsRouter = router({
 
       await ctx.prisma.channel.update({
         where: { id: input.id },
-        data: { name: input.name, number: input.number, ordering: input.ordering },
+        data: {
+          name: input.name,
+          number: input.number,
+          ordering: input.ordering,
+          packageId: input.packageId ?? null,
+        },
       });
 
       const plexFilter = {

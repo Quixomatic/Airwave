@@ -2,6 +2,20 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.1.12] - 2026-07-12
+
+Channel **packages** — grouping channels into lineups (e.g. "Kids & Family").
+
+### Added
+
+- **`packages` tRPC router** (`list` / `get` / `create` / `update` / `remove`) over the existing `ChannelPackage` model. Create generates a unique slug `key` (so the future auto-lineup generator can upsert packages idempotently); delete leaves channels intact (unassigned) via `onDelete: SetNull`.
+- **Packages UI**: `/packages` (list with channel counts) → `/packages/new` (create) → `/packages/$packageId` (rename / describe / see member channels / delete), with breadcrumbs + section icon.
+- **Channel ↔ package assignment**: `channels.create`/`update`/`get` carry `packageId`; the channel form has a **Package** selector, and the channel list shows each channel's package tag.
+
+### Verification
+
+- `pnpm check-types` passes.
+
 ## [0.1.11] - 2026-07-12
 
 Settings tabs + breadcrumbs (BasicTimeTracker parity).
