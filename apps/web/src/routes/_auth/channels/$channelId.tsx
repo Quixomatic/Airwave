@@ -128,6 +128,7 @@ function ChannelDetail() {
               packageId: channel.data.packageId,
               icon: channel.data.icon,
               tint: channel.data.tint,
+              description: channel.data.description,
             }}
             onSubmit={async (v) => {
               setSubmitting(true);
@@ -142,6 +143,7 @@ function ChannelDetail() {
                   packageId: v.packageId,
                   icon: v.icon,
                   tint: v.tint,
+                  description: v.description,
                 });
                 toast.success("Saved.");
                 await channel.refetch();

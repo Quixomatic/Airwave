@@ -1,5 +1,6 @@
 import { Input } from "@ChannelGuide/ui/components/input";
 import { Label } from "@ChannelGuide/ui/components/label";
+import { Textarea } from "@ChannelGuide/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Tv } from "lucide-react";
@@ -23,6 +24,7 @@ export type ChannelFormValues = {
   packageId: string | null;
   icon: string | null;
   tint: string | null;
+  description: string | null;
 };
 
 /**
@@ -52,6 +54,7 @@ export function ChannelForm({
   const [packageId, setPackageId] = useState<string>(initial?.packageId ?? "");
   const [icon, setIcon] = useState<string | null>(initial?.icon ?? null);
   const [tint, setTint] = useState<string | null>(initial?.tint ?? null);
+  const [description, setDescription] = useState(initial?.description ?? "");
   const [filter, setFilter] = useState<FilterGroup>(() => initial?.filter ?? emptyGroup());
 
   const selectedPackage = packages.data?.find((p) => p.id === packageId);
@@ -92,6 +95,7 @@ export function ChannelForm({
       packageId: packageId || null,
       icon,
       tint,
+      description: description.trim() || null,
       mediaSourceId: sourceId,
     });
   };
@@ -118,6 +122,16 @@ export function ChannelForm({
             placeholder="auto"
           />
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="cdesc">Description</Label>
+        <Textarea
+          id="cdesc"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Optional — what this channel is for."
+        />
       </div>
 
       <div className="space-y-2">

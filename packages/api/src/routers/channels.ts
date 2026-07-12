@@ -74,6 +74,7 @@ export const channelsRouter = router({
       number: channel.number,
       name: channel.name,
       ordering: channel.ordering,
+      description: channel.description,
       mediaSourceId: channel.mediaSourceId,
       packageId: channel.packageId,
       icon: channel.icon,
@@ -132,6 +133,7 @@ export const channelsRouter = router({
         packageId: z.string().nullish(),
         icon: z.string().nullish(),
         tint: z.string().nullish(),
+        description: z.string().nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -153,6 +155,7 @@ export const channelsRouter = router({
           packageId: input.packageId ?? null,
           icon: input.icon ?? null,
           tint: input.tint ?? null,
+          description: input.description ?? null,
           createdById: ctx.session.user.id,
           definitions: { create: { kind: "PREDICATE", plexFilter } },
         },
@@ -172,6 +175,7 @@ export const channelsRouter = router({
         packageId: z.string().nullish(),
         icon: z.string().nullish(),
         tint: z.string().nullish(),
+        description: z.string().nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -190,6 +194,7 @@ export const channelsRouter = router({
           packageId: input.packageId ?? null,
           icon: input.icon ?? null,
           tint: input.tint ?? null,
+          description: input.description ?? null,
         },
       });
 

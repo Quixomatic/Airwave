@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.1.14] - 2026-07-12
+
+### Added
+
+- **Channel description** — the existing `Channel.description` field is now wired into the channel router (create / update / get) and a Description textarea on the channel form.
+
 ## [0.1.13] - 2026-07-12
 
 Icon + tint system for channels and packages (virtualized picker over all of lucide + phosphor).
