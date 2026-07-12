@@ -34,6 +34,27 @@ export type TintedIconTileTint =
   | "cyan"
   | "sky";
 
+/** All tint tokens, in a sensible swatch order (for pickers). */
+export const TINT_TOKENS: TintedIconTileTint[] = [
+  "gray",
+  "red",
+  "orange",
+  "amber",
+  "yellow",
+  "lime",
+  "green",
+  "emerald",
+  "teal",
+  "cyan",
+  "sky",
+  "blue",
+  "indigo",
+  "violet",
+  "purple",
+  "pink",
+  "rose",
+];
+
 export type TintedIconTileSize = "sm" | "md" | "lg";
 
 type Props = {

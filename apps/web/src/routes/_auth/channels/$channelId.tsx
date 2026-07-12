@@ -126,6 +126,8 @@ function ChannelDetail() {
               filter: (channel.data.filter as FilterGroup | null) ?? undefined,
               ordering: channel.data.ordering as Ordering,
               packageId: channel.data.packageId,
+              icon: channel.data.icon,
+              tint: channel.data.tint,
             }}
             onSubmit={async (v) => {
               setSubmitting(true);
@@ -138,6 +140,8 @@ function ChannelDetail() {
                   filter: v.filter,
                   ordering: v.ordering,
                   packageId: v.packageId,
+                  icon: v.icon,
+                  tint: v.tint,
                 });
                 toast.success("Saved.");
                 await channel.refetch();

@@ -1,9 +1,11 @@
 import { Button } from "@ChannelGuide/ui/components/button";
 import { Card, CardContent } from "@ChannelGuide/ui/components/card";
+import { TintedIconTile } from "@ChannelGuide/ui/components/tinted-icon-tile";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
+import { Plus, Tv } from "lucide-react";
 
+import { resolveTile } from "@/features/icons/app-icon";
 import { HeaderRight } from "@/context/header-provider";
 import { trpc } from "@/utils/trpc";
 
@@ -33,7 +35,15 @@ function ChannelsList() {
       <Card className="mt-6">
         <CardContent className="p-0">
           <ul className="divide-y">
-            {channels.data?.map((c) => (
+            {channels.data?.map((c) => {
+              const tile = resolveTile({
+                icon: c.icon,
+                tint: c.tint,
+                inheritedIcon: c.package?.icon,
+                inheritedTint: c.package?.tint,
+                defaultIcon: Tv,
+              });
+              return (
               <li key={c.id}>
                 <Link
                   to="/channels/$channelId"
@@ -41,6 +51,7 @@ function ChannelsList() {
                   className="hover:bg-muted/50 flex items-center gap-3 px-4 py-3"
                 >
                   <span className="text-muted-foreground w-8 text-sm tabular-nums">{c.number}</span>
+                  <TintedIconTile icon={tile.Icon} tint={tile.tint} size="lg" />
                   <span className="flex-1 truncate text-sm font-medium">{c.name}</span>
                   {c.package && (
                     <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-xs">
@@ -52,7 +63,8 @@ function ChannelsList() {
                   </span>
                 </Link>
               </li>
-            ))}
+              );
+            })}
             {channels.data?.length === 0 && (
               <li className="text-muted-foreground px-4 py-8 text-center text-sm">
                 No channels yet.{" "}

@@ -1,9 +1,11 @@
 import { Button } from "@ChannelGuide/ui/components/button";
 import { Card } from "@ChannelGuide/ui/components/card";
+import { TintedIconTile } from "@ChannelGuide/ui/components/tinted-icon-tile";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, LayoutGrid, Plus } from "lucide-react";
 
+import { resolveTile } from "@/features/icons/app-icon";
 import { HeaderRight } from "@/context/header-provider";
 import { trpc } from "@/utils/trpc";
 
@@ -29,13 +31,21 @@ function PackagesList() {
 
       {packages.data && packages.data.length > 0 ? (
         <Card className="divide-border divide-y p-0">
-          {packages.data.map((p) => (
+          {packages.data.map((p) => {
+            const tile = resolveTile({
+              icon: p.icon,
+              tint: p.tint,
+              defaultIcon: LayoutGrid,
+              defaultTint: "violet",
+            });
+            return (
             <Link
               key={p.id}
               to="/packages/$packageId"
               params={{ packageId: p.id }}
               className="hover:bg-accent/50 flex items-center gap-3 p-4 transition-colors"
             >
+              <TintedIconTile icon={tile.Icon} tint={tile.tint} size="lg" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">{p.name}</p>
                 {p.description && (
@@ -47,7 +57,8 @@ function PackagesList() {
               </span>
               <ChevronRight className="text-muted-foreground h-4 w-4" />
             </Link>
-          ))}
+            );
+          })}
         </Card>
       ) : (
         <Card className="text-muted-foreground p-8 text-center text-sm">

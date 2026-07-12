@@ -4,11 +4,12 @@ import { Input } from "@ChannelGuide/ui/components/input";
 import { Label } from "@ChannelGuide/ui/components/label";
 import { Textarea } from "@ChannelGuide/ui/components/textarea";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, LayoutGrid, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { HeaderRight } from "@/context/header-provider";
+import { IconTintField } from "@/features/icons/icon-tint-field";
 import { trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/packages/new")({
@@ -22,6 +23,8 @@ function NewPackage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [icon, setIcon] = useState<string | null>(null);
+  const [tint, setTint] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
@@ -35,6 +38,8 @@ function NewPackage() {
       const res = await trpcClient.packages.create.mutate({
         name,
         description: description.trim() || undefined,
+        icon,
+        tint,
       });
       toast.success("Package created.");
       navigate({ to: "/packages/$packageId", params: { packageId: res.id } });
@@ -84,6 +89,19 @@ function NewPackage() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional — what this lineup is about."
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Appearance</Label>
+              <IconTintField
+                icon={icon}
+                tint={tint}
+                onIconChange={setIcon}
+                onTintChange={setTint}
+                defaultIcon={LayoutGrid}
+              />
+              <p className="text-muted-foreground text-xs">
+                Channels in this package inherit its tint unless they set their own.
+              </p>
             </div>
           </form>
         </CardContent>

@@ -22,6 +22,8 @@ model ChannelPackage {
   key         String    @unique // stable slug
   name        String
   description String?
+  icon        String? // "lucide:Sparkles" / "phosphor:Television"
+  tint        String? // TintedIconTile tint token — channels inherit this unless they override
   sortIndex   Int       @default(0)
   channels    Channel[]
 
@@ -38,8 +40,8 @@ model Channel {
   number      Int              @unique // guide channel number
   name        String
   description String?
-  iconUrl     String?
-  color       String?
+  icon        String? // "lucide:Sparkles" / "phosphor:Television" — overrides the package icon
+  tint        String? // TintedIconTile tint token — overrides the package tint
   enabled     Boolean          @default(true)
   sortIndex   Int              @default(0)
   ordering    OrderingStrategy @default(SHUFFLE)

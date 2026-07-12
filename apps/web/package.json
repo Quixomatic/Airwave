@@ -1,6 +1,6 @@
 {
   "name": "web",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,10 +15,12 @@
     "@ChannelGuide/env": "workspace:*",
     "@ChannelGuide/ui": "workspace:*",
     "@hookform/resolvers": "^5.4.0",
+    "@phosphor-icons/react": "^2.1.10",
     "@tailwindcss/vite": "^4.3.2",
     "@tanstack/react-form": "^1.33.0",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.17",
+    "@tanstack/react-virtual": "^3.14.5",
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
     "@trpc/tanstack-react-query": "^11.18.0",

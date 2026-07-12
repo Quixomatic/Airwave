@@ -50,7 +50,9 @@ export const channelsRouter = router({
         name: true,
         ordering: true,
         enabled: true,
-        package: { select: { id: true, name: true } },
+        icon: true,
+        tint: true,
+        package: { select: { id: true, name: true, icon: true, tint: true } },
       },
     });
   }),
@@ -74,6 +76,8 @@ export const channelsRouter = router({
       ordering: channel.ordering,
       mediaSourceId: channel.mediaSourceId,
       packageId: channel.packageId,
+      icon: channel.icon,
+      tint: channel.tint,
       mediaTypes: filter.mediaTypes ?? ["movie", "show"],
       filter: filter.filter ?? null,
     };
@@ -126,6 +130,8 @@ export const channelsRouter = router({
         filter: nodeSchema.optional(),
         ordering: orderingEnum.default("SHUFFLE"),
         packageId: z.string().nullish(),
+        icon: z.string().nullish(),
+        tint: z.string().nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -145,6 +151,8 @@ export const channelsRouter = router({
           mediaSourceId: input.mediaSourceId,
           ordering: input.ordering,
           packageId: input.packageId ?? null,
+          icon: input.icon ?? null,
+          tint: input.tint ?? null,
           createdById: ctx.session.user.id,
           definitions: { create: { kind: "PREDICATE", plexFilter } },
         },
@@ -162,6 +170,8 @@ export const channelsRouter = router({
         filter: nodeSchema.optional(),
         ordering: orderingEnum,
         packageId: z.string().nullish(),
+        icon: z.string().nullish(),
+        tint: z.string().nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -178,6 +188,8 @@ export const channelsRouter = router({
           number: input.number,
           ordering: input.ordering,
           packageId: input.packageId ?? null,
+          icon: input.icon ?? null,
+          tint: input.tint ?? null,
         },
       });
 

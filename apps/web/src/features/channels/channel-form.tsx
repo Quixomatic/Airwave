@@ -2,9 +2,11 @@ import { Input } from "@ChannelGuide/ui/components/input";
 import { Label } from "@ChannelGuide/ui/components/label";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { Tv } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { IconTintField } from "@/features/icons/icon-tint-field";
 import { trpc } from "@/utils/trpc";
 
 import { FilterBuilder, type FilterGroup, emptyGroup } from "./filter-builder";
@@ -19,6 +21,8 @@ export type ChannelFormValues = {
   filter: FilterGroup;
   ordering: Ordering;
   packageId: string | null;
+  icon: string | null;
+  tint: string | null;
 };
 
 /**
@@ -46,7 +50,11 @@ export function ChannelForm({
   const [tv, setTv] = useState(initialTypes.includes("show"));
   const [ordering, setOrdering] = useState<Ordering>(initial?.ordering ?? "SHUFFLE");
   const [packageId, setPackageId] = useState<string>(initial?.packageId ?? "");
+  const [icon, setIcon] = useState<string | null>(initial?.icon ?? null);
+  const [tint, setTint] = useState<string | null>(initial?.tint ?? null);
   const [filter, setFilter] = useState<FilterGroup>(() => initial?.filter ?? emptyGroup());
+
+  const selectedPackage = packages.data?.find((p) => p.id === packageId);
 
   const mediaTypes: MediaType[] = [
     ...(movies ? (["movie"] as const) : []),
@@ -82,6 +90,8 @@ export function ChannelForm({
       filter,
       ordering,
       packageId: packageId || null,
+      icon,
+      tint,
       mediaSourceId: sourceId,
     });
   };
@@ -164,6 +174,24 @@ export function ChannelForm({
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Appearance</Label>
+        <IconTintField
+          icon={icon}
+          tint={tint}
+          onIconChange={setIcon}
+          onTintChange={setTint}
+          inheritedIcon={selectedPackage?.icon}
+          inheritedTint={selectedPackage?.tint}
+          defaultIcon={Tv}
+        />
+        {selectedPackage && !tint && !icon && (
+          <p className="text-muted-foreground text-xs">
+            Inherits “{selectedPackage.name}” — pick an icon or tint to override.
+          </p>
+        )}
       </div>
     </form>
   );

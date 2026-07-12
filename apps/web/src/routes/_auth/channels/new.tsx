@@ -54,6 +54,8 @@ function NewChannel() {
                   filter: v.filter,
                   ordering: v.ordering,
                   packageId: v.packageId,
+                  icon: v.icon,
+                  tint: v.tint,
                 });
                 toast.success("Channel created.");
                 navigate({ to: "/channels/$channelId", params: { channelId: res.id } });

@@ -5,12 +5,13 @@ import { Label } from "@ChannelGuide/ui/components/label";
 import { Textarea } from "@ChannelGuide/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, LayoutGrid, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { useBreadcrumb } from "@/context/breadcrumb-provider";
 import { HeaderRight } from "@/context/header-provider";
+import { IconTintField } from "@/features/icons/icon-tint-field";
 import { trpc, trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/packages/$packageId")({
@@ -27,12 +28,16 @@ function PackageDetail() {
   useBreadcrumb(pkg.data?.name);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [icon, setIcon] = useState<string | null>(null);
+  const [tint, setTint] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (pkg.data) {
       setName(pkg.data.name);
       setDescription(pkg.data.description ?? "");
+      setIcon(pkg.data.icon ?? null);
+      setTint(pkg.data.tint ?? null);
     }
   }, [pkg.data]);
 
@@ -44,6 +49,8 @@ function PackageDetail() {
         id: packageId,
         name,
         description: description.trim() || undefined,
+        icon,
+        tint,
       });
       toast.success("Saved.");
       await pkg.refetch();
@@ -104,6 +111,16 @@ function PackageDetail() {
                 id="pdesc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Appearance</Label>
+              <IconTintField
+                icon={icon}
+                tint={tint}
+                onIconChange={setIcon}
+                onTintChange={setTint}
+                defaultIcon={LayoutGrid}
               />
             </div>
           </form>

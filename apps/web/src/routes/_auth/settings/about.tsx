@@ -20,7 +20,7 @@ function SettingsAbout() {
           </p>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
             <dt className="text-muted-foreground">Version</dt>
-            <dd className="tabular-nums">0.1.11</dd>
+            <dd className="tabular-nums">0.1.13</dd>
             <dt className="text-muted-foreground">Source</dt>
             <dd>
               <a

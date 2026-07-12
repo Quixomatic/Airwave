@@ -2,6 +2,25 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.1.13] - 2026-07-12
+
+Icon + tint system for channels and packages (virtualized picker over all of lucide + phosphor).
+
+### Added
+
+- **Icon picker** (`features/icons/`, adapted from GuideEngine): a virtualized (`@tanstack/react-virtual`) Base UI popover over the **full lucide + phosphor catalogs** with debounced search. Icons are stored as a single string id — **`lib:ExportName`** (`lucide:Sparkles`, `phosphor:Television`) — and resolved back via a lookup. **Phosphor renders solid** (`weight="fill"`).
+- **`icon` + `tint` on `Channel` and `ChannelPackage`** (schema). A combined **`IconTintField`** (preview tile + tint swatches from the existing `TintedIconTile` tokens) on the channel and package forms.
+- **Tint inheritance**: a channel's effective icon/tint follows override → its **package** → default, so tinting a package (e.g. "Kids & Family" violet) colors its channels automatically, with per-channel override + Reset.
+- Tinted tiles now render in the channels and packages lists. Copied Base UI `popover` into `packages/ui`; exported `TINT_TOKENS`.
+
+### Notes
+
+- The lucide+phosphor catalog is a **code-split ~1.2 MB-gzip chunk** loaded only on icon pages (not in the main bundle). If that first-load cost matters, a follow-up can switch to per-icon dynamic imports.
+
+### Verification
+
+- `pnpm check-types` passes; schema pushed. Needs a live click-test of the picker popover.
+
 ## [0.1.12] - 2026-07-12
 
 Channel **packages** — grouping channels into lineups (e.g. "Kids & Family").
