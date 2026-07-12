@@ -8,9 +8,11 @@ import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { useBreadcrumb } from "@/context/breadcrumb-provider";
 import { trpc, trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/sources/$sourceId")({
+  staticData: { breadcrumb: "Source" },
   component: SourceDetail,
 });
 
@@ -18,6 +20,7 @@ function SourceDetail() {
   const { sourceId } = Route.useParams();
   const navigate = useNavigate();
   const source = useQuery(trpc.sources.get.queryOptions({ id: sourceId }));
+  useBreadcrumb(source.data?.name);
   const [name, setName] = useState("");
   const [rescanning, setRescanning] = useState(false);
 

@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Clapperboard } from "lucide-react";
 
 export const Route = createFileRoute("/_auth/bumpers")({
+  staticData: { breadcrumb: "Bumpers", breadcrumbIcon: Clapperboard, breadcrumbTint: "amber" },
   component: () => (
     <div className="mx-auto max-w-5xl">
       <h1 className="text-2xl font-semibold tracking-tight">Bumpers</h1>

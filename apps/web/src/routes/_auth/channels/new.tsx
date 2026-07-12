@@ -10,6 +10,7 @@ import { ChannelForm } from "@/features/channels/channel-form";
 import { trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/channels/new")({
+  staticData: { breadcrumb: "New" },
   component: NewChannel,
 });
 

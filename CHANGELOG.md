@@ -2,6 +2,23 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.1.11] - 2026-07-12
+
+Settings tabs + breadcrumbs (BasicTimeTracker parity).
+
+### Added
+
+- **Settings is now a tabbed section** (seerr-style): `/settings` redirects to **`/settings/main`** (General), with **Jobs & Cache** (`/settings/jobs`) and **About** (`/settings/about`). The tabs render into the SubHeader (HeaderLeft portal) from the settings layout route; the Jobs page moved under it.
+- **Breadcrumbs** in the TopHeader (`TopHeaderLeft` portal), ported from BasicTimeTracker: `Breadcrumbs` component + `BreadcrumbProvider` / `useBreadcrumb`. Each route declares `staticData.breadcrumb` (+ section icon/tint matching the sidebar); detail pages publish a dynamic label (e.g. **Sources › _My Plex_**, **Channels › _90s Sitcoms_**, **Settings › Jobs & Cache**).
+
+### Changed
+
+- Sidebar "Settings" now links to `/settings/main`.
+
+### Verification
+
+- `pnpm check-types` passes (route tree regenerates clean).
+
 ## [0.1.10] - 2026-07-12
 
 More jobs (incremental scan, removal detection, token check), job **progress**, and an async sync button.

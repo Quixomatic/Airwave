@@ -10,6 +10,8 @@ import {
   TopHeaderLeftSlot,
   TopHeaderRightSlot,
 } from "@/context/header-provider";
+import { Breadcrumbs } from "@/components/breadcrumbs";
+import { BreadcrumbProvider } from "@/context/breadcrumb-provider";
 import { cn } from "@/lib/utils";
 
 import { AppSidebar } from "./app-sidebar";
@@ -43,13 +45,15 @@ export function AppLayout() {
       <AppSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <HeaderProvider>
-          <TopHeader />
-          <div className="flex min-h-0 flex-1 pr-1 pb-1">
-            <main className="bg-background m-2 mt-0 ml-0 flex flex-1 flex-col overflow-hidden rounded-md border shadow-sm">
-              <SubHeader />
-              <PageContent />
-            </main>
-          </div>
+          <BreadcrumbProvider>
+            <TopHeader />
+            <div className="flex min-h-0 flex-1 pr-1 pb-1">
+              <main className="bg-background m-2 mt-0 ml-0 flex flex-1 flex-col overflow-hidden rounded-md border shadow-sm">
+                <SubHeader />
+                <PageContent />
+              </main>
+            </div>
+          </BreadcrumbProvider>
         </HeaderProvider>
       </div>
     </SidebarProvider>
@@ -61,6 +65,7 @@ function TopHeader() {
     <header className="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center px-3">
       <TopHeaderLeftSlot className="flex items-center gap-2 justify-self-start">
         <SidebarTrigger />
+        <Breadcrumbs />
       </TopHeaderLeftSlot>
       <TopHeaderCenterSlot className="justify-self-center" />
       <TopHeaderRightSlot className="flex items-center gap-2 justify-self-end" />

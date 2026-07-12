@@ -6,12 +6,14 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { useBreadcrumb } from "@/context/breadcrumb-provider";
 import { HeaderRight } from "@/context/header-provider";
 import { ChannelForm, type MediaType, type Ordering } from "@/features/channels/channel-form";
 import type { FilterGroup } from "@/features/channels/filter-builder";
 import { trpc, trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/channels/$channelId")({
+  staticData: { breadcrumb: "Channel" },
   component: ChannelDetail,
 });
 
@@ -21,6 +23,7 @@ function ChannelDetail() {
   const { channelId } = Route.useParams();
   const navigate = useNavigate();
   const channel = useQuery(trpc.channels.get.queryOptions({ id: channelId }));
+  useBreadcrumb(channel.data?.name);
   const nowNext = useQuery(trpc.channels.nowNext.queryOptions({ id: channelId }));
   const schedule = useQuery(trpc.channels.schedule.queryOptions({ id: channelId, hours: 48 }));
   const [submitting, setSubmitting] = useState(false);

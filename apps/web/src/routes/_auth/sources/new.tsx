@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/sources/new")({
+  staticData: { breadcrumb: "Add source" },
   component: NewSource,
 });
 

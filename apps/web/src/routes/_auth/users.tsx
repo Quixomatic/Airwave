@@ -2,13 +2,14 @@ import { Button } from "@ChannelGuide/ui/components/button";
 import { Card, CardContent } from "@ChannelGuide/ui/components/card";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Loader2, UserPlus } from "lucide-react";
+import { Loader2, UserPlus, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { trpc, trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/users")({
+  staticData: { breadcrumb: "Users", breadcrumbIcon: Users, breadcrumbTint: "emerald" },
   component: UsersPage,
 });
 

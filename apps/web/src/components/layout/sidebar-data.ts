@@ -12,7 +12,7 @@ export const sidebarData: SidebarData = {
         { title: "Sources", url: "/sources", icon: Server, iconTint: "sky" },
         { title: "Bumpers", url: "/bumpers", icon: Clapperboard, iconTint: "amber" },
         { title: "Users", url: "/users", icon: Users, iconTint: "emerald" },
-        { title: "Settings", url: "/settings", icon: Settings, iconTint: "rose" },
+        { title: "Settings", url: "/settings/main", icon: Settings, iconTint: "rose" },
       ],
     },
   ],
