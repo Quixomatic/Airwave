@@ -1,5 +1,6 @@
 import { createContext } from "@ChannelGuide/api/context";
 import { appRouter } from "@ChannelGuide/api/routers/index";
+import { startJobs } from "@ChannelGuide/api/services/jobs/scheduler";
 import { buildAuthUrl, createPin } from "@ChannelGuide/api/services/plex/client";
 import { auth } from "@ChannelGuide/auth";
 import { PLEX_CLIENT_ID } from "@ChannelGuide/auth/lib/plex-login";
@@ -59,6 +60,13 @@ try {
   await seedAdmin();
 } catch (err) {
   console.error("Admin seeding failed:", err);
+}
+
+// Register background jobs (metadata sync, library scan, schedule refresh).
+try {
+  await startJobs();
+} catch (err) {
+  console.error("Job scheduler startup failed:", err);
 }
 
 export default app;

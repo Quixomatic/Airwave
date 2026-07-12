@@ -1,0 +1,17 @@
+/// Persisted config for a background job. Job *definitions* (name, interval, the
+/// work to run) live in code; this row stores the editable cron schedule and the
+/// last-run bookkeeping. Running state itself is in-memory (single-instance).
+model Job {
+  id             String    @id // stable slug, e.g. "metadata-sync"
+  cronSchedule   String // node-schedule cron expression
+  enabled        Boolean   @default(true)
+  lastRunAt      DateTime?
+  lastFinishedAt DateTime?
+  lastStatus     String? // "success" | "failed"
+  lastError      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("job")
+}

@@ -18,10 +18,12 @@
     "@trpc/server": "catalog:",
     "dotenv": "catalog:",
     "fast-xml-parser": "^4.5.0",
+    "node-schedule": "2.1.1",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@ChannelGuide/config": "workspace:*",
+    "@types/node-schedule": "2.1.8",
     "hono": "catalog:",
     "typescript": "catalog:"
   }
