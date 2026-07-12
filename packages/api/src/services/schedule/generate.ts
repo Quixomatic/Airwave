@@ -1,11 +1,20 @@
 import type { PrismaClient } from "@ChannelGuide/db";
 
+import type { GuideMeta } from "../plex/client";
 import { resolveChannel } from "../plex/resolve";
-import { type OrderingStrategy, buildTimeline } from "./timeline";
+import { type BuildResult, type OrderingStrategy, buildSchedule } from "./timeline";
 
 const DAY_SECONDS = 86400;
-/** Default materialization horizon — one admin week. Viewers read the first 24h. */
-const DEFAULT_HORIZON_SECONDS = 7 * DAY_SECONDS;
+/**
+ * Floor for a build block. A pool whose single pass is longer than this (e.g. a
+ * few hundred movies) schedules exactly one full pass; a short pool loops
+ * (reshuffling each pass) until it covers this much.
+ */
+const DEFAULT_MIN_HORIZON_SECONDS = 7 * DAY_SECONDS;
+/** Extend the tail once it is within this much of "now". */
+const DEFAULT_EXTEND_THRESHOLD_SECONDS = 2 * DAY_SECONDS;
+/** Keep a little played-out history, then prune. */
+const HISTORY_KEEP_SECONDS = 6 * 3600;
 
 /** Deterministic FNV-1a hash of the channel id — a stable fallback shuffle seed. */
 function deriveSeed(id: string): number {
@@ -17,74 +26,136 @@ function deriveSeed(id: string): number {
   return h >>> 0;
 }
 
-export type GenerateOptions = { from?: Date; horizonSeconds?: number };
+async function ensureSeed(prisma: PrismaClient, channelId: string, current: number | null) {
+  if (current != null) return current;
+  const seed = deriveSeed(channelId);
+  await prisma.channel.update({ where: { id: channelId }, data: { shuffleSeed: seed } });
+  return seed;
+}
 
-export type GenerateResult = {
+function toRows(channelId: string, build: BuildResult) {
+  return build.entries.map((e) => ({
+    channelId,
+    kind: "PROGRAM" as const,
+    startsAt: e.startsAt,
+    durationSeconds: e.durationSeconds,
+    startOffsetSeconds: e.startOffsetSeconds,
+    ratingKey: e.ratingKey,
+    guideData: e.guide as object,
+  }));
+}
+
+export type ScheduleSummary = {
   channelId: string;
   poolSize: number;
   itemCount: number;
-  loopSeconds: number;
-  from: Date;
-  to: Date;
+  passes: number;
+  poolSeconds: number;
+  coveredSeconds: number;
+  startsAt: Date;
+  endsAt: Date;
 };
 
+function summarize(
+  channelId: string,
+  poolSize: number,
+  build: BuildResult,
+  from: Date,
+): ScheduleSummary {
+  const last = build.entries[build.entries.length - 1];
+  return {
+    channelId,
+    poolSize,
+    itemCount: build.entries.length,
+    passes: build.passes,
+    poolSeconds: build.poolSeconds,
+    coveredSeconds: build.coveredSeconds,
+    startsAt: from,
+    endsAt: last ? new Date(last.startsAt.getTime() + last.durationSeconds * 1000) : from,
+  };
+}
+
 /**
- * (Re)materialize a channel's schedule over a rolling horizon. The timeline is a
- * pure function of (resolved pool, ordering, seed, channel epoch), so this is
- * idempotent for a stable pool: the same `from` yields the same rows. Replaces the
- * whole timeline for the channel (past rows are irrelevant to a live guide).
+ * Build the channel's whole lineup fresh from `now` and replace the timeline. Use
+ * after the filter/pool changes (it necessarily disturbs what's on now). For a
+ * channel that's just running low, prefer {@link extendChannelSchedule}.
  */
 export async function generateChannelSchedule(
   prisma: PrismaClient,
   channelId: string,
-  opts: GenerateOptions = {},
-): Promise<GenerateResult> {
+  opts: { from?: Date; minDurationSeconds?: number } = {},
+): Promise<ScheduleSummary> {
   const channel = await prisma.channel.findUnique({ where: { id: channelId } });
   if (!channel) throw new Error("Channel not found");
 
   const from = opts.from ?? new Date();
-  const horizon = opts.horizonSeconds ?? DEFAULT_HORIZON_SECONDS;
-  const to = new Date(from.getTime() + horizon * 1000);
-
-  // Pin a stable seed so the shuffle survives across regenerations.
-  let seed = channel.shuffleSeed;
-  if (seed == null) {
-    seed = deriveSeed(channelId);
-    await prisma.channel.update({ where: { id: channelId }, data: { shuffleSeed: seed } });
-  }
+  const min = opts.minDurationSeconds ?? DEFAULT_MIN_HORIZON_SECONDS;
+  const seed = await ensureSeed(prisma, channelId, channel.shuffleSeed);
 
   const pool = await resolveChannel(prisma, channelId);
-  const { entries, loopSeconds } = buildTimeline(
-    pool,
-    channel.ordering as OrderingStrategy,
-    seed,
-    channel.createdAt,
-    from,
-    to,
-  );
+  const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, from, min);
 
   await prisma.$transaction([
     prisma.scheduleItem.deleteMany({ where: { channelId } }),
-    prisma.scheduleItem.createMany({
-      data: entries.map((e) => ({
-        channelId,
-        kind: "PROGRAM" as const,
-        startsAt: e.startsAt,
-        durationSeconds: e.durationSeconds,
-        startOffsetSeconds: e.startOffsetSeconds,
-        ratingKey: e.ratingKey,
-        guideData: { title: e.title },
-      })),
-    }),
+    prisma.scheduleItem.createMany({ data: toRows(channelId, build) }),
   ]);
 
+  return summarize(channelId, pool.length, build, from);
+}
+
+export type ExtendResult = {
+  extended: boolean;
+  reason?: "empty" | "not-due";
+  added: number;
+  newEndsAt: Date | null;
+};
+
+/**
+ * Append a fresh block at the tail when the schedule is running low — the routine,
+ * non-disruptive path (leaves what's on now untouched). Returns `{ extended: false }`
+ * if there's still plenty of runway, or `reason: "empty"` if there's nothing to
+ * extend (call {@link generateChannelSchedule} first). `force` appends regardless.
+ */
+export async function extendChannelSchedule(
+  prisma: PrismaClient,
+  channelId: string,
+  opts: { minDurationSeconds?: number; thresholdSeconds?: number; force?: boolean } = {},
+): Promise<ExtendResult> {
+  const channel = await prisma.channel.findUnique({ where: { id: channelId } });
+  if (!channel) throw new Error("Channel not found");
+
+  const now = new Date();
+  const last = await prisma.scheduleItem.findFirst({
+    where: { channelId },
+    orderBy: { startsAt: "desc" },
+  });
+  if (!last) return { extended: false, reason: "empty", added: 0, newEndsAt: null };
+
+  const tailEnd = new Date(last.startsAt.getTime() + last.durationSeconds * 1000);
+  const threshold = opts.thresholdSeconds ?? DEFAULT_EXTEND_THRESHOLD_SECONDS;
+  const runwaySeconds = (tailEnd.getTime() - now.getTime()) / 1000;
+  if (!opts.force && runwaySeconds > threshold) {
+    return { extended: false, reason: "not-due", added: 0, newEndsAt: tailEnd };
+  }
+
+  const min = opts.minDurationSeconds ?? DEFAULT_MIN_HORIZON_SECONDS;
+  const seed = await ensureSeed(prisma, channelId, channel.shuffleSeed);
+  const pool = await resolveChannel(prisma, channelId);
+  const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, tailEnd, min);
+
+  const pruneBefore = new Date(now.getTime() - HISTORY_KEEP_SECONDS * 1000);
+  await prisma.$transaction([
+    prisma.scheduleItem.deleteMany({ where: { channelId, startsAt: { lt: pruneBefore } } }),
+    prisma.scheduleItem.createMany({ data: toRows(channelId, build) }),
+  ]);
+
+  const newLast = build.entries[build.entries.length - 1];
   return {
-    channelId,
-    poolSize: pool.length,
-    itemCount: entries.length,
-    loopSeconds,
-    from,
-    to,
+    extended: build.entries.length > 0,
+    added: build.entries.length,
+    newEndsAt: newLast
+      ? new Date(newLast.startsAt.getTime() + newLast.durationSeconds * 1000)
+      : tailEnd,
   };
 }
 
@@ -103,16 +174,22 @@ export async function getChannelTimeline(
   return rows.filter((r) => r.startsAt.getTime() + r.durationSeconds * 1000 > from.getTime());
 }
 
-export type NowNext = {
-  current: {
-    ratingKey: string;
-    title: string;
-    startsAt: Date;
-    durationSeconds: number;
-    offsetSeconds: number;
-  } | null;
-  next: { ratingKey: string; title: string; startsAt: Date; durationSeconds: number } | null;
+export type NowNextSlot = {
+  ratingKey: string;
+  startsAt: Date;
+  durationSeconds: number;
+  guide: GuideMeta;
 };
+
+export type NowNext = {
+  current: (NowNextSlot & { offsetSeconds: number }) | null;
+  next: NowNextSlot | null;
+  /** When the materialized schedule runs out — null if there's no schedule. */
+  endsAt: Date | null;
+};
+
+const guideOf = (r: { guideData: unknown }): GuideMeta =>
+  (r.guideData as GuideMeta | null) ?? { title: "" };
 
 /** "What's on now" (+ the live offset to seek to) and what's next, from materialized rows. */
 export async function getNowNext(
@@ -120,7 +197,7 @@ export async function getNowNext(
   channelId: string,
   at: Date = new Date(),
 ): Promise<NowNext> {
-  const [row, nextRow] = await Promise.all([
+  const [row, nextRow, lastRow] = await Promise.all([
     prisma.scheduleItem.findFirst({
       where: { channelId, startsAt: { lte: at } },
       orderBy: { startsAt: "desc" },
@@ -129,10 +206,15 @@ export async function getNowNext(
       where: { channelId, startsAt: { gt: at } },
       orderBy: { startsAt: "asc" },
     }),
+    prisma.scheduleItem.findFirst({ where: { channelId }, orderBy: { startsAt: "desc" } }),
   ]);
 
-  const title = (r: { guideData: unknown }) =>
-    (r.guideData as { title?: string } | null)?.title ?? "";
+  const slot = (r: NonNullable<typeof row>): NowNextSlot => ({
+    ratingKey: r.ratingKey,
+    startsAt: r.startsAt,
+    durationSeconds: r.durationSeconds,
+    guide: guideOf(r),
+  });
 
   let current: NowNext["current"] = null;
   if (row) {
@@ -140,10 +222,7 @@ export async function getNowNext(
     // Only "on now" if the slot actually spans `at` (else the schedule is stale/gapped).
     if (endMs > at.getTime()) {
       current = {
-        ratingKey: row.ratingKey,
-        title: title(row),
-        startsAt: row.startsAt,
-        durationSeconds: row.durationSeconds,
+        ...slot(row),
         offsetSeconds: Math.floor((at.getTime() - row.startsAt.getTime()) / 1000),
       };
     }
@@ -151,13 +230,9 @@ export async function getNowNext(
 
   return {
     current,
-    next: nextRow
-      ? {
-          ratingKey: nextRow.ratingKey,
-          title: title(nextRow),
-          startsAt: nextRow.startsAt,
-          durationSeconds: nextRow.durationSeconds,
-        }
+    next: nextRow ? slot(nextRow) : null,
+    endsAt: lastRow
+      ? new Date(lastRow.startsAt.getTime() + lastRow.durationSeconds * 1000)
       : null,
   };
 }

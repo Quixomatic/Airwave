@@ -2,10 +2,11 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
-import { getFilterValues } from "../services/plex/client";
+import { type GuideMeta, getFilterValues } from "../services/plex/client";
 import { FILTER_FIELDS, OPS_FOR_KIND, fieldMeta } from "../services/plex/filter-fields";
 import { resolveChannel } from "../services/plex/resolve";
 import {
+  extendChannelSchedule,
   generateChannelSchedule,
   getChannelTimeline,
   getNowNext,
@@ -188,19 +189,28 @@ export const channelsRouter = router({
     return { count: items.length, sample: items.slice(0, 8).map((i) => i.title) };
   }),
 
-  /** (Re)materialize the channel's schedule timeline over a rolling horizon. */
+  /**
+   * Rebuild the channel's whole lineup from now (one full pass minimum, looped to a
+   * ~7-day floor). Replaces the timeline — use after the filter/pool changed.
+   */
   generateSchedule: adminProcedure
-    .input(z.object({ id: z.string(), horizonHours: z.number().int().min(1).max(720).optional() }))
+    .input(z.object({ id: z.string(), minHorizonHours: z.number().int().min(1).max(1440).optional() }))
     .mutation(async ({ ctx, input }) => {
-      const result = await generateChannelSchedule(ctx.prisma, input.id, {
-        horizonSeconds: input.horizonHours ? input.horizonHours * 3600 : undefined,
+      return generateChannelSchedule(ctx.prisma, input.id, {
+        minDurationSeconds: input.minHorizonHours ? input.minHorizonHours * 3600 : undefined,
       });
-      return result;
+    }),
+
+  /** Append a fresh block at the tail when the schedule is running low (non-disruptive). */
+  extendSchedule: adminProcedure
+    .input(z.object({ id: z.string(), force: z.boolean().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      return extendChannelSchedule(ctx.prisma, input.id, { force: input.force });
     }),
 
   /** The materialized timeline over a window (default: next 24h) for the guide grid. */
   schedule: adminProcedure
-    .input(z.object({ id: z.string(), hours: z.number().int().min(1).max(720).default(24) }))
+    .input(z.object({ id: z.string(), hours: z.number().int().min(1).max(1440).default(24) }))
     .query(async ({ ctx, input }) => {
       const from = new Date();
       const to = new Date(from.getTime() + input.hours * 3600 * 1000);
@@ -210,7 +220,7 @@ export const channelsRouter = router({
         startsAt: r.startsAt,
         durationSeconds: r.durationSeconds,
         ratingKey: r.ratingKey,
-        title: (r.guideData as { title?: string } | null)?.title ?? "",
+        guide: (r.guideData as GuideMeta | null) ?? { title: "" },
       }));
     }),
 

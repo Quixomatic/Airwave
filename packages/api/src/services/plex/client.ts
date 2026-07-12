@@ -202,21 +202,101 @@ export async function getSectionGenres(
   return (data.MediaContainer?.Directory ?? []).map((d) => ({ id: d.key, title: d.title }));
 }
 
+/**
+ * The denormalized display bundle stored on each schedule slot (`guideData`) — what a
+ * guide/preview renders without a second round-trip to the media server.
+ */
+export type GuideMeta = {
+  title: string;
+  type?: string; // "movie" | "episode" | "show"
+  year?: number;
+  contentRating?: string; // "PG-13"
+  summary?: string;
+  tagline?: string;
+  studio?: string;
+  directors?: string[];
+  genres?: string[];
+  cast?: string[];
+  audienceRating?: number; // 0–10 (Plex scale)
+  criticRating?: number; // 0–10
+  durationMs?: number;
+  thumb?: string; // relative Plex path (needs baseUrl + token to fetch)
+  art?: string;
+  // media badges
+  resolution?: string; // "4k" | "1080" | "720" | "sd"
+  audioChannels?: number; // 6 → 5.1, 8 → 7.1
+  // episode context
+  showTitle?: string; // grandparentTitle
+  season?: number;
+  episode?: number;
+};
+
 export type PlexItem = {
   ratingKey: string;
   title: string;
   durationMs: number;
   year?: number;
   originallyAvailableAt?: string;
+  /** Full denormalized metadata for the guide. */
+  guide: GuideMeta;
 };
 
+type PlexTagRef = { tag?: string };
 type PlexMetadata = {
   ratingKey: string | number;
   title: string;
+  type?: string;
   duration?: number;
   year?: number;
   originallyAvailableAt?: string;
+  contentRating?: string;
+  summary?: string;
+  tagline?: string;
+  studio?: string;
+  rating?: number;
+  audienceRating?: number;
+  thumb?: string;
+  art?: string;
+  grandparentTitle?: string;
+  parentIndex?: number;
+  index?: number;
+  Director?: PlexTagRef[];
+  Genre?: PlexTagRef[];
+  Role?: PlexTagRef[];
+  Media?: Array<{ videoResolution?: string; audioChannels?: number }>;
 };
+
+const tags = (arr: PlexTagRef[] | undefined, max: number): string[] | undefined => {
+  if (!arr?.length) return undefined;
+  const out = arr.map((t) => t.tag).filter((t): t is string => !!t).slice(0, max);
+  return out.length ? out : undefined;
+};
+
+function toGuideMeta(m: PlexMetadata): GuideMeta {
+  const media = m.Media?.[0];
+  return {
+    title: m.title,
+    type: m.type,
+    year: m.year,
+    contentRating: m.contentRating,
+    summary: m.summary,
+    tagline: m.tagline,
+    studio: m.studio,
+    directors: tags(m.Director, 3),
+    genres: tags(m.Genre, 5),
+    cast: tags(m.Role, 5),
+    audienceRating: m.audienceRating,
+    criticRating: m.rating,
+    durationMs: m.duration ?? 0,
+    thumb: m.thumb,
+    art: m.art,
+    resolution: media?.videoResolution,
+    audioChannels: media?.audioChannels,
+    showTitle: m.grandparentTitle,
+    season: m.parentIndex,
+    episode: m.index,
+  };
+}
 
 function toPlexItem(m: PlexMetadata): PlexItem {
   return {
@@ -225,6 +305,7 @@ function toPlexItem(m: PlexMetadata): PlexItem {
     durationMs: m.duration ?? 0,
     year: m.year,
     originallyAvailableAt: m.originallyAvailableAt,
+    guide: toGuideMeta(m),
   };
 }
 
