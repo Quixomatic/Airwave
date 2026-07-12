@@ -76,9 +76,49 @@ async function resolveNode(node: FilterNode, ctx: LibCtx): Promise<Map<string, P
 
 type ChannelFilter = { mediaTypes?: string[]; filter?: FilterNode };
 
+export type ResolveSource = { id: string; baseUrl: string; token: string };
+
 /**
- * Resolve a channel's candidate pool across all enabled libraries of the chosen
- * content type(s), applying the predicate tree. Items are de-duped by ratingKey.
+ * Resolve a candidate pool for a raw predicate tree across the source's enabled
+ * libraries of the chosen content type(s). Movies query type=1; TV resolves to
+ * episodes (type=4) via Plex's dotted advanced-filter syntax. De-duped by ratingKey.
+ * Used by both channel resolution and the auto-lineup analyzer.
+ */
+export async function resolveFilter(
+  prisma: PrismaClient,
+  source: ResolveSource,
+  mediaTypes: string[],
+  tree: FilterNode | undefined,
+  ordering: string,
+): Promise<PlexItem[]> {
+  const libs = await prisma.mediaLibrary.findMany({
+    where: { mediaSourceId: source.id, enabled: true, type: { in: mediaTypes } },
+  });
+  // Stable sort only — the schedule engine owns deterministic ordering; a stable Plex
+  // sort also keeps the pool deterministic under the query size cap.
+  const sort = ordering === "BY_AIR_DATE" ? "originallyAvailableAt" : "titleSort";
+
+  const out = new Map<string, PlexItem>();
+  for (const lib of libs) {
+    const isShow = lib.type !== "movie";
+    const ctx: LibCtx = {
+      baseUrl: source.baseUrl,
+      token: source.token,
+      sectionKey: lib.key,
+      type: isShow ? 4 : 1,
+      tv: isShow,
+      sort,
+      tagCache: new Map(),
+    };
+    const matched = tree ? await resolveNode(tree, ctx) : await queryParams(ctx, []);
+    for (const [k, v] of matched) out.set(k, v);
+  }
+  return [...out.values()];
+}
+
+/**
+ * Resolve a channel's candidate pool — loads its definition and delegates to
+ * {@link resolveFilter}.
  */
 export async function resolveChannel(
   prisma: PrismaClient,
@@ -94,31 +134,11 @@ export async function resolveChannel(
 
   const filter = (def.plexFilter as unknown as ChannelFilter | null) ?? {};
   const mediaTypes = filter.mediaTypes?.length ? filter.mediaTypes : ["movie", "show"];
-  const tree = filter.filter;
-
-  const libs = await prisma.mediaLibrary.findMany({
-    where: { mediaSourceId: source.id, enabled: true, type: { in: mediaTypes } },
-  });
-  // Stable sort only — the schedule engine owns deterministic ordering (seeded
-  // shuffle / by-air-date). A stable Plex sort also keeps the candidate pool
-  // deterministic under the query size cap (a `random` sort would return a
-  // different subset each call).
-  const sort = channel.ordering === "BY_AIR_DATE" ? "originallyAvailableAt" : "titleSort";
-
-  const out = new Map<string, PlexItem>();
-  for (const lib of libs) {
-    const isShow = lib.type !== "movie";
-    const ctx: LibCtx = {
-      baseUrl: source.baseUrl,
-      token: source.token,
-      sectionKey: lib.key,
-      type: isShow ? 4 : 1, // TV resolves to episodes directly via dotted filters
-      tv: isShow,
-      sort,
-      tagCache: new Map(),
-    };
-    const matched = tree ? await resolveNode(tree, ctx) : await queryParams(ctx, []);
-    for (const [k, v] of matched) out.set(k, v);
-  }
-  return [...out.values()];
+  return resolveFilter(
+    prisma,
+    { id: source.id, baseUrl: source.baseUrl, token: source.token },
+    mediaTypes,
+    filter.filter,
+    channel.ordering,
+  );
 }

@@ -3,7 +3,8 @@ import { Card, CardContent } from "@ChannelGuide/ui/components/card";
 import { TintedIconTile } from "@ChannelGuide/ui/components/tinted-icon-tile";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Plus, Tv } from "lucide-react";
+import { Loader2, Plus, Sparkles, Tv } from "lucide-react";
+import { useEffect } from "react";
 
 import { resolveTile } from "@/features/icons/app-icon";
 import { HeaderRight } from "@/context/header-provider";
@@ -16,6 +17,35 @@ export const Route = createFileRoute("/_auth/channels/")({
 
 function ChannelsList() {
   const channels = useQuery(trpc.channels.list.queryOptions());
+  const jobs = useQuery({
+    ...trpc.jobs.list.queryOptions(),
+    refetchInterval: (q) =>
+      q.state.data?.some((j) => j.id === "lineup-generate" && j.running) ? 1500 : false,
+  });
+  const genJob = jobs.data?.find((j) => j.id === "lineup-generate");
+  const generating = genJob?.running ?? false;
+
+  // Refetch the channel list whenever a generation run completes.
+  useEffect(() => {
+    void channels.refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genJob?.lastFinishedAt]);
+
+  const autoGenerate = async () => {
+    if (
+      !window.confirm(
+        "Auto-generate the lineup? This rebuilds all auto-generated packages/channels from your library — your manually-created channels are left untouched.",
+      )
+    )
+      return;
+    try {
+      await trpcClient.jobs.run.mutate({ id: "lineup-generate" });
+      toast.success("Generating lineup…");
+      await jobs.refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to start generation");
+    }
+  };
 
   const toggle = async (id: string, enabled: boolean) => {
     try {
@@ -29,6 +59,14 @@ function ChannelsList() {
   return (
     <div className="mx-auto max-w-3xl">
       <HeaderRight>
+        <Button variant="outline" size="sm" onClick={autoGenerate} disabled={generating}>
+          {generating ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Sparkles className="mr-2 h-4 w-4" />
+          )}
+          Auto-generate
+        </Button>
         <Button size="sm" render={<Link to="/channels/new" />}>
           <Plus className="mr-2 h-4 w-4" />
           New channel
@@ -41,6 +79,20 @@ function ChannelsList() {
           Live channels built from your enabled libraries.
         </p>
       </div>
+
+      {generating && (
+        <div className="border-primary/30 bg-primary/5 mt-4 rounded-md border px-4 py-3 text-sm">
+          <div className="flex items-center gap-2">
+            <Loader2 className="text-primary h-4 w-4 animate-spin" />
+            <span>
+              Generating lineup{genJob?.progress ? ` — ${genJob.progress.label}` : ""}
+              {genJob?.progress && genJob.progress.total > 0
+                ? ` (${genJob.progress.current}/${genJob.progress.total})`
+                : ""}
+            </span>
+          </div>
+        </div>
+      )}
 
       <Card className="mt-6">
         <CardContent className="p-0">

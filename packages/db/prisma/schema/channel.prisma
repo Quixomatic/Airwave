@@ -25,6 +25,11 @@ model ChannelPackage {
   icon        String? // "lucide:Sparkles" / "phosphor:Television"
   tint        String? // TintedIconTile tint token — channels inherit this unless they override
   sortIndex   Int       @default(0)
+
+  // Provenance: auto-generated packages carry `generated=true` so a regen can delete
+  // + rebuild them without touching manually-created packages.
+  generated Boolean @default(false)
+
   channels    Channel[]
 
   createdAt DateTime @default(now())
@@ -46,6 +51,11 @@ model Channel {
   sortIndex   Int              @default(0)
   ordering    OrderingStrategy @default(SHUFFLE)
   shuffleSeed Int? // stable seed for deterministic shuffle
+
+  // Provenance: auto-generated channels carry `generated=true` + the `presetKey`
+  // they came from, so a regen deletes + rebuilds them without wiping manual channels.
+  generated Boolean @default(false)
+  presetKey String?
 
   mediaSourceId String
   mediaSource   MediaSource @relation(fields: [mediaSourceId], references: [id], onDelete: Cascade)

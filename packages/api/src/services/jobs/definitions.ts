@@ -1,6 +1,7 @@
 import prisma from "@ChannelGuide/db";
 
 import type { SyncProgress } from "../media/media-item";
+import { generateLineup } from "../generator/generate";
 import { syncMediaItems } from "../media/sync-media";
 import { syncRecentlyAdded } from "../media/sync-recent";
 import { getPlexUser } from "../plex/client";
@@ -22,6 +23,8 @@ export type JobDefinition = {
   name: string;
   interval: JobInterval;
   defaultCron: string;
+  /** Manual jobs are never auto-scheduled — run-now only (e.g. lineup generation). */
+  manual?: boolean;
   run: (signal: AbortSignal, ctx: JobContext) => Promise<void>;
 };
 
@@ -86,6 +89,19 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
       for (const channel of channels) {
         throwIfAborted(signal);
         await extendChannelSchedule(prisma, channel.id);
+      }
+    },
+  },
+  {
+    id: "lineup-generate",
+    name: "Auto-Generate Lineup",
+    interval: "fixed",
+    defaultCron: "0 0 0 1 1 *", // manual-only; never auto-fires
+    manual: true,
+    run: async (signal, ctx) => {
+      for (const source of await enabledSources()) {
+        throwIfAborted(signal);
+        await generateLineup(prisma, source.id, ctx.progress);
       }
     },
   },

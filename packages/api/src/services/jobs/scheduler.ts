@@ -7,7 +7,7 @@ export type JobProgress = { current: number; total: number; label: string };
 
 type LiveJob = {
   def: JobDefinition;
-  job: schedule.Job;
+  job: schedule.Job | null; // null for manual jobs (run-now only, never auto-scheduled)
   cronSchedule: string;
   running: boolean;
   controller?: AbortController;
@@ -26,12 +26,15 @@ export async function startJobs(): Promise<void> {
       create: { id: def.id, cronSchedule: def.defaultCron },
       update: {},
     });
-    const job = schedule.scheduleJob(row.cronSchedule, () => {
-      void runJob(def.id);
-    });
-    if (!job) {
-      console.error(`[jobs] invalid cron for "${def.id}": ${row.cronSchedule}`);
-      continue;
+    let job: schedule.Job | null = null;
+    if (!def.manual) {
+      job = schedule.scheduleJob(row.cronSchedule, () => {
+        void runJob(def.id);
+      });
+      if (!job) {
+        console.error(`[jobs] invalid cron for "${def.id}": ${row.cronSchedule}`);
+        continue;
+      }
     }
     live.set(def.id, {
       def,
@@ -90,7 +93,7 @@ export function cancelJob(id: string): boolean {
 /** Change a job's cron schedule; validates, persists, and re-arms. */
 export async function setJobSchedule(id: string, cron: string): Promise<boolean> {
   const l = live.get(id);
-  if (!l) return false;
+  if (!l?.job) return false; // manual jobs have no schedule to change
   // rescheduleJob returns the job on success, null on an invalid cron.
   const ok = rescheduleJob(l.job, cron);
   if (!ok) return false;
@@ -103,6 +106,7 @@ export type JobStatus = {
   id: string;
   name: string;
   interval: JobDefinition["interval"];
+  manual: boolean;
   cronSchedule: string;
   nextRunAt: Date | null;
   running: boolean;
@@ -124,8 +128,9 @@ export async function listJobs(): Promise<JobStatus[]> {
       id: def.id,
       name: def.name,
       interval: def.interval,
+      manual: def.manual ?? false,
       cronSchedule: l?.cronSchedule ?? row?.cronSchedule ?? def.defaultCron,
-      nextRunAt: l?.job.nextInvocation() ?? null,
+      nextRunAt: l?.job?.nextInvocation() ?? null,
       running: l?.running ?? false,
       progress: l?.progress ?? null,
       lastRunAt: row?.lastRunAt ?? null,

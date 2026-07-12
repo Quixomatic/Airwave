@@ -2,6 +2,22 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.2.1] - 2026-07-12
+
+**Auto-lineup generator** — foundation (BunnyEars' headline "machine-learned" feature, done as deterministic presets).
+
+### Added
+
+- **Provenance flags**: `Channel.generated` + `presetKey`, `ChannelPackage.generated`. Regeneration deletes + rebuilds only auto-generated content — manual channels/packages are never touched.
+- **Preset catalog** (`services/generator/presets.ts`): packages of channel presets, each a filter tree + minimum-item threshold + icon/tint/number. Starter set = **Basic**, **Time Machine** (decades), and **Genres** (~23 channels); structured to grow toward the full 425.
+- **Generator** (`services/generator/generate.ts`): for a source, evaluate every preset against the library (via the shared `resolveFilter`) and instantiate the ones with enough content — skipping presets your library can't fill (e.g. no 4K → no "Ultra HD Theater"). Channel numbers auto-avoid collisions with manual channels.
+- Runs as a **manual background job** (`lineup-generate`) with live progress (reusing the sync-button pattern); an **Auto-generate** button on the Channels page (with confirm). Verified live: 3 packages / 23 channels in ~60s.
+- Job scheduler gained a **`manual`** flag — such jobs are run-now only, never auto-scheduled.
+
+### Notes
+
+- Generated channels get schedules on the next Schedule Refresh (or manual generate). Granular regen (channels-only / one package) and the full 425-preset catalog are follow-ups.
+
 ## [0.2.0] - 2026-07-12
 
 Opens the 0.2.x line. Channel **active/inactive** toggle.
