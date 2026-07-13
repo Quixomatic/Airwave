@@ -86,8 +86,8 @@ type Current = {
   guide: SlotGuide;
   mode?: "direct" | "hls";
   session?: string | null;
-  /** The quality preset this stream was resolved at (so a quality change re-resolves). */
-  quality?: string;
+  /** The stream-params key this was resolved at (quality/audio/subs) — a change re-resolves. */
+  paramsKey?: string;
   /** Media-time (seconds) we asked playback to start at. */
   playStartOffset: number;
   /** video.currentTime captured at the first `playing` event (HLS may start it at the
@@ -97,10 +97,21 @@ type Current = {
   baselineReady: boolean;
 };
 
-export function useChannelPlayer(channelId: string, quality?: string) {
+export type PlayerOptions = { quality?: string; audioLang?: string; subtitleLang?: string };
+export type PlayerTrack = { lang: string; label: string };
+
+export function useChannelPlayer(channelId: string, options: PlayerOptions = {}) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const qualityRef = useRef(quality);
-  qualityRef.current = quality;
+  // A single key over all stream params — a change to any re-resolves at the same spot.
+  const paramsKey = `${options.quality ?? ""}|${options.audioLang ?? ""}|${options.subtitleLang ?? ""}`;
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+  const paramsKeyRef = useRef(paramsKey);
+  paramsKeyRef.current = paramsKey;
+  const [tracks, setTracks] = useState<{ audio: PlayerTrack[]; subtitle: PlayerTrack[] }>({
+    audio: [],
+    subtitle: [],
+  });
   const timeline = useQuery({
     ...trpc.playback.timeline.queryOptions({ channelId }),
     refetchInterval: 120_000,
@@ -192,7 +203,7 @@ export function useChannelPlayer(channelId: string, quality?: string) {
         if (
           cur.index === slots.indexOf(entry) &&
           Math.abs(clamped - curEff) < 2 &&
-          cur.quality === qualityRef.current
+          cur.paramsKey === paramsKeyRef.current
         )
           return;
       }
@@ -230,7 +241,9 @@ export function useChannelPlayer(channelId: string, quality?: string) {
           channelId,
           ratingKey: entry.slot.ratingKey,
           offsetSeconds: offset,
-          quality: qualityRef.current,
+          quality: optionsRef.current.quality,
+          audioLang: optionsRef.current.audioLang,
+          subtitleLang: optionsRef.current.subtitleLang,
         });
       } catch (err) {
         if (gen !== genRef.current) return;
@@ -258,12 +271,13 @@ export function useChannelPlayer(channelId: string, quality?: string) {
         guide: entry.slot.guide,
         mode: info.mode,
         session: info.session,
-        quality: qualityRef.current,
+        paramsKey: paramsKeyRef.current,
         playStartOffset: offset,
         playStartCurrentTime: 0,
         baselineReady: false,
       };
       pausedRef.current = false;
+      setTracks({ audio: info.audioTracks, subtitle: info.subtitleTracks });
 
       // Capture the true start position from the first real `playing` event — HLS may
       // report currentTime starting at the media offset rather than 0.
@@ -470,12 +484,12 @@ export function useChannelPlayer(channelId: string, quality?: string) {
     };
   }, [stopMedia]);
 
-  // Re-resolve the current program at the same position when quality changes (bumpers
-  // pick up the new setting on the next program automatically).
+  // Re-resolve the current program at the same position when a stream param changes
+  // (quality / audio / subtitles). Bumpers pick up the new setting on the next program.
   useEffect(() => {
     if (currentRef.current?.kind === "PROGRAM") void goTo(currentEffective());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quality]);
+  }, [paramsKey]);
 
   // ── Heartbeat the session; end it (and stop the transcode) on teardown ──
   useEffect(() => {
@@ -552,6 +566,7 @@ export function useChannelPlayer(channelId: string, quality?: string) {
     videoRef,
     status,
     controls,
+    tracks,
     loadingTimeline: timeline.isLoading,
     timelineError: timeline.error instanceof Error ? timeline.error.message : null,
   };

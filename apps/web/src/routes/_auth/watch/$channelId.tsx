@@ -3,9 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
+  Captions,
   ChevronUp,
   ChevronDown,
+  Languages,
   Loader2,
+  Maximize,
+  Minimize,
   Pause,
   Play,
   Radio,
@@ -13,8 +17,10 @@ import {
   Rewind,
   Settings,
   SkipBack,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useChannelPlayer } from "@/features/player/use-channel-player";
 import { trpc } from "@/utils/trpc";
@@ -24,16 +30,21 @@ export const Route = createFileRoute("/_auth/watch/$channelId")({
   component: Watch,
 });
 
-const QUALITY_KEY = "cg-quality";
+/** A piece of state mirrored to localStorage (so preferences survive reloads). */
+function usePersisted(key: string, fallback: string) {
+  const [v, setV] = useState<string>(() => localStorage.getItem(key) ?? fallback);
+  useEffect(() => localStorage.setItem(key, v), [key, v]);
+  return [v, setV] as const;
+}
+
+const SELECT = "border-input bg-background h-9 rounded-md border px-2 text-sm";
 
 function Watch() {
   const { channelId } = Route.useParams();
   const navigate = useNavigate();
-  const [quality, setQuality] = useState<string>(
-    () => localStorage.getItem(QUALITY_KEY) ?? "original",
-  );
-  useEffect(() => localStorage.setItem(QUALITY_KEY, quality), [quality]);
-  const qualities = useQuery(trpc.playback.qualities.queryOptions());
+  const [quality, setQuality] = usePersisted("cg-quality", "original");
+  const [audioLang, setAudioLang] = usePersisted("cg-audio", "");
+  const [subtitleLang, setSubtitleLang] = usePersisted("cg-subtitle", "off");
   const channels = useQuery(trpc.channels.list.queryOptions());
 
   const enabled = (channels.data ?? []).filter((c) => c.enabled);
@@ -73,39 +84,72 @@ function Watch() {
           <Button variant="outline" size="icon-sm" onClick={() => surf(1)} title="Channel down">
             <ChevronDown className="h-4 w-4" />
           </Button>
-          <div className="flex items-center gap-1.5">
-            <Settings className="text-muted-foreground h-4 w-4" />
-            <select
-              className="border-input bg-background h-9 rounded-md border px-2 text-sm"
-              value={quality}
-              onChange={(e) => setQuality(e.target.value)}
-              title="Streaming quality"
-            >
-              {qualities.data?.map((q) => (
-                <option key={q.id} value={q.id}>
-                  {q.label}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
       </div>
 
-      {/* Keyed by channelId so switching channels fully remounts the player. */}
-      <PlayerView key={channelId} channelId={channelId} quality={quality} />
+      <PlayerView
+        key={channelId}
+        channelId={channelId}
+        quality={quality}
+        audioLang={audioLang}
+        subtitleLang={subtitleLang}
+        setQuality={setQuality}
+        setAudioLang={setAudioLang}
+        setSubtitleLang={setSubtitleLang}
+      />
     </div>
   );
 }
 
-function PlayerView({ channelId, quality }: { channelId: string; quality: string }) {
-  const { videoRef, status, controls, loadingTimeline, timelineError } = useChannelPlayer(
+function PlayerView({
+  channelId,
+  quality,
+  audioLang,
+  subtitleLang,
+  setQuality,
+  setAudioLang,
+  setSubtitleLang,
+}: {
+  channelId: string;
+  quality: string;
+  audioLang: string;
+  subtitleLang: string;
+  setQuality: (v: string) => void;
+  setAudioLang: (v: string) => void;
+  setSubtitleLang: (v: string) => void;
+}) {
+  const { videoRef, status, controls, tracks, loadingTimeline, timelineError } = useChannelPlayer(
     channelId,
-    quality,
+    { quality, audioLang, subtitleLang },
   );
+  const qualities = useQuery(trpc.playback.qualities.queryOptions());
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [volume, setVolume] = usePersisted("cg-volume", "1");
+  const [muted, setMuted] = useState(false);
+  const [isFs, setIsFs] = useState(false);
+
+  // Apply volume/mute to the element (re-apply on each stream load).
+  useEffect(() => {
+    const v = videoRef.current;
+    if (v) {
+      v.volume = Number(volume);
+      v.muted = muted;
+    }
+  }, [volume, muted, videoRef, status.state]);
+
+  useEffect(() => {
+    const onFs = () => setIsFs(document.fullscreenElement === containerRef.current);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void containerRef.current?.requestFullscreen();
+  };
 
   return (
     <>
-      <div className="relative aspect-video w-full overflow-hidden rounded-md bg-black">
+      <div ref={containerRef} className="relative aspect-video w-full overflow-hidden rounded-md bg-black">
         <video ref={videoRef} playsInline className="h-full w-full bg-black" />
 
         {status.state === "bumper" && (
@@ -131,7 +175,6 @@ function PlayerView({ channelId, quality }: { channelId: string; quality: string
           </div>
         )}
 
-        {/* Autoplay blocked (e.g. after a reload with no user gesture) → click to play. */}
         {status.blocked && (
           <button
             onClick={controls.play}
@@ -163,6 +206,7 @@ function PlayerView({ channelId, quality }: { channelId: string; quality: string
         </div>
       </div>
 
+      {/* Transport controls */}
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" onClick={controls.togglePause}>
           {status.paused ? <Play className="mr-1 h-4 w-4" /> : <Pause className="mr-1 h-4 w-4" />}
@@ -185,6 +229,78 @@ function PlayerView({ channelId, quality }: { channelId: string; quality: string
         >
           <RotateCcw className="mr-1 h-4 w-4" /> Jump to Live
         </Button>
+
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="ghost" size="icon-sm" onClick={() => setMuted((m) => !m)} title="Mute">
+            {muted || Number(volume) === 0 ? (
+              <VolumeX className="h-4 w-4" />
+            ) : (
+              <Volume2 className="h-4 w-4" />
+            )}
+          </Button>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={muted ? 0 : Number(volume)}
+            onChange={(e) => {
+              setMuted(false);
+              setVolume(e.target.value);
+            }}
+            className="w-24"
+            title="Volume"
+          />
+          <Button variant="ghost" size="icon-sm" onClick={toggleFullscreen} title="Fullscreen">
+            {isFs ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
+
+      {/* Stream settings */}
+      <div className="mt-3 flex flex-wrap items-center gap-4">
+        <label className="flex items-center gap-1.5 text-sm">
+          <Settings className="text-muted-foreground h-4 w-4" />
+          <select className={SELECT} value={quality} onChange={(e) => setQuality(e.target.value)}>
+            {qualities.data?.map((q) => (
+              <option key={q.id} value={q.id}>
+                {q.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {tracks.audio.length > 1 && (
+          <label className="flex items-center gap-1.5 text-sm">
+            <Languages className="text-muted-foreground h-4 w-4" />
+            <select className={SELECT} value={audioLang} onChange={(e) => setAudioLang(e.target.value)}>
+              <option value="">Default audio</option>
+              {tracks.audio.map((t) => (
+                <option key={t.lang} value={t.lang}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {tracks.subtitle.length > 0 && (
+          <label className="flex items-center gap-1.5 text-sm">
+            <Captions className="text-muted-foreground h-4 w-4" />
+            <select
+              className={SELECT}
+              value={subtitleLang}
+              onChange={(e) => setSubtitleLang(e.target.value)}
+            >
+              <option value="off">Subtitles off</option>
+              {tracks.subtitle.map((t) => (
+                <option key={t.lang} value={t.lang}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
 
       {timelineError && <p className="text-destructive mt-2 text-sm">{timelineError}</p>}

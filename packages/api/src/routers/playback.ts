@@ -59,6 +59,8 @@ export const playbackRouter = router({
         ratingKey: z.string(),
         offsetSeconds: z.number().int().min(0),
         quality: z.string().optional(),
+        audioLang: z.string().optional(),
+        subtitleLang: z.string().optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -69,7 +71,11 @@ export const playbackRouter = router({
         clientId,
         input.ratingKey,
         input.offsetSeconds,
-        input.quality,
+        {
+          quality: input.quality,
+          audioLang: input.audioLang,
+          subtitleLang: input.subtitleLang,
+        },
       );
       if (!info) throw new TRPCError({ code: "NOT_FOUND", message: "No playable media part." });
       return { ...info, offsetSeconds: input.offsetSeconds };

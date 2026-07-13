@@ -452,6 +452,9 @@ export async function getMetadata(
  * seeks via `currentTime`); `hls` uses Plex's transcode-universal endpoint, which
  * applies the start `offset` server-side. Codec fields are for diagnostics.
  */
+/** An available audio or subtitle track, keyed by language so it carries across episodes. */
+export type PlaybackTrack = { lang: string; label: string };
+
 export type PlaybackInfo = {
   mode: "direct" | "hls";
   url: string;
@@ -460,12 +463,53 @@ export type PlaybackInfo = {
   container?: string;
   videoCodec?: string;
   audioCodec?: string;
+  /** Distinct audio / subtitle languages available on this item (for the pickers). */
+  audioTracks: PlaybackTrack[];
+  subtitleTracks: PlaybackTrack[];
+};
+
+/** Options that steer the transcode decision (any set → force a transcode). */
+export type PlaybackOptions = {
+  quality?: string;
+  /** Preferred audio language (`languageCode`, e.g. "jpn"/"eng"). */
+  audioLang?: string;
+  /** Preferred subtitle language, or "off"/undefined for none. */
+  subtitleLang?: string;
 };
 
 // Formats a browser can play from the original file (so we can direct-play + client-seek).
 const DIRECT_CONTAINERS = new Set(["mp4", "mov", "m4v"]);
 const DIRECT_VIDEO = new Set(["h264", "avc", "avc1"]);
 const DIRECT_AUDIO = new Set(["aac", "mp3", "mp2", "mp4a"]);
+
+type PlexStream = {
+  id?: number | string;
+  streamType?: number;
+  language?: string;
+  languageTag?: string;
+  languageCode?: string;
+  displayTitle?: string;
+  extendedDisplayTitle?: string;
+  forced?: number | boolean;
+};
+
+const streamLang = (s: PlexStream): string =>
+  (s.languageCode || s.languageTag || "und").toLowerCase();
+const streamLabel = (s: PlexStream): string =>
+  s.language || s.extendedDisplayTitle || s.displayTitle || streamLang(s).toUpperCase();
+
+/** Distinct languages present (first stream per language wins the label). */
+function dedupeTracks(streams: PlexStream[]): PlaybackTrack[] {
+  const out: PlaybackTrack[] = [];
+  const seen = new Set<string>();
+  for (const s of streams) {
+    const lang = streamLang(s);
+    if (seen.has(lang)) continue;
+    seen.add(lang);
+    out.push({ lang, label: streamLabel(s) });
+  }
+  return out;
+}
 
 /**
  * Resolve a playable URL for `ratingKey` at `offsetSeconds`, using the owner token.
@@ -479,7 +523,7 @@ export async function getPlaybackInfo(
   clientId: string,
   ratingKey: string,
   offsetSeconds: number,
-  qualityId?: string,
+  opts: PlaybackOptions = {},
 ): Promise<PlaybackInfo | null> {
   const res = await fetch(`${baseUrl}/library/metadata/${ratingKey}`, {
     headers: pmsHeaders(token),
@@ -492,7 +536,7 @@ export async function getPlaybackInfo(
           container?: string;
           videoCodec?: string;
           audioCodec?: string;
-          Part?: Array<{ key?: string; container?: string }>;
+          Part?: Array<{ key?: string; container?: string; Stream?: PlexStream[] }>;
         }>;
       }>;
     };
@@ -501,23 +545,52 @@ export async function getPlaybackInfo(
   const part = media?.Part?.[0];
   if (!part?.key) return null;
 
+  const streams = part.Stream ?? [];
+  const audioStreams = streams.filter((s) => s.streamType === 2);
+  // Prefer non-forced subtitles (forced only shows foreign-dialogue snippets), so a
+  // language maps to the full subtitle track and the picker labels it plainly.
+  const subStreams = streams
+    .filter((s) => s.streamType === 3)
+    .sort((a, b) => (a.forced ? 1 : 0) - (b.forced ? 1 : 0));
+  const audioTracks = dedupeTracks(audioStreams);
+  const subtitleTracks = dedupeTracks(subStreams);
+
   const container = (media?.container ?? part.container ?? "").toLowerCase();
   const videoCodec = (media?.videoCodec ?? "").toLowerCase();
   const audioCodec = (media?.audioCodec ?? "").toLowerCase();
 
-  // A selected quality cap forces a transcode (so the cap is honored) even for a
-  // browser-friendly file; "original" (no cap) direct-plays when it can.
-  const quality = qualityParams(qualityId);
+  // Map the requested audio/subtitle language to a concrete stream id on this item.
+  const quality = qualityParams(opts.quality);
+  const audioStreamId = opts.audioLang
+    ? audioStreams.find((s) => streamLang(s) === opts.audioLang)?.id
+    : undefined;
+  const wantsSubs = !!opts.subtitleLang && opts.subtitleLang !== "off";
+  const subStreamId = wantsSubs
+    ? subStreams.find((s) => streamLang(s) === opts.subtitleLang)?.id
+    : undefined;
+
+  // Any of quality / audio switch / subtitle burn forces a transcode; otherwise a
+  // browser-friendly file direct-plays and the client seeks to the offset.
   const canDirect =
     !quality &&
+    audioStreamId == null &&
+    subStreamId == null &&
     DIRECT_CONTAINERS.has(container) &&
     DIRECT_VIDEO.has(videoCodec) &&
     DIRECT_AUDIO.has(audioCodec);
 
   if (canDirect) {
-    // Original file; the client seeks to offsetSeconds via <video>.currentTime.
     const url = `${baseUrl}${part.key}?X-Plex-Token=${encodeURIComponent(token)}`;
-    return { mode: "direct", url, session: null, container, videoCodec, audioCodec };
+    return {
+      mode: "direct",
+      url,
+      session: null,
+      container,
+      videoCodec,
+      audioCodec,
+      audioTracks,
+      subtitleTracks,
+    };
   }
 
   // HLS transcode — Plex applies `offset` server-side, so playback starts there. A
@@ -553,6 +626,13 @@ export async function getPlaybackInfo(
     params.set("autoAdjustQuality", "0");
     params.set("X-Plex-Client-Profile-Extra", BROWSER_CLIENT_PROFILE);
   }
+  // Audio track switch (e.g. Japanese → English dub).
+  if (audioStreamId != null) params.set("audioStreamID", String(audioStreamId));
+  // Burned-in subtitles (works for any sub format; the only reliable way in a transcode).
+  if (subStreamId != null) {
+    params.set("subtitleStreamID", String(subStreamId));
+    params.set("subtitles", "burn");
+  }
   const qs = params.toString();
 
   // **Register the transcode with Plex's decision endpoint first.** This is the
@@ -572,7 +652,7 @@ export async function getPlaybackInfo(
   }
 
   const url = `${baseUrl}/video/:/transcode/universal/start.m3u8?${qs}`;
-  return { mode: "hls", url, session, container, videoCodec, audioCodec };
+  return { mode: "hls", url, session, container, videoCodec, audioCodec, audioTracks, subtitleTracks };
 }
 
 /** Stop a Plex transcode session (so behind-the-scenes transcodes don't pile up). */
