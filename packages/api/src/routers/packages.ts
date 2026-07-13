@@ -32,6 +32,7 @@ export const packagesRouter = router({
       description: p.description,
       icon: p.icon,
       tint: p.tint,
+      generated: p.generated,
       channelCount: p._count.channels,
     }));
   }),

@@ -1,5 +1,6 @@
 import { protectedProcedure, publicProcedure, router } from "../index";
 import { channelsRouter } from "./channels";
+import { generatorRouter } from "./generator";
 import { jobsRouter } from "./jobs";
 import { packagesRouter } from "./packages";
 import { plexRouter } from "./plex";
@@ -17,6 +18,7 @@ export const appRouter = router({
     };
   }),
   channels: channelsRouter,
+  generator: generatorRouter,
   jobs: jobsRouter,
   packages: packagesRouter,
   plex: plexRouter,

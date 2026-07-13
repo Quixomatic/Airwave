@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.2.3] - 2026-07-12
+
+Granular lineup regeneration + a schedule-prune job.
+
+### Added
+
+- **Granular regen** — the generator now takes a **scope**: `all` (full rebuild, the Auto-generate button), `packages` (refresh only package styling/metadata), or a **single package** (rebuild just its channels). Packages upsert by key so ids stay stable across regens; empty generated packages are pruned. `generator.regeneratePackage` / `regeneratePackages` tRPC + buttons: **Regenerate channels** on a generated package's page, **Refresh styling** on the Packages list (with an "Auto" badge on generated packages).
+- **Schedule Prune** job (`schedule-prune`, daily 02:00): deletes passed schedule slots (older than a 6h safety buffer, so a currently-playing long item is never cut).
+
+### Verification
+
+- `pnpm check-types` passes.
+
 ## [0.2.2] - 2026-07-12
 
 Channel **sort ordering** — Plex's full sort set, not just shuffle.

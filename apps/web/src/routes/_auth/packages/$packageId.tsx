@@ -31,6 +31,7 @@ function PackageDetail() {
   const [icon, setIcon] = useState<string | null>(null);
   const [tint, setTint] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
     if (pkg.data) {
@@ -61,6 +62,22 @@ function PackageDetail() {
     }
   };
 
+  const regenChannels = async () => {
+    if (!pkg.data) return;
+    if (!window.confirm(`Rebuild the channels in "${pkg.data.name}" from the preset? Existing generated channels here are replaced.`))
+      return;
+    setRegenerating(true);
+    try {
+      const r = await trpcClient.generator.regeneratePackage.mutate({ packageKey: pkg.data.key });
+      toast.success(`Rebuilt — ${r.channelsCreated} channels.`);
+      await pkg.refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Regenerate failed");
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
   const del = async () => {
     if (!window.confirm("Delete this package? Its channels stay but become unassigned.")) return;
     try {
@@ -79,6 +96,12 @@ function PackageDetail() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <HeaderRight>
+        {pkg.data.generated && (
+          <Button variant="outline" size="sm" onClick={regenChannels} disabled={regenerating}>
+            {regenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Regenerate channels
+          </Button>
+        )}
         <Button variant="ghost" size="sm" className="text-destructive" onClick={del}>
           Delete
         </Button>

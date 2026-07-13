@@ -2,34 +2,84 @@ import type { PrismaClient } from "@ChannelGuide/db";
 
 import type { SyncProgress } from "../media/media-item";
 import { resolveFilter } from "../plex/resolve";
-import { PRESET_PACKAGES } from "./presets";
+import { PRESET_PACKAGES, type PresetPackage } from "./presets";
+
+/**
+ * - "all": rebuild every generated package + channel.
+ * - "packages": refresh only package metadata (name/icon/tint/…), leave channels.
+ * - { packageKey }: rebuild just that one package's channels.
+ */
+export type GenerateScope = "all" | "packages" | { packageKey: string };
 
 export type GenerateResult = {
-  packagesCreated: number;
+  scope: string;
+  packages: number;
   channelsCreated: number;
   skipped: { name: string; count: number; needed: number }[];
 };
 
+function packagesFor(scope: GenerateScope): PresetPackage[] {
+  if (typeof scope === "object") return PRESET_PACKAGES.filter((p) => p.key === scope.packageKey);
+  return PRESET_PACKAGES;
+}
+
 /**
- * Auto-lineup generator: for one source, evaluate every preset against the library
- * and instantiate the ones with enough matching content into packages + channels.
- * Idempotent — deletes all previously-generated packages/channels first, so manual
- * ones are never touched. Run it as a background job (it's Plex-query heavy).
+ * Auto-lineup generator. Presets are evaluated against the library and instantiated
+ * into packages + channels where enough content matches. Idempotent: packages upsert
+ * by key (stable ids), generated channels in scope are wiped + rebuilt — manual
+ * channels/packages are never touched.
  */
 export async function generateLineup(
   prisma: PrismaClient,
   sourceId: string,
-  onProgress?: SyncProgress,
+  opts: { scope?: GenerateScope; onProgress?: SyncProgress } = {},
 ): Promise<GenerateResult> {
+  const scope = opts.scope ?? "all";
   const source = await prisma.mediaSource.findUnique({ where: { id: sourceId } });
   if (!source?.baseUrl) throw new Error("Source is not connected.");
   const src = { id: source.id, baseUrl: source.baseUrl, token: source.token };
+  const targets = packagesFor(scope);
 
-  // Idempotent regen: wipe prior generated content (leaves manual channels/packages).
-  await prisma.channel.deleteMany({ where: { generated: true, mediaSourceId: sourceId } });
-  await prisma.channelPackage.deleteMany({ where: { generated: true } });
+  // Upsert package metadata (all scopes) — keeps ids stable across regens.
+  const pkgIdByKey = new Map<string, string>();
+  for (const pkg of targets) {
+    const row = await prisma.channelPackage.upsert({
+      where: { key: pkg.key },
+      create: {
+        key: pkg.key,
+        name: pkg.name,
+        description: pkg.description,
+        icon: pkg.icon,
+        tint: pkg.tint,
+        sortIndex: pkg.sortIndex,
+        generated: true,
+      },
+      update: {
+        name: pkg.name,
+        description: pkg.description,
+        icon: pkg.icon,
+        tint: pkg.tint,
+        sortIndex: pkg.sortIndex,
+        generated: true,
+      },
+    });
+    pkgIdByKey.set(pkg.key, row.id);
+  }
 
-  // Avoid channel-number collisions with the surviving (manual) channels.
+  if (scope === "packages") {
+    return { scope: "packages", packages: targets.length, channelsCreated: 0, skipped: [] };
+  }
+
+  // Wipe the generated channels in scope (all, or just this package's).
+  await prisma.channel.deleteMany({
+    where: {
+      generated: true,
+      mediaSourceId: sourceId,
+      ...(typeof scope === "object" ? { package: { key: scope.packageKey } } : {}),
+    },
+  });
+
+  // Reserve numbers used by the surviving (manual + other-scope) channels.
   const used = new Set(
     (await prisma.channel.findMany({ select: { number: true } })).map((c) => c.number),
   );
@@ -40,39 +90,19 @@ export async function generateLineup(
     return x;
   };
 
-  const total = PRESET_PACKAGES.reduce((s, p) => s + p.channels.length, 0);
+  const total = targets.reduce((s, p) => s + p.channels.length, 0);
   let done = 0;
-  let packagesCreated = 0;
   let channelsCreated = 0;
   const skipped: GenerateResult["skipped"] = [];
 
-  for (const pkg of PRESET_PACKAGES) {
-    const survivors: (typeof pkg.channels)[number][] = [];
+  for (const pkg of targets) {
     for (const ch of pkg.channels) {
-      onProgress?.({ current: done++, total, label: ch.name });
+      opts.onProgress?.({ current: done++, total, label: ch.name });
       const items = await resolveFilter(prisma, src, ch.mediaTypes, ch.filter, "titleSort");
       if (items.length < ch.minItems) {
         skipped.push({ name: ch.name, count: items.length, needed: ch.minItems });
         continue;
       }
-      survivors.push(ch);
-    }
-    if (survivors.length === 0) continue;
-
-    const created = await prisma.channelPackage.create({
-      data: {
-        key: pkg.key,
-        name: pkg.name,
-        description: pkg.description,
-        icon: pkg.icon,
-        tint: pkg.tint,
-        sortIndex: pkg.sortIndex,
-        generated: true,
-      },
-    });
-    packagesCreated++;
-
-    for (const ch of survivors) {
       await prisma.channel.create({
         data: {
           name: ch.name,
@@ -80,9 +110,11 @@ export async function generateLineup(
           description: ch.description,
           mediaSourceId: sourceId,
           ordering: ch.ordering,
+          sortField: ch.sortField ?? "title",
+          sortDir: ch.sortDir ?? "asc",
           icon: ch.icon ?? null,
           tint: ch.tint ?? null,
-          packageId: created.id,
+          packageId: pkgIdByKey.get(pkg.key)!,
           generated: true,
           presetKey: ch.key,
           definitions: {
@@ -100,5 +132,13 @@ export async function generateLineup(
     }
   }
 
-  return { packagesCreated, channelsCreated, skipped };
+  // Drop any generated package that ended up with no channels.
+  await prisma.channelPackage.deleteMany({ where: { generated: true, channels: { none: {} } } });
+
+  return {
+    scope: typeof scope === "object" ? scope.packageKey : scope,
+    packages: pkgIdByKey.size,
+    channelsCreated,
+    skipped,
+  };
 }

@@ -101,8 +101,24 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
     run: async (signal, ctx) => {
       for (const source of await enabledSources()) {
         throwIfAborted(signal);
-        await generateLineup(prisma, source.id, ctx.progress);
+        await generateLineup(prisma, source.id, { scope: "all", onProgress: ctx.progress });
       }
+    },
+  },
+  {
+    id: "schedule-prune",
+    name: "Schedule Prune",
+    interval: "days",
+    // every day at 02:00 — drop schedule slots that have already passed
+    defaultCron: "0 0 2 * * *",
+    run: async () => {
+      // Keep a safety buffer past "a couple hours" to never cut a currently-playing
+      // long item (a 3h movie that started 2h ago is still on).
+      const cutoff = new Date(Date.now() - 6 * 3600 * 1000);
+      const { count } = await prisma.scheduleItem.deleteMany({
+        where: { startsAt: { lt: cutoff } },
+      });
+      if (count > 0) console.log(`[jobs] schedule-prune removed ${count} passed slots`);
     },
   },
   {

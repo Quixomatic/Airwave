@@ -13,6 +13,9 @@ export type PresetChannel = {
   tint?: string;
   mediaTypes: MediaType[];
   ordering: "SHUFFLE" | "IN_ORDER" | "BY_AIR_DATE";
+  /** When ordering isn't SHUFFLE, the Plex sort field + direction. */
+  sortField?: string;
+  sortDir?: "asc" | "desc";
   /** Undefined = the whole library (of the chosen media types). */
   filter?: FilterNode;
   /** Skip this channel if the library has fewer than this many matching items. */
