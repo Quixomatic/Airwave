@@ -31,6 +31,41 @@ export const emptyGroup = (): FilterGroup => ({
   children: [],
 });
 
+/** Give a loaded node a stable `id` (presets/stored filters omit them) and recurse. */
+function coerce(node: unknown): FilterNode {
+  const n = (node ?? {}) as Record<string, unknown>;
+  if (n.type === "group") {
+    const children = Array.isArray(n.children) ? n.children : [];
+    return {
+      type: "group",
+      id: typeof n.id === "string" ? n.id : uid(),
+      combinator: n.combinator === "or" ? "or" : "and",
+      children: children.map(coerce),
+    };
+  }
+  return {
+    type: "condition",
+    id: typeof n.id === "string" ? n.id : uid(),
+    field: typeof n.field === "string" ? n.field : "genre",
+    op: (typeof n.op === "string" ? n.op : "is") as FilterOp,
+    value: typeof n.value === "string" ? n.value : "",
+  };
+}
+
+/**
+ * Coerce a stored/loaded filter into a valid root FilterGroup for the builder:
+ * a bare condition (some presets store one, e.g. `duration ≤ 45`) is wrapped in an
+ * AND group, missing `id`s are filled in, and null/undefined yields an empty group.
+ * The resolver accepts a condition root too, so this only shapes it for the UI.
+ */
+export function normalizeFilter(node: unknown): FilterGroup {
+  if (node == null || typeof node !== "object") return emptyGroup();
+  const root = coerce(node);
+  return root.type === "group"
+    ? root
+    : { type: "group", id: uid(), combinator: "and", children: [root] };
+}
+
 const OP_LABEL: Record<FilterOp, string> = {
   is: "is",
   isNot: "is not",

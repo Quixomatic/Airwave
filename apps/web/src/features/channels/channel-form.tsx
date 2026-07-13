@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { IconTintField } from "@/features/icons/icon-tint-field";
 import { trpc } from "@/utils/trpc";
 
-import { FilterBuilder, type FilterGroup, emptyGroup } from "./filter-builder";
+import { FilterBuilder, type FilterGroup, normalizeFilter } from "./filter-builder";
 
 export type Ordering = "SHUFFLE" | "IN_ORDER" | "BY_AIR_DATE";
 export type MediaType = "movie" | "show";
@@ -64,7 +64,7 @@ export function ChannelForm({
   const [tint, setTint] = useState<string | null>(initial?.tint ?? null);
   const [description, setDescription] = useState(initial?.description ?? "");
   const [enabled, setEnabled] = useState(initial?.enabled ?? true);
-  const [filter, setFilter] = useState<FilterGroup>(() => initial?.filter ?? emptyGroup());
+  const [filter, setFilter] = useState<FilterGroup>(() => normalizeFilter(initial?.filter));
 
   const selectedPackage = packages.data?.find((p) => p.id === packageId);
 
