@@ -86,6 +86,8 @@ type Current = {
   guide: SlotGuide;
   mode?: "direct" | "hls";
   session?: string | null;
+  /** The quality preset this stream was resolved at (so a quality change re-resolves). */
+  quality?: string;
   /** Media-time (seconds) we asked playback to start at. */
   playStartOffset: number;
   /** video.currentTime captured at the first `playing` event (HLS may start it at the
@@ -178,8 +180,8 @@ export function useChannelPlayer(channelId: string, quality?: string) {
         return;
       }
 
-      // No-op if we're already playing this exact program at ~this position — avoids a
-      // redundant reload that would needlessly restart (and could kill) the transcode.
+      // No-op if we're already playing this exact program at ~this position AND the same
+      // quality — avoids a redundant reload, but still re-resolves on a quality change.
       const cur = currentRef.current;
       if (entry.slot.kind !== "BUMPER" && entry.slot.ratingKey && cur?.kind === "PROGRAM") {
         const curEff = cur.baselineReady
@@ -187,7 +189,12 @@ export function useChannelPlayer(channelId: string, quality?: string) {
             cur.playStartOffset +
             ((videoRef.current?.currentTime ?? cur.playStartCurrentTime) - cur.playStartCurrentTime)
           : cur.startS + cur.playStartOffset;
-        if (cur.index === slots.indexOf(entry) && Math.abs(clamped - curEff) < 2) return;
+        if (
+          cur.index === slots.indexOf(entry) &&
+          Math.abs(clamped - curEff) < 2 &&
+          cur.quality === qualityRef.current
+        )
+          return;
       }
 
       if (entry.slot.kind === "BUMPER" || !entry.slot.ratingKey) {
@@ -251,6 +258,7 @@ export function useChannelPlayer(channelId: string, quality?: string) {
         guide: entry.slot.guide,
         mode: info.mode,
         session: info.session,
+        quality: qualityRef.current,
         playStartOffset: offset,
         playStartCurrentTime: 0,
         baselineReady: false,
