@@ -14,7 +14,6 @@ import {
   Settings,
   SkipBack,
 } from "lucide-react";
-
 import { useEffect, useState } from "react";
 
 import { useChannelPlayer } from "@/features/player/use-channel-player";
@@ -35,10 +34,6 @@ function Watch() {
   );
   useEffect(() => localStorage.setItem(QUALITY_KEY, quality), [quality]);
   const qualities = useQuery(trpc.playback.qualities.queryOptions());
-  const { videoRef, status, controls, loadingTimeline, timelineError } = useChannelPlayer(
-    channelId,
-    quality,
-  );
   const channels = useQuery(trpc.channels.list.queryOptions());
 
   const enabled = (channels.data ?? []).filter((c) => c.enabled);
@@ -52,7 +47,7 @@ function Watch() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <Link
           to="/channels/$channelId"
           params={{ channelId }}
@@ -78,10 +73,38 @@ function Watch() {
           <Button variant="outline" size="icon-sm" onClick={() => surf(1)} title="Channel down">
             <ChevronDown className="h-4 w-4" />
           </Button>
+          <div className="flex items-center gap-1.5">
+            <Settings className="text-muted-foreground h-4 w-4" />
+            <select
+              className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+              value={quality}
+              onChange={(e) => setQuality(e.target.value)}
+              title="Streaming quality"
+            >
+              {qualities.data?.map((q) => (
+                <option key={q.id} value={q.id}>
+                  {q.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Video stage */}
+      {/* Keyed by channelId so switching channels fully remounts the player. */}
+      <PlayerView key={channelId} channelId={channelId} quality={quality} />
+    </div>
+  );
+}
+
+function PlayerView({ channelId, quality }: { channelId: string; quality: string }) {
+  const { videoRef, status, controls, loadingTimeline, timelineError } = useChannelPlayer(
+    channelId,
+    quality,
+  );
+
+  return (
+    <>
       <div className="relative aspect-video w-full overflow-hidden rounded-md bg-black">
         <video ref={videoRef} playsInline className="h-full w-full bg-black" />
 
@@ -108,13 +131,25 @@ function Watch() {
           </div>
         )}
 
-        {(loadingTimeline || status.loading) && (
+        {/* Autoplay blocked (e.g. after a reload with no user gesture) → click to play. */}
+        {status.blocked && (
+          <button
+            onClick={controls.play}
+            className="absolute inset-0 flex items-center justify-center bg-black/60 text-white"
+          >
+            <span className="flex flex-col items-center gap-2">
+              <Play className="h-14 w-14" />
+              <span className="text-sm">Click to play</span>
+            </span>
+          </button>
+        )}
+
+        {(loadingTimeline || status.loading) && !status.blocked && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/40">
             <Loader2 className="h-8 w-8 animate-spin text-white/80" />
           </div>
         )}
 
-        {/* Live / behind-live badge */}
         <div className="absolute right-3 top-3">
           {status.isLive ? (
             <span className="inline-flex items-center gap-1 rounded bg-red-600/90 px-2 py-0.5 text-xs font-semibold uppercase text-white">
@@ -128,8 +163,7 @@ function Watch() {
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" onClick={controls.togglePause}>
           {status.paused ? <Play className="mr-1 h-4 w-4" /> : <Pause className="mr-1 h-4 w-4" />}
           {status.paused ? "Play" : "Pause"}
@@ -151,30 +185,13 @@ function Watch() {
         >
           <RotateCcw className="mr-1 h-4 w-4" /> Jump to Live
         </Button>
-
-        <div className="ml-auto flex items-center gap-1.5">
-          <Settings className="text-muted-foreground h-4 w-4" />
-          <select
-            className="border-input bg-background h-9 rounded-md border px-2 text-sm"
-            value={quality}
-            onChange={(e) => setQuality(e.target.value)}
-            title="Streaming quality"
-          >
-            {qualities.data?.map((q) => (
-              <option key={q.id} value={q.id}>
-                {q.label}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
-      {timelineError && <p className="text-destructive text-sm">{timelineError}</p>}
-      {status.error && <p className="text-destructive text-sm">{status.error}</p>}
+      {timelineError && <p className="text-destructive mt-2 text-sm">{timelineError}</p>}
+      {status.error && <p className="text-destructive mt-2 text-sm">{status.error}</p>}
 
-      {/* Now / next readout */}
       {status.state === "program" && (
-        <div className="space-y-1">
+        <div className="mt-4 space-y-1">
           <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">On now</p>
           <p className="text-lg font-semibold">
             {status.title}
@@ -190,7 +207,7 @@ function Watch() {
           )}
         </div>
       )}
-    </div>
+    </>
   );
 }
 

@@ -34,6 +34,8 @@ export type PlayerStatus = {
   isLive: boolean;
   bumperRemaining: number | null;
   paused: boolean;
+  /** Autoplay was blocked (no user gesture) — the UI should show a click-to-play prompt. */
+  blocked: boolean;
   error: string | null;
 };
 
@@ -83,6 +85,7 @@ export function useChannelPlayer(channelId: string, quality?: string) {
     isLive: true,
     bumperRemaining: null,
     paused: false,
+    blocked: false,
     error: null,
   });
 
@@ -114,6 +117,15 @@ export function useChannelPlayer(channelId: string, quality?: string) {
     },
     [channelId],
   );
+
+  // Attempt playback; if the browser blocks autoplay (no user gesture — e.g. after a
+  // reload), flag it so the UI can prompt a click. Clears the flag once playing.
+  const tryPlay = useCallback((video: HTMLVideoElement) => {
+    video
+      .play()
+      .then(() => setStatus((s) => (s.blocked ? { ...s, blocked: false } : s)))
+      .catch(() => setStatus((s) => ({ ...s, blocked: true })));
+  }, []);
 
   const goTo = useCallback(
     async (target: number) => {
@@ -244,20 +256,18 @@ export function useChannelPlayer(channelId: string, quality?: string) {
         hlsRef.current = hls;
         hls.loadSource(info.url);
         hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => void video.play().catch(() => {}));
+        hls.on(Hls.Events.MANIFEST_PARSED, () => tryPlay(video));
       } else if (info.mode === "hls") {
         // Native HLS (Safari) — offset already baked into the URL.
         video.src = info.url;
-        video.addEventListener("loadedmetadata", () => void video.play().catch(() => {}), {
-          once: true,
-        });
+        video.addEventListener("loadedmetadata", () => tryPlay(video), { once: true });
       } else {
         video.src = info.url;
         video.addEventListener(
           "loadedmetadata",
           () => {
             if (offset > 0) video.currentTime = offset;
-            void video.play().catch(() => {});
+            tryPlay(video);
           },
           { once: true },
         );
@@ -266,7 +276,7 @@ export function useChannelPlayer(channelId: string, quality?: string) {
         transitioningRef.current = false;
       }
     },
-    [channelId, now, stopMedia, stopSession],
+    [channelId, now, stopMedia, stopSession, tryPlay],
   );
 
   /** Where we actually are on the timeline right now (seconds). */
@@ -405,12 +415,19 @@ export function useChannelPlayer(channelId: string, quality?: string) {
 
   const controls = useMemo(
     () => ({
+      /** Start/resume playback from a user gesture (also clears an autoplay block). */
+      play: () => {
+        const video = videoRef.current;
+        if (video) tryPlay(video);
+        pausedRef.current = false;
+        setStatus((s) => ({ ...s, paused: false }));
+      },
       togglePause: () => {
         const cur = currentRef.current;
         if (cur?.kind === "PROGRAM") {
           const video = videoRef.current;
           if (!video) return;
-          if (video.paused) void video.play().catch(() => {});
+          if (video.paused) tryPlay(video);
           else video.pause();
           pausedRef.current = video.paused;
         } else {
@@ -425,7 +442,7 @@ export function useChannelPlayer(channelId: string, quality?: string) {
         if (cur) void goTo(cur.startS);
       },
     }),
-    [goTo, now, currentEffective],
+    [goTo, now, currentEffective, tryPlay],
   );
 
   return {

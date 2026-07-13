@@ -2,6 +2,13 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.7] - 2026-07-13
+
+### Fixed
+
+- **Channel up/down now actually switches channels.** Navigating between `/watch/$channelId` values reused the same mounted component, so the player kept the previous channel's state and never re-bootstrapped. The player is now **keyed by `channelId`**, so each channel is a clean remount.
+- **Reload / returning to a channel no longer leaves a black player.** A reload has no user gesture, so the browser blocked `video.play()` and we silently swallowed it. Autoplay-blocked is now surfaced as a **"Click to play"** overlay (and any user-gesture control clears it), so playback starts on the click instead of hanging black.
+
 ## [0.3.6] - 2026-07-13
 
 ### Added
