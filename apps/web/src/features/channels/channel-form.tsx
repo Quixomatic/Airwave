@@ -17,6 +17,7 @@ export type MediaType = "movie" | "show";
 
 export type ChannelFormValues = {
   name: string;
+  callsign: string;
   number: string;
   mediaTypes: MediaType[];
   filter: FilterGroup;
@@ -51,6 +52,7 @@ export function ChannelForm({
 
   const initialTypes = initial?.mediaTypes ?? ["movie", "show"];
   const [name, setName] = useState(initial?.name ?? "");
+  const [callsign, setCallsign] = useState(initial?.callsign ?? "");
   const [number, setNumber] = useState(initial?.number ?? "");
   const [movies, setMovies] = useState(initialTypes.includes("movie"));
   const [tv, setTv] = useState(initialTypes.includes("show"));
@@ -95,6 +97,7 @@ export function ChannelForm({
     }
     onSubmit({
       name,
+      callsign,
       number,
       mediaTypes,
       filter,
@@ -112,7 +115,7 @@ export function ChannelForm({
 
   return (
     <form id={formId} onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-[1fr_auto] gap-3">
+      <div className="grid grid-cols-[1fr_auto_auto] gap-3">
         <div className="space-y-2">
           <Label htmlFor="cname">Name</Label>
           <Input
@@ -120,6 +123,17 @@ export function ChannelForm({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="90s Comedies"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="ccall">Callsign</Label>
+          <Input
+            id="ccall"
+            className="w-24 uppercase"
+            value={callsign}
+            maxLength={6}
+            onChange={(e) => setCallsign(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+            placeholder="90SCOM"
           />
         </div>
         <div className="space-y-2">

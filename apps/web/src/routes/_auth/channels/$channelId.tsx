@@ -121,6 +121,7 @@ function ChannelDetail() {
             formId={FORM_ID}
             initial={{
               name: channel.data.name,
+              callsign: channel.data.callsign ?? "",
               number: String(channel.data.number),
               mediaTypes: channel.data.mediaTypes as MediaType[],
               filter: (channel.data.filter as FilterGroup | null) ?? undefined,
@@ -139,6 +140,7 @@ function ChannelDetail() {
                 await trpcClient.channels.update.mutate({
                   id: channelId,
                   name: v.name,
+                  callsign: v.callsign || null,
                   number: Number(v.number),
                   mediaTypes: v.mediaTypes,
                   filter: v.filter,

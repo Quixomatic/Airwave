@@ -114,7 +114,14 @@ function ChannelsList() {
                 >
                   <span className="text-muted-foreground w-8 text-sm tabular-nums">{c.number}</span>
                   <TintedIconTile icon={tile.Icon} tint={tile.tint} size="lg" />
-                  <span className="flex-1 truncate text-sm font-medium">{c.name}</span>
+                  <span className="flex-1 truncate text-sm font-medium">
+                    {c.name}
+                    {c.callsign && (
+                      <span className="text-muted-foreground ml-2 font-mono text-xs">
+                        {c.callsign}
+                      </span>
+                    )}
+                  </span>
                   {!c.enabled && (
                     <span className="border-border text-muted-foreground rounded border px-1.5 py-0.5 text-xs">
                       Inactive

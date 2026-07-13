@@ -6,6 +6,7 @@ import { getFilterValues } from "../services/plex/client";
 import { FILTER_FIELDS, OPS_FOR_KIND, fieldMeta } from "../services/plex/filter-fields";
 import { resolveChannel } from "../services/plex/resolve";
 import { SORT_FIELDS } from "../services/plex/sort-fields";
+import { normalizeCallsign } from "../services/generator/callsign";
 import {
   extendChannelSchedule,
   generateChannelSchedule,
@@ -49,6 +50,7 @@ export const channelsRouter = router({
         id: true,
         number: true,
         name: true,
+        callsign: true,
         ordering: true,
         enabled: true,
         icon: true,
@@ -74,6 +76,7 @@ export const channelsRouter = router({
       id: channel.id,
       number: channel.number,
       name: channel.name,
+      callsign: channel.callsign,
       ordering: channel.ordering,
       sortField: channel.sortField,
       sortDir: channel.sortDir,
@@ -134,6 +137,7 @@ export const channelsRouter = router({
     .input(
       z.object({
         name: z.string().min(1),
+        callsign: z.string().nullish(),
         number: z.number().int().optional(),
         mediaSourceId: z.string(),
         mediaTypes: z.array(mediaTypeEnum).min(1),
@@ -161,6 +165,7 @@ export const channelsRouter = router({
       const channel = await ctx.prisma.channel.create({
         data: {
           name: input.name,
+          callsign: input.callsign ? normalizeCallsign(input.callsign) : null,
           number,
           mediaSourceId: input.mediaSourceId,
           ordering: input.ordering,
@@ -183,6 +188,7 @@ export const channelsRouter = router({
       z.object({
         id: z.string(),
         name: z.string().min(1),
+        callsign: z.string().nullish(),
         number: z.number().int(),
         mediaTypes: z.array(mediaTypeEnum).min(1),
         filter: nodeSchema.optional(),
@@ -207,6 +213,7 @@ export const channelsRouter = router({
         where: { id: input.id },
         data: {
           name: input.name,
+          callsign: input.callsign ? normalizeCallsign(input.callsign) : null,
           number: input.number,
           ordering: input.ordering,
           sortField: input.sortField ?? "title",

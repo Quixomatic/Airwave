@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.2.6] - 2026-07-12
+
+Channel **callsigns** (BunnyEars-style short codes, e.g. `EVRTV`).
+
+### Added
+
+- `Channel.callsign` — a short memorable code (uppercase, alphanumeric, ≤6). Every preset in the catalog now carries its BunnyEars callsign, and the generator writes it on created channels (de-duped against existing ones). A **Callsign** field on the channel form (auto-uppercases, capped at 6) and the code shown in the channel list.
+- **`callsign.ts`** helpers (`normalizeCallsign`, `deriveCallsign`, `uniqueCallsign`) + a **backfill script** (`apps/server/scripts/backfill-callsigns.ts`): sets callsigns on generated channels missing one — by `presetKey` where possible, else derived — de-duped. Run with `bun --env-file=.env run scripts/backfill-callsigns.ts`.
+
+### Verification
+
+- All 184 preset callsigns are valid (≤6, uppercase) and unique. `pnpm check-types` passes.
+
 ## [0.2.5] - 2026-07-12
 
 ### Added

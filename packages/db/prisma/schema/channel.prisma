@@ -44,6 +44,7 @@ model Channel {
   id          String           @id @default(cuid())
   number      Int              @unique // guide channel number
   name        String
+  callsign    String? // short memorable code, e.g. "EVRTV" (uppercase, ≤6 chars)
   description String?
   icon        String? // "lucide:Sparkles" / "phosphor:Television" — overrides the package icon
   tint        String? // TintedIconTile tint token — overrides the package tint

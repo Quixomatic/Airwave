@@ -48,6 +48,7 @@ function NewChannel() {
               try {
                 const res = await trpcClient.channels.create.mutate({
                   name: v.name,
+                  callsign: v.callsign || null,
                   number: v.number ? Number(v.number) : undefined,
                   mediaSourceId: v.mediaSourceId,
                   mediaTypes: v.mediaTypes,

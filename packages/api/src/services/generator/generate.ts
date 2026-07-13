@@ -2,6 +2,7 @@ import type { PrismaClient } from "@ChannelGuide/db";
 
 import type { SyncProgress } from "../media/media-item";
 import { resolveFilter } from "../plex/resolve";
+import { normalizeCallsign, uniqueCallsign } from "./callsign";
 import { PRESET_PACKAGES, type PresetPackage } from "./presets";
 
 /**
@@ -80,15 +81,17 @@ export async function generateLineup(
   });
 
   // Reserve numbers used by the surviving (manual + other-scope) channels.
-  const used = new Set(
-    (await prisma.channel.findMany({ select: { number: true } })).map((c) => c.number),
-  );
+  const existing = await prisma.channel.findMany({ select: { number: true, callsign: true } });
+  const used = new Set(existing.map((c) => c.number));
   const nextFree = (n: number) => {
     let x = n;
     while (used.has(x)) x++;
     used.add(x);
     return x;
   };
+  const usedCallsigns = new Set(
+    existing.map((c) => c.callsign).filter((c): c is string => !!c),
+  );
 
   const total = targets.reduce((s, p) => s + p.channels.length, 0);
   let done = 0;
@@ -107,6 +110,7 @@ export async function generateLineup(
         data: {
           name: ch.name,
           number: nextFree(ch.number),
+          callsign: uniqueCallsign(normalizeCallsign(ch.callsign), usedCallsigns),
           description: ch.description,
           mediaSourceId: sourceId,
           ordering: ch.ordering,
