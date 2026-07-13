@@ -445,6 +445,93 @@ export async function getMetadata(
   return m ? toPlexItem(m) : null;
 }
 
+/**
+ * How a client should play an item. `direct` streams the original file (the browser
+ * seeks via `currentTime`); `hls` uses Plex's transcode-universal endpoint, which
+ * applies the start `offset` server-side. Codec fields are for diagnostics.
+ */
+export type PlaybackInfo = {
+  mode: "direct" | "hls";
+  url: string;
+  container?: string;
+  videoCodec?: string;
+  audioCodec?: string;
+};
+
+// Formats a browser can play from the original file (so we can direct-play + client-seek).
+const DIRECT_CONTAINERS = new Set(["mp4", "mov", "m4v"]);
+const DIRECT_VIDEO = new Set(["h264", "avc", "avc1"]);
+const DIRECT_AUDIO = new Set(["aac", "mp3", "mp2", "mp4a"]);
+
+/**
+ * Resolve a playable URL for `ratingKey` at `offsetSeconds`, using the owner token.
+ * Browser-friendly files direct-play (the client seeks to the offset); everything else
+ * goes through Plex's HLS transcoder with the offset baked in. Returns null if the item
+ * has no playable part.
+ */
+export async function getPlaybackInfo(
+  baseUrl: string,
+  token: string,
+  clientId: string,
+  ratingKey: string,
+  offsetSeconds: number,
+): Promise<PlaybackInfo | null> {
+  const res = await fetch(`${baseUrl}/library/metadata/${ratingKey}`, {
+    headers: pmsHeaders(token),
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as {
+    MediaContainer?: {
+      Metadata?: Array<{
+        Media?: Array<{
+          container?: string;
+          videoCodec?: string;
+          audioCodec?: string;
+          Part?: Array<{ key?: string; container?: string }>;
+        }>;
+      }>;
+    };
+  };
+  const media = data.MediaContainer?.Metadata?.[0]?.Media?.[0];
+  const part = media?.Part?.[0];
+  if (!part?.key) return null;
+
+  const container = (media?.container ?? part.container ?? "").toLowerCase();
+  const videoCodec = (media?.videoCodec ?? "").toLowerCase();
+  const audioCodec = (media?.audioCodec ?? "").toLowerCase();
+
+  const canDirect =
+    DIRECT_CONTAINERS.has(container) &&
+    DIRECT_VIDEO.has(videoCodec) &&
+    DIRECT_AUDIO.has(audioCodec);
+
+  if (canDirect) {
+    // Original file; the client seeks to offsetSeconds via <video>.currentTime.
+    const url = `${baseUrl}${part.key}?X-Plex-Token=${encodeURIComponent(token)}`;
+    return { mode: "direct", url, container, videoCodec, audioCodec };
+  }
+
+  // HLS transcode — Plex applies `offset` server-side, so playback starts there.
+  const params = new URLSearchParams({
+    path: `/library/metadata/${ratingKey}`,
+    mediaIndex: "0",
+    partIndex: "0",
+    protocol: "hls",
+    fastSeek: "1",
+    offset: String(Math.max(0, Math.floor(offsetSeconds))),
+    directPlay: "0",
+    directStream: "1",
+    subtitles: "none",
+    session: `channelguide-${ratingKey}`,
+    "X-Plex-Client-Identifier": clientId,
+    "X-Plex-Token": token,
+    "X-Plex-Product": PRODUCT,
+    "X-Plex-Platform": "Web",
+  });
+  const url = `${baseUrl}/video/:/transcode/universal/start.m3u8?${params.toString()}`;
+  return { mode: "hls", url, container, videoCodec, audioCodec };
+}
+
 /** Available values for a tag filter field (genre/studio/director/actor/…). */
 export async function getFilterValues(
   baseUrl: string,

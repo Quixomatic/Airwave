@@ -4,6 +4,7 @@ import { channelsRouter } from "./channels";
 import { generatorRouter } from "./generator";
 import { jobsRouter } from "./jobs";
 import { packagesRouter } from "./packages";
+import { playbackRouter } from "./playback";
 import { plexRouter } from "./plex";
 import { sourcesRouter } from "./sources";
 import { usersRouter } from "./users";
@@ -23,6 +24,7 @@ export const appRouter = router({
   generator: generatorRouter,
   jobs: jobsRouter,
   packages: packagesRouter,
+  playback: playbackRouter,
   plex: plexRouter,
   sources: sourcesRouter,
   users: usersRouter,

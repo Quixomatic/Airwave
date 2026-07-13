@@ -101,6 +101,9 @@ function ChannelDetail() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <HeaderRight>
+        <Button variant="outline" size="sm" render={<Link to="/watch/$channelId" params={{ channelId }} />}>
+          Watch
+        </Button>
         <Button variant="outline" size="sm" onClick={doPreview} disabled={previewing}>
           {previewing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Preview"}
         </Button>
