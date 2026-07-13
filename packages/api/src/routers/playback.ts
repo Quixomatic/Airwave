@@ -93,6 +93,7 @@ export const playbackRouter = router({
         ratingKey: z.string().nullish(),
         title: z.string().nullish(),
         delaySeconds: z.number().int().min(0).default(0),
+        positionAt: z.string().nullish(),
         transcodeSession: z.string().nullish(),
       }),
     )
@@ -105,6 +106,7 @@ export const playbackRouter = router({
         ratingKey: input.ratingKey ?? null,
         title: input.title ?? null,
         delaySeconds: input.delaySeconds,
+        positionAt: input.positionAt ? new Date(input.positionAt) : null,
         transcodeSession: input.transcodeSession ?? null,
         lastHeartbeatAt: now,
       };

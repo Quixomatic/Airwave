@@ -56,6 +56,9 @@ model WatchSession {
   ratingKey      String? // the media currently playing (null for bumpers)
   title          String? // denormalized snapshot for the admin view
   delaySeconds   Int     @default(0) // how far behind live
+  // Absolute instant on the channel timeline the viewer is at (delaySeconds is
+  // relative to "now"; this is the exact spot — for cross-device resume later).
+  positionAt     DateTime?
   // The Plex transcode session id, if any — lets a reaper stop stale transcodes.
   transcodeSession String?
 

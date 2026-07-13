@@ -41,10 +41,40 @@ export type PlayerStatus = {
 
 const LIVE_THRESHOLD = 5; // within this many seconds of live counts as "live"
 const HEARTBEAT_MS = 10_000;
+/** Client-local resume position (survives reload; reset when you switch channels). */
+const RESUME_KEY = "cg-resume";
+/** Walk away longer than this and a reload just goes live again. */
+const RESUME_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 function titleOf(g?: SlotGuide | null): string {
   if (!g) return "";
   return g.showTitle ? `${g.showTitle} — ${g.title}` : g.title;
+}
+
+/**
+ * The saved resume position (seconds) for `channelId`, or `liveNow` if none is valid.
+ * Requires: same channel, behind live, recent (< RESUME_MAX_AGE_MS — walk away and it's
+ * live), and still within the retained schedule window ([earliestStartS, liveNow]).
+ */
+function resumePosition(channelId: string, earliestStartS: number, liveNow: number): number {
+  try {
+    const raw = localStorage.getItem(RESUME_KEY);
+    if (!raw) return liveNow;
+    const r = JSON.parse(raw) as {
+      channelId?: string;
+      positionAt?: number;
+      atLiveEdge?: boolean;
+      savedAt?: number;
+    };
+    const posSec = (r.positionAt ?? 0) / 1000;
+    const fresh = Date.now() - (r.savedAt ?? 0) < RESUME_MAX_AGE_MS;
+    if (r.channelId === channelId && !r.atLiveEdge && fresh && posSec >= earliestStartS && posSec < liveNow) {
+      return posSec;
+    }
+  } catch {
+    // malformed / unavailable storage — fall through to live
+  }
+  return liveNow;
 }
 
 type Current = {
@@ -350,6 +380,23 @@ export function useChannelPlayer(channelId: string, quality?: string) {
       }
 
       const delay = Math.max(0, t - effective);
+
+      // Persist the client's seek position so a reload resumes the exact spot. Keyed to
+      // the current channel, so switching channels overwrites it (no stale resume).
+      try {
+        localStorage.setItem(
+          RESUME_KEY,
+          JSON.stringify({
+            channelId,
+            positionAt: Math.round(effective * 1000),
+            atLiveEdge: delay < LIVE_THRESHOLD,
+            savedAt: Date.now(),
+          }),
+        );
+      } catch {
+        // localStorage unavailable — resume just won't persist.
+      }
+
       const nextSlot = slotsRef.current[cur.index + 1]?.slot;
       setStatus((s) => {
         const next: PlayerStatus = {
@@ -369,7 +416,7 @@ export function useChannelPlayer(channelId: string, quality?: string) {
       });
     }, 500);
     return () => window.clearInterval(id);
-  }, [now, goTo, currentEffective]);
+  }, [now, goTo, currentEffective, channelId]);
 
   // ── Build slots from the timeline; start at live on first load ──
   useEffect(() => {
@@ -382,9 +429,9 @@ export function useChannelPlayer(channelId: string, quality?: string) {
     // Bootstrap when nothing is playing (initial load, or after a remount that tore
     // down the previous session — e.g. StrictMode's double-invoke, or channel switch).
     if (currentRef.current === null && slotsRef.current.length > 0) {
-      void goTo(now());
+      void goTo(resumePosition(channelId, slotsRef.current[0]!.startS, now()));
     }
-  }, [timeline.data, goTo, now]);
+  }, [timeline.data, goTo, now, channelId]);
 
   // Full teardown on unmount so a remount cleanly re-bootstraps.
   useEffect(() => {
@@ -405,13 +452,15 @@ export function useChannelPlayer(channelId: string, quality?: string) {
   useEffect(() => {
     const beat = () => {
       const cur = currentRef.current;
+      const eff = currentEffective();
       void trpcClient.playback.heartbeat
         .mutate({
           channelId,
           state: cur ? (cur.kind === "BUMPER" ? "bumper" : "program") : "off",
           ratingKey: cur?.ratingKey ?? null,
           title: cur ? titleOf(cur.guide) : null,
-          delaySeconds: Math.max(0, Math.round(now() - currentEffective())),
+          delaySeconds: Math.max(0, Math.round(now() - eff)),
+          positionAt: new Date(eff * 1000).toISOString(),
           transcodeSession: cur?.session ?? null,
         })
         .catch(() => {});
