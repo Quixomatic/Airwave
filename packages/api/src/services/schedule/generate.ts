@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@ChannelGuide/db";
 
 import type { GuideMeta } from "../plex/client";
-import { channelBumperPlan } from "../bumpers/bumper-config";
+import { getGlobalBumperConfig, resolveBumperPlan } from "../bumpers/bumper-config";
 import {
   guideMetaOf,
   guideMetaOfTarget,
@@ -114,12 +114,15 @@ export async function generateChannelSchedule(
 
   const pool = await resolveChannel(prisma, channelId);
   const itemIds = await upsertPoolItems(prisma, channel.mediaSourceId, pool);
-  const plan = await channelBumperPlan(prisma, channel);
+  const globalBumper = await getGlobalBumperConfig(prisma);
+  const plan = resolveBumperPlan(globalBumper, channel);
   const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, from, min, plan);
 
   await prisma.$transaction([
     prisma.scheduleItem.deleteMany({ where: { channelId } }),
     prisma.scheduleItem.createMany({ data: toRows(channelId, build, itemIds) }),
+    // Stamp the config rev this full rebuild used, so Bumper Sync sees it as current.
+    prisma.channel.update({ where: { id: channelId }, data: { bumperRev: globalBumper.rev } }),
   ]);
 
   return summarize(channelId, pool.length, build, from);
@@ -164,7 +167,11 @@ export async function extendChannelSchedule(
   const seed = await ensureSeed(prisma, channelId, channel.shuffleSeed);
   const pool = await resolveChannel(prisma, channelId);
   const itemIds = await upsertPoolItems(prisma, channel.mediaSourceId, pool);
-  const plan = await channelBumperPlan(prisma, channel);
+  const globalBumper = await getGlobalBumperConfig(prisma);
+  const plan = resolveBumperPlan(globalBumper, channel);
+  // Extend appends a fresh tail under current settings but leaves the (possibly older)
+  // head in place, so it deliberately does NOT re-stamp bumperRev — Bumper Sync still
+  // sees a settings-changed channel as stale and does the full rebuild.
   const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, tailEnd, min, plan);
 
   const pruneBefore = new Date(now.getTime() - HISTORY_KEEP_SECONDS * 1000);

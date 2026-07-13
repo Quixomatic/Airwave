@@ -149,7 +149,7 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
       // Only channels that already have a schedule (the initial build is backfill's job).
       const channels = await prisma.channel.findMany({
         where: { enabled: true, scheduleItems: { some: {} } },
-        select: { id: true, name: true, bumperMode: true },
+        select: { id: true, name: true, bumperMode: true, bumperRev: true },
         orderBy: { number: "asc" },
       });
       const withBumpers = new Set(
@@ -161,32 +161,16 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
           })
         ).map((r) => r.channelId),
       );
-      // Channels whose interstitials no longer match the configured break length
-      // (only meaningful while bumpers are enabled). Restricted to interstitial slots
-      // so future commercial clips — which have their own media durations — aren't flagged.
-      const wrongLength = global.enabled
-        ? new Set(
-            (
-              await prisma.scheduleItem.findMany({
-                where: {
-                  kind: "BUMPER",
-                  bumperKind: "interstitial",
-                  durationSeconds: { not: global.interstitialSeconds },
-                },
-                distinct: ["channelId"],
-                select: { channelId: true },
-              })
-            ).map((r) => r.channelId),
-          )
-        : new Set<string>();
 
-      // Out of sync when (a) whether bumpers *should* be present differs from whether
-      // they are, or (b) they're present as they should be but at a stale break length.
+      // Out of sync when either (a) whether bumpers *should* be present differs from
+      // whether they are (toggled on/off, mode changed), or (b) they're present as they
+      // should be but the channel was last built under an older config rev — which
+      // catches ANY settings change (break-length tiers, threshold, style, …).
       const stale = channels
         .filter((c) => {
           const shouldHave = global.enabled && c.bumperMode !== "OFF";
           if (shouldHave !== withBumpers.has(c.id)) return true;
-          return shouldHave && wrongLength.has(c.id);
+          return shouldHave && c.bumperRev !== global.rev;
         })
         .slice(0, BATCH);
 

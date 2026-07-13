@@ -76,6 +76,9 @@ model Channel {
 
   // Thin per-channel bumper override; the global BumperConfig owns the content.
   bumperMode BumperMode @default(INHERIT)
+  // The BumperConfig.rev this channel's schedule was last built under; Bumper Sync
+  // rebuilds the channel when it falls behind the current config rev.
+  bumperRev  Int        @default(0)
 
   mediaSourceId String
   mediaSource   MediaSource @relation(fields: [mediaSourceId], references: [id], onDelete: Cascade)

@@ -1,12 +1,11 @@
+import { type BumperPlan, breakSeconds } from "../bumpers/bumper-config";
 import type { PlexItem } from "../plex/client";
 
 export type OrderingStrategy = "SHUFFLE" | "IN_ORDER" | "BY_AIR_DATE";
 
-/** The break plan woven between programs (null = no bumpers on this channel). */
-export type TimelineBumperPlan = {
-  /** Interstitial break length, in seconds. */
-  interstitialSeconds: number;
-};
+/** The break plan woven between programs (null = no bumpers on this channel). The
+ *  interstitial length is chosen per transition — see {@link breakSeconds}. */
+export type TimelineBumperPlan = BumperPlan;
 
 /** One materialized slot on a channel's timeline. Display metadata is joined via MediaItem. */
 export type TimelineEntry = {
@@ -119,7 +118,6 @@ export function buildSchedule(
     return { entries: [], passes: 0, poolSeconds: 0, coveredSeconds: 0, bumperCount: 0 };
 
   const poolSeconds = usable.reduce((s, i) => s + itemSeconds(i), 0);
-  const bumperSeconds = bumper ? Math.max(1, Math.round(bumper.interstitialSeconds)) : 0;
   // Fold the block's start time into the seed so an appended block (or a rebuild at a
   // different time) reshuffles differently, while staying deterministic.
   const baseSeed = mix(seed >>> 0, Math.floor(startAt.getTime() / 1000) >>> 0);
@@ -129,12 +127,16 @@ export function buildSchedule(
   let coveredSeconds = 0;
   let passes = 0;
   let bumperCount = 0;
+  // The program laid just before the current one — the "outgoing" side of a break.
+  let prevItem: PlexItem | null = null;
 
   while (coveredSeconds < minDurationSeconds && entries.length < MAX_ENTRIES) {
     const order = passOrder(usable, ordering, baseSeed, passes);
     for (const item of order) {
       // Interstitial break introducing this program (never before the very first slot).
-      if (bumper && entries.length > 0) {
+      // Length is contextual — a function of the outgoing (prevItem) → incoming (item) pair.
+      if (bumper && prevItem) {
+        const bumperSeconds = Math.max(1, Math.round(breakSeconds(prevItem, item, bumper)));
         entries.push({
           kind: "BUMPER",
           ratingKey: null,
@@ -162,6 +164,7 @@ export function buildSchedule(
       });
       cursorSec += dur;
       coveredSeconds += dur;
+      prevItem = item;
       if (entries.length >= MAX_ENTRIES) break;
     }
     passes++;

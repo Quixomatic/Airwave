@@ -23,9 +23,23 @@ model BumperConfig {
   key     String  @unique @default("global")
   enabled Boolean @default(false)
 
-  // ── Interstitial (the always-present break frame) ──────────────────────────
-  /// How long the interstitial break lasts, in seconds (long enough to stretch).
-  interstitialSeconds Int     @default(8)
+  /// Bumped on every settings change. Each channel's schedule is stamped with the
+  /// rev it was built under (Channel.bumperRev); Bumper Sync rebuilds any channel
+  /// whose stamp is behind — so any tier/threshold change reconciles cleanly.
+  rev Int @default(0)
+
+  // ── Interstitial break lengths (contextual — chosen per program transition) ─
+  /// Fallback length when no specific tier applies, in seconds.
+  interstitialSeconds Int @default(8)
+  /// After a movie — a real intermission (you just watched a feature).
+  afterMovieSeconds   Int @default(120)
+  /// After a TV episode — a normal between-shows breather.
+  afterEpisodeSeconds Int @default(30)
+  /// Quick break — same show continues, or a short episode is up next.
+  quickSeconds        Int @default(10)
+  /// An episode at or under this many minutes counts as "short" (→ quick break).
+  shortEpisodeMinutes Int @default(20)
+
   /// Reserved for future template/style variants; one auto-derived style for now.
   interstitialStyle   String  @default("up-next")
   /// Optional soft "elevator music"/chime bed played under the interstitial

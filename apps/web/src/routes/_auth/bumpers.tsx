@@ -21,33 +21,62 @@ const FORM_ID = "bumpers-form";
 function BumpersPage() {
   const config = useQuery(trpc.bumpers.get.queryOptions());
   const [enabled, setEnabled] = useState(false);
-  const [seconds, setSeconds] = useState("8");
+  const [afterMovie, setAfterMovie] = useState("120");
+  const [afterEpisode, setAfterEpisode] = useState("30");
+  const [quick, setQuick] = useState("10");
+  const [shortEp, setShortEp] = useState("20");
+  const [fallback, setFallback] = useState("8");
   const [musicKey, setMusicKey] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (config.data) {
       setEnabled(config.data.enabled);
-      setSeconds(String(config.data.interstitialSeconds));
+      setAfterMovie(String(config.data.afterMovieSeconds));
+      setAfterEpisode(String(config.data.afterEpisodeSeconds));
+      setQuick(String(config.data.quickSeconds));
+      setShortEp(String(config.data.shortEpisodeMinutes));
+      setFallback(String(config.data.interstitialSeconds));
       setMusicKey(config.data.interstitialMusicKey ?? "");
     }
   }, [config.data]);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    const secs = Math.round(Number(seconds));
-    if (!Number.isFinite(secs) || secs < 1 || secs > 120) {
-      toast.error("Interstitial length must be between 1 and 120 seconds.");
+    const inRange = (v: string, lo: number, hi: number) => {
+      const n = Math.round(Number(v));
+      return Number.isFinite(n) && n >= lo && n <= hi ? n : null;
+    };
+    const afterMovieSeconds = inRange(afterMovie, 1, 600);
+    const afterEpisodeSeconds = inRange(afterEpisode, 1, 600);
+    const quickSeconds = inRange(quick, 1, 600);
+    const shortEpisodeMinutes = inRange(shortEp, 1, 240);
+    const interstitialSeconds = inRange(fallback, 1, 600);
+    if (
+      afterMovieSeconds == null ||
+      afterEpisodeSeconds == null ||
+      quickSeconds == null ||
+      interstitialSeconds == null
+    ) {
+      toast.error("Break lengths must be between 1 and 600 seconds.");
+      return;
+    }
+    if (shortEpisodeMinutes == null) {
+      toast.error("Short-episode threshold must be between 1 and 240 minutes.");
       return;
     }
     setSaving(true);
     try {
       await trpcClient.bumpers.update.mutate({
         enabled,
-        interstitialSeconds: secs,
+        afterMovieSeconds,
+        afterEpisodeSeconds,
+        quickSeconds,
+        shortEpisodeMinutes,
+        interstitialSeconds,
         interstitialMusicKey: musicKey.trim() || null,
       });
-      toast.success("Bumper settings saved. Existing schedules reconcile on the next Bumper Sync.");
+      toast.success("Bumper settings saved — repairing affected schedules now.");
       await config.refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Save failed");
@@ -75,16 +104,16 @@ function BumpersPage() {
           Between programs, ChannelGuide shows a short interstitial break — a{" "}
           <em>“We'll be right back”</em> → <em>“Up Next”</em> card with the upcoming title, its cover
           art, and a countdown. A built-in breather instead of a nonstop binge. Each channel chooses
-          whether to show them (on its edit page); the content is configured here.
+          whether to show them (on its edit page); the timing is configured here.
         </p>
       </div>
 
-      <form id={FORM_ID} onSubmit={save}>
+      <form id={FORM_ID} onSubmit={save} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Interstitial breaks</CardTitle>
+            <CardTitle>Enable</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -96,23 +125,66 @@ function BumpersPage() {
                 — master switch; channels can still opt out individually
               </span>
             </label>
+          </CardContent>
+        </Card>
 
-            <div className="space-y-2">
-              <Label htmlFor="bsecs">Break length (seconds)</Label>
-              <Input
-                id="bsecs"
-                className="w-32"
-                value={seconds}
-                onChange={(e) => setSeconds(e.target.value)}
-                inputMode="numeric"
-                disabled={!enabled}
-              />
-              <p className="text-muted-foreground text-xs">
-                How long the “up next” card holds before the next program — long enough to stand up
-                and stretch. 8–10s feels like a real station break.
-              </p>
-            </div>
+        <Card className={enabled ? "" : "opacity-60"}>
+          <CardHeader>
+            <CardTitle>Break lengths</CardTitle>
+            <p className="text-muted-foreground text-xs">
+              The break length adapts to the moment — long after a feature, barely there between
+              episodes of the same show. First matching rule wins.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <SecondsField
+              label="After a movie"
+              hint="A real intermission — you just watched a feature."
+              value={afterMovie}
+              onChange={setAfterMovie}
+              unit="seconds"
+              disabled={!enabled}
+            />
+            <SecondsField
+              label="After an episode"
+              hint="A normal between-shows breather."
+              value={afterEpisode}
+              onChange={setAfterEpisode}
+              unit="seconds"
+              disabled={!enabled}
+            />
+            <SecondsField
+              label="Quick break"
+              hint="Same show continues, or a short episode is up next — barely interrupt."
+              value={quick}
+              onChange={setQuick}
+              unit="seconds"
+              disabled={!enabled}
+            />
+            <SecondsField
+              label="Short-episode threshold"
+              hint="An episode at or under this length counts as “short” (→ quick break)."
+              value={shortEp}
+              onChange={setShortEp}
+              unit="minutes"
+              disabled={!enabled}
+            />
+            <SecondsField
+              label="Default (anything else)"
+              hint="Fallback when no tier above applies."
+              value={fallback}
+              onChange={setFallback}
+              unit="seconds"
+              disabled={!enabled}
+            />
+          </CardContent>
+        </Card>
 
+        <Card className={enabled ? "" : "opacity-60"}>
+          <CardHeader>
+            <CardTitle>Interstitial extras</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="bmusic">Interstitial music (optional)</Label>
               <Input
@@ -139,6 +211,41 @@ function BumpersPage() {
           </CardContent>
         </Card>
       </form>
+    </div>
+  );
+}
+
+function SecondsField({
+  label,
+  hint,
+  value,
+  onChange,
+  unit,
+  disabled,
+}: {
+  label: string;
+  hint: string;
+  value: string;
+  onChange: (v: string) => void;
+  unit: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-[1fr_auto] items-start gap-3">
+      <div>
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-muted-foreground text-xs">{hint}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <Input
+          className="w-20 text-right"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          inputMode="numeric"
+          disabled={disabled}
+        />
+        <span className="text-muted-foreground w-14 text-xs">{unit}</span>
+      </div>
     </div>
   );
 }

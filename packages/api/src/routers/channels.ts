@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
+import { runJob } from "../services/jobs/scheduler";
 import { getFilterValues } from "../services/plex/client";
 import { FILTER_FIELDS, OPS_FOR_KIND, fieldMeta } from "../services/plex/filter-fields";
 import { resolveChannel } from "../services/plex/resolve";
@@ -246,6 +247,12 @@ export const channelsRouter = router({
         await ctx.prisma.channelDefinition.create({
           data: { channelId: input.id, kind: "PREDICATE", plexFilter },
         });
+      }
+
+      // A bumper-mode change immediately kicks off the reconcile job to repair this
+      // channel's schedule (add/remove breaks). No-ops if nothing turns out stale.
+      if (input.bumperMode && input.bumperMode !== channel.bumperMode) {
+        void runJob("schedule-bumper-sync");
       }
       return { ok: true };
     }),
