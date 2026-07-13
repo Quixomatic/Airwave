@@ -21,6 +21,7 @@ model User {
   channelsCreated Channel[]           @relation("ChannelCreatedBy")
   favorites       Favorite[]
   watchStates     ChannelWatchState[]
+  watchSession    WatchSession?
 
   @@unique([email])
   @@map("user")

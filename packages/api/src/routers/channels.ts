@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
 import { runJob } from "../services/jobs/scheduler";
+import { guideMetaOf, mediaItemGuideInclude } from "../services/media/media-item";
 import { getFilterValues } from "../services/plex/client";
 import { FILTER_FIELDS, OPS_FOR_KIND, fieldMeta } from "../services/plex/filter-fields";
 import { resolveChannel } from "../services/plex/resolve";
@@ -93,6 +94,65 @@ export const channelsRouter = router({
       filter: filter.filter ?? null,
     };
   }),
+
+  /**
+   * Cross-channel guide grid: every enabled channel with its upcoming PROGRAM slots
+   * over the window (currently-airing + next `forwardMinutes`), guide metadata merged.
+   * One query for all channels. Bumpers are omitted (they're tiny interstitials).
+   */
+  guide: adminProcedure
+    .input(z.object({ forwardMinutes: z.number().int().min(30).max(720).default(150) }))
+    .query(async ({ ctx, input }) => {
+      const channels = await ctx.prisma.channel.findMany({
+        where: { enabled: true },
+        orderBy: { number: "asc" },
+        select: {
+          id: true,
+          number: true,
+          name: true,
+          callsign: true,
+          icon: true,
+          tint: true,
+          package: { select: { icon: true, tint: true, name: true } },
+        },
+      });
+      const now = new Date();
+      const from = new Date(now.getTime() - 6 * 3600_000);
+      const to = new Date(now.getTime() + input.forwardMinutes * 60_000);
+      const rows = await ctx.prisma.scheduleItem.findMany({
+        where: {
+          channelId: { in: channels.map((c) => c.id) },
+          kind: "PROGRAM",
+          startsAt: { gte: from, lt: to },
+        },
+        orderBy: { startsAt: "asc" },
+        include: mediaItemGuideInclude,
+      });
+
+      const byChannel = new Map<string, typeof rows>();
+      for (const r of rows) {
+        // Keep only programs still airing or upcoming within the window.
+        if (r.startsAt.getTime() + r.durationSeconds * 1000 <= now.getTime()) continue;
+        const list = byChannel.get(r.channelId) ?? [];
+        list.push(r);
+        byChannel.set(r.channelId, list);
+      }
+
+      return {
+        serverTime: now,
+        windowMinutes: input.forwardMinutes,
+        channels: channels.map((c) => ({
+          ...c,
+          programs: (byChannel.get(c.id) ?? []).map((r) => ({
+            id: r.id,
+            ratingKey: r.ratingKey,
+            startsAt: r.startsAt,
+            durationSeconds: r.durationSeconds,
+            guide: guideMetaOf(r),
+          })),
+        })),
+      };
+    }),
 
   /** Sort options for a channel's ordering (Plex sort fields). */
   sortFields: adminProcedure.query(() =>

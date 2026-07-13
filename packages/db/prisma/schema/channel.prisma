@@ -93,6 +93,7 @@ model Channel {
   scheduleItems ScheduleItem[]
   favorites     Favorite[]
   watchStates   ChannelWatchState[]
+  watchSessions WatchSession[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -38,3 +38,31 @@ model ChannelWatchState {
   @@index([userId])
   @@map("channel_watch_state")
 }
+
+/// A live "who's watching what" session (our in-house version of Plex's Now Playing —
+/// we deliberately don't report sessions/watch-state to Plex). Kept fresh by client
+/// heartbeats; a session is "active" while its `lastHeartbeatAt` is recent. One per
+/// user (a user watches one channel at a time); switching channels updates it.
+model WatchSession {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  channelId String?
+  channel   Channel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+
+  // "program" | "bumper" | "off"
+  state          String  @default("off")
+  ratingKey      String? // the media currently playing (null for bumpers)
+  title          String? // denormalized snapshot for the admin view
+  delaySeconds   Int     @default(0) // how far behind live
+  // The Plex transcode session id, if any — lets a reaper stop stale transcodes.
+  transcodeSession String?
+
+  startedAt       DateTime @default(now())
+  lastHeartbeatAt DateTime @default(now())
+
+  @@index([channelId])
+  @@index([lastHeartbeatAt])
+  @@map("watch_session")
+}

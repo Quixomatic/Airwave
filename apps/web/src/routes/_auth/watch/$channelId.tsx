@@ -1,10 +1,20 @@
 import { Button } from "@ChannelGuide/ui/components/button";
 import { useQuery } from "@tanstack/react-query";
-import { Link, createFileRoute } from "@tanstack/react-router";
-import Hls from "hls.js";
-import { ArrowLeft, RefreshCw } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import {
+  ArrowLeft,
+  ChevronUp,
+  ChevronDown,
+  Loader2,
+  Pause,
+  Play,
+  Radio,
+  RotateCcw,
+  Rewind,
+  SkipBack,
+} from "lucide-react";
 
+import { useChannelPlayer } from "@/features/player/use-channel-player";
 import { trpc } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/watch/$channelId")({
@@ -12,56 +22,24 @@ export const Route = createFileRoute("/_auth/watch/$channelId")({
   component: Watch,
 });
 
-/**
- * Playback spike — proves direct-play-from-Plex-at-offset in the browser (the go/no-go
- * before the webOS client). Resolves what's on the channel now and plays it: native
- * <video> + client seek for direct-play files, hls.js for transcoded ones.
- * See `.docs/playback-model.md`.
- */
 function Watch() {
   const { channelId } = Route.useParams();
-  const query = useQuery(trpc.playback.resolve.queryOptions({ channelId }));
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const data = query.data;
+  const navigate = useNavigate();
+  const { videoRef, status, controls, loadingTimeline, timelineError } =
+    useChannelPlayer(channelId);
+  const channels = useQuery(trpc.channels.list.queryOptions());
 
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !data || data.state !== "program") return;
-    let hls: Hls | null = null;
-
-    if (data.mode === "hls") {
-      if (Hls.isSupported()) {
-        hls = new Hls({ enableWorker: true });
-        hls.loadSource(data.url);
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => void video.play().catch(() => {}));
-      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        // Native HLS (Safari): offset is already baked into the URL.
-        video.src = data.url;
-        video.addEventListener("loadedmetadata", () => void video.play().catch(() => {}), {
-          once: true,
-        });
-      }
-    } else {
-      // Direct play the original file; seek to the live offset once metadata is ready.
-      video.src = data.url;
-      const onMeta = () => {
-        if (data.offsetSeconds > 0) video.currentTime = data.offsetSeconds;
-        void video.play().catch(() => {});
-      };
-      video.addEventListener("loadedmetadata", onMeta, { once: true });
-    }
-
-    return () => {
-      hls?.destroy();
-      video.removeAttribute("src");
-      video.load();
-    };
-    // Re-run whenever the resolved slot changes (url/mode/offset live on `data`).
-  }, [data]);
+  const enabled = (channels.data ?? []).filter((c) => c.enabled);
+  const idx = enabled.findIndex((c) => c.id === channelId);
+  const surf = (dir: 1 | -1) => {
+    if (enabled.length === 0) return;
+    const next = enabled[(idx + dir + enabled.length) % enabled.length]!;
+    navigate({ to: "/watch/$channelId", params: { channelId: next.id } });
+  };
+  const current = enabled[idx];
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex items-center justify-between">
         <Link
           to="/channels/$channelId"
@@ -70,64 +48,127 @@ function Watch() {
         >
           <ArrowLeft className="h-4 w-4" /> Channel
         </Link>
-        <Button variant="outline" size="sm" onClick={() => query.refetch()}>
-          <RefreshCw className="mr-1 h-3.5 w-3.5" /> Re-resolve
+        <div className="flex items-center gap-2">
+          {current && (
+            <span className="text-sm font-medium">
+              <span className="text-muted-foreground tabular-nums">{current.number}</span>{" "}
+              {current.name}
+              {current.callsign && (
+                <span className="text-muted-foreground ml-2 font-mono text-xs">
+                  {current.callsign}
+                </span>
+              )}
+            </span>
+          )}
+          <Button variant="outline" size="icon-sm" onClick={() => surf(-1)} title="Channel up">
+            <ChevronUp className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon-sm" onClick={() => surf(1)} title="Channel down">
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Video stage */}
+      <div className="relative aspect-video w-full overflow-hidden rounded-md bg-black">
+        <video ref={videoRef} playsInline className="h-full w-full bg-black" />
+
+        {status.state === "bumper" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-b from-black/80 via-black/70 to-black/90 text-center text-white">
+            <p className="text-sm uppercase tracking-[0.2em] text-white/60">We'll be right back</p>
+            {status.nextTitle && (
+              <p className="max-w-lg px-6 text-2xl font-semibold">
+                <span className="text-white/60">Up next · </span>
+                {status.nextTitle}
+              </p>
+            )}
+            {status.bumperRemaining != null && (
+              <p className="text-4xl font-bold tabular-nums text-white/90">
+                {status.bumperRemaining}
+              </p>
+            )}
+          </div>
+        )}
+
+        {status.state === "off" && !loadingTimeline && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 text-center text-sm text-white/70">
+            Nothing on now — generate a schedule for this channel.
+          </div>
+        )}
+
+        {(loadingTimeline || status.loading) && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+            <Loader2 className="h-8 w-8 animate-spin text-white/80" />
+          </div>
+        )}
+
+        {/* Live / behind-live badge */}
+        <div className="absolute right-3 top-3">
+          {status.isLive ? (
+            <span className="inline-flex items-center gap-1 rounded bg-red-600/90 px-2 py-0.5 text-xs font-semibold uppercase text-white">
+              <Radio className="h-3 w-3" /> Live
+            </span>
+          ) : (
+            <span className="rounded bg-black/70 px-2 py-0.5 text-xs font-medium text-white/90">
+              {formatBehind(status.delaySeconds)} behind
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="outline" size="sm" onClick={controls.togglePause}>
+          {status.paused ? <Play className="mr-1 h-4 w-4" /> : <Pause className="mr-1 h-4 w-4" />}
+          {status.paused ? "Play" : "Pause"}
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => controls.rewind(60)}>
+          <Rewind className="mr-1 h-4 w-4" /> 1m
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => controls.rewind(15)}>
+          <Rewind className="mr-1 h-4 w-4" /> 15s
+        </Button>
+        <Button variant="outline" size="sm" onClick={controls.restart} title="Restart from beginning">
+          <SkipBack className="mr-1 h-4 w-4" /> Restart
+        </Button>
+        <Button
+          variant={status.isLive ? "outline" : "default"}
+          size="sm"
+          onClick={controls.jumpToLive}
+          disabled={status.isLive}
+        >
+          <RotateCcw className="mr-1 h-4 w-4" /> Jump to Live
         </Button>
       </div>
 
-      <div className="bg-black">
-        <video
-          ref={videoRef}
-          controls
-          playsInline
-          className="aspect-video w-full bg-black"
-        />
-      </div>
+      {timelineError && <p className="text-destructive text-sm">{timelineError}</p>}
+      {status.error && <p className="text-destructive text-sm">{status.error}</p>}
 
-      {query.isLoading && <p className="text-muted-foreground text-sm">Resolving…</p>}
-      {query.error && (
-        <p className="text-destructive text-sm">
-          {query.error instanceof Error ? query.error.message : "Failed to resolve playback."}
-        </p>
-      )}
-
-      {data?.state === "program" && (
-        <div className="space-y-1 text-sm">
-          <p className="font-medium">{guideTitle(data.guide)}</p>
-          <p className="text-muted-foreground text-xs">
-            Playing at offset {formatOffset(data.offsetSeconds)} ·{" "}
-            <span className="uppercase">{data.mode}</span>
-            {data.mode === "direct" ? " (client seek)" : " (server offset)"} ·{" "}
-            {data.container}/{data.videoCodec}/{data.audioCodec}
+      {/* Now / next readout */}
+      {status.state === "program" && (
+        <div className="space-y-1">
+          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">On now</p>
+          <p className="text-lg font-semibold">
+            {status.title}
+            {status.subtitle && (
+              <span className="text-muted-foreground ml-2 text-sm">{status.subtitle}</span>
+            )}
           </p>
-          {data.next && (
-            <p className="text-muted-foreground text-xs">Up next · {guideTitle(data.next.guide)}</p>
+          {status.summary && (
+            <p className="text-muted-foreground line-clamp-2 max-w-2xl text-sm">{status.summary}</p>
+          )}
+          {status.nextTitle && (
+            <p className="text-muted-foreground pt-1 text-sm">Up next · {status.nextTitle}</p>
           )}
         </div>
-      )}
-      {data?.state === "bumper" && (
-        <p className="text-muted-foreground text-sm">
-          On a break right now (interstitial). Up next · {data.next ? guideTitle(data.next.guide) : "…"}
-        </p>
-      )}
-      {data?.state === "off" && (
-        <p className="text-muted-foreground text-sm">
-          Nothing on now — generate a schedule for this channel first.
-        </p>
       )}
     </div>
   );
 }
 
-type GuideLike = { title: string; showTitle?: string };
-function guideTitle(g: GuideLike): string {
-  return g.showTitle ? `${g.showTitle} — ${g.title}` : g.title;
-}
-
-function formatOffset(s: number): string {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = Math.floor(s % 60);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+function formatBehind(s: number): string {
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return sec ? `${m}m ${sec}s` : `${m}m`;
 }

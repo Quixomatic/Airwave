@@ -5,7 +5,7 @@ import { getGlobalBumperConfig } from "../bumpers/bumper-config";
 import { generateLineup } from "../generator/generate";
 import { syncMediaItems } from "../media/sync-media";
 import { syncRecentlyAdded } from "../media/sync-recent";
-import { getPlexUser } from "../plex/client";
+import { getPlexUser, stopTranscode } from "../plex/client";
 import { syncLibraries } from "../plex/sync-libraries";
 import {
   extendChannelSchedule,
@@ -264,6 +264,37 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
         }
       }
       if (repaired > 0) console.log(`[jobs] schedule-missing-media-repair spliced ${repaired} channel(s)`);
+    },
+  },
+  {
+    id: "watch-session-reap",
+    name: "Watch Session Reaper",
+    description:
+      "Clears stale watch sessions (no heartbeat for ~1 min — e.g. a closed tab) and stops any Plex transcode they left running, so zombie transcode sessions don't pile up.",
+    interval: "minutes",
+    defaultCron: "0 */2 * * * *",
+    run: async (signal) => {
+      const cutoff = new Date(Date.now() - 60_000);
+      const stale = await prisma.watchSession.findMany({
+        where: { lastHeartbeatAt: { lt: cutoff } },
+        include: { channel: { include: { mediaSource: true } } },
+      });
+      for (const s of stale) {
+        throwIfAborted(signal);
+        const src = s.channel?.mediaSource;
+        if (s.transcodeSession && src?.baseUrl) {
+          await stopTranscode(
+            src.baseUrl,
+            src.token,
+            src.clientIdentifier ?? "channelguide-server",
+            s.transcodeSession,
+          );
+        }
+      }
+      if (stale.length > 0) {
+        await prisma.watchSession.deleteMany({ where: { id: { in: stale.map((s) => s.id) } } });
+        console.log(`[jobs] watch-session-reap cleared ${stale.length} stale session(s)`);
+      }
     },
   },
   {

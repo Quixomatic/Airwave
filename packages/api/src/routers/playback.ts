@@ -1,74 +1,153 @@
+import type { PrismaClient } from "@ChannelGuide/db";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
-import { getPlaybackInfo } from "../services/plex/client";
-import { getNowNext } from "../services/schedule/generate";
+import { getPlaybackInfo, stopTranscode } from "../services/plex/client";
+import { getChannelTimeline } from "../services/schedule/generate";
+
+/** A session is "active" while it's heartbeated within this window. */
+const SESSION_ACTIVE_MS = 30_000;
+
+async function channelSource(prisma: PrismaClient, channelId: string) {
+  const channel = await prisma.channel.findUnique({
+    where: { id: channelId },
+    include: { mediaSource: true },
+  });
+  if (!channel) throw new TRPCError({ code: "NOT_FOUND", message: "Channel not found." });
+  const source = channel.mediaSource;
+  if (!source?.baseUrl) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Source is not connected." });
+  }
+  return { channel, source, clientId: source.clientIdentifier ?? "channelguide-server" };
+}
 
 /**
- * Playback brokering for the (admin-side) preview player. Resolves what's on a channel
- * *now* into a directly-playable Plex URL at the live offset — proving the direct-play-
- * at-offset path in the browser before the webOS client. See `.docs/playback-model.md`.
+ * Playback brokering + in-house session tracking for the (admin-side) preview player.
+ * We deliberately don't report to Plex (§8a of `.docs/playback-model.md`), so watch
+ * sessions live here instead. See also `.docs/playback-model.md`.
  */
 export const playbackRouter = router({
-  resolve: adminProcedure
-    .input(z.object({ channelId: z.string() }))
+  /** A window of the channel timeline (past → future) for the client state machine. */
+  timeline: adminProcedure
+    .input(
+      z.object({
+        channelId: z.string(),
+        backMinutes: z.number().int().min(0).max(1440).default(360),
+        forwardMinutes: z.number().int().min(30).max(1440).default(180),
+      }),
+    )
     .query(async ({ ctx, input }) => {
-      const channel = await ctx.prisma.channel.findUnique({
-        where: { id: input.channelId },
-        include: { mediaSource: true },
-      });
-      if (!channel) throw new TRPCError({ code: "NOT_FOUND", message: "Channel not found." });
-      const source = channel.mediaSource;
-      if (!source?.baseUrl) {
-        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Source is not connected." });
-      }
+      const now = new Date();
+      const from = new Date(now.getTime() - input.backMinutes * 60_000);
+      const to = new Date(now.getTime() + input.forwardMinutes * 60_000);
+      const slots = await getChannelTimeline(ctx.prisma, input.channelId, from, to);
+      return { serverTime: now, slots };
+    }),
 
-      const nn = await getNowNext(ctx.prisma, input.channelId);
-      const clientId = source.clientIdentifier ?? "channelguide-server";
-
-      // Between programs (or a stale/empty schedule): nothing to direct-play right now.
-      if (!nn.current) {
-        return { state: "off" as const, endsAt: nn.endsAt, next: nn.next };
-      }
-      if (nn.current.kind === "BUMPER" || !nn.current.ratingKey) {
-        return {
-          state: "bumper" as const,
-          guide: nn.current.guide,
-          startsAt: nn.current.startsAt,
-          durationSeconds: nn.current.durationSeconds,
-          offsetSeconds: nn.current.offsetSeconds,
-          next: nn.next,
-          endsAt: nn.endsAt,
-        };
-      }
-
+  /** Resolve a playable URL for a specific item at a specific offset (client-driven). */
+  media: adminProcedure
+    .input(
+      z.object({
+        channelId: z.string(),
+        ratingKey: z.string(),
+        offsetSeconds: z.number().int().min(0),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const { source, clientId } = await channelSource(ctx.prisma, input.channelId);
       const info = await getPlaybackInfo(
-        source.baseUrl,
+        source.baseUrl!,
         source.token,
         clientId,
-        nn.current.ratingKey,
-        nn.current.offsetSeconds,
+        input.ratingKey,
+        input.offsetSeconds,
       );
-      if (!info) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "No playable media part for this item." });
-      }
-
-      return {
-        state: "program" as const,
-        mode: info.mode,
-        url: info.url,
-        // For 'direct' the client seeks here; for 'hls' the offset is already baked in.
-        offsetSeconds: nn.current.offsetSeconds,
-        container: info.container,
-        videoCodec: info.videoCodec,
-        audioCodec: info.audioCodec,
-        ratingKey: nn.current.ratingKey,
-        startsAt: nn.current.startsAt,
-        durationSeconds: nn.current.durationSeconds,
-        guide: nn.current.guide,
-        next: nn.next,
-        endsAt: nn.endsAt,
-      };
+      if (!info) throw new TRPCError({ code: "NOT_FOUND", message: "No playable media part." });
+      return { ...info, offsetSeconds: input.offsetSeconds };
     }),
+
+  /** Stop a Plex transcode session (client calls on program change / teardown). */
+  stop: adminProcedure
+    .input(z.object({ channelId: z.string(), session: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const { source, clientId } = await channelSource(ctx.prisma, input.channelId);
+      await stopTranscode(source.baseUrl!, source.token, clientId, input.session);
+      return { ok: true };
+    }),
+
+  /** Upsert the current user's live watch session (client heartbeats ~every 10s). */
+  heartbeat: adminProcedure
+    .input(
+      z.object({
+        channelId: z.string(),
+        state: z.enum(["program", "bumper", "off"]),
+        ratingKey: z.string().nullish(),
+        title: z.string().nullish(),
+        delaySeconds: z.number().int().min(0).default(0),
+        transcodeSession: z.string().nullish(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const now = new Date();
+      const data = {
+        channelId: input.channelId,
+        state: input.state,
+        ratingKey: input.ratingKey ?? null,
+        title: input.title ?? null,
+        delaySeconds: input.delaySeconds,
+        transcodeSession: input.transcodeSession ?? null,
+        lastHeartbeatAt: now,
+      };
+      await ctx.prisma.watchSession.upsert({
+        where: { userId },
+        create: { userId, startedAt: now, ...data },
+        update: data,
+      });
+      return { ok: true };
+    }),
+
+  /** End the current user's session (+ best-effort stop its transcode). */
+  endSession: adminProcedure.mutation(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    const existing = await ctx.prisma.watchSession.findUnique({
+      where: { userId },
+      include: { channel: { include: { mediaSource: true } } },
+    });
+    if (!existing) return { ok: true };
+    const src = existing.channel?.mediaSource;
+    if (existing.transcodeSession && src?.baseUrl) {
+      await stopTranscode(
+        src.baseUrl,
+        src.token,
+        src.clientIdentifier ?? "channelguide-server",
+        existing.transcodeSession,
+      );
+    }
+    await ctx.prisma.watchSession.delete({ where: { userId } });
+    return { ok: true };
+  }),
+
+  /** Active watch sessions — the admin "Now Watching" view. */
+  sessions: adminProcedure.query(async ({ ctx }) => {
+    const since = new Date(Date.now() - SESSION_ACTIVE_MS);
+    const rows = await ctx.prisma.watchSession.findMany({
+      where: { lastHeartbeatAt: { gte: since } },
+      orderBy: { startedAt: "asc" },
+      include: {
+        user: { select: { name: true, email: true } },
+        channel: { select: { number: true, name: true, callsign: true } },
+      },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      user: r.user.name || r.user.email,
+      channel: r.channel ? { number: r.channel.number, name: r.channel.name, callsign: r.channel.callsign } : null,
+      state: r.state,
+      title: r.title,
+      delaySeconds: r.delaySeconds,
+      startedAt: r.startedAt,
+    }));
+  }),
 });

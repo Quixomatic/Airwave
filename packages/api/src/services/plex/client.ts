@@ -453,6 +453,8 @@ export async function getMetadata(
 export type PlaybackInfo = {
   mode: "direct" | "hls";
   url: string;
+  /** The Plex transcode session id (hls only) — pass to {@link stopTranscode} on teardown. */
+  session: string | null;
   container?: string;
   videoCodec?: string;
   audioCodec?: string;
@@ -508,10 +510,13 @@ export async function getPlaybackInfo(
   if (canDirect) {
     // Original file; the client seeks to offsetSeconds via <video>.currentTime.
     const url = `${baseUrl}${part.key}?X-Plex-Token=${encodeURIComponent(token)}`;
-    return { mode: "direct", url, container, videoCodec, audioCodec };
+    return { mode: "direct", url, session: null, container, videoCodec, audioCodec };
   }
 
-  // HLS transcode — Plex applies `offset` server-side, so playback starts there.
+  // HLS transcode — Plex applies `offset` server-side, so playback starts there. A
+  // *unique* session id (per resolve) lets us stop this exact transcode on teardown
+  // without ever colliding with a freshly-started one for the same item/offset.
+  const session = `channelguide-${ratingKey}-${crypto.randomUUID().slice(0, 8)}`;
   const params = new URLSearchParams({
     path: `/library/metadata/${ratingKey}`,
     mediaIndex: "0",
@@ -522,14 +527,38 @@ export async function getPlaybackInfo(
     directPlay: "0",
     directStream: "1",
     subtitles: "none",
-    session: `channelguide-${ratingKey}`,
+    // `session` is what the (undocumented) universal/stop endpoint keys on;
+    // `X-Plex-Session-Identifier` is the spec's canonical field. Real clients send both.
+    session,
+    "X-Plex-Session-Identifier": session,
     "X-Plex-Client-Identifier": clientId,
     "X-Plex-Token": token,
     "X-Plex-Product": PRODUCT,
     "X-Plex-Platform": "Web",
   });
   const url = `${baseUrl}/video/:/transcode/universal/start.m3u8?${params.toString()}`;
-  return { mode: "hls", url, container, videoCodec, audioCodec };
+  return { mode: "hls", url, session, container, videoCodec, audioCodec };
+}
+
+/** Stop a Plex transcode session (so behind-the-scenes transcodes don't pile up). */
+export async function stopTranscode(
+  baseUrl: string,
+  token: string,
+  clientId: string,
+  session: string,
+): Promise<void> {
+  const params = new URLSearchParams({
+    session,
+    "X-Plex-Client-Identifier": clientId,
+    "X-Plex-Token": token,
+  });
+  try {
+    await fetch(`${baseUrl}/video/:/transcode/universal/stop?${params.toString()}`, {
+      headers: pmsHeaders(token),
+    });
+  } catch {
+    // Best-effort — a failed stop just lets Plex time the session out on its own.
+  }
 }
 
 /** Available values for a tag filter field (genre/studio/director/actor/…). */
