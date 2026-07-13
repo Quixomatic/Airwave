@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.13] - 2026-07-13
+
+### Fixed
+
+- **Subtitles now actually render when selected.** We set `subtitles=burn` but left `directStream=1`, so Plex **copied** the video and silently dropped the burn — nothing appeared. Burning requires the video to re-encode, so `directStream=0` is now set **only when a subtitle is selected** (normal, subtitle-off playback stays a video copy — no re-encode). Verified against the server: our request registers `subtitleDecision: "burn"` and decision→start returns 200. For **complex styled ASS** (anime karaoke/positioning) and **image subs** (PGS/VOBSUB), burning is exactly what **Plex Web itself does** — confirmed by a live Plex Web session on this content showing `subtitleDecision: "burn"`. Also prefers the full (non-forced) subtitle track for a language.
+
+### Notes
+
+- Simple text subs (SRT/VTT) *can* be delivered **soft** (no re-encode) via `subtitles=sidecar|segmented` + `advancedSubtitles=text` (per the Plex OpenAPI) — but that needs the exact Plex client-capability profile plus a client-side WebVTT renderer, so it's deferred to the real web/TV client. For complex ASS / image subs Plex burns regardless, so burn is the correct path there.
+
 ## [0.3.12] - 2026-07-13
 
 ### Added

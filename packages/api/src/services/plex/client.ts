@@ -628,10 +628,18 @@ export async function getPlaybackInfo(
   }
   // Audio track switch (e.g. Japanese → English dub).
   if (audioStreamId != null) params.set("audioStreamID", String(audioStreamId));
-  // Burned-in subtitles (works for any sub format; the only reliable way in a transcode).
+  // Burn the selected subtitle into the video. This is what Plex Web itself does for
+  // complex styled subs (heavily-styled ASS — anime karaoke/positioning; verified via a
+  // Plex Web session on this content showing subtitleDecision:"burn"), and for image subs
+  // (PGS/VOBSUB). It also stays aligned to our live offset for free. Burning re-encodes
+  // the video, so directStream MUST be off *for this request only* — otherwise Plex copies
+  // the video and silently drops the burn. Without a subtitle selected, directStream stays
+  // "1" (video copied, no re-encode). Soft rendering of simple SRT/VTT subs is a later,
+  // client-side path (the real web/TV player).
   if (subStreamId != null) {
     params.set("subtitleStreamID", String(subStreamId));
     params.set("subtitles", "burn");
+    params.set("directStream", "0");
   }
   const qs = params.toString();
 
