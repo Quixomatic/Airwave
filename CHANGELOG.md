@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.2.7] - 2026-07-12
+
+### Fixed
+
+- **Schedule generation crashed** with "value out of range for type integer" — the shuffle-seed FNV-1a hash returned an *unsigned* 32-bit value (up to ~4.29B), overflowing Postgres `Int` (signed, max ~2.15B). `deriveSeed` now returns a **signed** 32-bit int; the PRNG re-normalizes with `>>> 0` at use, so shuffle output is unchanged.
+
 ## [0.2.6] - 2026-07-12
 
 Channel **callsigns** (BunnyEars-style short codes, e.g. `EVRTV`).

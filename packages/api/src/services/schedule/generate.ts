@@ -17,14 +17,18 @@ const DEFAULT_EXTEND_THRESHOLD_SECONDS = 2 * DAY_SECONDS;
 /** Keep a little played-out history, then prune. */
 const HISTORY_KEEP_SECONDS = 6 * 3600;
 
-/** Deterministic FNV-1a hash of the channel id — a stable fallback shuffle seed. */
+/**
+ * Deterministic FNV-1a hash of the channel id — a stable fallback shuffle seed.
+ * Returned as a **signed** 32-bit int so it fits Postgres `Int` (`shuffleSeed`);
+ * the PRNG re-normalizes with `>>> 0` at use, so the sign doesn't matter.
+ */
 function deriveSeed(id: string): number {
   let h = 2166136261;
   for (let i = 0; i < id.length; i++) {
     h ^= id.charCodeAt(i);
     h = Math.imul(h, 16777619);
   }
-  return h >>> 0;
+  return h | 0;
 }
 
 async function ensureSeed(prisma: PrismaClient, channelId: string, current: number | null) {
