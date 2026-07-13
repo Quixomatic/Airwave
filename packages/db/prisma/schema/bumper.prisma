@@ -4,23 +4,46 @@ enum BumperSource {
   LOCAL_DIR
 }
 
-/// Commercial/bumper interstitial config. A null channelId is the global default;
-/// a set channelId is a per-channel override (1:1). The scheduler inserts
-/// minPerBreak..maxPerBreak (1–5) fillers between programs.
+/// How breaks are placed on a channel's timeline. Between-programs only for now;
+/// mid-program (with a settable cadence) is a future option — the fields exist so
+/// enabling it needs no migration.
+enum BumperPlacement {
+  BETWEEN_PROGRAMS
+  MID_PROGRAM
+}
+
+/// Global commercial/bumper configuration — a **singleton** (one row; admins have
+/// full control here). Every break is framed by a client-rendered **interstitial**
+/// ("We'll be right back" → "Up Next: <title>" with cover art + a countdown); when
+/// commercial media sources are configured (future), their clips play *within* that
+/// frame. A channel can only pick a mode (see Channel.bumperMode) — never a source.
 model BumperConfig {
-  id        String   @id @default(cuid())
-  channelId String?  @unique
-  channel   Channel? @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  id      String  @id @default(cuid())
+  /// Singleton guard: always "global" so upsert-by-key returns the one row.
+  key     String  @unique @default("global")
+  enabled Boolean @default(false)
 
-  enabled Boolean      @default(false)
-  source  BumperSource @default(PLEX_PLAYLIST)
+  // ── Interstitial (the always-present break frame) ──────────────────────────
+  /// How long the interstitial break lasts, in seconds (long enough to stretch).
+  interstitialSeconds Int     @default(8)
+  /// Reserved for future template/style variants; one auto-derived style for now.
+  interstitialStyle   String  @default("up-next")
+  /// Optional soft "elevator music"/chime bed played under the interstitial
+  /// (a media key; rendering lands with the viewer). Null = silent.
+  interstitialMusicKey String?
 
+  // ── Commercial media (future — clips shown inside the interstitial frame) ───
+  source            BumperSource?
   plexPlaylistKey   String?
   plexCollectionKey String?
   localDirPath      String? // server-readable dir of clips (served via a small static endpoint)
+  minPerBreak       Int          @default(1)
+  maxPerBreak       Int          @default(1) // clamp 1–5 in app logic
 
-  minPerBreak Int @default(1)
-  maxPerBreak Int @default(1) // clamp 1–5 in app logic
+  // ── Placement (future mid-program cadence) ─────────────────────────────────
+  placement          BumperPlacement @default(BETWEEN_PROGRAMS)
+  /// For MID_PROGRAM: insert a break roughly every N minutes into a program.
+  midProgramCadenceMinutes Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

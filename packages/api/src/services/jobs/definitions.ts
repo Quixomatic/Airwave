@@ -1,6 +1,7 @@
 import prisma from "@ChannelGuide/db";
 
 import type { SyncProgress } from "../media/media-item";
+import { getGlobalBumperConfig } from "../bumpers/bumper-config";
 import { generateLineup } from "../generator/generate";
 import { syncMediaItems } from "../media/sync-media";
 import { syncRecentlyAdded } from "../media/sync-recent";
@@ -131,6 +132,54 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
       }
       if (channels.length > 0) {
         console.log(`[jobs] schedule-backfill built ${channels.length} schedule(s)`);
+      }
+    },
+  },
+  {
+    id: "schedule-bumper-sync",
+    name: "Bumper Sync",
+    description:
+      "Reconciles existing schedules with the current bumper settings — when bumpers are toggled on/off (globally or per channel), rebuilds the affected channels a small batch at a time so their timelines match, then idles.",
+    interval: "minutes",
+    // every 10 min — reconcile a batch of channels whose bumper presence is stale.
+    defaultCron: "0 */10 * * * *",
+    run: async (signal, ctx) => {
+      const BATCH = 10;
+      const global = await getGlobalBumperConfig(prisma);
+      // Only channels that already have a schedule (the initial build is backfill's job).
+      const channels = await prisma.channel.findMany({
+        where: { enabled: true, scheduleItems: { some: {} } },
+        select: { id: true, name: true, bumperMode: true },
+        orderBy: { number: "asc" },
+      });
+      const withBumpers = new Set(
+        (
+          await prisma.scheduleItem.findMany({
+            where: { kind: "BUMPER" },
+            distinct: ["channelId"],
+            select: { channelId: true },
+          })
+        ).map((r) => r.channelId),
+      );
+      // Out of sync when whether bumpers *should* be present differs from whether they are.
+      const stale = channels
+        .filter((c) => {
+          const shouldHave = global.enabled && c.bumperMode !== "OFF";
+          return shouldHave !== withBumpers.has(c.id);
+        })
+        .slice(0, BATCH);
+
+      for (let i = 0; i < stale.length; i++) {
+        throwIfAborted(signal);
+        ctx.progress({ current: i, total: stale.length, label: stale[i]!.name });
+        try {
+          await generateChannelSchedule(prisma, stale[i]!.id);
+        } catch (err) {
+          console.warn(`[jobs] schedule-bumper-sync failed for "${stale[i]!.name}":`, err);
+        }
+      }
+      if (stale.length > 0) {
+        console.log(`[jobs] schedule-bumper-sync reconciled ${stale.length} channel(s)`);
       }
     },
   },

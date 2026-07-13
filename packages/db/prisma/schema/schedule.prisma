@@ -16,15 +16,25 @@ model ScheduleItem {
   // offset into the underlying media file where playback begins (usually 0)
   startOffsetSeconds Int @default(0)
 
-  ratingKey String // media-server item id to play
+  ratingKey String? // media-server item id to play — null for interstitial bumpers (nothing plays)
+
+  // For a BUMPER slot: which kind. "interstitial" = client-rendered break frame
+  // (no media); "plex"/"local" = a commercial clip (future). Null for programs.
+  bumperKind String?
 
   // Metadata for display lives in the central MediaItem cache; slots point at it.
   mediaItemId String?
   mediaItem   MediaItem? @relation(fields: [mediaItemId], references: [id], onDelete: SetNull)
 
+  // For a bumper: the upcoming program it introduces — the client pulls its title /
+  // cover art / start time to render "Up Next: <title>" + countdown.
+  targetMediaItemId String?
+  targetMediaItem   MediaItem? @relation("ScheduleItemTarget", fields: [targetMediaItemId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
 
   @@index([channelId, startsAt])
+  @@index([channelId, kind])
   @@index([mediaItemId])
   @@map("schedule_item")
 }

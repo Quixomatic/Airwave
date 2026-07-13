@@ -33,26 +33,34 @@ export function mergeGuide(base: GuideMeta, over: GuideMeta): GuideMeta {
   return out;
 }
 
-type RowWithMedia = {
-  mediaItem?: { guide: unknown; parent?: { guide: unknown } | null } | null;
-};
+type MediaNode = { guide: unknown; parent?: { guide: unknown } | null } | null | undefined;
 
-/** How to `include` a slot's metadata (own bundle + parent show) for the merge. */
+/** How to `include` a slot's metadata: its own item (programs) + its target program
+ *  (bumpers introduce the upcoming program), each with its parent show for the merge. */
 export const mediaItemGuideInclude = {
   mediaItem: { select: { guide: true, parent: { select: { guide: true } } } },
+  targetMediaItem: { select: { guide: true, parent: { select: { guide: true } } } },
 } as const;
 
-/**
- * The effective guide bundle for a slot: the item's own metadata merged over its
- * parent show's (so episodes inherit genres/cast/studio). Falls back safely when the
- * media has been unlinked/removed.
- */
-export function guideMetaOf(row: RowWithMedia): GuideMeta {
-  const mi = row.mediaItem;
+/** Merge a MediaItem node's own guide over its parent show's (episode inherits genres/cast). */
+function guideFromNode(mi: MediaNode): GuideMeta {
   if (!mi) return { title: "Unavailable" };
   const own = (mi.guide as GuideMeta | null) ?? { title: "Unavailable" };
   const parent = (mi.parent?.guide as GuideMeta | null | undefined) ?? undefined;
   return parent ? mergeGuide(parent, own) : own;
+}
+
+/**
+ * The effective guide bundle for a program slot: the item's own metadata merged over
+ * its parent show's. Falls back safely when the media has been unlinked/removed.
+ */
+export function guideMetaOf(row: { mediaItem?: MediaNode }): GuideMeta {
+  return guideFromNode(row.mediaItem);
+}
+
+/** The guide bundle of the program a bumper introduces (its "Up Next" target). */
+export function guideMetaOfTarget(row: { targetMediaItem?: MediaNode }): GuideMeta {
+  return guideFromNode(row.targetMediaItem);
 }
 
 /**

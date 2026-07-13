@@ -1,4 +1,5 @@
 import { protectedProcedure, publicProcedure, router } from "../index";
+import { bumpersRouter } from "./bumpers";
 import { channelsRouter } from "./channels";
 import { generatorRouter } from "./generator";
 import { jobsRouter } from "./jobs";
@@ -17,6 +18,7 @@ export const appRouter = router({
       user: ctx.session.user,
     };
   }),
+  bumpers: bumpersRouter,
   channels: channelsRouter,
   generator: generatorRouter,
   jobs: jobsRouter,

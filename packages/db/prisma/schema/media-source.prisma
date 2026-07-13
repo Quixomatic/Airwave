@@ -66,7 +66,8 @@ model MediaItem {
   available    Boolean  @default(true)
   lastSyncedAt DateTime @default(now())
 
-  scheduleItems ScheduleItem[]
+  scheduleItems       ScheduleItem[]
+  targetedByBumpers   ScheduleItem[] @relation("ScheduleItemTarget")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

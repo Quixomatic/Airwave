@@ -2,9 +2,21 @@ import type { PlexItem } from "../plex/client";
 
 export type OrderingStrategy = "SHUFFLE" | "IN_ORDER" | "BY_AIR_DATE";
 
+/** The break plan woven between programs (null = no bumpers on this channel). */
+export type TimelineBumperPlan = {
+  /** Interstitial break length, in seconds. */
+  interstitialSeconds: number;
+};
+
 /** One materialized slot on a channel's timeline. Display metadata is joined via MediaItem. */
 export type TimelineEntry = {
-  ratingKey: string;
+  kind: "PROGRAM" | "BUMPER";
+  /** The media to play. Null for interstitial bumpers (the client renders them). */
+  ratingKey: string | null;
+  /** For a bumper: which kind ("interstitial"). Null for programs. */
+  bumperKind: string | null;
+  /** For a bumper: the ratingKey of the upcoming program it introduces. */
+  targetRatingKey: string | null;
   startsAt: Date;
   durationSeconds: number;
   startOffsetSeconds: number;
@@ -14,10 +26,12 @@ export type BuildResult = {
   entries: TimelineEntry[];
   /** How many full passes of the pool were laid down. */
   passes: number;
-  /** Duration of one full pass of the pool (seconds). */
+  /** Duration of one full pass of the pool (seconds), programs only. */
   poolSeconds: number;
-  /** Total scheduled duration produced (seconds). */
+  /** Total scheduled duration produced (seconds), including bumpers. */
   coveredSeconds: number;
+  /** How many interstitial/bumper slots were woven in. */
+  bumperCount: number;
 };
 
 /** Items shorter than this are treated as this long, so a pass can never be zero-length. */
@@ -87,6 +101,10 @@ function passOrder(
  * whole passes — each reshuffled for SHUFFLE channels — until it has covered
  * `minDurationSeconds`. So a 20-day movie pool yields one 20-day pass; a 3-hour pool
  * loops until it fills the floor. Absolute `startsAt` times come from `startAt`.
+ *
+ * When `bumper` is set, an interstitial break is woven in **before each program**
+ * (except the very first slot of the build, so a mid-stream tune-in isn't preceded
+ * by a break) — the interstitial targets the program that follows it.
  */
 export function buildSchedule(
   pool: PlexItem[],
@@ -94,11 +112,14 @@ export function buildSchedule(
   seed: number,
   startAt: Date,
   minDurationSeconds: number,
+  bumper: TimelineBumperPlan | null = null,
 ): BuildResult {
   const usable = pool.filter((i) => i.durationMs > 0);
-  if (usable.length === 0) return { entries: [], passes: 0, poolSeconds: 0, coveredSeconds: 0 };
+  if (usable.length === 0)
+    return { entries: [], passes: 0, poolSeconds: 0, coveredSeconds: 0, bumperCount: 0 };
 
   const poolSeconds = usable.reduce((s, i) => s + itemSeconds(i), 0);
+  const bumperSeconds = bumper ? Math.max(1, Math.round(bumper.interstitialSeconds)) : 0;
   // Fold the block's start time into the seed so an appended block (or a rebuild at a
   // different time) reshuffles differently, while staying deterministic.
   const baseSeed = mix(seed >>> 0, Math.floor(startAt.getTime() / 1000) >>> 0);
@@ -107,13 +128,34 @@ export function buildSchedule(
   let cursorSec = Math.floor(startAt.getTime() / 1000);
   let coveredSeconds = 0;
   let passes = 0;
+  let bumperCount = 0;
 
   while (coveredSeconds < minDurationSeconds && entries.length < MAX_ENTRIES) {
     const order = passOrder(usable, ordering, baseSeed, passes);
     for (const item of order) {
+      // Interstitial break introducing this program (never before the very first slot).
+      if (bumper && entries.length > 0) {
+        entries.push({
+          kind: "BUMPER",
+          ratingKey: null,
+          bumperKind: "interstitial",
+          targetRatingKey: item.ratingKey,
+          startsAt: new Date(cursorSec * 1000),
+          durationSeconds: bumperSeconds,
+          startOffsetSeconds: 0,
+        });
+        cursorSec += bumperSeconds;
+        coveredSeconds += bumperSeconds;
+        bumperCount++;
+        if (entries.length >= MAX_ENTRIES) break;
+      }
+
       const dur = itemSeconds(item);
       entries.push({
+        kind: "PROGRAM",
         ratingKey: item.ratingKey,
+        bumperKind: null,
+        targetRatingKey: null,
         startsAt: new Date(cursorSec * 1000),
         durationSeconds: dur,
         startOffsetSeconds: 0,
@@ -125,5 +167,5 @@ export function buildSchedule(
     passes++;
   }
 
-  return { entries, passes, poolSeconds, coveredSeconds };
+  return { entries, passes, poolSeconds, coveredSeconds, bumperCount };
 }

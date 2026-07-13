@@ -16,6 +16,18 @@ enum DefinitionMode {
   EXCLUDE
 }
 
+/// A channel's thin control over bumpers. The global BumperConfig owns the actual
+/// content (sources, timing); a channel only picks a mode. INHERIT = follow the
+/// global config; OFF = never; INTERSTITIAL_ONLY = just the break frame; FULL =
+/// interstitial + commercials. (INTERSTITIAL_ONLY and FULL behave the same until
+/// commercial media sources ship.)
+enum BumperMode {
+  INHERIT
+  OFF
+  INTERSTITIAL_ONLY
+  FULL
+}
+
 /// A guide package — the toggleable grouping of channels (e.g. "Time Machine").
 model ChannelPackage {
   id          String    @id @default(cuid())
@@ -62,6 +74,9 @@ model Channel {
   generated Boolean @default(false)
   presetKey String?
 
+  // Thin per-channel bumper override; the global BumperConfig owns the content.
+  bumperMode BumperMode @default(INHERIT)
+
   mediaSourceId String
   mediaSource   MediaSource @relation(fields: [mediaSourceId], references: [id], onDelete: Cascade)
 
@@ -73,7 +88,6 @@ model Channel {
 
   definitions   ChannelDefinition[]
   scheduleItems ScheduleItem[]
-  bumperConfig  BumperConfig?
   favorites     Favorite[]
   watchStates   ChannelWatchState[]
 

@@ -14,6 +14,7 @@ import { FilterBuilder, type FilterGroup, normalizeFilter } from "./filter-build
 
 export type Ordering = "SHUFFLE" | "IN_ORDER" | "BY_AIR_DATE";
 export type MediaType = "movie" | "show";
+export type BumperMode = "INHERIT" | "OFF" | "INTERSTITIAL_ONLY" | "FULL";
 
 export type ChannelFormValues = {
   name: string;
@@ -29,7 +30,15 @@ export type ChannelFormValues = {
   tint: string | null;
   description: string | null;
   enabled: boolean;
+  bumperMode: BumperMode;
 };
+
+const BUMPER_MODE_OPTIONS: { value: BumperMode; label: string }[] = [
+  { value: "INHERIT", label: "Inherit global setting" },
+  { value: "OFF", label: "Off — no bumpers" },
+  { value: "INTERSTITIAL_ONLY", label: "Interstitial only" },
+  { value: "FULL", label: "Full — interstitial + commercials" },
+];
 
 /**
  * Channel create/edit fields as a `<form id={formId}>` with NO submit button —
@@ -64,6 +73,7 @@ export function ChannelForm({
   const [tint, setTint] = useState<string | null>(initial?.tint ?? null);
   const [description, setDescription] = useState(initial?.description ?? "");
   const [enabled, setEnabled] = useState(initial?.enabled ?? true);
+  const [bumperMode, setBumperMode] = useState<BumperMode>(initial?.bumperMode ?? "INHERIT");
   const [filter, setFilter] = useState<FilterGroup>(() => normalizeFilter(initial?.filter));
 
   const selectedPackage = packages.data?.find((p) => p.id === packageId);
@@ -109,6 +119,7 @@ export function ChannelForm({
       tint,
       description: description.trim() || null,
       enabled,
+      bumperMode,
       mediaSourceId: sourceId,
     });
   };
@@ -252,6 +263,31 @@ export function ChannelForm({
           — inactive channels aren't selectable in the guide
         </span>
       </label>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <Label htmlFor="cbump">Bumpers</Label>
+          <select
+            id="cbump"
+            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+            value={bumperMode}
+            onChange={(e) => setBumperMode(e.target.value as BumperMode)}
+          >
+            {BUMPER_MODE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-muted-foreground text-xs">
+            Break content is configured globally in{" "}
+            <Link to="/bumpers" className="text-primary hover:underline">
+              Bumpers
+            </Link>
+            . Channels only choose whether/which to show.
+          </p>
+        </div>
+      </div>
 
       <div className="space-y-2">
         <Label>Appearance</Label>

@@ -1,7 +1,13 @@
 import type { PrismaClient } from "@ChannelGuide/db";
 
 import type { GuideMeta } from "../plex/client";
-import { guideMetaOf, mediaItemGuideInclude, upsertPoolItems } from "../media/media-item";
+import { channelBumperPlan } from "../bumpers/bumper-config";
+import {
+  guideMetaOf,
+  guideMetaOfTarget,
+  mediaItemGuideInclude,
+  upsertPoolItems,
+} from "../media/media-item";
 import { resolveChannel } from "../plex/resolve";
 import { type BuildResult, type OrderingStrategy, buildSchedule } from "./timeline";
 
@@ -41,12 +47,16 @@ async function ensureSeed(prisma: PrismaClient, channelId: string, current: numb
 function toRows(channelId: string, build: BuildResult, itemIds: Map<string, string>) {
   return build.entries.map((e) => ({
     channelId,
-    kind: "PROGRAM" as const,
+    kind: e.kind,
     startsAt: e.startsAt,
     durationSeconds: e.durationSeconds,
     startOffsetSeconds: e.startOffsetSeconds,
     ratingKey: e.ratingKey,
-    mediaItemId: itemIds.get(e.ratingKey) ?? null,
+    bumperKind: e.bumperKind,
+    // A program links to its own MediaItem; a bumper links to the upcoming program
+    // it introduces via `targetMediaItemId` (for the "Up Next" art/metadata).
+    mediaItemId: e.ratingKey ? (itemIds.get(e.ratingKey) ?? null) : null,
+    targetMediaItemId: e.targetRatingKey ? (itemIds.get(e.targetRatingKey) ?? null) : null,
   }));
 }
 
@@ -54,6 +64,9 @@ export type ScheduleSummary = {
   channelId: string;
   poolSize: number;
   itemCount: number;
+  /** Program slots (itemCount minus bumpers). */
+  programCount: number;
+  bumperCount: number;
   passes: number;
   poolSeconds: number;
   coveredSeconds: number;
@@ -72,6 +85,8 @@ function summarize(
     channelId,
     poolSize,
     itemCount: build.entries.length,
+    programCount: build.entries.length - build.bumperCount,
+    bumperCount: build.bumperCount,
     passes: build.passes,
     poolSeconds: build.poolSeconds,
     coveredSeconds: build.coveredSeconds,
@@ -99,7 +114,8 @@ export async function generateChannelSchedule(
 
   const pool = await resolveChannel(prisma, channelId);
   const itemIds = await upsertPoolItems(prisma, channel.mediaSourceId, pool);
-  const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, from, min);
+  const plan = await channelBumperPlan(prisma, channel);
+  const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, from, min, plan);
 
   await prisma.$transaction([
     prisma.scheduleItem.deleteMany({ where: { channelId } }),
@@ -148,7 +164,8 @@ export async function extendChannelSchedule(
   const seed = await ensureSeed(prisma, channelId, channel.shuffleSeed);
   const pool = await resolveChannel(prisma, channelId);
   const itemIds = await upsertPoolItems(prisma, channel.mediaSourceId, pool);
-  const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, tailEnd, min);
+  const plan = await channelBumperPlan(prisma, channel);
+  const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, tailEnd, min, plan);
 
   const pruneBefore = new Date(now.getTime() - HISTORY_KEEP_SECONDS * 1000);
   await prisma.$transaction([
@@ -168,9 +185,12 @@ export async function extendChannelSchedule(
 
 export type TimelineSlot = {
   id: string;
-  ratingKey: string;
+  kind: "PROGRAM" | "BUMPER";
+  bumperKind: string | null;
+  ratingKey: string | null;
   startsAt: Date;
   durationSeconds: number;
+  /** For a bumper, this is the upcoming program it introduces ("Up Next"). */
   guide: GuideMeta;
 };
 
@@ -191,15 +211,19 @@ export async function getChannelTimeline(
     .filter((r) => r.startsAt.getTime() + r.durationSeconds * 1000 > from.getTime())
     .map((r) => ({
       id: r.id,
+      kind: r.kind,
+      bumperKind: r.bumperKind,
       ratingKey: r.ratingKey,
       startsAt: r.startsAt,
       durationSeconds: r.durationSeconds,
-      guide: guideMetaOf(r),
+      guide: r.kind === "BUMPER" ? guideMetaOfTarget(r) : guideMetaOf(r),
     }));
 }
 
 export type NowNextSlot = {
-  ratingKey: string;
+  kind: "PROGRAM" | "BUMPER";
+  bumperKind: string | null;
+  ratingKey: string | null;
   startsAt: Date;
   durationSeconds: number;
   guide: GuideMeta;
@@ -233,10 +257,12 @@ export async function getNowNext(
   ]);
 
   const slot = (r: NonNullable<typeof row>): NowNextSlot => ({
+    kind: r.kind,
+    bumperKind: r.bumperKind,
     ratingKey: r.ratingKey,
     startsAt: r.startsAt,
     durationSeconds: r.durationSeconds,
-    guide: guideMetaOf(r),
+    guide: r.kind === "BUMPER" ? guideMetaOfTarget(r) : guideMetaOf(r),
   });
 
   let current: NowNext["current"] = null;

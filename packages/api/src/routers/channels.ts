@@ -16,6 +16,7 @@ import {
 
 const orderingEnum = z.enum(["SHUFFLE", "IN_ORDER", "BY_AIR_DATE"]);
 const mediaTypeEnum = z.enum(["movie", "show"]);
+const bumperModeEnum = z.enum(["INHERIT", "OFF", "INTERSTITIAL_ONLY", "FULL"]);
 const opEnum = z.enum(["is", "isNot", "gte", "lte", "contains", "notContains"]);
 
 const conditionSchema = z.object({
@@ -81,6 +82,7 @@ export const channelsRouter = router({
       sortField: channel.sortField,
       sortDir: channel.sortDir,
       enabled: channel.enabled,
+      bumperMode: channel.bumperMode,
       description: channel.description,
       mediaSourceId: channel.mediaSourceId,
       packageId: channel.packageId,
@@ -150,6 +152,7 @@ export const channelsRouter = router({
         tint: z.string().nullish(),
         description: z.string().nullish(),
         enabled: z.boolean().optional(),
+        bumperMode: bumperModeEnum.optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -176,6 +179,7 @@ export const channelsRouter = router({
           tint: input.tint ?? null,
           description: input.description ?? null,
           enabled: input.enabled ?? true,
+          bumperMode: input.bumperMode ?? "INHERIT",
           createdById: ctx.session.user.id,
           definitions: { create: { kind: "PREDICATE", plexFilter } },
         },
@@ -200,6 +204,7 @@ export const channelsRouter = router({
         tint: z.string().nullish(),
         description: z.string().nullish(),
         enabled: z.boolean().optional(),
+        bumperMode: bumperModeEnum.optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -223,6 +228,7 @@ export const channelsRouter = router({
           tint: input.tint ?? null,
           description: input.description ?? null,
           ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+          ...(input.bumperMode ? { bumperMode: input.bumperMode } : {}),
         },
       });
 

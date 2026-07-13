@@ -8,7 +8,12 @@ import { toast } from "sonner";
 
 import { useBreadcrumb } from "@/context/breadcrumb-provider";
 import { HeaderRight } from "@/context/header-provider";
-import { ChannelForm, type MediaType, type Ordering } from "@/features/channels/channel-form";
+import {
+  ChannelForm,
+  type BumperMode,
+  type MediaType,
+  type Ordering,
+} from "@/features/channels/channel-form";
 import type { FilterGroup } from "@/features/channels/filter-builder";
 import { trpc, trpcClient } from "@/utils/trpc";
 
@@ -43,7 +48,10 @@ function ChannelDetail() {
       await refreshSchedule();
       const span = formatDuration(r.coveredSeconds);
       const passNote = r.passes > 1 ? ` (${r.passes} passes)` : "";
-      toast.success(`Scheduled ${r.itemCount} slots from ${r.poolSize} items · ${span}${passNote}.`);
+      const breakNote = r.bumperCount > 0 ? ` + ${r.bumperCount} breaks` : "";
+      toast.success(
+        `Scheduled ${r.programCount} programs${breakNote} from ${r.poolSize} items · ${span}${passNote}.`,
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Generate failed");
     } finally {
@@ -133,6 +141,7 @@ function ChannelDetail() {
               tint: channel.data.tint,
               description: channel.data.description,
               enabled: channel.data.enabled,
+              bumperMode: channel.data.bumperMode as BumperMode,
             }}
             onSubmit={async (v) => {
               setSubmitting(true);
@@ -152,6 +161,7 @@ function ChannelDetail() {
                   tint: v.tint,
                   description: v.description,
                   enabled: v.enabled,
+                  bumperMode: v.bumperMode,
                 });
                 toast.success("Saved.");
                 await channel.refetch();
@@ -224,24 +234,39 @@ function ChannelDetail() {
 
           {schedule.data && schedule.data.length > 0 && (
             <ol className="divide-border divide-y border-t text-sm">
-              {schedule.data.slice(0, 40).map((s) => (
-                <li key={s.id} className="flex items-center gap-3 py-1.5">
-                  <span className="text-muted-foreground w-24 shrink-0 tabular-nums text-xs">
-                    {formatWhen(s.startsAt)}
-                  </span>
-                  <span className="truncate">
-                    {guideTitle(s.guide)}
-                    {s.guide.contentRating && (
-                      <span className="text-muted-foreground ml-2 text-xs">
-                        {s.guide.contentRating}
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-muted-foreground ml-auto shrink-0 text-xs">
-                    {formatDuration(s.durationSeconds)}
-                  </span>
-                </li>
-              ))}
+              {schedule.data.slice(0, 40).map((s) =>
+                s.kind === "BUMPER" ? (
+                  <li
+                    key={s.id}
+                    className="text-muted-foreground flex items-center gap-3 py-1.5 text-xs italic"
+                  >
+                    <span className="w-24 shrink-0 not-italic tabular-nums">
+                      {formatWhen(s.startsAt)}
+                    </span>
+                    <span className="truncate">▸ Break — Up Next: {guideTitle(s.guide)}</span>
+                    <span className="ml-auto shrink-0 not-italic">
+                      {formatDuration(s.durationSeconds)}
+                    </span>
+                  </li>
+                ) : (
+                  <li key={s.id} className="flex items-center gap-3 py-1.5">
+                    <span className="text-muted-foreground w-24 shrink-0 tabular-nums text-xs">
+                      {formatWhen(s.startsAt)}
+                    </span>
+                    <span className="truncate">
+                      {guideTitle(s.guide)}
+                      {s.guide.contentRating && (
+                        <span className="text-muted-foreground ml-2 text-xs">
+                          {s.guide.contentRating}
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-muted-foreground ml-auto shrink-0 text-xs">
+                      {formatDuration(s.durationSeconds)}
+                    </span>
+                  </li>
+                ),
+              )}
             </ol>
           )}
         </CardContent>
