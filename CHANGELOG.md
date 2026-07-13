@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.2.5] - 2026-07-12
+
+### Added
+
+- **Progress bar on the Jobs page** — a running job (e.g. Auto-Generate Lineup, Metadata Sync) now shows its live progress (label + current/total bar), not just a spinner. The page also polls faster (1.5s) while any job is running.
+
 ## [0.2.4] - 2026-07-12
 
 Grow the preset catalog (23 → 184 channels).

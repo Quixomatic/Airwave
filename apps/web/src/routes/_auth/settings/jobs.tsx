@@ -21,6 +21,7 @@ type Job = {
   cronSchedule: string;
   nextRunAt: string | Date | null;
   running: boolean;
+  progress: { current: number; total: number; label: string } | null;
   lastRunAt: string | Date | null;
   lastFinishedAt: string | Date | null;
   lastStatus: string | null;
@@ -29,7 +30,11 @@ type Job = {
 const SELECT = "border-input bg-background h-9 rounded-md border px-2 text-sm";
 
 function SettingsJobs() {
-  const jobs = useQuery({ ...trpc.jobs.list.queryOptions(), refetchInterval: 5000 });
+  // Poll faster while any job is running so its progress bar is live.
+  const jobs = useQuery({
+    ...trpc.jobs.list.queryOptions(),
+    refetchInterval: (q) => (q.state.data?.some((j) => j.running) ? 1500 : 5000),
+  });
   const [editing, setEditing] = useState<Job | null>(null);
 
   const run = async (job: Job) => {
@@ -62,7 +67,8 @@ function SettingsJobs() {
 
       <Card className="divide-border divide-y p-0">
         {jobs.data?.map((job) => (
-          <div key={job.id} className="flex items-center gap-4 p-4">
+          <div key={job.id} className="space-y-2.5 p-4">
+            <div className="flex items-center gap-4">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium">{job.name}</p>
@@ -95,6 +101,9 @@ function SettingsJobs() {
                 <Pencil className="h-3.5 w-3.5" />
               </Button>
             )}
+            </div>
+
+            {job.running && <JobProgress progress={job.progress} />}
           </div>
         ))}
         {jobs.data?.length === 0 && (
@@ -205,6 +214,32 @@ function EditScheduleModal({
           </Button>
         </div>
       </Card>
+    </div>
+  );
+}
+
+function JobProgress({
+  progress,
+}: {
+  progress: { current: number; total: number; label: string } | null;
+}) {
+  const pct = progress && progress.total > 0 ? (progress.current / progress.total) * 100 : null;
+  return (
+    <div>
+      <div className="text-muted-foreground mb-1 flex items-center justify-between text-xs">
+        <span className="truncate">{progress?.label ?? "Starting…"}</span>
+        {progress && progress.total > 0 && (
+          <span className="shrink-0 tabular-nums">
+            {progress.current} / {progress.total}
+          </span>
+        )}
+      </div>
+      <div className="bg-muted h-1.5 overflow-hidden rounded-full">
+        <div
+          className={`bg-primary h-full rounded-full transition-all ${pct == null ? "w-1/3 animate-pulse" : ""}`}
+          style={pct == null ? undefined : { width: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 }
