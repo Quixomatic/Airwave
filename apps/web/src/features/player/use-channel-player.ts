@@ -300,6 +300,11 @@ export function useChannelPlayer(channelId: string, options: PlayerOptions = {})
       console.debug("[player] load", {
         offset,
         mode: info.mode,
+        subtitleLang: optionsRef.current.subtitleLang,
+        audioLang: optionsRef.current.audioLang,
+        quality: optionsRef.current.quality,
+        burn: info.url.includes("subtitles=burn"),
+        subtitleStreamID: new URLSearchParams(info.url.split("?")[1] ?? "").get("subtitleStreamID"),
         durationSlot: Math.round(entry.endS - entry.startS),
       });
 
