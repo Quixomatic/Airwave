@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
 import { getPlaybackInfo, stopTranscode } from "../services/plex/client";
+import { QUALITY_PRESETS } from "../services/plex/quality";
 import { getChannelTimeline } from "../services/schedule/generate";
 
 /** A session is "active" while it's heartbeated within this window. */
@@ -45,6 +46,11 @@ export const playbackRouter = router({
       return { serverTime: now, slots };
     }),
 
+  /** The Plex-style quality ladder for the player's quality selector. */
+  qualities: adminProcedure.query(() =>
+    QUALITY_PRESETS.map((q) => ({ id: q.id, label: q.label })),
+  ),
+
   /** Resolve a playable URL for a specific item at a specific offset (client-driven). */
   media: adminProcedure
     .input(
@@ -52,6 +58,7 @@ export const playbackRouter = router({
         channelId: z.string(),
         ratingKey: z.string(),
         offsetSeconds: z.number().int().min(0),
+        quality: z.string().optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -62,6 +69,7 @@ export const playbackRouter = router({
         clientId,
         input.ratingKey,
         input.offsetSeconds,
+        input.quality,
       );
       if (!info) throw new TRPCError({ code: "NOT_FOUND", message: "No playable media part." });
       return { ...info, offsetSeconds: input.offsetSeconds };

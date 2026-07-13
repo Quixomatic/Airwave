@@ -6,6 +6,8 @@
 
 import { XMLParser } from "fast-xml-parser";
 
+import { BROWSER_CLIENT_PROFILE, qualityParams } from "./quality";
+
 const PLEX_TV = "https://plex.tv/api/v2";
 const PRODUCT = "ChannelGuide";
 const VERSION = "0.0.10";
@@ -477,6 +479,7 @@ export async function getPlaybackInfo(
   clientId: string,
   ratingKey: string,
   offsetSeconds: number,
+  qualityId?: string,
 ): Promise<PlaybackInfo | null> {
   const res = await fetch(`${baseUrl}/library/metadata/${ratingKey}`, {
     headers: pmsHeaders(token),
@@ -502,7 +505,11 @@ export async function getPlaybackInfo(
   const videoCodec = (media?.videoCodec ?? "").toLowerCase();
   const audioCodec = (media?.audioCodec ?? "").toLowerCase();
 
+  // A selected quality cap forces a transcode (so the cap is honored) even for a
+  // browser-friendly file; "original" (no cap) direct-plays when it can.
+  const quality = qualityParams(qualityId);
   const canDirect =
+    !quality &&
     DIRECT_CONTAINERS.has(container) &&
     DIRECT_VIDEO.has(videoCodec) &&
     DIRECT_AUDIO.has(audioCodec);
@@ -536,6 +543,15 @@ export async function getPlaybackInfo(
     "X-Plex-Product": PRODUCT,
     "X-Plex-Platform": "Web",
   });
+  // Quality cap (the Plex "Quality" ladder). Only applied when a preset is chosen, so
+  // the uncapped transcode path is unchanged. Also advertise our client profile.
+  if (quality) {
+    params.set("maxVideoBitrate", quality.maxVideoBitrate);
+    params.set("videoResolution", quality.videoResolution);
+    params.set("videoQuality", quality.videoQuality);
+    params.set("autoAdjustQuality", "0");
+    params.set("X-Plex-Client-Profile-Extra", BROWSER_CLIENT_PROFILE);
+  }
   const url = `${baseUrl}/video/:/transcode/universal/start.m3u8?${params.toString()}`;
   return { mode: "hls", url, session, container, videoCodec, audioCodec };
 }

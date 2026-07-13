@@ -11,8 +11,11 @@ import {
   Radio,
   RotateCcw,
   Rewind,
+  Settings,
   SkipBack,
 } from "lucide-react";
+
+import { useEffect, useState } from "react";
 
 import { useChannelPlayer } from "@/features/player/use-channel-player";
 import { trpc } from "@/utils/trpc";
@@ -22,11 +25,20 @@ export const Route = createFileRoute("/_auth/watch/$channelId")({
   component: Watch,
 });
 
+const QUALITY_KEY = "cg-quality";
+
 function Watch() {
   const { channelId } = Route.useParams();
   const navigate = useNavigate();
-  const { videoRef, status, controls, loadingTimeline, timelineError } =
-    useChannelPlayer(channelId);
+  const [quality, setQuality] = useState<string>(
+    () => localStorage.getItem(QUALITY_KEY) ?? "original",
+  );
+  useEffect(() => localStorage.setItem(QUALITY_KEY, quality), [quality]);
+  const qualities = useQuery(trpc.playback.qualities.queryOptions());
+  const { videoRef, status, controls, loadingTimeline, timelineError } = useChannelPlayer(
+    channelId,
+    quality,
+  );
   const channels = useQuery(trpc.channels.list.queryOptions());
 
   const enabled = (channels.data ?? []).filter((c) => c.enabled);
@@ -139,6 +151,22 @@ function Watch() {
         >
           <RotateCcw className="mr-1 h-4 w-4" /> Jump to Live
         </Button>
+
+        <div className="ml-auto flex items-center gap-1.5">
+          <Settings className="text-muted-foreground h-4 w-4" />
+          <select
+            className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+            value={quality}
+            onChange={(e) => setQuality(e.target.value)}
+            title="Streaming quality"
+          >
+            {qualities.data?.map((q) => (
+              <option key={q.id} value={q.id}>
+                {q.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {timelineError && <p className="text-destructive text-sm">{timelineError}</p>}

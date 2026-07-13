@@ -63,8 +63,10 @@ type Current = {
   baselineReady: boolean;
 };
 
-export function useChannelPlayer(channelId: string) {
+export function useChannelPlayer(channelId: string, quality?: string) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const qualityRef = useRef(quality);
+  qualityRef.current = quality;
   const timeline = useQuery({
     ...trpc.playback.timeline.queryOptions({ channelId }),
     refetchInterval: 120_000,
@@ -179,6 +181,7 @@ export function useChannelPlayer(channelId: string) {
           channelId,
           ratingKey: entry.slot.ratingKey,
           offsetSeconds: offset,
+          quality: qualityRef.current,
         });
       } catch (err) {
         if (gen !== genRef.current) return;
@@ -355,6 +358,13 @@ export function useChannelPlayer(channelId: string) {
       currentRef.current = null;
     };
   }, [stopMedia]);
+
+  // Re-resolve the current program at the same position when quality changes (bumpers
+  // pick up the new setting on the next program automatically).
+  useEffect(() => {
+    if (currentRef.current?.kind === "PROGRAM") void goTo(currentEffective());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quality]);
 
   // ── Heartbeat the session; end it (and stop the transcode) on teardown ──
   useEffect(() => {
