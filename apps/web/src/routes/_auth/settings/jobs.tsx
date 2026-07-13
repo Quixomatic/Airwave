@@ -17,6 +17,7 @@ export const Route = createFileRoute("/_auth/settings/jobs")({
 type Job = {
   id: string;
   name: string;
+  description: string;
   interval: "seconds" | "minutes" | "hours" | "days" | "fixed";
   cronSchedule: string;
   nextRunAt: string | Date | null;
@@ -81,7 +82,8 @@ function SettingsJobs() {
                   <span className="text-destructive text-xs">last run failed</span>
                 )}
               </div>
-              <p className="text-muted-foreground mt-0.5 text-xs">
+              <p className="text-muted-foreground mt-0.5 text-xs">{job.description}</p>
+              <p className="text-muted-foreground mt-1 text-xs">
                 {describeCron(job.cronSchedule)} · next {formatWhen(job.nextRunAt)}
                 {job.lastFinishedAt ? ` · last ran ${formatWhen(job.lastFinishedAt)}` : ""}
               </p>

@@ -105,6 +105,7 @@ export async function setJobSchedule(id: string, cron: string): Promise<boolean>
 export type JobStatus = {
   id: string;
   name: string;
+  description: string;
   interval: JobDefinition["interval"];
   manual: boolean;
   cronSchedule: string;
@@ -127,6 +128,7 @@ export async function listJobs(): Promise<JobStatus[]> {
     return {
       id: def.id,
       name: def.name,
+      description: def.description,
       interval: def.interval,
       manual: def.manual ?? false,
       cronSchedule: l?.cronSchedule ?? row?.cronSchedule ?? def.defaultCron,

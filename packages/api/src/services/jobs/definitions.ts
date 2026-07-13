@@ -21,6 +21,8 @@ export type JobContext = { progress: SyncProgress };
 export type JobDefinition = {
   id: string;
   name: string;
+  /** One-line, human-readable explanation of what the job does (shown on the Jobs page). */
+  description: string;
   interval: JobInterval;
   defaultCron: string;
   /** Manual jobs are never auto-scheduled — run-now only (e.g. lineup generation). */
@@ -39,6 +41,8 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
   {
     id: "metadata-sync",
     name: "Metadata Sync",
+    description:
+      "Full refresh of the metadata cache from every connected source — pages all movies and episodes, links episodes to their shows, and flags anything no longer on the server as unavailable.",
     interval: "hours",
     // full refresh + removal detection — every day at 03:00
     defaultCron: "0 0 3 * * *",
@@ -52,6 +56,8 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
   {
     id: "recently-added-scan",
     name: "Recently Added Scan",
+    description:
+      "Quick incremental scan that pulls only the most-recently-added items from each library, so new content shows up in guides within minutes without a full resync.",
     interval: "minutes",
     // cheap incremental — every 5 minutes
     defaultCron: "0 */5 * * * *",
@@ -65,6 +71,8 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
   {
     id: "library-scan",
     name: "Library Scan",
+    description:
+      "Re-reads each source's list of libraries (sections), picking up newly-added or removed libraries while preserving your enabled/disabled choices.",
     interval: "days",
     // every day at 04:00
     defaultCron: "0 0 4 * * *",
@@ -78,6 +86,8 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
   {
     id: "schedule-refresh",
     name: "Schedule Refresh",
+    description:
+      "Tops up each active channel's timeline when it's running low, appending fresh programming at the tail without disturbing what's currently on.",
     interval: "hours",
     // hourly — tops up any channel whose timeline is running low (self-adjusting)
     defaultCron: "0 0 * * * *",
@@ -95,6 +105,8 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
   {
     id: "schedule-backfill",
     name: "Schedule Backfill",
+    description:
+      "Builds the initial schedule for active channels that don't have one yet (e.g. freshly auto-generated), a small batch at a time, then idles once every channel is scheduled.",
     interval: "minutes",
     // every 10 min — build initial schedules for enabled channels that have none
     // yet, a small batch at a time (extend/refresh only tops up existing timelines).
@@ -125,6 +137,8 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
   {
     id: "lineup-generate",
     name: "Auto-Generate Lineup",
+    description:
+      "Auto-generates the full channel lineup from the preset catalog — evaluates each preset against your library and creates the channels it can fill. Manual; run it from the Channels page.",
     interval: "fixed",
     defaultCron: "0 0 0 1 1 *", // manual-only; never auto-fires
     manual: true,
@@ -138,6 +152,8 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
   {
     id: "schedule-prune",
     name: "Schedule Prune",
+    description:
+      "Removes schedule slots that have already aired (past a safety buffer) to keep the timeline table lean.",
     interval: "days",
     // every day at 02:00 — drop schedule slots that have already passed
     defaultCron: "0 0 2 * * *",
@@ -154,6 +170,8 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
   {
     id: "plex-token-check",
     name: "Plex Token Check",
+    description:
+      "Verifies each source's owner token still works and logs a warning if it's been revoked, so a broken connection is caught early.",
     interval: "days",
     // once a day at 05:00 — verify each source's owner token still works
     defaultCron: "0 0 5 * * *",
