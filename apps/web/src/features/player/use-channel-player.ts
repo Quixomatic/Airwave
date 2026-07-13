@@ -406,21 +406,42 @@ export function useChannelPlayer(channelId: string, quality?: string) {
       }
 
       const nextSlot = slotsRef.current[cur.index + 1]?.slot;
+      const state = cur.kind === "BUMPER" ? "bumper" : "program";
+      const title = titleOf(cur.guide);
+      const nextTitle = nextSlot ? titleOf(nextSlot.guide) : null;
+      const delaySeconds = Math.round(delay);
+      const isLive = delay < LIVE_THRESHOLD;
+      const bumperRemaining =
+        cur.kind === "BUMPER" ? Math.max(0, Math.ceil(cur.endS - effective)) : null;
+      const paused = pausedRef.current;
       setStatus((s) => {
-        const next: PlayerStatus = {
+        // Bail out (return the same object) when nothing visible changed — React then
+        // skips the re-render, so the 500ms tick doesn't thrash the main thread.
+        if (
+          !s.loading &&
+          s.state === state &&
+          s.title === title &&
+          s.nextTitle === nextTitle &&
+          s.delaySeconds === delaySeconds &&
+          s.isLive === isLive &&
+          s.bumperRemaining === bumperRemaining &&
+          s.paused === paused
+        ) {
+          return s;
+        }
+        return {
           ...s,
           loading: false,
-          state: cur.kind === "BUMPER" ? "bumper" : "program",
-          title: titleOf(cur.guide),
+          state,
+          title,
           subtitle: cur.guide.contentRating ?? null,
           summary: cur.guide.summary ?? null,
-          nextTitle: nextSlot ? titleOf(nextSlot.guide) : null,
-          delaySeconds: Math.round(delay),
-          isLive: delay < LIVE_THRESHOLD,
-          bumperRemaining: cur.kind === "BUMPER" ? Math.max(0, Math.ceil(cur.endS - effective)) : null,
-          paused: pausedRef.current,
+          nextTitle,
+          delaySeconds,
+          isLive,
+          bumperRemaining,
+          paused,
         };
-        return next;
       });
     }, 500);
     return () => window.clearInterval(id);
