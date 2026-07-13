@@ -6,7 +6,7 @@ import { syncMediaItems } from "../media/sync-media";
 import { syncRecentlyAdded } from "../media/sync-recent";
 import { getPlexUser } from "../plex/client";
 import { syncLibraries } from "../plex/sync-libraries";
-import { extendChannelSchedule } from "../schedule/generate";
+import { extendChannelSchedule, generateChannelSchedule } from "../schedule/generate";
 
 export type JobInterval = "seconds" | "minutes" | "hours" | "days" | "fixed";
 
@@ -89,6 +89,36 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
       for (const channel of channels) {
         throwIfAborted(signal);
         await extendChannelSchedule(prisma, channel.id);
+      }
+    },
+  },
+  {
+    id: "schedule-backfill",
+    name: "Schedule Backfill",
+    interval: "minutes",
+    // every 10 min — build initial schedules for enabled channels that have none
+    // yet, a small batch at a time (extend/refresh only tops up existing timelines).
+    // Idles once every channel has a schedule; picks up newly-generated channels.
+    defaultCron: "0 */10 * * * *",
+    run: async (signal, ctx) => {
+      const BATCH = 10;
+      const channels = await prisma.channel.findMany({
+        where: { enabled: true, scheduleItems: { none: {} } },
+        select: { id: true, name: true },
+        orderBy: { number: "asc" },
+        take: BATCH,
+      });
+      for (let i = 0; i < channels.length; i++) {
+        throwIfAborted(signal);
+        ctx.progress({ current: i, total: channels.length, label: channels[i]!.name });
+        try {
+          await generateChannelSchedule(prisma, channels[i]!.id);
+        } catch (err) {
+          console.warn(`[jobs] schedule-backfill failed for "${channels[i]!.name}":`, err);
+        }
+      }
+      if (channels.length > 0) {
+        console.log(`[jobs] schedule-backfill built ${channels.length} schedule(s)`);
       }
     },
   },
