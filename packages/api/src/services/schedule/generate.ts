@@ -190,6 +190,81 @@ export async function extendChannelSchedule(
   };
 }
 
+/** Keep the currently-playing item and this much upcoming runway untouched when splicing. */
+const REPAIR_BUFFER_SECONDS = 5 * 60;
+
+export type RepairResult = {
+  repaired: boolean;
+  /** Slots removed from the spliced tail. */
+  replaced: number;
+  /** Fresh slots laid in their place. */
+  added: number;
+  /** Where the splice began, or null if nothing needed repair. */
+  from: Date | null;
+};
+
+/**
+ * Splice-repair a channel whose upcoming schedule references media that's been
+ * removed from the server (`MediaItem.available = false`). Finds the earliest
+ * upcoming bad slot (a program pointing at gone media, or a bumper introducing one),
+ * then re-flows the timeline **from that point forward** with the current live pool —
+ * which no longer contains the removed items. Everything before the splice (what's on
+ * now + still-valid near-term slots) is left untouched. Non-disruptive, like extend;
+ * does not re-stamp `bumperRev`.
+ */
+export async function repairChannelSchedule(
+  prisma: PrismaClient,
+  channelId: string,
+  opts: { now?: Date; minDurationSeconds?: number } = {},
+): Promise<RepairResult> {
+  const channel = await prisma.channel.findUnique({ where: { id: channelId } });
+  if (!channel) throw new Error("Channel not found");
+
+  const now = opts.now ?? new Date();
+  const cutoff = new Date(now.getTime() + REPAIR_BUFFER_SECONDS * 1000);
+
+  // Earliest upcoming slot referencing unavailable media (its own, or a bumper's target).
+  const bad = await prisma.scheduleItem.findFirst({
+    where: {
+      channelId,
+      startsAt: { gte: cutoff },
+      OR: [{ mediaItem: { available: false } }, { targetMediaItem: { available: false } }],
+    },
+    orderBy: { startsAt: "asc" },
+    select: { startsAt: true },
+  });
+  if (!bad) return { repaired: false, replaced: 0, added: 0, from: null };
+
+  // If an intro bumper immediately precedes the bad program, splice from the bumper so
+  // we don't keep an "Up Next: <removed>" break (and leave no gap at the seam).
+  let from = bad.startsAt;
+  const prior = await prisma.scheduleItem.findFirst({
+    where: { channelId, startsAt: { lt: bad.startsAt } },
+    orderBy: { startsAt: "desc" },
+    select: { kind: true, startsAt: true },
+  });
+  if (prior?.kind === "BUMPER") from = prior.startsAt;
+
+  const replaced = await prisma.scheduleItem.count({
+    where: { channelId, startsAt: { gte: from } },
+  });
+
+  const min = opts.minDurationSeconds ?? DEFAULT_MIN_HORIZON_SECONDS;
+  const seed = await ensureSeed(prisma, channelId, channel.shuffleSeed);
+  const pool = await resolveChannel(prisma, channelId); // Plex live → excludes removed media
+  const itemIds = await upsertPoolItems(prisma, channel.mediaSourceId, pool);
+  const globalBumper = await getGlobalBumperConfig(prisma);
+  const plan = resolveBumperPlan(globalBumper, channel);
+  const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, from, min, plan);
+
+  await prisma.$transaction([
+    prisma.scheduleItem.deleteMany({ where: { channelId, startsAt: { gte: from } } }),
+    prisma.scheduleItem.createMany({ data: toRows(channelId, build, itemIds) }),
+  ]);
+
+  return { repaired: build.entries.length > 0, replaced, added: build.entries.length, from };
+}
+
 export type TimelineSlot = {
   id: string;
   kind: "PROGRAM" | "BUMPER";

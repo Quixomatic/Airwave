@@ -7,7 +7,11 @@ import { syncMediaItems } from "../media/sync-media";
 import { syncRecentlyAdded } from "../media/sync-recent";
 import { getPlexUser } from "../plex/client";
 import { syncLibraries } from "../plex/sync-libraries";
-import { extendChannelSchedule, generateChannelSchedule } from "../schedule/generate";
+import {
+  extendChannelSchedule,
+  generateChannelSchedule,
+  repairChannelSchedule,
+} from "../schedule/generate";
 
 export type JobInterval = "seconds" | "minutes" | "hours" | "days" | "fixed";
 
@@ -219,6 +223,47 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
         where: { startsAt: { lt: cutoff } },
       });
       if (count > 0) console.log(`[jobs] schedule-prune removed ${count} passed slots`);
+    },
+  },
+  {
+    id: "schedule-missing-media-repair",
+    name: "Missing Media Repair",
+    description:
+      "When content is removed from the media server (metadata sync flags it unavailable), splices the affected channels' upcoming schedules — re-flows the timeline from the first slot that points at now-gone media, leaving what's on now and the still-valid near-term slots untouched.",
+    interval: "hours",
+    // hourly at :30 — offset from the other schedule jobs. Removal is detected by the
+    // daily metadata sync, so hourly is plenty; the repair itself is a cheap no-op when
+    // nothing's broken.
+    defaultCron: "0 30 * * * *",
+    run: async (signal, ctx) => {
+      const BATCH = 10;
+      const cutoff = new Date(Date.now() + 5 * 60 * 1000);
+      const channels = await prisma.channel.findMany({
+        where: {
+          enabled: true,
+          scheduleItems: {
+            some: {
+              startsAt: { gte: cutoff },
+              OR: [{ mediaItem: { available: false } }, { targetMediaItem: { available: false } }],
+            },
+          },
+        },
+        select: { id: true, name: true },
+        orderBy: { number: "asc" },
+        take: BATCH,
+      });
+      let repaired = 0;
+      for (let i = 0; i < channels.length; i++) {
+        throwIfAborted(signal);
+        ctx.progress({ current: i, total: channels.length, label: channels[i]!.name });
+        try {
+          const r = await repairChannelSchedule(prisma, channels[i]!.id);
+          if (r.repaired) repaired++;
+        } catch (err) {
+          console.warn(`[jobs] missing-media-repair failed for "${channels[i]!.name}":`, err);
+        }
+      }
+      if (repaired > 0) console.log(`[jobs] schedule-missing-media-repair spliced ${repaired} channel(s)`);
     },
   },
   {
