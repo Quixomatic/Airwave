@@ -254,6 +254,31 @@ export function useChannelPlayer(channelId: string, quality?: string) {
       if (info.mode === "hls" && Hls.isSupported()) {
         const hls = new Hls({ enableWorker: true });
         hlsRef.current = hls;
+        hls.on(Hls.Events.ERROR, (_e, data) => {
+          console.warn("[player] hls error", {
+            type: data.type,
+            details: data.details,
+            fatal: data.fatal,
+            code: (data as { response?: { code?: number } }).response?.code,
+            url: (data as { url?: string }).url,
+          });
+          if (!data.fatal) return;
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            hls.recoverMediaError();
+            return;
+          }
+          // Fatal network error (e.g. Plex 400 on start.m3u8) — surface it instead of
+          // sitting on a black frame.
+          setStatus((s) => ({
+            ...s,
+            loading: false,
+            error: `Stream error (${data.details}${
+              (data as { response?: { code?: number } }).response?.code
+                ? ` · ${(data as { response?: { code?: number } }).response!.code}`
+                : ""
+            })`,
+          }));
+        });
         hls.loadSource(info.url);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, () => tryPlay(video));

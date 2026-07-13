@@ -534,6 +534,7 @@ export async function getPlaybackInfo(
     directPlay: "0",
     directStream: "1",
     subtitles: "none",
+    hasMDE: "1",
     // `session` is what the (undocumented) universal/stop endpoint keys on;
     // `X-Plex-Session-Identifier` is the spec's canonical field. Real clients send both.
     session,
@@ -552,7 +553,25 @@ export async function getPlaybackInfo(
     params.set("autoAdjustQuality", "0");
     params.set("X-Plex-Client-Profile-Extra", BROWSER_CLIENT_PROFILE);
   }
-  const url = `${baseUrl}/video/:/transcode/universal/start.m3u8?${params.toString()}`;
+  const qs = params.toString();
+
+  // **Register the transcode with Plex's decision endpoint first.** This is the
+  // documented two-step flow (decision → start): without it, `start.m3u8` 400s for any
+  // media that needs a real transcode decision (e.g. an mkv/DTS movie at a non-trivial
+  // offset). Same session/params so `start` picks up the negotiated session.
+  try {
+    const decision = await fetch(
+      `${baseUrl}/video/:/transcode/universal/decision?${qs}`,
+      { headers: pmsHeaders(token) },
+    );
+    if (!decision.ok) {
+      console.warn(`[plex] transcode decision ${decision.status} for ratingKey ${ratingKey}`);
+    }
+  } catch (err) {
+    console.warn(`[plex] transcode decision failed for ratingKey ${ratingKey}:`, err);
+  }
+
+  const url = `${baseUrl}/video/:/transcode/universal/start.m3u8?${qs}`;
   return { mode: "hls", url, session, container, videoCodec, audioCodec };
 }
 
