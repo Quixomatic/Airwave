@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.14] - 2026-07-13
+
+### Fixed
+
+- **Subtitles now render for every subtitle format** — the 0.3.13 fix only covered text (SRT). Image subtitles (**PGS/VOBSUB**, common on Blu-ray rips) still showed nothing because Plex honors the URL `subtitleStreamID` param **inconsistently per codec** (text burns via `subtitles=burn`, image only via `subtitles=auto`, etc.), so the burn was silently dropped (`subtitleDecision: none`). The reliable, universal fix: **select the subtitle with a server-side PUT** (`PUT /library/parts/{partId}?subtitleStreamID={id}&allParts=1`) instead of the URL param, then `subtitles=burn` + `directStream=0`. Verified live that this yields `subtitleDecision: burn` for **both** text (SRT → Andor) and image (PGS → Fast X) subs; turning subtitles off clears the selection. NB: PUT-select is per-part *global* Plex state (shared across viewers of an item) — fine for the single-admin preview, to revisit for multi-user. Full matrix in `.docs/plex-subtitles-findings.md`.
+
 ## [0.3.13] - 2026-07-13
 
 ### Fixed

@@ -536,7 +536,7 @@ export async function getPlaybackInfo(
           container?: string;
           videoCodec?: string;
           audioCodec?: string;
-          Part?: Array<{ key?: string; container?: string; Stream?: PlexStream[] }>;
+          Part?: Array<{ id?: number | string; key?: string; container?: string; Stream?: PlexStream[] }>;
         }>;
       }>;
     };
@@ -569,8 +569,8 @@ export async function getPlaybackInfo(
     ? subStreams.find((s) => streamLang(s) === opts.subtitleLang)?.id
     : undefined;
 
-  // Any of quality / audio switch / subtitle burn forces a transcode; otherwise a
-  // browser-friendly file direct-plays and the client seeks to the offset.
+  // Quality cap, an audio-track switch, or burned subtitles all force a transcode;
+  // otherwise a browser-friendly file direct-plays and the client seeks to the offset.
   const canDirect =
     !quality &&
     audioStreamId == null &&
@@ -628,18 +628,28 @@ export async function getPlaybackInfo(
   }
   // Audio track switch (e.g. Japanese → English dub).
   if (audioStreamId != null) params.set("audioStreamID", String(audioStreamId));
-  // Burn the selected subtitle into the video. This is what Plex Web itself does for
-  // complex styled subs (heavily-styled ASS — anime karaoke/positioning; verified via a
-  // Plex Web session on this content showing subtitleDecision:"burn"), and for image subs
-  // (PGS/VOBSUB). It also stays aligned to our live offset for free. Burning re-encodes
-  // the video, so directStream MUST be off *for this request only* — otherwise Plex copies
-  // the video and silently drops the burn. Without a subtitle selected, directStream stays
-  // "1" (video copied, no re-encode). Soft rendering of simple SRT/VTT subs is a later,
-  // client-side path (the real web/TV player).
-  if (subStreamId != null) {
-    params.set("subtitleStreamID", String(subStreamId));
+
+  // Burned-in subtitles — the universal recipe, works for TEXT (srt) AND IMAGE (pgs/vobsub).
+  // Plex's URL `subtitleStreamID` is honored inconsistently per codec (srt burns via burn,
+  // pgs only via auto, etc.), so we select the sub the reliable way: a **server-side PUT**
+  // on the part. Then `subtitles=burn` + `directStream=0` re-encodes the video with the sub
+  // painted in — renders in any player. Verified live: srt + pgs both → subtitleDecision=burn.
+  // NB: the PUT-select is per-part *global* Plex state (all viewers of that item share it) —
+  // fine for the single-admin preview; revisit for true multi-user. See .docs/plex-subtitles-findings.md.
+  const partId = String(part.id ?? (part.key ?? "").split("/")[3] ?? "");
+  if (subStreamId != null && partId) {
+    await fetch(`${baseUrl}/library/parts/${partId}?subtitleStreamID=${subStreamId}&allParts=1`, {
+      method: "PUT",
+      headers: pmsHeaders(token),
+    }).catch(() => {});
     params.set("subtitles", "burn");
     params.set("directStream", "0");
+  } else if (opts.subtitleLang === "off" && partId) {
+    // Explicitly off — clear any prior server-side selection so nothing burns.
+    await fetch(`${baseUrl}/library/parts/${partId}?subtitleStreamID=0&allParts=1`, {
+      method: "PUT",
+      headers: pmsHeaders(token),
+    }).catch(() => {});
   }
   const qs = params.toString();
 
