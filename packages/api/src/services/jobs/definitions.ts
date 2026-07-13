@@ -139,7 +139,7 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
     id: "schedule-bumper-sync",
     name: "Bumper Sync",
     description:
-      "Reconciles existing schedules with the current bumper settings — when bumpers are toggled on/off (globally or per channel), rebuilds the affected channels a small batch at a time so their timelines match, then idles.",
+      "Reconciles existing schedules with the current bumper settings — when bumpers are toggled on/off (globally or per channel) or the interstitial break length changes, rebuilds the affected channels a small batch at a time so their timelines match, then idles.",
     interval: "minutes",
     // every 10 min — reconcile a batch of channels whose bumper presence is stale.
     defaultCron: "0 */10 * * * *",
@@ -161,11 +161,32 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
           })
         ).map((r) => r.channelId),
       );
-      // Out of sync when whether bumpers *should* be present differs from whether they are.
+      // Channels whose interstitials no longer match the configured break length
+      // (only meaningful while bumpers are enabled). Restricted to interstitial slots
+      // so future commercial clips — which have their own media durations — aren't flagged.
+      const wrongLength = global.enabled
+        ? new Set(
+            (
+              await prisma.scheduleItem.findMany({
+                where: {
+                  kind: "BUMPER",
+                  bumperKind: "interstitial",
+                  durationSeconds: { not: global.interstitialSeconds },
+                },
+                distinct: ["channelId"],
+                select: { channelId: true },
+              })
+            ).map((r) => r.channelId),
+          )
+        : new Set<string>();
+
+      // Out of sync when (a) whether bumpers *should* be present differs from whether
+      // they are, or (b) they're present as they should be but at a stale break length.
       const stale = channels
         .filter((c) => {
           const shouldHave = global.enabled && c.bumperMode !== "OFF";
-          return shouldHave !== withBumpers.has(c.id);
+          if (shouldHave !== withBumpers.has(c.id)) return true;
+          return shouldHave && wrongLength.has(c.id);
         })
         .slice(0, BATCH);
 
