@@ -81,6 +81,27 @@ app.use(
 // <video src>, which can't send a bearer token). Generate with
 // scripts/gen-capability-media.ts into CAP_MEDIA_DIR (default ./capability-media).
 const CAP_MEDIA_DIR = process.env.CAP_MEDIA_DIR ?? "./capability-media";
+const MEDIA_MIME: Record<string, string> = {
+  mp4: "video/mp4",
+  m4v: "video/mp4",
+  mov: "video/quicktime",
+  mkv: "video/x-matroska",
+  ts: "video/mp2t",
+  webm: "video/webm",
+  avi: "video/x-msvideo",
+  flv: "video/x-flv",
+};
+// Override serveStatic's octet-stream with the real video MIME (some TV players
+// reject octet-stream for the native <video> element).
+app.use("/caps/media/*", async (c, next) => {
+  await next();
+  const ext = c.req.path.split(".").pop()?.toLowerCase() ?? "";
+  const mt = MEDIA_MIME[ext];
+  if (mt && c.res) {
+    c.res = new Response(c.res.body, c.res);
+    c.res.headers.set("Content-Type", mt);
+  }
+});
 app.use(
   "/caps/media/*",
   serveStatic({
