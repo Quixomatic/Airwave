@@ -2,6 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.25] - 2026-07-14
+
+Make the webOS app render on the LG C2's browser (Chromium 108).
+
+### Fixed
+
+- **Tailwind v4 styling silently dropped on the C2.** Tailwind v4 emits bleeding-edge CSS — `oklch()` theme variables and `color-mix()` — that landed in **Chrome 111**; the C2 is **Chrome 108**, so every `var(--color-*)` (defined in oklch) resolved to an invalid value and the UI lost its colors, while the desktop Simulator (Chrome 132) looked fine. Rather than downgrade to Tailwind v3, `apps/tv-web` now runs **Lightning CSS with a Chrome-108 target** (`css.transformer: "lightningcss"` + `browserslist("chrome >= 108")`): it lowers `oklch()` to hex fallbacks in `:root` (guarding the modern value behind `@supports`) and the `color-mix()` opacity utilities already ship an `@supports` hex fallback — so the shipped CSS has **zero unguarded modern color functions**. Verified on the C2: full styling. Build target also pinned to `chrome108` for JS. This is the pattern the future `packages/tv-ui` kit will follow.
+
 ## [0.3.24] - 2026-07-14
 
 Fix the capability-probe test media — the diagnostic was giving false negatives on a real TV.
