@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.23] - 2026-07-14
+
+Capability diagnostic reworked into hands-off **onboarding**.
+
+### Changed
+
+- **Fully automatic diagnostic.** Plays each clip **muted** (so autoplay never blocks — the old run's "only HDR played" was largely an unmuted-autoplay artifact), and judges **only whether the video decodes** (`videoWidth×videoHeight`) — audio is switchable/transcodable, so it's no longer a manual verdict. No more thumbs-up/down, no confusing corner UI. Auto-advances through the whole matrix with a clean progress bar + results grid.
+- **Runs as onboarding** — auto-fires once on first sign-in per device (localStorage flag; also set on skip/error so it never nags), establishing the baseline capability map. Still re-runnable from "Run diagnostic".
+
+### Fixed
+
+- Generated `.ts` MPEG-TS test clips no longer break `tsc` (excluded `capability-media` from the server build); the media dir is gitignored (large, regeneratable).
+
 ## [0.3.22] - 2026-07-14
 
 **Capability diagnostic** — a self-test that *measures* exactly what a TV's native decoder handles, so playback can go native-first with hls.js as a true last resort.

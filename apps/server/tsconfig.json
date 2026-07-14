@@ -8,5 +8,7 @@
     },
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx"
-  }
+  },
+  "include": ["src", "scripts"],
+  "exclude": ["dist", "capability-media"]
 }

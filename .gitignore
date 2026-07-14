@@ -61,3 +61,6 @@ temp
 # Local reference repos (sibling sources cloned for design reference)
 .tmp/
 .refs/
+
+# Generated capability-probe test media (large, regeneratable)
+apps/server/capability-media/

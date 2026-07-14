@@ -8,6 +8,9 @@
 
 const DEVICE_ID_KEY = "cg-device-id";
 
+/** Set once the capability onboarding has run on this device. */
+export const CAPS_DONE_KEY = "cg-caps-done";
+
 export function deviceId(): string {
   let id = localStorage.getItem(DEVICE_ID_KEY);
   if (!id) {

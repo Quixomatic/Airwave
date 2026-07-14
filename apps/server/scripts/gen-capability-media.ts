@@ -5,8 +5,13 @@
  *
  *   bun --env-file=.env run scripts/gen-capability-media.ts <master> <outdir>
  *
- * Output into the dir the server serves (CAP_MEDIA_DIR). `realSample` entries
- * are skipped — drop real DV/Atmos/DTS-HD/HDR10+/PGS clips there yourself.
+ * The master supplies VIDEO. AUDIO is synthesized: a 5.1 track with a distinct
+ * tone per channel (FL/FR/FC/LFE/BL/BR), so the audio-codec tests encode real
+ * multichannel audio regardless of the master (many test masters are video-only)
+ * — and you can verify surround by ear (each channel a different pitch).
+ *
+ * `realSample` entries are skipped — drop real DV/Atmos/DTS-HD/HDR10+/PGS clips
+ * there yourself, named per the matrix ids.
  */
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 
@@ -25,6 +30,30 @@ const DUR = "5";
 const SRT = `${OUT}/_probe.srt`;
 writeFileSync(SRT, "1\n00:00:00,500 --> 00:00:04,500\nCapability probe subtitle\n");
 
+// Synthesize a 6s 5.1 tone bed (distinct pitch per channel) once.
+const TONE = `${OUT}/_tone51.flac`;
+console.log("synthesizing 5.1 tone bed…");
+{
+  const r = Bun.spawnSync([
+    "ffmpeg",
+    "-y",
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-filter_complex",
+    "sine=f=220:d=6[fl];sine=f=277:d=6[fr];sine=f=330:d=6[fc];sine=f=110:d=6[lfe];sine=f=440:d=6[bl];sine=f=550:d=6[br];[fl][fr][fc][lfe][bl][br]join=inputs=6:channel_layout=5.1[a]",
+    "-map",
+    "[a]",
+    "-c:a",
+    "flac",
+    TONE,
+  ]);
+  if (r.exitCode !== 0) {
+    console.error("failed to build tone bed:", r.stderr?.toString());
+    process.exit(1);
+  }
+}
+
 let ok = 0;
 let fail = 0;
 let skip = 0;
@@ -37,10 +66,11 @@ for (const test of CAP_MATRIX) {
     continue;
   }
   const ff = test.ff;
-  const inputs = ["-ss", SS, "-t", DUR, "-i", MASTER];
-  const maps: string[] = [];
+  // input 0 = master (video), input 1 = tone (audio), input 2 = srt (when needed)
+  const inputs = ["-ss", SS, "-t", DUR, "-i", MASTER, "-i", TONE];
+  let maps = ["-map", "0:v:0", "-map", "1:a:0"];
   let vArgs = [...ff.v];
-  let aArgs = [...ff.a];
+  const aArgs = [...ff.a];
   const post: string[] = [];
   let subArgs: string[] = [];
 
@@ -57,20 +87,18 @@ for (const test of CAP_MATRIX) {
       post.push("-vf", "tinterlace=interleave_top,fps=50", "-flags", "+ilme+ildct");
       break;
     case "tracks30":
-      maps.push("-map", "0:v:0");
-      for (let i = 0; i < 30; i++) maps.push("-map", "0:a:0?");
+      maps = ["-map", "0:v:0"];
+      for (let i = 0; i < 30; i++) maps.push("-map", "1:a:0");
       break;
     case "sub_srt":
     case "sub_ass":
       inputs.push("-i", SRT);
-      maps.push("-map", "0:v:0", "-map", "0:a:0", "-map", "1:0");
+      maps.push("-map", "2:0");
       subArgs = ["-c:s", ff.vf === "sub_ass" ? "ass" : "srt"];
       break;
     default:
       post.push("-vf", ff.vf);
   }
-
-  if (ff.upmix) aArgs = ["-af", "aformat=channel_layouts=5.1", ...aArgs];
 
   const args = [
     "-y",
@@ -83,20 +111,23 @@ for (const test of CAP_MATRIX) {
     ...post,
     ...aArgs,
     ...subArgs,
+    "-shortest",
     ...(ff.extra ?? []),
     outFile,
   ];
 
+  process.stdout.write(`  ${test.id}.${test.container} … `);
   const proc = Bun.spawnSync(["ffmpeg", ...args]);
   if (proc.exitCode === 0) {
-    console.log(`ok    ${test.id}.${test.container}`);
+    console.log("ok");
     ok++;
   } else {
-    console.log(`FAIL  ${test.id}: ${(proc.stderr?.toString() ?? "").trim().slice(0, 200)}`);
+    console.log(`FAIL: ${(proc.stderr?.toString() ?? "").trim().slice(0, 180)}`);
     fail++;
   }
 }
 
 rmSync(SRT, { force: true });
+rmSync(TONE, { force: true });
 console.log(`\ngenerated ${ok}, failed ${fail}, skipped(real-sample) ${skip} of ${CAP_MATRIX.length}`);
 process.exit(0);

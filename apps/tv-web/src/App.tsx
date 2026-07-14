@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { authClient } from "./lib/auth-client";
 import { ApiError, api, plexLink, type GuideChannel } from "./lib/api";
 import { SERVER_URL, getToken, setToken } from "./lib/auth-client";
-import { gatherDeviceReport } from "./lib/device";
+import { CAPS_DONE_KEY, gatherDeviceReport } from "./lib/device";
 import { Qr } from "./lib/qr";
 import { Watch } from "./features/watch/watch";
 import { Diagnostic } from "./features/diagnostic/diagnostic";
@@ -197,6 +197,11 @@ function Home({
       .then((r) => api.reportDevice(r))
       .catch(() => {});
   }, []);
+
+  // First sign-in on this device → run the capability onboarding once.
+  useEffect(() => {
+    if (!localStorage.getItem(CAPS_DONE_KEY)) onDiagnostic();
+  }, [onDiagnostic]);
 
   // D-pad / remote navigation over the channel grid (arrow keys + OK/Enter to tune).
   useEffect(() => {
