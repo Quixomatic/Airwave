@@ -1,9 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
-import { Home } from "../../features/guide/home";
+import { GuideScreen } from "../../features/guide/guide-screen";
 import { setToken } from "../../lib/auth-client";
 
-/** / — the guide (channel list → Aurora grid). */
+/** / — the Aurora guide grid. */
 export const Route = createFileRoute("/_auth/")({
   component: GuideRoute,
 });
@@ -11,13 +11,14 @@ export const Route = createFileRoute("/_auth/")({
 function GuideRoute() {
   const navigate = useNavigate();
   return (
-    <Home
+    <GuideScreen
+      onTune={(channelId) => void navigate({ to: "/watch/$channelId", params: { channelId } })}
+      onSettings={() => void navigate({ to: "/settings" })}
+      onDiagnostic={() => void navigate({ to: "/diagnostic" })}
       onSignOut={() => {
         setToken(null);
         void navigate({ to: "/login" });
       }}
-      onWatch={(channel) => void navigate({ to: "/watch/$channelId", params: { channelId: channel.id } })}
-      onDiagnostic={() => void navigate({ to: "/diagnostic" })}
     />
   );
 }

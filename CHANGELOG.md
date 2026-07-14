@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.29] - 2026-07-14
+
+The **Aurora guide grid** — the 10-foot live-TV guide UI (from the Claude Design handoff).
+
+### Added
+
+- **`apps/tv-web` now opens on a real guide grid** instead of a plain channel list: a featured now-playing panel (channel, title + SxxEyy, year/rating/★, HD·5.1 badges, summary, progress + "Xm left") over a scrolling **time grid** — per-channel rows with program blocks positioned by air-time, a pulsing red **now-line**, and blue focus. D-pad: ◄► move program, ▲▼ move channel (preserving the horizontal time cursor), **OK tunes**. New `/settings` route (sign out + re-run diagnostic). Data via a `useGuide` Query hook over `/api/v1/guide`. Design tokens/spec captured in `.docs/tv-design-spec.md`.
+- **Fluid, not fixed:** the layout is a flex column that fills the viewport (the grid expands into leftover height), the time-lane's px-per-minute is derived from the *measured* width, and text/spacing are `vw`-based — so it fits any screen. The featured panel is uniformly scaled down so the grid gets the majority of the vertical space.
+
+### Notes
+
+- Program still-art is a placeholder box (Plex images need a server-side proxy — a follow-up). Channel accent colors are index-based for now (mapping to genre/tint is next). Parity player controls (subtitles / audio / quality) are the next sub-arc.
+
 ## [0.3.28] - 2026-07-14
 
 TV app foundation refactor — the webOS app now uses the admin's frontend paradigms.

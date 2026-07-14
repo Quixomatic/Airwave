@@ -86,6 +86,47 @@ export type NowNext = {
   endsAt: string | null;
 };
 
+/** Full denormalized guide metadata for a program (mirrors the server's GuideMeta). */
+export type GuideMeta = {
+  title: string;
+  type?: string;
+  year?: number;
+  contentRating?: string;
+  summary?: string;
+  tagline?: string;
+  studio?: string;
+  directors?: string[];
+  genres?: string[];
+  cast?: string[];
+  audienceRating?: number;
+  criticRating?: number;
+  durationMs?: number;
+  thumb?: string;
+  art?: string;
+  resolution?: string;
+  audioChannels?: number;
+  showTitle?: string;
+  showRatingKey?: string;
+  season?: number;
+  episode?: number;
+};
+
+export type GuideGridProgram = {
+  id: string;
+  ratingKey: string | null;
+  startsAt: string;
+  durationSeconds: number;
+  guide: GuideMeta;
+};
+
+export type GuideGridChannel = GuideChannel & { programs: GuideGridProgram[] };
+
+export type GuideGrid = {
+  serverTime: string;
+  windowMinutes: number;
+  channels: GuideGridChannel[];
+};
+
 export type Track = { lang: string; label: string };
 
 export type MediaInfo = {
@@ -112,6 +153,9 @@ export type MediaInfo = {
 
 export const api = {
   channels: () => request<{ channels: GuideChannel[] }>("/api/v1/channels"),
+
+  guide: (forwardMinutes = 180) =>
+    request<GuideGrid>(`/api/v1/guide?forwardMinutes=${forwardMinutes}`),
 
   reportDevice: (report: unknown) =>
     request<{ ok: true; id: string }>("/api/v1/devices/report", {
