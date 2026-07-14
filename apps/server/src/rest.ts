@@ -117,6 +117,7 @@ api.get("/channels/:id/media", async (c) => {
         audioLang: c.req.query("audioLang"),
         subtitleLang: c.req.query("subtitleLang"),
         caps,
+        deviceId: c.req.query("deviceId"),
       }),
     );
   } catch (err) {

@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.26] - 2026-07-14
+
+Native-first playback, step 1 — the measured capability map drives Plex's decision.
+
+### Added
+
+- **The onboarding diagnostic's measured results now build the Plex profile.** New `capabilities/native-caps.ts` (`getDeviceNativeCaps`) turns a device's `DeviceCapability` rows into its real native-decode set — a codec/container counts as supported only if a clip that *actually decoded* on the panel contains it. `resolveMedia` prefers this **measured** map over the client's `canPlayType` self-report (which lies on TVs); the report is now just a fallback until a device has onboarded. The media response carries `capsSource` (`measured` / `reported` / `default`), surfaced in the TV debug overlay.
+
+### Why it matters
+
+- On the real C2 the measured set is `video: h264/hevc/av1/vp9`, `audio: aac/ac3/eac3/dts/truehd/flac/alac/opus/pcm`, `containers: mp4/mkv/mov/ts/webm`. Because the profile now declares exactly that, Plex **direct-plays the raw file** (native `<video src>`, HDR preserved) for essentially the whole real-world library — including the **MKV + E-AC3/DTS/TrueHD** content that used to fail with `bufferAddCodecError` when it was wrongly routed through hls.js/MSE. hls.js drops toward a true last resort. The progressive-HTTP transcode fallback for the genuinely-native-incompatible tail (Hi10P / MPEG-2 / AVI / FLV) is step 2.
+
 ## [0.3.25] - 2026-07-14
 
 Make the webOS app render on the LG C2's browser (Chromium 108).

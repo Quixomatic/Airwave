@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@ChannelGuide/db";
 
+import { getDeviceNativeCaps } from "../capabilities/native-caps";
 import { notFound, preconditionFailed } from "../errors";
 import { getPlaybackInfo, stopTranscode } from "../plex/client";
 import { QUALITY_PRESETS, type ClientCaps } from "../plex/quality";
@@ -28,7 +29,12 @@ export type ResolveMediaOptions = {
   quality?: string;
   audioLang?: string;
   subtitleLang?: string;
+  /** The client's canPlayType self-report — a fallback used only until the device
+   * has run the capability diagnostic (canPlayType lies on TVs). */
   caps?: ClientCaps;
+  /** The reporting device — if it has a MEASURED capability map, that overrides the
+   * canPlayType guess and becomes the source of truth for the Plex profile. */
+  deviceId?: string;
 };
 
 /** Resolve a playable URL for one item at one offset (client-driven). */
@@ -40,6 +46,10 @@ export async function resolveMedia(
   opts: ResolveMediaOptions = {},
 ) {
   const { source, clientId } = await resolveChannelSource(prisma, channelId);
+  // Prefer the device's MEASURED native-decode map (from the onboarding diagnostic)
+  // over its canPlayType self-report — measure, don't guess. See
+  // capabilities/native-caps.ts + [[project-tv-playback-protocol]].
+  const measured = opts.deviceId ? await getDeviceNativeCaps(prisma, opts.deviceId) : null;
   const info = await getPlaybackInfo(
     source.baseUrl!,
     source.token,
@@ -50,11 +60,11 @@ export async function resolveMedia(
       quality: opts.quality,
       audioLang: opts.audioLang,
       subtitleLang: opts.subtitleLang,
-      caps: opts.caps,
+      caps: measured ?? opts.caps,
     },
   );
   if (!info) throw notFound("No playable media part.");
-  return { ...info, offsetSeconds };
+  return { ...info, offsetSeconds, capsSource: measured ? "measured" : opts.caps ? "reported" : "default" };
 }
 
 /** Stop a Plex transcode session (client calls on program change / teardown). */

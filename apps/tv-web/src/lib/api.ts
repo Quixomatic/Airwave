@@ -93,6 +93,9 @@ export type MediaInfo = {
   url: string;
   session: string | null;
   offsetSeconds: number;
+  /** Which capability set drove the decision: the panel's measured diagnostic map,
+   * its canPlayType self-report, or the default browser assumption. */
+  capsSource?: "measured" | "reported" | "default";
   container?: string;
   videoCodec?: string;
   audioCodec?: string;
@@ -123,8 +126,12 @@ export const api = {
     ratingKey: string,
     offsetSeconds: number,
     caps?: { videoCodecs: string[]; audioCodecs: string[]; directContainers: string[] },
+    deviceId?: string,
   ) => {
     const p = new URLSearchParams({ ratingKey, offsetSeconds: String(offsetSeconds) });
+    // deviceId lets the server use this panel's MEASURED capability map (from the
+    // onboarding diagnostic) instead of the canPlayType guess below.
+    if (deviceId) p.set("deviceId", deviceId);
     if (caps) {
       p.set("vcodecs", caps.videoCodecs.join(","));
       p.set("acodecs", caps.audioCodecs.join(","));

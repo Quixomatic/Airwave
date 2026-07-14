@@ -144,7 +144,7 @@ export function Watch({
         window.setTimeout(() => void resolve(), remainingMs);
         return;
       }
-      const m = await api.media(channelId, cur.ratingKey, cur.offsetSeconds, clientCaps());
+      const m = await api.media(channelId, cur.ratingKey, cur.offsetSeconds, clientCaps(), deviceId());
       teardown();
       sessionRef.current = m.session;
       setMedia(m);
@@ -268,7 +268,14 @@ export function Watch({
           {media && (
             <div className="mt-1 text-zinc-400">
               source: {media.container ?? "?"} {media.videoCodec ?? "?"}/{media.audioCodec ?? "?"} ·
-              mode {media.mode}
+              mode{" "}
+              <span className={media.mode === "direct" ? "text-green-400" : "text-amber-400"}>
+                {media.mode}
+              </span>{" "}
+              · caps{" "}
+              <span className={media.capsSource === "measured" ? "text-green-400" : "text-amber-400"}>
+                {media.capsSource ?? "?"}
+              </span>
             </div>
           )}
           {media?.decision ? (
