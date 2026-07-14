@@ -138,4 +138,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ session }),
     }),
+
+  logPlayback: (data: Record<string, unknown>) =>
+    request<{ ok: true; id: string }>("/api/v1/playback/log", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };

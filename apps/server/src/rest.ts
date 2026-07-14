@@ -12,6 +12,7 @@ import {
   listActiveSessions,
 } from "@ChannelGuide/api/services/playback/sessions";
 import { reportDevice } from "@ChannelGuide/api/services/devices/report";
+import { logPlayback } from "@ChannelGuide/api/services/playback/log";
 import { getNowNext } from "@ChannelGuide/api/services/schedule/generate";
 import prisma from "@ChannelGuide/db";
 import { auth } from "@ChannelGuide/auth";
@@ -117,6 +118,13 @@ api.get("/channels/:id/media", async (c) => {
   } catch (err) {
     return onError(err);
   }
+});
+
+/** Record a tune's diagnostics to the DB (test log). */
+api.post("/playback/log", async (c) => {
+  const body = (await c.req.json().catch(() => null)) as Parameters<typeof logPlayback>[2] | null;
+  if (!body) return c.json({ error: "body required" }, 400);
+  return c.json(await logPlayback(prisma, c.get("session").user.id, body));
 });
 
 /** Stop a Plex transcode session (client calls on program change / teardown). */

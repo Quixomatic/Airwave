@@ -1,0 +1,37 @@
+/// One row per tune attempt on a TV client — the full playback diagnostics
+/// captured to the DB so we can review test results (what played, what Plex
+/// decided, whether the panel actually decoded frames, any error) without
+/// squinting at the on-screen overlay. Powers the "did channel X play?" review.
+model PlaybackLog {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deviceId    String? // links to TvDevice.deviceId (the panel that played it)
+  channelId   String?
+  channelName String?
+  ratingKey   String?
+  title       String?
+
+  // What we asked Plex for / what it returned
+  mode             String? // "direct" | "hls"
+  sourceContainer  String?
+  sourceVideoCodec String?
+  sourceAudioCodec String?
+  decision         Json? // { videoDecision, audioDecision, videoCodec, audioCodec, container }
+  caps             Json? // { videoCodecs, audioCodecs } advertised by the client
+
+  // How it actually went on the panel
+  outcome       String? // "playing" | "not_decoding" | "error"
+  decodedWidth  Int? // video.videoWidth (0 = never decoded)
+  decodedHeight Int?
+  readyState    Int?
+  error         String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([channelId])
+  @@index([createdAt])
+  @@map("playback_log")
+}

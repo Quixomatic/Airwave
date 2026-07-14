@@ -2,7 +2,7 @@ import Hls from "hls.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ApiError, api, type MediaInfo, type NowNext } from "../../lib/api";
-import { clientCaps } from "../../lib/device";
+import { clientCaps, deviceId } from "../../lib/device";
 
 /**
  * Minimal "tune and play what's on now" — the H2 webOS capability probe. Resolves
@@ -24,6 +24,10 @@ export function Watch({
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const sessionRef = useRef<string | null>(null);
+  const curRef = useRef<NowNext["current"]>(null);
+  const mediaRef = useRef<MediaInfo | null>(null);
+  const loggedRef = useRef(false);
+  const logTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [now, setNow] = useState<NowNext | null>(null);
   const [media, setMedia] = useState<MediaInfo | null>(null);
@@ -40,6 +44,10 @@ export function Watch({
   const [debug, setDebug] = useState(true);
 
   const teardown = useCallback(() => {
+    if (logTimerRef.current) {
+      clearTimeout(logTimerRef.current);
+      logTimerRef.current = null;
+    }
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
@@ -49,6 +57,42 @@ export function Watch({
       sessionRef.current = null;
     }
   }, [channelId]);
+
+  // Record this tune's diagnostics to the DB (once per tune). Called on the
+  // settle timer (playing/not-decoding) and immediately on error.
+  const logResult = useCallback(
+    (errMsg?: string) => {
+      const cur = curRef.current;
+      const m = mediaRef.current;
+      if (loggedRef.current || !cur || !m) return;
+      loggedRef.current = true;
+      const v = videoRef.current;
+      const w = v?.videoWidth ?? 0;
+      const h = v?.videoHeight ?? 0;
+      const outcome = errMsg ? "error" : w > 0 && h > 0 ? "playing" : "not_decoding";
+      void api
+        .logPlayback({
+          deviceId: deviceId(),
+          channelId,
+          channelName,
+          ratingKey: cur.ratingKey,
+          title: cur.guide?.title ?? null,
+          mode: m.mode,
+          sourceContainer: m.container ?? null,
+          sourceVideoCodec: m.videoCodec ?? null,
+          sourceAudioCodec: m.audioCodec ?? null,
+          decision: m.decision ?? null,
+          caps: clientCaps(),
+          outcome,
+          decodedWidth: w,
+          decodedHeight: h,
+          readyState: v?.readyState ?? null,
+          error: errMsg ?? null,
+        })
+        .catch(() => {});
+    },
+    [channelId, channelName],
+  );
 
   const play = useCallback((m: MediaInfo, offsetSeconds: number) => {
     const video = videoRef.current;
@@ -106,15 +150,25 @@ export function Watch({
       setMedia(m);
       setNote("playing");
       play(m, cur.offsetSeconds);
+      // Arm the diagnostics log for this tune (settles after ~6s of playback).
+      curRef.current = cur;
+      mediaRef.current = m;
+      loggedRef.current = false;
+      logTimerRef.current = setTimeout(() => logResult(), 6000);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to tune.");
     }
-  }, [channelId, play, teardown]);
+  }, [channelId, play, teardown, logResult]);
 
   useEffect(() => {
     void resolve();
     return teardown;
   }, [resolve, teardown]);
+
+  // Log immediately on error (don't wait for the settle timer).
+  useEffect(() => {
+    if (error) logResult(error);
+  }, [error, logResult]);
 
   // Sample the real <video> state so the overlay can prove frames are decoding.
   useEffect(() => {
@@ -133,17 +187,28 @@ export function Watch({
     return () => window.clearInterval(id);
   }, []);
 
-  // Remote: OK toggles the debug panel; Back exits to the guide.
+  // Remote: OK toggles the debug panel; Back returns to the guide. We MUST
+  // preventDefault on the webOS Back key (keyCode 461) or the platform shows its
+  // own "close app?" prompt. Capture phase so we beat the default handling.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Enter") setDebug((d) => !d);
-      else if (e.key === "Backspace" || e.key === "GoBack" || e.keyCode === 461) {
+      if (
+        e.keyCode === 461 ||
+        e.key === "Backspace" ||
+        e.key === "GoBack" ||
+        e.key === "BrowserBack" ||
+        e.key === "XF86Back"
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
         teardown();
         onExit();
+      } else if (e.key === "Enter") {
+        setDebug((d) => !d);
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [teardown, onExit]);
 
   const exit = () => {

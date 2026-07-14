@@ -8,7 +8,7 @@
 
 const DEVICE_ID_KEY = "cg-device-id";
 
-function deviceId(): string {
+export function deviceId(): string {
   let id = localStorage.getItem(DEVICE_ID_KEY);
   if (!id) {
     id = `dev-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;

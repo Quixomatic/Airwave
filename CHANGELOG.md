@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.21] - 2026-07-14
+
+Playback logging (tests record themselves) + remote Back fix. Confirmed 4K HDR HEVC direct-stream on the real C2.
+
+### Added
+
+- **Playback log** — a `PlaybackLog` table + `POST /api/v1/playback/log`. Every tune records its full diagnostics to the DB (channel, source container/codec, Plex decision, advertised caps, **outcome** = playing / not_decoding / error, decoded `videoWidth×videoHeight`, `readyState`, error) ~6s after it settles, or immediately on error. Test results are now reviewable in the DB instead of squinting at the overlay.
+- **Real device facts captured** — the webOS Luna probe now records the true panel: the C2 shows `OLED77C2AUA` / webOS `9.2.2` / `3840×2160` / UHD (vs the old bogus 1080p canvas).
+
+### Fixed
+
+- **Remote Back** now returns to the guide from a playing channel instead of triggering webOS's "close app?" prompt — `preventDefault` on the Back key (keyCode 461) in the capture phase.
+
 ## [0.3.20] - 2026-07-14
 
 TV-client instrumentation & navigation — so we can *see* what's playing and drive it with the remote.
