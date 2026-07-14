@@ -28,7 +28,7 @@ const A: Record<string, string[]> = {
   ac3: ["-c:a", "ac3", "-b:a", "448k"],
   eac3: ["-c:a", "eac3", "-b:a", "384k"],
   dts: ["-strict", "-2", "-c:a", "dca"],
-  truehd: ["-c:a", "truehd"],
+  truehd: ["-strict", "-2", "-c:a", "truehd"],
   flac: ["-c:a", "flac"],
   alac: ["-c:a", "alac"],
   opus: ["-c:a", "libopus"],
