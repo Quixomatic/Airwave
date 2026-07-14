@@ -69,15 +69,28 @@ export async function getGuideGrid(
     serverTime: now,
     windowMinutes: forwardMinutes,
     backMinutes,
-    channels: channels.map((c) => ({
-      ...c,
-      programs: (byChannel.get(c.id) ?? []).map((r) => ({
-        id: r.id,
-        ratingKey: r.ratingKey,
-        startsAt: r.startsAt,
-        durationSeconds: r.durationSeconds,
-        guide: guideMetaOf(r),
-      })),
-    })),
+    channels: channels.map((c) => {
+      const list = byChannel.get(c.id) ?? [];
+      return {
+        ...c,
+        programs: list.map((r, i) => {
+          // Absorb the trailing interstitial (bumper) gap into this program: a break
+          // between two programs is broadcast-style "part of" the program before it,
+          // so the guide runs edge-to-edge with no gaps. Extend this program's shown
+          // duration to the next program's start; the last one keeps its real duration.
+          const next = list[i + 1];
+          const durationSeconds = next
+            ? Math.max(r.durationSeconds, Math.round((next.startsAt.getTime() - r.startsAt.getTime()) / 1000))
+            : r.durationSeconds;
+          return {
+            id: r.id,
+            ratingKey: r.ratingKey,
+            startsAt: r.startsAt,
+            durationSeconds,
+            guide: guideMetaOf(r),
+          };
+        }),
+      };
+    }),
   };
 }

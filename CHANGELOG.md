@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.32] - 2026-07-14
+
+### Changed
+
+- **Guide grid runs edge-to-edge — no gaps for bumpers.** Bumper interstitials (omitted from the grid) left an empty gap between a program's real end and the next program's start. `getGuideGrid` now **absorbs that trailing gap into the preceding program's shown duration** (broadcast-style: an inter-program break belongs to the program before it, like a commercial), so program blocks butt right up against each other. Channels with no bumpers are unaffected.
+
+## [0.3.31] - 2026-07-14
+
+### Changed
+
+- **Featured panel leads with the show name for episodes** — renders `{Show Name} S1, E2 · {Episode Title}` (show name bold, SxxEyy + episode title in the lighter suffix) instead of using the episode title as the heading. Movies are unchanged.
+
 ## [0.3.30] - 2026-07-14
 
 ### Fixed
