@@ -12,14 +12,17 @@
 
 /** ffmpeg encoder fragments (video). */
 const V: Record<string, string[]> = {
-  h264: ["-c:v", "libx264", "-preset", "veryfast"],
+  // 8-bit codecs MUST pin yuv420p — the HDR master is 10-bit, so without this
+  // libx264/libx265 emit High-10 / Main-10 (Hi10P), which real TV hardware
+  // decoders reject (error 4) even though desktop software decoders accept it.
+  h264: ["-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p"],
   h264_10: ["-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p10le"],
-  hevc: ["-c:v", "libx265", "-preset", "veryfast", "-tag:v", "hvc1"],
+  hevc: ["-c:v", "libx265", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-tag:v", "hvc1"],
   hevc_10: ["-c:v", "libx265", "-preset", "veryfast", "-pix_fmt", "yuv420p10le", "-tag:v", "hvc1"],
-  av1: ["-c:v", "libsvtav1", "-preset", "8", "-crf", "35"],
-  vp9: ["-c:v", "libvpx-vp9", "-b:v", "6M"],
-  mpeg2: ["-c:v", "mpeg2video", "-b:v", "8M"],
-  mpeg4: ["-c:v", "mpeg4", "-vtag", "DX50"],
+  av1: ["-c:v", "libsvtav1", "-preset", "8", "-crf", "35", "-pix_fmt", "yuv420p"],
+  vp9: ["-c:v", "libvpx-vp9", "-b:v", "6M", "-pix_fmt", "yuv420p"],
+  mpeg2: ["-c:v", "mpeg2video", "-b:v", "8M", "-pix_fmt", "yuv420p"],
+  mpeg4: ["-c:v", "mpeg4", "-vtag", "DX50", "-pix_fmt", "yuv420p"],
 };
 
 /** ffmpeg encoder fragments (audio). Surround codecs get upmixed to 5.1 by the generator. */

@@ -71,8 +71,18 @@ for (const test of CAP_MATRIX) {
   let maps = ["-map", "0:v:0", "-map", "1:a:0"];
   let vArgs = [...ff.v];
   const aArgs = [...ff.a];
-  const post: string[] = [];
+  const extraFlags: string[] = [];
   let subArgs: string[] = [];
+
+  // The master is 10-bit HDR (PQ / BT.2020). For every NON-HDR clip we must
+  // tonemap down to 8-bit SDR BT.709 — otherwise the HDR transfer/primaries
+  // ride along on an "SDR" clip and confuse TV decoders/display paths. The
+  // encoder's own -pix_fmt (from the matrix) then pins the final bit depth.
+  const isHDR = ff.vf === "hdr10";
+  const SDR_NORMALIZE =
+    "zscale=t=linear:npl=100,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:p=bt709:r=tv,format=yuv420p";
+  const vfChain: string[] = [];
+  if (!isHDR) vfChain.push(SDR_NORMALIZE);
 
   switch (ff.vf) {
     case undefined:
@@ -84,7 +94,8 @@ for (const test of CAP_MATRIX) {
       ]);
       break;
     case "interlace":
-      post.push("-vf", "tinterlace=interleave_top,fps=50", "-flags", "+ilme+ildct");
+      vfChain.push("tinterlace=interleave_top,fps=50");
+      extraFlags.push("-flags", "+ilme+ildct");
       break;
     case "tracks30":
       maps = ["-map", "0:v:0"];
@@ -97,8 +108,10 @@ for (const test of CAP_MATRIX) {
       subArgs = ["-c:s", ff.vf === "sub_ass" ? "ass" : "srt"];
       break;
     default:
-      post.push("-vf", ff.vf);
+      vfChain.push(ff.vf);
   }
+
+  const post = vfChain.length ? ["-vf", vfChain.join(","), ...extraFlags] : extraFlags;
 
   const args = [
     "-y",

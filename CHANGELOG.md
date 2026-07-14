@@ -2,6 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.24] - 2026-07-14
+
+Fix the capability-probe test media — the diagnostic was giving false negatives on a real TV.
+
+### Fixed
+
+- **H.264 clips were accidental Hi10P/HDR, which real TV hardware rejects.** The master is a 10-bit HDR HEVC file, and the ffmpeg recipes never pinned a pixel format, so libx264/libx265 inherited 10-bit + BT.2020/PQ — emitting **H.264 High 10 (Hi10P)** tagged HDR. LG's *hardware* H.264 decoder refuses that (`error 4`), while desktop *software* decoders (the Simulator) accept it — so the panel failed the H.264 control clip and, because every audio/subtitle/edge clip rides on an H.264 carrier, all of those too (a real LG C2 scored 14/49). The matrix now pins `yuv420p` on the 8-bit codecs (10-bit stays only where intended), and the generator **tonemaps HDR→SDR BT.709** for every non-HDR clip while leaving the HDR10 clips untouched. Re-measured on the C2: **33/39 generatable clips**, and the six remaining failures are all genuine (Hi10P, MPEG-2, AVI/FLV containers, 8K) — including a clean pass of the full native audio set (E-AC3/DTS/TrueHD/FLAC).
+
 ## [0.3.23] - 2026-07-14
 
 Capability diagnostic reworked into hands-off **onboarding**.
