@@ -454,6 +454,9 @@ function FeaturedPanel({
     pct = Math.round(((now.getTime() - start.getTime()) / (end.getTime() - start.getTime())) * 100);
   }
   const audio = audioBadge(g.audioChannels);
+  // For an episode: lead with the SHOW name, then "S1, E2 · Episode Title".
+  // For a movie: just the title.
+  const isEpisode = !!g.showTitle && g.season != null && g.episode != null;
   // Featured panel scales off width but is uniformly shrunk (FEATURE_SCALE) so it
   // doesn't dominate the vertical space — the grid below gets the majority.
   const fv = (px: number) => vw(px * FEATURE_SCALE);
@@ -478,11 +481,12 @@ function FeaturedPanel({
 
         <div style={{ display: "flex", alignItems: "center", gap: fv(28) }}>
           <div style={{ flex: 1, fontSize: fv(60), fontWeight: 700, letterSpacing: "-0.5px", lineHeight: 1.05, minWidth: 0 }}>
-            {g.title}
-            {g.season != null && g.episode != null && (
+            {isEpisode ? g.showTitle : g.title}
+            {isEpisode && (
               <span style={{ fontWeight: 400, color: "#c3c9d4" }}>
                 {" "}
                 S{g.season}, E{g.episode}
+                {g.title ? ` · ${g.title}` : ""}
               </span>
             )}
           </div>
