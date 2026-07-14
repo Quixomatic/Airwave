@@ -79,11 +79,22 @@ export type ClientCaps = {
  * the target means Plex **copies** them (direct-stream, no re-encode → HDR preserved)
  * rather than transcoding. See .docs/plex-profiles.md + [[project-tv-playback-protocol]].
  */
+/**
+ * Audio codecs that survive the hls.js/MSE remux+SourceBuffer path. AC3/E-AC3/
+ * DTS/TrueHD do NOT — even when `canPlayType` says "probably" (that reflects the
+ * panel's *native* decoder, used for raw-file direct-play), hls.js throws
+ * `bufferAddCodecError` trying to append them. So we let those direct-play but
+ * force a transcode (→ aac) on the HLS path. Proven from the playback log.
+ */
+const MSE_SAFE_AUDIO = new Set(["aac", "opus", "mp3"]);
+
 export function clientProfileExtra(caps: ClientCaps): string {
   const v = caps.videoCodecs.join(",");
-  const a = caps.audioCodecs.join(",");
+  const aDirect = caps.audioCodecs.join(","); // native player (raw file): full set
+  const safe = caps.audioCodecs.filter((c) => MSE_SAFE_AUDIO.has(c));
+  const aHls = (safe.length ? safe : ["aac"]).join(","); // MSE/hls.js: safe only → aac fallback
   return [
-    `add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mp4&videoCodec=${v}&audioCodec=${a})`,
-    `add-direct-play-target(type=videoProfile&container=mp4&videoCodec=${v}&audioCodec=${a})`,
+    `add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mp4&videoCodec=${v}&audioCodec=${aHls})`,
+    `add-direct-play-target(type=videoProfile&container=mp4&videoCodec=${v}&audioCodec=${aDirect})`,
   ].join("+");
 }

@@ -6,16 +6,19 @@ import { SERVER_URL, getToken, setToken } from "./lib/auth-client";
 import { gatherDeviceReport } from "./lib/device";
 import { Qr } from "./lib/qr";
 import { Watch } from "./features/watch/watch";
+import { Diagnostic } from "./features/diagnostic/diagnostic";
 
 type Screen =
   | { name: "login" }
   | { name: "home" }
-  | { name: "watch"; channel: GuideChannel };
+  | { name: "watch"; channel: GuideChannel }
+  | { name: "diagnostic" };
 
 export function App() {
   const [screen, setScreen] = useState<Screen>(getToken() ? { name: "home" } : { name: "login" });
 
   if (screen.name === "login") return <Login onSignedIn={() => setScreen({ name: "home" })} />;
+  if (screen.name === "diagnostic") return <Diagnostic onExit={() => setScreen({ name: "home" })} />;
   if (screen.name === "watch")
     return (
       <Watch
@@ -28,6 +31,7 @@ export function App() {
     <Home
       onSignOut={() => setScreen({ name: "login" })}
       onWatch={(channel) => setScreen({ name: "watch", channel })}
+      onDiagnostic={() => setScreen({ name: "diagnostic" })}
     />
   );
 }
@@ -176,9 +180,11 @@ function Login({ onSignedIn }: { onSignedIn: () => void }) {
 function Home({
   onSignOut,
   onWatch,
+  onDiagnostic,
 }: {
   onSignOut: () => void;
   onWatch: (channel: GuideChannel) => void;
+  onDiagnostic: () => void;
 }) {
   const [channels, setChannels] = useState<GuideChannel[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -236,15 +242,23 @@ function Home({
     <div className="mx-auto max-w-4xl p-10">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-semibold">Channels</h1>
-        <button
-          onClick={() => {
-            setToken(null);
-            onSignOut();
-          }}
-          className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
-        >
-          Sign out
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={onDiagnostic}
+            className="rounded-lg border border-amber-600 px-4 py-2 text-sm text-amber-400 hover:bg-amber-400/10"
+          >
+            Run diagnostic
+          </button>
+          <button
+            onClick={() => {
+              setToken(null);
+              onSignOut();
+            }}
+            className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+          >
+            Sign out
+          </button>
+        </div>
       </div>
 
       {error && <p className="mt-6 text-red-400">{error}</p>}

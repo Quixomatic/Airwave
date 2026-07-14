@@ -8,6 +8,7 @@ import { seedAdmin } from "@ChannelGuide/auth/lib/seed-admin";
 import { env } from "@ChannelGuide/env/server";
 import { trpcServer } from "@hono/trpc-server";
 import { Hono } from "hono";
+import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 
@@ -76,6 +77,18 @@ app.use(
 // token or cookie (see ./rest.ts). NOTE (H2/H5): the global CORS above allows
 // only the admin web origin — when the webOS/TV origin is known, add it to
 // CORS_ORIGIN + auth trustedOrigins (bearer/native fetch isn't subject to CORS).
+// Capability-probe test media — PUBLIC static files (the TV plays them via
+// <video src>, which can't send a bearer token). Generate with
+// scripts/gen-capability-media.ts into CAP_MEDIA_DIR (default ./capability-media).
+const CAP_MEDIA_DIR = process.env.CAP_MEDIA_DIR ?? "./capability-media";
+app.use(
+  "/caps/media/*",
+  serveStatic({
+    root: CAP_MEDIA_DIR,
+    rewriteRequestPath: (p) => p.replace(/^\/caps\/media/, ""),
+  }),
+);
+
 app.route("/api/v1", restApi);
 
 // TV device-code login (Plex plex.tv/link flow). Unauthenticated — these

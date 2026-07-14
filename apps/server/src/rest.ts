@@ -11,6 +11,10 @@ import {
   heartbeatSession,
   listActiveSessions,
 } from "@ChannelGuide/api/services/playback/sessions";
+import {
+  getCapabilityManifest,
+  saveCapabilityResult,
+} from "@ChannelGuide/api/services/capabilities/service";
 import { reportDevice } from "@ChannelGuide/api/services/devices/report";
 import { logPlayback } from "@ChannelGuide/api/services/playback/log";
 import { getNowNext } from "@ChannelGuide/api/services/schedule/generate";
@@ -136,6 +140,22 @@ api.post("/channels/:id/stop", async (c) => {
   } catch (err) {
     return onError(err);
   }
+});
+
+// --- Capability diagnostic (native-decode probe matrix) -------------------
+
+/** The probe matrix the TV app iterates (media served at /caps/media/*). */
+api.get("/caps/manifest", (c) => c.json({ tests: getCapabilityManifest() }));
+
+/** Record one capability-test result (auto metrics + manual verdicts). */
+api.post("/caps/result", async (c) => {
+  const body = (await c.req.json().catch(() => null)) as
+    | Parameters<typeof saveCapabilityResult>[2]
+    | null;
+  if (!body?.deviceId || !body?.testId) {
+    return c.json({ error: "deviceId and testId required" }, 400);
+  }
+  return c.json(await saveCapabilityResult(prisma, c.get("session").user.id, body));
 });
 
 // --- Device capability reporting (webOS probe) ----------------------------

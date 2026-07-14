@@ -2,6 +2,21 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.22] - 2026-07-14
+
+**Capability diagnostic** — a self-test that *measures* exactly what a TV's native decoder handles, so playback can go native-first with hls.js as a true last resort.
+
+### Added
+
+- **Capability matrix** (`packages/api/.../capabilities/matrix.ts`) — the single source of truth: an axis-comprehensive set (every container, video codec, audio codec, HDR feature, a bitrate/fps ladder, subtitle types, edge cases; ~45 tests). `realSample` flags the few ffmpeg can't fabricate (Dolby Vision / Atmos / DTS-HD MA / HDR10+ / PGS).
+- **Media generator** (`apps/server/scripts/gen-capability-media.ts`) — ffmpeg fabricates a 5s clip per entry from one master source, driven by the matrix.
+- **Server-hosted probe** — the backend serves the clips as public static files at `/caps/media/*` (played via `<video src>`, which can't carry a token), plus `GET /api/v1/caps/manifest` and `POST /api/v1/caps/result`. New `DeviceCapability` table (upsert per device+test) stores the measured map.
+- **Visual Diagnostic screen** (tv-web, "Run diagnostic" on Home) — plays each clip **full-screen**, auto-detects decode (`videoWidth×videoHeight`) + dropped frames (`getVideoPlaybackQuality`), and prompts a remote **👍/👎** for the subjective axes JS can't see (audio present? HDR triggered? subs shown?). Live results list down the side; everything saved to the device's capability map.
+
+### Notes
+
+- To run it: generate clips into the server's `CAP_MEDIA_DIR` (default `./capability-media`) with the generator + a master, drop the real-sample files, restart the server. Then "Run diagnostic" on the TV grinds the matrix and records the true, measured capability set. Native-first playback off that map is the next step.
+
 ## [0.3.21] - 2026-07-14
 
 Playback logging (tests record themselves) + remote Back fix. Confirmed 4K HDR HEVC direct-stream on the real C2.

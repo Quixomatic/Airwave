@@ -1,0 +1,37 @@
+/// The measured result of ONE capability-probe test on ONE device (upsert by
+/// deviceId+testId, so re-running the diagnostic updates). Auto-detected fields
+/// (decoded / dropped frames) come from the native <video>; the manual verdicts
+/// (audioOk / hdrOk / subtitleOk) come from the on-screen 👍/👎, since those
+/// axes can't be auto-detected. Together = the device's real capability map.
+model DeviceCapability {
+  id       String  @id @default(cuid())
+  deviceId String
+  userId   String?
+  testId   String // matches a CAP_MATRIX id
+
+  container String?
+  video     String?
+  audio     String?
+  feature   String?
+  subtitle  String?
+
+  // auto-detected (native <video>)
+  decoded       Boolean?
+  decodedWidth  Int?
+  decodedHeight Int?
+  droppedFrames Int?
+  totalFrames   Int?
+  error         String?
+
+  // manual verdicts (subjective axes the probe can't see)
+  audioOk    Boolean?
+  hdrOk      Boolean?
+  subtitleOk Boolean?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([deviceId, testId])
+  @@index([deviceId])
+  @@map("device_capability")
+}

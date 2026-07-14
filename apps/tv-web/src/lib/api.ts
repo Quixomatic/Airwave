@@ -144,4 +144,23 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  capsManifest: () => request<{ tests: CapTest[] }>("/api/v1/caps/manifest"),
+
+  capsResult: (data: Record<string, unknown>) =>
+    request<{ ok: true }>("/api/v1/caps/result", { method: "POST", body: JSON.stringify(data) }),
+};
+
+export type CapTest = {
+  id: string;
+  category: string;
+  container: string;
+  video: string;
+  audio: string;
+  feature: string | null;
+  subtitle: string | null;
+  diagnostic: string;
+  realSample: boolean;
+  manual: Array<"audio" | "hdr" | "subtitle">;
+  url: string;
 };
