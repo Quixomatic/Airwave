@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "note": "Capability-probe matrix. The app iterates `tests`, plays `<baseUrl>/<file>` via native <video>, and records decode / dropped-frames / audio outcome. `realSample:true` = FFmpeg can't fabricate it; drop a real clip with that filename.",
+  "tests": [
+    { "id": "base_mp4_avc_aac", "file": "base_mp4_avc_aac.mp4", "category": "core", "container": "mp4", "video": "h264", "audio": "aac", "feature": null, "realSample": false, "diagnostic": "Control: basic hardware sanity" },
+    { "id": "base_mkv_avc_aac", "file": "base_mkv_avc_aac.mkv", "category": "core", "container": "mkv", "video": "h264", "audio": "aac", "feature": null, "realSample": false, "diagnostic": "MKV demuxer parses headers" },
+    { "id": "base_mkv_hevc_ac3", "file": "base_mkv_hevc_ac3.mkv", "category": "core", "container": "mkv", "video": "hevc", "audio": "ac3", "feature": null, "realSample": false, "diagnostic": "Typical 4K rip (HEVC+Dolby D)" },
+    { "id": "base_mp4_hevc_eac3", "file": "base_mp4_hevc_eac3.mp4", "category": "core", "container": "mp4", "video": "hevc", "audio": "eac3", "feature": null, "realSample": false, "diagnostic": "Streaming standard (Netflix/Prime)" },
+    { "id": "base_webm_vp9_opus", "file": "base_webm_vp9_opus.webm", "category": "core", "container": "webm", "video": "vp9", "audio": "opus", "feature": null, "realSample": false, "diagnostic": "Web/YouTube decoders" },
+    { "id": "base_mkv_av1_opus", "file": "base_mkv_av1_opus.mkv", "category": "core", "container": "mkv", "video": "av1", "audio": "opus", "feature": null, "realSample": false, "diagnostic": "Next-gen AV1 hardware chip" },
+    { "id": "base_avi_divx_mp3", "file": "base_avi_divx_mp3.avi", "category": "core", "container": "avi", "video": "mpeg4", "audio": "mp3", "feature": null, "realSample": false, "diagnostic": "Legacy AVI/DivX licensing" },
+
+    { "id": "hdr_mkv_hdr10", "file": "hdr_mkv_hdr10.mkv", "category": "hdr", "container": "mkv", "video": "hevc", "audio": "ac3", "feature": "hdr10", "realSample": false, "diagnostic": "HDR10 static-metadata decode" },
+    { "id": "hdr_mkv_hdr10plus", "file": "hdr_mkv_hdr10plus.mkv", "category": "hdr", "container": "mkv", "video": "hevc", "audio": "ac3", "feature": "hdr10plus", "realSample": true, "diagnostic": "HDR10+ dynamic metadata" },
+    { "id": "hdr_mp4_dv_p5", "file": "hdr_mp4_dv_p5.mp4", "category": "hdr", "container": "mp4", "video": "hevc", "audio": "eac3", "feature": "dolbyvision_p5", "realSample": true, "diagnostic": "Streaming DV (no SDR fallback)" },
+    { "id": "hdr_mp4_dv_p8", "file": "hdr_mp4_dv_p8.mp4", "category": "hdr", "container": "mp4", "video": "hevc", "audio": "eac3", "feature": "dolbyvision_p8", "realSample": true, "diagnostic": "Cross-compatible DV (HDR10 fallback)" },
+    { "id": "hdr_mkv_dv_p7", "file": "hdr_mkv_dv_p7.mkv", "category": "hdr", "container": "mkv", "video": "hevc", "audio": "truehd", "feature": "dolbyvision_p7", "realSample": true, "diagnostic": "Blu-ray dual-layer DV in MKV (usually rejected)" },
+
+    { "id": "aud_mkv_avc_flac", "file": "aud_mkv_avc_flac.mkv", "category": "audio", "container": "mkv", "video": "h264", "audio": "flac", "feature": "surround", "realSample": false, "diagnostic": "Lossless FLAC decode" },
+    { "id": "aud_mkv_avc_truehd", "file": "aud_mkv_avc_truehd.mkv", "category": "audio", "container": "mkv", "video": "h264", "audio": "truehd", "feature": "surround", "realSample": false, "diagnostic": "Dolby TrueHD lossless core" },
+    { "id": "aud_mkv_avc_dts", "file": "aud_mkv_avc_dts.mkv", "category": "audio", "container": "mkv", "video": "h264", "audio": "dts", "feature": "surround", "realSample": false, "diagnostic": "Legacy DTS licensing" },
+    { "id": "aud_mkv_hevc_dtshd", "file": "aud_mkv_hevc_dtshd.mkv", "category": "audio", "container": "mkv", "video": "hevc", "audio": "dtshd", "feature": "surround", "realSample": true, "diagnostic": "DTS-HD Master Audio" },
+    { "id": "aud_mp4_hevc_atmos", "file": "aud_mp4_hevc_atmos.mp4", "category": "audio", "container": "mp4", "video": "hevc", "audio": "eac3_atmos", "feature": "atmos", "realSample": true, "diagnostic": "Streaming Atmos (E-AC3 JOC)" },
+    { "id": "aud_mkv_hevc_atmos", "file": "aud_mkv_hevc_atmos.mkv", "category": "audio", "container": "mkv", "video": "hevc", "audio": "truehd_atmos", "feature": "atmos", "realSample": true, "diagnostic": "Lossless Atmos (TrueHD)" },
+
+    { "id": "perf_1080p_60_10m", "file": "perf_1080p_60_10m.mkv", "category": "perf", "container": "mkv", "video": "hevc", "audio": "aac", "feature": "1080p60@10M", "realSample": false, "diagnostic": "HFR baseline" },
+    { "id": "perf_4k_30_40m", "file": "perf_4k_30_40m.mkv", "category": "perf", "container": "mkv", "video": "hevc", "audio": "aac", "feature": "4k30@40M", "realSample": false, "diagnostic": "Standard 4K ceiling" },
+    { "id": "perf_4k_60_80m", "file": "perf_4k_60_80m.mkv", "category": "perf", "container": "mkv", "video": "hevc", "audio": "aac", "feature": "4k60@80M", "realSample": false, "diagnostic": "High-tier streaming / low-tier rip" },
+    { "id": "perf_4k_60_120m", "file": "perf_4k_60_120m.mkv", "category": "perf", "container": "mkv", "video": "hevc", "audio": "aac", "feature": "4k60@120M", "realSample": false, "diagnostic": "4K decode ceiling" },
+    { "id": "perf_8k_60_150m", "file": "perf_8k_60_150m.mkv", "category": "perf", "container": "mkv", "video": "hevc", "audio": "aac", "feature": "8k60@150M", "realSample": false, "diagnostic": "8K raster / SoC + network limit" },
+
+    { "id": "edge_sub_srt", "file": "edge_sub_srt.mkv", "category": "edge", "container": "mkv", "video": "h264", "audio": "aac", "feature": "sub_srt", "realSample": false, "diagnostic": "Text subtitle overlay" },
+    { "id": "edge_sub_pgs", "file": "edge_sub_pgs.mkv", "category": "edge", "container": "mkv", "video": "hevc", "audio": "aac", "feature": "sub_pgs", "realSample": true, "diagnostic": "Image (PGS) subs — SW-rendered, UI-lag torture test" },
+    { "id": "edge_tracks_30", "file": "edge_tracks_30.mkv", "category": "edge", "container": "mkv", "video": "h264", "audio": "aac", "feature": "30_audio_tracks", "realSample": false, "diagnostic": "High track count / demuxer overflow" },
+    { "id": "edge_anamorphic", "file": "edge_anamorphic.mp4", "category": "edge", "container": "mp4", "video": "h264", "audio": "aac", "feature": "anamorphic_sar", "realSample": false, "diagnostic": "Non-square pixels / aspect flags" }
+  ]
+}
