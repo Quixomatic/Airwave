@@ -29,6 +29,23 @@ function headers(token?: string): Record<string, string> {
   return h;
 }
 
+/**
+ * Create a **link pin** for the TV device flow (`plex.tv/link`). Unlike the web
+ * login's strong pin (a long code for the `app.plex.tv/auth` redirect), this is
+ * a plain pin whose short 4-char `code` the user types at `plex.tv/link` against
+ * their logged-in Plex account. Poll {@link getPinToken} until it returns a token.
+ */
+export async function createLinkPin(): Promise<{
+  id: number;
+  code: string;
+  expiresIn: number;
+}> {
+  const res = await fetch(`${PLEX_TV}/pins`, { method: "POST", headers: headers() });
+  if (!res.ok) throw new Error(`Plex createLinkPin failed (${res.status})`);
+  const data = (await res.json()) as { id: number; code: string; expiresIn?: number };
+  return { id: data.id, code: data.code, expiresIn: data.expiresIn ?? 1800 };
+}
+
 /** Fetch the auth token for a claimed pin (the pin id arrives as the OAuth `code`). */
 export async function getPinToken(id: number): Promise<string | null> {
   const res = await fetch(`${PLEX_TV}/pins/${id}`, { headers: headers() });

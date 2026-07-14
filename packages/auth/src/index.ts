@@ -2,7 +2,7 @@ import { createPrismaClient } from "@ChannelGuide/db";
 import { env } from "@ChannelGuide/env/server";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { admin, deviceAuthorization, genericOAuth, magicLink } from "better-auth/plugins";
+import { admin, bearer, deviceAuthorization, genericOAuth, magicLink } from "better-auth/plugins";
 
 import { PLEX_CLIENT_ID, getPinToken, getPlexAccount } from "./lib/plex-login";
 
@@ -38,7 +38,8 @@ export function createAuth() {
 
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
-    trustedOrigins: [env.CORS_ORIGIN],
+    // Admin web origin + the TV app origin (when set) — for OAuth/device flows.
+    trustedOrigins: [env.CORS_ORIGIN, ...(env.TV_APP_ORIGIN ? [env.TV_APP_ORIGIN] : [])],
 
     // Regular email/password login is always available. Linking a personal
     // Plex account is optional (playback falls back to the owner's connection).
@@ -79,12 +80,26 @@ export function createAuth() {
         adminRoles: ["admin"],
       }),
 
+      // Lets a session be carried as `Authorization: Bearer <token>` instead of a
+      // cookie — the auth model for native/TV clients (webOS), where sameSite:none
+      // cookies are awkward. The device-code flow (deviceAuthorization) mints a
+      // session; bearer makes it a token the TV app sends on every REST call.
+      // On sign-in the token comes back in the `set-auth-token` response header.
+      bearer(),
+
       // RFC 8628 device grant — lets a TV log into an EXISTING ChannelGuide
-      // account via a user code approved at /device on a phone/computer.
+      // account via a user code approved at /device on a phone/computer. This
+      // is the non-Plex TV login path (the Plex path is /api/tv/auth/plex/*).
+      // verificationUri is absolute → the web app's /device page (where the
+      // user is logged in), so the TV's QR / verification_uri_complete point
+      // there: `${CORS_ORIGIN}/device?user_code=XXXX`.
       deviceAuthorization({
-        verificationUri: "/device",
+        verificationUri: `${env.CORS_ORIGIN}/device`,
         expiresIn: "30m",
         interval: "5s",
+        // Short Plex-style code (default is 8). 4 chars from better-auth's
+        // unambiguous charset — fine for self-hosted + a 30m expiry.
+        userCodeLength: 4,
       }),
 
       // Passwordless email login. Optional — real delivery needs SMTP/Resend;

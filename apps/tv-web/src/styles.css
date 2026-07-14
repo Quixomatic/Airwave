@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+/* 10-foot baseline. The real TV kit (spatial nav, focus scaling, retro static)
+   lands with packages/tv-ui; this is just a dark, legible starting canvas. */
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #0a0a0f;
+  color: #f4f4f5;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

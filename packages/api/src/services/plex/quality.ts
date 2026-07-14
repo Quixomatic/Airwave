@@ -60,3 +60,30 @@ export const BROWSER_CLIENT_PROFILE = [
   "add-direct-play-target(type=videoProfile&container=mp4&videoCodec=h264&audioCodec=aac)",
   "add-limitation(scope=videoCodec&scopeName=h264&type=upperBound&name=video.level&value=51&isRequired=false)",
 ].join("+");
+
+/** What a specific client (a real TV) can actually decode — from its probe report. */
+export type ClientCaps = {
+  /** Video codecs the client can decode (e.g. ["h264","hevc","av1","vp9"]). */
+  videoCodecs: string[];
+  /** Audio codecs the client can decode (e.g. ["aac","ac3","eac3","flac"]). */
+  audioCodecs: string[];
+  /** Containers the client can direct-play as a raw file (e.g. ["mp4"]). */
+  directContainers: string[];
+};
+
+/**
+ * Build an `X-Plex-Client-Profile-Extra` from a client's real codec capabilities.
+ * The critical bit is `protocol=hls&container=mp4`: it tells Plex to package HLS as
+ * **fMP4/CMAF**, not MPEG-TS. HEVC in MPEG-TS is undecodable by MSE (the "could not
+ * be decoded" error on the C2); HEVC in fMP4 plays. Listing the client's codecs in
+ * the target means Plex **copies** them (direct-stream, no re-encode → HDR preserved)
+ * rather than transcoding. See .docs/plex-profiles.md + [[project-tv-playback-protocol]].
+ */
+export function clientProfileExtra(caps: ClientCaps): string {
+  const v = caps.videoCodecs.join(",");
+  const a = caps.audioCodecs.join(",");
+  return [
+    `add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mp4&videoCodec=${v}&audioCodec=${a})`,
+    `add-direct-play-target(type=videoProfile&container=mp4&videoCodec=${v}&audioCodec=${a})`,
+  ].join("+");
+}

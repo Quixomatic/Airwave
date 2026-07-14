@@ -1,0 +1,33 @@
+/// A TV/client device that signed in, with the capabilities it reported — the
+/// data behind the webOS playback probe. We use this to design the per-device
+/// Plex capability profile (what to direct-play vs transcode: HEVC, HDR, E-AC3,
+/// resolution, MSE support, …). Keyed by a stable client-generated deviceId so a
+/// device upserts (last report wins) instead of piling up rows.
+model TvDevice {
+  id       String @id @default(cuid())
+  deviceId String @unique
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Denormalized, easy-to-query highlights (also present in `raw`).
+  userAgent    String?
+  platform     String? // "webos" | "browser" | ...
+  model        String? // webOS model name, when available
+  osVersion    String? // webOS / OS version
+  screenWidth  Int?
+  screenHeight Int?
+  pixelRatio   Float?
+  hdr          Boolean? // display reports HDR (dynamic-range: high)
+  colorGamut   String? // "rec2020" | "p3" | "srgb"
+
+  // Full capability matrix (canPlayType / MediaSource.isTypeSupported per codec)
+  // and the complete raw report — JSON so we can evolve the probe without migrations.
+  capabilities Json?
+  raw          Json?
+
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @updatedAt
+
+  @@index([userId])
+  @@map("tv_device")
+}

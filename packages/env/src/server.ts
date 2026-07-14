@@ -8,6 +8,10 @@ export const env = createEnv({
     BETTER_AUTH_SECRET: z.string().min(32),
     BETTER_AUTH_URL: z.url(),
     CORS_ORIGIN: z.url(),
+    // The TV app's origin (dev: http://localhost:3002; later the webOS app
+    // origin). Optional — when set, it's allowed through CORS + better-auth
+    // trustedOrigins so the TV app can call /api/auth, /api/tv/auth, /api/v1.
+    TV_APP_ORIGIN: z.url().optional(),
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 
     // First-admin seed (Overseerr-style). Optional — set both to bootstrap an

@@ -6,7 +6,7 @@
 
 import { XMLParser } from "fast-xml-parser";
 
-import { BROWSER_CLIENT_PROFILE, qualityParams } from "./quality";
+import { BROWSER_CLIENT_PROFILE, type ClientCaps, clientProfileExtra, qualityParams } from "./quality";
 
 const PLEX_TV = "https://plex.tv/api/v2";
 const PRODUCT = "ChannelGuide";
@@ -475,6 +475,9 @@ export type PlaybackOptions = {
   audioLang?: string;
   /** Preferred subtitle language, or "off"/undefined for none. */
   subtitleLang?: string;
+  /** The real client's decode capabilities (a TV) — drives direct-play/direct-stream
+   * vs transcode + the Plex profile. Absent → the built-in browser assumption. */
+  caps?: ClientCaps;
 };
 
 // Formats a browser can play from the original file (so we can direct-play + client-seek).
@@ -569,15 +572,22 @@ export async function getPlaybackInfo(
     ? subStreams.find((s) => streamLang(s) === opts.subtitleLang)?.id
     : undefined;
 
+  // Device-aware capability check: use the real client's codec support when it reports
+  // it (a TV), else the built-in browser assumption (h264/aac/mp4 — the admin preview).
+  const caps = opts.caps;
+  const vOk = (c: string) => (caps ? caps.videoCodecs.includes(c) : DIRECT_VIDEO.has(c));
+  const aOk = (c: string) => (caps ? caps.audioCodecs.includes(c) : DIRECT_AUDIO.has(c));
+  const cOk = (c: string) => (caps ? caps.directContainers.includes(c) : DIRECT_CONTAINERS.has(c));
+
   // Quality cap, an audio-track switch, or burned subtitles all force a transcode;
-  // otherwise a browser-friendly file direct-plays and the client seeks to the offset.
+  // otherwise a file the client can play natively direct-plays (client seeks to the offset).
   const canDirect =
     !quality &&
     audioStreamId == null &&
     subStreamId == null &&
-    DIRECT_CONTAINERS.has(container) &&
-    DIRECT_VIDEO.has(videoCodec) &&
-    DIRECT_AUDIO.has(audioCodec);
+    cOk(container) &&
+    vOk(videoCodec) &&
+    aOk(audioCodec);
 
   if (canDirect) {
     const url = `${baseUrl}${part.key}?X-Plex-Token=${encodeURIComponent(token)}`;
@@ -618,12 +628,21 @@ export async function getPlaybackInfo(
     "X-Plex-Platform": "Web",
   });
   // Quality cap (the Plex "Quality" ladder). Only applied when a preset is chosen, so
-  // the uncapped transcode path is unchanged. Also advertise our client profile.
+  // the uncapped transcode path is unchanged.
   if (quality) {
     params.set("maxVideoBitrate", quality.maxVideoBitrate);
     params.set("videoResolution", quality.videoResolution);
     params.set("videoQuality", quality.videoQuality);
     params.set("autoAdjustQuality", "0");
+  }
+  // Advertise the client's real capabilities. With a TV's caps, Plex copies (direct-streams)
+  // the codecs it can and packages HLS as **fMP4** (HEVC-in-mpegts is undecodable by MSE →
+  // the C2 "could not be decoded"). Platform MUST be Generic — real names 400 on /decision
+  // with custom transcode targets (plezy). Without caps, the browser profile (quality path).
+  if (caps) {
+    params.set("X-Plex-Client-Profile-Extra", clientProfileExtra(caps));
+    params.set("X-Plex-Platform", "Generic");
+  } else if (quality) {
     params.set("X-Plex-Client-Profile-Extra", BROWSER_CLIENT_PROFILE);
   }
   // Audio track switch (e.g. Japanese → English dub).

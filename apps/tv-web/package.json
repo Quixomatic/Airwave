@@ -1,0 +1,32 @@
+{
+  "name": "tv-web",
+  "version": "0.3.19",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "serve": "vite preview",
+    "start": "vite",
+    "check-types": "vite build && tsc --noEmit"
+  },
+  "dependencies": {
+    "better-auth": "catalog:",
+    "hls.js": "^1.6.16",
+    "qrcode": "^1.5.4",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@ChannelGuide/config": "workspace:*",
+    "@tailwindcss/vite": "^4.3.2",
+    "@types/node": "^22.13.14",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "^6.0.3",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "^8.1.3"
+  }
+}

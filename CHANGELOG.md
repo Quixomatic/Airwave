@@ -2,6 +2,92 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.19] - 2026-07-14
+
+**TV playback on real hardware (H2)** + **device-aware Plex profiles** — the app runs on a real LG C2 and direct-streams 4K HDR HEVC with no re-encode.
+
+### Added
+
+- **webOS TV app playback** — tune a channel → resolve what's on now at the live offset → play (hls.js / native) with an on-screen diagnostics readout; clickable channel list. `apps/tv-web/src/features/watch`.
+- **Device capability reporting** — a `TvDevice` table + `POST /api/v1/devices/report`. On sign-in the TV probes its real `<video>.canPlayType` + `MediaSource.isTypeSupported` matrix (plus HDR / color-gamut / screen / UA / webOS version) and persists it (upsert by a stable `deviceId`). This is the data behind the codec probe — e.g. the real C2 reports HEVC-10/AV1/Dolby-Vision/AC3/E-AC3 while the desktop/Simulator don't.
+- **Device-aware playback** — the TV sends its real codec caps with each media resolve; `getPlaybackInfo` uses those (not the hardcoded browser assumption) to choose direct-play / direct-stream / transcode and builds a matching `X-Plex-Client-Profile-Extra` with `X-Plex-Platform=Generic`. Crucially it packages HLS as **fMP4** (not MPEG-TS), so HEVC is **copied** rather than re-encoded — verified live: 4K HEVC + E-AC3 → `copy`, fMP4, **HDR (HLG) preserved**, zero transcode.
+- **webOS packaging** — `appinfo.json` + icon, `base: "./"` relative assets; build → `ares-package --no-minify` → `ares-install`. Confirmed running on a real LG C2 (Chromium 108).
+
+### Changed
+
+- **CORS split for installed apps** — the **bearer** surface (`/api/v1`, `/api/tv/auth`) is now permissive (any origin, credentials off — safe, no cookies), so an installed webOS app (unknown / `file://` / null origin) can reach the API; the **cookie** surface (`/trpc`, web `/api/auth`) stays locked to the allowlist. New optional `TV_APP_ORIGIN` env for dev.
+
+### Notes
+
+- Caps are still a conservative `canPlayType` guess (misses DTS/TrueHD, and HDR/resolution come from the wrong web APIs) — real **webOS Luna `deviceInfo`** is next. **native vs hls.js** playback under evaluation. Plex has **no LG/webOS profile** and its generic TV profiles **re-encode HEVC**, so our custom `-Extra` is the better path — findings in `.docs/plex-profiles/`.
+
+## [0.3.18] - 2026-07-13
+
+The **second TV login flow** — ChannelGuide device-code — completing the auth story. Verified end-to-end.
+
+### Added
+
+- **"Log in with a code"** on the TV app — the ChannelGuide **device-code flow** (better-auth `deviceAuthorization`, RFC 8628) for **any** account (email/password, Google, GitHub, or Plex-linked), not just Plex-imported users. The TV shows a short **4-char code** + a **QR** (to the pre-filled approval page); the user approves on their phone; the TV polls and signs in with a bearer token. Parallel to the Plex `plex.tv/link` flow.
+- **`/device` approval page** (`apps/web`) — a logged-in user confirms the TV's code. Does the two-step better-auth requires: **claim** the code (`GET /device?user_code=…`) then **approve**/deny.
+- **QR codes** on the TV login (via `qrcode`) — to the device approval page (`verification_uri_complete`, code pre-filled) and to `plex.tv/link`.
+
+### Changed
+
+- `deviceAuthorization` now points `verificationUri` at the **web app's** `/device` (absolute, `${CORS_ORIGIN}/device`) so the QR/verification URL is reachable, and sets **`userCodeLength: 4`** for a Plex-style short code (default is 8).
+
+### Notes
+
+- **Verified end-to-end in-browser:** short code → approve at `/device` → TV polls → signed in → authenticated `/api/v1`.
+- **Dev caveat:** the QR points at `CORS_ORIGIN` (`localhost:3001`), reachable only on the dev machine; set `CORS_ORIGIN` to the LAN IP to scan from a phone.
+
+## [0.3.17] - 2026-07-13
+
+The **webOS TV app is born** (`apps/tv-web`) — scaffold + working Plex login, verified in a browser.
+
+### Added
+
+- **`apps/tv-web`** — a plain Vite + React app (developed in-browser first, packaged for webOS later), auto-included in the monorepo `pnpm dev` (port **3002**). Bearer-token native (TV clients carry a token, not cookies): a better-auth client configured to capture the `set-auth-token` header → localStorage and send `Authorization: Bearer`, plus a thin `api.ts` for the custom REST/`/api/v1` + Plex-link endpoints.
+- **TV login screen** with two paths: **"Log in with Plex"** (the `plex.tv/link` flow — shows a code, polls, signs in) and **"Log in with a code"** (ChannelGuide device-code, wired next once the `/device` approval page exists). After sign-in, a Home screen loads `/api/v1/channels` with the token to prove the authenticated API. **Verified end-to-end in a browser**: Plex login → bearer → 136 channels listed.
+- **`TV_APP_ORIGIN`** (optional server env) — allowed through Hono CORS + better-auth `trustedOrigins` so the TV app's origin (dev `:3002`, later the webOS origin) can call `/api/auth`, `/api/tv/auth`, and `/api/v1`.
+
+### Notes
+
+- **CORS for installed webOS apps** (unknown/`file://` origin) will switch the **bearer** API surface to permissive CORS (safe — no cookies there); the per-origin allowlist is just for dev.
+- **Next:** the login **QR code** (to the device page / plex.tv/link) + the ChannelGuide device-code flow, and the **`/device`** approval page on the admin web.
+
+## [0.3.16] - 2026-07-13
+
+**TV device-code login (H5)** — how the webOS app authenticates, reusing the existing Plex identity path.
+
+### Added
+
+- **TV login via Plex's `plex.tv/link` device flow.** New unauthenticated endpoints `POST /api/tv/auth/plex/start` (returns a short `code` + `verificationUrl` + `pinId`) and `POST /api/tv/auth/plex/poll` (`{ pinId }` → `pending` / `expired` / `unregistered` / `ok`). The TV shows the code, the user enters it at **plex.tv/link** against their logged-in Plex account, and the TV polls until approved. This reuses the **exact identity path** of the web "Sign in with Plex" (genericOAuth): Plex pin → user's Plex token → Plex account email → **match an existing ChannelGuide account by email** (login-only — an unregistered Plex email is rejected, provisioning stays "Import Plex Users"). The only difference from the web flow is acquisition (a typed code vs a browser redirect). On success we mint a better-auth session server-side (`auth.$context.internalAdapter.createSession`) and return its token; the TV carries it as `Authorization: Bearer <token>` on every `/api/v1` call. `services/auth/tv-plex-link.ts` + `apps/server/src/tv-auth.ts`.
+- **`createLinkPin()`** (`packages/auth`) — creates a **non-strong** Plex pin (the plain 4-char code for plex.tv/link), distinct from the web login's strong pin (a long code for the `app.plex.tv/auth` redirect).
+
+### Notes
+
+- We do **not** use the RFC-8628 `deviceAuthorization` plugin for this — Plex's own device PIN replaces it (the plugin stays configured as a possible fallback for non-Plex accounts). The `bearer` plugin (v0.3.15) is what makes the minted session a token the TV sends.
+- **Verified live end-to-end:** `start` → entered code at plex.tv/link → `poll` returned `ok` + a session token → that token authorized `/api/v1` (matched the admin by email; no-token requests 401). No TV UI drives it yet — that's H4.
+
+## [0.3.15] - 2026-07-13
+
+Opens the **TV-client arc (H1)** — a REST guide/playback API for the TV apps, sitting alongside the existing tRPC admin surface.
+
+### Added
+
+- **REST guide/playback API** at `/api/v1` (`apps/server/src/rest.ts`) for heterogeneous TV clients (webOS first) — the parallel to the admin tRPC surface. Endpoints: `GET /channels` (lineup), `GET /guide` (cross-channel grid), `GET /qualities`, `GET /channels/:id/timeline`, `GET /channels/:id/now`, `GET /channels/:id/media` (playable URL for a ratingKey+offset), `POST /channels/:id/stop` (transcode teardown), `POST /sessions/heartbeat`, `POST /sessions/end`, and `GET /sessions` (admin-only "Now Watching"). Auth is **viewer-level** (any authenticated user, not admin) via `Authorization: Bearer <token>` or a session cookie; playback still brokers the **admin's** media-source connection for everyone (architecture §10).
+- **better-auth `bearer` plugin** — sessions can now be carried as a bearer token instead of a `sameSite:none` cookie, the auth model for native/TV clients. On sign-in the token comes back in the `set-auth-token` response header. This is also the missing half of the future TV device-code flow (the already-configured `deviceAuthorization` plugin mints the session; `bearer` makes it a token the TV app can send).
+
+### Changed
+
+- **Playback/guide logic extracted into shared services** (`services/errors.ts`, `services/playback/broker.ts`, `services/playback/sessions.ts`, `services/guide.ts`) so the tRPC admin router and the new REST API call **one** implementation — no duplication. The tRPC `playback.*` procedures and `channels.guide` are now thin wrappers over these services (behavior unchanged; the admin preview is unaffected). Services throw a transport-neutral `ApiError` that each transport maps (tRPC → `TRPCError`, REST → HTTP status).
+
+### Notes
+
+- **Transport decision:** the webOS client is a React app and *could* consume tRPC directly, but we keep tRPC for the in-monorepo admin and expose REST for the TV apps (and future non-JS / third-party clients / IPTV) — both over the shared services, so neither is gutted.
+- **Verified live** (v0.3.16): `/channels`, `/guide`, `/qualities`, `/channels/:id/{now,timeline,media}`, and `/stop` all return correct data with a real bearer token minted via the TV Plex device-link flow; no-token requests 401; a resolved transcode was torn down cleanly via `/stop`.
+- **Follow-up (H2/H4):** the global CORS still allows only the admin web origin; when the webOS/TV origin is known, add it to `CORS_ORIGIN` + auth `trustedOrigins` (bearer/native fetch isn't subject to CORS). Next arc is the **webOS capability probe (H2)** now that auth + API are proven.
+
 ## [0.3.14] - 2026-07-13
 
 ### Fixed
