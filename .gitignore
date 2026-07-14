@@ -10,6 +10,8 @@ build
 
 # Generated files
 apps/web/src/routeTree.gen.ts
+apps/tv-web/src/routeTree.gen.ts
+apps/tv-web/.tanstack/
 
 # Environment variables
 .env

@@ -1,8 +1,12 @@
-@import "tailwindcss";
+/* The shared base-lyra design system (same as the admin) — tokens, Inter,
+   shadcn component styles. `pnpm dlx shadcn add <c>` drops components into
+   @ChannelGuide/ui/components per components.json. Lightning CSS lowers its
+   oklch/color-mix for the C2's Chromium 108 (see vite.config + [[feedback-tv-css-chromium108]]). */
+@import "@ChannelGuide/ui/globals.css";
 
-/* 10-foot baseline. The real TV kit (spatial nav, focus scaling, retro static)
-   lands with packages/tv-ui; this is just a dark, legible starting canvas. */
-:root {
+/* The TV app is always dark + 10-foot. The <html> carries `class="dark"` (index.html)
+   so base-lyra's dark tokens apply. Canvas = the Aurora design (.docs/tv-design-spec.md). */
+html {
   color-scheme: dark;
 }
 
@@ -14,8 +18,7 @@ body,
 
 body {
   margin: 0;
-  background: #0a0a0f;
-  color: #f4f4f5;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: #060a14;
+  color: #f1f5f9;
   -webkit-font-smoothing: antialiased;
 }

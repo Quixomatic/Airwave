@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.28] - 2026-07-14
+
+TV app foundation refactor — the webOS app now uses the admin's frontend paradigms.
+
+### Changed
+
+- **`apps/tv-web` is now on TanStack Router + TanStack Query + base-lyra shadcn**, instead of the slapped-together `useState` screen-switcher and raw `fetch`. File-based routes (`login` / `_auth/` guide / `_auth/watch/$channelId` / `_auth/diagnostic`) with a bearer-token auth gate (`_auth/route.tsx`), **in-memory history** (a packaged webOS app has no URL bar), and the `QueryClient` mounted via the router's `Wrap` — mirroring `apps/web`. Reads go through thin Query hooks (`useChannels`) over the existing REST chokepoint (`lib/api.ts`); the TV app stays on the **bearer `/api/v1` surface, not tRPC** (an installed app's unknown origin only the permissive bearer surface accepts). The **login flow is unchanged** (it works well) — just moved onto the `/login` route.
+- **shadcn/base-lyra wired up** (`components.json` + `@ChannelGuide/ui` dependency + `lib/utils` `cn` re-export), so tv-web shares the admin's design system and `pnpm dlx shadcn add <component>` works. Chrome-108 CSS lowering (Lightning CSS) already covers the base-lyra oklch/color-mix tokens.
+
+### Notes
+
+- Behavior is preserved (login, guide list, tune-and-play, capability onboarding). The 10-foot **Aurora** guide-grid UI (`.docs/tv-design-spec.md`, from the Claude Design handoff — blue accent, channel rail, now-line) is the next step; this refactor is the foundation it builds on.
+
 ## [0.3.27] - 2026-07-14
 
 Native-first playback, step 2 — the self-healing delivery ladder (hls.js is now a true last resort).
