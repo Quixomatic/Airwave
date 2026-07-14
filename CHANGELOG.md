@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.30] - 2026-07-14
+
+### Fixed
+
+- **The guide grid's lead area is no longer blank.** `getGuideGrid` only returned currently-airing + upcoming programs, so the space to the left of "now" (recently-aired programs) rendered empty. It now takes a `backMinutes` window (default 60, exposed as `/api/v1/guide?backMinutes=`) and keeps programs that **ended within the recent past** — filling the grid's lead with the just-aired items (which are still rewindable via the DVR timeshift window). The broad 6h query still catches a long program that started before the window but is still airing.
+
 ## [0.3.29] - 2026-07-14
 
 The **Aurora guide grid** — the 10-foot live-TV guide UI (from the Claude Design handoff).

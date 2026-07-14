@@ -27,15 +27,25 @@ export async function listGuideChannels(prisma: PrismaClient) {
 }
 
 /**
- * The guide grid: every enabled channel with its currently-airing + upcoming
- * PROGRAM slots over the window, guide metadata merged. One query for all
+ * The guide grid: every enabled channel with its recently-aired + currently-airing
+ * + upcoming PROGRAM slots over the window, guide metadata merged. One query for all
  * channels. Bumpers are omitted (tiny interstitials).
+ *
+ * `backMinutes` includes programs that ended within the recent past so the guide's
+ * left/lead area isn't blank (they're still rewindable via the DVR timeshift window).
  */
-export async function getGuideGrid(prisma: PrismaClient, forwardMinutes: number) {
+export async function getGuideGrid(
+  prisma: PrismaClient,
+  forwardMinutes: number,
+  backMinutes = 60,
+) {
   const channels = await listGuideChannels(prisma);
   const now = new Date();
+  // Query broadly (6h) so a long program that started well before the window but is
+  // still airing is caught; the filter below trims to the visible past/future span.
   const from = new Date(now.getTime() - 6 * 3600_000);
   const to = new Date(now.getTime() + forwardMinutes * 60_000);
+  const pastCutoff = now.getTime() - backMinutes * 60_000;
   const rows = await prisma.scheduleItem.findMany({
     where: {
       channelId: { in: channels.map((c) => c.id) },
@@ -48,8 +58,8 @@ export async function getGuideGrid(prisma: PrismaClient, forwardMinutes: number)
 
   const byChannel = new Map<string, typeof rows>();
   for (const r of rows) {
-    // Keep only programs still airing or upcoming within the window.
-    if (r.startsAt.getTime() + r.durationSeconds * 1000 <= now.getTime()) continue;
+    // Keep programs that ended within the recent past window, are airing, or upcoming.
+    if (r.startsAt.getTime() + r.durationSeconds * 1000 <= pastCutoff) continue;
     const list = byChannel.get(r.channelId) ?? [];
     list.push(r);
     byChannel.set(r.channelId, list);
@@ -58,6 +68,7 @@ export async function getGuideGrid(prisma: PrismaClient, forwardMinutes: number)
   return {
     serverTime: now,
     windowMinutes: forwardMinutes,
+    backMinutes,
     channels: channels.map((c) => ({
       ...c,
       programs: (byChannel.get(c.id) ?? []).map((r) => ({

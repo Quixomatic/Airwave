@@ -71,7 +71,8 @@ api.get("/channels", async (c) => c.json({ channels: await listGuideChannels(pri
 /** Cross-channel guide grid over a forward window. */
 api.get("/guide", async (c) => {
   const forwardMinutes = intParam(c.req.query("forwardMinutes"), 150, 30, 720);
-  return c.json(await getGuideGrid(prisma, forwardMinutes));
+  const backMinutes = intParam(c.req.query("backMinutes"), 60, 0, 360);
+  return c.json(await getGuideGrid(prisma, forwardMinutes, backMinutes));
 });
 
 /** The Plex-style quality ladder for the client's quality selector. */
