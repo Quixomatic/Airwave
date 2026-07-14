@@ -169,29 +169,56 @@ export const api = {
     channelId: string,
     ratingKey: string,
     offsetSeconds: number,
-    caps?: { videoCodecs: string[]; audioCodecs: string[]; directContainers: string[] },
-    deviceId?: string,
-    forceHls?: boolean,
+    opts: {
+      caps?: { videoCodecs: string[]; audioCodecs: string[]; directContainers: string[] };
+      deviceId?: string;
+      forceHls?: boolean;
+      /** Quality-ladder preset id (or "original"/undefined for uncapped). */
+      quality?: string;
+      /** Preferred audio-track language (carries across episodes). */
+      audioLang?: string;
+      /** Subtitle language to burn in, or "off" to clear. */
+      subtitleLang?: string;
+    } = {},
   ) => {
     const p = new URLSearchParams({ ratingKey, offsetSeconds: String(offsetSeconds) });
     // deviceId lets the server use this panel's MEASURED capability map (from the
     // onboarding diagnostic) instead of the canPlayType guess below.
-    if (deviceId) p.set("deviceId", deviceId);
+    if (opts.deviceId) p.set("deviceId", opts.deviceId);
     // Set only after a native attempt failed — forces the hls.js/MSE last resort.
-    if (forceHls) p.set("forceHls", "1");
-    if (caps) {
-      p.set("vcodecs", caps.videoCodecs.join(","));
-      p.set("acodecs", caps.audioCodecs.join(","));
-      p.set("dcontainers", caps.directContainers.join(","));
+    if (opts.forceHls) p.set("forceHls", "1");
+    if (opts.quality && opts.quality !== "original") p.set("quality", opts.quality);
+    if (opts.audioLang) p.set("audioLang", opts.audioLang);
+    if (opts.subtitleLang) p.set("subtitleLang", opts.subtitleLang);
+    if (opts.caps) {
+      p.set("vcodecs", opts.caps.videoCodecs.join(","));
+      p.set("acodecs", opts.caps.audioCodecs.join(","));
+      p.set("dcontainers", opts.caps.directContainers.join(","));
     }
     return request<MediaInfo>(`/api/v1/channels/${channelId}/media?${p.toString()}`);
   },
+
+  qualities: () => request<{ qualities: { id: string; label: string }[] }>("/api/v1/qualities"),
 
   stop: (channelId: string, session: string) =>
     request<{ ok: true }>(`/api/v1/channels/${channelId}/stop`, {
       method: "POST",
       body: JSON.stringify({ session }),
     }),
+
+  // Watch sessions — powers "Now Watching" + lets watch-session-reap stop orphaned
+  // transcodes. The client heartbeats ~every 10s and ends the session on teardown.
+  heartbeat: (body: {
+    channelId: string;
+    state: "program" | "bumper" | "off";
+    ratingKey?: string | null;
+    title?: string | null;
+    delaySeconds?: number;
+    positionAt?: string | null;
+    transcodeSession?: string | null;
+  }) => request<unknown>("/api/v1/sessions/heartbeat", { method: "POST", body: JSON.stringify(body) }),
+
+  endSession: () => request<unknown>("/api/v1/sessions/end", { method: "POST", body: "{}" }),
 
   logPlayback: (data: Record<string, unknown>) =>
     request<{ ok: true; id: string }>("/api/v1/playback/log", {

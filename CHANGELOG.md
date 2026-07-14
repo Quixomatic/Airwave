@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.33] - 2026-07-14
+
+Parity player controls + watch sessions on the TV.
+
+### Added
+
+- **Audio-track / subtitle / quality controls on the watch screen** — matching the admin preview. Press **OK** while watching to open a D-pad control panel with three columns: **Audio** (switch track by language), **Subtitles** (Off + burn a language), **Quality** (the full Plex ladder). Selecting an option re-resolves the current program with it (the server forces the matching transcode); the native-first ladder + hls fallback are unchanged. `api.media` now takes an options object and `api.qualities()` was added.
+- **Watch-session heartbeat** — the TV now drives the same `WatchSession` machinery as the admin preview: it heartbeats (`POST /api/v1/sessions/heartbeat`) ~every 10s with channel / state / ratingKey / transcode-session, and **ends the session** (`/sessions/end`) on leaving the player. This populates "Now Watching" and lets `watch-session-reap` stop orphaned transcodes.
+
+### Notes
+
+- Options re-resolve at the live edge for now (the minimal player has no DVR position yet — that lands with the effectiveTime state machine), so a change snaps to live. Subtitle burn follows the verified PUT-select recipe server-side.
+
 ## [0.3.32] - 2026-07-14
 
 ### Changed
