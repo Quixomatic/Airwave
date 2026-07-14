@@ -29,6 +29,15 @@ export function Watch({
   const [media, setMedia] = useState<MediaInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string>("Tuning…");
+  const [vstat, setVstat] = useState<{
+    w: number;
+    h: number;
+    rs: number;
+    ct: number;
+    paused: boolean;
+    buf: number;
+  } | null>(null);
+  const [debug, setDebug] = useState(true);
 
   const teardown = useCallback(() => {
     if (hlsRef.current) {
@@ -107,12 +116,43 @@ export function Watch({
     return teardown;
   }, [resolve, teardown]);
 
+  // Sample the real <video> state so the overlay can prove frames are decoding.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const v = videoRef.current;
+      if (!v) return;
+      setVstat({
+        w: v.videoWidth,
+        h: v.videoHeight,
+        rs: v.readyState,
+        ct: v.currentTime,
+        paused: v.paused,
+        buf: v.buffered.length ? v.buffered.end(v.buffered.length - 1) : 0,
+      });
+    }, 500);
+    return () => window.clearInterval(id);
+  }, []);
+
+  // Remote: OK toggles the debug panel; Back exits to the guide.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter") setDebug((d) => !d);
+      else if (e.key === "Backspace" || e.key === "GoBack" || e.keyCode === 461) {
+        teardown();
+        onExit();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [teardown, onExit]);
+
   const exit = () => {
     teardown();
     onExit();
   };
 
   const cur = now?.current;
+  const decoding = !!vstat && vstat.w > 0 && vstat.h > 0;
 
   return (
     <div className="relative h-full w-full bg-black">
@@ -153,22 +193,36 @@ export function Watch({
         </div>
       )}
 
-      {/* Probe diagnostics — what the panel was asked to decode */}
-      {media && (
-        <div className="absolute bottom-5 left-5 rounded-lg bg-black/70 px-4 py-3 font-mono text-xs text-zinc-300">
-          <div>
-            mode: <span className="text-amber-400">{media.mode}</span>
-            {media.mode === "hls" && " (Plex transcode)"}
-            {media.mode === "direct" && " (original file)"}
+      {/* Debug overlay — proves whether frames are actually decoding (OK toggles). */}
+      {debug && (
+        <div className="absolute bottom-5 left-5 max-w-xl rounded-lg bg-black/85 px-4 py-3 font-mono text-sm text-zinc-200">
+          <div className={`text-base font-bold ${decoding ? "text-green-400" : "text-red-400"}`}>
+            {decoding ? `▶ DECODING ${vstat!.w}×${vstat!.h}` : "✖ NOT DECODING (0×0)"}
+            {vstat ? (vstat.paused ? " · paused" : decoding ? " · playing" : "") : ""}
           </div>
-          <div>
-            container: {media.container ?? "?"} · video: {media.videoCodec ?? "?"} · audio:{" "}
-            {media.audioCodec ?? "?"}
-          </div>
-          <div>
-            audio tracks: {media.audioTracks.length} · subtitle tracks:{" "}
-            {media.subtitleTracks.length}
-          </div>
+          {media && (
+            <div className="mt-1 text-zinc-400">
+              source: {media.container ?? "?"} {media.videoCodec ?? "?"}/{media.audioCodec ?? "?"} ·
+              mode {media.mode}
+            </div>
+          )}
+          {media?.decision ? (
+            <div>
+              plex: video{" "}
+              <span className="text-amber-400">{media.decision.videoDecision ?? "?"}</span>→
+              {media.decision.videoCodec ?? "?"} · audio {media.decision.audioDecision ?? "?"}→
+              {media.decision.audioCodec ?? "?"} · out {media.decision.container ?? "?"}
+            </div>
+          ) : (
+            media?.mode === "direct" && <div className="text-zinc-500">plex: direct-play (raw file)</div>
+          )}
+          {vstat && (
+            <div className="text-zinc-400">
+              readyState {vstat.rs}/4 · t={vstat.ct.toFixed(1)}s · buffered {vstat.buf.toFixed(1)}s
+            </div>
+          )}
+          {error && <div className="mt-1 text-red-400">{error}</div>}
+          <div className="mt-1 text-xs text-zinc-600">OK = toggle debug · Back = guide</div>
         </div>
       )}
     </div>

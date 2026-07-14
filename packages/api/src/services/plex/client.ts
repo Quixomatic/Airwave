@@ -466,6 +466,14 @@ export type PlaybackInfo = {
   /** Distinct audio / subtitle languages available on this item (for the pickers). */
   audioTracks: PlaybackTrack[];
   subtitleTracks: PlaybackTrack[];
+  /** What Plex's /decision actually chose (hls only) — for the debug overlay. */
+  decision?: {
+    videoDecision?: string; // "copy" | "transcode" | "directplay"
+    audioDecision?: string;
+    videoCodec?: string; // output codec
+    audioCodec?: string; // output codec
+    container?: string; // output container (mp4 = fMP4/CMAF, mpegts, …)
+  };
 };
 
 /** Options that steer the transcode decision (any set → force a transcode). */
@@ -676,20 +684,54 @@ export async function getPlaybackInfo(
   // documented two-step flow (decision → start): without it, `start.m3u8` 400s for any
   // media that needs a real transcode decision (e.g. an mkv/DTS movie at a non-trivial
   // offset). Same session/params so `start` picks up the negotiated session.
+  let decision: PlaybackInfo["decision"];
   try {
-    const decision = await fetch(
-      `${baseUrl}/video/:/transcode/universal/decision?${qs}`,
-      { headers: pmsHeaders(token) },
-    );
-    if (!decision.ok) {
-      console.warn(`[plex] transcode decision ${decision.status} for ratingKey ${ratingKey}`);
+    const res2 = await fetch(`${baseUrl}/video/:/transcode/universal/decision?${qs}`, {
+      headers: { ...pmsHeaders(token), Accept: "application/json" },
+    });
+    if (!res2.ok) {
+      console.warn(`[plex] transcode decision ${res2.status} for ratingKey ${ratingKey}`);
+    } else {
+      const dj = (await res2.json().catch(() => null)) as {
+        MediaContainer?: {
+          Metadata?: Array<{
+            Media?: Array<{
+              videoDecision?: string;
+              audioDecision?: string;
+              videoCodec?: string;
+              audioCodec?: string;
+              container?: string;
+            }>;
+          }>;
+        };
+      } | null;
+      const m = dj?.MediaContainer?.Metadata?.[0]?.Media?.[0];
+      if (m) {
+        decision = {
+          videoDecision: m.videoDecision,
+          audioDecision: m.audioDecision,
+          videoCodec: m.videoCodec,
+          audioCodec: m.audioCodec,
+          container: m.container,
+        };
+      }
     }
   } catch (err) {
     console.warn(`[plex] transcode decision failed for ratingKey ${ratingKey}:`, err);
   }
 
   const url = `${baseUrl}/video/:/transcode/universal/start.m3u8?${qs}`;
-  return { mode: "hls", url, session, container, videoCodec, audioCodec, audioTracks, subtitleTracks };
+  return {
+    mode: "hls",
+    url,
+    session,
+    container,
+    videoCodec,
+    audioCodec,
+    audioTracks,
+    subtitleTracks,
+    decision,
+  };
 }
 
 /** Stop a Plex transcode session (so behind-the-scenes transcodes don't pile up). */

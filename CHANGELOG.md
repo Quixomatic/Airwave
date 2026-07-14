@@ -2,6 +2,21 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.20] - 2026-07-14
+
+TV-client instrumentation & navigation — so we can *see* what's playing and drive it with the remote.
+
+### Added
+
+- **Rich playback debug overlay** (Watch view) — shows whether frames are actually decoding (`video.videoWidth×videoHeight`; **0×0 = not decoding**), Plex's real decision (video/audio `copy` vs `transcode` + output container), the source codec, `readyState`, `currentTime`, buffered seconds, and any error. **OK** toggles it, **Back** exits to the guide.
+- **webOS Luna device probe** — via `PalmServiceBridge` (`com.webos.service.tv.systemproperty/getSystemInfo`) we now read the **real model / 4K (UHD) / firmware** and merge them into the device report, so `TvDevice` reflects the actual panel instead of the 1080p web canvas.
+- **D-pad navigation** for the channel grid — arrow keys move a focus ring (with scroll-into-view), **OK** tunes. The channel list is finally usable with the remote instead of the Wii pointer.
+- **Plex decision surfaced** — `getPlaybackInfo` parses `/decision` and returns `{ videoDecision, audioDecision, output codec/container }` through `/api/v1` media, feeding the debug overlay.
+
+### Notes
+
+- Confirms via the profile dump (`.docs/plex-profiles/`) that Plex's built-in TV profiles (e.g. **HTML TV App**) cap at **1080p/8-bit/h264-only** — inheriting them would cripple the C2, so our custom `-Extra` (HEVC copy → fMP4, HDR preserved) is the right path. Full spatial-nav (norigin) for the whole app is still a follow-up.
+
 ## [0.3.19] - 2026-07-14
 
 **TV playback on real hardware (H2)** + **device-aware Plex profiles** — the app runs on a real LG C2 and direct-streams 4K HDR HEVC with no re-encode.

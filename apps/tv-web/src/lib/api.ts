@@ -98,6 +98,13 @@ export type MediaInfo = {
   audioCodec?: string;
   audioTracks: Track[];
   subtitleTracks: Track[];
+  decision?: {
+    videoDecision?: string;
+    audioDecision?: string;
+    videoCodec?: string;
+    audioCodec?: string;
+    container?: string;
+  };
 };
 
 export const api = {

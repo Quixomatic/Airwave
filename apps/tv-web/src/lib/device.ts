@@ -105,6 +105,77 @@ export function clientCaps(): ClientCaps {
   return { videoCodecs, audioCodecs, directContainers: ["mp4", "m4v", "mov"] };
 }
 
+/* ------------------------------------------------------------------ */
+/*  webOS Luna device info — the REAL panel facts (model, 4K, firmware) */
+/*  that the web APIs get wrong (screen = 1080p canvas, hdr = false).    */
+/* ------------------------------------------------------------------ */
+
+type Luna = Record<string, unknown> | null;
+
+function lunaCall(uri: string, params: Record<string, unknown>): Promise<Luna> {
+  return new Promise((resolve) => {
+    try {
+      // PalmServiceBridge is injected on real webOS TVs (absent in browser/Simulator).
+      const Bridge = (window as unknown as { PalmServiceBridge?: new () => unknown })
+        .PalmServiceBridge;
+      if (typeof Bridge !== "function") return resolve(null);
+      const bridge = new Bridge() as {
+        onservicecallback: (msg: string) => void;
+        call: (uri: string, params: string) => void;
+      };
+      let done = false;
+      const finish = (v: Luna) => {
+        if (!done) {
+          done = true;
+          resolve(v);
+        }
+      };
+      bridge.onservicecallback = (msg: string) => {
+        try {
+          finish(JSON.parse(msg) as Luna);
+        } catch {
+          finish(null);
+        }
+      };
+      bridge.call(uri, JSON.stringify(params));
+      setTimeout(() => finish(null), 2500);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/** Real device facts from webOS (null off-webOS). */
+async function webosDeviceInfo(): Promise<Luna> {
+  const sys = await lunaCall("luna://com.webos.service.tv.systemproperty/getSystemInfo", {
+    keys: ["modelName", "UHD", "sdkVersion", "firmwareVersion", "serialNumber", "boardType"],
+  });
+  return sys && typeof sys === "object" ? sys : null;
+}
+
+/**
+ * The full device report sent on sign-in: web-standards probe (codecs) + webOS
+ * Luna facts (real model / 4K / firmware) merged in, so the DB record reflects
+ * the actual panel, not the 1080p web canvas.
+ */
+export async function gatherDeviceReport() {
+  const base = collectDeviceInfo();
+  const sys = await webosDeviceInfo();
+  if (sys) {
+    const uhd = String(sys.UHD ?? "").toLowerCase() === "true";
+    base.model = (sys.modelName as string) ?? base.model;
+    base.osVersion = (sys.sdkVersion as string) ?? (sys.firmwareVersion as string) ?? base.osVersion;
+    // UHD is the authoritative panel signal; the web `screen` is the 1080p app canvas.
+    if (uhd) {
+      base.screenWidth = 3840;
+      base.screenHeight = 2160;
+    }
+    (base.raw as Record<string, unknown>).webosSystemInfo = sys;
+    (base.raw as Record<string, unknown>).panelUhd = uhd;
+  }
+  return base;
+}
+
 export function collectDeviceInfo() {
   const video = document.createElement("video");
   const ua = navigator.userAgent;

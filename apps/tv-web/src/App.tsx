@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { authClient } from "./lib/auth-client";
 import { ApiError, api, plexLink, type GuideChannel } from "./lib/api";
 import { SERVER_URL, getToken, setToken } from "./lib/auth-client";
-import { collectDeviceInfo } from "./lib/device";
+import { gatherDeviceReport } from "./lib/device";
 import { Qr } from "./lib/qr";
 import { Watch } from "./features/watch/watch";
 
@@ -182,15 +182,41 @@ function Home({
 }) {
   const [channels, setChannels] = useState<GuideChannel[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [focused, setFocused] = useState(0);
+  const COLS = 2;
 
-  // Report this device's real capabilities once (the webOS probe data).
+  // Report this device's real capabilities once (web probe + webOS Luna facts).
   useEffect(() => {
-    try {
-      void api.reportDevice(collectDeviceInfo()).catch(() => {});
-    } catch {
-      /* device probe is best-effort */
-    }
+    void gatherDeviceReport()
+      .then((r) => api.reportDevice(r))
+      .catch(() => {});
   }, []);
+
+  // D-pad / remote navigation over the channel grid (arrow keys + OK/Enter to tune).
+  useEffect(() => {
+    if (!channels?.length) return;
+    const n = channels.length;
+    const onKey = (e: KeyboardEvent) => {
+      let next = focused;
+      switch (e.key) {
+        case "ArrowRight": next = Math.min(n - 1, focused + 1); break;
+        case "ArrowLeft": next = Math.max(0, focused - 1); break;
+        case "ArrowDown": next = Math.min(n - 1, focused + COLS); break;
+        case "ArrowUp": next = Math.max(0, focused - COLS); break;
+        case "Enter": e.preventDefault(); onWatch(channels[focused]); return;
+        default: return;
+      }
+      e.preventDefault();
+      setFocused(next);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [channels, focused, onWatch]);
+
+  // Keep the focused channel scrolled into view.
+  useEffect(() => {
+    document.getElementById(`ch-${focused}`)?.scrollIntoView({ block: "nearest" });
+  }, [focused]);
 
   useEffect(() => {
     api
@@ -228,11 +254,20 @@ function Home({
         <>
           <p className="mt-2 text-zinc-500">{channels.length} channels</p>
           <ul className="mt-6 grid grid-cols-2 gap-3">
-            {channels.map((c) => (
+            {channels.map((c, i) => (
               <li key={c.id}>
                 <button
-                  onClick={() => onWatch(c)}
-                  className="flex w-full items-baseline gap-3 rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-3 text-left transition hover:border-zinc-600 hover:bg-zinc-800/60"
+                  id={`ch-${i}`}
+                  onClick={() => {
+                    setFocused(i);
+                    onWatch(c);
+                  }}
+                  onMouseEnter={() => setFocused(i)}
+                  className={`flex w-full items-baseline gap-3 rounded-lg border px-4 py-3 text-left transition ${
+                    i === focused
+                      ? "border-amber-400 bg-amber-400/10 ring-2 ring-amber-400"
+                      : "border-zinc-800 bg-zinc-900/40"
+                  }`}
                 >
                   <span className="font-mono text-zinc-500">{c.number}</span>
                   <span className="font-medium">{c.name}</span>
