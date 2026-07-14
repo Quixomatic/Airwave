@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.27] - 2026-07-14
+
+Native-first playback, step 2 — the self-healing delivery ladder (hls.js is now a true last resort).
+
+### Added
+
+- **Progressive-HTTP transcode for TVs.** When a source *can't* be native raw-file direct-played (Hi10P, MPEG-2, AVI/FLV, or a forced transcode from a quality cap / audio switch), a capable panel now gets a **progressive HTTP transcode** (`protocol=http`, `start`, `container=mp4`) it plays with the **native `<video>` element** — not HLS/hls.js. Because native `<video>` isn't MSE, the transcode target can keep the **full native audio set** (Plex copies E-AC3/DTS/TrueHD instead of forcing it → aac). New `mode: "http"`; `clientProfileExtra(caps, protocol)` builds the per-protocol target.
+- **Runtime native→hls safety-catch.** If a native attempt (`direct` or `http`) throws a `<video>` error at runtime, the client re-resolves the same program **once** with `forceHls`, and Plex serves an hls.js/MSE stream. So the full ladder is **raw-file direct → progressive-HTTP transcode → hls.js**, each rung native until the last — and even if progressive-HTTP misbehaves on a given panel, playback self-heals to hls.
+
+### Notes
+
+- The admin browser preview is unaffected — it passes no capability profile, so it always resolves to `direct`/`hls` (hls.js in the browser, by design). `mode: "http"` only ever occurs for a capability-reporting TV client.
+
 ## [0.3.26] - 2026-07-14
 
 Native-first playback, step 1 — the measured capability map drives Plex's decision.

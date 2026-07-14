@@ -35,6 +35,8 @@ export type ResolveMediaOptions = {
   /** The reporting device — if it has a MEASURED capability map, that overrides the
    * canPlayType guess and becomes the source of truth for the Plex profile. */
   deviceId?: string;
+  /** Set by the client after a NATIVE attempt errored → force the hls.js/MSE path. */
+  forceHls?: boolean;
 };
 
 /** Resolve a playable URL for one item at one offset (client-driven). */
@@ -61,6 +63,7 @@ export async function resolveMedia(
       audioLang: opts.audioLang,
       subtitleLang: opts.subtitleLang,
       caps: measured ?? opts.caps,
+      forceHls: opts.forceHls,
     },
   );
   if (!info) throw notFound("No playable media part.");

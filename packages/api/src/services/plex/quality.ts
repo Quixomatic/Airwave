@@ -88,13 +88,23 @@ export type ClientCaps = {
  */
 const MSE_SAFE_AUDIO = new Set(["aac", "opus", "mp3"]);
 
-export function clientProfileExtra(caps: ClientCaps): string {
+/**
+ * Build the profile for a given delivery protocol:
+ * - **http** = a PROGRESSIVE transcode played by the NATIVE `<video>` element → the
+ *   full native audio set is safe (no MSE remux), so Plex can COPY the audio.
+ * - **hls** = played through hls.js/MSE (last resort) → only MSE-safe audio survives
+ *   the SourceBuffer append (E-AC3/DTS/TrueHD throw `bufferAddCodecError`), so the
+ *   transcode target advertises only {aac,opus,mp3} and Plex transcodes the rest → aac.
+ * The direct-play target always carries the full native set (raw-file direct-play uses
+ * the native decoder). See [[project-tv-playback-protocol]].
+ */
+export function clientProfileExtra(caps: ClientCaps, protocol: "hls" | "http" = "http"): string {
   const v = caps.videoCodecs.join(",");
-  const aDirect = caps.audioCodecs.join(","); // native player (raw file): full set
+  const aDirect = caps.audioCodecs.join(","); // native player: full set
   const safe = caps.audioCodecs.filter((c) => MSE_SAFE_AUDIO.has(c));
-  const aHls = (safe.length ? safe : ["aac"]).join(","); // MSE/hls.js: safe only → aac fallback
+  const aTrans = protocol === "hls" ? (safe.length ? safe : ["aac"]).join(",") : aDirect;
   return [
-    `add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mp4&videoCodec=${v}&audioCodec=${aHls})`,
+    `add-transcode-target(type=videoProfile&context=streaming&protocol=${protocol}&container=mp4&videoCodec=${v}&audioCodec=${aTrans})`,
     `add-direct-play-target(type=videoProfile&container=mp4&videoCodec=${v}&audioCodec=${aDirect})`,
   ].join("+");
 }

@@ -456,7 +456,10 @@ export async function getMetadata(
 export type PlaybackTrack = { lang: string; label: string };
 
 export type PlaybackInfo = {
-  mode: "direct" | "hls";
+  /** `direct` = raw file, native `<video>`, client seeks to the offset.
+   *  `http`   = progressive transcode, native `<video>`, offset baked in server-side.
+   *  `hls`    = hls.js/MSE transcode — the true last resort (only when native fails). */
+  mode: "direct" | "http" | "hls";
   url: string;
   /** The Plex transcode session id (hls only) — pass to {@link stopTranscode} on teardown. */
   session: string | null;
@@ -486,6 +489,10 @@ export type PlaybackOptions = {
   /** The real client's decode capabilities (a TV) — drives direct-play/direct-stream
    * vs transcode + the Plex profile. Absent → the built-in browser assumption. */
   caps?: ClientCaps;
+  /** Force the hls.js/MSE path (skip raw-file direct-play AND progressive-http). The
+   * client sets this only after a NATIVE attempt errored at runtime — the last-resort
+   * rung of the native-first ladder. */
+  forceHls?: boolean;
 };
 
 // Formats a browser can play from the original file (so we can direct-play + client-seek).
@@ -587,9 +594,11 @@ export async function getPlaybackInfo(
   const aOk = (c: string) => (caps ? caps.audioCodecs.includes(c) : DIRECT_AUDIO.has(c));
   const cOk = (c: string) => (caps ? caps.directContainers.includes(c) : DIRECT_CONTAINERS.has(c));
 
-  // Quality cap, an audio-track switch, or burned subtitles all force a transcode;
-  // otherwise a file the client can play natively direct-plays (client seeks to the offset).
+  // Quality cap, an audio-track switch, burned subtitles, or a runtime native-failure
+  // retry (forceHls) all force a transcode; otherwise a file the client can play
+  // natively direct-plays the raw part (client seeks to the offset).
   const canDirect =
+    !opts.forceHls &&
     !quality &&
     audioStreamId == null &&
     subStreamId == null &&
@@ -615,11 +624,16 @@ export async function getPlaybackInfo(
   // *unique* session id (per resolve) lets us stop this exact transcode on teardown
   // without ever colliding with a freshly-started one for the same item/offset.
   const session = `channelguide-${ratingKey}-${crypto.randomUUID().slice(0, 8)}`;
+  // Native-first delivery: a TV (caps present) gets a PROGRESSIVE HTTP transcode it plays
+  // with the native <video> element (full audio set, no MSE); the admin browser (no caps)
+  // and the runtime native-failure retry (forceHls) fall back to HLS + hls.js/MSE — the
+  // true last resort. See [[project-tv-playback-protocol]].
+  const protocol: "hls" | "http" = !opts.forceHls && caps ? "http" : "hls";
   const params = new URLSearchParams({
     path: `/library/metadata/${ratingKey}`,
     mediaIndex: "0",
     partIndex: "0",
-    protocol: "hls",
+    protocol,
     fastSeek: "1",
     offset: String(Math.max(0, Math.floor(offsetSeconds))),
     directPlay: "0",
@@ -648,7 +662,7 @@ export async function getPlaybackInfo(
   // the C2 "could not be decoded"). Platform MUST be Generic — real names 400 on /decision
   // with custom transcode targets (plezy). Without caps, the browser profile (quality path).
   if (caps) {
-    params.set("X-Plex-Client-Profile-Extra", clientProfileExtra(caps));
+    params.set("X-Plex-Client-Profile-Extra", clientProfileExtra(caps, protocol));
     params.set("X-Plex-Platform", "Generic");
   } else if (quality) {
     params.set("X-Plex-Client-Profile-Extra", BROWSER_CLIENT_PROFILE);
@@ -720,9 +734,13 @@ export async function getPlaybackInfo(
     console.warn(`[plex] transcode decision failed for ratingKey ${ratingKey}:`, err);
   }
 
-  const url = `${baseUrl}/video/:/transcode/universal/start.m3u8?${qs}`;
+  // HLS = segmented playlist (start.m3u8 → hls.js); HTTP = one progressive stream
+  // (start → native <video src>). Plex bakes `offset` into both, so the client plays
+  // from 0 (no seek) for either transcode mode.
+  const startPath = protocol === "hls" ? "start.m3u8" : "start";
+  const url = `${baseUrl}/video/:/transcode/universal/${startPath}?${qs}`;
   return {
-    mode: "hls",
+    mode: protocol === "hls" ? "hls" : "http",
     url,
     session,
     container,

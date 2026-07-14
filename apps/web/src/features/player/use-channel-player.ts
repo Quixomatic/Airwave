@@ -84,7 +84,10 @@ type Current = {
   endS: number;
   ratingKey: string | null;
   guide: SlotGuide;
-  mode?: "direct" | "hls";
+  // "http" (progressive native transcode) only occurs for the TV client; the admin
+  // preview passes no caps so it always resolves to direct/hls — kept in the union so
+  // the shared PlaybackInfo type assigns cleanly.
+  mode?: "direct" | "http" | "hls";
   session?: string | null;
   /** The stream-params key this was resolved at (quality/audio/subs) — a change re-resolves. */
   paramsKey?: string;

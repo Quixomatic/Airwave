@@ -89,7 +89,7 @@ export type NowNext = {
 export type Track = { lang: string; label: string };
 
 export type MediaInfo = {
-  mode: "direct" | "hls";
+  mode: "direct" | "http" | "hls";
   url: string;
   session: string | null;
   offsetSeconds: number;
@@ -127,11 +127,14 @@ export const api = {
     offsetSeconds: number,
     caps?: { videoCodecs: string[]; audioCodecs: string[]; directContainers: string[] },
     deviceId?: string,
+    forceHls?: boolean,
   ) => {
     const p = new URLSearchParams({ ratingKey, offsetSeconds: String(offsetSeconds) });
     // deviceId lets the server use this panel's MEASURED capability map (from the
     // onboarding diagnostic) instead of the canPlayType guess below.
     if (deviceId) p.set("deviceId", deviceId);
+    // Set only after a native attempt failed — forces the hls.js/MSE last resort.
+    if (forceHls) p.set("forceHls", "1");
     if (caps) {
       p.set("vcodecs", caps.videoCodecs.join(","));
       p.set("acodecs", caps.audioCodecs.join(","));

@@ -28,6 +28,9 @@ export function Watch({
   const mediaRef = useRef<MediaInfo | null>(null);
   const loggedRef = useRef(false);
   const logTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Native-first safety catch: if a native attempt (direct/http) errors at runtime we
+  // re-resolve once forcing hls.js/MSE. One retry per tune (guards an infinite loop).
+  const retriedRef = useRef(false);
 
   const [now, setNow] = useState<NowNext | null>(null);
   const [media, setMedia] = useState<MediaInfo | null>(null);
@@ -114,8 +117,13 @@ export function Watch({
       } else {
         setError("This player can't play HLS.");
       }
+    } else if (m.mode === "http") {
+      // Progressive transcode — Plex baked the offset in server-side, so the native
+      // <video> plays from 0 (no client seek).
+      video.src = m.url;
+      void video.play().catch(() => {});
     } else {
-      // Direct-play the original file; seek to the live offset once ready.
+      // direct: the raw part file — seek to the live offset once metadata is ready.
       video.src = m.url;
       const onMeta = () => {
         video.currentTime = offsetSeconds;
@@ -126,8 +134,9 @@ export function Watch({
     }
   }, []);
 
-  const resolve = useCallback(async () => {
+  const resolve = useCallback(async (forceHls = false) => {
     setError(null);
+    if (!forceHls) retriedRef.current = false; // fresh tune → restore the retry budget
     try {
       const nn = await api.now(channelId);
       setNow(nn);
@@ -144,7 +153,14 @@ export function Watch({
         window.setTimeout(() => void resolve(), remainingMs);
         return;
       }
-      const m = await api.media(channelId, cur.ratingKey, cur.offsetSeconds, clientCaps(), deviceId());
+      const m = await api.media(
+        channelId,
+        cur.ratingKey,
+        cur.offsetSeconds,
+        clientCaps(),
+        deviceId(),
+        forceHls,
+      );
       teardown();
       sessionRef.current = m.session;
       setMedia(m);
@@ -229,6 +245,13 @@ export function Watch({
         onEnded={() => void resolve()}
         onError={() => {
           const e = videoRef.current?.error;
+          // Native (direct/http) failed at runtime → fall back to hls.js/MSE, once.
+          if (mediaRef.current && mediaRef.current.mode !== "hls" && !retriedRef.current) {
+            retriedRef.current = true;
+            setNote("native failed → hls fallback");
+            void resolve(true);
+            return;
+          }
           if (e) setError(`Video error ${e.code}: ${e.message || "decode/playback failed"}`);
         }}
       />
@@ -269,7 +292,7 @@ export function Watch({
             <div className="mt-1 text-zinc-400">
               source: {media.container ?? "?"} {media.videoCodec ?? "?"}/{media.audioCodec ?? "?"} ·
               mode{" "}
-              <span className={media.mode === "direct" ? "text-green-400" : "text-amber-400"}>
+              <span className={media.mode !== "hls" ? "text-green-400" : "text-amber-400"}>
                 {media.mode}
               </span>{" "}
               · caps{" "}

@@ -118,6 +118,7 @@ api.get("/channels/:id/media", async (c) => {
         subtitleLang: c.req.query("subtitleLang"),
         caps,
         deviceId: c.req.query("deviceId"),
+        forceHls: c.req.query("forceHls") === "1",
       }),
     );
   } catch (err) {
