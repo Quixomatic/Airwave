@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.55] - 2026-07-15
+
+### Changed
+
+- **Cleaner focus states in the guide.** Highlighting a channel row now tints only the **rail** (the redundant row-wide highlight background is gone). And focusing a program that isn't the currently-airing one now shows just the **outline** — it no longer changes the block's background, so only the live program ever carries a filled color.
+
 ## [0.3.54] - 2026-07-15
 
 ### Added

@@ -421,7 +421,7 @@ function Row({
         height: rowPx,
         display: "flex",
         borderTop: `1px solid ${C.rowBorder}`,
-        background: focused ? hexA(accent, 0.06) : "transparent",
+        background: "transparent",
       }}
     >
       <div
@@ -518,15 +518,13 @@ function Row({
                   overflow: "hidden",
                   borderRadius: 8,
                   border: selected ? `2px solid ${C.ring}` : `1px solid ${C.cellBorder}`,
-                  // Only the currently-airing program carries the channel tint — and it's a
-                  // two-tone progress fill: a stronger tint up to the live point, a weaker
-                  // tint for the not-yet-aired remainder. Everything else gets a neutral fill.
-                  // (Live wins over the selection highlight; focus still shows via the ring.)
+                  // Only the currently-airing program carries the channel tint — a two-tone
+                  // progress fill: stronger tint up to the live point, weaker tint for the
+                  // not-yet-aired remainder. Every other program gets a neutral fill and shows
+                  // focus via the outline only (background is unaffected by selection).
                   background: live
                     ? `linear-gradient(90deg, ${hexA(accent, 0.32)} ${fillPct}%, ${hexA(accent, 0.1)} ${fillPct}%)`
-                    : selected
-                      ? C.highlight
-                      : "rgba(148,163,184,0.05)",
+                    : "rgba(148,163,184,0.05)",
                   boxShadow: selected ? "0 0 0 2px rgba(59,130,246,0.4), 0 12px 30px rgba(0,0,0,0.5)" : "none",
                   zIndex: selected ? 4 : 1,
                   transition: "background .12s",
