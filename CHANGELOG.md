@@ -2,6 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.41] - 2026-07-15
+
+### Added
+
+- **Redesigned bumper interstitial.** The between-programs card is no longer a plain black "Up next" — it's a full-screen **blurred cover art** of the upcoming program with a heavy dark overlay (always dark), a "**Coming up next**" label, the show/movie title + episode + **SxxEyy**, and a big **countdown** whose seconds **pop-grow** (Framer Motion spring). The countdown runs on a **local clock** (captured end-time), reconciling against the server-derived remaining only on real drift — so ticks stay smooth regardless of polling. `features/watch/bumper-card.tsx`.
+- **Public artwork proxy** (`GET /img/:channelId?path=…&w=…`) — streams Plex cover art through the channel's media source with the admin token injected (a CSS/`<img>` background can't send a bearer token). Only proxies Plex image paths; optional `w`/`h` resize via Plex's photo transcoder. Also usable for guide thumbnails later.
+
+### Changed
+
+- **Scrubber eases instead of snapping** — CSS transitions on the segment left/width, thumb, live marker, and time label, so expanding/contracting when you scrub across a boundary glides.
+
 ## [0.3.40] - 2026-07-15
 
 ### Changed

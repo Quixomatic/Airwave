@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Tv } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { BumperCard } from "./bumper-card";
 import { FeaturePanel } from "./feature-panel";
 import { useTvPlayer } from "./use-tv-player";
 import { api, type GuideChannel } from "../../lib/api";
@@ -63,12 +64,9 @@ export function Watch({
     <div className="relative h-full w-full bg-black">
       <video ref={videoRef} className="h-full w-full" playsInline />
 
-      {/* Bumper interstitial — transient, designed card. status.guide is the upcoming program. */}
+      {/* Bumper interstitial — status.guide is the upcoming program. */}
       {isBumper && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black">
-          <p className="text-2xl text-zinc-400">We'll be right back…</p>
-          {status.guide?.title && <p className="text-4xl font-semibold">Up next: {status.guide.title}</p>}
-        </div>
+        <BumperCard channelId={channelId} guide={status.guide} remaining={status.bumperRemaining} accent={accent} />
       )}
 
       {status.error && !panelOpen && (

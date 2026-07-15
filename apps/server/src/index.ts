@@ -1,7 +1,9 @@
 import { createContext } from "@ChannelGuide/api/context";
 import { appRouter } from "@ChannelGuide/api/routers/index";
 import { startJobs } from "@ChannelGuide/api/services/jobs/scheduler";
+import { resolveChannelSource } from "@ChannelGuide/api/services/playback/broker";
 import { buildAuthUrl, createPin } from "@ChannelGuide/api/services/plex/client";
+import prisma from "@ChannelGuide/db";
 import { auth } from "@ChannelGuide/auth";
 import { PLEX_CLIENT_ID } from "@ChannelGuide/auth/lib/plex-login";
 import { seedAdmin } from "@ChannelGuide/auth/lib/seed-admin";
@@ -109,6 +111,34 @@ app.use(
     rewriteRequestPath: (p) => p.replace(/^\/caps\/media/, ""),
   }),
 );
+
+// Plex artwork proxy — PUBLIC (a CSS/<img> background can't send a bearer token), so
+// the TV can use program cover art (blurred bumper backgrounds, guide thumbnails). Only
+// proxies Plex image paths (/library, /photo) through the channel's own media source,
+// injecting the admin token. `w`/`h` optionally resize via Plex's photo transcoder.
+app.get("/img/:channelId", async (c) => {
+  const path = c.req.query("path");
+  const channelId = c.req.param("channelId");
+  if (!path || !/^\/(library|photo)\//.test(path)) return c.text("bad path", 400);
+  try {
+    const { source } = await resolveChannelSource(prisma, channelId);
+    const token = encodeURIComponent(source.token);
+    const w = c.req.query("w");
+    const h = c.req.query("h");
+    const upstream =
+      w || h
+        ? `${source.baseUrl}/photo/:/transcode?url=${encodeURIComponent(path)}&width=${w ?? h}&height=${h ?? w}&minSize=1&X-Plex-Token=${token}`
+        : `${source.baseUrl}${path}${path.includes("?") ? "&" : "?"}X-Plex-Token=${token}`;
+    const res = await fetch(upstream);
+    if (!res.ok) return c.text("not found", 404);
+    const headers = new Headers();
+    headers.set("Content-Type", res.headers.get("Content-Type") ?? "image/jpeg");
+    headers.set("Cache-Control", "public, max-age=3600");
+    return new Response(res.body, { status: 200, headers });
+  } catch {
+    return c.text("error", 500);
+  }
+});
 
 app.route("/api/v1", restApi);
 

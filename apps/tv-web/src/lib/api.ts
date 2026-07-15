@@ -32,6 +32,15 @@ export class ApiError extends Error {
   }
 }
 
+/** URL for a Plex artwork path via the server's public image proxy (blurred bumper
+ * backgrounds, guide thumbnails). Returns null when there's no path. */
+export function imageUrl(channelId: string, path?: string | null, w?: number): string | null {
+  if (!path) return null;
+  const p = new URLSearchParams({ path });
+  if (w) p.set("w", String(w));
+  return `${SERVER_URL}/img/${channelId}?${p.toString()}`;
+}
+
 // --- Custom Plex device-link login (server flow proven in v0.3.16) -----------
 
 export type PlexStart = { pinId: number; code: string; verificationUrl: string; expiresIn: number };

@@ -313,15 +313,16 @@ export function FeaturePanel({
                     borderRadius: 999,
                     overflow: "hidden",
                     background: seg.kind === "BUMPER" ? "rgba(148,163,184,0.30)" : "rgba(255,255,255,0.18)",
+                    transition: "left 0.35s ease, width 0.35s ease",
                   }}
                 >
                   {seg.fillPct > 0 && (
-                    <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${seg.fillPct}%`, background: accent }} />
+                    <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${seg.fillPct}%`, background: accent, transition: "width 0.35s ease" }} />
                   )}
                 </div>
               ))}
               {liveInWindow && (
-                <div style={{ position: "absolute", top: -4, left: `${livePct}%`, width: 2, height: 16, background: "#ef4444", transform: "translateX(-1px)" }} />
+                <div style={{ position: "absolute", top: -4, left: `${livePct}%`, width: 2, height: 16, background: "#ef4444", transform: "translateX(-1px)", transition: "left 0.35s ease" }} />
               )}
               <div
                 style={{
@@ -334,12 +335,12 @@ export function FeaturePanel({
                   background: "#fff",
                   boxShadow: scrubFocused ? `0 0 0 5px ${accent}66` : "0 0 6px rgba(0,0,0,0.5)",
                   transform: "translate(-50%, -50%)",
-                  transition: "width .12s, height .12s",
+                  transition: "width .12s, height .12s, left 0.35s ease",
                 }}
               />
             </div>
             <div style={{ position: "relative", height: 26, marginTop: 10 }}>
-              <span style={{ position: "absolute", left: `${posPct}%`, transform: "translateX(-50%)", fontSize: 17, fontWeight: 600, color: scrubFocused ? "#f1f5f9" : "#c3c9d4" }}>
+              <span style={{ position: "absolute", left: `${posPct}%`, transform: "translateX(-50%)", fontSize: 17, fontWeight: 600, color: scrubFocused ? "#f1f5f9" : "#c3c9d4", transition: "left 0.35s ease" }}>
                 {fmt(sc?.slotPositionS ?? 0)}
               </span>
               <span
