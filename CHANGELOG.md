@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.40] - 2026-07-15
+
+### Changed
+
+- **Scrubber reworked to an anchored, expanded-focus layout.** The program you're in is now the **expanded middle** of the bar (fixed `[start…end]` mapping, so scrubbing moves the thumb through the wide middle — real motion, not a panning background), flanked by a **fixed left peek** (previous-program tail + bumper — always visible, even at live) and a **fixed right peek** (upcoming bumper + next-program head — so at live near a program's end the thumb never collides with the LIVE indicator). Rewind into a previous program and *it* becomes the expanded focus. Segment percentages are computed in the hook; the panel just renders them.
+
 ## [0.3.39] - 2026-07-15
 
 The effectiveTime DVR machine — rewind across programs, like real TV.

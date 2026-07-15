@@ -19,18 +19,22 @@ import { clientCaps, deviceId } from "../../lib/device";
 
 type SlotEntry = { slot: TimelineSlot; startS: number; endS: number };
 
-export type Segment = { kind: "PROGRAM" | "BUMPER"; startS: number; endS: number; title: string; current: boolean };
+/** A slot rendered on the scrubber, already mapped to bar percentages. */
+export type ScrubberSegment = {
+  kind: "PROGRAM" | "BUMPER";
+  leftPct: number;
+  widthPct: number;
+  current: boolean; // the focus (expanded) program
+  fillPct: number; // accent fill (0–100 within this segment) up to the thumb
+};
 export type ScrubberView = {
-  mode: "program" | "window";
-  windowStart: number;
-  windowEnd: number;
-  positionS: number; // effectiveTime
-  liveS: number; // now
-  behindS: number; // now − effectiveTime
+  segments: ScrubberSegment[];
+  thumbPct: number;
+  livePct: number;
+  liveVisible: boolean;
+  slotPositionS: number; // position within the slot you're in
   atLive: boolean;
-  slotPositionS: number; // position within the current slot
-  slotDurationS: number; // current slot length
-  segments: Segment[];
+  behindS: number; // now − effectiveTime
 };
 
 export type PlayerStatus = {
@@ -65,8 +69,14 @@ export type PlayerTrack = { lang: string; label: string };
 
 const LIVE_THRESHOLD = 5;
 const HEARTBEAT_MS = 10_000;
-const WINDOW_SPAN_S = 13 * 60; // sliding-window width when rewound before the current program
-const WINDOW_LEAD_S = 90; // show a little ahead of the thumb
+// Scrubber layout: the program you're in is the EXPANDED middle; a fixed sliver of the
+// timeline before it (prev-program tail + bumper) sits on the left, and a sliver of what's
+// coming (bumper + next-program head) on the right — so at live the thumb never collides
+// with the LIVE edge, and scrubbing moves the thumb through the wide middle (real motion).
+const PEEK_L = 0.14; // left peek fraction of the bar
+const PEEK_R = 0.14; // right peek fraction of the bar
+const LOOKBACK_S = 6 * 60; // seconds of timeline compressed into the left peek
+const LOOKAHEAD_S = 6 * 60; // seconds compressed into the right peek
 const RESUME_KEY = "cg-tv-resume";
 const RESUME_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
@@ -303,53 +313,61 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
     return bumperEffRef.current;
   }, [now]);
 
-  // Build the scrubber view: full current program at live, sliding window once rewound.
+  // Build the scrubber view — the PROGRAM you're in is the expanded middle, flanked by a
+  // fixed left peek (prev tail + bumper) and right peek (upcoming bumper + next head).
   const buildScrubber = useCallback(
     (effective: number, nowS: number): ScrubberView => {
       const slots = slotsRef.current;
-      const curEntry = slots.find((s) => effective >= s.startS && effective < s.endS) ?? null;
-      const liveEntry = slots.find((s) => nowS >= s.startS && nowS < s.endS) ?? null;
       const behindS = Math.max(0, nowS - effective);
       const atLive = behindS < LIVE_THRESHOLD;
-      const slotStart = curEntry?.startS ?? effective;
-      const slotEnd = curEntry?.endS ?? nowS;
-
-      const inLiveProgram = !!curEntry && curEntry === liveEntry && curEntry.slot.kind === "PROGRAM";
-      if (inLiveProgram && curEntry) {
-        return {
-          mode: "program",
-          windowStart: curEntry.startS,
-          windowEnd: curEntry.endS,
-          positionS: effective,
-          liveS: nowS,
-          behindS,
-          atLive,
-          slotPositionS: effective - curEntry.startS,
-          slotDurationS: curEntry.endS - curEntry.startS,
-          segments: [{ kind: "PROGRAM", startS: curEntry.startS, endS: curEntry.endS, title: titleOf(curEntry.slot.guide), current: true }],
-        };
+      const curIdx = slots.findIndex((s) => effective >= s.startS && effective < s.endS);
+      const cur = curIdx >= 0 ? slots[curIdx]! : null;
+      if (!cur) {
+        return { segments: [], thumbPct: 0, livePct: 100, liveVisible: false, slotPositionS: 0, atLive, behindS };
       }
 
-      // Sliding multi-segment window, panning with the thumb, trimming the right.
-      const earliest = slots[0]?.startS ?? effective;
-      let windowEnd = Math.min(nowS, effective + WINDOW_LEAD_S);
-      let windowStart = Math.max(earliest, windowEnd - WINDOW_SPAN_S);
-      windowEnd = Math.min(nowS, windowStart + WINDOW_SPAN_S);
-      const segments: Segment[] = slots
-        .filter((s) => s.endS > windowStart && s.startS < windowEnd)
-        .map((s) => ({ kind: s.slot.kind, startS: s.startS, endS: s.endS, title: titleOf(s.slot.guide), current: s === curEntry }));
-      return {
-        mode: "window",
-        windowStart,
-        windowEnd,
-        positionS: effective,
-        liveS: nowS,
-        behindS,
-        atLive,
-        slotPositionS: effective - slotStart,
-        slotDurationS: slotEnd - slotStart,
-        segments,
+      // Focus = the program you're in; if you're in a bumper, the nearest program (prev, else next).
+      let focus = cur;
+      if (cur.slot.kind === "BUMPER") {
+        let j = curIdx - 1;
+        while (j >= 0 && slots[j]!.slot.kind !== "PROGRAM") j--;
+        if (j >= 0) focus = slots[j]!;
+        else {
+          let k = curIdx + 1;
+          while (k < slots.length && slots[k]!.slot.kind !== "PROGRAM") k++;
+          if (k < slots.length) focus = slots[k]!;
+        }
+      }
+      const fStart = focus.startS;
+      const fEnd = focus.endS;
+      const fDur = Math.max(1, fEnd - fStart);
+      const peekStart = fStart - LOOKBACK_S;
+      const peekEnd = fEnd + LOOKAHEAD_S;
+
+      const mapT = (t: number): number => {
+        let f: number;
+        if (t < fStart) f = PEEK_L * (1 - Math.min(1, (fStart - t) / LOOKBACK_S));
+        else if (t > fEnd) f = 1 - PEEK_R + Math.min(1, (t - fEnd) / LOOKAHEAD_S) * PEEK_R;
+        else f = PEEK_L + ((t - fStart) / fDur) * (1 - PEEK_L - PEEK_R);
+        return Math.min(100, Math.max(0, f * 100));
       };
+
+      const thumbPct = mapT(effective);
+      const liveVisible = nowS >= peekStart && nowS <= peekEnd;
+      const livePct = liveVisible ? mapT(nowS) : 100;
+
+      const segments: ScrubberSegment[] = [];
+      for (const s of slots) {
+        if (s.endS <= peekStart || s.startS >= peekEnd) continue;
+        const l = mapT(Math.max(s.startS, peekStart));
+        const r = mapT(Math.min(s.endS, peekEnd));
+        const widthPct = Math.max(0, r - l);
+        if (widthPct <= 0.05) continue;
+        const isFocus = s === focus;
+        const fillPct = isFocus && thumbPct > l ? Math.min(100, ((thumbPct - l) / Math.max(0.0001, widthPct)) * 100) : 0;
+        segments.push({ kind: s.slot.kind, leftPct: l, widthPct, current: isFocus, fillPct });
+      }
+      return { segments, thumbPct, livePct, liveVisible, slotPositionS: effective - cur.startS, atLive, behindS };
     },
     [],
   );

@@ -237,13 +237,12 @@ export function FeaturePanel({
   ];
   const qualityItems = qualities.map((q) => ({ value: q.id, label: q.label }));
 
-  // Scrubber geometry — a sliding window with one rounded segment per slot.
+  // Scrubber geometry — percentages are pre-computed by the hook (expanded focus program
+  // + fixed left/right peeks). See use-tv-player buildScrubber.
   const sc = scrubber;
-  const span = sc ? Math.max(1, sc.windowEnd - sc.windowStart) : 1;
-  const at = (s: number) => (sc ? clampPct(((s - sc.windowStart) / span) * 100) : 0);
-  const posPct = sc ? at(sc.positionS) : 0;
-  const livePct = sc ? at(sc.liveS) : 100;
-  const liveInWindow = sc ? sc.liveS <= sc.windowEnd + 0.5 && sc.liveS >= sc.windowStart : true;
+  const posPct = sc?.thumbPct ?? 0;
+  const livePct = sc?.livePct ?? 100;
+  const liveInWindow = sc?.liveVisible ?? true;
   const atLive = sc?.atLive ?? true;
   const behind = sc?.behindS ?? 0;
   const scrubFocused = focus.row === 0;
@@ -302,31 +301,25 @@ export function FeaturePanel({
           >
             <div style={{ position: "relative", height: 8 }}>
               {/* one rounded segment per slot (tiny gaps); the current slot fills to the thumb in the accent */}
-              {sc?.segments.map((seg, i) => {
-                const l = at(seg.startS);
-                const w = Math.max(0, at(seg.endS) - l);
-                const isBumper = seg.kind === "BUMPER";
-                const fillW = seg.current ? clampPct(((posPct - l) / Math.max(0.0001, w)) * 100) : 0;
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      height: 8,
-                      left: `calc(${l}% + 2px)`,
-                      width: `calc(${w}% - 4px)`,
-                      borderRadius: 999,
-                      overflow: "hidden",
-                      background: isBumper ? "rgba(148,163,184,0.30)" : "rgba(255,255,255,0.18)",
-                    }}
-                  >
-                    {fillW > 0 && (
-                      <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${fillW}%`, background: accent }} />
-                    )}
-                  </div>
-                );
-              })}
+              {sc?.segments.map((seg, i) => (
+                <div
+                  key={i}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    height: 8,
+                    left: `calc(${seg.leftPct}% + 2px)`,
+                    width: `calc(${seg.widthPct}% - 4px)`,
+                    borderRadius: 999,
+                    overflow: "hidden",
+                    background: seg.kind === "BUMPER" ? "rgba(148,163,184,0.30)" : "rgba(255,255,255,0.18)",
+                  }}
+                >
+                  {seg.fillPct > 0 && (
+                    <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${seg.fillPct}%`, background: accent }} />
+                  )}
+                </div>
+              ))}
               {liveInWindow && (
                 <div style={{ position: "absolute", top: -4, left: `${livePct}%`, width: 2, height: 16, background: "#ef4444", transform: "translateX(-1px)" }} />
               )}
