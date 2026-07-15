@@ -121,7 +121,14 @@ export function AuroraGrid({
   const pickAtCursor = (chIdx: number) => {
     const progs = channels[chIdx]?.programs ?? [];
     if (!progs.length) return 0;
-    const cur = cursorRef.current;
+    // Clamp the time cursor to the visible window before matching. If we were focused
+    // on a program that started before the grid's left edge (a long already-airing item,
+    // clamped to the rail), its midpoint sits off-screen-left — matching that raw time on
+    // the next channel would land the focus on an equally off-screen program. Clamping to
+    // [T0, T0+window] instead selects that channel's clamped/left-most in-view program.
+    const winStart = T0.getTime();
+    const winEnd = T0.getTime() + WINDOW_MIN * MIN;
+    const cur = Math.min(Math.max(cursorRef.current, winStart), winEnd);
     const containing = progs.findIndex(
       (p) => new Date(p.startsAt).getTime() <= cur && new Date(p.startsAt).getTime() + p.durationSeconds * 1000 > cur,
     );

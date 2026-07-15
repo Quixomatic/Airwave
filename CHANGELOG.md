@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.46] - 2026-07-15
+
+### Fixed
+
+- **Guide up/down navigation no longer lands on off-screen programs.** When focused on a long, already-airing program clamped to the rail, the vertical-nav time cursor sat at that program's midpoint — often left of the grid's visible start — so moving to the next channel matched an equally off-screen program and put the focus ring on something you couldn't see. The cursor is now clamped to the visible window before matching, so up/down selects the next channel's clamped/left-most in-view program instead.
+
 ## [0.3.45] - 2026-07-15
 
 ### Changed
