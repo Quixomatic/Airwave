@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.54] - 2026-07-15
+
+### Added
+
+- **The live program card fills like a progress bar.** The currently-airing program now shows a two-tone channel-tint background: a stronger, more vibrant tint from the left up to the live point (how far into the show we are), and a weaker tint of the same color for the not-yet-aired remainder. The fill is computed against the card's *rendered* width, so it stays correct even when the card is clamped to the rail (a program that started before the visible window). The live tint takes precedence over the selection highlight; D-pad focus still reads via the ring.
+
 ## [0.3.53] - 2026-07-15
 
 ### Changed

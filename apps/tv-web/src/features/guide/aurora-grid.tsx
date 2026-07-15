@@ -501,6 +501,9 @@ function Row({
             const rawRight = rawLeft + Math.max(laneW * 0.02, (p.durationSeconds / 60) * ppm) - 6;
             const left = rawLeft < 0 ? 6 : rawLeft;
             const width = rawRight - left;
+            // For the live program, how far the live point is across the *rendered* card
+            // (accounts for cards clamped to the rail) — drives the two-tone progress fill.
+            const fillPct = Math.max(0, Math.min(100, ((laneX(now) - left) / width) * 100));
             return (
               <div
                 key={p.id}
@@ -515,9 +518,15 @@ function Row({
                   overflow: "hidden",
                   borderRadius: 8,
                   border: selected ? `2px solid ${C.ring}` : `1px solid ${C.cellBorder}`,
-                  // Only the currently-airing program carries the channel tint; the rest
-                  // get a standard neutral fill. (Focus/selection keeps its own highlight.)
-                  background: selected ? C.highlight : live ? hexA(accent, 0.13) : "rgba(148,163,184,0.05)",
+                  // Only the currently-airing program carries the channel tint — and it's a
+                  // two-tone progress fill: a stronger tint up to the live point, a weaker
+                  // tint for the not-yet-aired remainder. Everything else gets a neutral fill.
+                  // (Live wins over the selection highlight; focus still shows via the ring.)
+                  background: live
+                    ? `linear-gradient(90deg, ${hexA(accent, 0.32)} ${fillPct}%, ${hexA(accent, 0.1)} ${fillPct}%)`
+                    : selected
+                      ? C.highlight
+                      : "rgba(148,163,184,0.05)",
                   boxShadow: selected ? "0 0 0 2px rgba(59,130,246,0.4), 0 12px 30px rgba(0,0,0,0.5)" : "none",
                   zIndex: selected ? 4 : 1,
                   transition: "background .12s",
