@@ -463,10 +463,11 @@ function Row({
             const live = now.getTime() >= startMs && now.getTime() < startMs + p.durationSeconds * 1000;
             // A program that started before the grid's left edge (T0) would render
             // way off-screen to the left, hiding its title. Clamp its left to the rail
-            // and shrink the width by the clipped amount so it always butts flush.
+            // and shrink the width by the clipped amount — leaving the same tiny 6px
+            // gap the blocks have between each other, so it isn't butted flush.
             const rawLeft = laneX(p.startsAt);
             const rawRight = rawLeft + Math.max(laneW * 0.02, (p.durationSeconds / 60) * ppm) - 6;
-            const left = Math.max(0, rawLeft);
+            const left = rawLeft < 0 ? 6 : rawLeft;
             const width = rawRight - left;
             return (
               <div

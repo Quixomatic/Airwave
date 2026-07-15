@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.45] - 2026-07-15
+
+### Changed
+
+- **Rail-clamped guide programs keep a tiny gap from the rail.** Following 0.3.44, an in-progress program pinned to the rail sat flush against it; it now leaves the same small 6px gap the program blocks have between each other, so it's inset consistently rather than butted right up against the channel rail.
+
 ## [0.3.44] - 2026-07-15
 
 ### Changed
