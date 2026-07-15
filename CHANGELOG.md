@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.34] - 2026-07-14
+
+Burn-in-safe player with a Framer Motion feature panel.
+
+### Changed
+
+- **Nothing is drawn on the live video anymore** (OLED burn-in) — the always-on top bar, debug overlay, and hints are gone. Pressing **OK** now reveals transient chrome via **Framer Motion**: a **feature panel slides up** from the bottom (fade + slide) with the program details, **DVR controls** (Restart · −15s · Play/Pause · +15s · Jump to Live), and the audio / subtitle / quality selectors as **base-lyra (shadcn) dropdowns** that open upward; and a **slim top header slides in** (channel + back hint). Both **auto-hide after ~8s** of inactivity and on Back, so nothing sits burned on screen. D-pad ◄► moves across controls, OK activates, Back closes the open menu then the panel.
+
+### Notes
+
+- DVR controls are native seeks for now (pause / ±15s / restart / jump-to-live) — great for direct-play; the full effectiveTime/delaySeconds machine (cross-program rewind, rollover-into-bumper, resume, and position-preserving option changes) is the next arc. Added `framer-motion`.
+
 ## [0.3.33] - 2026-07-14
 
 Parity player controls + watch sessions on the TV.
