@@ -461,14 +461,20 @@ function Row({
             // left bar (a broadcast "on air" cue); everything else stays plain.
             const startMs = new Date(p.startsAt).getTime();
             const live = now.getTime() >= startMs && now.getTime() < startMs + p.durationSeconds * 1000;
-            const width = Math.max(laneW * 0.02, (p.durationSeconds / 60) * ppm) - 6;
+            // A program that started before the grid's left edge (T0) would render
+            // way off-screen to the left, hiding its title. Clamp its left to the rail
+            // and shrink the width by the clipped amount so it always butts flush.
+            const rawLeft = laneX(p.startsAt);
+            const rawRight = rawLeft + Math.max(laneW * 0.02, (p.durationSeconds / 60) * ppm) - 6;
+            const left = Math.max(0, rawLeft);
+            const width = rawRight - left;
             return (
               <div
                 key={p.id}
                 style={{
                   position: "absolute",
                   top: vw(6),
-                  left: laneX(p.startsAt),
+                  left,
                   width,
                   height: `calc(100% - ${vw(12)})`,
                   padding: `${vw(20)} ${vw(20)} 0`,

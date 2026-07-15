@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.44] - 2026-07-15
+
+### Changed
+
+- **Guide grid: in-progress programs now pin to the rail instead of overflowing off-screen.** A program that started before the grid's left edge (the recently-aired lead, or a long movie already underway) was positioned with a negative offset, so its rectangle — and the left-aligned title inside it — ran off the left of the lane, leaving a blank block against the rail. Such blocks are now **clamped to the rail** (left pinned to the lane start, width shrunk by the clipped amount), so the program and its title always butt flush against the channel rail. Blocks fully inside the window are unchanged.
+
 ## [0.3.43] - 2026-07-15
 
 ### Changed
