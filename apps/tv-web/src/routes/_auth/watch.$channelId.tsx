@@ -1,9 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 
-import { Watch } from "../../features/watch/watch";
-import { useChannels } from "../../hooks/use-channels";
+import { usePlayer } from "../../features/watch/player-context";
 
-/** /watch/$channelId — the player. Channel name comes from the (cached) lineup. */
+/**
+ * /watch/$channelId — deep-link entry only. The player is now a persistent overlay
+ * (see player-context.tsx), so this route just tunes the channel and bounces to the
+ * guide; the full-screen player takes over from there.
+ */
 export const Route = createFileRoute("/_auth/watch/$channelId")({
   component: WatchRoute,
 });
@@ -11,7 +15,10 @@ export const Route = createFileRoute("/_auth/watch/$channelId")({
 function WatchRoute() {
   const { channelId } = Route.useParams();
   const navigate = useNavigate();
-  const { data: channels } = useChannels();
-  const ch = channels?.find((c) => c.id === channelId);
-  return <Watch channelId={channelId} channel={ch} onExit={() => void navigate({ to: "/" })} />;
+  const player = usePlayer();
+  useEffect(() => {
+    player.tune(channelId);
+    void navigate({ to: "/" });
+  }, [channelId, player, navigate]);
+  return null;
 }

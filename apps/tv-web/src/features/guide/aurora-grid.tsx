@@ -3,6 +3,16 @@ import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Menu, Settings, Star
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { GuideGridChannel, GuideGridProgram } from "../../lib/api";
+import { usePlayer } from "../watch/player-context";
+
+/** Index of the program airing at `nowMs` (else 0) — the "on now" slot. */
+function liveProgramIndex(programs: GuideGridProgram[], nowMs: number): number {
+  const i = programs.findIndex((p) => {
+    const s = new Date(p.startsAt).getTime();
+    return nowMs >= s && nowMs < s + p.durationSeconds * 1000;
+  });
+  return i >= 0 ? i : 0;
+}
 
 // Resolve a channel's stored icon id (`lucide:Radio`) to its component. Presets use
 // lucide only; `import *` lands in the (code-split) guide chunk, not the initial load.
@@ -109,6 +119,7 @@ export function AuroraGrid({
 
   const [fc, setFc] = useState(0);
   const [fp, setFp] = useState(0);
+  const player = usePlayer();
   const cursorRef = useRef<number>(now.getTime());
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -128,13 +139,23 @@ export function AuroraGrid({
     const progs = channels[fc]?.programs;
     if (!progs?.length) return;
     didInitFocus.current = true;
-    const t = now.getTime();
-    const i = progs.findIndex((p) => {
-      const s = new Date(p.startsAt).getTime();
-      return t >= s && t < s + p.durationSeconds * 1000;
-    });
+    const i = liveProgramIndex(progs, now.getTime());
     if (i > 0) setFp(i);
   }, [channels, fc, now]);
+
+  // When the player drops to a mini feed (returning from full), land focus on the
+  // channel that's playing (its live program), so the guide matches the mini feed.
+  const prevLayoutRef = useRef(player.layout);
+  useEffect(() => {
+    if (player.layout === "mini" && prevLayoutRef.current !== "mini" && player.playingChannelId) {
+      const idx = channels.findIndex((c) => c.id === player.playingChannelId);
+      if (idx >= 0) {
+        setFc(idx);
+        setFp(liveProgramIndex(channels[idx]!.programs, now.getTime()));
+      }
+    }
+    prevLayoutRef.current = player.layout;
+  }, [player.layout, player.playingChannelId, channels, now]);
 
   const pickAtCursor = (chIdx: number) => {
     const progs = channels[chIdx]?.programs ?? [];
@@ -166,13 +187,29 @@ export function AuroraGrid({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Back at the guide root (webOS remote → keyCode 461, keyboard → Backspace):
-      // exit the app via the webOS platform back (no-op off-device).
-      if (e.keyCode === 461 || ["Backspace", "GoBack", "BrowserBack", "XF86Back"].includes(e.key)) {
+      // The full-screen player owns the keys while it's up.
+      if (player.layout === "full") return;
+      const isBack = e.keyCode === 461 || ["Backspace", "GoBack", "BrowserBack", "XF86Back"].includes(e.key);
+
+      // Mini feed focused → its two buttons own the keys.
+      if (player.miniFocused) {
         e.preventDefault();
-        (window as unknown as { webOS?: { platformBack?: () => void } }).webOS?.platformBack?.();
+        if (isBack) player.stop();
+        else if (e.key === "ArrowLeft") player.miniMove(-1);
+        else if (e.key === "ArrowRight") player.miniMove(1);
+        else if (e.key === "Enter") player.miniActivate();
+        else if (e.key === "ArrowDown") player.blurMini();
         return;
       }
+
+      // Back: a playing mini feed → stop the feed + session; otherwise exit the app.
+      if (isBack) {
+        e.preventDefault();
+        if (player.layout === "mini") player.stop();
+        else (window as unknown as { webOS?: { platformBack?: () => void } }).webOS?.platformBack?.();
+        return;
+      }
+
       const n = channels.length;
       if (!n) return;
       switch (e.key) {
@@ -193,6 +230,11 @@ export function AuroraGrid({
         }
         case "ArrowUp": {
           e.preventDefault();
+          // At the top row, Up docks focus into the mini feed (if one's playing).
+          if (fc === 0 && player.layout === "mini") {
+            player.focusMini();
+            break;
+          }
           const nc = Math.max(0, fc - 1);
           setFc(nc);
           setFp(pickAtCursor(nc));
@@ -208,7 +250,7 @@ export function AuroraGrid({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [channels, fc, focusedChannel, onTune]);
+  }, [channels, fc, focusedChannel, onTune, player]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -233,7 +275,7 @@ export function AuroraGrid({
     >
       <NavPill onSettings={onSettings} />
       {focusedChannel && focusedProgram ? (
-        <FeaturedPanel channel={focusedChannel} program={focusedProgram} now={now} accent={accentOf(fc)} />
+        <FeaturedPanel channel={focusedChannel} program={focusedProgram} now={now} accent={accentOf(fc)} slotRef={player.miniSlotRef} showSlot={player.layout !== "off"} />
       ) : (
         <div style={{ height: vw(600) }} />
       )}
@@ -574,11 +616,15 @@ function FeaturedPanel({
   program,
   now,
   accent,
+  slotRef,
+  showSlot,
 }: {
   channel: GuideGridChannel;
   program: GuideGridProgram;
   now: Date;
   accent: string;
+  slotRef?: React.RefObject<HTMLDivElement | null>;
+  showSlot?: boolean;
 }) {
   const g = program.guide;
   const start = new Date(program.startsAt);
@@ -670,7 +716,10 @@ function FeaturedPanel({
         </div>
       </div>
 
-      <div style={{ width: fv(820), aspectRatio: "16 / 9", borderRadius: 14, overflow: "hidden", background: C.card, border: `1px solid ${C.cellBorder}`, flexShrink: 0 }} />
+      {/* The slot the persistent mini feed docks into — only present while a feed is
+          active, so with nothing playing the left content spans the full width (no empty
+          gap). The player (player-context.tsx) overlays the live video here in `mini`. */}
+      {showSlot && <div ref={slotRef} style={{ width: fv(820), aspectRatio: "16 / 9", borderRadius: 14, flexShrink: 0 }} />}
     </div>
   );
 }

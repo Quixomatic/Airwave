@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.1] - 2026-07-15
+
+### Added
+
+- **Persistent player with a live mini-feed in the guide.** Playback no longer stops when you leave a channel. The `<video>` and the effectiveTime state machine now live in a root-level `PlayerProvider` (above the router), so:
+  - Tuning a channel plays it **full-screen**; **Back** drops it to a **mini feed** docked in the guide's featured panel (top-right) that **keeps playing** (audio too), instead of ending the session.
+  - Focus returns to the channel you were watching (its live program) when you land back in the guide.
+  - **D-pad Up** from the top of the grid docks focus into the mini feed, showing two buttons — **Full screen** and **Close**. **Back** while a mini feed plays stops the feed + session; a second Back exits the app.
+  - The featured **right slot only appears while a feed is playing** — with nothing playing, the featured info spans the full width (no empty gap).
+  - One `<video>` element is repositioned between full and the featured slot (Framer-animated), so same-channel navigation never reloads the stream; a channel *change* is a clean remount.
+- `/watch/$channelId` is now a deep-link entry that tunes and bounces to the guide (the player is a persistent overlay, not a route).
+
 ## [0.4.0] - 2026-07-15
 
 Opens the 0.4.x line. Fixes the black-screen channels — DTS content now direct-plays, and the progressive transcode path actually produces a playable stream.

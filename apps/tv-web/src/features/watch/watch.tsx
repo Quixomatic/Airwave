@@ -4,43 +4,55 @@ import { useEffect, useState } from "react";
 
 import { BumperCard } from "./bumper-card";
 import { FeaturePanel } from "./feature-panel";
-import { useTvPlayer } from "./use-tv-player";
-import { api, type GuideChannel } from "../../lib/api";
+import type { useTvPlayer } from "./use-tv-player";
+import type { GuideChannel } from "../../lib/api";
 
 /**
- * The channel player. Playback (the effectiveTime state machine: timeline-driven
- * rollover, cross-program rewind, native-first delivery, sessions) lives in
- * `use-tv-player.ts`. This component owns the 10-foot chrome: nothing on the live
- * video (OLED burn-in), OK slides up the FeaturePanel, Back exits.
+ * Full-screen player CHROME — the 10-foot overlays drawn on top of the persistent
+ * <video> when the player is in `full` layout. Playback itself (the effectiveTime
+ * state machine + the <video> element) lives in the root PlayerProvider/PlayerHost
+ * (`player-context.tsx`) so it survives guide↔watch navigation; this component is pure
+ * chrome driven by the hook result passed in. Nothing static on the live video
+ * (OLED burn-in): OK slides up the FeaturePanel, Back returns to the guide (mini).
  */
 
-const ACCENTS = ["#2f9e8f", "#4a9fe0", "#3b82f6", "#8b5cf6", "#3fa66a", "#d08b2f", "#d0587e", "#7c8aa3"];
+export const ACCENTS = ["#2f9e8f", "#4a9fe0", "#3b82f6", "#8b5cf6", "#3fa66a", "#d08b2f", "#d0587e", "#7c8aa3"];
+export const accentForChannel = (n?: number) => (n == null ? "#3b82f6" : ACCENTS[n % ACCENTS.length]!);
 
-export function Watch({
+type Player = ReturnType<typeof useTvPlayer>;
+
+export function FullChrome({
   channelId,
   channel,
-  onExit,
+  player,
+  quality,
+  audioLang,
+  subtitleLang,
+  qualities,
+  onSelectQuality,
+  onSelectAudio,
+  onSelectSub,
+  onBack,
 }: {
   channelId: string;
   channel?: GuideChannel;
-  onExit: () => void;
+  player: Player;
+  quality: string;
+  audioLang?: string;
+  subtitleLang?: string;
+  qualities: { id: string; label: string }[];
+  onSelectQuality: (id: string) => void;
+  onSelectAudio: (lang?: string) => void;
+  onSelectSub: (lang?: string) => void;
+  onBack: () => void;
 }) {
-  const accent = channel ? ACCENTS[channel.number % ACCENTS.length]! : "#3b82f6";
-
-  const [quality, setQuality] = useState("original");
-  const [audioLang, setAudioLang] = useState<string | undefined>(undefined);
-  const [subtitleLang, setSubtitleLang] = useState<string | undefined>(undefined);
-  const [qualities, setQualities] = useState<{ id: string; label: string }[]>([]);
-  useEffect(() => {
-    api.qualities().then((r) => setQualities(r.qualities)).catch(() => {});
-  }, []);
-
-  const { videoRef, status, controls, tracks } = useTvPlayer(channelId, { quality, audioLang, subtitleLang });
+  const { status, controls, tracks } = player;
+  const accent = accentForChannel(channel?.number);
 
   const [panelOpen, setPanelOpen] = useState(false);
 
-  // Remote: panel closed → OK/Up/Down opens it, Back exits (the hook tears down on
-  // unmount). When the panel is open the FeaturePanel owns the keys.
+  // Remote: panel closed → OK/Up/Down opens it, Back returns to the guide (keeps
+  // playing as a mini feed). When the panel is open the FeaturePanel owns the keys.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (panelOpen) return;
@@ -48,24 +60,23 @@ export function Watch({
       if (isBack) {
         e.preventDefault();
         e.stopPropagation();
-        onExit();
+        onBack();
       } else if (e.key === "Enter" || e.key === "ArrowUp" || e.key === "ArrowDown") {
         e.preventDefault();
+        e.stopPropagation();
         setPanelOpen(true);
       }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [panelOpen, onExit]);
+  }, [panelOpen, onBack]);
 
   const isBumper = status.state === "bumper";
 
   return (
-    <div className="relative h-full w-full bg-black">
-      <video ref={videoRef} className="h-full w-full" playsInline />
-
+    <>
       {/* Bumper interstitial — status.guide is the upcoming program. */}
-      {isBumper && (
+      {isBumper && status.guide && (
         <BumperCard channelId={channelId} guide={status.guide} remaining={status.bumperRemaining} accent={accent} />
       )}
 
@@ -128,14 +139,14 @@ export function Watch({
             onPlayPause={controls.togglePause}
             onLive={controls.jumpToLive}
             onRestart={controls.restart}
-            onChannelSurf={onExit}
-            onSelectAudio={(lang) => setAudioLang(lang)}
-            onSelectSub={(lang) => setSubtitleLang(lang)}
-            onSelectQuality={(id) => setQuality(id)}
+            onChannelSurf={onBack}
+            onSelectAudio={onSelectAudio}
+            onSelectSub={onSelectSub}
+            onSelectQuality={onSelectQuality}
             onClose={() => setPanelOpen(false)}
           />
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }
