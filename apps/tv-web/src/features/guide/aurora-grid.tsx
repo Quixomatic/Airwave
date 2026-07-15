@@ -257,17 +257,24 @@ export function AuroraGrid({
               }}
             />
             <div
+              // A subtle downward triangle capping the line: its bottom point sits at
+              // the very top of the line. Anchored at the line's center (left edge +1.5px
+              // for the 3px line) and centered with translateX(-50%), so the apex lands
+              // exactly on the midpoint regardless of the base width (no unit-mixing skew).
               style={{
                 position: "absolute",
-                top: 0,
-                left: railPx + laneX(now) - vwNum(width, 10.5),
-                width: vw(21),
-                height: vw(21),
-                borderRadius: "50%",
-                background: C.now,
-                boxShadow: `0 0 12px ${C.now}`,
+                top: -vwNum(width, 14),
+                left: railPx + laneX(now) + 1.5,
+                transform: "translateX(-50%)",
+                width: 0,
+                height: 0,
+                borderLeft: `${vw(9)} solid transparent`,
+                borderRight: `${vw(9)} solid transparent`,
+                borderTop: `${vw(14)} solid ${C.now}`,
+                filter: `drop-shadow(0 0 6px ${C.now})`,
                 zIndex: 7,
                 animation: "tvgPulse 2s ease-in-out infinite",
+                pointerEvents: "none",
               }}
             />
           </>
@@ -347,7 +354,7 @@ function TimeHeader({
 }) {
   const ticks = Array.from({ length: Math.ceil(WINDOW_MIN / 30) + 1 }, (_, i) => new Date(T0.getTime() + i * 30 * MIN));
   return (
-    <div style={{ position: "relative", height: vw(52), flexShrink: 0, marginTop: vw(20) }}>
+    <div style={{ position: "relative", height: vw(52), flexShrink: 0, marginTop: vw(20), marginBottom: vw(20) }}>
       <div style={{ position: "absolute", left: vw(40), top: vw(6), fontSize: vw(32), fontWeight: 600, color: "#e6eaf1" }}>
         {fmtDay(T0)}
       </div>

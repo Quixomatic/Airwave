@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.48] - 2026-07-15
+
+### Changed
+
+- **The now-line's top marker is now a downward triangle, correctly centered.** The red circle that capped the live now-line was centered on the line's left edge rather than its 3px center, so it looked slightly off. Replaced it with a subtle downward-pointing triangle whose bottom point sits at the very top of the line, centered on the line (with a soft red glow). Added a buffer between the time-increment axis and the top of the grid so the triangle has clearance and doesn't crowd the time labels.
+
 ## [0.3.47] - 2026-07-15
 
 ### Changed
