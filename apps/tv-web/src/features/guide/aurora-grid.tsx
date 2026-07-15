@@ -1,7 +1,16 @@
+import * as LucideIcons from "lucide-react";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Menu, Settings, Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { GuideGridChannel, GuideGridProgram } from "../../lib/api";
+
+// Resolve a channel's stored icon id (`lucide:Radio`) to its component. Presets use
+// lucide only; `import *` lands in the (code-split) guide chunk, not the initial load.
+const LUCIDE = LucideIcons as unknown as Record<string, React.ComponentType<{ size?: number | string }>>;
+function channelIcon(id?: string | null): React.ComponentType<{ size?: number | string }> {
+  if (id && id.startsWith("lucide:")) return LUCIDE[id.slice(7)] ?? LucideIcons.Radio;
+  return LucideIcons.Radio;
+}
 
 /**
  * The Aurora guide grid — the 10-foot live-TV guide from the Claude Design handoff
@@ -385,18 +394,54 @@ function Row({
         style={{
           width: `${railFrac * 100}%`,
           flexShrink: 0,
-          padding: `${vw(22)} ${vw(24)}`,
+          padding: `${vw(18)} ${vw(20)}`,
           boxSizing: "border-box",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
           background: focused ? "rgba(59,130,246,0.10)" : "transparent",
           boxShadow: focused ? `inset 4px 0 0 ${C.ring}` : "none",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: vw(14) }}>
-          <span style={{ width: vw(30), height: vw(30), borderRadius: "50%", background: hexA(accent, 0.9), flexShrink: 0 }} />
-          <span style={{ fontSize: vw(36), fontWeight: 700, color: "#e6eaf1" }}>{channel.number}</span>
+        {/* top: tinted channel icon left, channel number pushed right — same height */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: vw(34) }}>
+          <span
+            style={{
+              width: vw(34),
+              height: vw(34),
+              borderRadius: "50%",
+              background: hexA(accent, 0.2),
+              color: accent,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: vw(20),
+            }}
+          >
+            {(() => {
+              const Icon = channelIcon(channel.icon ?? channel.package?.icon);
+              return <Icon size="1em" />;
+            })()}
+          </span>
+          <span style={{ fontSize: vw(34), lineHeight: 1, fontWeight: 700, color: "#e6eaf1", display: "flex", alignItems: "center", height: vw(34) }}>
+            {channel.number}
+          </span>
         </div>
-        <div style={{ marginTop: vw(12), fontSize: vw(26), color: C.mutedFg, lineHeight: 1.22, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {channel.callsign ?? channel.name}
+        {/* bottom: full name, left-aligned, clamped to 2 lines */}
+        <div
+          style={{
+            fontSize: vw(23),
+            color: C.mutedFg,
+            lineHeight: 1.2,
+            textAlign: "left",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {channel.name}
         </div>
       </div>
 

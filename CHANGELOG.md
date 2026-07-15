@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.42] - 2026-07-15
+
+### Changed
+
+- **Guide rail polish.** The left channel cell now shows the **real channel icon** (resolved from the stored `lucide:Name` id — presets are lucide-only, so no phosphor catalog needed) in a tinted tile top-left with the **channel number pushed to the top-right** (same height, centered), and the **full channel name** pinned to the bottom, left-aligned, clamped to **2 lines**. Tighter cell padding and a slightly smaller name. (Genre-accurate tint from each channel's real `tint`/`icon` inheritance is a follow-up; the accent is still index-derived for now.)
+
 ## [0.3.41] - 2026-07-15
 
 ### Added
