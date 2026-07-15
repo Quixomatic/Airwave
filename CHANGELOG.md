@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.51] - 2026-07-15
+
+### Changed
+
+- **Featured now-playing card gets more of the screen.** Bumped the featured panel's scale so it has more room to breathe; the guide grid keeps the remaining height and stays comfortably scrollable.
+
 ## [0.3.50] - 2026-07-15
 
 ### Changed

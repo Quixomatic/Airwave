@@ -45,9 +45,9 @@ const ACCENTS = ["#2f9e8f", "#4a9fe0", "#3b82f6", "#8b5cf6", "#3fa66a", "#d08b2f
 const CH_FRAC = 212 / DESIGN_W; // channel rail = this fraction of width
 const ROW_FRAC = 168 / DESIGN_W; // row height fraction (of width)
 // The featured panel, sized purely off width, dominates a 16:9 panel (~60% tall).
-// Shrink it uniformly so the grid gets the majority of the vertical space (bumped
-// up now that the top nav control is much smaller — the feature card gets that room).
-const FEATURE_SCALE = 0.62;
+// Shrink it uniformly (the grid keeps flex:1 for the rest). Tuned to give the
+// feature area more room to breathe while the grid stays comfortably scrollable.
+const FEATURE_SCALE = 0.72;
 const WINDOW_MIN = 180; // minutes of timeline shown across the lane
 const LEAD_MIN = 30; // minutes of "already aired" shown before the grid start
 const MIN = 60_000;
