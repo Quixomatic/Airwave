@@ -25,12 +25,16 @@ function SettingsRoute() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // webOS Back arrives as keyCode 461 (disableBackHistoryAPI) → return to the guide.
+      if (e.keyCode === 461 || ["Backspace", "GoBack", "BrowserBack", "XF86Back"].includes(e.key)) {
+        e.preventDefault();
+        void navigate({ to: "/" });
+        return;
+      }
       switch (e.key) {
         case "ArrowDown": e.preventDefault(); setFocus((f) => Math.min(items.length - 1, f + 1)); break;
         case "ArrowUp": e.preventDefault(); setFocus((f) => Math.max(0, f - 1)); break;
         case "Enter": e.preventDefault(); items[focus]!.action(); break;
-        case "Backspace": case "GoBack": case "BrowserBack": case "XF86Back":
-          e.preventDefault(); void navigate({ to: "/" }); break;
         default: break;
       }
     };

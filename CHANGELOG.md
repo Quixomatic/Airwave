@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.37] - 2026-07-15
+
+### Fixed
+
+- **The LG remote's Back button now closes overlays instead of jumping to the guide.** By default webOS routes the remote Back through the browser History API (the app gets a `popstate`, not a keydown) — so our router navigated away while a keyboard Backspace (a real keydown) worked. Set **`"disableBackHistoryAPI": true`** in `appinfo.json` (per LG's guide), so Back now arrives as **keyCode 461** and our handlers catch it: on the player it closes the open dropdown → info view → panel → then the guide; Settings returns to the guide; the guide root best-effort-exits the app. **Keyboard Backspace still works everywhere** (both `keyCode 461` and the `Backspace`/`GoBack`/`XF86Back` key names are handled).
+
 ## [0.3.36] - 2026-07-14
 
 Player UI to match the reference design + **lucide icons everywhere** (no more tofu boxes on the C2).

@@ -1,6 +1,6 @@
 {
   "id": "com.channelguide.tv",
-  "version": "0.3.36",
+  "version": "0.3.37",
   "vendor": "ChannelGuide",
   "type": "web",
   "main": "index.html",
@@ -8,5 +8,6 @@
   "icon": "icon.png",
   "iconColor": "#6366f1",
   "bgColor": "#0a0a0f",
-  "supportPortraitMode": false
+  "supportPortraitMode": false,
+  "disableBackHistoryAPI": true
 }

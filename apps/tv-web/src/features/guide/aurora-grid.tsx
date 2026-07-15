@@ -132,6 +132,13 @@ export function AuroraGrid({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Back at the guide root (webOS remote → keyCode 461, keyboard → Backspace):
+      // exit the app via the webOS platform back (no-op off-device).
+      if (e.keyCode === 461 || ["Backspace", "GoBack", "BrowserBack", "XF86Back"].includes(e.key)) {
+        e.preventDefault();
+        (window as unknown as { webOS?: { platformBack?: () => void } }).webOS?.platformBack?.();
+        return;
+      }
       const n = channels.length;
       if (!n) return;
       switch (e.key) {
