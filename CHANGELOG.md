@@ -2,6 +2,13 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.50] - 2026-07-15
+
+### Changed
+
+- **Smaller top Guide/Settings control; bigger feature card.** The segmented Guide/Settings control at the top was oversized; shrank its font, padding, and top margin considerably and handed that vertical room to the featured now-playing card (bumped the feature panel scale up).
+- **Featured description holds a fixed two-line height.** The summary reserves two lines (its max) at all times, so the featured panel no longer grows/shrinks as the description varies between one line, two lines, or none.
+
 ## [0.3.49] - 2026-07-15
 
 ### Changed

@@ -45,8 +45,9 @@ const ACCENTS = ["#2f9e8f", "#4a9fe0", "#3b82f6", "#8b5cf6", "#3fa66a", "#d08b2f
 const CH_FRAC = 212 / DESIGN_W; // channel rail = this fraction of width
 const ROW_FRAC = 168 / DESIGN_W; // row height fraction (of width)
 // The featured panel, sized purely off width, dominates a 16:9 panel (~60% tall).
-// Shrink it uniformly so the grid gets the majority of the vertical space.
-const FEATURE_SCALE = 0.58;
+// Shrink it uniformly so the grid gets the majority of the vertical space (bumped
+// up now that the top nav control is much smaller — the feature card gets that room).
+const FEATURE_SCALE = 0.62;
 const WINDOW_MIN = 180; // minutes of timeline shown across the lane
 const LEAD_MIN = 30; // minutes of "already aired" shown before the grid start
 const MIN = 60_000;
@@ -322,10 +323,10 @@ function NavPill({ onSettings }: { onSettings: () => void }) {
   const tab = (active: boolean): React.CSSProperties => ({
     display: "flex",
     alignItems: "center",
-    gap: vw(16),
-    padding: `${vw(16)} ${vw(40)}`,
+    gap: vw(10),
+    padding: `${vw(8)} ${vw(24)}`,
     borderRadius: 999,
-    fontSize: vw(32),
+    fontSize: vw(21),
     fontWeight: 600,
     color: active ? "#f1f5f9" : "#94a3b8",
     background: active ? C.navActive : "transparent",
@@ -337,13 +338,13 @@ function NavPill({ onSettings }: { onSettings: () => void }) {
     <div
       style={{
         alignSelf: "center",
-        marginTop: vw(56),
+        marginTop: vw(24),
         display: "flex",
         alignItems: "center",
         background: C.navBg,
         border: `1px solid ${C.border}`,
         borderRadius: 999,
-        padding: vw(6),
+        padding: vw(4),
         boxShadow: "0 12px 40px rgba(0,0,0,0.55)",
         zIndex: 20,
         flexShrink: 0,
@@ -634,11 +635,11 @@ function FeaturedPanel({
           )}
         </div>
 
-        {g.summary && (
-          <div style={{ marginTop: fv(22), fontSize: fv(36), lineHeight: 1.4, color: "#c9cfda", maxWidth: fv(1560), display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-            {g.summary}
-          </div>
-        )}
+        {/* Always reserve two lines (the max) so the panel height doesn't jump
+            between a 1-line and 2-line (or missing) summary. */}
+        <div style={{ marginTop: fv(22), fontSize: fv(36), lineHeight: 1.4, minHeight: fv(36 * 1.4 * 2), color: "#c9cfda", maxWidth: fv(1560), display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          {g.summary ?? ""}
+        </div>
 
         <div style={{ marginTop: fv(26), display: "flex", justifyContent: "space-between", fontSize: fv(34), color: "#c3c9d4" }}>
           <span>
