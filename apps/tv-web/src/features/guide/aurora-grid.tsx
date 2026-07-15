@@ -465,7 +465,8 @@ function Row({
           .map((p) => {
             const selected = p.id === focusedProgramId;
             // Only the program that's actually airing right now gets the channel-accent
-            // left bar (a broadcast "on air" cue); everything else stays plain.
+            // bar (a broadcast "on air" cue) — drawn as a separate inset element below,
+            // not a border, so it never depends on focus and isn't curved by the radius.
             const startMs = new Date(p.startsAt).getTime();
             const live = now.getTime() >= startMs && now.getTime() < startMs + p.durationSeconds * 1000;
             // A program that started before the grid's left edge (T0) would render
@@ -490,17 +491,28 @@ function Row({
                   overflow: "hidden",
                   borderRadius: 8,
                   border: selected ? `2px solid ${C.ring}` : `1px solid ${C.cellBorder}`,
-                  borderLeft: live
-                    ? `4px solid ${accent}`
-                    : selected
-                      ? `2px solid ${C.ring}`
-                      : `1px solid ${C.cellBorder}`,
                   background: selected ? C.highlight : hexA(accent, 0.09),
                   boxShadow: selected ? "0 0 0 2px rgba(59,130,246,0.4), 0 12px 30px rgba(0,0,0,0.5)" : "none",
                   zIndex: selected ? 4 : 1,
                   transition: "background .12s",
                 }}
               >
+                {live && (
+                  <div
+                    // The "on air" accent line: a separate inset element (not a border),
+                    // pinned slightly in from the left and clear of the top/bottom radius.
+                    style={{
+                      position: "absolute",
+                      left: 6,
+                      top: 10,
+                      bottom: 10,
+                      width: 4,
+                      borderRadius: 4,
+                      background: accent,
+                      zIndex: 2,
+                    }}
+                  />
+                )}
                 <div style={{ fontSize: vw(34), fontWeight: 600, color: "#f1f5f9", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {p.guide.showTitle ?? p.guide.title}
                 </div>

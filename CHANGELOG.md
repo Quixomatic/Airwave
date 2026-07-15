@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.47] - 2026-07-15
+
+### Changed
+
+- **The live "on air" accent is now a separate inset line, not a border.** It was drawn as the block's left border, which meant it read as the blue focus ring while focused and dropped to a thin, radius-curved edge once you moved away — so it looked like moving focus lost the accent. It's now a dedicated element: a rounded accent line inset slightly from the left edge and clear of the top/bottom corner radius, driven purely by whether the program is airing — so it stays put on the live program regardless of focus and never gets clipped by the block's rounded corners.
+
 ## [0.3.46] - 2026-07-15
 
 ### Fixed
