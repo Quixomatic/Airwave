@@ -421,7 +421,7 @@ function Row({
         height: rowPx,
         display: "flex",
         borderTop: `1px solid ${C.rowBorder}`,
-        background: focused ? "rgba(59,130,246,0.06)" : "transparent",
+        background: focused ? hexA(accent, 0.06) : "transparent",
       }}
     >
       <div
@@ -433,8 +433,8 @@ function Row({
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          background: focused ? "rgba(59,130,246,0.10)" : "transparent",
-          boxShadow: focused ? `inset 4px 0 0 ${C.ring}` : "none",
+          background: focused ? hexA(accent, 0.12) : "transparent",
+          boxShadow: focused ? `inset 4px 0 0 ${accent}` : "none",
         }}
       >
         {/* top: tinted channel icon left, channel number pushed right — same height */}
@@ -515,7 +515,9 @@ function Row({
                   overflow: "hidden",
                   borderRadius: 8,
                   border: selected ? `2px solid ${C.ring}` : `1px solid ${C.cellBorder}`,
-                  background: selected ? C.highlight : hexA(accent, 0.09),
+                  // Only the currently-airing program carries the channel tint; the rest
+                  // get a standard neutral fill. (Focus/selection keeps its own highlight.)
+                  background: selected ? C.highlight : live ? hexA(accent, 0.13) : "rgba(148,163,184,0.05)",
                   boxShadow: selected ? "0 0 0 2px rgba(59,130,246,0.4), 0 12px 30px rgba(0,0,0,0.5)" : "none",
                   zIndex: selected ? 4 : 1,
                   transition: "background .12s",

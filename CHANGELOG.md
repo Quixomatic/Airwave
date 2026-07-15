@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.53] - 2026-07-15
+
+### Changed
+
+- **Channel tint is now reserved for the live program and the focused channel rail.** Previously every program block wore a faint channel-tint background. Now only the currently-airing program carries the channel tint; all other blocks get a standard neutral fill. The focused channel's rail/row highlight (background + inset bar) also switches from the generic blue to that channel's tint, so the selected channel reads in its own color. The D-pad selection/focus highlight on a program block is unchanged.
+
 ## [0.3.52] - 2026-07-15
 
 ### Changed
