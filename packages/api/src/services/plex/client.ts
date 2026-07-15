@@ -6,7 +6,13 @@
 
 import { XMLParser } from "fast-xml-parser";
 
-import { BROWSER_CLIENT_PROFILE, type ClientCaps, clientProfileExtra, qualityParams } from "./quality";
+import {
+  BROWSER_CLIENT_PROFILE,
+  type ClientCaps,
+  clientProfileExtra,
+  progressiveContainer,
+  qualityParams,
+} from "./quality";
 
 const PLEX_TV = "https://plex.tv/api/v2";
 const PRODUCT = "ChannelGuide";
@@ -500,6 +506,31 @@ const DIRECT_CONTAINERS = new Set(["mp4", "mov", "m4v"]);
 const DIRECT_VIDEO = new Set(["h264", "avc", "avc1"]);
 const DIRECT_AUDIO = new Set(["aac", "mp3", "mp2", "mp4a"]);
 
+// Plex/ffmpeg report a codec/container under several names; fold them to the token our
+// capability set uses, so a direct-playable stream isn't sent to transcode over a naming
+// gap. DTS especially: Plex reports `dca` / `dca-ma` (DTS-HD MA) / `dca-hra`, and MA/HRA
+// embed a DTS core any DTS-core decoder falls back to — so the measured `dts` covers them.
+function normAudioCodec(c: string): string {
+  const x = c.toLowerCase();
+  if (x.startsWith("dca") || x.startsWith("dts")) return "dts";
+  if (x === "ec-3" || x === "ec3" || x === "eac-3") return "eac3";
+  if (x === "ac-3") return "ac3";
+  if (x === "mlp") return "truehd";
+  return x;
+}
+function normVideoCodec(c: string): string {
+  const x = c.toLowerCase();
+  if (x === "h265" || x === "hvc1" || x === "hev1") return "hevc";
+  if (x === "avc" || x === "avc1") return "h264";
+  return x;
+}
+function normContainer(c: string): string {
+  const x = c.toLowerCase();
+  if (x.startsWith("matroska")) return "mkv";
+  if (x === "quicktime") return "mov";
+  return x;
+}
+
 type PlexStream = {
   id?: number | string;
   streamType?: number;
@@ -590,9 +621,18 @@ export async function getPlaybackInfo(
   // Device-aware capability check: use the real client's codec support when it reports
   // it (a TV), else the built-in browser assumption (h264/aac/mp4 — the admin preview).
   const caps = opts.caps;
-  const vOk = (c: string) => (caps ? caps.videoCodecs.includes(c) : DIRECT_VIDEO.has(c));
-  const aOk = (c: string) => (caps ? caps.audioCodecs.includes(c) : DIRECT_AUDIO.has(c));
-  const cOk = (c: string) => (caps ? caps.directContainers.includes(c) : DIRECT_CONTAINERS.has(c));
+  const vOk = (c: string) => {
+    const n = normVideoCodec(c);
+    return caps ? caps.videoCodecs.includes(n) : DIRECT_VIDEO.has(n);
+  };
+  const aOk = (c: string) => {
+    const n = normAudioCodec(c);
+    return caps ? caps.audioCodecs.includes(n) : DIRECT_AUDIO.has(n);
+  };
+  const cOk = (c: string) => {
+    const n = normContainer(c);
+    return caps ? caps.directContainers.includes(n) : DIRECT_CONTAINERS.has(n);
+  };
 
   // Quality cap, an audio-track switch, burned subtitles, or a runtime native-failure
   // retry (forceHls) all force a transcode; otherwise a file the client can play
@@ -628,7 +668,16 @@ export async function getPlaybackInfo(
   // with the native <video> element (full audio set, no MSE); the admin browser (no caps)
   // and the runtime native-failure retry (forceHls) fall back to HLS + hls.js/MSE — the
   // true last resort. See [[project-tv-playback-protocol]].
-  const protocol: "hls" | "http" = !opts.forceHls && caps ? "http" : "hls";
+  let protocol: "hls" | "http" = !opts.forceHls && caps ? "http" : "hls";
+  // The progressive-http rung needs a container the native <video> can play while it's
+  // still transcoding AND that this panel decodes (mkv/mpegts). If the panel has none,
+  // a progressive mp4 would return an unplayable stub → go straight to hls instead.
+  let httpContainer = "mkv";
+  if (protocol === "http" && caps) {
+    const pc = progressiveContainer(caps);
+    if (pc) httpContainer = pc;
+    else protocol = "hls";
+  }
   const params = new URLSearchParams({
     path: `/library/metadata/${ratingKey}`,
     mediaIndex: "0",
@@ -662,7 +711,7 @@ export async function getPlaybackInfo(
   // the C2 "could not be decoded"). Platform MUST be Generic — real names 400 on /decision
   // with custom transcode targets (plezy). Without caps, the browser profile (quality path).
   if (caps) {
-    params.set("X-Plex-Client-Profile-Extra", clientProfileExtra(caps, protocol));
+    params.set("X-Plex-Client-Profile-Extra", clientProfileExtra(caps, protocol, httpContainer));
     params.set("X-Plex-Platform", "Generic");
   } else if (quality) {
     params.set("X-Plex-Client-Profile-Extra", BROWSER_CLIENT_PROFILE);

@@ -98,13 +98,35 @@ const MSE_SAFE_AUDIO = new Set(["aac", "opus", "mp3"]);
  * The direct-play target always carries the full native set (raw-file direct-play uses
  * the native decoder). See [[project-tv-playback-protocol]].
  */
-export function clientProfileExtra(caps: ClientCaps, protocol: "hls" | "http" = "http"): string {
+export function clientProfileExtra(
+  caps: ClientCaps,
+  protocol: "hls" | "http" = "http",
+  httpContainer = "mkv",
+): string {
   const v = caps.videoCodecs.join(",");
   const aDirect = caps.audioCodecs.join(","); // native player: full set
   const safe = caps.audioCodecs.filter((c) => MSE_SAFE_AUDIO.has(c));
   const aTrans = protocol === "hls" ? (safe.length ? safe : ["aac"]).join(",") : aDirect;
+  // hls always packages as fMP4/CMAF (container=mp4). http = a PROGRESSIVE transcode played
+  // by the native <video>: it MUST be a streamable-while-growing container (mkv/mpegts), not
+  // mp4 — a live mp4 has no front moov atom, so the native element gets an unplayable stub
+  // (~89 bytes) and shows black. See progressiveContainer() + [[project-tv-playback-protocol]].
+  const transContainer = protocol === "hls" ? "mp4" : httpContainer;
   return [
-    `add-transcode-target(type=videoProfile&context=streaming&protocol=${protocol}&container=mp4&videoCodec=${v}&audioCodec=${aTrans})`,
+    `add-transcode-target(type=videoProfile&context=streaming&protocol=${protocol}&container=${transContainer}&videoCodec=${v}&audioCodec=${aTrans})`,
     `add-direct-play-target(type=videoProfile&container=mp4&videoCodec=${v}&audioCodec=${aDirect})`,
   ].join("+");
+}
+
+/**
+ * A container the native `<video>` can play WHILE Plex is still transcoding (streamable —
+ * no front moov atom) AND that this panel natively decodes. `mp4`/`mov` can't stream live.
+ * Returns null when the panel has no such container → the progressive-http rung can't work,
+ * so the caller falls back to hls.js/MSE. mkv preferred (carries any codec); mpegts next.
+ */
+export function progressiveContainer(caps: ClientCaps): string | null {
+  const c = caps.directContainers;
+  if (c.includes("mkv")) return "mkv";
+  if (c.includes("mpegts") || c.includes("ts")) return "mpegts";
+  return null;
 }

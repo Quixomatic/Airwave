@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.0] - 2026-07-15
+
+Opens the 0.4.x line. Fixes the black-screen channels — DTS content now direct-plays, and the progressive transcode path actually produces a playable stream.
+
+### Fixed
+
+- **DTS content now direct-plays instead of black-screening.** Plex reports DTS streams as `dca` / `dca-ma` (DTS-HD MA) / `dca-hra`, but our measured capability token is `dts`, so the names never matched and every DTS title was pushed to transcode. Added codec-name normalization in the direct-play check (`dca*`/`dts*` → `dts`, plus `ec-3`→`eac3`, `hvc1`/`h265`→`hevc`, `matroska`→`mkv`, etc.). DTS-HD MA/HRA embed a DTS core any DTS-core decoder falls back to, so the measured `dts` legitimately covers them. Verified via simulation: `mkv/hevc/dca-ma` → `direct` with a real matroska stream.
+- **The progressive-HTTP transcode rung produced an unplayable stub (the black screen).** For a TV, content that must transcode was served as a **progressive MP4**, which a native `<video>` can't play while it's still transcoding (no front `moov` atom) — Plex returned an ~89-byte stub and the screen stayed black, only recovering to hls.js if at all. The progressive transcode now uses a **streamable container the panel natively decodes** — `progressiveContainer()` picks `mkv` (preferred) or `mpegts` from the device's measured containers; if it has neither, we skip straight to hls instead of a doomed attempt. Verified via simulation: a must-transcode title went from `container=mp4` / 89-byte stub → `container=mkv` / a real 165 KB matroska stream. hls.js is now a genuine last resort.
+
+### Added
+
+- **Playback simulation scripts** (`apps/server/scripts/sim-playback.ts`, `sim-channel.ts`) — resolve playback for a panel's *measured* capabilities and fetch the resulting stream to confirm Plex serves a real body, reproducing the TV playback path server-side. Lets codec/transcode issues be diagnosed without a TV. `sim-playback.ts` sweeps every channel's "now"; `sim-channel.ts <n>` scans one channel's timeline.
+
 ## [0.3.57] - 2026-07-15
 
 ### Changed
