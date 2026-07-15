@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.43] - 2026-07-15
+
+### Changed
+
+- **Guide grid: the channel-accent left bar now marks only the live program.** Every program block previously carried a left border in the channel's accent color; now that "on air" cue is reserved for the program **actually airing right now** (server-time within its slot), so scanning the grid you can instantly see what's live per channel. Other blocks keep the plain hairline border; the D-pad focus ring is unchanged.
+
 ## [0.3.42] - 2026-07-15
 
 ### Changed
