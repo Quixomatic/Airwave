@@ -1,10 +1,14 @@
 import { AnimatePresence, motion } from "framer-motion";
 import Hls from "hls.js";
+import { Tv } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { FeaturePanel, type Progress } from "./feature-panel";
-import { ApiError, api, type MediaInfo, type NowNext } from "../../lib/api";
+import { ApiError, api, type GuideChannel, type MediaInfo, type NowNext } from "../../lib/api";
 import { clientCaps, deviceId } from "../../lib/device";
+
+// Genre-ish accent palette (keyed by channel number) — matches the guide grid.
+const ACCENTS = ["#2f9e8f", "#4a9fe0", "#3b82f6", "#8b5cf6", "#3fa66a", "#d08b2f", "#d0587e", "#7c8aa3"];
 
 /**
  * The channel player. NOTHING is drawn on the live video (OLED burn-in) — press OK to
@@ -17,13 +21,15 @@ type Options = { quality: string; audioLang?: string; subtitleLang?: string };
 
 export function Watch({
   channelId,
-  channelName,
+  channel,
   onExit,
 }: {
   channelId: string;
-  channelName: string;
+  channel?: GuideChannel;
   onExit: () => void;
 }) {
+  const channelName = channel ? `${channel.number} · ${channel.name}` : "";
+  const accent = channel ? ACCENTS[channel.number % ACCENTS.length]! : "#3b82f6";
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const sessionRef = useRef<string | null>(null);
@@ -389,20 +395,36 @@ export function Watch({
         </div>
       )}
 
-      {/* Slide-in top header (channel + back hint) — only while the panel is up. */}
+      {/* Glass channel chip, top-right — only while the panel is up. */}
       <AnimatePresence>
         {panelOpen && (
           <motion.div
-            key="topbar"
-            initial={{ opacity: 0, y: -40 }}
+            key="chip"
+            initial={{ opacity: 0, y: -30 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -40 }}
+            exit={{ opacity: 0, y: -30 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
-            className="absolute left-0 top-0 flex w-full items-center gap-4 p-6"
-            style={{ background: "linear-gradient(to bottom, rgba(6,10,20,0.9), transparent)", color: "#f1f5f9" }}
+            style={{
+              position: "absolute",
+              top: 28,
+              right: 40,
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              height: 56,
+              padding: "0 22px 0 12px",
+              borderRadius: 999,
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(18,24,38,0.55)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+            }}
           >
-            <span className="rounded-lg bg-white/10 px-3 py-1 text-sm text-zinc-300">← Back to guide</span>
-            <span className="text-xl font-semibold">{channelName}</span>
+            <span style={{ width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: `${accent}33`, color: accent }}>
+              <Tv size={20} />
+            </span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: accent }}>{channel?.number}</span>
+            <span style={{ fontSize: 22, fontWeight: 600, color: "#e6eaf1" }}>{channel?.name}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -411,8 +433,8 @@ export function Watch({
         {panelOpen && (
           <FeaturePanel
             key="panel"
-            channelName={channelName}
             cur={cur ?? null}
+            accent={accent}
             media={media}
             qualities={qualities}
             quality={quality}
@@ -424,6 +446,10 @@ export function Watch({
             onPlayPause={onPlayPause}
             onLive={onLive}
             onRestart={onRestart}
+            onChannelSurf={() => {
+              teardown();
+              onExit();
+            }}
             onSelectAudio={selectAudio}
             onSelectSub={selectSub}
             onSelectQuality={selectQuality}

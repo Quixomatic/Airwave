@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Menu, Settings, Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { GuideGridChannel, GuideGridProgram } from "../../lib/api";
@@ -252,8 +253,14 @@ export function AuroraGrid({
       <div
         style={{ position: "absolute", bottom: vw(22), left: vw(40), display: "flex", gap: vw(26), color: "#475569", fontSize: vw(24), zIndex: 8 }}
       >
-        <span>◄ ► programs</span>
-        <span>▲ ▼ channels</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <ChevronLeft size="1em" />
+          <ChevronRight size="1em" /> programs
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <ChevronUp size="1em" />
+          <ChevronDown size="1em" /> channels
+        </span>
         <span>OK to watch</span>
       </div>
       <style>{`@keyframes tvgPulse{0%,100%{opacity:1}50%{opacity:.55}}`}</style>
@@ -295,9 +302,11 @@ function NavPill({ onSettings }: { onSettings: () => void }) {
         flexShrink: 0,
       }}
     >
-      <button style={tab(true)}>☰ Guide</button>
+      <button style={tab(true)}>
+        <Menu size="1em" /> Guide
+      </button>
       <button style={tab(false)} onClick={onSettings}>
-        ⚙ Settings
+        <Settings size="1em" /> Settings
       </button>
     </div>
   );
@@ -507,7 +516,7 @@ function FeaturedPanel({
           {g.criticRating != null && (
             <>
               <span style={{ color: "#475569" }}>·</span>
-              <span style={{ color: C.star }}>★</span>
+              <Star size="1em" color={C.star} fill={C.star} />
               <span>{g.criticRating.toFixed(1)}</span>
             </>
           )}

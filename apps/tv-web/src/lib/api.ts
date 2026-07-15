@@ -70,6 +70,17 @@ export type Guide = {
   season?: number | null;
   episode?: number | null;
   summary?: string | null;
+  // Richer metadata (present when the server sends the full GuideMeta) — for the
+  // player's Info view. Optional so a narrower payload still typechecks.
+  contentRating?: string | null;
+  criticRating?: number | null;
+  audienceRating?: number | null;
+  durationMs?: number | null;
+  genres?: string[] | null;
+  cast?: string[] | null;
+  directors?: string[] | null;
+  studio?: string | null;
+  tagline?: string | null;
 };
 
 export type NowSlot = {

@@ -1,6 +1,6 @@
 {
   "name": "tv-web",
-  "version": "0.3.35",
+  "version": "0.3.36",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,6 +17,7 @@
     "better-auth": "catalog:",
     "framer-motion": "^12.42.2",
     "hls.js": "^1.6.16",
+    "lucide-react": "catalog:",
     "qrcode": "^1.5.4",
     "react": "catalog:",
     "react-dom": "catalog:"

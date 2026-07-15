@@ -13,12 +13,5 @@ function WatchRoute() {
   const navigate = useNavigate();
   const { data: channels } = useChannels();
   const ch = channels?.find((c) => c.id === channelId);
-  const channelName = ch ? `${ch.number} · ${ch.name}` : "";
-  return (
-    <Watch
-      channelId={channelId}
-      channelName={channelName}
-      onExit={() => void navigate({ to: "/" })}
-    />
-  );
+  return <Watch channelId={channelId} channel={ch} onExit={() => void navigate({ to: "/" })} />;
 }

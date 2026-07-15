@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.36] - 2026-07-14
+
+Player UI to match the reference design + **lucide icons everywhere** (no more tofu boxes on the C2).
+
+### Changed
+
+- **All icons are now lucide components** instead of unicode glyphs — the C2's system font has no glyphs for `☰ ⚙ ◄ ► ▲ ▼ ★ ⏸ ⟲` etc., so they rendered as empty boxes. Swapped across the player and the guide grid (nav, hints, rating star, all controls).
+- **Redesigned the watch player** to match the reference: a **glass channel chip** top-right (tinted genre accent + number + name), just the **program title** bottom-left, a **minimal borderless scrubber** (accent-filled bar, white thumb, time centered under the thumb, LIVE far-right), a row of **glassmorphism control pills** (Pause · Restart · Channel Surf · Info · Continue Watching/Jump to Live), and **circular glass icon buttons** for Audio / Subtitles / Quality (base-lyra dropdowns). Removed the redundant focus outline (the thumb + button highlight show focus).
+- **Info mode:** the **Info** button swaps the scrubber + controls for a full **details view** (summary, year/rating/★, genres, cast, director, studio); Back returns. The `now` payload already carries the full metadata.
+
 ## [0.3.35] - 2026-07-14
 
 ### Added
