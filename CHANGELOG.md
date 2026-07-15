@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.52] - 2026-07-15
+
+### Changed
+
+- **Live "on air" accent line hugs the card edge and is a touch slimmer.** Moved the accent line right up against the left edge of the program card (`left: 3`) and reduced its width (`4 → 3`px), keeping the top/bottom inset that clears the corner radius.
+
 ## [0.3.51] - 2026-07-15
 
 ### Changed

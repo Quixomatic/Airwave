@@ -524,13 +524,13 @@ function Row({
                 {live && (
                   <div
                     // The "on air" accent line: a separate inset element (not a border),
-                    // pinned slightly in from the left and clear of the top/bottom radius.
+                    // hugging the left edge and clear of the top/bottom radius.
                     style={{
                       position: "absolute",
-                      left: 6,
+                      left: 3,
                       top: 10,
                       bottom: 10,
-                      width: 4,
+                      width: 3,
                       borderRadius: 4,
                       background: accent,
                       zIndex: 2,
