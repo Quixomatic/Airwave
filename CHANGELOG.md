@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.49] - 2026-07-15
+
+### Changed
+
+- **The guide opens focused on what's on now.** On first load the focus sat on the first program of the first channel — the recently-aired lead that fills the grid's left edge — rather than the program actually airing. It now initializes focus (and the featured panel) to the currently-airing program for the selected channel once the guide data loads.
+
 ## [0.3.48] - 2026-07-15
 
 ### Changed

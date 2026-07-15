@@ -118,6 +118,22 @@ export function AuroraGrid({
     if (p) cursorRef.current = new Date(p.startsAt).getTime() + (p.durationSeconds * 1000) / 2;
   }, [fc, fp, channels]);
 
+  // On first data load, focus the program airing right now on the selected channel
+  // (not the recently-aired lead at index 0 that fills the grid's left edge).
+  const didInitFocus = useRef(false);
+  useEffect(() => {
+    if (didInitFocus.current) return;
+    const progs = channels[fc]?.programs;
+    if (!progs?.length) return;
+    didInitFocus.current = true;
+    const t = now.getTime();
+    const i = progs.findIndex((p) => {
+      const s = new Date(p.startsAt).getTime();
+      return t >= s && t < s + p.durationSeconds * 1000;
+    });
+    if (i > 0) setFp(i);
+  }, [channels, fc, now]);
+
   const pickAtCursor = (chIdx: number) => {
     const progs = channels[chIdx]?.programs ?? [];
     if (!progs.length) return 0;
