@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.38] - 2026-07-15
+
+### Added
+
+- **Back at the guide root now exits the app.** Bundled LG's **`webOSTV.js`** runtime (vendored into `public/`, loaded from `index.html`) so `window.webOS.platformBack()` is available — pressing Back on the guide triggers the platform exit (webOS 9 shows the "exit app?" prompt). Previously it was a no-op (you had to press Home). `@procot/webostv` is TS typings that still expect this runtime, so vendoring the actual library is what enables `platformBack`.
+
 ## [0.3.37] - 2026-07-15
 
 ### Fixed
