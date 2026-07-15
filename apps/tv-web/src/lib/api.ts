@@ -138,6 +138,17 @@ export type GuideGrid = {
   channels: GuideGridChannel[];
 };
 
+export type TimelineSlot = {
+  id: string;
+  kind: "PROGRAM" | "BUMPER";
+  ratingKey: string | null;
+  startsAt: string;
+  durationSeconds: number;
+  guide: GuideMeta;
+};
+
+export type Timeline = { serverTime: string; slots: TimelineSlot[] };
+
 export type Track = { lang: string; label: string };
 
 export type MediaInfo = {
@@ -167,6 +178,11 @@ export const api = {
 
   guide: (forwardMinutes = 180) =>
     request<GuideGrid>(`/api/v1/guide?forwardMinutes=${forwardMinutes}`),
+
+  timeline: (channelId: string, backMinutes = 360, forwardMinutes = 180) =>
+    request<Timeline>(
+      `/api/v1/channels/${channelId}/timeline?backMinutes=${backMinutes}&forwardMinutes=${forwardMinutes}`,
+    ),
 
   reportDevice: (report: unknown) =>
     request<{ ok: true; id: string }>("/api/v1/devices/report", {

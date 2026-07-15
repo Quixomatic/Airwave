@@ -21,7 +21,8 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import type { MediaInfo, NowNext } from "../../lib/api";
+import type { GuideMeta } from "../../lib/api";
+import type { ScrubberView } from "./use-tv-player";
 
 /**
  * The watch-screen feature panel — nothing is drawn on the live video (OLED burn-in).
@@ -37,8 +38,9 @@ import type { MediaInfo, NowNext } from "../../lib/api";
 
 const HIDE_MS = 8000;
 type MenuKey = "audio" | "subs" | "quality" | null;
+type Track = { lang: string; label: string };
 
-export type Progress = { position: number; duration: number; liveOffset: number; paused: boolean };
+const clampPct = (n: number) => Math.min(100, Math.max(0, n));
 
 const fmt = (s: number) => {
   s = Math.max(0, Math.floor(s));
@@ -53,14 +55,16 @@ const fmt = (s: number) => {
 const ICON = 20;
 
 export function FeaturePanel({
-  cur,
+  guide,
   accent,
-  media,
+  scrubber,
+  paused,
+  canRestart,
+  tracks,
   qualities,
   quality,
   audioLang,
   subtitleLang,
-  progress,
   onSeekBack,
   onSeekForward,
   onPlayPause,
@@ -72,14 +76,16 @@ export function FeaturePanel({
   onSelectQuality,
   onClose,
 }: {
-  cur: NowNext["current"];
+  guide: GuideMeta | null;
   accent: string;
-  media: MediaInfo | null;
+  scrubber: ScrubberView | null;
+  paused: boolean;
+  canRestart: boolean;
+  tracks: { audio: Track[]; subtitle: Track[] };
   qualities: { id: string; label: string }[];
   quality: string;
   audioLang?: string;
   subtitleLang?: string;
-  progress: Progress;
   onSeekBack: () => void;
   onSeekForward: () => void;
   onPlayPause: () => void;
@@ -91,7 +97,7 @@ export function FeaturePanel({
   onSelectQuality: (id: string) => void;
   onClose: () => void;
 }) {
-  const g = cur?.guide;
+  const g = guide;
   const isEpisode = !!g?.showTitle && g?.season != null && g?.episode != null;
   const title = isEpisode ? g?.showTitle : g?.title;
   const subTitle = isEpisode ? `S${g?.season}, E${g?.episode}${g?.title ? ` · ${g.title}` : ""}` : undefined;
@@ -224,19 +230,22 @@ export function FeaturePanel({
     </DropdownMenu>
   );
 
-  const audioItems = (media?.audioTracks ?? []).map((t) => ({ value: t.lang, label: t.label }));
+  const audioItems = tracks.audio.map((t) => ({ value: t.lang, label: t.label }));
   const subItems = [
     { value: "off", label: "Off" },
-    ...(media?.subtitleTracks ?? []).map((t) => ({ value: t.lang, label: t.label })),
+    ...tracks.subtitle.map((t) => ({ value: t.lang, label: t.label })),
   ];
   const qualityItems = qualities.map((q) => ({ value: q.id, label: q.label }));
 
-  // Scrubber geometry.
-  const { position, duration, liveOffset, paused } = progress;
-  const pct = duration ? Math.min(100, Math.max(0, (position / duration) * 100)) : 0;
-  const livePct = duration ? Math.min(100, Math.max(0, (liveOffset / duration) * 100)) : 100;
-  const behind = Math.max(0, liveOffset - position);
-  const atLive = behind < 5;
+  // Scrubber geometry — a sliding window with one rounded segment per slot.
+  const sc = scrubber;
+  const span = sc ? Math.max(1, sc.windowEnd - sc.windowStart) : 1;
+  const at = (s: number) => (sc ? clampPct(((s - sc.windowStart) / span) * 100) : 0);
+  const posPct = sc ? at(sc.positionS) : 0;
+  const livePct = sc ? at(sc.liveS) : 100;
+  const liveInWindow = sc ? sc.liveS <= sc.windowEnd + 0.5 && sc.liveS >= sc.windowStart : true;
+  const atLive = sc?.atLive ?? true;
+  const behind = sc?.behindS ?? 0;
   const scrubFocused = focus.row === 0;
 
   return (
@@ -292,14 +301,40 @@ export function FeaturePanel({
             style={{ display: "block", width: "100%", textAlign: "left", border: "none", outline: "none", background: "transparent", cursor: "pointer", padding: "6px 0 4px" }}
           >
             <div style={{ position: "relative", height: 8 }}>
-              <div style={{ position: "absolute", inset: 0, borderRadius: 999, background: "rgba(255,255,255,0.18)" }} />
-              <div style={{ position: "absolute", top: 0, left: 0, height: 8, width: `${pct}%`, borderRadius: 999, background: accent }} />
-              <div style={{ position: "absolute", top: -4, left: `${livePct}%`, width: 2, height: 16, background: "#ef4444", transform: "translateX(-1px)" }} />
+              {/* one rounded segment per slot (tiny gaps); the current slot fills to the thumb in the accent */}
+              {sc?.segments.map((seg, i) => {
+                const l = at(seg.startS);
+                const w = Math.max(0, at(seg.endS) - l);
+                const isBumper = seg.kind === "BUMPER";
+                const fillW = seg.current ? clampPct(((posPct - l) / Math.max(0.0001, w)) * 100) : 0;
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      height: 8,
+                      left: `calc(${l}% + 2px)`,
+                      width: `calc(${w}% - 4px)`,
+                      borderRadius: 999,
+                      overflow: "hidden",
+                      background: isBumper ? "rgba(148,163,184,0.30)" : "rgba(255,255,255,0.18)",
+                    }}
+                  >
+                    {fillW > 0 && (
+                      <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${fillW}%`, background: accent }} />
+                    )}
+                  </div>
+                );
+              })}
+              {liveInWindow && (
+                <div style={{ position: "absolute", top: -4, left: `${livePct}%`, width: 2, height: 16, background: "#ef4444", transform: "translateX(-1px)" }} />
+              )}
               <div
                 style={{
                   position: "absolute",
                   top: "50%",
-                  left: `${pct}%`,
+                  left: `${posPct}%`,
                   width: scrubFocused ? 24 : 16,
                   height: scrubFocused ? 24 : 16,
                   borderRadius: "50%",
@@ -311,8 +346,8 @@ export function FeaturePanel({
               />
             </div>
             <div style={{ position: "relative", height: 26, marginTop: 10 }}>
-              <span style={{ position: "absolute", left: `${pct}%`, transform: "translateX(-50%)", fontSize: 17, fontWeight: 600, color: scrubFocused ? "#f1f5f9" : "#c3c9d4" }}>
-                {fmt(position)}
+              <span style={{ position: "absolute", left: `${posPct}%`, transform: "translateX(-50%)", fontSize: 17, fontWeight: 600, color: scrubFocused ? "#f1f5f9" : "#c3c9d4" }}>
+                {fmt(sc?.slotPositionS ?? 0)}
               </span>
               <span
                 onClick={(e) => { e.stopPropagation(); onLive(); }}
@@ -329,7 +364,11 @@ export function FeaturePanel({
             <button ref={(el) => { ctlRefs.current[0] = el; }} style={glass(0)} onClick={onPlayPause}>
               {paused ? <Play size={ICON} /> : <Pause size={ICON} />} {paused ? "Play" : "Pause"}
             </button>
-            <button ref={(el) => { ctlRefs.current[1] = el; }} style={glass(1)} onClick={onRestart}>
+            <button
+              ref={(el) => { ctlRefs.current[1] = el; }}
+              style={{ ...glass(1), opacity: canRestart ? 1 : 0.4 }}
+              onClick={onRestart}
+            >
               <RotateCcw size={ICON} /> Restart
             </button>
             <button ref={(el) => { ctlRefs.current[2] = el; }} style={glass(2)} onClick={onChannelSurf}>

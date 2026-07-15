@@ -2,6 +2,15 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.39] - 2026-07-15
+
+The effectiveTime DVR machine — rewind across programs, like real TV.
+
+### Added
+
+- **Net-new `use-tv-player.ts`** — a REST + native-first channel-player state machine (a sibling of the admin's `use-channel-player.ts`, which is **untouched**). It drives the `<video>` off one clock (`effectiveTime`) on the **whole channel timeline** instead of the single current file, so you can **rewind out of the current program, through the bumper, into the previous program** — the timeline maps any instant to `(ratingKey, offset)`. Timeline-driven rollover (program → bumper card → next program), resume-on-reload, watch-session heartbeat, and the native-first delivery ladder (direct → progressive-http → hls.js last-resort + safety-catch) are all preserved. `watch.tsx` is now a thin shell over the hook.
+- **Multi-segment sliding scrubber.** At/near live it's the **full current program** with the thumb at its relative position (as before). Rewind before the program start and it collapses to a **sliding ~13-min window** that pans with you and trims the right edge, rendering **one rounded segment per slot** (capped prev-program tail · bumper · current), the current slot filled to the thumb in the channel accent. **Restart** restarts the slot you're *in* (so rewound into Program A, it restarts Program A); in a live bumper it dims and acts as Jump-to-Live (no unaired program to restart).
+
 ## [0.3.38] - 2026-07-15
 
 ### Added
