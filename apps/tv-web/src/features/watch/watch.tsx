@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Hls from "hls.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { FeaturePanel } from "./feature-panel";
+import { FeaturePanel, type Progress } from "./feature-panel";
 import { ApiError, api, type MediaInfo, type NowNext } from "../../lib/api";
 import { clientCaps, deviceId } from "../../lib/device";
 
@@ -32,12 +32,17 @@ export function Watch({
   const loggedRef = useRef(false);
   const logTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retriedRef = useRef(false);
+  // Program timing for the DVR scrubber. `baselineRef` captures the (currentTime, program
+  // offset) pair at the first `playing` event, so program position = offset + (currentTime
+  // − baselineCT) across all modes (direct / http / hls). This is the seed of the
+  // effectiveTime machine.
+  const progRef = useRef<{ startsAtMs: number; durationSeconds: number; tuneOffset: number } | null>(null);
+  const baselineRef = useRef<{ ct: number; offset: number } | null>(null);
 
   const [now, setNow] = useState<NowNext | null>(null);
   const [media, setMedia] = useState<MediaInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isBumper, setIsBumper] = useState(false);
-  const [paused, setPaused] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
 
   const [quality, setQuality] = useState("original");
@@ -159,6 +164,12 @@ export function Watch({
           return;
         }
         setIsBumper(false);
+        progRef.current = {
+          startsAtMs: new Date(cur.startsAt).getTime(),
+          durationSeconds: cur.durationSeconds,
+          tuneOffset: cur.offsetSeconds,
+        };
+        baselineRef.current = null;
         const o = optionsRef.current;
         const m = await api.media(channelId, cur.ratingKey, cur.offsetSeconds, {
           caps: clientCaps(),
@@ -219,22 +230,37 @@ export function Watch({
     if (error) logResult(error);
   }, [error, logResult]);
 
-  // DVR controls (native seeks for now; full effectiveTime machine is next).
+  // DVR — program position derived from the baseline (progRef/baselineRef).
+  const curPos = () => {
+    const p = progRef.current;
+    const v = videoRef.current;
+    const b = baselineRef.current;
+    if (!p) return 0;
+    return b && v ? b.offset + (v.currentTime - b.ct) : p.tuneOffset;
+  };
+  const liveNow = () => {
+    const p = progRef.current;
+    return p ? Math.min(p.durationSeconds, (Date.now() - p.startsAtMs) / 1000) : 0;
+  };
+  const seekTo = (P: number) => {
+    const v = videoRef.current;
+    const b = baselineRef.current;
+    if (!v || !b) return;
+    const clamped = Math.max(0, Math.min(liveNow(), P)); // never seek past live
+    v.currentTime = b.ct + (clamped - b.offset);
+  };
   const onPlayPause = () => {
     const v = videoRef.current;
     if (!v) return;
     if (v.paused) void v.play().catch(() => {});
     else v.pause();
   };
-  const onRewind = () => {
-    const v = videoRef.current;
-    if (v) v.currentTime = Math.max(0, v.currentTime - 15);
+  const onSeekBack = () => seekTo(curPos() - 10);
+  const onSeekForward = () => seekTo(curPos() + 10);
+  const onLive = () => {
+    if (mediaRef.current?.mode === "direct" && baselineRef.current) seekTo(liveNow());
+    else void resolve();
   };
-  const onForward = () => {
-    const v = videoRef.current;
-    if (v) v.currentTime = v.currentTime + 15;
-  };
-  const onLive = () => void resolve();
   const onRestart = () => {
     const v = videoRef.current;
     if (mediaRef.current?.mode === "direct" && v) {
@@ -279,6 +305,29 @@ export function Watch({
     void resolve();
   };
 
+  // Sample program position for the scrubber — only while the panel is open (no work,
+  // and nothing on screen, during normal viewing).
+  const [progress, setProgress] = useState<Progress>({ position: 0, duration: 0, liveOffset: 0, paused: false });
+  useEffect(() => {
+    if (!panelOpen) return;
+    const sample = () => {
+      const p = progRef.current;
+      const v = videoRef.current;
+      const b = baselineRef.current;
+      if (!p) return;
+      const pos = b && v ? b.offset + (v.currentTime - b.ct) : p.tuneOffset;
+      setProgress({
+        position: Math.max(0, pos),
+        duration: p.durationSeconds,
+        liveOffset: Math.max(0, Math.min(p.durationSeconds, (Date.now() - p.startsAtMs) / 1000)),
+        paused: v?.paused ?? false,
+      });
+    };
+    sample();
+    const id = window.setInterval(sample, 500);
+    return () => window.clearInterval(id);
+  }, [panelOpen]);
+
   // Remote: panel closed → OK/Up opens it, Back exits. When open, the FeaturePanel
   // owns the keys (this handler yields).
   useEffect(() => {
@@ -308,8 +357,12 @@ export function Watch({
         ref={videoRef}
         className="h-full w-full"
         playsInline
-        onPlay={() => setPaused(false)}
-        onPause={() => setPaused(true)}
+        onPlaying={() => {
+          // Capture the position baseline once per tune (see progRef/baselineRef).
+          if (!baselineRef.current && progRef.current && videoRef.current) {
+            baselineRef.current = { ct: videoRef.current.currentTime, offset: progRef.current.tuneOffset };
+          }
+        }}
         onEnded={() => void resolve()}
         onError={() => {
           const e = videoRef.current?.error;
@@ -365,10 +418,10 @@ export function Watch({
             quality={quality}
             audioLang={audioLang}
             subtitleLang={subtitleLang}
-            paused={paused}
+            progress={progress}
+            onSeekBack={onSeekBack}
+            onSeekForward={onSeekForward}
             onPlayPause={onPlayPause}
-            onRewind={onRewind}
-            onForward={onForward}
             onLive={onLive}
             onRestart={onRestart}
             onSelectAudio={selectAudio}

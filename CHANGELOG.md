@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.35] - 2026-07-14
+
+### Added
+
+- **Glass DVR scrubber in the feature panel.** The panel now leads with a frosted (`backdrop-blur`) scrubber: a timeline bar with a **thumb** at the current position, the **elapsed / duration** time, a red **live marker** on the bar, and a **LIVE indicator** below-right that shows how far behind live you are (`-2:30 · LIVE`) or a bright **LIVE** when caught up. Focus model is two rows — **row 0 = scrubber** (◄ seek back, ► seek forward toward live but never past it, **OK pause/play**, ▼ to the controls), **row 1 = Restart + the audio/subtitle/quality dropdowns** (◄► move, ▲ back to the scrubber). Program **position is derived from a playback baseline** (offset + currentTime delta) so it's accurate across direct/http/hls — the first piece of the effectiveTime machine. Selecting the LIVE indicator jumps to live.
+
+### Notes
+
+- Seeking is reliable for direct-play (full-file); on a live transcode it's bounded by the buffer. Pausing correctly falls behind live (the gap grows), matching DVR intuition. The full machine (cross-program rewind, rollover-into-bumper, resume, position-preserving option changes) still follows.
+
 ## [0.3.34] - 2026-07-14
 
 Burn-in-safe player with a Framer Motion feature panel.
