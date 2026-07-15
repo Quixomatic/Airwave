@@ -51,6 +51,7 @@ const FEATURE_SCALE = 0.72;
 const WINDOW_MIN = 180; // minutes of timeline shown across the lane
 const LEAD_MIN = 30; // minutes of "already aired" shown before the grid start
 const MIN = 60_000;
+const SHOW_NOW_LINE = false; // hidden for now — the triangle marker alone marks "now"
 
 const accentOf = (i: number) => ACCENTS[i % ACCENTS.length]!;
 const hexA = (hex: string, a: number) => {
@@ -260,19 +261,23 @@ export function AuroraGrid({
         </div>
         {nowMins >= 0 && nowMins <= WINDOW_MIN && (
           <>
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                bottom: 0,
-                left: railPx + laneX(now),
-                width: 3,
-                background: C.now,
-                boxShadow: `0 0 12px ${C.now}`,
-                zIndex: 6,
-                pointerEvents: "none",
-              }}
-            />
+            {/* Vertical now-line hidden for now — the triangle marker alone reads the
+                current time. Flip SHOW_NOW_LINE to bring the full line back. */}
+            {SHOW_NOW_LINE && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  bottom: 0,
+                  left: railPx + laneX(now),
+                  width: 3,
+                  background: C.now,
+                  boxShadow: `0 0 12px ${C.now}`,
+                  zIndex: 6,
+                  pointerEvents: "none",
+                }}
+              />
+            )}
             <div
               // A subtle downward triangle capping the line: its bottom point sits at
               // the very top of the line. Anchored at the line's center (left edge +1.5px

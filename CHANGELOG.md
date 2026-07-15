@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.57] - 2026-07-15
+
+### Changed
+
+- **Guide now-line is just the triangle marker (vertical line hidden).** The big red vertical now-line is hidden for now; the downward triangle at the top marks the current time. Behind a `SHOW_NOW_LINE` toggle so the full line can be restored.
+
 ## [0.3.56] - 2026-07-15
 
 ### Fixed
