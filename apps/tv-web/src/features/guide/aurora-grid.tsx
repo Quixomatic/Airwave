@@ -517,7 +517,11 @@ function Row({
                   boxSizing: "border-box",
                   overflow: "hidden",
                   borderRadius: 8,
-                  border: selected ? `2px solid ${C.ring}` : `1px solid ${C.cellBorder}`,
+                  // Constant 1px border + an inset focus outline, so highlighting never
+                  // changes the border width (which would nudge the layout by a pixel).
+                  border: `1px solid ${C.cellBorder}`,
+                  outline: selected ? `2px solid ${C.ring}` : "none",
+                  outlineOffset: selected ? -2 : 0,
                   // Only the currently-airing program carries the channel tint — a two-tone
                   // progress fill: stronger tint up to the live point, weaker tint for the
                   // not-yet-aired remainder. Every other program gets a neutral fill and shows
@@ -525,7 +529,7 @@ function Row({
                   background: live
                     ? `linear-gradient(90deg, ${hexA(accent, 0.32)} ${fillPct}%, ${hexA(accent, 0.1)} ${fillPct}%)`
                     : "rgba(148,163,184,0.05)",
-                  boxShadow: selected ? "0 0 0 2px rgba(59,130,246,0.4), 0 12px 30px rgba(0,0,0,0.5)" : "none",
+                  boxShadow: selected ? "0 12px 30px rgba(0,0,0,0.5)" : "none",
                   zIndex: selected ? 4 : 1,
                   transition: "background .12s",
                 }}

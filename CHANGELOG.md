@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.3.56] - 2026-07-15
+
+### Fixed
+
+- **Highlighting a program no longer nudges the layout.** The focus indicator was a border-width change (1px → 2px), which reflowed the card's contents by a pixel or two. The card border is now a constant 1px and focus is drawn as an **inset outline** (`outline-offset: -2px`) — no layout participation, stays within the rounded card, so highlighting is a pure visual change.
+
 ## [0.3.55] - 2026-07-15
 
 ### Changed
