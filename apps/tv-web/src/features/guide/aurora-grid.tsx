@@ -1,3 +1,4 @@
+import { useVirtualizer } from "@tanstack/react-virtual";
 import * as LucideIcons from "lucide-react";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Menu, Settings, Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -122,6 +123,18 @@ export function AuroraGrid({
   const player = usePlayer();
   const cursorRef = useRef<number>(now.getTime());
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Virtualize the channel rows — with 100+ channels × program blocks, rendering them all
+  // is what makes scrolling crawl on the C2. Render only the visible rows + an overscan of
+  // 10 above/below (so nothing pops in mid-scroll). Row height is the dynamic, viewport-
+  // derived rowPx; remeasure when it changes.
+  const rowVirtualizer = useVirtualizer({
+    count: channels.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => rowPx,
+    overscan: 10,
+  });
+  useEffect(() => rowVirtualizer.measure(), [rowPx, rowVirtualizer]);
 
   const focusedChannel = channels[fc];
   const focusedProgram = focusedChannel?.programs[fp];
@@ -252,13 +265,10 @@ export function AuroraGrid({
     return () => window.removeEventListener("keydown", onKey);
   }, [channels, fc, focusedChannel, onTune, player]);
 
+  // Keep the focused row in view (it may not be rendered yet, so go through the virtualizer).
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const top = fc * rowPx;
-    if (top < el.scrollTop) el.scrollTop = top;
-    else if (top + rowPx > el.scrollTop + el.clientHeight) el.scrollTop = top + rowPx - el.clientHeight;
-  }, [fc, rowPx]);
+    rowVirtualizer.scrollToIndex(fc, { align: "auto" });
+  }, [fc, rowVirtualizer]);
 
   return (
     <div
@@ -283,23 +293,32 @@ export function AuroraGrid({
 
       {/* Grid area — flex:1 so it fills all remaining height on any screen. */}
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
-        <div ref={scrollRef} style={{ position: "absolute", inset: 0, overflowY: "auto", overflowX: "hidden" }}>
-          {channels.map((c, ci) => (
-            <Row
-              key={c.id}
-              channel={c}
-              accent={accentOf(ci)}
-              focused={ci === fc}
-              focusedProgramId={ci === fc ? focusedProgram?.id : undefined}
-              now={now}
-              rowPx={rowPx}
-              railFrac={CH_FRAC}
-              laneX={laneX}
-              laneW={laneW}
-              ppm={ppm}
-              minsFrom={minsFrom}
-            />
-          ))}
+        <div ref={scrollRef} className="cg-grid-scroll" style={{ position: "absolute", inset: 0, overflowY: "auto", overflowX: "hidden" }}>
+          <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
+            {rowVirtualizer.getVirtualItems().map((vi) => {
+              const c = channels[vi.index]!;
+              return (
+                <div
+                  key={c.id}
+                  style={{ position: "absolute", top: 0, left: 0, width: "100%", height: rowPx, transform: `translateY(${vi.start}px)` }}
+                >
+                  <Row
+                    channel={c}
+                    accent={accentOf(vi.index)}
+                    focused={vi.index === fc}
+                    focusedProgramId={vi.index === fc ? focusedProgram?.id : undefined}
+                    now={now}
+                    rowPx={rowPx}
+                    railFrac={CH_FRAC}
+                    laneX={laneX}
+                    laneW={laneW}
+                    ppm={ppm}
+                    minsFrom={minsFrom}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
         {nowMins >= 0 && nowMins <= WINDOW_MIN && (
           <>
@@ -358,7 +377,7 @@ export function AuroraGrid({
         </span>
         <span>OK to watch</span>
       </div>
-      <style>{`@keyframes tvgPulse{0%,100%{opacity:1}50%{opacity:.55}}`}</style>
+      <style>{`@keyframes tvgPulse{0%,100%{opacity:1}50%{opacity:.55}}.cg-grid-scroll{scrollbar-width:none;-ms-overflow-style:none}.cg-grid-scroll::-webkit-scrollbar{display:none}`}</style>
     </div>
   );
 }
@@ -466,6 +485,7 @@ function Row({
       style={{
         position: "relative",
         height: rowPx,
+        boxSizing: "border-box",
         display: "flex",
         borderTop: `1px solid ${C.rowBorder}`,
         background: "transparent",

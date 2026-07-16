@@ -2,7 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
-## [0.4.9] - 2026-07-16
+## [0.4.10] - 2026-07-16
+
+### Changed
+
+- **Guide grid is virtualized — fixes the painfully slow scrolling on the C2.** With 100+ channels × several program blocks each, rendering every row up front made scrolling crawl on the TV browser (and bloated the DOM compositing behind the full player). The channel rows now use `@tanstack/react-virtual`: only the visible rows plus an **overscan of 10 above/below** render (so nothing pops in mid-scroll), sized from the dynamic viewport-derived row height (remeasured on resize). D-pad focus scrolls via the virtualizer's `scrollToIndex`. The now-line/marker overlay and per-row time-lane math are unchanged.
+- **Hid the grid scrollbar** — it never showed on the C2 but appeared in the desktop browser sim. `scrollbar-width: none` + `::-webkit-scrollbar { display: none }` on the grid's scroll container.
+
+
 
 ### Fixed
 

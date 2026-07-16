@@ -1,6 +1,6 @@
 {
   "name": "tv-web",
-  "version": "0.4.9",
+  "version": "0.4.10",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,6 +14,7 @@
     "@ChannelGuide/ui": "workspace:*",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.17",
+    "@tanstack/react-virtual": "^3.14.5",
     "better-auth": "catalog:",
     "framer-motion": "^12.42.2",
     "hls.js": "^1.6.16",
