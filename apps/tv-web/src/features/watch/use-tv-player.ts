@@ -302,7 +302,21 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
         );
 
         if (info.mode === "hls" && Hls.isSupported()) {
-          const hls = new Hls({ enableWorker: true });
+          const hls = new Hls({
+            enableWorker: true,
+            // Buffer as aggressively as the browser allows, so high-bitrate 4K HDR that's
+            // *copied* into HLS (e.g. ~50 Mbps Avatar) can ride out Wi-Fi jitter. The hard
+            // ceiling is the MSE SourceBuffer quota (~150 MB) — we can't exceed it, but we can
+            // devote all of it to the FORWARD buffer:
+            //  • maxBufferSize huge → hls.js's own cap never binds before the browser quota.
+            //  • maxBufferLength long → target a big forward window (bytes/quota cap it first).
+            //  • backBufferLength tiny → keep almost no history, freeing the quota for ahead.
+            //  • maxBufferHole → tolerate small gaps instead of stalling to re-seek over them.
+            maxBufferSize: 600 * 1000 * 1000,
+            maxBufferLength: 60,
+            backBufferLength: 10,
+            maxBufferHole: 0.5,
+          });
           hlsRef.current = hls;
           hls.on(Hls.Events.ERROR, (_e, data) => {
             const d = String(data.details ?? "");

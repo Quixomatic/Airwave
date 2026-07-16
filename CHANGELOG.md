@@ -2,7 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
-## [0.4.14] - 2026-07-16
+## [0.4.15] - 2026-07-16
+
+### Changed
+
+- **Aggressive HLS buffering for high-bitrate 4K HDR.** When a very high-bitrate 4K HDR HEVC video is *copied* into the HLS transcode (e.g. ~50 Mbps Avatar, forced there only because its TrueHD audio must transcode), hls.js's default 60 MB buffer (≈ a few seconds) thrashed over Wi-Fi — `bufferFull ↔ bufferStalled ↔ bufferSeekOverHole`. The player now buffers as aggressively as the browser allows: `maxBufferSize` raised so hls.js's own cap never binds before the MSE quota (~150 MB, the hard ceiling), a long forward `maxBufferLength`, a tiny `backBufferLength` so the whole quota goes to the *forward* buffer, and `maxBufferHole` tolerance so it doesn't stall re-seeking small gaps. Video is still copied (untouched); this only changes how much is buffered ahead.
+
+### Added
+
+- `probe-title-streams.ts` — read-only inspector for a title's bitrate + every audio track (codec/channels/default), for deciding delivery (e.g. spotting a decodable secondary audio track on a TrueHD-default UHD rip).
+
+
 
 ### Added
 
