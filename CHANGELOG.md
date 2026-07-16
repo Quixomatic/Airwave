@@ -2,7 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
-## [0.4.10] - 2026-07-16
+## [0.4.11] - 2026-07-16
+
+### Added
+
+- **D-pad up reaches the Guide/Settings nav pill.** From the top channel row, Up now leaves the grid — into the mini feed if one's playing, then Up again (or directly, if no feed) to the **Guide/Settings segmented control**. Left/Right move between the tabs, OK activates (Settings navigates; Guide returns to the grid), Down returns to the grid. The focused tab shows a ring (inset outline, no layout shift).
+- **Magic-remote pointer + scroll-wheel support on the guide.** Clicking a channel row with the motion pointer tunes it (same as OK). Scrolling with the wheel keeps the D-pad focus following the view (the highlighted/tuned channel stays on-screen), so pointer-scrolling and D-pad navigation stay in sync — guarded so it doesn't fight the D-pad's own scroll.
+
+
 
 ### Changed
 

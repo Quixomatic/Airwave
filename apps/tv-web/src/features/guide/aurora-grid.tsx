@@ -120,9 +120,15 @@ export function AuroraGrid({
 
   const [fc, setFc] = useState(0);
   const [fp, setFp] = useState(0);
+  // Focus zone: the grid (channel rows) vs the top Guide/Settings nav pill.
+  const [zone, setZone] = useState<"grid" | "nav">("grid");
+  const [navSel, setNavSel] = useState<0 | 1>(0);
   const player = usePlayer();
   const cursorRef = useRef<number>(now.getTime());
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Set before we programmatically scroll to a focused row, so the follow-scroll from a
+  // wheel/pointer scroll doesn't fight the D-pad's own scrollToIndex.
+  const suppressScrollSync = useRef(false);
 
   // Virtualize the channel rows — with 100+ channels × program blocks, rendering them all
   // is what makes scrolling crawl on the C2. Render only the visible rows + an overscan of
@@ -204,7 +210,20 @@ export function AuroraGrid({
       if (player.layout === "full") return;
       const isBack = e.keyCode === 461 || ["Backspace", "GoBack", "BrowserBack", "XF86Back"].includes(e.key);
 
-      // Mini feed focused → its two buttons own the keys.
+      // Top Guide/Settings nav pill focused.
+      if (zone === "nav") {
+        e.preventDefault();
+        if (isBack || e.key === "ArrowDown") setZone("grid");
+        else if (e.key === "ArrowLeft") setNavSel(0);
+        else if (e.key === "ArrowRight") setNavSel(1);
+        else if (e.key === "Enter") {
+          if (navSel === 1) onSettings();
+          setZone("grid");
+        }
+        return;
+      }
+
+      // Mini feed focused → its two buttons own the keys (Up leaves it for the nav pill).
       if (player.miniFocused) {
         e.preventDefault();
         if (isBack) player.stop();
@@ -212,6 +231,10 @@ export function AuroraGrid({
         else if (e.key === "ArrowRight") player.miniMove(1);
         else if (e.key === "Enter") player.miniActivate();
         else if (e.key === "ArrowDown") player.blurMini();
+        else if (e.key === "ArrowUp") {
+          player.blurMini();
+          setZone("nav");
+        }
         return;
       }
 
@@ -243,9 +266,11 @@ export function AuroraGrid({
         }
         case "ArrowUp": {
           e.preventDefault();
-          // At the top row, Up docks focus into the mini feed (if one's playing).
-          if (fc === 0 && player.layout === "mini") {
-            player.focusMini();
+          // At the top row, Up leaves the grid: into the mini feed if one's playing, else
+          // up to the Guide/Settings nav pill.
+          if (fc === 0) {
+            if (player.layout === "mini") player.focusMini();
+            else setZone("nav");
             break;
           }
           const nc = Math.max(0, fc - 1);
@@ -263,10 +288,15 @@ export function AuroraGrid({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [channels, fc, focusedChannel, onTune, player]);
+  }, [channels, fc, focusedChannel, onTune, player, zone, navSel, onSettings]);
 
   // Keep the focused row in view (it may not be rendered yet, so go through the virtualizer).
+  // Skipped when focus was just snapped to follow a user (wheel/pointer) scroll.
   useEffect(() => {
+    if (suppressScrollSync.current) {
+      suppressScrollSync.current = false;
+      return;
+    }
     rowVirtualizer.scrollToIndex(fc, { align: "auto" });
   }, [fc, rowVirtualizer]);
 
@@ -283,7 +313,7 @@ export function AuroraGrid({
         fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif',
       }}
     >
-      <NavPill onSettings={onSettings} />
+      <NavPill focused={zone === "nav"} sel={navSel} onGuide={() => setZone("grid")} onSettings={onSettings} />
       {focusedChannel && focusedProgram ? (
         <FeaturedPanel channel={focusedChannel} program={focusedProgram} now={now} accent={accentOf(fc)} slotRef={player.miniSlotRef} showSlot={player.layout !== "off"} />
       ) : (
@@ -293,14 +323,40 @@ export function AuroraGrid({
 
       {/* Grid area — flex:1 so it fills all remaining height on any screen. */}
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
-        <div ref={scrollRef} className="cg-grid-scroll" style={{ position: "absolute", inset: 0, overflowY: "auto", overflowX: "hidden" }}>
+        <div
+          ref={scrollRef}
+          className="cg-grid-scroll"
+          style={{ position: "absolute", inset: 0, overflowY: "auto", overflowX: "hidden" }}
+          onScroll={() => {
+            // Wheel/pointer scroll: keep the D-pad focus following the view so the highlighted
+            // (and thus tuned) channel is always on-screen. Guarded so the D-pad's own
+            // scrollToIndex doesn't get overridden — it keeps fc within the visible range.
+            const el = scrollRef.current;
+            if (!el || !channels.length) return;
+            const first = Math.floor(el.scrollTop / rowPx);
+            const last = Math.floor((el.scrollTop + el.clientHeight) / rowPx);
+            if (fc < first || fc > last) {
+              const nc = Math.min(channels.length - 1, Math.max(0, first));
+              suppressScrollSync.current = true;
+              setFc(nc);
+              setFp(pickAtCursor(nc));
+            }
+          }}
+        >
           <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
             {rowVirtualizer.getVirtualItems().map((vi) => {
               const c = channels[vi.index]!;
               return (
                 <div
                   key={c.id}
-                  style={{ position: "absolute", top: 0, left: 0, width: "100%", height: rowPx, transform: `translateY(${vi.start}px)` }}
+                  onClick={() => {
+                    // Pointer/magic-remote click = tune this channel (like OK on it).
+                    setZone("grid");
+                    setFc(vi.index);
+                    setFp(liveProgramIndex(c.programs, now.getTime()));
+                    onTune(c.id);
+                  }}
+                  style={{ position: "absolute", top: 0, left: 0, width: "100%", height: rowPx, transform: `translateY(${vi.start}px)`, cursor: "pointer" }}
                 >
                   <Row
                     channel={c}
@@ -385,8 +441,20 @@ export function AuroraGrid({
 /** spec px → device px at the current width (for exact left-offsets). */
 const vwNum = (width: number, px: number) => (px / DESIGN_W) * width;
 
-function NavPill({ onSettings }: { onSettings: () => void }) {
-  const tab = (active: boolean): React.CSSProperties => ({
+function NavPill({
+  focused,
+  sel,
+  onGuide,
+  onSettings,
+}: {
+  focused: boolean;
+  sel: 0 | 1;
+  onGuide: () => void;
+  onSettings: () => void;
+}) {
+  // `active` = the current view (Guide). `ring` = the D-pad-focused tab (only when the pill
+  // has focus). box-sizing:border-box so the focus ring doesn't nudge the layout.
+  const tab = (active: boolean, ring: boolean): React.CSSProperties => ({
     display: "flex",
     alignItems: "center",
     gap: vw(10),
@@ -394,8 +462,10 @@ function NavPill({ onSettings }: { onSettings: () => void }) {
     borderRadius: 999,
     fontSize: vw(21),
     fontWeight: 600,
-    color: active ? "#f1f5f9" : "#94a3b8",
+    color: active || ring ? "#f1f5f9" : "#94a3b8",
     background: active ? C.navActive : "transparent",
+    outline: ring ? `2px solid ${C.ring}` : "none",
+    outlineOffset: -2,
     cursor: "pointer",
     border: "none",
     transition: "all .12s",
@@ -416,10 +486,10 @@ function NavPill({ onSettings }: { onSettings: () => void }) {
         flexShrink: 0,
       }}
     >
-      <button style={tab(true)}>
+      <button style={tab(true, focused && sel === 0)} onClick={onGuide}>
         <Menu size="1em" /> Guide
       </button>
-      <button style={tab(false)} onClick={onSettings}>
+      <button style={tab(false, focused && sel === 1)} onClick={onSettings}>
         <Settings size="1em" /> Settings
       </button>
     </div>
