@@ -225,9 +225,13 @@ export type GuideMeta = {
   durationMs?: number;
   thumb?: string; // relative Plex path (needs baseUrl + token to fetch)
   art?: string;
+  addedAt?: string; // ISO — when the file was added to the library (recency / "New")
   // media badges
   resolution?: string; // "4k" | "1080" | "720" | "sd"
   audioChannels?: number; // 6 → 5.1, 8 → 7.1
+  hdr?: string; // "HDR10" | "Dolby Vision" | "HLG" when the video is HDR, else undefined (SDR)
+  dynamicAudio?: string; // "Atmos" | "DTS:X" object/next-gen audio, else undefined
+  videoCodec?: string; // "hevc" | "h264" | "av1" — for badges / diagnostics
   // episode context
   showTitle?: string; // grandparentTitle
   showRatingKey?: string; // grandparentRatingKey — links an episode to its parent show
@@ -268,8 +272,54 @@ type PlexMetadata = {
   Director?: PlexTagRef[];
   Genre?: PlexTagRef[];
   Role?: PlexTagRef[];
-  Media?: Array<{ videoResolution?: string; audioChannels?: number }>;
+  Media?: PlexMedia[];
+  addedAt?: number; // epoch seconds the item was added to the library
 };
+
+/** A file's Media element. The video/audio Streams (and thus HDR / object-audio detection) are
+ *  only present when the listing is fetched with `includeElements=Stream`. */
+type PlexMedia = {
+  videoResolution?: string;
+  videoCodec?: string;
+  audioChannels?: number;
+  Part?: Array<{ Stream?: PlexStreamLite[] }>;
+};
+type PlexStreamLite = {
+  streamType?: number; // 1=video, 2=audio, 3=subtitle
+  codec?: string;
+  channels?: number;
+  colorTrc?: string;
+  DOVIPresent?: boolean | number;
+  title?: string;
+  displayTitle?: string;
+  extendedDisplayTitle?: string;
+};
+
+/** The HDR type of a Media's video stream, or undefined for SDR. HDR lives on the STREAM
+ *  (`colorTrc` = PQ/HLG transfer, or the Dolby-Vision flag), NOT the Media element — so this
+ *  is only populated when the listing was fetched with `includeElements=Stream`. */
+function detectHdr(media: PlexMedia | undefined): string | undefined {
+  const vs = media?.Part?.[0]?.Stream?.find((s) => s.streamType === 1);
+  if (!vs) return undefined;
+  if (vs.DOVIPresent === 1 || vs.DOVIPresent === true) return "Dolby Vision";
+  const trc = (vs.colorTrc ?? "").toLowerCase();
+  if (trc === "smpte2084") return "HDR10"; // PQ
+  if (trc === "arib-std-b67") return "HLG";
+  return undefined;
+}
+
+/** Object-based / next-gen audio (Dolby Atmos, DTS:X) if any audio stream carries it — Plex
+ *  labels them in the stream title (e.g. "Atmos (English TRUEHD 7.1)"). Only with
+ *  `includeElements=Stream`. Undefined for plain channel-based audio. */
+function detectDynamicAudio(media: PlexMedia | undefined): string | undefined {
+  const audio = media?.Part?.[0]?.Stream?.filter((s) => s.streamType === 2) ?? [];
+  for (const s of audio) {
+    const t = `${s.extendedDisplayTitle ?? ""} ${s.displayTitle ?? ""} ${s.title ?? ""}`.toLowerCase();
+    if (t.includes("atmos")) return "Atmos";
+    if (t.includes("dts:x") || t.includes("dts-x") || t.includes("dtsx")) return "DTS:X";
+  }
+  return undefined;
+}
 
 const tags = (arr: PlexTagRef[] | undefined, max: number): string[] | undefined => {
   if (!arr?.length) return undefined;
@@ -295,8 +345,12 @@ function toGuideMeta(m: PlexMetadata): GuideMeta {
     durationMs: m.duration ?? 0,
     thumb: m.thumb,
     art: m.art,
+    addedAt: m.addedAt ? new Date(m.addedAt * 1000).toISOString() : undefined,
     resolution: media?.videoResolution,
     audioChannels: media?.audioChannels,
+    hdr: detectHdr(media),
+    dynamicAudio: detectDynamicAudio(media),
+    videoCodec: media?.videoCodec,
     showTitle: m.grandparentTitle,
     showRatingKey: m.grandparentRatingKey != null ? String(m.grandparentRatingKey) : undefined,
     season: m.parentIndex,
@@ -337,6 +391,9 @@ export async function getSectionItems(
   });
   if (q.genreId) params.set("genre", q.genreId);
   if (q.unwatched) params.set("unwatched", "1");
+  // Pull per-file streams inline (HDR / object-audio). NOT for shows (type 2) — they're
+  // containers with no streams and Plex 500s on `includeElements=Stream` for them.
+  if (q.type !== 2) params.set("includeElements", "Stream");
   const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/all?${params.toString()}`, {
     headers: pmsHeaders(token),
   });
@@ -366,6 +423,8 @@ export async function getSectionItemsRaw(
     `type=${type}`,
     `sort=${encodeURIComponent(sort)}`,
     `X-Plex-Container-Size=${limit}`,
+    // per-file streams inline (HDR / object-audio); not for shows (type 2 → Plex 500s, no streams)
+    ...(type === 2 ? [] : ["includeElements=Stream"]),
     ...filterParams,
   ].join("&");
   const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/all?${qs}`, {
@@ -395,6 +454,9 @@ export async function getAllSectionItems(
       "sort=titleSort",
       `X-Plex-Container-Start=${start}`,
       `X-Plex-Container-Size=${pageSize}`,
+      // per-file streams inline (HDR / object-audio) — bulk, no per-item calls; NOT for shows
+      // (type 2): they're containers with no streams and Plex 500s on includeElements=Stream.
+      ...(type === 2 ? [] : ["includeElements=Stream"]),
     ].join("&");
     const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/all?${qs}`, {
       headers: pmsHeaders(token),
@@ -424,6 +486,8 @@ export async function getRecentlyAdded(
     "sort=addedAt:desc",
     `X-Plex-Container-Start=0`,
     `X-Plex-Container-Size=${limit}`,
+    // per-file streams inline (HDR / object-audio); not for shows (type 2 → Plex 500s, no streams)
+    ...(type === 2 ? [] : ["includeElements=Stream"]),
   ].join("&");
   const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/all?${qs}`, {
     headers: pmsHeaders(token),

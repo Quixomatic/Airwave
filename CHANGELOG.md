@@ -2,6 +2,22 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.18] - 2026-07-16
+
+### Added
+
+- **HDR / Dolby Vision / Atmos captured during metadata sync + badged in the guide.** The featured panel now shows an **HDR** badge (or **DV** for Dolby Vision) beside the 4K/HD badge, and an **ATMOS**/**DTS:X** badge beside the audio badge. These live on the video/audio *streams*, which the section listing omits by default — so the sync now requests them inline with **`includeElements=Stream`** (the same bulk call, no per-item fetches; verified it doesn't strip the genre/cast tags) and `getPlaybackInfo`-style parsing derives HDR from the video stream's `colorTrc` (`smpte2084`→HDR10, `arib-std-b67`→HLG) or the Dolby-Vision flag, and object-audio from the audio stream titles. Stored on the cached `GuideMeta` (a JSON column — no migration), so the guide reads them straight from the `MediaItem` table.
+- **A few other useful fields now captured in the same sync call** for future use: `videoCodec` (hevc/h264/av1), `dynamicAudio` (Atmos/DTS:X), and `addedAt` (library add date, for recency / "New" cues).
+
+> Run **Sync Metadata** once to backfill these onto existing library items.
+
+## [0.4.17] - 2026-07-16
+
+### Changed
+
+- **Guide mini-feed fills the featured panel's height.** The docked mini player was sized by a fixed width with a 16:9 aspect ratio, so its height was width-derived and, with the row top-aligned, it sat short against the top of the featured panel leaving a gap below. It now stretches to fill the panel's available height (bottom-flush — the panel has no bottom padding) while keeping a fixed, bounded width (the video's `objectFit: cover` fills the taller slot), so the feed spans the featured section top-to-bottom and stays on-screen on the webOS simulator (deriving width from a stretched height via `aspect-ratio` overflowed off-screen there).
+- **Featured description uses the full available width.** The now-playing summary had a fixed `maxWidth` that capped it well short of the column, leaving empty horizontal space beside it. The cap is removed so it fills the room left beside the mini feed (still clamped to two lines).
+
 ## [0.4.16] - 2026-07-16
 
 ### Added

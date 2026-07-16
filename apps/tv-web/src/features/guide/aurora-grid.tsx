@@ -779,7 +779,17 @@ function FeaturedPanel({
             ) : isHD(g.resolution) ? (
               <span style={{ ...badge, background: "#7fd6de", color: "#06222a" }}>HD</span>
             ) : null}
+            {g.hdr && (
+              <span style={{ ...badge, background: "#f0c14b", color: "#2a1e00" }}>
+                {g.hdr === "Dolby Vision" ? "DV" : "HDR"}
+              </span>
+            )}
             {audio && <span style={{ ...badge, background: "#1e293b", color: "#dfe4ec" }}>{audio}</span>}
+            {g.dynamicAudio && (
+              <span style={{ ...badge, background: "#1e293b", color: "#dfe4ec" }}>
+                {g.dynamicAudio === "Atmos" ? "ATMOS" : g.dynamicAudio}
+              </span>
+            )}
           </div>
         </div>
 
@@ -797,8 +807,9 @@ function FeaturedPanel({
         </div>
 
         {/* Always reserve two lines (the max) so the panel height doesn't jump
-            between a 1-line and 2-line (or missing) summary. */}
-        <div style={{ marginTop: fv(22), fontSize: fv(36), lineHeight: 1.4, minHeight: fv(36 * 1.4 * 2), color: "#c9cfda", maxWidth: fv(1560), display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            between a 1-line and 2-line (or missing) summary. Spans the full column
+            width (no maxWidth cap) so it uses the room left beside the mini feed. */}
+        <div style={{ marginTop: fv(22), fontSize: fv(36), lineHeight: 1.4, minHeight: fv(36 * 1.4 * 2), color: "#c9cfda", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
           {g.summary ?? ""}
         </div>
 
@@ -815,8 +826,12 @@ function FeaturedPanel({
 
       {/* The slot the persistent mini feed docks into — only present while a feed is
           active, so with nothing playing the left content spans the full width (no empty
-          gap). The player (player-context.tsx) overlays the live video here in `mini`. */}
-      {showSlot && <div ref={slotRef} style={{ width: fv(820), aspectRatio: "16 / 9", borderRadius: 14, flexShrink: 0 }} />}
+          gap). The player (player-context.tsx) overlays the live video here in `mini`.
+          Fixed width + `alignSelf: stretch` FILLS the panel's height (bottom-flush — the panel
+          has no bottom padding); the width is tuned so the filled height lands ~16:9. (Deriving
+          width from the stretched height via `aspect-ratio` overflowed off-screen on Chrome 108
+          / the webOS simulator, so we use a plain fixed width instead.) */}
+      {showSlot && <div ref={slotRef} style={{ alignSelf: "stretch", width: fv(970), borderRadius: 14, flexShrink: 0 }} />}
     </div>
   );
 }

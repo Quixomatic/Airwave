@@ -123,8 +123,12 @@ export type GuideMeta = {
   durationMs?: number;
   thumb?: string;
   art?: string;
+  addedAt?: string;
   resolution?: string;
   audioChannels?: number;
+  hdr?: string; // "HDR10" | "Dolby Vision" | "HLG" when HDR, else undefined
+  dynamicAudio?: string; // "Atmos" | "DTS:X", else undefined
+  videoCodec?: string;
   showTitle?: string;
   showRatingKey?: string;
   season?: number;
