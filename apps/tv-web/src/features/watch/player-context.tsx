@@ -27,6 +27,10 @@ import { useChannels } from "../../hooks/use-channels";
 
 type Layout = "off" | "mini" | "full";
 
+/** Idle time (no remote/pointer input) with the mini feed playing before we auto-expand to
+ *  full-screen — beats the TV screensaver that would otherwise blank the screen. */
+const MINI_IDLE_FULLSCREEN_MS = 60_000;
+
 type PlayerCtx = {
   activeChannelId: string | null;
   playingChannelId: string | null;
@@ -91,6 +95,25 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (miniSel === 0) goFull();
     else stop();
   }, [miniSel, goFull, stop]);
+
+  // After a stretch of no input with the mini feed playing, go full-screen. Otherwise the
+  // TV's screensaver eventually blanks everything but the tiny video — a fullscreen video
+  // keeps the panel awake. Any remote/pointer activity resets the timer.
+  useEffect(() => {
+    if (layout !== "mini") return;
+    let timer = 0;
+    const reset = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(goFull, MINI_IDLE_FULLSCREEN_MS);
+    };
+    const evs = ["keydown", "pointermove", "pointerdown", "wheel"];
+    reset();
+    evs.forEach((ev) => window.addEventListener(ev, reset));
+    return () => {
+      window.clearTimeout(timer);
+      evs.forEach((ev) => window.removeEventListener(ev, reset));
+    };
+  }, [layout, goFull]);
 
   const value = useMemo<PlayerCtx>(
     () => ({

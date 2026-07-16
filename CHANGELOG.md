@@ -2,7 +2,13 @@
 
 All notable changes to ChannelGuide are documented here.
 
-## [0.4.13] - 2026-07-16
+## [0.4.14] - 2026-07-16
+
+### Added
+
+- **Idle mini-feed auto-expands to full-screen** (default 60s of no input). With only the small mini feed playing over the guide, the TV's screensaver would eventually blank everything but the tiny video; a fullscreen video keeps the panel awake, so after an idle stretch the mini feed goes full. Any remote/pointer activity resets the timer.
+
+
 
 ### Fixed
 
