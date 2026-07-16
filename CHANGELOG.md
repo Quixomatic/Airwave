@@ -2,6 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.16] - 2026-07-16
+
+### Added
+
+- **Direct-play with a client-side audio-track switch — the real fix for TrueHD/DTS-default 4K HDR (e.g. Avatar).** When a file's container + video are natively decodable but its *default* audio isn't (TrueHD/DTS/ALAC), yet it carries a **decodable companion track** (Avatar's TrueHD 7.1 default alongside an AC3 5.1), playback no longer drops to an HLS transcode (where the copied ~50 Mbps HDR video blew past the MSE SourceBuffer quota and buffered endlessly). Instead the raw file **direct-plays** — no transcode, HDR/HEVC untouched, entirely off the MSE path — and the server tells the client **which audio track to select** on load. A new `getPlaybackInfo` middle case picks the best decodable audio track — preferring a real program track over a **commentary**, then most channels — and returns `directAudio` with its **index among the decodable tracks** (which is exactly what the panel exposes, since it hides tracks it can't decode); the TV player switches to it via `video.audioTracks` after `loadedmetadata`. No Plex-side PUT is involved: a raw-file direct-play serves the file as-is, so Plex's selected-stream state wouldn't ride along — and since the browser's `AudioTrack` API exposes no codec, the **server** names the track and the **client** enables it. The panel's exposed audio-track list + the selected index are recorded to `PlaybackLog` (`caps.audio`).
+- **Client falls through same-language audio tracks before dropping to HLS.** Measured on the C2, `video.audioTracks` does **not** match Plex's file order — the panel reorders and even hides tracks (Avatar's 2 audio streams surfaced as 1). So the server's `audioIndex` is a first guess, not a certainty: the player now enables that candidate, and on a `<video>` decode error tries the **next same-language track**, exhausting them before it falls back to the (buffering) HLS transcode. This turns files where the panel exposes multiple tracks (which previously errored straight to HLS) into native direct-plays when any exposed same-language track is decodable.
+- `sim-audio-directplay.ts` — server-side test of the flow (PUT-select a decodable track, re-read metadata, and diff Plex's `/decision` before/after — proving the file's embedded `default` flag is immutable and `Media.audioCodec` doesn't follow the selection, which is *why* the switch must happen client-side). `sim-title.ts` now prints `directAudio`.
+
 ## [0.4.15] - 2026-07-16
 
 ### Changed

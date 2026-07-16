@@ -472,6 +472,19 @@ export type PlaybackInfo = {
   /** Distinct audio / subtitle languages available on this item (for the pickers). */
   audioTracks: PlaybackTrack[];
   subtitleTracks: PlaybackTrack[];
+  /** DIRECT-PLAY with a client-side audio switch. Set when the file's DEFAULT audio is
+   *  undecodable (DTS/TrueHD/ALAC) but a decodable companion track exists, so we direct-play
+   *  the raw file anyway (no transcode) and the client selects this track on load. A raw-file
+   *  direct-play serves the file as-is (Plex's selected-stream state doesn't ride along), and
+   *  the browser's AudioTrack API exposes no codec — so the server names the track. `audioIndex`
+   *  is the 0-based index AMONG audio tracks in file order (the only handle both sides share). */
+  directAudio?: {
+    streamId: string;
+    audioIndex: number;
+    lang: string;
+    label: string;
+    codec: string;
+  };
   /** What Plex's /decision actually chose (hls only) — for the debug overlay. */
   decision?: {
     videoDecision?: string; // "copy" | "transcode" | "directplay"
@@ -627,18 +640,53 @@ export async function getPlaybackInfo(
   };
 
   // Quality cap, an audio-track switch, burned subtitles, or a runtime native-failure
-  // retry (forceHls) all force a transcode; otherwise a file the client can play
-  // natively direct-plays the raw part (client seeks to the offset).
-  const canDirect =
-    !opts.forceHls &&
-    !quality &&
-    audioStreamId == null &&
-    subStreamId == null &&
-    cOk(container) &&
-    vOk(videoCodec) &&
-    aOk(audioCodec);
+  // retry (forceHls) all force a transcode. Otherwise, if the client can natively play the
+  // container + video + the file's DEFAULT audio, we direct-play the raw part (client seeks
+  // to the offset).
+  const noOverride = !opts.forceHls && !quality && audioStreamId == null && subStreamId == null;
+  const directContainer = cOk(container);
+  const directVideo = vOk(videoCodec);
+  const directDefaultAudio = aOk(audioCodec);
+  const canDirect = noOverride && directContainer && directVideo && directDefaultAudio;
 
-  if (canDirect) {
+  // Middle case — direct-play WITH a client-side audio-track switch. The container + video are
+  // natively decodable but the file's DEFAULT audio isn't (DTS/TrueHD/ALAC), YET the file carries
+  // a companion track the client CAN decode (e.g. Avatar's AC3 alongside its TrueHD default). We
+  // STILL direct-play the raw file — no transcode, HDR/HEVC intact, off the MSE/HLS buffering path
+  // entirely — and tell the client which track to select on load. Why the client and not a server
+  // PUT: a raw-file direct-play serves the file as-is, so Plex's "selected stream" DB state doesn't
+  // ride along (the embedded default stays undecodable), and the browser's AudioTrack API exposes
+  // no codec — so the SERVER must name the track. The handle is its index AMONG audio tracks (file
+  // order). Proven server-side by sim-audio-directplay.ts; see [[project-tv-playback-protocol]].
+  let directAudio: PlaybackInfo["directAudio"];
+  if (!canDirect && noOverride && directContainer && directVideo && !directDefaultAudio) {
+    // The DECODABLE audio streams, in file order — this is EXACTLY what the client's native
+    // <video>.audioTracks exposes (measured on the C2: it filters out tracks it can't decode,
+    // e.g. the undecodable TrueHD default, keeping the rest in order — exposedCount always equals
+    // the decodable count). So the client's handle must be the index WITHIN this decodable subset,
+    // NOT among all audio streams (which would point past the hidden tracks and land on the wrong
+    // one — e.g. a commentary). Prefer a real program track over a commentary, then most channels.
+    const decodable = audioStreams.filter((s) => aOk((s.codec ?? "").toLowerCase()));
+    const isCommentary = (s: PlexStream) =>
+      /comment/i.test(`${s.title ?? ""} ${s.extendedDisplayTitle ?? ""} ${s.displayTitle ?? ""}`);
+    const best = decodable
+      .map((s, k) => ({ s, k }))
+      .sort((a, b) => {
+        const c = (isCommentary(a.s) ? 1 : 0) - (isCommentary(b.s) ? 1 : 0);
+        return c !== 0 ? c : (b.s.channels ?? 0) - (a.s.channels ?? 0);
+      })[0];
+    if (best) {
+      directAudio = {
+        streamId: best.s.id != null ? String(best.s.id) : "",
+        audioIndex: best.k, // index AMONG DECODABLE tracks = the panel's exposed audioTracks index
+        lang: streamLang(best.s),
+        label: streamLabel(best.s),
+        codec: canonicalAudioCodec((best.s.codec ?? "").toLowerCase()),
+      };
+    }
+  }
+
+  if (canDirect || directAudio) {
     const url = `${baseUrl}${part.key}?X-Plex-Token=${encodeURIComponent(token)}`;
     return {
       mode: "direct",
@@ -649,6 +697,7 @@ export async function getPlaybackInfo(
       audioCodec,
       audioTracks,
       subtitleTracks,
+      directAudio,
     };
   }
 

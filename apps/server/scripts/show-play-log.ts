@@ -22,6 +22,9 @@ async function main() {
         `decision=${d.videoDecision ?? "?"}/${d.audioDecision ?? "?"}->${d.videoCodec ?? "?"}/${d.audioCodec ?? "?"} cont=${d.container ?? "?"} ` +
         `decoded=${dims} rs=${r.readyState ?? "?"}${r.error ? ` ERR=${r.error}` : ""}`,
     );
+    // The direct-play audio-track switch readout (what the panel exposed + which we selected).
+    const audio: any = (r.caps as any)?.audio;
+    if (audio) console.log(`        audio=${JSON.stringify(audio)}`);
   }
   await prisma.$disconnect();
 }

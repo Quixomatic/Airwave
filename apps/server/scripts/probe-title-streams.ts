@@ -21,11 +21,11 @@ async function main() {
   if (!movie) return console.log("No movie lib.");
 
   const res = await fetch(`${base}/library/sections/${movie.key}/all?title=${encodeURIComponent(title)}`, { headers: H(src.token) });
-  const items: any[] = (await res.json())?.MediaContainer?.Metadata ?? [];
+  const items: any[] = ((await res.json()) as any)?.MediaContainer?.Metadata ?? [];
   if (!items.length) return console.log(`No match for "${title}".`);
 
   for (const it of items.slice(0, 6)) {
-    const meta: any = (await (await fetch(`${base}/library/metadata/${it.ratingKey}`, { headers: H(src.token) })).json())?.MediaContainer?.Metadata?.[0];
+    const meta: any = ((await (await fetch(`${base}/library/metadata/${it.ratingKey}`, { headers: H(src.token) })).json()) as any)?.MediaContainer?.Metadata?.[0];
     const m = meta?.Media?.[0];
     const mbps = m?.bitrate ? (m.bitrate / 1000).toFixed(1) : "?";
     console.log(`\n[${it.ratingKey}] ${it.title} (${it.year ?? "?"})  ${m?.videoResolution}/${m?.videoCodec}  bitrate=${mbps} Mbps  defaultAudio=${m?.audioCodec}`);

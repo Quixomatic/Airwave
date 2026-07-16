@@ -70,3 +70,4 @@ apps/server/capability-media/
 # Stray tsc build-mode emit in the (TS-only) api source tree (belongs in dist/, not src/)
 packages/api/src/**/*.js
 packages/api/src/**/*.d.ts
+*.ipk

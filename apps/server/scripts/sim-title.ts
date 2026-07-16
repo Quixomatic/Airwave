@@ -77,6 +77,7 @@ async function main() {
         `   decision: v=${d.videoDecision ?? "?"} a=${d.audioDecision ?? "?"} -> ${d.videoCodec ?? "?"}/${d.audioCodec ?? "?"} container=${d.container ?? "?"}`,
       );
       console.log(`   audioTracks:`, JSON.stringify(info.audioTracks));
+      if (info.directAudio) console.log(`   directAudio:`, JSON.stringify(info.directAudio));
       if (info.mode !== "hls") console.log(`   fetch:`, JSON.stringify(await probe(info.url)));
     }
   }

@@ -85,6 +85,70 @@ const RESUME_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const titleOf = (g?: GuideMeta | null): string =>
   !g ? "" : g.showTitle ? `${g.showTitle} — ${g.title}` : g.title;
 
+// The native `<video>.audioTracks` (AudioTrackList) — not in TS's DOM lib (no desktop browser
+// implemented it for years; webOS/Safari do), so we reach it through a cast.
+type NativeAudioTrack = { id: string; label: string; language: string; enabled: boolean; kind?: string };
+type NativeAudioTrackList = { length: number; [i: number]: NativeAudioTrack };
+const nativeAudioTracks = (v: HTMLVideoElement): NativeAudioTrackList | undefined =>
+  (v as unknown as { audioTracks?: NativeAudioTrackList }).audioTracks;
+
+/**
+ * Ordered list of native audio-track indices to try on a direct-play whose file DEFAULT audio is
+ * undecodable (TrueHD) but which carries a decodable companion (AC3). The server-named `audioIndex`
+ * goes FIRST (its best guess), then every OTHER same-language track — because the C2 reorders/hides
+ * tracks (proven: Avatar's 2 file streams surfaced as 1), so the file-order index isn't reliable.
+ * The player enables the first, and on a decode error falls through to the next before dropping to
+ * HLS. Falls back to all tracks if nothing matches the language. See [[project-tv-playback-protocol]].
+ */
+function directAudioCandidates(
+  v: HTMLVideoElement,
+  directAudio: NonNullable<MediaInfo["directAudio"]>,
+): number[] {
+  const list = nativeAudioTracks(v);
+  const n = list?.length ?? 0;
+  if (n === 0) return [];
+  const lang2 = directAudio.lang.slice(0, 2).toLowerCase();
+  const ordered: number[] = [];
+  if (directAudio.audioIndex >= 0 && directAudio.audioIndex < n) ordered.push(directAudio.audioIndex);
+  for (let i = 0; i < n; i++) {
+    const l = (list![i]!.language || "").toLowerCase();
+    if ((!lang2 || l.startsWith(lang2) || l === "") && !ordered.includes(i)) ordered.push(i);
+  }
+  if (ordered.length === 0) for (let i = 0; i < n; i++) ordered.push(i);
+  return ordered;
+}
+
+/** Enable exactly one native audio track (disable the rest). */
+function enableAudioTrack(v: HTMLVideoElement, index: number): void {
+  const list = nativeAudioTracks(v);
+  if (!list) return;
+  for (let i = 0; i < list.length; i++) {
+    try {
+      list[i]!.enabled = i === index;
+    } catch {
+      /* some panels expose the list read-only before play */
+    }
+  }
+}
+
+/** A readout of what the panel exposed + which track we chose (attempt N), for PlaybackLog. */
+function audioReadout(
+  v: HTMLVideoElement,
+  directAudio: NonNullable<MediaInfo["directAudio"]>,
+  candidates: number[],
+  chosen: number,
+  attempt: number,
+): Record<string, unknown> {
+  const list = nativeAudioTracks(v);
+  const n = list?.length ?? 0;
+  const exposed: Array<Record<string, unknown>> = [];
+  for (let i = 0; i < n; i++) {
+    const t = list![i]!;
+    exposed.push({ i, id: t.id, lang: t.language, label: t.label, enabled: t.enabled });
+  }
+  return { directAudio, exposedCount: n, exposed, candidates, chosen, attempt };
+}
+
 function resumePosition(channelId: string, earliestStartS: number, liveNow: number): number {
   try {
     const raw = localStorage.getItem(RESUME_KEY);
@@ -151,6 +215,12 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
     decision: MediaInfo["decision"] | null;
     caps: unknown;
   } | null>(null);
+  // The audio-track readout from a direct-play + client-side track switch (what the panel
+  // exposed + which we selected), merged into the next PlaybackLog row's `caps` JSON.
+  const audioReadoutRef = useRef<Record<string, unknown> | null>(null);
+  // Direct-play audio-switch cycling: which candidate track we're on + how many exist, so a
+  // decode error can try the NEXT same-language track before dropping to HLS.
+  const directAudioStateRef = useRef<{ attempt: number; count: number } | null>(null);
 
   const now = useCallback(() => (Date.now() + clockOffsetRef.current) / 1000, []);
 
@@ -182,9 +252,13 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
     if (!ctx) return;
     const v = videoRef.current;
     const decoded = (v?.videoWidth ?? 0) > 0;
+    const caps = audioReadoutRef.current
+      ? { ...(ctx.caps as Record<string, unknown>), audio: audioReadoutRef.current }
+      : ctx.caps;
     void api
       .logPlayback({
         ...ctx,
+        caps,
         outcome: outcome ?? (v?.error ? "error" : decoded ? "playing" : "not_decoding"),
         decodedWidth: v?.videoWidth ?? 0,
         decodedHeight: v?.videoHeight ?? 0,
@@ -195,7 +269,7 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
   }, []);
 
   const goTo = useCallback(
-    async (target: number, forceHls = false) => {
+    async (target: number, forceHls = false, audioCandidate = 0) => {
       const slots = slotsRef.current;
       if (slots.length === 0) return;
       if (transitioningRef.current) return;
@@ -218,7 +292,7 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
         // No-op if already playing this exact program at ~this position + same params
         // (skip the guard on a forced hls retry so it actually re-resolves).
         const cur = currentRef.current;
-        if (!forceHls && entry.slot.kind === "PROGRAM" && entry.slot.ratingKey && cur?.kind === "PROGRAM") {
+        if (!forceHls && audioCandidate === 0 && entry.slot.kind === "PROGRAM" && entry.slot.ratingKey && cur?.kind === "PROGRAM") {
           const curEff = cur.baselineReady
             ? cur.startS + cur.playStartOffset + ((videoRef.current?.currentTime ?? cur.playStartCurrentTime) - cur.playStartCurrentTime)
             : cur.startS + cur.playStartOffset;
@@ -269,6 +343,8 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
 
         if (prevSession && prevSession !== info.session) stopSession(prevSession);
         stopMedia();
+        audioReadoutRef.current = null;
+        directAudioStateRef.current = null;
         const video = videoRef.current;
         if (!video) return;
         currentRef.current = {
@@ -344,6 +420,16 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
             "loadedmetadata",
             () => {
               if (info.mode === "direct" && offset > 0) video.currentTime = offset;
+              // File default audio is undecodable but a decodable companion exists — select the
+              // candidate for THIS attempt (the server names the first guess; on a decode error
+              // the onError handler retries the next same-language candidate before HLS).
+              if (info.directAudio) {
+                const candidates = directAudioCandidates(video, info.directAudio);
+                const chosen = candidates[Math.min(audioCandidate, Math.max(0, candidates.length - 1))] ?? 0;
+                enableAudioTrack(video, chosen);
+                directAudioStateRef.current = { attempt: audioCandidate, count: candidates.length };
+                audioReadoutRef.current = audioReadout(video, info.directAudio, candidates, chosen, audioCandidate);
+              }
               tryPlay(video);
             },
             { once: true },
@@ -557,9 +643,16 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
     const onError = () => {
       recordLog("error");
       const cur = currentRef.current;
-      if (cur?.kind === "PROGRAM" && cur.mode !== "hls" && !cur.retried) {
-        void goTo(currentEffective(), true); // retry this spot forcing hls.js
+      if (cur?.kind !== "PROGRAM" || cur.mode === "hls") return;
+      // Direct-play + client audio switch: the C2 reorders/hides tracks, so the first pick may be
+      // wrong (or the undecodable default choked the decoder). Try the NEXT same-language candidate
+      // track before giving up — only when all candidates are exhausted do we drop to HLS.
+      const das = directAudioStateRef.current;
+      if (das && das.attempt + 1 < das.count) {
+        void goTo(currentEffective(), false, das.attempt + 1);
+        return;
       }
+      if (!cur.retried) void goTo(currentEffective(), true); // all candidates failed → force hls.js
     };
     // Buffering feedback: waiting/stalled → spinner on; playing/canplay → off.
     const onWaiting = () => setStatus((s) => (s.buffering ? s : { ...s, buffering: true }));

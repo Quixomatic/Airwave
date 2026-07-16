@@ -173,6 +173,16 @@ export type MediaInfo = {
   audioCodec?: string;
   audioTracks: Track[];
   subtitleTracks: Track[];
+  /** Present on a direct-play whose file DEFAULT audio is undecodable but a decodable companion
+   *  track exists: the track the client must select on load via `video.audioTracks` (the browser
+   *  exposes no codec, so the server names it). `audioIndex` = 0-based index among audio tracks. */
+  directAudio?: {
+    streamId: string;
+    audioIndex: number;
+    lang: string;
+    label: string;
+    codec: string;
+  };
   decision?: {
     videoDecision?: string;
     audioDecision?: string;
