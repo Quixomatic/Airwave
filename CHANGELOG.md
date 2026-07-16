@@ -2,7 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
-## [0.4.5] - 2026-07-15
+## [0.4.6] - 2026-07-15
+
+### Changed
+
+- **Transcode delivery is now HLS, not progressive MKV.** The must-transcode tail (DTS/TrueHD/ALAC audio, Hi10P, quality caps) was delivered as a progressive-HTTP stream to the native `<video>` — which the PlaybackLog proved **does not play on the C2**: `mode=http` either returned nothing (`0x0`) or reported dimensions but rendered a black screen, while the *identical* content via `mode=hls` played cleanly (e.g. `hevc/dca-ma → hevc/opus`, 3840×1632). The progressive rung is removed; transcodes now always deliver **HLS (fMP4)** via hls.js/MSE. **Direct-play (native `<video>`) is unchanged and remains the primary path** for everything the panel decodes — HLS only carries the transcode tail. The HLS profile advertises the full native video set (so Plex **copies** HEVC/AV1, HDR metadata preserved) with MSE-safe audio (aac/opus/mp3). `getPlaybackInfo` no longer emits `mode: "http"`.
+- **Sim tooling:** `sim-channel.ts <n> hls` forces the HLS transcode path for inspection; added `show-play-log.ts` to dump recent PlaybackLog rows.
+
+### Notes
+
+- Open item: verify **HDR survives the HLS/MSE path** on the C2 for HDR content that *also* has undecodable audio (DTS/TrueHD) — the only case forced to transcode a copied HEVC-HDR video. HDR content with decodable audio still direct-plays untouched.
+
+
 
 ### Added
 

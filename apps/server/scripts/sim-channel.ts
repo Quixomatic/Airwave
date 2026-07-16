@@ -5,7 +5,10 @@
  * path to confirm it's real). Handy for hunting codec-specific playback issues
  * without waiting for the content to roll around to "now".
  *
- *   bun --env-file=.env run scripts/sim-channel.ts <channelNumber>
+ *   bun --env-file=.env run scripts/sim-channel.ts <channelNumber> [hls]
+ *
+ * Pass `hls` as the 2nd arg to force the HLS transcode path (forceHls) instead of the
+ * native-first ladder — to compare what the transcode fallback resolves to.
  */
 import prisma from "@ChannelGuide/db";
 
@@ -36,8 +39,22 @@ async function probe(url: string) {
   }
 }
 
+async function probeHls(url: string) {
+  try {
+    const res = await fetch(url);
+    const text = await res.text();
+    const segs = text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+    const info: any = { status: res.status, isPlaylist: text.startsWith("#EXTM3U"), segCount: segs.length };
+    if (segs[0]) info.firstSeg = await probe(new URL(segs[0], url).toString());
+    return info;
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+}
+
 async function main() {
   const chNum = Number(process.argv[2] ?? "9");
+  const forceHls = process.argv[3] === "hls";
   const capRow = await prisma.deviceCapability.findFirst({ where: { decoded: true } });
   const deviceId = capRow!.deviceId;
   console.log(`Device: ${deviceId}`);
@@ -62,7 +79,7 @@ async function main() {
     seen.add(s.ratingKey!);
     let info: any;
     try {
-      info = await resolveMedia(prisma, ch.id, s.ratingKey!, 60, { deviceId });
+      info = await resolveMedia(prisma, ch.id, s.ratingKey!, 60, { deviceId, forceHls });
     } catch (e) {
       console.log(`  "${s.guide?.title}" resolveMedia ERROR ${(e as Error).message}`);
       continue;
@@ -73,7 +90,7 @@ async function main() {
     );
     // Prove the stream is real for DTS content and for any transcode path.
     if (flag || info.mode !== "direct") {
-      const p = info.mode === "hls" ? { note: "hls playlist (skip)" } : await probe(info.url);
+      const p = info.mode === "hls" ? await probeHls(info.url) : await probe(info.url);
       console.log(`       fetch:`, JSON.stringify(p));
     }
     if (seen.size >= 25) break;

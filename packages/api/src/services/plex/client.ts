@@ -6,13 +6,7 @@
 
 import { XMLParser } from "fast-xml-parser";
 
-import {
-  BROWSER_CLIENT_PROFILE,
-  type ClientCaps,
-  clientProfileExtra,
-  progressiveContainer,
-  qualityParams,
-} from "./quality";
+import { BROWSER_CLIENT_PROFILE, type ClientCaps, clientProfileExtra, qualityParams } from "./quality";
 import { canonicalAudioCodec, canonicalContainer, canonicalVideoCodec } from "../capabilities/codecs";
 
 const PLEX_TV = "https://plex.tv/api/v2";
@@ -642,20 +636,17 @@ export async function getPlaybackInfo(
   // *unique* session id (per resolve) lets us stop this exact transcode on teardown
   // without ever colliding with a freshly-started one for the same item/offset.
   const session = `channelguide-${ratingKey}-${crypto.randomUUID().slice(0, 8)}`;
-  // Native-first delivery: a TV (caps present) gets a PROGRESSIVE HTTP transcode it plays
-  // with the native <video> element (full audio set, no MSE); the admin browser (no caps)
-  // and the runtime native-failure retry (forceHls) fall back to HLS + hls.js/MSE — the
-  // true last resort. See [[project-tv-playback-protocol]].
-  let protocol: "hls" | "http" = !opts.forceHls && caps ? "http" : "hls";
-  // The progressive-http rung needs a container the native <video> can play while it's
-  // still transcoding AND that this panel decodes (mkv/mpegts). If the panel has none,
-  // a progressive mp4 would return an unplayable stub → go straight to hls instead.
-  let httpContainer = "mkv";
-  if (protocol === "http" && caps) {
-    const pc = progressiveContainer(caps);
-    if (pc) httpContainer = pc;
-    else protocol = "hls";
-  }
+  // Transcode delivery = HLS (fMP4) via hls.js/MSE. We tried a progressive-HTTP + native
+  // <video> rung (v0.3.27–0.4.0: container=mp4 then mkv) so a transcode could keep the full
+  // native audio set — but a live, still-transcoding stream does NOT play in the C2's <video>
+  // (mp4 = ~89-byte stub, mkv = black/freeze; proven in PlaybackLog). HLS's segmented buffering
+  // is what actually sustains a live transcode. Native DIRECT-PLAY (above) stays the primary
+  // path for everything the panel decodes; HLS only carries this must-transcode tail. The HLS
+  // profile advertises the full native VIDEO set (so Plex COPIES HEVC/AV1 — HDR preserved) but
+  // MSE-SAFE AUDIO only (aac/opus/mp3) — MSE rejects E-AC3/DTS/TrueHD (bufferAddCodecError) even
+  // though native <video> plays them; that audio either direct-plays or is transcoded anyway,
+  // so nothing is lost. See [[project-tv-playback-protocol]].
+  const protocol = "hls" as const;
   const params = new URLSearchParams({
     path: `/library/metadata/${ratingKey}`,
     mediaIndex: "0",
@@ -689,7 +680,7 @@ export async function getPlaybackInfo(
   // the C2 "could not be decoded"). Platform MUST be Generic — real names 400 on /decision
   // with custom transcode targets (plezy). Without caps, the browser profile (quality path).
   if (caps) {
-    params.set("X-Plex-Client-Profile-Extra", clientProfileExtra(caps, protocol, httpContainer));
+    params.set("X-Plex-Client-Profile-Extra", clientProfileExtra(caps, protocol));
     params.set("X-Plex-Platform", "Generic");
   } else if (quality) {
     params.set("X-Plex-Client-Profile-Extra", BROWSER_CLIENT_PROFILE);
