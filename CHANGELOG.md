@@ -2,7 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
-## [0.4.1] - 2026-07-15
+## [0.4.2] - 2026-07-15
+
+### Fixed
+
+- **DTS audio no longer cuts out dead (Anastasia).** The onboarding diagnostic verifies only that a clip's **video** decodes (`videoWidth×videoHeight`) — it never checks audio — so a DTS clip whose video decoded made us wrongly credit DTS *audio* support. The LG C2 has no DTS decoder (licensing), so DTS video plays but the audio is silent then stalls dead. DTS is now excluded from the credited native audio set, so DTS/`dca` content takes the transcode path — the **video still copies** (no re-encode) and only the **audio** transcodes to Opus over the (working) MKV progressive stream. `mkv/h264/dca` now resolves to `MODE=http` with a real matroska stream.
+
+### Changed
+
+- **Codec naming consolidated into one module** (`services/capabilities/codecs.ts`). The codec-name canonicalization (DTS `dca`/`dca-ma`/`dca-hra` → `dts`, `ec-3` → `eac3`, `h265`/`hvc1` → `hevc`, `matroska` → `mkv`, …) was duplicated between the capability side (`native-caps.ts`) and the source-matching side (`plex/client.ts`); it now lives once and both import it. The DTS exclusion is a documented **device-quirk table** (`UNDECODABLE_AUDIO`) rather than a magic set — a stopgap until the diagnostic verifies audio directly.
+
+
 
 ### Added
 

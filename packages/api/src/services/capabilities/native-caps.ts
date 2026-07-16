@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@ChannelGuide/db";
 
 import type { ClientCaps } from "../plex/quality";
+import { UNDECODABLE_AUDIO } from "./codecs";
 import { CAP_MATRIX } from "./matrix";
 
 /**
@@ -49,6 +50,7 @@ const AUDIO_TOKEN: Record<string, string> = {
   pcm: "pcm",
 };
 
+
 // Matrix container (output extension) → Plex `container` tokens (Media.container).
 const CONTAINER_TOKENS: Record<string, string[]> = {
   mp4: ["mp4", "m4v"],
@@ -89,7 +91,9 @@ export async function getDeviceNativeCaps(
 
   return {
     videoCodecs: [...video],
-    audioCodecs: [...audio],
+    // Drop codecs the video-only diagnostic can't actually prove for audio (device quirks) —
+    // their content transcodes audio while the video still copies. See codecs.ts.
+    audioCodecs: [...audio].filter((c) => !UNDECODABLE_AUDIO[c]),
     directContainers: [...containers],
   };
 }

@@ -13,6 +13,7 @@ import {
   progressiveContainer,
   qualityParams,
 } from "./quality";
+import { canonicalAudioCodec, canonicalContainer, canonicalVideoCodec } from "../capabilities/codecs";
 
 const PLEX_TV = "https://plex.tv/api/v2";
 const PRODUCT = "ChannelGuide";
@@ -505,31 +506,8 @@ export type PlaybackOptions = {
 const DIRECT_CONTAINERS = new Set(["mp4", "mov", "m4v"]);
 const DIRECT_VIDEO = new Set(["h264", "avc", "avc1"]);
 const DIRECT_AUDIO = new Set(["aac", "mp3", "mp2", "mp4a"]);
-
-// Plex/ffmpeg report a codec/container under several names; fold them to the token our
-// capability set uses, so a direct-playable stream isn't sent to transcode over a naming
-// gap. DTS especially: Plex reports `dca` / `dca-ma` (DTS-HD MA) / `dca-hra`, and MA/HRA
-// embed a DTS core any DTS-core decoder falls back to — so the measured `dts` covers them.
-function normAudioCodec(c: string): string {
-  const x = c.toLowerCase();
-  if (x.startsWith("dca") || x.startsWith("dts")) return "dts";
-  if (x === "ec-3" || x === "ec3" || x === "eac-3") return "eac3";
-  if (x === "ac-3") return "ac3";
-  if (x === "mlp") return "truehd";
-  return x;
-}
-function normVideoCodec(c: string): string {
-  const x = c.toLowerCase();
-  if (x === "h265" || x === "hvc1" || x === "hev1") return "hevc";
-  if (x === "avc" || x === "avc1") return "h264";
-  return x;
-}
-function normContainer(c: string): string {
-  const x = c.toLowerCase();
-  if (x.startsWith("matroska")) return "mkv";
-  if (x === "quicktime") return "mov";
-  return x;
-}
+// Codec-name canonicalization lives in one place (capabilities/codecs.ts), shared with the
+// capability side, so a direct-playable stream isn't sent to transcode over a naming gap.
 
 type PlexStream = {
   id?: number | string;
@@ -622,15 +600,15 @@ export async function getPlaybackInfo(
   // it (a TV), else the built-in browser assumption (h264/aac/mp4 — the admin preview).
   const caps = opts.caps;
   const vOk = (c: string) => {
-    const n = normVideoCodec(c);
+    const n = canonicalVideoCodec(c);
     return caps ? caps.videoCodecs.includes(n) : DIRECT_VIDEO.has(n);
   };
   const aOk = (c: string) => {
-    const n = normAudioCodec(c);
+    const n = canonicalAudioCodec(c);
     return caps ? caps.audioCodecs.includes(n) : DIRECT_AUDIO.has(n);
   };
   const cOk = (c: string) => {
-    const n = normContainer(c);
+    const n = canonicalContainer(c);
     return caps ? caps.directContainers.includes(n) : DIRECT_CONTAINERS.has(n);
   };
 
