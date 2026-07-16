@@ -453,8 +453,10 @@ export async function getMetadata(
  * seeks via `currentTime`); `hls` uses Plex's transcode-universal endpoint, which
  * applies the start `offset` server-side. Codec fields are for diagnostics.
  */
-/** An available audio or subtitle track, keyed by language so it carries across episodes. */
-export type PlaybackTrack = { lang: string; label: string };
+/** One available audio or subtitle track. `id` is the Plex stream id — the client selects
+ *  the EXACT track by id (multiple same-language tracks — 5.1 / stereo / commentary — are
+ *  distinct), not by language. */
+export type PlaybackTrack = { id: string; lang: string; label: string };
 
 export type PlaybackInfo = {
   /** `direct` = raw file, native `<video>`, client seeks to the offset.
@@ -483,10 +485,10 @@ export type PlaybackInfo = {
 /** Options that steer the transcode decision (any set → force a transcode). */
 export type PlaybackOptions = {
   quality?: string;
-  /** Preferred audio language (`languageCode`, e.g. "jpn"/"eng"). */
-  audioLang?: string;
-  /** Preferred subtitle language, or "off"/undefined for none. */
-  subtitleLang?: string;
+  /** The audio stream id to select (from `PlaybackTrack.id`). A selection forces a transcode. */
+  audioStreamId?: string;
+  /** The subtitle stream id to burn, "off" to clear, or undefined for none. */
+  subtitleStreamId?: string;
   /** The real client's decode capabilities (a TV) — drives direct-play/direct-stream
    * vs transcode + the Plex profile. Absent → the built-in browser assumption. */
   caps?: ClientCaps;
@@ -511,23 +513,37 @@ type PlexStream = {
   languageCode?: string;
   displayTitle?: string;
   extendedDisplayTitle?: string;
+  codec?: string;
+  channels?: number;
+  title?: string;
   forced?: number | boolean;
 };
 
 const streamLang = (s: PlexStream): string =>
   (s.languageCode || s.languageTag || "und").toLowerCase();
-const streamLabel = (s: PlexStream): string =>
-  s.language || s.extendedDisplayTitle || s.displayTitle || streamLang(s).toUpperCase();
 
-/** Distinct languages present (first stream per language wins the label). */
-function dedupeTracks(streams: PlexStream[]): PlaybackTrack[] {
+// A rich, per-stream label so multiple same-language tracks are distinguishable (5.1 vs
+// stereo vs commentary). Plex's `extendedDisplayTitle` already reads like "English (DTS 5.1)"
+// or "Commentary - English (AC3 Stereo)"; only compose one if it's missing.
+const CH_LABEL: Record<number, string> = { 1: "Mono", 2: "Stereo", 6: "5.1", 8: "7.1" };
+const streamLabel = (s: PlexStream): string => {
+  if (s.extendedDisplayTitle) return s.extendedDisplayTitle;
+  if (s.displayTitle) return s.displayTitle;
+  const name = [s.title, s.language || streamLang(s).toUpperCase()].filter(Boolean).join(" ");
+  const extra = [s.codec?.toUpperCase(), s.channels ? CH_LABEL[s.channels] : ""].filter(Boolean).join(" ");
+  return extra ? `${name} (${extra})` : name;
+};
+
+/** Every track (NOT deduped by language — same-language tracks are distinct), each carrying
+ *  its Plex stream id so the client can select the exact one. */
+function listTracks(streams: PlexStream[]): PlaybackTrack[] {
   const out: PlaybackTrack[] = [];
   const seen = new Set<string>();
   for (const s of streams) {
-    const lang = streamLang(s);
-    if (seen.has(lang)) continue;
-    seen.add(lang);
-    out.push({ lang, label: streamLabel(s) });
+    const id = s.id != null ? String(s.id) : "";
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, lang: streamLang(s), label: streamLabel(s) });
   }
   return out;
 }
@@ -573,22 +589,26 @@ export async function getPlaybackInfo(
   const subStreams = streams
     .filter((s) => s.streamType === 3)
     .sort((a, b) => (a.forced ? 1 : 0) - (b.forced ? 1 : 0));
-  const audioTracks = dedupeTracks(audioStreams);
-  const subtitleTracks = dedupeTracks(subStreams);
+  const audioTracks = listTracks(audioStreams);
+  const subtitleTracks = listTracks(subStreams);
 
   const container = (media?.container ?? part.container ?? "").toLowerCase();
   const videoCodec = (media?.videoCodec ?? "").toLowerCase();
   const audioCodec = (media?.audioCodec ?? "").toLowerCase();
 
-  // Map the requested audio/subtitle language to a concrete stream id on this item.
+  // The exact audio/subtitle streams the client asked for, BY STREAM ID (validated against
+  // this item's streams). A selection forces a transcode (we can't pick a track out of a
+  // raw direct-play file server-side).
   const quality = qualityParams(opts.quality);
-  const audioStreamId = opts.audioLang
-    ? audioStreams.find((s) => streamLang(s) === opts.audioLang)?.id
-    : undefined;
-  const wantsSubs = !!opts.subtitleLang && opts.subtitleLang !== "off";
-  const subStreamId = wantsSubs
-    ? subStreams.find((s) => streamLang(s) === opts.subtitleLang)?.id
-    : undefined;
+  const audioStreamId =
+    opts.audioStreamId && audioStreams.some((s) => String(s.id) === opts.audioStreamId)
+      ? opts.audioStreamId
+      : undefined;
+  const wantsSubs = !!opts.subtitleStreamId && opts.subtitleStreamId !== "off";
+  const subStreamId =
+    wantsSubs && subStreams.some((s) => String(s.id) === opts.subtitleStreamId)
+      ? opts.subtitleStreamId
+      : undefined;
 
   // Device-aware capability check: use the real client's codec support when it reports
   // it (a TV), else the built-in browser assumption (h264/aac/mp4 — the admin preview).
@@ -685,30 +705,27 @@ export async function getPlaybackInfo(
   } else if (quality) {
     params.set("X-Plex-Client-Profile-Extra", BROWSER_CLIENT_PROFILE);
   }
-  // Audio track switch (e.g. Japanese → English dub).
-  if (audioStreamId != null) params.set("audioStreamID", String(audioStreamId));
-
-  // Burned-in subtitles — the universal recipe, works for TEXT (srt) AND IMAGE (pgs/vobsub).
-  // Plex's URL `subtitleStreamID` is honored inconsistently per codec (srt burns via burn,
-  // pgs only via auto, etc.), so we select the sub the reliable way: a **server-side PUT**
-  // on the part. Then `subtitles=burn` + `directStream=0` re-encodes the video with the sub
-  // painted in — renders in any player. Verified live: srt + pgs both → subtitleDecision=burn.
-  // NB: the PUT-select is per-part *global* Plex state (all viewers of that item share it) —
-  // fine for the single-admin preview; revisit for true multi-user. See .docs/plex-subtitles-findings.md.
+  // Select the exact audio/subtitle stream via Plex's "Set stream selection" PUT
+  // (PUT /library/parts/{id}?audioStreamID=&subtitleStreamID=&allParts=1). The URL transcode
+  // params are honored INCONSISTENTLY (this was the subtitle bug — and the audio switch never
+  // worked because it only set the URL param); the PUT is the canonical, reliable way. It's
+  // per-part *global* Plex state (shared across viewers of that item) — fine for single-admin,
+  // revisit for multi-user. See .docs/plex-subtitles-findings.md + the Plex OpenAPI.
   const partId = String(part.id ?? (part.key ?? "").split("/")[3] ?? "");
-  if (subStreamId != null && partId) {
-    await fetch(`${baseUrl}/library/parts/${partId}?subtitleStreamID=${subStreamId}&allParts=1`, {
+  if (partId && (audioStreamId != null || subStreamId != null || opts.subtitleStreamId === "off")) {
+    const sel = new URLSearchParams({ allParts: "1" });
+    if (audioStreamId != null) sel.set("audioStreamID", String(audioStreamId));
+    if (subStreamId != null) sel.set("subtitleStreamID", String(subStreamId));
+    else if (opts.subtitleStreamId === "off") sel.set("subtitleStreamID", "0");
+    await fetch(`${baseUrl}/library/parts/${partId}?${sel.toString()}`, {
       method: "PUT",
       headers: pmsHeaders(token),
     }).catch(() => {});
+  }
+  // Burn the selected subtitle (re-encodes the video with it painted in → renders anywhere).
+  if (subStreamId != null) {
     params.set("subtitles", "burn");
     params.set("directStream", "0");
-  } else if (opts.subtitleLang === "off" && partId) {
-    // Explicitly off — clear any prior server-side selection so nothing burns.
-    await fetch(`${baseUrl}/library/parts/${partId}?subtitleStreamID=0&allParts=1`, {
-      method: "PUT",
-      headers: pmsHeaders(token),
-    }).catch(() => {});
   }
   const qs = params.toString();
 

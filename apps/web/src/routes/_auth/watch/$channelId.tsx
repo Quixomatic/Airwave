@@ -43,8 +43,8 @@ function Watch() {
   const { channelId } = Route.useParams();
   const navigate = useNavigate();
   const [quality, setQuality] = usePersisted("cg-quality", "original");
-  const [audioLang, setAudioLang] = usePersisted("cg-audio", "");
-  const [subtitleLang, setSubtitleLang] = usePersisted("cg-subtitle", "off");
+  const [audioStreamId, setAudioStreamId] = usePersisted("cg-audio-id", "");
+  const [subtitleStreamId, setSubtitleStreamId] = usePersisted("cg-subtitle-id", "off");
   const channels = useQuery(trpc.channels.list.queryOptions());
 
   const enabled = (channels.data ?? []).filter((c) => c.enabled);
@@ -91,11 +91,11 @@ function Watch() {
         key={channelId}
         channelId={channelId}
         quality={quality}
-        audioLang={audioLang}
-        subtitleLang={subtitleLang}
+        audioStreamId={audioStreamId}
+        subtitleStreamId={subtitleStreamId}
         setQuality={setQuality}
-        setAudioLang={setAudioLang}
-        setSubtitleLang={setSubtitleLang}
+        setAudioStreamId={setAudioStreamId}
+        setSubtitleStreamId={setSubtitleStreamId}
       />
     </div>
   );
@@ -104,23 +104,23 @@ function Watch() {
 function PlayerView({
   channelId,
   quality,
-  audioLang,
-  subtitleLang,
+  audioStreamId,
+  subtitleStreamId,
   setQuality,
-  setAudioLang,
-  setSubtitleLang,
+  setAudioStreamId,
+  setSubtitleStreamId,
 }: {
   channelId: string;
   quality: string;
-  audioLang: string;
-  subtitleLang: string;
+  audioStreamId: string;
+  subtitleStreamId: string;
   setQuality: (v: string) => void;
-  setAudioLang: (v: string) => void;
-  setSubtitleLang: (v: string) => void;
+  setAudioStreamId: (v: string) => void;
+  setSubtitleStreamId: (v: string) => void;
 }) {
   const { videoRef, status, controls, tracks, loadingTimeline, timelineError } = useChannelPlayer(
     channelId,
-    { quality, audioLang, subtitleLang },
+    { quality, audioStreamId, subtitleStreamId },
   );
   const qualities = useQuery(trpc.playback.qualities.queryOptions());
   const containerRef = useRef<HTMLDivElement>(null);
@@ -273,10 +273,10 @@ function PlayerView({
         {tracks.audio.length > 1 && (
           <label className="flex items-center gap-1.5 text-sm">
             <Languages className="text-muted-foreground h-4 w-4" />
-            <select className={SELECT} value={audioLang} onChange={(e) => setAudioLang(e.target.value)}>
+            <select className={SELECT} value={audioStreamId} onChange={(e) => setAudioStreamId(e.target.value)}>
               <option value="">Default audio</option>
               {tracks.audio.map((t) => (
-                <option key={t.lang} value={t.lang}>
+                <option key={t.id} value={t.id}>
                   {t.label}
                 </option>
               ))}
@@ -289,12 +289,12 @@ function PlayerView({
             <Captions className="text-muted-foreground h-4 w-4" />
             <select
               className={SELECT}
-              value={subtitleLang}
-              onChange={(e) => setSubtitleLang(e.target.value)}
+              value={subtitleStreamId}
+              onChange={(e) => setSubtitleStreamId(e.target.value)}
             >
               <option value="off">Subtitles off</option>
               {tracks.subtitle.map((t) => (
-                <option key={t.lang} value={t.lang}>
+                <option key={t.id} value={t.id}>
                   {t.label}
                 </option>
               ))}

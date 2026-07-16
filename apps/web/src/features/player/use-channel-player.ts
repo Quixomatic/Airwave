@@ -100,13 +100,13 @@ type Current = {
   baselineReady: boolean;
 };
 
-export type PlayerOptions = { quality?: string; audioLang?: string; subtitleLang?: string };
-export type PlayerTrack = { lang: string; label: string };
+export type PlayerOptions = { quality?: string; audioStreamId?: string; subtitleStreamId?: string };
+export type PlayerTrack = { id: string; lang: string; label: string };
 
 export function useChannelPlayer(channelId: string, options: PlayerOptions = {}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   // A single key over all stream params — a change to any re-resolves at the same spot.
-  const paramsKey = `${options.quality ?? ""}|${options.audioLang ?? ""}|${options.subtitleLang ?? ""}`;
+  const paramsKey = `${options.quality ?? ""}|${options.audioStreamId ?? ""}|${options.subtitleStreamId ?? ""}`;
   const optionsRef = useRef(options);
   optionsRef.current = options;
   const paramsKeyRef = useRef(paramsKey);
@@ -245,8 +245,8 @@ export function useChannelPlayer(channelId: string, options: PlayerOptions = {})
           ratingKey: entry.slot.ratingKey,
           offsetSeconds: offset,
           quality: optionsRef.current.quality,
-          audioLang: optionsRef.current.audioLang,
-          subtitleLang: optionsRef.current.subtitleLang,
+          audioStreamId: optionsRef.current.audioStreamId,
+          subtitleStreamId: optionsRef.current.subtitleStreamId,
         });
       } catch (err) {
         if (gen !== genRef.current) return;
@@ -303,8 +303,8 @@ export function useChannelPlayer(channelId: string, options: PlayerOptions = {})
       console.debug("[player] load", {
         offset,
         mode: info.mode,
-        subtitleLang: optionsRef.current.subtitleLang,
-        audioLang: optionsRef.current.audioLang,
+        subtitleStreamId: optionsRef.current.subtitleStreamId,
+        audioStreamId: optionsRef.current.audioStreamId,
         quality: optionsRef.current.quality,
         burn: info.url.includes("subtitles=burn"),
         subtitleStreamID: new URLSearchParams(info.url.split("?")[1] ?? "").get("subtitleStreamID"),

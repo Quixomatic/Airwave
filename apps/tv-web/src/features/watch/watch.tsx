@@ -26,8 +26,8 @@ export function FullChrome({
   channel,
   player,
   quality,
-  audioLang,
-  subtitleLang,
+  audioStreamId,
+  subtitleStreamId,
   qualities,
   onSelectQuality,
   onSelectAudio,
@@ -38,12 +38,12 @@ export function FullChrome({
   channel?: GuideChannel;
   player: Player;
   quality: string;
-  audioLang?: string;
-  subtitleLang?: string;
+  audioStreamId?: string;
+  subtitleStreamId?: string;
   qualities: { id: string; label: string }[];
   onSelectQuality: (id: string) => void;
-  onSelectAudio: (lang?: string) => void;
-  onSelectSub: (lang?: string) => void;
+  onSelectAudio: (id?: string) => void;
+  onSelectSub: (id?: string) => void;
   onBack: () => void;
 }) {
   const { status, controls, tracks } = player;
@@ -132,8 +132,8 @@ export function FullChrome({
             tracks={tracks}
             qualities={qualities}
             quality={quality}
-            audioLang={audioLang}
-            subtitleLang={subtitleLang}
+            audioStreamId={audioStreamId}
+            subtitleStreamId={subtitleStreamId}
             onSeekBack={() => controls.seekBy(-10)}
             onSeekForward={() => controls.seekBy(10)}
             onPlayPause={controls.togglePause}

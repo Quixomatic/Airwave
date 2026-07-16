@@ -158,7 +158,7 @@ export type TimelineSlot = {
 
 export type Timeline = { serverTime: string; slots: TimelineSlot[] };
 
-export type Track = { lang: string; label: string };
+export type Track = { id: string; lang: string; label: string };
 
 export type MediaInfo = {
   mode: "direct" | "http" | "hls";
@@ -211,10 +211,10 @@ export const api = {
       forceHls?: boolean;
       /** Quality-ladder preset id (or "original"/undefined for uncapped). */
       quality?: string;
-      /** Preferred audio-track language (carries across episodes). */
-      audioLang?: string;
-      /** Subtitle language to burn in, or "off" to clear. */
-      subtitleLang?: string;
+      /** Audio stream id to select (from Track.id). Forces a transcode. */
+      audioStreamId?: string;
+      /** Subtitle stream id to burn, or "off" to clear. */
+      subtitleStreamId?: string;
     } = {},
   ) => {
     const p = new URLSearchParams({ ratingKey, offsetSeconds: String(offsetSeconds) });
@@ -224,8 +224,8 @@ export const api = {
     // Set only after a native attempt failed — forces the hls.js/MSE last resort.
     if (opts.forceHls) p.set("forceHls", "1");
     if (opts.quality && opts.quality !== "original") p.set("quality", opts.quality);
-    if (opts.audioLang) p.set("audioLang", opts.audioLang);
-    if (opts.subtitleLang) p.set("subtitleLang", opts.subtitleLang);
+    if (opts.audioStreamId) p.set("audioStreamId", opts.audioStreamId);
+    if (opts.subtitleStreamId) p.set("subtitleStreamId", opts.subtitleStreamId);
     if (opts.caps) {
       p.set("vcodecs", opts.caps.videoCodecs.join(","));
       p.set("acodecs", opts.caps.audioCodecs.join(","));

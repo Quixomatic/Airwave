@@ -66,8 +66,8 @@ type Current = {
   retried: boolean; // native→hls safety-catch used for this load
 };
 
-export type PlayerOptions = { quality?: string; audioLang?: string; subtitleLang?: string };
-export type PlayerTrack = { lang: string; label: string };
+export type PlayerOptions = { quality?: string; audioStreamId?: string; subtitleStreamId?: string };
+export type PlayerTrack = { id: string; lang: string; label: string };
 
 const LIVE_THRESHOLD = 5;
 const HEARTBEAT_MS = 10_000;
@@ -103,7 +103,7 @@ function resumePosition(channelId: string, earliestStartS: number, liveNow: numb
 
 export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const paramsKey = `${options.quality ?? ""}|${options.audioLang ?? ""}|${options.subtitleLang ?? ""}`;
+  const paramsKey = `${options.quality ?? ""}|${options.audioStreamId ?? ""}|${options.subtitleStreamId ?? ""}`;
   const optionsRef = useRef(options);
   optionsRef.current = options;
   const paramsKeyRef = useRef(paramsKey);
@@ -257,8 +257,8 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
             deviceId: deviceId(),
             forceHls,
             quality: optionsRef.current.quality,
-            audioLang: optionsRef.current.audioLang,
-            subtitleLang: optionsRef.current.subtitleLang,
+            audioStreamId: optionsRef.current.audioStreamId,
+            subtitleStreamId: optionsRef.current.subtitleStreamId,
           });
         } catch (err) {
           if (gen !== genRef.current) return;

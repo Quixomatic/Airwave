@@ -38,7 +38,7 @@ import type { ScrubberView } from "./use-tv-player";
 
 const HIDE_MS = 8000;
 type MenuKey = "audio" | "subs" | "quality" | null;
-type Track = { lang: string; label: string };
+type Track = { id: string; lang: string; label: string };
 
 const clampPct = (n: number) => Math.min(100, Math.max(0, n));
 
@@ -63,8 +63,8 @@ export function FeaturePanel({
   tracks,
   qualities,
   quality,
-  audioLang,
-  subtitleLang,
+  audioStreamId,
+  subtitleStreamId,
   onSeekBack,
   onSeekForward,
   onPlayPause,
@@ -84,16 +84,16 @@ export function FeaturePanel({
   tracks: { audio: Track[]; subtitle: Track[] };
   qualities: { id: string; label: string }[];
   quality: string;
-  audioLang?: string;
-  subtitleLang?: string;
+  audioStreamId?: string;
+  subtitleStreamId?: string;
   onSeekBack: () => void;
   onSeekForward: () => void;
   onPlayPause: () => void;
   onLive: () => void;
   onRestart: () => void;
   onChannelSurf: () => void;
-  onSelectAudio: (lang: string) => void;
-  onSelectSub: (lang: string) => void;
+  onSelectAudio: (id: string) => void;
+  onSelectSub: (id: string) => void;
   onSelectQuality: (id: string) => void;
   onClose: () => void;
 }) {
@@ -230,10 +230,13 @@ export function FeaturePanel({
     </DropdownMenu>
   );
 
-  const audioItems = tracks.audio.map((t) => ({ value: t.lang, label: t.label }));
+  const audioItems = [
+    { value: "", label: "Default" },
+    ...tracks.audio.map((t) => ({ value: t.id, label: t.label })),
+  ];
   const subItems = [
     { value: "off", label: "Off" },
-    ...tracks.subtitle.map((t) => ({ value: t.lang, label: t.label })),
+    ...tracks.subtitle.map((t) => ({ value: t.id, label: t.label })),
   ];
   const qualityItems = qualities.map((q) => ({ value: q.id, label: q.label }));
 
@@ -376,8 +379,8 @@ export function FeaturePanel({
             </button>
 
             <div style={{ marginLeft: "auto", display: "flex", gap: 12 }}>
-              {circleSelector("audio", 5, AudioLines, audioLang ?? audioItems[0]?.value ?? "", audioItems.length ? audioItems : [{ value: "", label: "Default" }], onSelectAudio)}
-              {circleSelector("subs", 6, Captions, subtitleLang && subtitleLang !== "off" ? subtitleLang : "off", subItems, onSelectSub)}
+              {circleSelector("audio", 5, AudioLines, audioStreamId ?? "", audioItems, onSelectAudio)}
+              {circleSelector("subs", 6, Captions, subtitleStreamId && subtitleStreamId !== "off" ? subtitleStreamId : "off", subItems, onSelectSub)}
               {circleSelector("quality", 7, SlidersHorizontal, quality, qualityItems, onSelectQuality)}
             </div>
           </div>

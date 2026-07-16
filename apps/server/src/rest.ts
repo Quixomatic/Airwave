@@ -115,8 +115,8 @@ api.get("/channels/:id/media", async (c) => {
     return c.json(
       await resolveMedia(prisma, c.req.param("id"), ratingKey, offsetSeconds, {
         quality: c.req.query("quality"),
-        audioLang: c.req.query("audioLang"),
-        subtitleLang: c.req.query("subtitleLang"),
+        audioStreamId: c.req.query("audioStreamId"),
+        subtitleStreamId: c.req.query("subtitleStreamId"),
         caps,
         deviceId: c.req.query("deviceId"),
         forceHls: c.req.query("forceHls") === "1",

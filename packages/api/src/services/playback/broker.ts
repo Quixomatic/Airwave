@@ -27,8 +27,8 @@ export async function resolveChannelSource(prisma: PrismaClient, channelId: stri
 
 export type ResolveMediaOptions = {
   quality?: string;
-  audioLang?: string;
-  subtitleLang?: string;
+  audioStreamId?: string;
+  subtitleStreamId?: string;
   /** The client's canPlayType self-report — a fallback used only until the device
    * has run the capability diagnostic (canPlayType lies on TVs). */
   caps?: ClientCaps;
@@ -60,8 +60,8 @@ export async function resolveMedia(
     offsetSeconds,
     {
       quality: opts.quality,
-      audioLang: opts.audioLang,
-      subtitleLang: opts.subtitleLang,
+      audioStreamId: opts.audioStreamId,
+      subtitleStreamId: opts.subtitleStreamId,
       caps: measured ?? opts.caps,
       forceHls: opts.forceHls,
     },

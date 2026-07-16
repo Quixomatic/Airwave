@@ -190,14 +190,14 @@ function PlayerHost({
   const accent = accentForChannel(channel?.number);
 
   const [quality, setQuality] = useState("original");
-  const [audioLang, setAudioLang] = useState<string | undefined>(undefined);
-  const [subtitleLang, setSubtitleLang] = useState<string | undefined>(undefined);
+  const [audioStreamId, setAudioStreamId] = useState<string | undefined>(undefined);
+  const [subtitleStreamId, setSubtitleStreamId] = useState<string | undefined>(undefined);
   const [qualities, setQualities] = useState<{ id: string; label: string }[]>([]);
   useEffect(() => {
     api.qualities().then((r) => setQualities(r.qualities)).catch(() => {});
   }, []);
 
-  const player = useTvPlayer(channelId, { quality, audioLang, subtitleLang });
+  const player = useTvPlayer(channelId, { quality, audioStreamId, subtitleStreamId });
 
   const vp = useViewport();
   const slot = useSlotRect(slotRef, layout === "mini");
@@ -253,12 +253,12 @@ function PlayerHost({
           channel={channel}
           player={player}
           quality={quality}
-          audioLang={audioLang}
-          subtitleLang={subtitleLang}
+          audioStreamId={audioStreamId}
+          subtitleStreamId={subtitleStreamId}
           qualities={qualities}
           onSelectQuality={setQuality}
-          onSelectAudio={setAudioLang}
-          onSelectSub={setSubtitleLang}
+          onSelectAudio={setAudioStreamId}
+          onSelectSub={setSubtitleStreamId}
           onBack={onBack}
         />
       )}

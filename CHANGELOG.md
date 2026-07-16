@@ -2,7 +2,13 @@
 
 All notable changes to ChannelGuide are documented here.
 
-## [0.4.7] - 2026-07-16
+## [0.4.8] - 2026-07-16
+
+### Fixed
+
+- **Audio track switching now actually works, and shows every track.** Two bugs: (1) audio tracks were **coalesced by language**, so a title with multiple English tracks (main 5.1, stereo, **director commentary**) collapsed to a single "English" — you couldn't see or pick the others (e.g. Back to the Future defaulting to commentary with no way off it); (2) the switch selected by *language* and applied it via the URL `audioStreamID` transcode param, which Plex honors **inconsistently** — so it re-resolved the stream but never changed the track. Now each track is exposed individually with its **stream id** and a rich label (from `extendedDisplayTitle` — e.g. "English (DTS 5.1)" / "Commentary"), the client selects by **id**, and selection is applied via Plex's **"Set stream selection" PUT** (`PUT /library/parts/{id}?audioStreamID=&subtitleStreamID=&allParts=1`) — the same proven path subtitles already use. Fixed in **both** the TV app and the admin preview. (Switching still forces a transcode to HLS; a future Phase 2 will switch supported codecs natively via `video.audioTracks` without transcoding.)
+
+
 
 ### Added
 

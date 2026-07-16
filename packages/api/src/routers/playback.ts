@@ -62,15 +62,15 @@ export const playbackRouter = router({
         ratingKey: z.string(),
         offsetSeconds: z.number().int().min(0),
         quality: z.string().optional(),
-        audioLang: z.string().optional(),
-        subtitleLang: z.string().optional(),
+        audioStreamId: z.string().optional(),
+        subtitleStreamId: z.string().optional(),
       }),
     )
     .query(({ ctx, input }) =>
       resolveMedia(ctx.prisma, input.channelId, input.ratingKey, input.offsetSeconds, {
         quality: input.quality,
-        audioLang: input.audioLang,
-        subtitleLang: input.subtitleLang,
+        audioStreamId: input.audioStreamId,
+        subtitleStreamId: input.subtitleStreamId,
       }).catch(toTRPC),
     ),
 
