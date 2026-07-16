@@ -11,7 +11,19 @@ type Auto = {
   droppedFrames?: number;
   totalFrames?: number;
   error?: string;
+  // Audio-decode measurement (webkitAudioDecodedByteCount over the clip). hasAudioApi=false
+  // when the panel doesn't expose the counter. audioOk is DERIVED post-run (needs the
+  // cross-clip control), never inline — see the audio-verdict pass below.
+  hasAudioApi?: boolean;
+  audioBytesDelta?: number;
+  audioOk?: boolean;
 };
+
+// A clip whose decoded-audio-bytes climbed by at least this much over ~2.5s genuinely
+// decoded audio. DTS on a panel with no DTS decoder sits flat at 0.
+const AUDIO_BYTES_MIN = 1000;
+
+type WithAudioCounter = HTMLVideoElement & { webkitAudioDecodedByteCount?: number };
 
 /**
  * Device capability onboarding. Fully automatic: plays each matrix clip through
@@ -45,9 +57,11 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
 
     const runOne = (test: CapTest): Promise<Auto> =>
       new Promise((resolve) => {
-        const v = videoRef.current;
+        const v = videoRef.current as WithAudioCounter | null;
         if (!v) return resolve({ decoded: false, decodedWidth: 0, decodedHeight: 0, error: "no video el" });
         let settled = false;
+        let audioStart: number | undefined;
+        const bytes = () => v.webkitAudioDecodedByteCount;
         const finish = (r: Auto) => {
           if (settled) return;
           settled = true;
@@ -58,6 +72,8 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
         };
         const snap = (err?: string): Auto => {
           const q = v.getVideoPlaybackQuality?.();
+          const audioEnd = bytes();
+          const hasAudioApi = typeof audioStart === "number" && typeof audioEnd === "number";
           return {
             decoded: !err && v.videoWidth > 0 && v.videoHeight > 0,
             decodedWidth: v.videoWidth,
@@ -65,45 +81,82 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
             droppedFrames: q?.droppedVideoFrames,
             totalFrames: q?.totalVideoFrames,
             error: err,
+            hasAudioApi,
+            audioBytesDelta: hasAudioApi ? Math.max(0, (audioEnd as number) - (audioStart as number)) : 0,
           };
         };
-        // First decoded frame → let it play ~2.5s (to catch dropped-frame stutter), then record.
-        const onLoaded = () => window.setTimeout(() => finish(snap()), 2500);
+        // First decoded frame → capture the audio-byte baseline, let it play ~2.5s (catches
+        // dropped-frame stutter AND accumulates decoded-audio bytes), then record.
+        const onLoaded = () => {
+          audioStart = bytes();
+          window.setTimeout(() => finish(snap()), 2500);
+        };
         const onErr = () => finish(snap(`decode error ${v.error?.code ?? "?"}`));
         const hard = window.setTimeout(() => finish(snap(v.videoWidth > 0 ? undefined : "timeout (no frame)")), 10000);
         v.addEventListener("loadeddata", onLoaded);
         v.addEventListener("error", onErr);
-        v.muted = true; // muted → autoplay is never blocked; we only care about video decode
+        v.muted = true; // muted → autoplay never blocks; audio still DECODES (we count the bytes)
         v.src = `${SERVER_URL}${test.url}`;
         void v.play().catch(() => {});
       });
 
+    const upsert = (test: CapTest, r: Auto, audioOk?: boolean) =>
+      void api
+        .capsResult({
+          deviceId: deviceId(),
+          testId: test.id,
+          container: test.container,
+          video: test.video,
+          audio: test.audio,
+          feature: test.feature,
+          subtitle: test.subtitle,
+          decoded: r.decoded,
+          decodedWidth: r.decodedWidth,
+          decodedHeight: r.decodedHeight,
+          droppedFrames: r.droppedFrames,
+          totalFrames: r.totalFrames,
+          error: r.error,
+          ...(audioOk === undefined ? {} : { audioOk }),
+        })
+        .catch(() => {});
+
     (async () => {
+      const results: Record<string, Auto> = {};
       for (let i = 0; i < tests.length; i++) {
         if (cancelled) return;
         setIdx(i);
         const test = tests[i];
         const auto = await runOne(test);
         if (cancelled) return;
+        results[test.id] = auto;
         setRows((r) => ({ ...r, [test.id]: auto }));
-        void api
-          .capsResult({
-            deviceId: deviceId(),
-            testId: test.id,
-            container: test.container,
-            video: test.video,
-            audio: test.audio,
-            feature: test.feature,
-            subtitle: test.subtitle,
-            ...auto,
-          })
-          .catch(() => {});
+        upsert(test, auto);
       }
-      if (!cancelled) {
-        localStorage.setItem(CAPS_DONE_KEY, "1");
-        setDone(true);
-        videoRef.current?.pause();
+      if (cancelled) return;
+
+      // Audio-verdict pass — DERIVED after the full run (needs the cross-clip control):
+      //  • bytes climbed ≥ AUDIO_BYTES_MIN → audioOk=true (audio decoded, even muted).
+      //  • If ANY clip climbed, muting doesn't suppress decode on this panel → a clip that
+      //    played its video but decoded ~0 audio bytes genuinely can't decode that audio
+      //    → audioOk=false.
+      //  • Otherwise (nothing climbed / no counter / video never decoded) → stay null (unknown),
+      //    so we NEVER wrongly mark a working codec as unsupported. Re-upsert only definite verdicts.
+      const anyClimbed = Object.values(results).some((r) => r.hasAudioApi && (r.audioBytesDelta ?? 0) >= AUDIO_BYTES_MIN);
+      for (const test of tests) {
+        const r = results[test.id];
+        if (!r) continue;
+        let audioOk: boolean | undefined;
+        if (r.hasAudioApi && (r.audioBytesDelta ?? 0) >= AUDIO_BYTES_MIN) audioOk = true;
+        else if (r.hasAudioApi && anyClimbed && r.decoded) audioOk = false;
+        if (audioOk === undefined) continue;
+        r.audioOk = audioOk;
+        setRows((rows) => ({ ...rows, [test.id]: { ...rows[test.id]!, audioOk } }));
+        upsert(test, r, audioOk);
       }
+
+      localStorage.setItem(CAPS_DONE_KEY, "1");
+      setDone(true);
+      videoRef.current?.pause();
     })();
 
     return () => {
@@ -181,6 +234,8 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
               >
                 <span>{r ? (r.decoded ? "✅" : "❌") : i === idx && !done ? "▶" : "·"}</span>
                 <span className="truncate text-zinc-400">{tt.id}</span>
+                {r?.audioOk === true && <span title="audio decoded" className="text-emerald-500">🔊</span>}
+                {r?.audioOk === false && <span title="no audio decode" className="text-red-500">🔇</span>}
                 {r?.decoded && (
                   <span className="ml-auto text-zinc-600">
                     {r.decodedWidth}×{r.decodedHeight}

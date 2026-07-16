@@ -67,33 +67,43 @@ export async function getDeviceNativeCaps(
   deviceId: string,
 ): Promise<ClientCaps | null> {
   const rows = await prisma.deviceCapability.findMany({
-    where: { deviceId, decoded: true },
-    select: { testId: true },
+    where: { deviceId },
+    select: { testId: true, decoded: true, audioOk: true },
   });
   if (!rows.length) return null;
 
   const video = new Set<string>();
-  const audio = new Set<string>();
   const containers = new Set<string>();
+  const inferredAudio = new Set<string>(); // audio codec rode along in a video-decoded clip (inference)
+  const audioTrue = new Set<string>(); // MEASURED: audio actually decoded (audioOk=true)
+  const audioFalse = new Set<string>(); // MEASURED: audio did NOT decode (audioOk=false) — supersedes
 
-  for (const { testId } of rows) {
+  for (const { testId, decoded, audioOk } of rows) {
     const t = BY_ID.get(testId);
     if (!t) continue;
-    const vt = VIDEO_TOKEN[t.video];
-    if (vt) video.add(vt);
     const at = AUDIO_TOKEN[t.audio];
-    if (at) audio.add(at);
-    for (const ct of CONTAINER_TOKENS[t.container] ?? []) containers.add(ct);
+    if (decoded) {
+      const vt = VIDEO_TOKEN[t.video];
+      if (vt) video.add(vt);
+      for (const ct of CONTAINER_TOKENS[t.container] ?? []) containers.add(ct);
+      if (at) inferredAudio.add(at);
+    }
+    if (at && audioOk === true) audioTrue.add(at);
+    if (at && audioOk === false) audioFalse.add(at);
   }
 
   // No decodable video at all → treat as unknown rather than "plays nothing".
   if (video.size === 0) return null;
 
-  return {
-    videoCodecs: [...video],
-    // Drop codecs the video-only diagnostic can't actually prove for audio (device quirks) —
-    // their content transcodes audio while the video still copies. See codecs.ts.
-    audioCodecs: [...audio].filter((c) => !UNDECODABLE_AUDIO[c]),
-    directContainers: [...containers],
-  };
+  // Audio credit: a MEASURED positive (audioOk=true) wins; a measured negative (audioOk=false)
+  // blocks and SUPERSEDES the video-only inference; otherwise fall back to inference minus the
+  // known-unplayable quirk table (the safety net for devices not yet re-run with audio checks).
+  const audio = new Set<string>();
+  for (const c of new Set([...inferredAudio, ...audioTrue])) {
+    if (audioTrue.has(c)) audio.add(c);
+    else if (audioFalse.has(c)) continue;
+    else if (inferredAudio.has(c) && !UNDECODABLE_AUDIO[c]) audio.add(c);
+  }
+
+  return { videoCodecs: [...video], audioCodecs: [...audio], directContainers: [...containers] };
 }

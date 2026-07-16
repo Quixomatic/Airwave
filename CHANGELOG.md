@@ -2,7 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
-## [0.4.2] - 2026-07-15
+## [0.4.3] - 2026-07-15
+
+### Added
+
+- **The diagnostic now verifies audio decode, not just video.** Each clip's decoded-audio bytes (`webkitAudioDecodedByteCount`) are sampled over playback; the result fills the existing `DeviceCapability.audioOk` column (previously always null — the hands-off onboarding had dropped the manual audio verdict). It's derived safely, never a false negative: a clip whose audio bytes climb → `audioOk = true`; and **only if some clip proves audio decodes on this panel** (a control) does a clip that played its video but decoded ~0 audio bytes get `audioOk = false`. If nothing climbs or the counter isn't exposed, verdicts stay null (unknown). The results grid shows 🔊/🔇 per clip. Fully silent (muted — audio still decodes) and needs no re-onboarding gesture.
+- **`native-caps` credits audio from the measured verdict.** An audio codec is credited when `audioOk = true`; a measured `audioOk = false` blocks it and **supersedes** the old video-only inference; codecs with no verdict (`null`) fall back to inference minus the `UNDECODABLE_AUDIO` quirk. So on a re-run panel, DTS is blocked because the C2 demonstrably decodes no DTS audio — not because of a hardcoded list. Re-run "Run diagnostic" from Settings to populate `audioOk` on an existing device (upsert by `deviceId+testId`).
+
+
 
 ### Fixed
 
