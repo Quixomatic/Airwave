@@ -2,7 +2,13 @@
 
 All notable changes to ChannelGuide are documented here.
 
-## [0.4.3] - 2026-07-15
+## [0.4.4] - 2026-07-15
+
+### Changed
+
+- **Diagnostic audio detector switched to `audioTracks`.** `webkitAudioDecodedByteCount` turned out to be stubbed to `0` on the C2's Chrome 108 (measured on-device — it never climbed), so it can't detect audio decode. The working signal is `HTMLMediaElement.audioTracks`: the panel lists a decodable audio track for codecs it can decode and drops/disables it for ones it can't. `audioOk` is derived from that, with the same safe cross-clip control (only a panel that produced a usable track for *some* clip can mark another clip's audio unsupported) so it's never a false negative. Grid shows the raw `tracks=/en=/bc=` readout. DTS remains excluded via the `UNDECODABLE_AUDIO` quirk regardless.
+
+
 
 ### Added
 
