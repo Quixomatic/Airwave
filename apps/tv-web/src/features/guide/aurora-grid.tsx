@@ -1,6 +1,6 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import * as LucideIcons from "lucide-react";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Menu, Settings, Star } from "lucide-react";
+import { Menu, Settings, Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { GuideGridChannel, GuideGridProgram } from "../../lib/api";
@@ -63,6 +63,13 @@ const WINDOW_MIN = 180; // minutes of timeline shown across the lane
 const LEAD_MIN = 30; // minutes of "already aired" shown before the grid start
 const MIN = 60_000;
 const SHOW_NOW_LINE = false; // hidden for now — the triangle marker alone marks "now"
+// Channel-change (up/down/wheel) highlight strategy. `true` = time-alignment: keep the same
+// time column across channels (pickAtCursor). `false` = always snap to the channel's currently-
+// airing "on now" program (pickAtLive); left/right still browses its other programs.
+const TIME_ALIGN_CHANNEL_NAV = false;
+// The live program's two-tone progress fill direction. `true` = elapsed (up to the live point)
+// is the STRONGER tint, the not-yet-aired remainder is weaker. `false` = reversed.
+const PROGRESS_FILL_ELAPSED_STRONGER = true;
 
 const accentOf = (i: number) => ACCENTS[i % ACCENTS.length]!;
 const hexA = (hex: string, a: number) => {
@@ -204,6 +211,13 @@ export function AuroraGrid({
     return best;
   };
 
+  // Same shape as pickAtCursor, but always the channel's currently-airing ("on now") program —
+  // so a channel change snaps to what's live and left/right browses from there.
+  const pickAtLive = (chIdx: number) => liveProgramIndex(channels[chIdx]?.programs ?? [], now.getTime());
+
+  // The strategy a channel change uses to pick the highlighted program (toggle at the top).
+  const pickForChannel = TIME_ALIGN_CHANNEL_NAV ? pickAtCursor : pickAtLive;
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // The full-screen player owns the keys while it's up.
@@ -261,7 +275,7 @@ export function AuroraGrid({
           e.preventDefault();
           const nc = Math.min(n - 1, fc + 1);
           setFc(nc);
-          setFp(pickAtCursor(nc));
+          setFp(pickForChannel(nc));
           break;
         }
         case "ArrowUp": {
@@ -275,7 +289,7 @@ export function AuroraGrid({
           }
           const nc = Math.max(0, fc - 1);
           setFc(nc);
-          setFp(pickAtCursor(nc));
+          setFp(pickForChannel(nc));
           break;
         }
         case "Enter":
@@ -308,7 +322,7 @@ export function AuroraGrid({
       if (nc !== fcRef.current) {
         fcRef.current = nc; // advance synchronously so the next tick in the burst builds on it
         setFc(nc);
-        setFp(pickAtCursor(nc));
+        setFp(pickForChannel(nc));
       }
     };
     el.addEventListener("wheel", onWheel, { passive: false });
@@ -427,19 +441,6 @@ export function AuroraGrid({
         )}
       </div>
 
-      <div
-        style={{ position: "absolute", bottom: vw(22), left: vw(40), display: "flex", gap: vw(26), color: "#475569", fontSize: vw(24), zIndex: 8 }}
-      >
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          <ChevronLeft size="1em" />
-          <ChevronRight size="1em" /> programs
-        </span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          <ChevronUp size="1em" />
-          <ChevronDown size="1em" /> channels
-        </span>
-        <span>OK to watch</span>
-      </div>
       <style>{`@keyframes tvgPulse{0%,100%{opacity:1}50%{opacity:.55}}.cg-grid-scroll{scrollbar-width:none;-ms-overflow-style:none}.cg-grid-scroll::-webkit-scrollbar{display:none}`}</style>
     </div>
   );
@@ -648,6 +649,12 @@ function Row({
             // For the live program, how far the live point is across the *rendered* card
             // (accounts for cards clamped to the rail) — drives the two-tone progress fill.
             const fillPct = Math.max(0, Math.min(100, ((laneX(now) - left) / width) * 100));
+            // Two-tone fill: strong tint on one side of the live point, weak on the other —
+            // PROGRESS_FILL_ELAPSED_STRONGER picks whether elapsed or remaining is the strong side.
+            const [fillA, fillB] = PROGRESS_FILL_ELAPSED_STRONGER
+              ? [hexA(accent, 0.32), hexA(accent, 0.1)]
+              : [hexA(accent, 0.1), hexA(accent, 0.32)];
+            const liveFill = `linear-gradient(90deg, ${fillA} ${fillPct}%, ${fillB} ${fillPct}%)`;
             return (
               <div
                 key={p.id}
@@ -657,7 +664,10 @@ function Row({
                   left,
                   width,
                   height: `calc(100% - ${vw(12)})`,
-                  padding: `${vw(20)} ${vw(20)} 0`,
+                  // Padding lives on the inner wrapper, NOT here: with box-sizing:border-box a
+                  // block narrower than the horizontal padding can't shrink below it, so a
+                  // clamped sliver would floor to the padding width (~42px) and overlap its
+                  // neighbor. The block stays its exact geometric `width`; overflow clips the pad.
                   boxSizing: "border-box",
                   overflow: "hidden",
                   borderRadius: 8,
@@ -670,9 +680,7 @@ function Row({
                   // progress fill: stronger tint up to the live point, weaker tint for the
                   // not-yet-aired remainder. Every other program gets a neutral fill and shows
                   // focus via the outline only (background is unaffected by selection).
-                  background: live
-                    ? `linear-gradient(90deg, ${hexA(accent, 0.32)} ${fillPct}%, ${hexA(accent, 0.1)} ${fillPct}%)`
-                    : "rgba(148,163,184,0.05)",
+                  background: live ? liveFill : "rgba(148,163,184,0.05)",
                   boxShadow: selected ? "0 12px 30px rgba(0,0,0,0.5)" : "none",
                   zIndex: selected ? 4 : 1,
                   transition: "background .12s",
@@ -694,11 +702,13 @@ function Row({
                     }}
                   />
                 )}
-                <div style={{ fontSize: vw(34), fontWeight: 600, color: "#f1f5f9", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {p.guide.showTitle ?? p.guide.title}
-                </div>
-                <div style={{ marginTop: vw(12), fontSize: vw(26), color: C.mutedFg, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {subLine(p.guide)}
+                <div style={{ height: "100%", padding: `${vw(20)} ${vw(20)} 0`, boxSizing: "border-box" }}>
+                  <div style={{ fontSize: vw(34), fontWeight: 600, color: "#f1f5f9", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {p.guide.showTitle ?? p.guide.title}
+                  </div>
+                  <div style={{ marginTop: vw(12), fontSize: vw(26), color: C.mutedFg, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {subLine(p.guide)}
+                  </div>
                 </div>
               </div>
             );

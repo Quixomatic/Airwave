@@ -2,6 +2,21 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.19] - 2026-07-16
+
+### Changed
+
+- **Channel up/down in the guide now snaps to the currently-airing program.** Moving between channels previously preserved a horizontal *time cursor* — it matched whatever program aired at the same time position on the next channel (cable-guide time-column alignment). It now always highlights the next channel's **"on now"** program instead; left/right still browses that channel's past/future programs as before. The time-alignment logic is retained behind a `TIME_ALIGN_CHANNEL_NAV` flag (default `false`) via a `pickAtLive` wrapper mirroring `pickAtCursor`, so the old behavior can be flipped back on.
+- **Live program's progress-fill direction is now a flag.** The two-tone tint on the currently-airing card (stronger for elapsed, weaker for the remainder) can be reversed via `PROGRESS_FILL_ELAPSED_STRONGER` (default `true` keeps the current look).
+
+### Fixed
+
+- **A narrow clamped guide program no longer overflows into its neighbor.** A program that started before the grid's left edge is clamped to the rail with a shrunk width; when that width was smaller than the block's horizontal padding, `box-sizing: border-box` couldn't shrink the element below its padding, so it floored to ~42px (padding + borders) instead of its real ~19px and overlapped the next program. The padding now lives on an inner wrapper that the block clips, so the block always renders at its exact geometric width.
+
+### Removed
+
+- **The leftover D-pad legend** ("◄► programs · ▲▼ channels · OK to watch") pinned to the bottom-left of the guide — it overlapped the program grid and is no longer needed.
+
 ## [0.4.18] - 2026-07-16
 
 ### Added
