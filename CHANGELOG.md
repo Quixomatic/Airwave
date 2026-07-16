@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.7] - 2026-07-16
+
+### Added
+
+- **Buffering spinner on the player.** The player now shows a spinner while the `<video>` is waiting on data — both the **initial channel load** (nothing to look at while a 4K HDR / transcoded stream spins up) and any **mid-stream rebuffer** (e.g. scrubbing a transcoded channel re-spins the transcode). Driven by real `waiting`/`stalled` → `playing`/`canplay` events (plus the initial resolve), a new `PlayerStatus.buffering`. Centered, animated (no burn-in), shown in both full and mini layouts; hidden during the bumper card and while paused.
+
 ## [0.4.6] - 2026-07-15
 
 ### Changed

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Maximize2, X } from "lucide-react";
+import { Loader2, Maximize2, X } from "lucide-react";
 import {
   createContext,
   useCallback,
@@ -233,6 +233,19 @@ function PlayerHost({
         playsInline
         style={{ width: "100%", height: "100%", objectFit: full ? "contain" : "cover" }}
       />
+
+      {/* Buffering spinner — initial load + mid-stream rebuffer (esp. 4K HDR / transcode spin-up). */}
+      {player.status.buffering && player.status.state !== "bumper" && !player.status.paused && (
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 0.9, ease: "linear" }}
+            style={{ color: "rgba(255,255,255,0.92)", filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.6))" }}
+          >
+            <Loader2 size={full ? 64 : 30} />
+          </motion.div>
+        </div>
+      )}
 
       {full && (
         <FullChrome

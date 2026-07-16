@@ -39,6 +39,8 @@ export type ScrubberView = {
 
 export type PlayerStatus = {
   loading: boolean;
+  /** The <video> is waiting on data (initial load or a mid-stream rebuffer) — show a spinner. */
+  buffering: boolean;
   state: "program" | "bumper" | "off" | "idle";
   guide: GuideMeta | null;
   paused: boolean;
@@ -110,6 +112,7 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
   const [tracks, setTracks] = useState<{ audio: PlayerTrack[]; subtitle: PlayerTrack[] }>({ audio: [], subtitle: [] });
   const [status, setStatus] = useState<PlayerStatus>({
     loading: true,
+    buffering: false,
     state: "idle",
     guide: null,
     paused: false,
@@ -246,7 +249,7 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
 
         const gen = ++genRef.current;
         const offset = Math.max(0, Math.floor(clamped - entry.startS));
-        setStatus((s) => ({ ...s, loading: true, error: null }));
+        setStatus((s) => ({ ...s, loading: true, error: null, buffering: true }));
         let info: MediaInfo;
         try {
           info = await api.media(channelId, entry.slot.ratingKey, offset, {
@@ -540,11 +543,22 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
         void goTo(currentEffective(), true); // retry this spot forcing hls.js
       }
     };
+    // Buffering feedback: waiting/stalled → spinner on; playing/canplay → off.
+    const onWaiting = () => setStatus((s) => (s.buffering ? s : { ...s, buffering: true }));
+    const onResume = () => setStatus((s) => (s.buffering ? { ...s, buffering: false } : s));
     video.addEventListener("ended", onEnded);
     video.addEventListener("error", onError);
+    video.addEventListener("waiting", onWaiting);
+    video.addEventListener("stalled", onWaiting);
+    video.addEventListener("playing", onResume);
+    video.addEventListener("canplay", onResume);
     return () => {
       video.removeEventListener("ended", onEnded);
       video.removeEventListener("error", onError);
+      video.removeEventListener("waiting", onWaiting);
+      video.removeEventListener("stalled", onWaiting);
+      video.removeEventListener("playing", onResume);
+      video.removeEventListener("canplay", onResume);
     };
   }, [goTo, currentEffective, recordLog]);
 
