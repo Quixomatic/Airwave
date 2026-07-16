@@ -80,13 +80,15 @@ export type ClientCaps = {
  * rather than transcoding. See .docs/plex-profiles.md + [[project-tv-playback-protocol]].
  */
 /**
- * Audio codecs that survive the hls.js/MSE remux+SourceBuffer path. AC3/E-AC3/
- * DTS/TrueHD do NOT — even when `canPlayType` says "probably" (that reflects the
- * panel's *native* decoder, used for raw-file direct-play), hls.js throws
- * `bufferAddCodecError` trying to append them. So we let those direct-play but
- * force a transcode (→ aac) on the HLS path. Proven from the playback log.
+ * Audio codecs that survive the hls.js/MSE remux+SourceBuffer path. AC3/E-AC3/DTS/TrueHD do
+ * NOT — even when `canPlayType` says "probably" (that reflects the panel's *native* decoder,
+ * used for raw-file direct-play), hls.js throws `bufferAddCodecError`. We advertise ONLY these
+ * on the HLS transcode target, so Plex transcodes the rest into one of them. **Opus is
+ * deliberately excluded**: it's technically MSE-safe, but Opus-in-fMP4 cut out mid-stream on
+ * the C2 (the video kept playing) — AAC is the bulletproof choice, and we're transcoding
+ * anyway so there's no quality tradeoff. Leaving only AAC (mp3 kept as a legacy fallback).
  */
-const MSE_SAFE_AUDIO = new Set(["aac", "opus", "mp3"]);
+const MSE_SAFE_AUDIO = new Set(["aac", "mp3"]);
 
 /**
  * Build the profile for a given delivery protocol:

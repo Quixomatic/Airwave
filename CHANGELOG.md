@@ -2,7 +2,21 @@
 
 All notable changes to ChannelGuide are documented here.
 
-## [0.4.8] - 2026-07-16
+## [0.4.9] - 2026-07-16
+
+### Fixed
+
+- **HLS transcode audio is now AAC (was Opus) — fixes the mid-stream audio cutout.** The HLS transcode target advertised `{aac, opus}` (measured caps ∩ MSE-safe), and Plex picked **Opus** — which cut out mid-stream on the C2 while the video kept playing (confirmed on the HDR + DTS test channel). Opus removed from the MSE-safe set (`{aac, mp3}`), so the target advertises only AAC and Plex transcodes audio to AAC — the bulletproof MSE codec. No quality tradeoff (the audio is transcoded either way); direct-play keeps the full native audio set.
+
+### Added
+
+- **hls.js audio/buffer errors are logged to PlaybackLog.** Non-fatal audio/buffer/append/stall errors now record a row (with the hls.js detail), so a future mid-stream cutout is captured with its real cause instead of guesswork.
+
+### Verified
+
+- **HDR survives the HLS transcode path on the C2.** 4K HEVC HDR + DTS-HD MA (The Bourne Legacy) played via HLS with the video **copied** (`→hevc`, 3840×1600) and HDR intact for 12+ minutes — the last open question on the playback arc.
+
+
 
 ### Fixed
 

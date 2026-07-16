@@ -177,7 +177,7 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
 
   // Post one PlaybackLog row for the last-loaded program: what Plex decided + whether the
   // panel actually decoded it. `outcome` forced to "error" from the <video> error handler.
-  const recordLog = useCallback((outcome?: "error") => {
+  const recordLog = useCallback((outcome?: "error", errorDetail?: string) => {
     const ctx = logCtxRef.current;
     if (!ctx) return;
     const v = videoRef.current;
@@ -189,7 +189,7 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
         decodedWidth: v?.videoWidth ?? 0,
         decodedHeight: v?.videoHeight ?? 0,
         readyState: v?.readyState ?? 0,
-        error: v?.error ? `code ${v.error.code}` : null,
+        error: errorDetail ?? (v?.error ? `code ${v.error.code}` : null),
       })
       .catch(() => {});
   }, []);
@@ -305,6 +305,10 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
           const hls = new Hls({ enableWorker: true });
           hlsRef.current = hls;
           hls.on(Hls.Events.ERROR, (_e, data) => {
+            const d = String(data.details ?? "");
+            // Capture audio/buffer hiccups (even non-fatal) so a mid-stream audio cutout lands
+            // in PlaybackLog with the real reason instead of us guessing.
+            if (/audio|buffer|append|stall/i.test(d)) recordLog("error", `hls ${d}${data.fatal ? " (fatal)" : ""}`);
             if (!data.fatal) return;
             if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
               hls.recoverMediaError();
