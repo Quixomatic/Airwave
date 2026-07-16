@@ -2,7 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
-## [0.4.11] - 2026-07-16
+## [0.4.12] - 2026-07-16
+
+### Fixed
+
+- **No stray tune when activating the nav pill.** The magic-remote OK button also fires a *click* on whatever the pointer is hovering, so pressing OK on the Guide/Settings pill was clicking the (still-highlighted) channel underneath and tuning it. A channel-row click now only tunes when the **grid** is the focused zone; on the pill or mini feed a click just returns to the grid. The channel highlight also **dims when focus is on the pill or mini feed**, so it's clear where focus is.
+- **Wheel / scroll-ring now moves the selection like a D-pad**, one channel per tick (fast), instead of slowly free-scrolling the grid. (Non-passive wheel listener that drives `fc` up/down and lets the virtualizer scroll to it.)
+
+### Added
+
+- **The channel overlay opens automatically when you tune a channel** (and auto-hides after the normal timeout, or on Back) — so you see the channel/program info + controls on open without pressing OK first.
+
+
 
 ### Added
 

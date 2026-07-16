@@ -49,7 +49,8 @@ export function FullChrome({
   const { status, controls, tracks } = player;
   const accent = accentForChannel(channel?.number);
 
-  const [panelOpen, setPanelOpen] = useState(false);
+  // Open the channel overlay on tune (auto-hides after the panel's timeout, or on Back).
+  const [panelOpen, setPanelOpen] = useState(true);
 
   // Remote: panel closed → OK/Up/Down opens it, Back returns to the guide (keeps
   // playing as a mini feed). When the panel is open the FeaturePanel owns the keys.

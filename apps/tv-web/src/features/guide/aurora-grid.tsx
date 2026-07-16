@@ -126,9 +126,6 @@ export function AuroraGrid({
   const player = usePlayer();
   const cursorRef = useRef<number>(now.getTime());
   const scrollRef = useRef<HTMLDivElement>(null);
-  // Set before we programmatically scroll to a focused row, so the follow-scroll from a
-  // wheel/pointer scroll doesn't fight the D-pad's own scrollToIndex.
-  const suppressScrollSync = useRef(false);
 
   // Virtualize the channel rows — with 100+ channels × program blocks, rendering them all
   // is what makes scrolling crawl on the C2. Render only the visible rows + an overscan of
@@ -291,14 +288,29 @@ export function AuroraGrid({
   }, [channels, fc, focusedChannel, onTune, player, zone, navSel, onSettings]);
 
   // Keep the focused row in view (it may not be rendered yet, so go through the virtualizer).
-  // Skipped when focus was just snapped to follow a user (wheel/pointer) scroll.
   useEffect(() => {
-    if (suppressScrollSync.current) {
-      suppressScrollSync.current = false;
-      return;
-    }
     rowVirtualizer.scrollToIndex(fc, { align: "auto" });
   }, [fc, rowVirtualizer]);
+
+  // Wheel / scroll-ring = D-pad up/down (one channel per tick, fast) instead of a slow
+  // free-scroll. preventDefault needs a non-passive native listener.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (player.layout === "full" || zone === "nav" || player.miniFocused) return;
+      e.preventDefault();
+      const dir = e.deltaY > 0 ? 1 : -1;
+      const nc = Math.min(channels.length - 1, Math.max(0, fc + dir));
+      if (nc !== fc) {
+        setFc(nc);
+        setFp(pickAtCursor(nc));
+      }
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fc, channels.length, player, zone]);
 
   return (
     <div
@@ -327,21 +339,6 @@ export function AuroraGrid({
           ref={scrollRef}
           className="cg-grid-scroll"
           style={{ position: "absolute", inset: 0, overflowY: "auto", overflowX: "hidden" }}
-          onScroll={() => {
-            // Wheel/pointer scroll: keep the D-pad focus following the view so the highlighted
-            // (and thus tuned) channel is always on-screen. Guarded so the D-pad's own
-            // scrollToIndex doesn't get overridden — it keeps fc within the visible range.
-            const el = scrollRef.current;
-            if (!el || !channels.length) return;
-            const first = Math.floor(el.scrollTop / rowPx);
-            const last = Math.floor((el.scrollTop + el.clientHeight) / rowPx);
-            if (fc < first || fc > last) {
-              const nc = Math.min(channels.length - 1, Math.max(0, first));
-              suppressScrollSync.current = true;
-              setFc(nc);
-              setFp(pickAtCursor(nc));
-            }
-          }}
         >
           <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
             {rowVirtualizer.getVirtualItems().map((vi) => {
@@ -350,8 +347,14 @@ export function AuroraGrid({
                 <div
                   key={c.id}
                   onClick={() => {
-                    // Pointer/magic-remote click = tune this channel (like OK on it).
-                    setZone("grid");
+                    // Pointer/magic-remote click = tune this channel. But the OK button also
+                    // fires a click on whatever the pointer hovers — so if focus is on the pill
+                    // or mini feed, a click here just returns to the grid (never a stray tune).
+                    if (player.miniFocused) return;
+                    if (zone !== "grid") {
+                      setZone("grid");
+                      return;
+                    }
                     setFc(vi.index);
                     setFp(liveProgramIndex(c.programs, now.getTime()));
                     onTune(c.id);
@@ -361,7 +364,7 @@ export function AuroraGrid({
                   <Row
                     channel={c}
                     accent={accentOf(vi.index)}
-                    focused={vi.index === fc}
+                    focused={vi.index === fc && zone === "grid" && !player.miniFocused}
                     focusedProgramId={vi.index === fc ? focusedProgram?.id : undefined}
                     now={now}
                     rowPx={rowPx}
