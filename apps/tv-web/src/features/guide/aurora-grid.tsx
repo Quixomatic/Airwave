@@ -126,6 +126,9 @@ export function AuroraGrid({
   const player = usePlayer();
   const cursorRef = useRef<number>(now.getTime());
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Live mirror of fc, so a burst of wheel ticks accumulates synchronously (no one-per-render lag).
+  const fcRef = useRef(fc);
+  fcRef.current = fc;
 
   // Virtualize the channel rows — with 100+ channels × program blocks, rendering them all
   // is what makes scrolling crawl on the C2. Render only the visible rows + an overscan of
@@ -301,8 +304,9 @@ export function AuroraGrid({
       if (player.layout === "full" || zone === "nav" || player.miniFocused) return;
       e.preventDefault();
       const dir = e.deltaY > 0 ? 1 : -1;
-      const nc = Math.min(channels.length - 1, Math.max(0, fc + dir));
-      if (nc !== fc) {
+      const nc = Math.min(channels.length - 1, Math.max(0, fcRef.current + dir));
+      if (nc !== fcRef.current) {
+        fcRef.current = nc; // advance synchronously so the next tick in the burst builds on it
         setFc(nc);
         setFp(pickAtCursor(nc));
       }
@@ -310,7 +314,7 @@ export function AuroraGrid({
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fc, channels.length, player, zone]);
+  }, [channels.length, player, zone]);
 
   return (
     <div
@@ -365,7 +369,7 @@ export function AuroraGrid({
                     channel={c}
                     accent={accentOf(vi.index)}
                     focused={vi.index === fc && zone === "grid" && !player.miniFocused}
-                    focusedProgramId={vi.index === fc ? focusedProgram?.id : undefined}
+                    focusedProgramId={vi.index === fc && zone === "grid" && !player.miniFocused ? focusedProgram?.id : undefined}
                     now={now}
                     rowPx={rowPx}
                     railFrac={CH_FRAC}

@@ -2,7 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
-## [0.4.12] - 2026-07-16
+## [0.4.13] - 2026-07-16
+
+### Fixed
+
+- **Grid fully deselects when focus moves to the nav pill / mini feed.** The row highlight already dimmed, but the focused program *block* kept its outline (its `focusedProgramId` wasn't gated on the zone), so a channel still looked selected while you were on Guide/Settings. Now nothing in the grid is highlighted when focus isn't on the grid.
+- **Snappy fast-scroll.** The wheel handler read `fc` from the render closure, so a burst of ~15 ticks all saw the same stale value and advanced one-per-render (the lag before it caught up). It now accumulates through a synchronous `fcRef`, so a fast scroll jumps straight to the target channel.
+
+
 
 ### Fixed
 
