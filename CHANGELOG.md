@@ -2,7 +2,13 @@
 
 All notable changes to ChannelGuide are documented here.
 
-## [0.4.4] - 2026-07-15
+## [0.4.5] - 2026-07-15
+
+### Added
+
+- **Playback logging restored in the TV player.** The player refactor had left `api.logPlayback` uncalled, so `PlaybackLog` stopped recording. `use-tv-player` now records each program load's real on-device outcome — mode (direct/http/hls), Plex's decision, source codecs, and whether the panel actually decoded (`decodedWidth`/`readyState`/`error`) — ~6s after load, and immediately on a `<video>` error. This is the ground truth for diagnosing bad channels (e.g. a black-screen `mode=http` transcode with `decodedWidth=0`) instead of guessing.
+
+
 
 ### Changed
 

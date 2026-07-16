@@ -134,6 +134,20 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
   const lastTickRef = useRef(Date.now());
   const currentRef = useRef<Current | null>(null);
   const transitioningRef = useRef(false);
+  // Diagnostics: the context of the last program load, so we can record its real on-device
+  // outcome to PlaybackLog (~6s after load, and immediately on a <video> error).
+  const logCtxRef = useRef<{
+    deviceId: string;
+    channelId: string;
+    ratingKey: string | null;
+    title: string;
+    mode: string;
+    sourceContainer: string | null;
+    sourceVideoCodec: string | null;
+    sourceAudioCodec: string | null;
+    decision: MediaInfo["decision"] | null;
+    caps: unknown;
+  } | null>(null);
 
   const now = useCallback(() => (Date.now() + clockOffsetRef.current) / 1000, []);
 
@@ -156,6 +170,25 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
 
   const tryPlay = useCallback((v: HTMLVideoElement) => {
     void v.play().catch(() => {});
+  }, []);
+
+  // Post one PlaybackLog row for the last-loaded program: what Plex decided + whether the
+  // panel actually decoded it. `outcome` forced to "error" from the <video> error handler.
+  const recordLog = useCallback((outcome?: "error") => {
+    const ctx = logCtxRef.current;
+    if (!ctx) return;
+    const v = videoRef.current;
+    const decoded = (v?.videoWidth ?? 0) > 0;
+    void api
+      .logPlayback({
+        ...ctx,
+        outcome: outcome ?? (v?.error ? "error" : decoded ? "playing" : "not_decoding"),
+        decodedWidth: v?.videoWidth ?? 0,
+        decodedHeight: v?.videoHeight ?? 0,
+        readyState: v?.readyState ?? 0,
+        error: v?.error ? `code ${v.error.code}` : null,
+      })
+      .catch(() => {});
   }, []);
 
   const goTo = useCallback(
@@ -295,11 +328,29 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
             { once: true },
           );
         }
+
+        // Capture this load for PlaybackLog, then record the real outcome ~6s later (unless a
+        // newer load supersedes it). A <video> error records immediately (error handler below).
+        logCtxRef.current = {
+          deviceId: deviceId(),
+          channelId,
+          ratingKey: entry.slot.ratingKey,
+          title: titleOf(entry.slot.guide),
+          mode: info.mode,
+          sourceContainer: info.container ?? null,
+          sourceVideoCodec: info.videoCodec ?? null,
+          sourceAudioCodec: info.audioCodec ?? null,
+          decision: info.decision ?? null,
+          caps: { capsSource: info.capsSource },
+        };
+        window.setTimeout(() => {
+          if (gen === genRef.current) recordLog();
+        }, 6000);
       } finally {
         transitioningRef.current = false;
       }
     },
-    [channelId, now, stopMedia, stopSession, tryPlay],
+    [channelId, now, stopMedia, stopSession, tryPlay, recordLog],
   );
 
   const currentEffective = useCallback((): number => {
@@ -483,6 +534,7 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
       if (cur?.kind === "PROGRAM" && currentEffective() >= cur.endS - 2) void goTo(cur.endS);
     };
     const onError = () => {
+      recordLog("error");
       const cur = currentRef.current;
       if (cur?.kind === "PROGRAM" && cur.mode !== "hls" && !cur.retried) {
         void goTo(currentEffective(), true); // retry this spot forcing hls.js
@@ -494,7 +546,7 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
       video.removeEventListener("ended", onEnded);
       video.removeEventListener("error", onError);
     };
-  }, [goTo, currentEffective]);
+  }, [goTo, currentEffective, recordLog]);
 
   const controls = useMemo(
     () => ({
