@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 
+import { BumperCard } from "./bumper-card";
 import { accentForChannel, FullChrome } from "./watch";
 import { useTvPlayer } from "./use-tv-player";
 import { api } from "../../lib/api";
@@ -268,6 +269,18 @@ function PlayerHost({
             <Loader2 size={full ? 64 : 30} />
           </motion.div>
         </div>
+      )}
+
+      {/* Mini feed: a bumper draws nothing on the <video> (it's between programs), so show a
+          compact "Up next" donut + blurb — the full BumperCard is drawn by FullChrome (full only). */}
+      {layout === "mini" && player.status.state === "bumper" && player.status.guide && (
+        <BumperCard
+          channelId={channelId}
+          guide={player.status.guide}
+          remaining={player.status.bumperRemaining}
+          accent={accent}
+          compact
+        />
       )}
 
       {full && (

@@ -2,6 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.26] - 2026-07-17
+
+### Changed
+
+- **The bumper countdown is now a draining donut.** The between-programs "Coming up next" card used to pop/enlarge the number on every tick; it now shows an accent ring that **empties like a pie/loader** as the countdown runs, with the seconds held steady in the middle. The ring drains off a local clock (smoothed with a CSS `stroke-dashoffset` transition) and represents the whole bumper length, so it winds cleanly from full to empty.
+- **The bumper's cover art is a touch more visible.** The blurred backdrop was dimmed a little too far — eased the image opacity up (0.5 → 0.62), the blur down (48 → 40px), and the dark overlay lighter, so the upcoming program's art reads without hurting text contrast.
+
+### Added
+
+- **A bumper now shows something in the mini feed too.** When a bumper hit while the player was docked as a mini feed in the guide, the video area just went blank (the full bumper card only draws in full-screen). The mini feed now shows a **compact** version — the donut countdown + an "Up next · {title}" blurb (no art) — so the interstitial is visible there as well.
+
 ## [0.4.25] - 2026-07-17
 
 ### Changed
