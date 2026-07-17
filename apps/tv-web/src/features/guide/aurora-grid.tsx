@@ -762,9 +762,15 @@ function Row({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  padding: 0,
+                  // Rail focused → ring the heart with a circular outline in the program-focus blue,
+                  // so it's clear OK toggles the favorite. Padding is CONSTANT (an outline takes no
+                  // layout space, so only it toggles) — the heart never moves when focus lands.
+                  padding: vw(7),
                   border: "none",
+                  borderRadius: "50%",
                   background: "transparent",
+                  outline: railFocused ? `${vw(3)} solid ${C.ring}` : "none",
+                  outlineOffset: railFocused ? vw(1) : 0,
                   cursor: "pointer",
                   fontSize: vw(26),
                   lineHeight: 1,

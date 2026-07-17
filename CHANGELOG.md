@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.27] - 2026-07-17
+
+### Changed
+
+- **The favorite heart shows a clear focus ring when its channel rail is focused.** Focusing a channel's rail in the guide is the affordance to favorite/unfavorite it (OK toggles), but the heart didn't read as the interactive target. It now gets a circular outline in the same blue the program focus uses. The heart's own size, color, and position are unchanged — the padding that reserves the ring's space is constant (an outline takes no layout space), so the icon never shifts when focus lands on it.
+
 ## [0.4.26] - 2026-07-17
 
 ### Changed
