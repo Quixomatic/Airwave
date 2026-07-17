@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.25] - 2026-07-17
+
+### Changed
+
+- **Guide featured-panel badges now carry a subtle left→right gradient.** The 4K/HD, HDR/DV, audio-channel (Stereo/5.1/7.1), and ATMOS/DTS:X badges keep their existing base colors, but each now fills with a `linear-gradient(90deg, …)` that starts at that color and deepens slightly toward the right — a soft sheen rather than a flat block (identical at the left edge). Text colors are untouched; plain gradients render fine on the C2's Chrome 108.
+
+### Added
+
+- **The watch player's Info view now shows how the current program is being delivered.** Pressing **Info** in the full-screen chrome tucks a small **Playback** readout under the details: the delivery mode (**Direct Play** / **HLS Transcode** / **Progressive Transcode**) as an accent pill, then the container, video codec, and audio codec as chips — each codec chip annotating Plex's copy-vs-transcode call (amber when it's re-encoding). When a direct-play uses a client-side audio-track switch (the Avatar / Gladiator II case), the audio chip shows the selected track's label instead. Backed by a new `delivery` field on the player status, captured from the resolved media at each program load — so it's a from-the-couch diagnostic without digging into PlaybackLog.
+
 ## [0.4.24] - 2026-07-17
 
 ### Fixed

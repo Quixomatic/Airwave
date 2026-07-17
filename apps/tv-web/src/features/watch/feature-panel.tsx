@@ -22,7 +22,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import type { GuideMeta } from "../../lib/api";
-import type { ScrubberView } from "./use-tv-player";
+import type { Delivery, ScrubberView } from "./use-tv-player";
 
 /**
  * The watch-screen feature panel — nothing is drawn on the live video (OLED burn-in).
@@ -58,6 +58,7 @@ export function FeaturePanel({
   guide,
   accent,
   scrubber,
+  delivery,
   paused,
   canRestart,
   tracks,
@@ -79,6 +80,7 @@ export function FeaturePanel({
   guide: GuideMeta | null;
   accent: string;
   scrubber: ScrubberView | null;
+  delivery: Delivery | null;
   paused: boolean;
   canRestart: boolean;
   tracks: { audio: Track[]; subtitle: Track[] };
@@ -292,6 +294,7 @@ export function FeaturePanel({
             {g?.directors?.length ? <DetailCol label="Director" value={g.directors.join(", ")} /> : null}
             {g?.studio ? <DetailCol label="Studio" value={g.studio} /> : null}
           </div>
+          {delivery && <DeliveryReadout delivery={delivery} accent={accent} />}
           <div style={{ marginTop: 24, fontSize: 15, color: "#64748b" }}>Press Back to return</div>
         </div>
       ) : (
@@ -395,6 +398,37 @@ function DetailCol({ label, value }: { label: string; value: string }) {
     <div style={{ maxWidth: 360 }}>
       <div style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: 1, color: "#64748b", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 18, color: "#dfe4ec" }}>{value}</div>
+    </div>
+  );
+}
+
+const MODE_LABEL: Record<Delivery["mode"], string> = {
+  direct: "Direct Play",
+  http: "Progressive Transcode",
+  hls: "HLS Transcode",
+};
+
+// Small tucked-away readout of HOW the current program is being delivered (mode / container /
+// video+audio codec, each with Plex's copy-vs-transcode call) — for diagnosing a bad channel
+// without leaving the couch. Shown at the bottom of the Info view.
+function DeliveryReadout({ delivery, accent }: { delivery: Delivery; accent: string }) {
+  const chip = (main: string, sub?: string | null) => (
+    <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6, fontSize: 15, padding: "5px 12px", borderRadius: 6, background: "rgba(148,163,184,0.14)", color: "#dfe4ec" }}>
+      {main.toUpperCase()}
+      {sub && <span style={{ fontSize: 12, color: sub === "transcode" ? "#f0a92a" : "#64748b" }}>{sub}</span>}
+    </span>
+  );
+  return (
+    <div style={{ marginTop: 28 }}>
+      <div style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: 1, color: "#64748b", marginBottom: 8 }}>Playback</div>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 15, fontWeight: 700, padding: "5px 12px", borderRadius: 6, background: `${accent}22`, color: accent }}>
+          {MODE_LABEL[delivery.mode]}
+        </span>
+        {delivery.container && chip(delivery.container)}
+        {delivery.videoCodec && chip(delivery.videoCodec, delivery.videoDecision)}
+        {delivery.audioCodec && chip(delivery.audioCodec, delivery.directAudioLabel ?? delivery.audioDecision)}
+      </div>
     </div>
   );
 }

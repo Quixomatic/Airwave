@@ -134,6 +134,7 @@ export function FullChrome({
             guide={status.guide}
             accent={accent}
             scrubber={status.scrubber}
+            delivery={status.delivery}
             paused={status.paused}
             canRestart={status.canRestart}
             tracks={tracks}

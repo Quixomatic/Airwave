@@ -87,6 +87,13 @@ function subLine(g: GuideGridProgram["guide"]): string {
 const audioBadge = (ch?: number) => (ch === 8 ? "7.1" : ch === 6 ? "5.1" : ch === 2 ? "Stereo" : ch ? "Mono" : null);
 const isHD = (res?: string) => !!res && res !== "sd" && res !== "480";
 const is4K = (res?: string) => res === "4k";
+// Featured-panel badge fills — each badge's base color deepened slightly toward the right for a
+// subtle left→right sheen (start = the original flat color, so the look is unchanged at the left edge).
+const BADGE_GRAD = {
+  res: "linear-gradient(90deg, #7fd6de, #4bb8c9)", // 4K / HD (cyan)
+  hdr: "linear-gradient(90deg, #f0c14b, #e0a020)", // HDR / DV (gold)
+  audio: "linear-gradient(90deg, #1e293b, #334155)", // channels + ATMOS/DTS:X (slate)
+} as const;
 
 export function AuroraGrid({
   channels: rawChannels,
@@ -972,18 +979,18 @@ function FeaturedPanel({
           </div>
           <div style={{ display: "flex", gap: fv(14), flexShrink: 0 }}>
             {is4K(g.resolution) ? (
-              <span style={{ ...badge, background: "#7fd6de", color: "#06222a" }}>4K</span>
+              <span style={{ ...badge, background: BADGE_GRAD.res, color: "#06222a" }}>4K</span>
             ) : isHD(g.resolution) ? (
-              <span style={{ ...badge, background: "#7fd6de", color: "#06222a" }}>HD</span>
+              <span style={{ ...badge, background: BADGE_GRAD.res, color: "#06222a" }}>HD</span>
             ) : null}
             {g.hdr && (
-              <span style={{ ...badge, background: "#f0c14b", color: "#2a1e00" }}>
+              <span style={{ ...badge, background: BADGE_GRAD.hdr, color: "#2a1e00" }}>
                 {g.hdr === "Dolby Vision" ? "DV" : "HDR"}
               </span>
             )}
-            {audio && <span style={{ ...badge, background: "#1e293b", color: "#dfe4ec" }}>{audio}</span>}
+            {audio && <span style={{ ...badge, background: BADGE_GRAD.audio, color: "#dfe4ec" }}>{audio}</span>}
             {g.dynamicAudio && (
-              <span style={{ ...badge, background: "#1e293b", color: "#dfe4ec" }}>
+              <span style={{ ...badge, background: BADGE_GRAD.audio, color: "#dfe4ec" }}>
                 {g.dynamicAudio === "Atmos" ? "ATMOS" : g.dynamicAudio}
               </span>
             )}

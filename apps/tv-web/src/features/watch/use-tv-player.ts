@@ -37,6 +37,19 @@ export type ScrubberView = {
   behindS: number; // now − effectiveTime
 };
 
+/** How the current program is being delivered — surfaced (tucked away) in the player's Info view. */
+export type Delivery = {
+  mode: "direct" | "http" | "hls";
+  container: string | null;
+  videoCodec: string | null;
+  audioCodec: string | null;
+  /** Plex's per-stream call: "copy" (remux/passthrough) vs "transcode" (re-encode). */
+  videoDecision: string | null;
+  audioDecision: string | null;
+  /** When a direct-play uses a client-side audio-track switch (Avatar case), the chosen track's label. */
+  directAudioLabel: string | null;
+};
+
 export type PlayerStatus = {
   loading: boolean;
   /** The <video> is waiting on data (initial load or a mid-stream rebuffer) — show a spinner. */
@@ -48,6 +61,8 @@ export type PlayerStatus = {
   canRestart: boolean;
   error: string | null;
   scrubber: ScrubberView | null;
+  /** Delivery diagnostics for the current program (null during a bumper / when off). */
+  delivery: Delivery | null;
 };
 
 type Current = {
@@ -58,6 +73,7 @@ type Current = {
   ratingKey: string | null;
   guide: GuideMeta;
   mode?: MediaInfo["mode"];
+  delivery?: Delivery;
   session?: string | null;
   paramsKey?: string;
   playStartOffset: number;
@@ -184,6 +200,7 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
     canRestart: false,
     error: null,
     scrubber: null,
+    delivery: null,
   });
 
   const timeline = useQuery({
@@ -355,6 +372,15 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
           ratingKey: entry.slot.ratingKey,
           guide: entry.slot.guide,
           mode: info.mode,
+          delivery: {
+            mode: info.mode,
+            container: info.decision?.container ?? info.container ?? null,
+            videoCodec: info.videoCodec ?? info.decision?.videoCodec ?? null,
+            audioCodec: info.directAudio?.codec ?? info.audioCodec ?? info.decision?.audioCodec ?? null,
+            videoDecision: info.decision?.videoDecision ?? null,
+            audioDecision: info.decision?.audioDecision ?? null,
+            directAudioLabel: info.directAudio?.label ?? null,
+          },
           session: info.session,
           paramsKey: paramsKeyRef.current,
           playStartOffset: offset,
@@ -576,6 +602,7 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
         bumperRemaining,
         canRestart: cur.kind === "PROGRAM",
         scrubber: buildScrubber(effective, t),
+        delivery: cur.kind === "PROGRAM" ? cur.delivery ?? null : null,
       }));
     }, 500);
     return () => window.clearInterval(id);
