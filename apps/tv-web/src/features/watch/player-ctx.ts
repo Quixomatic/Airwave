@@ -27,6 +27,8 @@ export type PlayerCtx = {
   blurMini: () => void;
   miniMove: (dir: -1 | 1) => void;
   miniActivate: () => void;
+  /** Remote CH▲/▼: step the lineup by one (dir +1 = up/next), clamped, behind the in-flight lock. */
+  channelStep: (dir: 1 | -1) => void;
   /** True while channel-number entry is capturing input. The guide and full-screen chrome read this
    *  (synchronously, at event time) to DEFER the keys number entry owns — OK commits it and Back
    *  cancels it, so neither should also tune / exit / pop to mini. A ref (not state) so the keydown

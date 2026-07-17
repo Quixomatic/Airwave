@@ -1,21 +1,19 @@
 import { useCallback, useMemo } from "react";
 
-import { usePlayer } from "./player-context";
+import { usePlayer } from "./player-ctx";
 import { useChannels } from "../../hooks/use-channels";
 
 /**
- * The shared channel-navigation foundation for the remote-control arc (§7.2): the ordered lineup,
- * lookup by channel number, and next/prev. Number entry uses `byNumber` + `maxNumber` today;
- * `next`/`prev` are here for the CH▲/▼ arc (built once the C2's CH keycodes are known via the
- * remote-key probe). `tune` is re-exported so callers have the whole nav surface from one hook.
+ * Channel lookups for number entry (§7.2): the ordered lineup, `byNumber`, and the widest channel
+ * number's digit count (`maxNumber`). Lookup is client-side against the already-loaded channel list
+ * (no server round-trip). `tune` is re-exported so the number-entry commit has the whole surface.
  *
- * NOTE: no in-flight lock yet — number entry commits deliberately on OK (not spammable). The lock
- * (fire immediately, block further changes until the tune fully completes) lands with CH▲/▼, where
- * rapid presses against the remounting persistent player actually need it, and can be tested on-device.
+ * CH▲/▼ stepping lives in the provider (`channelStep`) instead, because it needs the in-flight lock
+ * that's shared with the persistent player's load lifecycle — see `player-context.tsx`.
  */
 export function useChannelNav() {
   const { data: channels } = useChannels();
-  const { tune, playingChannelId } = usePlayer();
+  const { tune } = usePlayer();
 
   const lineup = useMemo(
     () => [...(channels ?? [])].sort((a, b) => (a.number ?? 0) - (b.number ?? 0)),
@@ -32,21 +30,5 @@ export function useChannelNav() {
     [lineup],
   );
 
-  const currentIndex = useMemo(
-    () => lineup.findIndex((c) => c.id === playingChannelId),
-    [lineup, playingChannelId],
-  );
-
-  const step = useCallback(
-    (delta: 1 | -1) => {
-      if (currentIndex < 0) return;
-      const target = lineup[currentIndex + delta];
-      if (target) tune(target.id); // clamped at the ends (no wrap past first/last)
-    },
-    [currentIndex, lineup, tune],
-  );
-  const next = useCallback(() => step(1), [step]);
-  const prev = useCallback(() => step(-1), [step]);
-
-  return { lineup, byNumber, maxNumber, currentIndex, next, prev, tune };
+  return { byNumber, maxNumber, tune };
 }

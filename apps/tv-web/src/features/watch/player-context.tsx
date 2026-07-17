@@ -68,6 +68,44 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     else stop();
   }, [miniSel, goFull, stop]);
 
+  // Remote channel navigation (CH▲/▼ = PageUp/PageDown, keyCode 33/34): step the ORDERED lineup by
+  // one, clamped at the ends, behind an IN-FLIGHT LOCK. A press fires immediately and blocks any
+  // further channel change until the new channel has actually loaded — the persistent player remounts
+  // on a channel change, so this stops rapid presses from thrashing the reload (James's spec: NOT a
+  // debounce). The lock releases when PlayerHost reports the new channel is showing content
+  // (`releaseChannelLock`), with a timeout backstop in case a channel errors and never plays.
+  const { data: channels } = useChannels();
+  const lineup = useMemo(
+    () => [...(channels ?? [])].sort((a, b) => (a.number ?? 0) - (b.number ?? 0)),
+    [channels],
+  );
+  const lineupRef = useRef(lineup);
+  lineupRef.current = lineup;
+  const playingRef = useRef(playingChannelId);
+  playingRef.current = playingChannelId;
+  const chLockRef = useRef(false);
+  const chLockTimer = useRef(0);
+
+  const releaseChannelLock = useCallback(() => {
+    chLockRef.current = false;
+    window.clearTimeout(chLockTimer.current);
+  }, []);
+  const channelStep = useCallback(
+    (dir: 1 | -1) => {
+      if (chLockRef.current) return; // a change is still in flight — ignore
+      const list = lineupRef.current;
+      const idx = list.findIndex((c) => c.id === playingRef.current);
+      if (idx < 0) return; // nothing playing → CH▲/▼ is a while-watching gesture, so no-op
+      const target = list[idx + dir];
+      if (!target) return; // clamp at the first / last channel (no wrap)
+      chLockRef.current = true;
+      window.clearTimeout(chLockTimer.current);
+      chLockTimer.current = window.setTimeout(() => { chLockRef.current = false; }, 5000);
+      tune(target.id);
+    },
+    [tune],
+  );
+
   // After a stretch of no input with the mini feed playing, go full-screen. Otherwise the
   // TV's screensaver eventually blanks everything but the tiny video — a fullscreen video
   // keeps the panel awake. Any remote/pointer activity resets the timer.
@@ -104,8 +142,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       miniMove,
       miniActivate,
       numberEntryActiveRef,
+      channelStep,
     }),
-    [activeChannelId, playingChannelId, layout, miniFocused, miniSel, tune, goFull, goMini, stop, focusMini, blurMini, miniMove, miniActivate],
+    [activeChannelId, playingChannelId, layout, miniFocused, miniSel, tune, goFull, goMini, stop, focusMini, blurMini, miniMove, miniActivate, channelStep],
   );
 
   return (
@@ -124,6 +163,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           onBack={goMini}
           onGoFull={goFull}
           onClose={stop}
+          onPlaying={releaseChannelLock}
         />
       )}
     </Ctx.Provider>
@@ -173,6 +213,7 @@ function PlayerHost({
   onBack,
   onGoFull,
   onClose,
+  onPlaying,
 }: {
   channelId: string;
   layout: Layout;
@@ -182,6 +223,7 @@ function PlayerHost({
   onBack: () => void;
   onGoFull: () => void;
   onClose: () => void;
+  onPlaying: () => void;
 }) {
   const { data: channels } = useChannels();
   const channel = channels?.find((c) => c.id === channelId);
@@ -196,6 +238,15 @@ function PlayerHost({
   }, []);
 
   const player = useTvPlayer(channelId, { quality, audioStreamId, subtitleStreamId });
+
+  // Release the CH▲/▼ in-flight lock once THIS channel is actually showing content (program or
+  // bumper) — a CH press stays locked through the remount+load, then frees the next press. This
+  // host is keyed on the channel id, so a fresh instance mounts per channel and reports its own load.
+  const st = player.status.state;
+  const loading = player.status.loading;
+  useEffect(() => {
+    if (!loading && (st === "program" || st === "bumper")) onPlaying();
+  }, [st, loading, onPlaying]);
 
   const vp = useViewport();
   const slot = useSlotRect(slotRef, layout === "mini");

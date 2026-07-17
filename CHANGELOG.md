@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.30] - 2026-07-17
+
+### Added
+
+- **CH▲/▼ changes the channel while watching (§7.2, Arc 1).** The remote's channel up/down — **PageUp/PageDown, keyCode 33/34** on the C2 — steps one channel through the ordered lineup (up = the next-higher number), clamped at the first/last channel (no wrap). It's a while-watching gesture (full-screen or mini); on the guide with nothing playing it's a no-op. No banner — a tune already opens the feature panel showing the new channel. Behind an **in-flight lock** (per spec, *not* a debounce): a press fires immediately and any further CH press is ignored until the new channel has actually loaded — the persistent player remounts on a channel change, so this prevents rapid-press reload thrash — with a timeout backstop if a channel errors and never plays. Also testable in a desktop browser (PageUp/PageDown). Stepping lives in the provider (`channelStep`) since it shares the lock with the player's load lifecycle.
+
 ## [0.4.29] - 2026-07-17
 
 ### Added

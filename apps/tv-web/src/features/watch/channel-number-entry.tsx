@@ -40,7 +40,7 @@ const inputFocused = () => {
 export function ChannelNumberEntry() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { byNumber, maxNumber, tune } = useChannelNav();
-  const { numberEntryActiveRef } = usePlayer();
+  const { numberEntryActiveRef, channelStep } = usePlayer();
 
   const [buffer, setBuffer] = useState("");
   const [flash, setFlash] = useState(false);
@@ -99,6 +99,17 @@ export function ChannelNumberEntry() {
       // never while a dropdown menu or a text field owns the keys.
       if (pathname !== "/" || menuOpen() || inputFocused()) return;
 
+      // CH▲/▼ = PageUp/PageDown (keyCode 33/34) on the webOS remote: step one channel (clamped,
+      // in-flight-locked in the provider). preventDefault so it never page-scrolls; abandons any
+      // in-progress number entry first.
+      if (e.keyCode === 33 || e.keyCode === 34) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (bufferRef.current.length > 0) cancel();
+        channelStep(e.keyCode === 33 ? 1 : -1);
+        return;
+      }
+
       const digit = digitOf(e);
       if (digit != null) {
         e.preventDefault();
@@ -141,7 +152,7 @@ export function ChannelNumberEntry() {
       clearFlash();
       numberEntryActiveRef.current = false;
     };
-  }, [pathname, byNumber, maxNumber, tune, maxDigits, numberEntryActiveRef]);
+  }, [pathname, byNumber, maxNumber, tune, maxDigits, numberEntryActiveRef, channelStep]);
 
   const pad = "_".repeat(Math.max(0, maxDigits - buffer.length));
 
