@@ -60,9 +60,8 @@ export function FullChrome({
 
   // Open the channel overlay on tune (auto-hides after the panel's timeout, or on Back).
   const [panelOpen, setPanelOpen] = useState(true);
-  // Channel surf (◄/► with the chrome closed): the carousel + the direction it opened in.
+  // Channel surf (◄/► with the chrome closed) — opens centered on the current channel.
   const [surfOpen, setSurfOpen] = useState(false);
-  const [surfDir, setSurfDir] = useState<1 | -1>(1);
 
   // Remote: panel closed → OK/Up/Down opens it, Back returns to the guide (keeps
   // playing as a mini feed). When the panel is open the FeaturePanel owns the keys.
@@ -82,10 +81,9 @@ export function FullChrome({
         e.stopPropagation();
         setPanelOpen(true);
       } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-        // Chrome closed → ◄/► slides up the channel-surf carousel (opening one step that way).
+        // Chrome closed → ◄/► slides up the channel-surf carousel (centered on the current channel).
         e.preventDefault();
         e.stopPropagation();
-        setSurfDir(e.key === "ArrowRight" ? 1 : -1);
         setSurfOpen(true);
       }
     };
@@ -176,7 +174,6 @@ export function FullChrome({
           <ChannelSurf
             key="surf"
             currentChannelId={channelId}
-            initialDir={surfDir}
             onClose={() => setSurfOpen(false)}
           />
         )}

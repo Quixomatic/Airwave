@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.32] - 2026-07-17
+
+### Fixed
+
+- **Channel surf now auto-hides, and opens on the current channel.** Two fixes to the new carousel: (1) the ~12s auto-hide never fired — the player status ticks ~twice a second, re-rendering the chrome and handing surf a fresh `onClose` that restarted the countdown every time; the timer now lives in its own mount-scoped effect (reading `onClose` through a ref), so it actually reaches 12s. (2) Opening surf pre-stepped one channel in the pressed direction; it now opens **centered on the channel you're already watching**, marked with a subtle "Watching" flag above that tile, and ◄/► move from there.
+
 ## [0.4.31] - 2026-07-17
 
 ### Added

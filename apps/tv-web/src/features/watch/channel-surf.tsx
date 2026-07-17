@@ -10,9 +10,10 @@ import { usePlayer } from "./player-ctx";
 
 /**
  * Channel surf (§7.2, Arc 3). With the full-screen chrome closed, ◄/► slide up a horizontal
- * carousel of channel tiles — each with cover art, a progress bar, and what's on now — the current
- * channel centered. ◄/► move (WRAPPING, so channel 1 → last is one press), **OK tunes** the
- * highlighted channel, **Back closes** without changing, and ~12s of no input auto-hides it.
+ * carousel of channel tiles — each with cover art, a progress bar, and what's on now — opening
+ * centered on the channel you're already watching (marked with a subtle "Watching" flag). ◄/► move
+ * (WRAPPING, so channel 1 → last is one press), **OK tunes** the highlighted channel, **Back closes**
+ * without changing, and ~12s of no input auto-hides it.
  *
  * Virtualized horizontally (@tanstack/react-virtual) like the guide grid, so 100+ tiles — and their
  * cover-art images — stay cheap: only the visible window loads. It owns ◄/►/OK/Back while up
@@ -40,11 +41,9 @@ function liveProgramIndex(programs: GuideGridProgram[], nowMs: number): number {
 
 export function ChannelSurf({
   currentChannelId,
-  initialDir,
   onClose,
 }: {
   currentChannelId: string;
-  initialDir: 1 | -1;
   onClose: () => void;
 }) {
   const { data: guide } = useGuide();
@@ -61,13 +60,11 @@ export function ChannelSurf({
   );
   const nowMs = () => Date.now() + clockOffset;
 
-  // Open one step in the pressed direction (◄/► already implies where you're heading), wrapping.
+  // Open centered on the channel you're already watching.
   const startIdx = useMemo(() => {
-    if (len === 0) return 0;
     const cur = channels.findIndex((c) => c.id === currentChannelId);
-    const base = cur < 0 ? 0 : cur;
-    return ((base + initialDir) % len + len) % len;
-  }, [channels, currentChannelId, initialDir, len]);
+    return cur < 0 ? 0 : cur;
+  }, [channels, currentChannelId]);
 
   const [focused, setFocused] = useState(startIdx);
   const focusedRef = useRef(startIdx);
@@ -99,6 +96,21 @@ export function ChannelSurf({
     };
   }, [surfActiveRef]);
 
+  // Auto-hide, in its OWN effect so it isn't reset by unrelated re-renders (the player status ticks
+  // ~2×/s and would otherwise keep restarting the countdown). `onClose` is read through a ref so this
+  // effect stays mount-only and the timer actually reaches 12s.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const hideTimerRef = useRef(0);
+  const resetHide = useCallback(() => {
+    window.clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = window.setTimeout(() => onCloseRef.current(), AUTO_HIDE_MS);
+  }, []);
+  useEffect(() => {
+    resetHide();
+    return () => window.clearTimeout(hideTimerRef.current);
+  }, [resetHide]);
+
   // Center the opening tile instantly (no long slide on open).
   useEffect(() => {
     const raf = requestAnimationFrame(() => virtualizer.scrollToIndex(startIdx, { align: "center" }));
@@ -119,11 +131,6 @@ export function ChannelSurf({
   );
 
   useEffect(() => {
-    let hideTimer = window.setTimeout(onClose, AUTO_HIDE_MS);
-    const resetHide = () => {
-      window.clearTimeout(hideTimer);
-      hideTimer = window.setTimeout(onClose, AUTO_HIDE_MS);
-    };
     const onKey = (e: KeyboardEvent) => {
       const isBack = e.keyCode === 461 || BACK_KEYS.includes(e.key);
       if (e.key === "ArrowLeft") {
@@ -141,11 +148,11 @@ export function ChannelSurf({
         e.stopImmediatePropagation();
         const ch = channels[focusedRef.current];
         if (ch && ch.id !== currentChannelId) tune(ch.id);
-        onClose();
+        onCloseRef.current();
       } else if (isBack) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        onClose();
+        onCloseRef.current();
       } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
         // Swallow (don't leak to the chrome), keep surf open.
         e.preventDefault();
@@ -154,11 +161,8 @@ export function ChannelSurf({
       }
     };
     window.addEventListener("keydown", onKey, true);
-    return () => {
-      window.clearTimeout(hideTimer);
-      window.removeEventListener("keydown", onKey, true);
-    };
-  }, [move, channels, currentChannelId, tune, onClose]);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [move, channels, currentChannelId, tune, resetHide]);
 
   return (
     <motion.div
@@ -172,20 +176,21 @@ export function ChannelSurf({
         right: 0,
         bottom: 0,
         zIndex: 56,
-        height: 420,
-        paddingTop: 26,
+        height: 440,
+        paddingTop: 22,
         background: "linear-gradient(to top, rgba(4,6,12,0.96) 40%, rgba(4,6,12,0))",
       }}
     >
-      <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", color: "rgba(255,255,255,0.7)", textAlign: "center", marginBottom: 18 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", color: "rgba(255,255,255,0.7)", textAlign: "center", marginBottom: 14 }}>
         Channel Surf
       </div>
       <div ref={parentRef} style={{ width: "100%", overflowX: "hidden", overflowY: "hidden" }}>
-        <div style={{ position: "relative", width: virtualizer.getTotalSize(), height: ART_H + 118 }}>
+        <div style={{ position: "relative", width: virtualizer.getTotalSize(), height: ART_H + 150 }}>
           {virtualizer.getVirtualItems().map((vi) => {
             const ch = channels[vi.index];
             if (!ch) return null;
             const isFocused = vi.index === focused;
+            const isCurrent = ch.id === currentChannelId;
             const accent = channelVivid(ch) ?? "#4a9fe0";
             const prog = ch.programs.length ? ch.programs[liveProgramIndex(ch.programs, nowMs())] : undefined;
             const g = prog?.guide;
@@ -204,7 +209,7 @@ export function ChannelSurf({
                 key={ch.id}
                 style={{
                   position: "absolute",
-                  top: 8,
+                  top: 4,
                   left: vi.start,
                   width: TILE_W,
                   transform: isFocused ? "scale(1.06)" : "scale(1)",
@@ -213,6 +218,16 @@ export function ChannelSurf({
                   transition: "transform 0.16s ease, opacity 0.16s ease",
                 }}
               >
+                {/* "Watching" flag above the channel you're currently on (fixed-height slot so all
+                    tiles' art stays aligned whether or not the flag is shown). */}
+                <div style={{ height: 22, display: "flex", justifyContent: "center", alignItems: "flex-end", marginBottom: 6 }}>
+                  {isCurrent && (
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, background: "rgba(255,255,255,0.13)", fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(255,255,255,0.9)" }}>
+                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: accent }} />
+                      Watching
+                    </div>
+                  )}
+                </div>
                 {/* Cover art */}
                 <div
                   style={{
