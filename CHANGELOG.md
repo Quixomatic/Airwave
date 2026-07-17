@@ -2,7 +2,11 @@
 
 All notable changes to ChannelGuide are documented here.
 
-## [0.4.23] - 2026-07-17
+## [0.4.24] - 2026-07-17
+
+### Fixed
+
+- **VP9 video now transcodes instead of tanking the app.** VP9 decodes in isolation (the capability diagnostic passes it — it's what YouTube uses) but fails every real path on the LG C2: raw-file `<video>` direct-play of `mkv/vp9` errors (code 4, `SRC_NOT_SUPPORTED`), and VP9 *copied* into fMP4/MSE **software-decodes**, pegging the CPU so the whole app goes unresponsive (Back / channel-change took ~30s until the stream was killed). VP9 is now a device-quirk exclusion (`UNRELIABLE_VIDEO` in `codecs.ts`, the video analog of `UNDECODABLE_AUDIO`): it's dropped from the panel's credited video set, so `getPlaybackInfo` won't direct-play it and the HLS profile won't advertise it as a copy target → Plex re-encodes the video to H.264, which hits the hardware decoder. Confirmed on the C2 (Ms. Rachel, `mkv/vp9/aac`). Server-side only.
 
 ### Added
 

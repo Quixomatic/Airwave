@@ -52,3 +52,21 @@ export const UNDECODABLE_AUDIO: Record<string, string> = {
   // mkv/h264/dca — video played, audio silent then dead).
   dts: "LG webOS has no DTS/DCA audio decoder (licensing) — audio silent.",
 };
+
+/**
+ * Video codecs that decode in ISOLATION (the diagnostic passed a clip) but do NOT play through our
+ * actual paths on the panel — so they must force a real VIDEO transcode to a working codec, same
+ * idea as {@link UNDECODABLE_AUDIO}. A codec listed here is dropped from the credited native video
+ * set, so `getPlaybackInfo` won't direct-play it AND the HLS profile won't advertise it as a copy
+ * target → Plex re-encodes it (e.g. → H.264). Keyed by canonical codec → the reason.
+ *
+ * (Stopgap until a manual capability-settings page lets the user toggle codecs per device — the
+ * proper long-term home, which writes back to `DeviceCapability`.)
+ */
+export const UNRELIABLE_VIDEO: Record<string, string> = {
+  // LG C2: VP9 decodes in isolation (it's what YouTube uses) but FAILS every path we have — raw-file
+  // `<video>` direct-play of mkv/vp9 errors (code 4, SRC_NOT_SUPPORTED), and VP9 *copied* into
+  // fMP4/MSE sticks at readyState 1 (never plays). Confirmed 2026-07-17 on the C2 (Ms. Rachel,
+  // mkv/vp9/aac — direct 0x0/err4, HLS stuck buffering). Force a transcode to H.264.
+  vp9: "LG webOS C2: VP9 fails raw-file direct-play (err 4) and VP9-in-MSE stalls — transcode video.",
+};

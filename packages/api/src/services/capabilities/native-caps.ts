@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@ChannelGuide/db";
 
 import type { ClientCaps } from "../plex/quality";
-import { UNDECODABLE_AUDIO } from "./codecs";
+import { UNDECODABLE_AUDIO, UNRELIABLE_VIDEO } from "./codecs";
 import { CAP_MATRIX } from "./matrix";
 
 /**
@@ -84,7 +84,9 @@ export async function getDeviceNativeCaps(
     const at = AUDIO_TOKEN[t.audio];
     if (decoded) {
       const vt = VIDEO_TOKEN[t.video];
-      if (vt) video.add(vt);
+      // A codec in UNRELIABLE_VIDEO decoded in the diagnostic but doesn't play through our paths on
+      // the panel (VP9 on the C2) — drop it so its content transcodes to a working codec.
+      if (vt && !UNRELIABLE_VIDEO[vt]) video.add(vt);
       for (const ct of CONTAINER_TOKENS[t.container] ?? []) containers.add(ct);
       if (at) inferredAudio.add(at);
     }
