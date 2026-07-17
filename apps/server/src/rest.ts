@@ -1,5 +1,8 @@
 import { ApiError } from "@ChannelGuide/api/services/errors";
+import { listFavoriteChannelIds, setFavorite } from "@ChannelGuide/api/services/favorites";
 import { getGuideGrid, listGuideChannels } from "@ChannelGuide/api/services/guide";
+import { listActivePackages } from "@ChannelGuide/api/services/packages";
+import { listRecentChannelIds } from "@ChannelGuide/api/services/recents";
 import {
   getTimelineWindow,
   qualityList,
@@ -67,6 +70,34 @@ function intParam(raw: string | undefined, def: number, min: number, max: number
 
 /** Enabled channels in lineup order (the TV channel list / surfing). */
 api.get("/channels", async (c) => c.json({ channels: await listGuideChannels(prisma) }));
+
+/** Channel packages that have active channels — the guide sidebar's filter list. */
+api.get("/packages", async (c) => c.json({ packages: await listActivePackages(prisma) }));
+
+// --- Favorites (per-user, synced across devices) --------------------------
+
+/** This user's favorited channel ids (the guide's heart state + "Favorites" lens). */
+api.get("/favorites", async (c) =>
+  c.json({ channelIds: await listFavoriteChannelIds(prisma, c.get("session").user.id) }),
+);
+
+/**
+ * Favorite / unfavorite a channel. The BODY carries the desired state (`favorite: true|false`)
+ * rather than a toggle, so it's idempotent — a retry or double-press can't flip it back.
+ * POST (not PUT/DELETE) to match the rest of this surface: CORS here only allows GET/POST/OPTIONS.
+ */
+api.post("/favorites", async (c) => {
+  const body = (await c.req.json().catch(() => null)) as { channelId?: string; favorite?: boolean } | null;
+  if (!body?.channelId || typeof body.favorite !== "boolean") {
+    return c.json({ error: "channelId and favorite are required" }, 400);
+  }
+  return c.json(await setFavorite(prisma, c.get("session").user.id, body.channelId, body.favorite));
+});
+
+/** This user's recently-watched channels, deduped, most-recent-first (the "Recents" lens). */
+api.get("/recents", async (c) =>
+  c.json({ channelIds: await listRecentChannelIds(prisma, c.get("session").user.id) }),
+);
 
 /** Cross-channel guide grid over a forward window. */
 api.get("/guide", async (c) => {

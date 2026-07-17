@@ -1,10 +1,16 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { AnimatePresence, motion } from "framer-motion";
 import * as LucideIcons from "lucide-react";
-import { Menu, Settings, Star } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Heart, Star } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { GuideGridChannel, GuideGridProgram } from "../../lib/api";
+import { C } from "../../lib/theme";
+import { useFavorites, useSetFavorite } from "../../hooks/use-favorites";
+import { usePackages } from "../../hooks/use-packages";
+import { useRecents } from "../../hooks/use-recents";
 import { usePlayer } from "../watch/player-context";
+import { GuideSidebar, SIDEBAR_SLIVER_W, buildSidebarItems, lensEquals, type Lens } from "./guide-sidebar";
 
 /** Index of the program airing at `nowMs` (else 0) — the "on now" slot. */
 function liveProgramIndex(programs: GuideGridProgram[], nowMs: number): number {
@@ -36,22 +42,7 @@ const DESIGN_W = 2560;
 /** spec px (at 2560 wide) → vw, so sizing scales fluidly with the screen. */
 const vw = (px: number) => `${(px / DESIGN_W) * 100}vw`;
 
-const C = {
-  bg: "#060a14",
-  card: "#0b1120",
-  border: "rgba(148,163,184,0.14)",
-  cellBorder: "rgba(148,163,184,0.10)",
-  rowBorder: "rgba(148,163,184,0.12)",
-  fg: "#f1f5f9",
-  mutedFg: "#94a3b8",
-  ring: "#3b82f6",
-  highlight: "#12233d",
-  now: "#ef4444",
-  star: "#f0a92a",
-  navBg: "#0f1626",
-  navActive: "#243043",
-};
-const ACCENTS = ["#2f9e8f", "#4a9fe0", "#3b82f6", "#8b5cf6", "#3fa66a", "#d08b2f", "#d0587e", "#7c8aa3"];
+const ACCENTS =["#2f9e8f", "#4a9fe0", "#3b82f6", "#8b5cf6", "#3fa66a", "#d08b2f", "#d0587e", "#7c8aa3"];
 
 const CH_FRAC = 212 / DESIGN_W; // channel rail = this fraction of width
 const ROW_FRAC = 168 / DESIGN_W; // row height fraction (of width)
@@ -99,11 +90,13 @@ export function AuroraGrid({
   serverTime,
   onTune,
   onSettings,
+  onSignOut,
 }: {
   channels: GuideGridChannel[];
   serverTime: string;
   onTune: (channelId: string) => void;
   onSettings: () => void;
+  onSignOut: () => void;
 }) {
   const now = useMemo(() => new Date(serverTime), [serverTime]);
   const T0 = useMemo(() => {
@@ -120,14 +113,37 @@ export function AuroraGrid({
     window.addEventListener("resize", f);
     return () => window.removeEventListener("resize", f);
   }, []);
-  const railPx = width * CH_FRAC;
+  // The guide column is FIXED at viewport-minus-the-sliver and never moves: the sidebar only ever
+  // occupies the sliver in the layout, and expanding it is a pure overlay on top. So the program
+  // blocks and time axis are never shifted, reflowed, or smooshed — and the lane geometry stays
+  // deterministic (no measuring, and no re-render during the expand animation).
+  const colW = Math.max(1, width - SIDEBAR_SLIVER_W);
+  const railPx = colW * CH_FRAC;
   const rowPx = width * ROW_FRAC;
-  const laneW = width - railPx;
+  const laneW = Math.max(1, colW - railPx);
   const ppm = laneW / WINDOW_MIN; // px per minute, derived from the real lane width
   const minsFrom = (iso: string | Date) =>
     ((typeof iso === "string" ? new Date(iso).getTime() : iso.getTime()) - T0.getTime()) / MIN;
   const laneX = (iso: string | Date) => minsFrom(iso) * ppm; // px within the lane (0 = T0)
   const nowMins = minsFrom(now);
+
+  // Active guide lens (which channels the sidebar filter shows) + the sidebar's package list.
+  const [lens, setLens] = useState<Lens>({ type: "all" });
+  const { data: pkgData } = usePackages();
+  const sidebarItems = useMemo(() => buildSidebarItems(pkgData?.packages ?? []), [pkgData]);
+
+  // Per-user favorites — the rail's heart + the "Favorites" lens.
+  const { data: favData } = useFavorites();
+  const favoriteIds = useMemo(() => new Set(favData?.channelIds ?? []), [favData]);
+  const setFavorite = useSetFavorite();
+  const toggleFavorite = useCallback(
+    (channelId: string) => setFavorite.mutate({ channelId, favorite: !favoriteIds.has(channelId) }),
+    [setFavorite, favoriteIds],
+  );
+
+  // Recently-watched channels (deduped, most-recent-first) — the "Recents" lens.
+  const { data: recentData } = useRecents();
+  const recentIds = useMemo(() => recentData?.channelIds ?? [], [recentData]);
 
   // The programs actually shown on the grid: within the visible window AND wide enough to render
   // (not a rail-edge sliver). Filtering the channel's programs HERE — not just in the render —
@@ -146,14 +162,31 @@ export function AuroraGrid({
       const left = rawLeft < 0 ? 6 : rawLeft;
       return rawRight - left >= MIN_VISIBLE_PX; // cull rail-edge slivers
     };
-    return rawChannels.map((c) => ({ ...c, programs: c.programs.filter(visible) }));
-  }, [rawChannels, ppm, laneW, T0]);
+    // Channel-level lens filter — which channels the active sidebar filter shows.
+    const inLens = (c: GuideGridChannel): boolean =>
+      lens.type === "all"
+        ? true
+        : lens.type === "packages"
+          ? c.package != null && lens.ids.includes(c.package.id)
+          : lens.type === "favorites"
+            ? favoriteIds.has(c.id)
+            : recentIds.includes(c.id);
+    let list = rawChannels.filter(inLens);
+    // Recents is the one lens that isn't in channel-number order — it's ordered by when you last
+    // watched each channel (the server returns them most-recent-first).
+    if (lens.type === "recents") {
+      const rank = new Map(recentIds.map((id, i) => [id, i]));
+      list = list.slice().sort((a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity));
+    }
+    return list.map((c) => ({ ...c, programs: c.programs.filter(visible) }));
+  }, [rawChannels, ppm, laneW, T0, lens, favoriteIds, recentIds]);
 
   const [fc, setFc] = useState(0);
   const [fp, setFp] = useState(0);
-  // Focus zone: the grid (channel rows) vs the top Guide/Settings nav pill.
-  const [zone, setZone] = useState<"grid" | "nav">("grid");
-  const [navSel, setNavSel] = useState<0 | 1>(0);
+  // Focus zone. Leftward chain off the grid: grid → rail (channel cell; favorite toggle later) →
+  // sidebar. Guide/Settings/Account live in the sidebar now (the top nav pill is retired).
+  const [zone, setZone] = useState<"grid" | "rail" | "sidebar">("grid");
+  const [sidebarSel, setSidebarSel] = useState(0);
   const player = usePlayer();
   const cursorRef = useRef<number>(now.getTime());
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -175,6 +208,42 @@ export function AuroraGrid({
 
   const focusedChannel = channels[fc];
   const focusedProgram = focusedChannel?.programs[fp];
+
+  // Refs so the lens-change effect reads the latest filtered channels + clock without re-firing.
+  const channelsRef = useRef(channels);
+  channelsRef.current = channels;
+  const nowRef = useRef(now);
+  nowRef.current = now;
+
+  // Selecting a sidebar item: Settings/Account are actions; a lens item filters the grid and
+  // returns focus to it. Shared by the pointer click (onActivate) and keyboard Enter.
+  const activateSidebar = useCallback(
+    (index: number) => {
+      const item = sidebarItems[index];
+      if (!item) return;
+      setSidebarSel(index);
+      if (item.kind === "settings") return onSettings();
+      if (item.kind === "account") return onSignOut();
+      if (item.lens) {
+        // Selecting the filter that's already applied toggles it OFF — back to all channels.
+        // (Guide IS the "all" lens, so it never toggles; it just clears.)
+        const next: Lens =
+          item.lens.type !== "all" && lensEquals(item.lens, lens) ? { type: "all" } : item.lens;
+        setLens(next);
+        setZone("grid");
+      }
+    },
+    [sidebarItems, onSettings, onSignOut, lens],
+  );
+
+  // On a lens change, land focus on the first shown channel's live program (the filtered channel
+  // list just changed, so the old fc/fp may be stale or out of range).
+  useEffect(() => {
+    setFc(0);
+    fcRef.current = 0;
+    setFp(liveProgramIndex(channelsRef.current[0]?.programs ?? [], nowRef.current.getTime()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lens]);
 
   useEffect(() => {
     const p = channels[fc]?.programs[fp];
@@ -248,20 +317,38 @@ export function AuroraGrid({
       if (player.layout === "full") return;
       const isBack = e.keyCode === 461 || ["Backspace", "GoBack", "BrowserBack", "XF86Back"].includes(e.key);
 
-      // Top Guide/Settings nav pill focused.
-      if (zone === "nav") {
+      // Sidebar focused → its circles own the keys (Up/Down cycle, OK activates, Right/Back → grid).
+      if (zone === "sidebar") {
         e.preventDefault();
-        if (isBack || e.key === "ArrowDown") setZone("grid");
-        else if (e.key === "ArrowLeft") setNavSel(0);
-        else if (e.key === "ArrowRight") setNavSel(1);
-        else if (e.key === "Enter") {
-          if (navSel === 1) onSettings();
+        if (isBack || e.key === "ArrowRight") setZone("grid");
+        else if (e.key === "ArrowUp") setSidebarSel((s) => Math.max(0, s - 1));
+        else if (e.key === "ArrowDown") setSidebarSel((s) => Math.min(sidebarItems.length - 1, s + 1));
+        else if (e.key === "Enter") activateSidebar(sidebarSel);
+        return;
+      }
+
+      // Rail focused (the channel cell) → the waypoint between grid and sidebar. Left opens the
+      // sidebar; Up/Down browse channels rail-first; Right/Back returns to the grid; OK toggles
+      // this channel's favorite (the heart shown beside the rail icon).
+      if (zone === "rail") {
+        e.preventDefault();
+        if (e.key === "ArrowLeft") {
+          setZone("sidebar");
+          setSidebarSel(0);
+        } else if (isBack || e.key === "ArrowRight") {
           setZone("grid");
+        } else if (e.key === "ArrowUp") {
+          setFc((c) => Math.max(0, c - 1));
+        } else if (e.key === "ArrowDown") {
+          setFc((c) => Math.min(channels.length - 1, c + 1));
+        } else if (e.key === "Enter" && focusedChannel) {
+          toggleFavorite(focusedChannel.id);
         }
         return;
       }
 
-      // Mini feed focused → its two buttons own the keys (Up leaves it for the nav pill).
+      // Mini feed focused → its two buttons own the keys (Down returns to the grid; nothing sits
+      // above it now that the nav pill is gone).
       if (player.miniFocused) {
         e.preventDefault();
         if (isBack) player.stop();
@@ -269,10 +356,6 @@ export function AuroraGrid({
         else if (e.key === "ArrowRight") player.miniMove(1);
         else if (e.key === "Enter") player.miniActivate();
         else if (e.key === "ArrowDown") player.blurMini();
-        else if (e.key === "ArrowUp") {
-          player.blurMini();
-          setZone("nav");
-        }
         return;
       }
 
@@ -293,7 +376,9 @@ export function AuroraGrid({
           break;
         case "ArrowLeft":
           e.preventDefault();
-          setFp((p) => Math.max(0, p - 1));
+          // Left off the leftmost program → the channel rail (favorite waypoint), then the sidebar.
+          if (fp === 0) setZone("rail");
+          else setFp((p) => Math.max(0, p - 1));
           break;
         case "ArrowDown": {
           e.preventDefault();
@@ -304,11 +389,10 @@ export function AuroraGrid({
         }
         case "ArrowUp": {
           e.preventDefault();
-          // At the top row, Up leaves the grid: into the mini feed if one's playing, else
-          // up to the Guide/Settings nav pill.
+          // At the top row, Up docks into the mini feed if one's playing (nothing above it
+          // otherwise — Guide/Settings/Account moved into the sidebar).
           if (fc === 0) {
             if (player.layout === "mini") player.focusMini();
-            else setZone("nav");
             break;
           }
           const nc = Math.max(0, fc - 1);
@@ -326,7 +410,17 @@ export function AuroraGrid({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [channels, fc, focusedChannel, onTune, player, zone, navSel, onSettings]);
+  }, [channels, fc, fp, focusedChannel, onTune, player, zone, onSettings, sidebarSel, sidebarItems, activateSidebar, toggleFavorite]);
+
+  // The lens list can shrink under the focus (e.g. unfavoriting the channel you're on while in the
+  // Favorites lens), which would leave `fc` pointing past the end.
+  useEffect(() => {
+    if (fc > 0 && fc >= channels.length) {
+      const last = Math.max(0, channels.length - 1);
+      setFc(last);
+      fcRef.current = last;
+    }
+  }, [channels.length, fc]);
 
   // Keep the focused row in view (it may not be rendered yet, so go through the virtualizer).
   useEffect(() => {
@@ -339,7 +433,7 @@ export function AuroraGrid({
     const el = scrollRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
-      if (player.layout === "full" || zone === "nav" || player.miniFocused) return;
+      if (player.layout === "full" || zone !== "grid" || player.miniFocused) return;
       e.preventDefault();
       const dir = e.deltaY > 0 ? 1 : -1;
       const nc = Math.min(channels.length - 1, Math.max(0, fcRef.current + dir));
@@ -362,21 +456,72 @@ export function AuroraGrid({
         background: C.bg,
         color: C.fg,
         display: "flex",
-        flexDirection: "column",
+        flexDirection: "row",
         overflow: "hidden",
         fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif',
       }}
     >
-      <NavPill focused={zone === "nav"} sel={navSel} onGuide={() => setZone("grid")} onSettings={onSettings} />
+      {/* Scrim behind the expanded sidebar — dims the guide so the sidebar reads as the focused
+          layer. Sits BELOW the sidebar (z 25) and above the grid. The mini player is safe for free:
+          it's a root-level fixed sibling (z 15) outside this stacking context, so nothing in here
+          can paint over it.
+          NO backdrop-filter, deliberately: MEASURED on the C2 (Chrome 108) — a full-screen blur
+          tanks the frame rate even as a single blur(2px) layer, and even after removing the 20
+          blurred circles. backdrop-filter is effectively unusable at this size on the panel; the
+          plain translucent fill reads the same at 10 feet for none of the cost.
+          AnimatePresence fades it out on the way back instead of snapping. */}
+      <AnimatePresence>
+        {zone === "sidebar" && (
+          <motion.div
+            key="sidebar-scrim"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 24,
+              background: "rgba(6,10,20,0.55)",
+              pointerEvents: "none",
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Left sidebar — it owns all the guide chrome now: Guide/Settings/Account plus the filter
+          lenses (the old top segmented pill is retired). It's an absolute OVERLAY: the layout
+          reserves only the sliver (the spacer below), and focusing it grows it OVER the guide, so
+          nothing ever shifts or reflows. */}
+      <GuideSidebar
+        items={sidebarItems}
+        expanded={zone === "sidebar"}
+        focused={zone === "sidebar"}
+        sel={sidebarSel}
+        lens={lens}
+        onActivate={activateSidebar}
+      />
+      {/* Reserves the sliver's space, since the sidebar itself is out of flow. */}
+      <div style={{ width: SIDEBAR_SLIVER_W, flexShrink: 0 }} />
+      <div style={{ width: colW, flexShrink: 0, display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
       {focusedChannel && focusedProgram ? (
         <FeaturedPanel channel={focusedChannel} program={focusedProgram} now={now} accent={accentOf(fc)} slotRef={player.miniSlotRef} showSlot={player.layout !== "off"} />
       ) : (
         <div style={{ height: vw(600) }} />
       )}
-      <TimeHeader T0={T0} railFrac={CH_FRAC} laneX={laneX} />
+      <TimeHeader T0={T0} railPx={railPx} laneX={laneX} />
 
       {/* Grid area — flex:1 so it fills all remaining height on any screen. */}
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
+        {channels.length === 0 && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: vw(44), fontWeight: 600 }}>
+            {lens.type === "favorites"
+              ? "No favorite channels yet"
+              : lens.type === "recents"
+                ? "No recently watched channels yet"
+                : "No channels in this filter"}
+          </div>
+        )}
         <div
           ref={scrollRef}
           className="cg-grid-scroll"
@@ -406,11 +551,15 @@ export function AuroraGrid({
                   <Row
                     channel={c}
                     accent={accentOf(vi.index)}
-                    focused={vi.index === fc && zone === "grid" && !player.miniFocused}
+                    // The rail stays lit while focus is ON the rail (it's the same channel row).
+                    focused={vi.index === fc && (zone === "grid" || zone === "rail") && !player.miniFocused}
                     focusedProgramId={vi.index === fc && zone === "grid" && !player.miniFocused ? focusedProgram?.id : undefined}
+                    railFocused={vi.index === fc && zone === "rail" && !player.miniFocused}
+                    favorited={favoriteIds.has(c.id)}
+                    onToggleFavorite={() => toggleFavorite(c.id)}
                     now={now}
                     rowPx={rowPx}
-                    railFrac={CH_FRAC}
+                    railPx={railPx}
                     laneX={laneX}
                     laneW={laneW}
                     ppm={ppm}
@@ -464,6 +613,7 @@ export function AuroraGrid({
           </>
         )}
       </div>
+      </div>
 
       <style>{`@keyframes tvgPulse{0%,100%{opacity:1}50%{opacity:.55}}.cg-grid-scroll{scrollbar-width:none;-ms-overflow-style:none}.cg-grid-scroll::-webkit-scrollbar{display:none}`}</style>
     </div>
@@ -473,68 +623,13 @@ export function AuroraGrid({
 /** spec px → device px at the current width (for exact left-offsets). */
 const vwNum = (width: number, px: number) => (px / DESIGN_W) * width;
 
-function NavPill({
-  focused,
-  sel,
-  onGuide,
-  onSettings,
-}: {
-  focused: boolean;
-  sel: 0 | 1;
-  onGuide: () => void;
-  onSettings: () => void;
-}) {
-  // `active` = the current view (Guide). `ring` = the D-pad-focused tab (only when the pill
-  // has focus). box-sizing:border-box so the focus ring doesn't nudge the layout.
-  const tab = (active: boolean, ring: boolean): React.CSSProperties => ({
-    display: "flex",
-    alignItems: "center",
-    gap: vw(10),
-    padding: `${vw(8)} ${vw(24)}`,
-    borderRadius: 999,
-    fontSize: vw(21),
-    fontWeight: 600,
-    color: active || ring ? "#f1f5f9" : "#94a3b8",
-    background: active ? C.navActive : "transparent",
-    outline: ring ? `2px solid ${C.ring}` : "none",
-    outlineOffset: -2,
-    cursor: "pointer",
-    border: "none",
-    transition: "all .12s",
-  });
-  return (
-    <div
-      style={{
-        alignSelf: "center",
-        marginTop: vw(24),
-        display: "flex",
-        alignItems: "center",
-        background: C.navBg,
-        border: `1px solid ${C.border}`,
-        borderRadius: 999,
-        padding: vw(4),
-        boxShadow: "0 12px 40px rgba(0,0,0,0.55)",
-        zIndex: 20,
-        flexShrink: 0,
-      }}
-    >
-      <button style={tab(true, focused && sel === 0)} onClick={onGuide}>
-        <Menu size="1em" /> Guide
-      </button>
-      <button style={tab(false, focused && sel === 1)} onClick={onSettings}>
-        <Settings size="1em" /> Settings
-      </button>
-    </div>
-  );
-}
-
 function TimeHeader({
   T0,
-  railFrac,
+  railPx,
   laneX,
 }: {
   T0: Date;
-  railFrac: number;
+  railPx: number;
   laneX: (iso: string | Date) => number;
 }) {
   const ticks = Array.from({ length: Math.ceil(WINDOW_MIN / 30) + 1 }, (_, i) => new Date(T0.getTime() + i * 30 * MIN));
@@ -543,7 +638,7 @@ function TimeHeader({
       <div style={{ position: "absolute", left: vw(40), top: vw(6), fontSize: vw(32), fontWeight: 600, color: "#e6eaf1" }}>
         {fmtDay(T0)}
       </div>
-      <div style={{ position: "absolute", left: `${railFrac * 100}%`, right: 0, top: 0, bottom: 0 }}>
+      <div style={{ position: "absolute", left: railPx, right: 0, top: 0, bottom: 0 }}>
         {ticks.map((t, i) => (
           <div
             key={i}
@@ -562,9 +657,12 @@ function Row({
   accent,
   focused,
   focusedProgramId,
+  railFocused,
+  favorited,
+  onToggleFavorite,
   now,
   rowPx,
-  railFrac,
+  railPx,
   laneX,
   laneW,
   ppm,
@@ -574,9 +672,13 @@ function Row({
   accent: string;
   focused: boolean;
   focusedProgramId?: string;
+  /** Focus is on this channel's RAIL cell → reveal the favorite heart. */
+  railFocused: boolean;
+  favorited: boolean;
+  onToggleFavorite: () => void;
   now: Date;
   rowPx: number;
-  railFrac: number;
+  railPx: number;
   laneX: (iso: string | Date) => number;
   laneW: number;
   ppm: number;
@@ -595,7 +697,9 @@ function Row({
     >
       <div
         style={{
-          width: `${railFrac * 100}%`,
+          // Fixed px (viewport-derived), NOT a % of the row — so the rail keeps its width when the
+          // sidebar expands and the column narrows; the time lane absorbs the difference.
+          width: railPx,
           flexShrink: 0,
           padding: `${vw(18)} ${vw(20)}`,
           boxSizing: "border-box",
@@ -606,27 +710,58 @@ function Row({
           boxShadow: focused ? `inset 4px 0 0 ${accent}` : "none",
         }}
       >
-        {/* top: tinted channel icon left, channel number pushed right — same height */}
+        {/* top: tinted channel icon left (+ the favorite heart while the rail is focused),
+            channel number pushed right — same height */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: vw(34) }}>
-          <span
-            style={{
-              width: vw(34),
-              height: vw(34),
-              borderRadius: "50%",
-              background: hexA(accent, 0.2),
-              color: accent,
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: vw(20),
-            }}
-          >
-            {(() => {
-              const Icon = channelIcon(channel.icon ?? channel.package?.icon);
-              return <Icon size="1em" />;
-            })()}
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: vw(12), minWidth: 0 }}>
+            <span
+              style={{
+                width: vw(34),
+                height: vw(34),
+                borderRadius: "50%",
+                background: hexA(accent, 0.2),
+                color: accent,
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: vw(20),
+              }}
+            >
+              {(() => {
+                const Icon = channelIcon(channel.icon ?? channel.package?.icon);
+                return <Icon size="1em" />;
+              })()}
+            </span>
+            {/* Favorite toggle. A favorited channel ALWAYS shows its filled heart, so you can spot
+                your favorites while scanning the guide; the empty heart only appears while the rail
+                itself is focused (the affordance to add one). stopPropagation so a pointer click
+                hearts the channel instead of tuning it (the row's onClick tunes). */}
+            {(railFocused || favorited) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite();
+                }}
+                title={favorited ? "Remove favorite" : "Add favorite"}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 0,
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  fontSize: vw(26),
+                  lineHeight: 1,
+                  color: favorited ? C.fav : "#c3c9d4",
+                  flexShrink: 0,
+                }}
+              >
+                <Heart size="1em" fill={favorited ? C.fav : "none"} />
+              </button>
+            )}
+          </div>
           <span style={{ fontSize: vw(34), lineHeight: 1, fontWeight: 700, color: "#e6eaf1", display: "flex", alignItems: "center", height: vw(34) }}>
             {channel.number}
           </span>

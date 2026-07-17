@@ -41,6 +41,24 @@ export async function heartbeatSession(
     create: { userId, startedAt: now, ...data },
     update: data,
   });
+
+  // Also record PER-CHANNEL watch state. `WatchSession` is one row per user (the *current*
+  // session), so it carries no history — this table is the history: its @@unique([userId,
+  // channelId]) dedupes to one row per channel and `updatedAt` orders them, which is exactly the
+  // guide's "Recents" list. (It's also the seed for cross-device resume — the table's raison
+  // d'être.) Skipped when nothing's playing so "off" never counts as watching.
+  if (input.state !== "off" && input.channelId) {
+    const watched = {
+      atLiveEdge: (input.delaySeconds ?? 0) < 5,
+      positionAt: input.positionAt ? new Date(input.positionAt) : null,
+      lastRatingKey: input.ratingKey ?? null,
+    };
+    await prisma.channelWatchState.upsert({
+      where: { userId_channelId: { userId, channelId: input.channelId } },
+      create: { userId, channelId: input.channelId, ...watched },
+      update: watched,
+    });
+  }
   return { ok: true as const };
 }
 

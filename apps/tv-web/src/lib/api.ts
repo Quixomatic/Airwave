@@ -61,6 +61,17 @@ export const plexLink = {
 
 // --- REST guide/playback API (/api/v1, bearer) -------------------------------
 
+/** A channel package (the guide sidebar's filter list). */
+export type Package = {
+  id: string;
+  key: string;
+  name: string;
+  icon: string | null;
+  tint: string | null;
+  /** How many ENABLED channels it has — i.e. what its lens will actually show. */
+  channelCount: number;
+};
+
 export type GuideChannel = {
   id: string;
   number: number;
@@ -68,7 +79,7 @@ export type GuideChannel = {
   callsign: string | null;
   icon: string | null;
   tint: string | null;
-  package: { icon: string | null; tint: string | null; name: string } | null;
+  package: { id: string; key: string; icon: string | null; tint: string | null; name: string } | null;
 };
 
 export type Guide = {
@@ -198,6 +209,22 @@ export type MediaInfo = {
 
 export const api = {
   channels: () => request<{ channels: GuideChannel[] }>("/api/v1/channels"),
+
+  packages: () => request<{ packages: Package[] }>("/api/v1/packages"),
+
+  // Favorites — per-user, server-side so they follow you across devices.
+  favorites: () => request<{ channelIds: string[] }>("/api/v1/favorites"),
+
+  /** Favorite / unfavorite a channel. Sends the DESIRED state (idempotent), not a toggle. POST —
+   *  the /api/v1 CORS only allows GET/POST, and every mutation on this surface is a POST. */
+  setFavorite: (channelId: string, favorite: boolean) =>
+    request<{ channelId: string; favorited: boolean }>("/api/v1/favorites", {
+      method: "POST",
+      body: JSON.stringify({ channelId, favorite }),
+    }),
+
+  /** Recently-watched channel ids, deduped, most-recent-first. */
+  recents: () => request<{ channelIds: string[] }>("/api/v1/recents"),
 
   guide: (forwardMinutes = 180) =>
     request<GuideGrid>(`/api/v1/guide?forwardMinutes=${forwardMinutes}`),

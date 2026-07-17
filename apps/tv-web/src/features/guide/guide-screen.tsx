@@ -49,6 +49,7 @@ export function GuideScreen({
       serverTime={data.serverTime}
       onTune={onTune}
       onSettings={onSettings}
+      onSignOut={onSignOut}
     />
   );
 }

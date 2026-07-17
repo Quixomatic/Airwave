@@ -2,6 +2,24 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.21] - 2026-07-16
+
+### Added
+
+- **Guide sidebar (step 1) — filter the channel grid by package.** A collapsed **sliver** of glassmorphism circle buttons sits at the left of the guide; D-pad **left** off the leftmost program lands on the **channel rail**, and left again focuses the sidebar, which **expands to reveal a label beside each circle**. The layout reserves only the sliver's width and the expansion is a pure **overlay**, so the guide never shifts, reflows, or smooshes the program blocks / time axis (and the expand animation costs no re-renders). Collapsed it stays quiet — just the **actions** (Guide / Settings / Account) and a single **Filters** circle standing in for the whole filter group (lit in the active filter's accent when one is applied). On focus the real lenses — Favorites, Recents, then each channel **package in its own stored tint + icon** — **fade in, staggered**, in a scrolling list that keeps the focused circle in view. Selecting a package filters the grid to it and stays lit; selecting the **already-applied** filter toggles it back off to all channels; **Guide** clears to all channels; **Settings**/**Account** navigate / sign out.
+- **Favorite channels (per user, synced across devices).** Focus a channel's **rail** and a **heart** appears beside its icon — filled when favorited; **OK** (or a click) toggles it. Backed by the long-dormant `Favorite` table via `GET /api/v1/favorites` + `PUT`/`DELETE /api/v1/favorites/:channelId` — the method carries the **desired state** rather than toggling server-side, so it's idempotent (a retry or double-press can't flip it back), and the TV flips its cached set **optimistically** so the heart responds instantly. The **Favorites** lens filters the grid to them.
+- **Recently-watched channels.** The **Recents** lens shows the channels you've actually watched, **deduped** and **most-recent-first** (the one lens not in channel-number order). `WatchSession` couldn't serve this — it's `userId @unique`, i.e. only the *current* session — so the heartbeat now also upserts **`ChannelWatchState`** (previously declared but never written): its `@@unique([userId, channelId])` dedupes to one row per channel for free and `updatedAt` is the recency order. Exposed as `GET /api/v1/recents`. This also seeds the cross-device resume that table was designed for.
+- **`GET /api/v1/packages`** — the channel packages that have at least one **enabled** channel (the sidebar's canonical filter list, ordered by the admin `sortIndex`), via a new `listActivePackages` service. The guide's channel payload now also carries `package.id`/`key`, so the grid filters by package **id**.
+- **Shared `GlassCircleButton`** — the player chrome's glass circle treatment (blur + translucent + accent focus ring) extracted for reuse by the sidebar, with a per-item accent so packages glow in their own tint. Tint **tokens** (`blue`, `rose`, …) now resolve to hex on the TV via `lib/tint.ts`.
+
+### Fixed
+
+- **The channel rail is now a D-pad focus stop** between the grid and the sidebar (OK on it is inert for now — the Favorites step will make it toggle favorite/unfavorite).
+
+### Removed
+
+- **The top Guide/Settings segmented control is gone** — the sidebar owns that navigation now (Guide / Settings / Account), and the reclaimed vertical space goes to the guide. Up from the top channel row still docks into the mini feed.
+
 ## [0.4.20] - 2026-07-16
 
 ### Fixed

@@ -14,7 +14,7 @@ const guideChannelSelect = {
   callsign: true,
   icon: true,
   tint: true,
-  package: { select: { icon: true, tint: true, name: true } },
+  package: { select: { id: true, key: true, icon: true, tint: true, name: true } },
 } as const;
 
 /** Enabled channels in guide/lineup order — the TV client's channel list (surfing). */
