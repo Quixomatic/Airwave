@@ -326,6 +326,9 @@ export function AuroraGrid({
       // The full-screen player owns the keys while it's up.
       if (player.layout === "full") return;
       const isBack = e.keyCode === 461 || ["Backspace", "GoBack", "BrowserBack", "XF86Back"].includes(e.key);
+      // Channel-number entry owns OK (commit) + Back (cancel) while active — defer so we don't tune
+      // the focused channel or exit the app under it. Arrows fall through (break out + navigate).
+      if (player.numberEntryActiveRef.current && (isBack || e.key === "Enter")) return;
 
       // Sidebar focused → its circles own the keys (Up/Down cycle, OK activates, Right/Back → grid).
       if (zone === "sidebar") {

@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.29] - 2026-07-17
+
+### Added
+
+- **Channel number entry — type a number on the remote to tune it (§7.2).** From the guide, the full-screen player, or the mini feed, typing digits drops a glass overlay from the top-center (same treatment as the channel pill) showing the number with placeholder slots. **OK — and only OK — commits**, tuning that channel full-screen if it exists or flashing red briefly if it doesn't; there's deliberately no commit-on-timeout and no auto-commit as soon as digits resolve (a toddler mashing numbers never jumps channels on its own). An arrow breaks out and passes through to normal navigation, Back cancels the entry, and a stretch of inactivity quietly dismisses it *without* tuning. Number→channel lookup is client-side against the already-loaded lineup (no server round-trip), via a new shared `use-channel-nav` foundation (ordered lineup + `byNumber`, plus next/prev ready for the upcoming CH▲/▼ arc). While entry is active it's **zoned** so OK/Back reach only it — the guide and player chrome defer via a shared context ref (`numberEntryActiveRef`) paired with `stopImmediatePropagation`, so there's no stray tune, app-exit, or pop-to-mini underneath. (Internally, the player context was split into `player-ctx` to break a Fast-Refresh import cycle.)
+
 ## [0.4.28] - 2026-07-17
 
 ### Added

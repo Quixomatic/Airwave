@@ -1,16 +1,10 @@
 import { motion } from "framer-motion";
 import { Loader2, Maximize2, X } from "lucide-react";
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { BumperCard } from "./bumper-card";
+import { ChannelNumberEntry } from "./channel-number-entry";
+import { Ctx, type Layout, type PlayerCtx } from "./player-ctx";
 import { accentForChannel, FullChrome } from "./watch";
 import { useTvPlayer } from "./use-tv-player";
 import { api } from "../../lib/api";
@@ -26,37 +20,13 @@ import { useChannels } from "../../hooks/use-channels";
  * keeps playing. See [[project-tv-client-api]].
  */
 
-type Layout = "off" | "mini" | "full";
-
 /** Idle time (no remote/pointer input) with the mini feed playing before we auto-expand to
  *  full-screen — beats the TV screensaver that would otherwise blank the screen. */
 const MINI_IDLE_FULLSCREEN_MS = 60_000;
 
-type PlayerCtx = {
-  activeChannelId: string | null;
-  playingChannelId: string | null;
-  layout: Layout;
-  miniFocused: boolean;
-  miniSel: 0 | 1;
-  /** The featured-panel slot the mini feed docks into (guide attaches this ref). */
-  miniSlotRef: React.RefObject<HTMLDivElement | null>;
-  tune: (channelId: string) => void;
-  goFull: () => void;
-  goMini: () => void;
-  stop: () => void;
-  focusMini: () => void;
-  blurMini: () => void;
-  miniMove: (dir: -1 | 1) => void;
-  miniActivate: () => void;
-};
-
-const Ctx = createContext<PlayerCtx | null>(null);
-
-export function usePlayer(): PlayerCtx {
-  const c = useContext(Ctx);
-  if (!c) throw new Error("usePlayer must be used within PlayerProvider");
-  return c;
-}
+// The context + hook live in ./player-ctx (a leaf module) to avoid a Fast-Refresh-breaking import
+// cycle; re-exported here so existing `import { usePlayer } from "./player-context"` callers work.
+export { usePlayer } from "./player-ctx";
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [activeChannelId, setActive] = useState<string | null>(null);
@@ -65,6 +35,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [miniFocused, setMiniFocused] = useState(false);
   const [miniSel, setMiniSel] = useState<0 | 1>(0);
   const miniSlotRef = useRef<HTMLDivElement | null>(null);
+  const numberEntryActiveRef = useRef(false);
 
   const tune = useCallback((channelId: string) => {
     setActive(channelId);
@@ -132,6 +103,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       blurMini,
       miniMove,
       miniActivate,
+      numberEntryActiveRef,
     }),
     [activeChannelId, playingChannelId, layout, miniFocused, miniSel, tune, goFull, goMini, stop, focusMini, blurMini, miniMove, miniActivate],
   );
@@ -139,6 +111,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={value}>
       {children}
+      {/* Global channel-number entry (armed on the "/" route: guide + full player + mini). */}
+      <ChannelNumberEntry />
       {activeChannelId && (
         <PlayerHost
           key={activeChannelId}

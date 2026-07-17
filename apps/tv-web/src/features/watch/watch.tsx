@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { BumperCard } from "./bumper-card";
 import { FeaturePanel } from "./feature-panel";
+import { usePlayer } from "./player-ctx";
 import type { useTvPlayer } from "./use-tv-player";
 import type { GuideChannel } from "../../lib/api";
 import { channelVivid } from "../../lib/tint";
@@ -54,6 +55,7 @@ export function FullChrome({
 }) {
   const { status, controls, tracks } = player;
   const accent = accentForChannel(channel);
+  const { numberEntryActiveRef } = usePlayer();
 
   // Open the channel overlay on tune (auto-hides after the panel's timeout, or on Back).
   const [panelOpen, setPanelOpen] = useState(true);
@@ -64,6 +66,8 @@ export function FullChrome({
     const onKey = (e: KeyboardEvent) => {
       if (panelOpen) return;
       const isBack = e.keyCode === 461 || ["Backspace", "GoBack", "BrowserBack", "XF86Back"].includes(e.key);
+      // Channel-number entry owns OK (commit) + Back (cancel) while active — don't also pop to mini.
+      if (numberEntryActiveRef.current && (isBack || e.key === "Enter")) return;
       if (isBack) {
         e.preventDefault();
         e.stopPropagation();
@@ -76,7 +80,7 @@ export function FullChrome({
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [panelOpen, onBack]);
+  }, [panelOpen, onBack, numberEntryActiveRef]);
 
   const isBumper = status.state === "bumper";
 

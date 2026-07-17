@@ -22,6 +22,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import type { GuideMeta } from "../../lib/api";
+import { usePlayer } from "./player-ctx";
 import type { Delivery, ScrubberView } from "./use-tv-player";
 
 /**
@@ -107,6 +108,7 @@ export function FeaturePanel({
   const [focus, setFocus] = useState<{ row: 0 | 1; col: number }>({ row: 0, col: 0 });
   const [openMenu, setOpenMenu] = useState<MenuKey>(null);
   const [infoMode, setInfoMode] = useState(false);
+  const { numberEntryActiveRef } = usePlayer();
   const scrubberRef = useRef<HTMLButtonElement | null>(null);
   const ctlRefs = useRef<(HTMLElement | null)[]>([]);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -134,6 +136,8 @@ export function FeaturePanel({
     const onKey = (e: KeyboardEvent) => {
       const isBack =
         e.keyCode === 461 || ["Backspace", "GoBack", "BrowserBack", "XF86Back"].includes(e.key);
+      // Channel-number entry owns OK (commit) + Back (cancel) while active — defer to it.
+      if (numberEntryActiveRef.current && (isBack || e.key === "Enter")) return;
       if (isBack) {
         e.preventDefault();
         e.stopPropagation();
