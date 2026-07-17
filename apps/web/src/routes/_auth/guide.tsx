@@ -1,5 +1,5 @@
 import { Card } from "@ChannelGuide/ui/components/card";
-import { TintedIconTile } from "@ChannelGuide/ui/components/tinted-icon-tile";
+import { AccentIconTile } from "@ChannelGuide/ui/components/accent-icon-tile";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Tv, Tv2 } from "lucide-react";
@@ -58,7 +58,7 @@ function Guide() {
                     <span className="text-muted-foreground w-6 shrink-0 text-xs tabular-nums">
                       {ch.number}
                     </span>
-                    <TintedIconTile icon={tile.Icon} tint={tile.tint} size="md" />
+                    <AccentIconTile icon={tile.Icon} tint={tile.tint} size="md" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-xs font-medium">{ch.name}</span>
                       {ch.callsign && (

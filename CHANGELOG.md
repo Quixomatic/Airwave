@@ -2,6 +2,23 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.23] - 2026-07-17
+
+### Added
+
+- **A proper channel/package accent palette + per-channel colour variance.** Channels and packages now choose from a fixed **16-swatch palette** (a stored swatch **key** like `orange`, not a hex — each app computes the colour from the key). Every swatch has a **vivid** value (shown small: the picker swatch, the sidebar package dot) and a hand-tuned **muted** value (large surfaces: the guide's rail/cell fill + channel icon) — "store vivid, present muted", so saturated tones never glow against the dark grid. Palette lives once in `@ChannelGuide/ui/lib/accent-palette` (both apps) with a server-side key mirror in `packages/api/services/accents.ts`.
+- **The generator now gives channels colour variance.** Previously every channel inherited its package's single colour, so the guide read as long same-colour bands down each package's contiguous channel numbers. The generator now assigns each channel a **cycled accent** (a running index through the palette) so adjacent channels contrast — restoring the lively per-row variance while staying a fixed, overridable palette choice. Packages keep their own colour for the sidebar.
+- **`backfill-accents.ts`** — migrates the existing DB in place (no regeneration needed): remaps package tint tokens to keys (`gray`→`slate`; the rest already matched), and assigns the variance accent to all generated channels. Idempotent, with a dry-run default.
+
+### Changed
+
+- **Admin accent picker + tiles use the palette.** The channel/package appearance picker now shows the 16 vivid swatches; channel/package/guide tiles render the palette's exact muted hexes via a new `AccentIconTile` (so the admin matches the TV). The app's own nav/breadcrumb chrome is untouched (it keeps `TintedIconTile`). Channel/package `tint` inputs are coerced to a valid accent key server-side.
+- **The TV now colors everything from the channel's real accent** (its own key, else its package's), replacing the index-derived accents: the guide rail/cell fill + channel icon, the featured panel's icon tile + muted-tinted channel number/name + progress fill (all **muted**, for large surfaces over the slate grid), and the full-screen player chrome — channel chip, scrubber/progress fill, control buttons, bumper card, mini-feed buttons (all **vivid**, since they sit over black video where the muted tint reads washed out). "Store vivid, present muted" applied per context.
+
+### Changed
+
+- **The featured now-playing card gets more height.** Retiring the top Guide/Settings segmented control into the sidebar freed the vertical space it occupied; the featured panel's scale is bumped (0.72 → 0.80) to take it back. The grid keeps the remaining height and stays comfortably scrollable.
+
 ## [0.4.21] - 2026-07-16
 
 ### Added

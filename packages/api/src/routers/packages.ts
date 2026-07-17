@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
+import { toAccentKey } from "../services/accents";
 
 const slugify = (s: string) =>
   s
@@ -57,7 +58,7 @@ export const packagesRouter = router({
         name: z.string().min(1),
         description: z.string().optional(),
         icon: z.string().nullish(),
-        tint: z.string().nullish(),
+        tint: z.string().nullish().transform((v) => (v ? toAccentKey(v) : null)), // coerce to a valid accent key
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -85,7 +86,7 @@ export const packagesRouter = router({
         name: z.string().min(1),
         description: z.string().optional(),
         icon: z.string().nullish(),
-        tint: z.string().nullish(),
+        tint: z.string().nullish().transform((v) => (v ? toAccentKey(v) : null)), // coerce to a valid accent key
       }),
     )
     .mutation(async ({ ctx, input }) => {

@@ -6,6 +6,7 @@ import { BumperCard } from "./bumper-card";
 import { FeaturePanel } from "./feature-panel";
 import type { useTvPlayer } from "./use-tv-player";
 import type { GuideChannel } from "../../lib/api";
+import { channelVivid } from "../../lib/tint";
 
 /**
  * Full-screen player CHROME — the 10-foot overlays drawn on top of the persistent
@@ -17,7 +18,12 @@ import type { GuideChannel } from "../../lib/api";
  */
 
 export const ACCENTS = ["#2f9e8f", "#4a9fe0", "#3b82f6", "#8b5cf6", "#3fa66a", "#d08b2f", "#d0587e", "#7c8aa3"];
-export const accentForChannel = (n?: number) => (n == null ? "#3b82f6" : ACCENTS[n % ACCENTS.length]!);
+/** The channel's real VIVID accent — its own key, else its package's — for the full-screen player
+ *  chrome over black video (the muted guide tint reads washed there). Index-derived palette is the
+ *  fallback for a channel that carries no tint at all. */
+export const accentForChannel = (channel?: Pick<GuideChannel, "number" | "tint" | "package">) =>
+  (channel ? channelVivid(channel) : undefined) ??
+  (channel?.number == null ? "#3b82f6" : ACCENTS[channel.number % ACCENTS.length]!);
 
 type Player = ReturnType<typeof useTvPlayer>;
 
@@ -47,7 +53,7 @@ export function FullChrome({
   onBack: () => void;
 }) {
   const { status, controls, tracks } = player;
-  const accent = accentForChannel(channel?.number);
+  const accent = accentForChannel(channel);
 
   // Open the channel overlay on tune (auto-hides after the panel's timeout, or on Back).
   const [panelOpen, setPanelOpen] = useState(true);

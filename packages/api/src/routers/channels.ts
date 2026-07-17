@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
+import { toAccentKey } from "../services/accents";
 import { getGuideGrid } from "../services/guide";
 import { runJob } from "../services/jobs/scheduler";
 import { getFilterValues } from "../services/plex/client";
@@ -161,7 +162,7 @@ export const channelsRouter = router({
         sortDir: z.enum(["asc", "desc"]).optional(),
         packageId: z.string().nullish(),
         icon: z.string().nullish(),
-        tint: z.string().nullish(),
+        tint: z.string().nullish().transform((v) => (v ? toAccentKey(v) : null)), // coerce to a valid accent key
         description: z.string().nullish(),
         enabled: z.boolean().optional(),
         bumperMode: bumperModeEnum.optional(),
@@ -213,7 +214,7 @@ export const channelsRouter = router({
         sortDir: z.enum(["asc", "desc"]).optional(),
         packageId: z.string().nullish(),
         icon: z.string().nullish(),
-        tint: z.string().nullish(),
+        tint: z.string().nullish().transform((v) => (v ? toAccentKey(v) : null)), // coerce to a valid accent key
         description: z.string().nullish(),
         enabled: z.boolean().optional(),
         bumperMode: bumperModeEnum.optional(),

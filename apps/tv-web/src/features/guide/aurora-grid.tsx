@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { GuideGridChannel, GuideGridProgram } from "../../lib/api";
 import { C } from "../../lib/theme";
+import { channelTint } from "../../lib/tint";
 import { useFavorites, useSetFavorite } from "../../hooks/use-favorites";
 import { usePackages } from "../../hooks/use-packages";
 import { useRecents } from "../../hooks/use-recents";
@@ -49,7 +50,9 @@ const ROW_FRAC = 168 / DESIGN_W; // row height fraction (of width)
 // The featured panel, sized purely off width, dominates a 16:9 panel (~60% tall).
 // Shrink it uniformly (the grid keeps flex:1 for the rest). Tuned to give the
 // feature area more room to breathe while the grid stays comfortably scrollable.
-const FEATURE_SCALE = 0.72;
+// Nudged up from 0.72 once the top Guide/Settings pill was retired into the sidebar,
+// handing back some of the vertical space it used to occupy.
+const FEATURE_SCALE = 0.76;
 const WINDOW_MIN = 180; // minutes of timeline shown across the lane
 const LEAD_MIN = 30; // minutes of "already aired" shown before the grid start
 const MIN = 60_000;
@@ -505,7 +508,7 @@ export function AuroraGrid({
       <div style={{ width: SIDEBAR_SLIVER_W, flexShrink: 0 }} />
       <div style={{ width: colW, flexShrink: 0, display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
       {focusedChannel && focusedProgram ? (
-        <FeaturedPanel channel={focusedChannel} program={focusedProgram} now={now} accent={accentOf(fc)} slotRef={player.miniSlotRef} showSlot={player.layout !== "off"} />
+        <FeaturedPanel channel={focusedChannel} program={focusedProgram} now={now} accent={channelTint(focusedChannel) ?? accentOf(fc)} slotRef={player.miniSlotRef} showSlot={player.layout !== "off"} />
       ) : (
         <div style={{ height: vw(600) }} />
       )}
@@ -550,7 +553,9 @@ export function AuroraGrid({
                 >
                   <Row
                     channel={c}
-                    accent={accentOf(vi.index)}
+                    // The channel's REAL tint (its own, else its package's); the index-derived
+                    // palette is only a fallback for channels that carry no tint at all.
+                    accent={channelTint(c) ?? accentOf(vi.index)}
                     // The rail stays lit while focus is ON the rail (it's the same channel row).
                     focused={vi.index === fc && (zone === "grid" || zone === "rail") && !player.miniFocused}
                     focusedProgramId={vi.index === fc && zone === "grid" && !player.miniFocused ? focusedProgram?.id : undefined}
@@ -634,7 +639,9 @@ function TimeHeader({
 }) {
   const ticks = Array.from({ length: Math.ceil(WINDOW_MIN / 30) + 1 }, (_, i) => new Date(T0.getTime() + i * 30 * MIN));
   return (
-    <div style={{ position: "relative", height: vw(52), flexShrink: 0, marginTop: vw(20), marginBottom: vw(20) }}>
+    // marginTop = breathing room below the featured card (they read as crowded when it's tight);
+    // marginBottom = clearance for the now-marker triangle that caps the grid.
+    <div style={{ position: "relative", height: vw(52), flexShrink: 0, marginTop: vw(56), marginBottom: vw(20) }}>
       <div style={{ position: "absolute", left: vw(40), top: vw(6), fontSize: vw(32), fontWeight: 600, color: "#e6eaf1" }}>
         {fmtDay(T0)}
       </div>
@@ -918,9 +925,30 @@ function FeaturedPanel({
     <div style={{ display: "flex", gap: fv(56), alignItems: "flex-start", padding: `${fv(40)} ${fv(64)} 0`, flexShrink: 0 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: fv(22) }}>
-          <span style={{ width: fv(64), height: fv(64), borderRadius: "50%", background: hexA(accent, 0.9), border: `1px solid ${C.border}`, flexShrink: 0 }} />
-          <span style={{ fontSize: fv(44), fontWeight: 700, color: "#8f97a6" }}>{channel.number}</span>
-          <span style={{ fontSize: fv(44), fontWeight: 700, color: "#e9edf5", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {/* Tinted icon tile in the channel's accent (own or inherited), matching the rail. */}
+          <span
+            style={{
+              width: fv(64),
+              height: fv(64),
+              borderRadius: "50%",
+              background: hexA(accent, 0.2),
+              border: `1px solid ${hexA(accent, 0.35)}`,
+              color: accent,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: fv(34),
+              flexShrink: 0,
+            }}
+          >
+            {(() => {
+              const Icon = channelIcon(channel.icon ?? channel.package?.icon);
+              return <Icon size="1em" />;
+            })()}
+          </span>
+          {/* Number + name carry a muted tint of the channel's accent (name a touch brighter). */}
+          <span style={{ fontSize: fv(44), fontWeight: 700, color: hexA(accent, 0.75) }}>{channel.number}</span>
+          <span style={{ fontSize: fv(44), fontWeight: 700, color: accent, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {channel.name}
           </span>
         </div>
@@ -989,7 +1017,7 @@ function FeaturedPanel({
           <span style={{ color: "#e6eaf1" }}>{status}</span>
         </div>
         <div style={{ marginTop: fv(16), height: fv(8), borderRadius: 999, background: "rgba(148,163,184,0.18)", overflow: "hidden" }}>
-          <div style={{ height: "100%", borderRadius: 999, background: "#dfe4ec", width: `${pct}%`, transition: "width .2s" }} />
+          <div style={{ height: "100%", borderRadius: 999, background: accent, width: `${pct}%`, transition: "width .2s" }} />
         </div>
       </div>
 

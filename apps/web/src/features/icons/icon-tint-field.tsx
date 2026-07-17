@@ -1,9 +1,5 @@
-import {
-  TINT_TOKENS,
-  TintedIconTile,
-  type TintedIconTileTint,
-} from "@ChannelGuide/ui/components/tinted-icon-tile";
-import { Circle } from "lucide-react";
+import { AccentIconTile } from "@ChannelGuide/ui/components/accent-icon-tile";
+import { ACCENT_PALETTE } from "@ChannelGuide/ui/lib/accent-palette";
 
 import { cn } from "@/lib/utils";
 
@@ -12,10 +8,10 @@ import { IconPicker } from "./icon-picker";
 import { resolveTile } from "./app-icon";
 
 /**
- * Icon + tint control for a channel/package. The preview tile opens the icon
- * picker; the swatch row sets the tint. When `inherited*` is provided (a channel's
- * package), leaving these unset shows the inherited look, and "Reset" clears the
- * override so it keeps following the package.
+ * Icon + accent control for a channel/package. The preview tile opens the icon picker; the swatch
+ * row sets the accent (stored as a palette KEY). When `inherited*` is provided (a channel's
+ * package), leaving these unset shows the inherited look, and "Reset" clears the override so it
+ * keeps following the package.
  */
 export function IconTintField({
   icon,
@@ -48,14 +44,20 @@ export function IconTintField({
             className="hover:bg-accent focus-visible:ring-ring rounded-md p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
             title="Choose icon"
           >
-            <TintedIconTile icon={preview.Icon} tint={preview.tint} size="lg" />
+            <AccentIconTile icon={preview.Icon} tint={preview.tint} size="lg" />
           </button>
         }
       />
 
-      <div className="flex flex-wrap gap-1">
-        {TINT_TOKENS.map((t) => (
-          <TintSwatch key={t} tint={t} selected={tint === t} onClick={() => onTintChange(t)} />
+      <div className="flex flex-wrap gap-1.5">
+        {ACCENT_PALETTE.map((s) => (
+          <AccentSwatch
+            key={s.key}
+            vivid={s.vivid}
+            name={s.name}
+            selected={tint === s.key}
+            onClick={() => onTintChange(s.key)}
+          />
         ))}
       </div>
 
@@ -75,12 +77,15 @@ export function IconTintField({
   );
 }
 
-function TintSwatch({
-  tint,
+/** A vivid color dot for the accent picker (small surface → the saturated value). */
+function AccentSwatch({
+  vivid,
+  name,
   selected,
   onClick,
 }: {
-  tint: TintedIconTileTint;
+  vivid: string;
+  name: string;
   selected: boolean;
   onClick: () => void;
 }) {
@@ -88,13 +93,12 @@ function TintSwatch({
     <button
       type="button"
       onClick={onClick}
-      title={tint}
+      title={name}
       className={cn(
-        "rounded-[5px] ring-offset-1 transition-shadow",
+        "size-5 rounded-full ring-offset-1 ring-offset-background transition-shadow",
         selected && "ring-foreground ring-2",
       )}
-    >
-      <TintedIconTile icon={Circle} tint={tint} size="md" />
-    </button>
+      style={{ background: vivid }}
+    />
   );
 }

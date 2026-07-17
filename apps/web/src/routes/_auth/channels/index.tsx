@@ -1,6 +1,6 @@
 import { Button } from "@ChannelGuide/ui/components/button";
 import { Card, CardContent } from "@ChannelGuide/ui/components/card";
-import { TintedIconTile } from "@ChannelGuide/ui/components/tinted-icon-tile";
+import { AccentIconTile } from "@ChannelGuide/ui/components/accent-icon-tile";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Loader2, Plus, Sparkles, Tv } from "lucide-react";
@@ -113,7 +113,7 @@ function ChannelsList() {
                   className={`hover:bg-muted/50 flex flex-1 items-center gap-3 px-4 py-3 ${c.enabled ? "" : "opacity-50"}`}
                 >
                   <span className="text-muted-foreground w-8 text-sm tabular-nums">{c.number}</span>
-                  <TintedIconTile icon={tile.Icon} tint={tile.tint} size="lg" />
+                  <AccentIconTile icon={tile.Icon} tint={tile.tint} size="lg" />
                   <span className="flex-1 truncate text-sm font-medium">
                     {c.name}
                     {c.callsign && (

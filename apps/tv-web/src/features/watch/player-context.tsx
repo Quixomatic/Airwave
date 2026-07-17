@@ -210,7 +210,7 @@ function PlayerHost({
 }) {
   const { data: channels } = useChannels();
   const channel = channels?.find((c) => c.id === channelId);
-  const accent = accentForChannel(channel?.number);
+  const accent = accentForChannel(channel);
 
   const [quality, setQuality] = useState("original");
   const [audioStreamId, setAudioStreamId] = useState<string | undefined>(undefined);

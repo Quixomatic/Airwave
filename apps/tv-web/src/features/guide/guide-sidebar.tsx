@@ -5,7 +5,7 @@ import React, { useEffect, useRef } from "react";
 
 import type { Package } from "../../lib/api";
 import { C } from "../../lib/theme";
-import { tintColor } from "../../lib/tint";
+import { accentVivid } from "../../lib/tint";
 import { GlassCircleButton } from "../watch/glass-button";
 
 /**
@@ -70,7 +70,8 @@ export function buildSidebarItems(packages: Package[]): SidebarItem[] {
       kind: "lens",
       lens: { type: "packages", ids: [p.id] },
       group: "filter",
-      accent: tintColor(p.tint),
+      // Small circle → the VIVID swatch (the sidebar is where the saturated value belongs).
+      accent: accentVivid(p.tint),
     })),
   ];
 }

@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@ChannelGuide/db";
 
+import { channelAccentAt } from "../accents";
 import type { SyncProgress } from "../media/media-item";
 import { resolveFilter } from "../plex/resolve";
 import { normalizeCallsign, uniqueCallsign } from "./callsign";
@@ -117,7 +118,10 @@ export async function generateLineup(
           sortField: ch.sortField ?? "title",
           sortDir: ch.sortDir ?? "asc",
           icon: ch.icon ?? null,
-          tint: ch.tint ?? null,
+          // Per-channel accent for guide VARIANCE: cycle the palette by a running index so
+          // adjacent channels contrast, instead of every channel inheriting its package's one
+          // color (which banded the guide). A preset that sets its own `tint` still wins.
+          tint: ch.tint ?? channelAccentAt(channelsCreated),
           packageId: pkgIdByKey.get(pkg.key)!,
           generated: true,
           presetKey: ch.key,

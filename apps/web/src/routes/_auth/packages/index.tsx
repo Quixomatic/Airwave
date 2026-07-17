@@ -1,6 +1,6 @@
 import { Button } from "@ChannelGuide/ui/components/button";
 import { Card } from "@ChannelGuide/ui/components/card";
-import { TintedIconTile } from "@ChannelGuide/ui/components/tinted-icon-tile";
+import { AccentIconTile } from "@ChannelGuide/ui/components/accent-icon-tile";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { ChevronRight, LayoutGrid, Plus } from "lucide-react";
@@ -69,7 +69,7 @@ function PackagesList() {
               params={{ packageId: p.id }}
               className="hover:bg-accent/50 flex items-center gap-3 p-4 transition-colors"
             >
-              <TintedIconTile icon={tile.Icon} tint={tile.tint} size="lg" />
+              <AccentIconTile icon={tile.Icon} tint={tile.tint} size="lg" />
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 text-sm font-medium">
                   {p.name}

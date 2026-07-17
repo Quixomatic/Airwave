@@ -492,7 +492,7 @@ export const PRESET_PACKAGES: PresetPackage[] = [
     name: "Special Purpose",
     description: "4K, unwatched, seasonal & more.",
     icon: "lucide:Settings2",
-    tint: "gray",
+    tint: "slate", // was "gray" — retired token; slate is its accent-palette equivalent
     sortIndex: 18,
     channels: [
       { key: "4k-ultra", name: "4K Ultra", callsign: "4KULT", number: 400, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "4K only.", filter: res("4K") },
