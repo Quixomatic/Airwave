@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.31] - 2026-07-17
+
+### Added
+
+- **Channel surf — ◄/► brings up a channel carousel while watching (§7.2, Arc 3; completes the remote-navigation arc).** With the full-screen chrome closed, pressing left/right slides a horizontal carousel of channel tiles up from the bottom (same slide as the feature panel), opening one step in the pressed direction. Each tile shows the channel (icon / number / name in its accent), its **cover art**, a **progress bar** for how far into the current program it is, and the **title / episode** on now. ◄/► move — **wrapping**, so channel 1 → the last channel is a single press — **OK tunes** the highlighted channel, **Back closes** without changing, and ~12s of no input auto-hides it back to the video. The row is **virtualized horizontally** (`@tanstack/react-virtual`, like the guide grid) so 100+ tiles and their cover images stay cheap — only the visible window loads. While it's up it owns ◄/►/OK/Back via a shared `surfActiveRef`, so number entry, CH▲/▼, and the player chrome all defer to it.
+
 ## [0.4.30] - 2026-07-17
 
 ### Added

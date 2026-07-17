@@ -36,6 +36,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [miniSel, setMiniSel] = useState<0 | 1>(0);
   const miniSlotRef = useRef<HTMLDivElement | null>(null);
   const numberEntryActiveRef = useRef(false);
+  const surfActiveRef = useRef(false);
 
   const tune = useCallback((channelId: string) => {
     setActive(channelId);
@@ -142,6 +143,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       miniMove,
       miniActivate,
       numberEntryActiveRef,
+      surfActiveRef,
       channelStep,
     }),
     [activeChannelId, playingChannelId, layout, miniFocused, miniSel, tune, goFull, goMini, stop, focusMini, blurMini, miniMove, miniActivate, channelStep],

@@ -40,7 +40,7 @@ const inputFocused = () => {
 export function ChannelNumberEntry() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { byNumber, maxNumber, tune } = useChannelNav();
-  const { numberEntryActiveRef, channelStep } = usePlayer();
+  const { numberEntryActiveRef, surfActiveRef, channelStep } = usePlayer();
 
   const [buffer, setBuffer] = useState("");
   const [flash, setFlash] = useState(false);
@@ -98,6 +98,7 @@ export function ChannelNumberEntry() {
       // Armed only while browsing/watching (the "/" route covers guide + full player + mini), and
       // never while a dropdown menu or a text field owns the keys.
       if (pathname !== "/" || menuOpen() || inputFocused()) return;
+      if (surfActiveRef.current) return; // channel surf owns ◄/►/OK/Back — don't arm entry or CH▲/▼
 
       // CH▲/▼ = PageUp/PageDown (keyCode 33/34) on the webOS remote: step one channel (clamped,
       // in-flight-locked in the provider). preventDefault so it never page-scrolls; abandons any
@@ -152,7 +153,7 @@ export function ChannelNumberEntry() {
       clearFlash();
       numberEntryActiveRef.current = false;
     };
-  }, [pathname, byNumber, maxNumber, tune, maxDigits, numberEntryActiveRef, channelStep]);
+  }, [pathname, byNumber, maxNumber, tune, maxDigits, numberEntryActiveRef, surfActiveRef, channelStep]);
 
   const pad = "_".repeat(Math.max(0, maxDigits - buffer.length));
 

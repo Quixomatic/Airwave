@@ -3,6 +3,7 @@ import { Tv } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { BumperCard } from "./bumper-card";
+import { ChannelSurf } from "./channel-surf";
 import { FeaturePanel } from "./feature-panel";
 import { usePlayer } from "./player-ctx";
 import type { useTvPlayer } from "./use-tv-player";
@@ -55,16 +56,20 @@ export function FullChrome({
 }) {
   const { status, controls, tracks } = player;
   const accent = accentForChannel(channel);
-  const { numberEntryActiveRef } = usePlayer();
+  const { numberEntryActiveRef, surfActiveRef } = usePlayer();
 
   // Open the channel overlay on tune (auto-hides after the panel's timeout, or on Back).
   const [panelOpen, setPanelOpen] = useState(true);
+  // Channel surf (◄/► with the chrome closed): the carousel + the direction it opened in.
+  const [surfOpen, setSurfOpen] = useState(false);
+  const [surfDir, setSurfDir] = useState<1 | -1>(1);
 
   // Remote: panel closed → OK/Up/Down opens it, Back returns to the guide (keeps
   // playing as a mini feed). When the panel is open the FeaturePanel owns the keys.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (panelOpen) return;
+      if (surfActiveRef.current) return; // the surf carousel owns keys while it's open
       const isBack = e.keyCode === 461 || ["Backspace", "GoBack", "BrowserBack", "XF86Back"].includes(e.key);
       // Channel-number entry owns OK (commit) + Back (cancel) while active — don't also pop to mini.
       if (numberEntryActiveRef.current && (isBack || e.key === "Enter")) return;
@@ -76,11 +81,17 @@ export function FullChrome({
         e.preventDefault();
         e.stopPropagation();
         setPanelOpen(true);
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        // Chrome closed → ◄/► slides up the channel-surf carousel (opening one step that way).
+        e.preventDefault();
+        e.stopPropagation();
+        setSurfDir(e.key === "ArrowRight" ? 1 : -1);
+        setSurfOpen(true);
       }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [panelOpen, onBack, numberEntryActiveRef]);
+  }, [panelOpen, onBack, numberEntryActiveRef, surfActiveRef]);
 
   const isBumper = status.state === "bumper";
 
@@ -156,6 +167,17 @@ export function FullChrome({
             onSelectSub={onSelectSub}
             onSelectQuality={onSelectQuality}
             onClose={() => setPanelOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {surfOpen && (
+          <ChannelSurf
+            key="surf"
+            currentChannelId={channelId}
+            initialDir={surfDir}
+            onClose={() => setSurfOpen(false)}
           />
         )}
       </AnimatePresence>
