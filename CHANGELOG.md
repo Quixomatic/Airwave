@@ -2,6 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.0] - 2026-07-17
+
+Opens the 0.5.x line.
+
+### Changed
+
+- **The capability diagnostic is now a polished onboarding screen.** The setup flow (auto-run on first sign-in, or Settings → Run capability diagnostic) is centered and clean: the clip being tested plays inside a framed "screen," and the format under test — its label plus container/codec chips — **slides in and out with Framer Motion** as the run advances, over a single filling progress bar with a live "N native · M transcode" tally beneath. On completion a check-mark pops into the frame and a Continue button fades up. The **measurement logic is unchanged** (same per-clip native-decode test + post-run audio-track verdict, same `DeviceCapability` writes) — only the presentation changed; the old dense debug results grid is gone (per-clip detail still lives in the DB / PlaybackLog and the remote/probe tooling).
+
 ## [0.4.33] - 2026-07-17
 
 ### Changed
