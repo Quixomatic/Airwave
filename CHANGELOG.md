@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.33] - 2026-07-17
+
+### Changed
+
+- **The full-screen "Channel Surf" control now opens the surf carousel.** It previously dropped the player to the mini feed (a leftover from before channel surf existed) — pressing it now closes the feature panel and slides up the channel-surf carousel, which is what the button says it does.
+
 ## [0.4.32] - 2026-07-17
 
 ### Fixed

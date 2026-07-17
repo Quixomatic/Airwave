@@ -160,7 +160,10 @@ export function FullChrome({
             onPlayPause={controls.togglePause}
             onLive={controls.jumpToLive}
             onRestart={controls.restart}
-            onChannelSurf={onBack}
+            onChannelSurf={() => {
+              setPanelOpen(false);
+              setSurfOpen(true);
+            }}
             onSelectAudio={onSelectAudio}
             onSelectSub={onSelectSub}
             onSelectQuality={onSelectQuality}
