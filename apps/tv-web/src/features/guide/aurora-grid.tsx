@@ -62,6 +62,10 @@ const FEATURE_SCALE = 0.72;
 const WINDOW_MIN = 180; // minutes of timeline shown across the lane
 const LEAD_MIN = 30; // minutes of "already aired" shown before the grid start
 const MIN = 60_000;
+// Cull guide program blocks narrower than this (px). A clamped program that ended right at the
+// rail edge computes to a near-zero (or negative) width — a useless sliver, and a negative width
+// is invalid CSS so the block would auto-expand to its content. Below this it isn't shown at all.
+const MIN_VISIBLE_PX = 24;
 const SHOW_NOW_LINE = false; // hidden for now — the triangle marker alone marks "now"
 // Channel-change (up/down/wheel) highlight strategy. `true` = time-alignment: keep the same
 // time column across channels (pickAtCursor). `false` = always snap to the channel's currently-
@@ -91,7 +95,7 @@ const isHD = (res?: string) => !!res && res !== "sd" && res !== "480";
 const is4K = (res?: string) => res === "4k";
 
 export function AuroraGrid({
-  channels,
+  channels: rawChannels,
   serverTime,
   onTune,
   onSettings,
@@ -124,6 +128,26 @@ export function AuroraGrid({
     ((typeof iso === "string" ? new Date(iso).getTime() : iso.getTime()) - T0.getTime()) / MIN;
   const laneX = (iso: string | Date) => minsFrom(iso) * ppm; // px within the lane (0 = T0)
   const nowMins = minsFrom(now);
+
+  // The programs actually shown on the grid: within the visible window AND wide enough to render
+  // (not a rail-edge sliver). Filtering the channel's programs HERE — not just in the render —
+  // means D-pad nav can only land on a program you can actually see: one that ended before the
+  // rail start (the API returns a back-buffer past it), or that clamps to a few-pixel sliver, is
+  // now neither shown nor navigable. The currently-airing program is never affected (it's always
+  // well within the window and full-width).
+  const channels = useMemo(() => {
+    const visible = (p: GuideGridProgram): boolean => {
+      const start = (new Date(p.startsAt).getTime() - T0.getTime()) / MIN;
+      const durMin = p.durationSeconds / 60;
+      const end = start + durMin;
+      if (!(end > 0 && start < WINDOW_MIN)) return false; // ended before the rail, or starts past the window
+      const rawLeft = start * ppm;
+      const rawRight = rawLeft + Math.max(laneW * 0.02, durMin * ppm) - 6;
+      const left = rawLeft < 0 ? 6 : rawLeft;
+      return rawRight - left >= MIN_VISIBLE_PX; // cull rail-edge slivers
+    };
+    return rawChannels.map((c) => ({ ...c, programs: c.programs.filter(visible) }));
+  }, [rawChannels, ppm, laneW, T0]);
 
   const [fc, setFc] = useState(0);
   const [fp, setFp] = useState(0);

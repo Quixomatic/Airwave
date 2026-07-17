@@ -2,7 +2,11 @@
 
 All notable changes to ChannelGuide are documented here.
 
-## [0.4.19] - 2026-07-16
+## [0.4.20] - 2026-07-16
+
+### Fixed
+
+- **Off-window and sliver guide programs are dropped from navigation *and* render.** The guide API returns a small back-buffer past the rail start, and a program clamped tight to the rail could compute to a near-zero/negative width (which is invalid CSS, so the block auto-expanded to fit its content — a mis-sized stub). Such programs — ones that ended before the rail start, or that would render narrower than a small pixel threshold (`MIN_VISIBLE_PX`) — are now filtered out of each channel's `programs` at the source, so they're **neither shown nor D-pad-navigable** (you can no longer left-arrow onto a program that isn't on screen). The currently-airing program is never affected (always well within the window and full-width). Filtering stays client-side because "too tiny to show" is a pixel judgment tied to the panel's lane width.
 
 ### Changed
 
