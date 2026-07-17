@@ -12,6 +12,7 @@ function SettingsRoute() {
   const navigate = useNavigate();
   const items = [
     { label: "Run capability diagnostic", action: () => void navigate({ to: "/diagnostic" }) },
+    { label: "Remote key probe", action: () => void navigate({ to: "/remote" }) },
     {
       label: "Sign out",
       action: () => {

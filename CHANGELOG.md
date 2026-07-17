@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.4.28] - 2026-07-17
+
+### Added
+
+- **Remote key probe (Settings → Remote key probe).** A dedicated diagnostic route (alongside the capability diagnostic) that shows the raw key event for every remote button press — `keyCode` front and center, plus `key`/`code`/`which`/`location`/`repeat` and keydown-vs-keyup — newest first. webOS surfaces its special keys only via `keyCode` (Back is 461; the CH▲/▼, color, and other buttons are otherwise unknown, and the desktop simulator won't reveal them), so this reads them straight off the panel. It swallows every key so probing never navigates away; **double-press Back** (or click **Exit** with the magic-remote pointer) to leave. This unblocks the remote channel-navigation arc (§7.2) — we can now capture the real CH keycodes on the C2.
+
 ## [0.4.27] - 2026-07-17
 
 ### Changed
