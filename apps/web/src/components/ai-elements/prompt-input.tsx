@@ -23,7 +23,7 @@ export function PromptInput({ className, onSubmit, ...props }: PromptInputProps)
   return (
     <form
       className={cn(
-        "bg-background w-full divide-y overflow-hidden rounded-xl border shadow-sm transition-colors",
+        "bg-background w-full overflow-hidden rounded-xl border shadow-sm transition-colors",
         "focus-within:border-ring focus-within:ring-ring/40 focus-within:ring-[3px]",
         className,
       )}

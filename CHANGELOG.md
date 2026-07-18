@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.7] - 2026-07-18
+
+### Changed
+
+- **Removed the divider line between the chat textarea and its footer** — the input card now reads as one continuous surface.
+
 ## [0.5.6] - 2026-07-18
 
 ### Changed
