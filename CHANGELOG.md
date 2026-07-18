@@ -2,6 +2,13 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.8] - 2026-07-18
+
+### Added
+
+- **The chat's input footer shows the active model** as a badge (Sparkles + model name) — clicking it opens a dropdown to **switch the active connection** right from the chat, like AI Elements' model selector.
+- **Empty state when no model is connected.** If there are no AI connections yet, the whole assistant panel shows a "No model connected" state with a **Set up a model** button that jumps to Settings → AI Assistant, instead of a broken chat.
+
 ## [0.5.7] - 2026-07-18
 
 ### Changed

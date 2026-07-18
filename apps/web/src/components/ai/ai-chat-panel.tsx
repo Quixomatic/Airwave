@@ -1,7 +1,9 @@
 import { useChat } from "@ai-sdk/react";
 import { env } from "@ChannelGuide/env/web";
 import { Button } from "@ChannelGuide/ui/components/button";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@ChannelGuide/ui/components/select";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { History, Loader2, MessageSquarePlus, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -35,10 +37,40 @@ const serverBase = () => {
   return u.startsWith("/") && typeof window !== "undefined" ? `${window.location.origin}${u}` : u;
 };
 
+const Title = () => (
+  <PanelHeaderTitle>
+    <span className="flex items-center gap-2">
+      <Sparkles className="text-primary h-4 w-4" />
+      AI Assistant
+    </span>
+  </PanelHeaderTitle>
+);
+
 export function AiChatPanel() {
+  const navigate = useNavigate();
   const [activeId, setActiveId] = useState<string>(() => crypto.randomUUID());
   const [showHistory, setShowHistory] = useState(false);
   const conversations = useQuery(trpc.ai.conversations.queryOptions());
+  const connections = useQuery(trpc.ai.list.queryOptions());
+
+  // No model configured yet → an empty state over the whole panel with a link to set one up.
+  if (connections.data && connections.data.length === 0) {
+    return (
+      <>
+        <Title />
+        <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+          <div className="bg-primary/10 flex size-14 items-center justify-center rounded-2xl">
+            <Sparkles className="text-primary size-7" />
+          </div>
+          <div className="text-base font-semibold">No model connected</div>
+          <p className="text-muted-foreground max-w-xs text-sm">
+            Connect an AI model to build channels from your library just by chatting.
+          </p>
+          <Button onClick={() => void navigate({ to: "/settings/ai" })}>Set up a model</Button>
+        </div>
+      </>
+    );
+  }
 
   const newChat = () => {
     setActiveId(crypto.randomUUID());
@@ -52,12 +84,7 @@ export function AiChatPanel() {
 
   return (
     <>
-      <PanelHeaderTitle>
-        <span className="flex items-center gap-2">
-          <Sparkles className="text-primary h-4 w-4" />
-          AI Assistant
-        </span>
-      </PanelHeaderTitle>
+      <Title />
 
       <div className="flex h-full flex-col">
         <div className="flex items-center gap-1 border-b p-2">
@@ -162,11 +189,43 @@ function Thread({
             <PromptInputTextarea placeholder="Ask about building channels…" />
           </PromptInputBody>
           <PromptInputFooter>
-            <PromptInputTools />
+            <PromptInputTools>
+              <ModelBadge />
+            </PromptInputTools>
             <PromptInputSubmit status={status} disabled={busy} />
           </PromptInputFooter>
         </PromptInput>
       </div>
     </div>
+  );
+}
+
+/** Footer badge showing the active model — click to switch the active connection (AI Elements' model-selector vibe). */
+function ModelBadge() {
+  const list = useQuery(trpc.ai.list.queryOptions());
+  const conns = list.data ?? [];
+  if (!conns.length) return null;
+  const active = conns.find((c) => c.isActive);
+  const setActive = async (id: string) => {
+    await trpcClient.ai.setActive.mutate({ id });
+    await list.refetch();
+  };
+  return (
+    <Select value={active?.id ?? ""} onValueChange={(v) => void setActive(v as string)}>
+      <SelectTrigger
+        size="sm"
+        className="text-muted-foreground hover:bg-accent h-7 gap-1.5 border-none bg-transparent px-2 text-xs shadow-none"
+      >
+        <Sparkles className="size-3.5" />
+        <SelectValue>{(v) => conns.find((c) => c.id === v)?.model ?? "Select model"}</SelectValue>
+      </SelectTrigger>
+      <SelectPopup>
+        {conns.map((c) => (
+          <SelectItem key={c.id} value={c.id}>
+            {c.name} · {c.model}
+          </SelectItem>
+        ))}
+      </SelectPopup>
+    </Select>
   );
 }
