@@ -207,6 +207,42 @@ export type MediaInfo = {
   };
 };
 
+export type CapKind = "video" | "audio" | "container";
+export type CapTokenState = {
+  token: string;
+  label: string;
+  measured: boolean;
+  quirk: string | null;
+  override: boolean | null;
+  effective: boolean;
+};
+export type CapGroup = { kind: CapKind; tokens: CapTokenState[] };
+export type PlaybackError = {
+  channelName: string | null;
+  title: string | null;
+  mode: string | null;
+  sourceContainer: string | null;
+  sourceVideoCodec: string | null;
+  sourceAudioCodec: string | null;
+  error: string | null;
+  outcome: string | null;
+  createdAt: string;
+};
+export type DeviceCapView = {
+  onboarded: boolean;
+  hasOverrides: boolean;
+  device: {
+    model: string | null;
+    osVersion: string | null;
+    platform: string | null;
+    screenWidth: number | null;
+    screenHeight: number | null;
+    hdr: boolean | null;
+  } | null;
+  groups: CapGroup[];
+  recentErrors: PlaybackError[];
+};
+
 export const api = {
   channels: () => request<{ channels: GuideChannel[] }>("/api/v1/channels"),
 
@@ -238,6 +274,24 @@ export const api = {
     request<{ ok: true; id: string }>("/api/v1/devices/report", {
       method: "POST",
       body: JSON.stringify(report),
+    }),
+
+  /** This device's capability breakdown (measured / quirk / override / effective) + recent errors. */
+  deviceCaps: (deviceId: string) =>
+    request<DeviceCapView>(`/api/v1/device/caps?deviceId=${encodeURIComponent(deviceId)}`),
+
+  /** Set one codec/container override; `value: null` clears it (revert to measured). */
+  setDeviceCap: (deviceId: string, kind: CapKind, token: string, value: boolean | null) =>
+    request<{ overrides: unknown }>("/api/v1/device/caps", {
+      method: "POST",
+      body: JSON.stringify({ deviceId, kind, token, value }),
+    }),
+
+  /** Clear ALL overrides → revert to exactly what the diagnostic found. */
+  resetDeviceCaps: (deviceId: string) =>
+    request<{ ok: true }>("/api/v1/device/caps/reset", {
+      method: "POST",
+      body: JSON.stringify({ deviceId }),
     }),
 
   now: (channelId: string) => request<NowNext>(`/api/v1/channels/${channelId}/now`),

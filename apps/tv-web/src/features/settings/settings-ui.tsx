@@ -77,8 +77,14 @@ export function SettingRow({
   onClick?: () => void;
   right?: React.ReactNode;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // Keep the focused row on screen as D-pad focus moves down a long page (the content area scrolls).
+  useEffect(() => {
+    if (focused) ref.current?.scrollIntoView({ block: "nearest" });
+  }, [focused]);
   return (
     <div
+      ref={ref}
       role="button"
       onClick={onClick}
       style={{
@@ -93,6 +99,7 @@ export function SettingRow({
         outline: focused ? `2px solid ${SETTINGS_ACCENT}` : "none",
         outlineOffset: -2,
         marginBottom: 12,
+        scrollMarginBlock: 28,
       }}
     >
       <div style={{ minWidth: 0 }}>
@@ -101,5 +108,53 @@ export function SettingRow({
       </div>
       {right}
     </div>
+  );
+}
+
+export function SectionLabel({ children, small }: { children: React.ReactNode; small?: boolean }) {
+  return (
+    <div
+      style={{
+        fontSize: small ? 13 : 15,
+        fontWeight: 700,
+        letterSpacing: 1,
+        textTransform: "uppercase",
+        color: "#64748b",
+        margin: small ? "20px 0 10px" : "34px 0 14px",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** A small status pill. `accent` = an active override; `warn` = a risky forced-on; `muted` = info. */
+export function Pill({ children, tone = "accent" }: { children: React.ReactNode; tone?: "accent" | "warn" | "muted" }) {
+  const c =
+    tone === "warn" ? { bg: "rgba(240,169,42,0.16)", fg: "#f0a92a" } : tone === "muted" ? { bg: "rgba(148,163,184,0.16)", fg: "#94a3b8" } : { bg: "rgba(74,159,224,0.16)", fg: SETTINGS_ACCENT };
+  return (
+    <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", padding: "3px 9px", borderRadius: 999, background: c.bg, color: c.fg, whiteSpace: "nowrap" }}>
+      {children}
+    </span>
+  );
+}
+
+/** A read-only switch visual (the D-pad OK on the row flips it — we don't rely on native focus). */
+export function Toggle({ on, warn }: { on: boolean; warn?: boolean }) {
+  const color = warn ? "#f0a92a" : SETTINGS_ACCENT;
+  return (
+    <span
+      style={{
+        width: 46,
+        height: 26,
+        borderRadius: 999,
+        background: on ? color : "rgba(148,163,184,0.3)",
+        position: "relative",
+        flexShrink: 0,
+        transition: "background .15s",
+      }}
+    >
+      <span style={{ position: "absolute", top: 3, left: on ? 23 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+    </span>
   );
 }

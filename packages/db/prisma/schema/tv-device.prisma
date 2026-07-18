@@ -25,6 +25,11 @@ model TvDevice {
   capabilities Json?
   raw          Json?
 
+  // Manual per-device overrides of the measured capability profile, set from the TV's Device
+  // settings page: { video?: {token:bool}, audio?: {...}, container?: {...} }. Applied LAST in
+  // getDeviceNativeCaps (force a codec on/off); clearing them reverts to what the diagnostic found.
+  capabilityOverrides Json?
+
   firstSeenAt DateTime @default(now())
   lastSeenAt  DateTime @updatedAt
 

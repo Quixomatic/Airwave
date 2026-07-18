@@ -2,6 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.2] - 2026-07-17
+
+### Added
+
+- **Device settings: per-codec capability overrides.** The Device page now lists this TV's video / audio / container support (in two columns), each with a toggle, showing what the diagnostic **measured**, any **known-issue** default (VP9, DTS/TrueHD — now defaults you can override rather than hardcoded), and an **Override** badge when a toggle diverges from what the diagnostic found. You can **force a codec on or off** — forcing on something the panel can't actually decode is flagged with a "Forced" warning — and **Reset to diagnostic** clears all overrides. The device's recent playback errors are listed for context, alongside its info (model / webOS / resolution / HDR). Backed by a new `capabilityOverrides` JSON column on `TvDevice`; `getDeviceNativeCaps` now layers **measured → known-issue quirks → overrides**, so playback honors your toggles. New endpoints `GET`/`POST /api/v1/device/caps` + `POST /api/v1/device/caps/reset`. _(Requires `pnpm db:push` + a backend restart.)_
+- **About page** — the app is now **Airwave**; the subpage shows the version (tracked from `appinfo.json`) and a short description.
+
+### Changed
+
+- The settings sidebar gains an **About** category, and the focused settings row now **scrolls into view** as D-pad focus moves down a long page.
+
 ## [0.5.1] - 2026-07-17
 
 ### Changed

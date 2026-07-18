@@ -18,6 +18,12 @@ import {
   getCapabilityManifest,
   saveCapabilityResult,
 } from "@ChannelGuide/api/services/capabilities/service";
+import {
+  getDeviceCapabilityView,
+  resetDeviceCapabilityOverrides,
+  setDeviceCapabilityOverride,
+  type CapKind,
+} from "@ChannelGuide/api/services/capabilities/device-settings";
 import { reportDevice } from "@ChannelGuide/api/services/devices/report";
 import { logPlayback } from "@ChannelGuide/api/services/playback/log";
 import { getNowNext } from "@ChannelGuide/api/services/schedule/generate";
@@ -200,6 +206,35 @@ api.post("/devices/report", async (c) => {
   if (!body?.deviceId) return c.json({ error: "deviceId is required" }, 400);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return c.json(await reportDevice(prisma, c.get("session").user.id, body as any));
+});
+
+// --- Device capability settings (the Device page toggles) -----------------
+
+/** The per-token capability breakdown (measured / quirk / override / effective) + recent errors. */
+api.get("/device/caps", async (c) => {
+  const deviceId = c.req.query("deviceId");
+  if (!deviceId) return c.json({ error: "deviceId is required" }, 400);
+  return c.json(await getDeviceCapabilityView(prisma, deviceId));
+});
+
+/** Toggle one codec/container override; `value: null` clears it (revert that token to measured). */
+api.post("/device/caps", async (c) => {
+  const body = (await c.req.json().catch(() => null)) as
+    | { deviceId?: string; kind?: CapKind; token?: string; value?: boolean | null }
+    | null;
+  if (!body?.deviceId || !body?.kind || !body?.token) {
+    return c.json({ error: "deviceId, kind and token are required" }, 400);
+  }
+  const overrides = await setDeviceCapabilityOverride(prisma, body.deviceId, body.kind, body.token, body.value ?? null);
+  return c.json({ overrides });
+});
+
+/** Reset ALL overrides for a device → revert to exactly what the diagnostic found. */
+api.post("/device/caps/reset", async (c) => {
+  const body = (await c.req.json().catch(() => null)) as { deviceId?: string } | null;
+  if (!body?.deviceId) return c.json({ error: "deviceId is required" }, 400);
+  await resetDeviceCapabilityOverrides(prisma, body.deviceId);
+  return c.json({ ok: true });
 });
 
 // --- Watch sessions -------------------------------------------------------
