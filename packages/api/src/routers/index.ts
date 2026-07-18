@@ -1,4 +1,5 @@
 import { protectedProcedure, publicProcedure, router } from "../index";
+import { aiRouter } from "./ai";
 import { bumpersRouter } from "./bumpers";
 import { channelsRouter } from "./channels";
 import { generatorRouter } from "./generator";
@@ -19,6 +20,7 @@ export const appRouter = router({
       user: ctx.session.user,
     };
   }),
+  ai: aiRouter,
   bumpers: bumpersRouter,
   channels: channelsRouter,
   generator: generatorRouter,

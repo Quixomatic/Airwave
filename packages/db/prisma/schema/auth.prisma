@@ -24,6 +24,7 @@ model User {
   watchSession    WatchSession?
   tvDevices       TvDevice[]
   playbackLogs    PlaybackLog[]
+  aiConversations AiConversation[]
 
   @@unique([email])
   @@map("user")

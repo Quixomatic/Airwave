@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.4] - 2026-07-18
+
+### Added
+
+- **AI provider connections (Settings → AI Assistant).** Configure one or more AI model connections for the channel-building assistant and pick which is **active** (what the chat uses). Each is a provider (Anthropic / OpenAI / Google / **OpenAI-compatible / local**) + a **model dropdown** (curated per provider, with a custom option) + optional base URL (for local endpoints — Ollama, LM Studio, vLLM, OpenRouter) + an API key **encrypted at rest** (AES-256-GCM keyed off `BETTER_AUTH_SECRET`). Each connection can be **tested** (a cheap round-trip that proves the model actually responds) and **set active**. Built on the **Vercel AI SDK** provider factory (`getModel`) so the rest of the agent stays provider-agnostic. New `AiConnection` table (+ `AiConversation` / `AiMessage` tables ready for the chat's history persistence) and an `ai` tRPC router; added the base-lyra `select` + `badge` components. _(Requires `pnpm db:push` + a backend restart.)_
+
 ## [0.5.3] - 2026-07-18
 
 ### Added

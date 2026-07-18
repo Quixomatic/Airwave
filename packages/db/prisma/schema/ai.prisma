@@ -1,0 +1,49 @@
+/// A saved AI provider connection. Several can exist; exactly one is `isActive` (what the chat uses).
+/// The API key is stored ENCRYPTED (app-level, AES-256-GCM) — never in plaintext. `provider` selects
+/// the adapter; `baseUrl` is for OpenAI-compatible / local endpoints (Ollama, LM Studio, OpenRouter).
+model AiConnection {
+  id        String   @id @default(cuid())
+  name      String // a human label the admin gives it ("Claude Sonnet", "Local Llama")
+  provider  String // "anthropic" | "openai" | "google" | "compatible"
+  model     String
+  baseUrl   String?
+  apiKeyEnc String? // encrypted; null for a keyless local endpoint
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("ai_connection")
+}
+
+/// A persisted chat with the channel-building assistant. Retained so histories survive reloads; a
+/// prune job can trim old ones later.
+model AiConversation {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  messages  AiMessage[]
+
+  @@index([userId])
+  @@index([updatedAt])
+  @@map("ai_conversation")
+}
+
+/// One message in a conversation. `parts` is the full AI SDK UIMessage part list (text, tool calls,
+/// tool results) stored as JSON so the thread replays faithfully.
+model AiMessage {
+  id             String         @id @default(cuid())
+  conversationId String
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role      String // "user" | "assistant" | "system"
+  parts     Json
+  createdAt DateTime @default(now())
+
+  @@index([conversationId])
+  @@map("ai_message")
+}

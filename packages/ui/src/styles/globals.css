@@ -54,6 +54,13 @@
   /* Tiled noise texture (Twenty parity) — applied to the sidebar wrapper so the
      sidebar and the inset content card float over the same textured surface. */
   --t-background-noisy: url("/textures/noisy-light.png");
+  --destructive-foreground: var(--color-red-700);
+  --info: var(--color-blue-500);
+  --info-foreground: var(--color-blue-700);
+  --success: var(--color-emerald-500);
+  --success-foreground: var(--color-emerald-700);
+  --warning: var(--color-amber-500);
+  --warning-foreground: var(--color-amber-700);
 }
 
 .dark {
@@ -89,6 +96,13 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.552 0.016 285.938);
   --t-background-noisy: url("/textures/noisy-dark.jpg");
+  --destructive-foreground: var(--color-red-400);
+  --info: var(--color-blue-500);
+  --info-foreground: var(--color-blue-400);
+  --success: var(--color-emerald-500);
+  --success-foreground: var(--color-emerald-400);
+  --warning: var(--color-amber-500);
+  --warning-foreground: var(--color-amber-400);
 }
 
 @theme inline {
@@ -142,6 +156,13 @@
     }
   }
   --animate-caret-blink: 1s ease-out infinite caret-blink;
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning: var(--warning);
+  --color-success-foreground: var(--success-foreground);
+  --color-success: var(--success);
+  --color-info-foreground: var(--info-foreground);
+  --color-info: var(--info);
+  --color-destructive-foreground: var(--destructive-foreground);
   @keyframes caret-blink {
     0%, 70%, to {
       opacity: 1;

@@ -5,6 +5,7 @@ import { HeaderLeft } from "@/context/header-provider";
 
 const TABS = [
   { label: "General", to: "/settings/main" },
+  { label: "AI Assistant", to: "/settings/ai" },
   { label: "Jobs & Cache", to: "/settings/jobs" },
   { label: "About", to: "/settings/about" },
 ] as const;

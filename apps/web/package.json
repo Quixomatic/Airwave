@@ -1,6 +1,6 @@
 {
   "name": "web",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,6 +14,7 @@
     "@ChannelGuide/api": "workspace:*",
     "@ChannelGuide/env": "workspace:*",
     "@ChannelGuide/ui": "workspace:*",
+    "@ai-sdk/react": "^4.0.34",
     "@hookform/resolvers": "^5.4.0",
     "@phosphor-icons/react": "^2.1.10",
     "@tailwindcss/vite": "^4.3.2",
