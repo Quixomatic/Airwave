@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.1] - 2026-07-17
+
+### Changed
+
+- **Settings is now a master-detail shell with a sliver sidebar.** `/settings` gains a left sidebar reusing the guide's glass-circle treatment — a quiet sliver of circles (Guide · General · User · Device) that expands to labels when focused — over nested subpage routes (`/settings`, `/settings/user`, `/settings/device`) that all share one consistent layout. D-pad: on the rail ▲/▼ move between categories, OK opens one (Guide returns to live TV), ► enters the page's content, Back returns to the guide; in the content ▲/▼ move between options, OK activates, ◄/Back returns to the rail. The old flat settings list is replaced by **General** (app prefs + back to guide), **User** (sign out), and **Device** (Run capability diagnostic + Remote key probe). The device capability toggles + reset land next (0.5.2).
+
 ## [0.5.0] - 2026-07-17
 
 Opens the 0.5.x line.
