@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.6] - 2026-07-18
+
+### Changed
+
+- **The AI chat's input is now a single unified card** (matching AI Elements' PromptInput): a taller, auto-growing textarea with a divider and a footer row (tools on the left, send on the right), and the **focus ring wraps the whole control** — textarea + footer + send button — via `focus-within`, instead of just the textarea. Enter sends / Shift+Enter makes a newline; it clears on submit. Bumped the default textarea height so the footer no longer crowds it.
+
 ## [0.5.5] - 2026-07-18
 
 ### Added

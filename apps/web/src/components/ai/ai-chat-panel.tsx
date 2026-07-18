@@ -15,9 +15,9 @@ import { Message, MessageContent } from "@/components/ai-elements/message";
 import {
   PromptInput,
   PromptInputBody,
+  PromptInputFooter,
   PromptInputSubmit,
   PromptInputTextarea,
-  PromptInputToolbar,
   PromptInputTools,
 } from "@/components/ai-elements/prompt-input";
 import { Response } from "@/components/ai-elements/response";
@@ -156,15 +156,15 @@ function Thread({
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="p-2">
+      <div className="shrink-0 p-3">
         <PromptInput onSubmit={(msg) => sendMessage({ text: msg.text })}>
           <PromptInputBody>
-            <PromptInputTextarea placeholder="Ask about building channels…" disabled={busy} />
+            <PromptInputTextarea placeholder="Ask about building channels…" />
           </PromptInputBody>
-          <PromptInputToolbar>
+          <PromptInputFooter>
             <PromptInputTools />
             <PromptInputSubmit status={status} disabled={busy} />
-          </PromptInputToolbar>
+          </PromptInputFooter>
         </PromptInput>
       </div>
     </div>
