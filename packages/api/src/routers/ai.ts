@@ -9,6 +9,7 @@ import {
   testConnection,
   updateConnection,
 } from "../services/agent/config";
+import { deleteConversation, getConversationMessages, listConversations } from "../services/agent/conversations";
 
 const connectionInput = z.object({
   name: z.string().min(1),
@@ -34,4 +35,9 @@ export const aiRouter = router({
 
   /** A cheap round-trip that proves the connection's model actually responds. */
   test: adminProcedure.input(z.object({ id: z.string() })).mutation(({ ctx, input }) => testConnection(ctx.prisma, input.id)),
+
+  // --- chat history ---
+  conversations: adminProcedure.query(({ ctx }) => listConversations(ctx.prisma, ctx.session.user.id)),
+  messages: adminProcedure.input(z.object({ id: z.string() })).query(({ ctx, input }) => getConversationMessages(ctx.prisma, ctx.session.user.id, input.id)),
+  deleteConversation: adminProcedure.input(z.object({ id: z.string() })).mutation(({ ctx, input }) => deleteConversation(ctx.prisma, ctx.session.user.id, input.id)),
 });

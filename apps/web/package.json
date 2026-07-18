@@ -1,6 +1,6 @@
 {
   "name": "web",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "private": true,
   "type": "module",
   "scripts": {
@@ -25,6 +25,7 @@
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
     "@trpc/tanstack-react-query": "^11.18.0",
+    "ai": "^7.0.31",
     "better-auth": "catalog:",
     "cronstrue": "3.14.0",
     "dotenv": "catalog:",
@@ -34,6 +35,8 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "sonner": "catalog:",
+    "streamdown": "^2.5.0",
+    "use-stick-to-bottom": "^1.1.6",
     "zod": "catalog:"
   },
   "devDependencies": {

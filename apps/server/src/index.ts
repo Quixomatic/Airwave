@@ -1,5 +1,6 @@
 import { createContext } from "@ChannelGuide/api/context";
 import { appRouter } from "@ChannelGuide/api/routers/index";
+import { runAgentChat } from "@ChannelGuide/api/services/agent/chat";
 import { startJobs } from "@ChannelGuide/api/services/jobs/scheduler";
 import { resolveChannelSource } from "@ChannelGuide/api/services/playback/broker";
 import { buildAuthUrl, createPin } from "@ChannelGuide/api/services/plex/client";
@@ -46,8 +47,22 @@ const cookieCors = cors({
 });
 app.use("/api/auth/*", cookieCors);
 app.use("/trpc/*", cookieCors);
+app.use("/api/ai/*", cookieCors);
 
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+
+// AI assistant chat — cookie-authed admin surface. Streams a UI-message response (Vercel AI SDK)
+// from the active connection; DefaultChatTransport posts { id, messages }, id = the conversation id.
+app.post("/api/ai/chat", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  const user = session?.user as { id: string; role?: string | null } | undefined;
+  if (!user) return c.json({ error: "Unauthorized" }, 401);
+  if (user.role !== "admin") return c.json({ error: "Admin only" }, 403);
+  const body = (await c.req.json().catch(() => null)) as { id?: string; messages?: unknown } | null;
+  if (!body?.id || !Array.isArray(body.messages)) return c.json({ error: "id and messages required" }, 400);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return runAgentChat(prisma, user.id, { conversationId: body.id, messages: body.messages as any });
+});
 
 // Plex login authorize-proxy. better-auth's genericOAuth "plex" provider points
 // its authorizationUrl here (with better-auth's redirect_uri + state). We create a

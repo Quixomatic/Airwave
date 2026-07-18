@@ -2,6 +2,15 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.5] - 2026-07-18
+
+### Added
+
+- **The AI assistant chat is live (increment B).** The reserved global side panel (0.5.3) is now a working **streaming chat** against your active AI connection (0.5.4) via the Vercel AI SDK (`streamText` → `useChat`, a new cookie-authed admin-only `POST /api/ai/chat` route). **Chat history persists** — every exchange saves to the `AiConversation` / `AiMessage` tables, and the panel lets you start a **New chat** or resume any past one from **History** (with delete).
+- **Base-lyra "AI Elements" components.** The upstream AI Elements registry assumes stock (Radix) shadcn and tries to overwrite base-lyra's own components, so we built our own equivalents on base-lyra: **Conversation** (auto-stick-to-bottom via `use-stick-to-bottom` + a scroll-to-bottom button), **Message** / **MessageContent** (user/assistant bubbles), **Response** (streaming markdown via `streamdown`), and **PromptInput** (textarea + submit, Enter-to-send). More (tool-call cards, reasoning) will come with the tool layer.
+
+> No tools yet — it's a grounded conversational assistant that helps you think through channels. The channel-building **tool layer + propose-then-approve** is increment C. Requires a backend restart.
+
 ## [0.5.4] - 2026-07-18
 
 ### Added
