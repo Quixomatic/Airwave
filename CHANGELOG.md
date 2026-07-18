@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.3] - 2026-07-18
+
+### Added
+
+- **Slide-in side-panel system in the admin (ported from BasicTimeTracker).** The authenticated layout now hosts a right-side panel that slides in beside the inset content card, with BTT's two modes: **global panels** (local state, persist across navigation — for always-available surfaces like the AI assistant) and **URL-param route panels** (`?panel=<type>`, shareable / refresh-survivable, content declared by the matched route's context). Global wins when both are set. Panel content publishes its own title / meta / footer up to the chrome via **portals** (matching the use-portals-not-slots convention). An **AI Assistant** button (Sparkles) in the top header toggles the reserved `chat` global panel — a placeholder for now; the next arc fills it with the Vercel AI SDK chat, the channel-building tool layer, and the provider/model config. New: `@ChannelGuide/ui` `side-panel` primitives, `details-panel-provider`, `panel-header-provider`, `DetailsPanel`.
+
 ## [0.5.2] - 2026-07-17
 
 ### Added

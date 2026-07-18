@@ -1,6 +1,8 @@
 // SidebarTrigger temporarily hidden from the TopHeader — re-add the import to restore it.
+import { Button } from "@ChannelGuide/ui/components/button";
 import { SidebarProvider } from "@ChannelGuide/ui/components/sidebar";
 import { Outlet, useMatches } from "@tanstack/react-router";
+import { Sparkles } from "lucide-react";
 
 import {
   HeaderCenterSlot,
@@ -13,9 +15,12 @@ import {
 } from "@/context/header-provider";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { BreadcrumbProvider } from "@/context/breadcrumb-provider";
+import { DetailsPanelProvider, useDetailsPanel } from "@/context/details-panel-provider";
+import { PanelHeaderProvider } from "@/context/panel-header-provider";
 import { cn } from "@/lib/utils";
 
 import { AppSidebar } from "./app-sidebar";
+import { DetailsPanel } from "./details-panel";
 
 /**
  * Routes can opt out of the SubHeader with `staticData: { hideSubHeader: true }`,
@@ -43,21 +48,41 @@ declare module "@tanstack/react-router" {
 export function AppLayout() {
   return (
     <SidebarProvider defaultOpen>
-      <AppSidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <HeaderProvider>
-          <BreadcrumbProvider>
-            <TopHeader />
-            <div className="flex min-h-0 flex-1 pr-1 pb-1">
-              <main className="bg-background m-2 mt-0 ml-0 flex flex-1 flex-col overflow-hidden rounded-md border shadow-sm">
-                <SubHeader />
-                <PageContent />
-              </main>
-            </div>
-          </BreadcrumbProvider>
-        </HeaderProvider>
-      </div>
+      <DetailsPanelProvider>
+        <PanelHeaderProvider>
+          <AppSidebar />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <HeaderProvider>
+              <BreadcrumbProvider>
+                <TopHeader />
+                <div className="flex min-h-0 flex-1 pr-1 pb-1">
+                  <main className="bg-background m-2 mt-0 ml-0 flex flex-1 flex-col overflow-hidden rounded-md border shadow-sm">
+                    <SubHeader />
+                    <PageContent />
+                  </main>
+                  <DetailsPanel />
+                </div>
+              </BreadcrumbProvider>
+            </HeaderProvider>
+          </div>
+        </PanelHeaderProvider>
+      </DetailsPanelProvider>
     </SidebarProvider>
+  );
+}
+
+/** Toggles the global AI assistant panel from the top header. */
+function AiPanelTrigger() {
+  const { toggleGlobalPanel, globalPanelType } = useDetailsPanel();
+  return (
+    <Button
+      variant={globalPanelType === "chat" ? "secondary" : "ghost"}
+      size="icon"
+      aria-label="AI assistant"
+      onClick={() => toggleGlobalPanel("chat")}
+    >
+      <Sparkles className="h-4 w-4" />
+    </Button>
   );
 }
 
@@ -69,7 +94,9 @@ function TopHeader() {
         <Breadcrumbs />
       </TopHeaderLeftSlot>
       <TopHeaderCenterSlot className="justify-self-center" />
-      <TopHeaderRightSlot className="flex items-center gap-2 justify-self-end" />
+      <TopHeaderRightSlot className="flex items-center gap-2 justify-self-end">
+        <AiPanelTrigger />
+      </TopHeaderRightSlot>
     </header>
   );
 }
