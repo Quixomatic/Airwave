@@ -41,6 +41,9 @@ model ChannelPackage {
   // Provenance: auto-generated packages carry `generated=true` so a regen can delete
   // + rebuild them without touching manually-created packages.
   generated Boolean @default(false)
+  // Distinct provenance for the AI assistant / workflow (separate from the static generator's
+  // `generated`), so those can be listed + cleanly reverted via `clear_ai_generated`.
+  aiGenerated Boolean @default(false)
 
   channels    Channel[]
 
@@ -73,6 +76,9 @@ model Channel {
   // they came from, so a regen deletes + rebuilds them without wiping manual channels.
   generated Boolean @default(false)
   presetKey String?
+  // Distinct provenance for the AI assistant / workflow (separate from the static generator), so
+  // those can be listed + cleanly reverted via `clear_ai_generated`.
+  aiGenerated Boolean @default(false)
 
   // Thin per-channel bumper override; the global BumperConfig owns the content.
   bumperMode BumperMode @default(INHERIT)

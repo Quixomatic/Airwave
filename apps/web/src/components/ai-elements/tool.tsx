@@ -1,5 +1,5 @@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@ChannelGuide/ui/components/collapsible";
-import { CheckCircle2Icon, ChevronDownIcon, CircleIcon, Loader2Icon, WrenchIcon, XCircleIcon } from "lucide-react";
+import { CheckCircle2Icon, ChevronDownIcon, CircleIcon, Loader2Icon, ShieldQuestionIcon, WrenchIcon, XCircleIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
@@ -7,10 +7,10 @@ import { cn } from "@/lib/utils";
 /**
  * AI Elements' Tool, rebuilt on base-lyra — renders one tool call in the thread as a collapsible
  * card: header (name + status), input params, and output/error. States mirror the AI SDK's tool part
- * lifecycle.
+ * lifecycle (incl. `approval-requested` for write tools awaiting the admin's OK).
  */
 
-export type ToolState = "input-streaming" | "input-available" | "output-available" | "output-error";
+export type ToolState = "input-streaming" | "input-available" | "approval-requested" | "output-available" | "output-error";
 
 export type ToolProps = ComponentProps<typeof Collapsible>;
 export function Tool({ className, ...props }: ToolProps) {
@@ -20,6 +20,7 @@ export function Tool({ className, ...props }: ToolProps) {
 const STATUS: Record<ToolState, { label: string; icon: ReactNode }> = {
   "input-streaming": { label: "Preparing", icon: <CircleIcon className="size-3.5" /> },
   "input-available": { label: "Running", icon: <Loader2Icon className="size-3.5 animate-spin" /> },
+  "approval-requested": { label: "Needs approval", icon: <ShieldQuestionIcon className="size-3.5 text-amber-600" /> },
   "output-available": { label: "Done", icon: <CheckCircle2Icon className="size-3.5 text-emerald-600" /> },
   "output-error": { label: "Error", icon: <XCircleIcon className="size-3.5 text-red-600" /> },
 };

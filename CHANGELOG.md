@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.10] - 2026-07-18
+
+### Added
+
+- **The AI assistant can now build channels — the tool layer (increment C).** The chat has a full, grounded toolbox over your real services: **discovery** (`list_media_sources`, `library_overview`, `list_filter_fields`, `discover_field_values`, `search_titles`) and **`preview_filter`** (resolve an unsaved filter → count + sample), so it builds filter trees ONLY from real library data and verifies before creating; **inspection** (`list`/`get` channels + packages); and **writes** — `create_channel`, `update_channel` (any subset — even just a number or package), `delete_channel`, bulk `update_channels` / `renumber_channels`, `create`/`update`/`delete_package`, and `clear_ai_generated`. **Writes require the admin's approval**: the chat pauses and shows an **Approve / Deny** card (AI SDK native tool-approval) before anything touches the DB. AI-made rows are flagged with a new **`aiGenerated`** provenance field (on Channel + ChannelPackage), so they're cleanly reversible. The tools are plain reusable services — the coming **workflow-SDK** "analyze the whole library and build everything" job will call the exact same functions. _(Requires `pnpm db:push` + a backend restart.)_
+
 ## [0.5.9] - 2026-07-18
 
 ### Added

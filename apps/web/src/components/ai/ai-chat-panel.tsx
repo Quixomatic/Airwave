@@ -155,7 +155,7 @@ function Thread({
   onActivity: () => void;
 }) {
   const transport = useMemo(() => new DefaultChatTransport({ api: `${serverBase()}/api/ai/chat`, credentials: "include" }), []);
-  const { messages, sendMessage, status } = useChat({ id: conversationId, messages: initialMessages, transport });
+  const { messages, sendMessage, status, addToolApprovalResponse } = useChat({ id: conversationId, messages: initialMessages, transport });
 
   // Refresh the history list (titles / order) when a turn settles.
   useEffect(() => {
@@ -198,13 +198,35 @@ function Thread({
                       ) : null;
                     }
                     if (part.type.startsWith("tool-") || part.type === "dynamic-tool") {
-                      const p = part as unknown as { type: string; toolName?: string; state: ToolState; input?: unknown; output?: unknown; errorText?: string };
+                      const p = part as unknown as {
+                        type: string;
+                        toolName?: string;
+                        state: ToolState;
+                        input?: unknown;
+                        output?: unknown;
+                        errorText?: string;
+                        approval?: { id: string };
+                      };
                       const name = p.type === "dynamic-tool" ? `tool-${p.toolName ?? "tool"}` : p.type;
+                      const awaiting = p.state === "approval-requested";
                       return (
-                        <Tool key={i} defaultOpen={p.state === "output-error"}>
+                        <Tool key={i} defaultOpen={awaiting || p.state === "output-error"}>
                           <ToolHeader type={name} state={p.state} />
                           <ToolContent>
                             <ToolInput input={p.input} />
+                            {awaiting && p.approval && (
+                              <div className="flex items-center justify-between gap-2 border-t p-2">
+                                <span className="text-muted-foreground text-xs">Apply this change?</span>
+                                <div className="flex gap-1">
+                                  <Button size="sm" variant="outline" onClick={() => void addToolApprovalResponse({ id: p.approval!.id, approved: false })}>
+                                    Deny
+                                  </Button>
+                                  <Button size="sm" onClick={() => void addToolApprovalResponse({ id: p.approval!.id, approved: true })}>
+                                    Approve
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                             <ToolOutput output={p.output} errorText={p.errorText} />
                           </ToolContent>
                         </Tool>
