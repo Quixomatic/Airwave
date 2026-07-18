@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.9] - 2026-07-18
+
+### Added
+
+- **Tool-call + reasoning rendering in the chat.** New base-lyra **Tool** and **Reasoning** AI Elements components, and the assistant thread now renders the model's tool calls (collapsible cards showing the tool name, status, input, and output/error) and its reasoning inline — the UI groundwork for the channel-building tool layer.
+
 ## [0.5.8] - 2026-07-18
 
 ### Added

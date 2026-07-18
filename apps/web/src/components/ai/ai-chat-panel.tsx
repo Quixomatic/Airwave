@@ -22,8 +22,11 @@ import {
   PromptInputTextarea,
   PromptInputTools,
 } from "@/components/ai-elements/prompt-input";
+import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
 import { Response } from "@/components/ai-elements/response";
+import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput, type ToolState } from "@/components/ai-elements/tool";
 import { PanelHeaderTitle } from "@/context/panel-header-provider";
+import { cn } from "@/lib/utils";
 import { trpc, trpcClient } from "@/utils/trpc";
 
 /**
@@ -172,13 +175,47 @@ function Thread({
               <p>Ask me to help design channels from your library — e.g. "build a toddler channel with Bluey and Sesame Street."</p>
             </div>
           )}
-          {messages.map((m) => (
-            <Message key={m.id} from={m.role === "user" ? "user" : "assistant"}>
-              <MessageContent>
-                {m.parts.map((p, i) => (p.type === "text" ? <Response key={i}>{p.text}</Response> : null))}
-              </MessageContent>
-            </Message>
-          ))}
+          {messages.map((m) => {
+            const from = m.role === "user" ? "user" : "assistant";
+            return (
+              <Message key={m.id} from={from}>
+                <div className={cn("flex min-w-0 flex-col gap-2", from === "user" ? "items-end" : "w-full items-stretch")}>
+                  {m.parts.map((part, i) => {
+                    if (part.type === "text") {
+                      return part.text ? (
+                        <MessageContent key={i}>
+                          <Response>{part.text}</Response>
+                        </MessageContent>
+                      ) : null;
+                    }
+                    if (part.type === "reasoning") {
+                      const text = (part as { text?: string }).text ?? "";
+                      return text ? (
+                        <Reasoning key={i}>
+                          <ReasoningTrigger />
+                          <ReasoningContent>{text}</ReasoningContent>
+                        </Reasoning>
+                      ) : null;
+                    }
+                    if (part.type.startsWith("tool-") || part.type === "dynamic-tool") {
+                      const p = part as unknown as { type: string; toolName?: string; state: ToolState; input?: unknown; output?: unknown; errorText?: string };
+                      const name = p.type === "dynamic-tool" ? `tool-${p.toolName ?? "tool"}` : p.type;
+                      return (
+                        <Tool key={i} defaultOpen={p.state === "output-error"}>
+                          <ToolHeader type={name} state={p.state} />
+                          <ToolContent>
+                            <ToolInput input={p.input} />
+                            <ToolOutput output={p.output} errorText={p.errorText} />
+                          </ToolContent>
+                        </Tool>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+              </Message>
+            );
+          })}
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
