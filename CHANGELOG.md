@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.23] - 2026-07-19
+
+### Added
+
+- **The AI lineup workflow can now see your library (§7.3a Phase 2 — the analyze step).** The planning model can't be shown 15,000 items, so the workflow distills the whole library into a compact **profile**: totals, the **genre distribution**, the **studios/networks** that dominate, the **content-rating** mix, the **decade spread**, and the **shows big enough to carry a channel** (by episode count). That's what will let the planner propose channels grounded in what's actually on the server instead of generic guesses. Measured on a real library — 584 movies / 275 shows / 14,793 episodes → **~630 tokens in 90ms**, small enough to sit in the cached prompt prefix every per-channel agent shares.
+- **`scripts/show-library-profile.ts`** — prints the profile as the model will see it, with its size in characters/tokens, for sanity-checking a plan's inputs.
+
+### Notes
+
+- Genres live inside the `guide` JSONB bundle rather than a column, so the counts are done with **one `jsonb_array_elements_text` aggregate** instead of pulling every row into memory.
+- The dimension counts deliberately cover **movies and shows only, never episodes**: episode guides don't carry genre/studio/rating (those live on the parent show), and counting episodes would let one 583-episode show drown out the entire distribution. Episode counts surface separately as "biggest shows".
+- _(Server — needs a restart, and `bunx workflow build` after any change under `workflows/`.)_
+
 ## [0.5.22] - 2026-07-19
 
 ### Added

@@ -23,8 +23,15 @@ import { setLineupRunner } from "@ChannelGuide/api/services/agent/lineup-runner"
 
 import { aiLineupWorkflow } from "../workflows/lineup";
 
-/** Loopback-only port for the workflow handlers. Never expose this. */
-const WORKFLOW_PORT = Number(process.env.WORKFLOW_LOCAL_PORT ?? 3152);
+/**
+ * Loopback-only port for the workflow handlers. Never expose this.
+ *
+ * Read at CALL time, not module scope: imports are evaluated before the importing
+ * module's body runs, so a module-level const would capture the default before a caller
+ * (e.g. scripts/run-lineup.ts picking a free port) could override it — and then collide
+ * with the dev server already holding 3152.
+ */
+const workflowPort = () => Number(process.env.WORKFLOW_LOCAL_PORT ?? 3152);
 
 export async function startWorkflowEngine(): Promise<void> {
   // Opt-in: the app must boot fine without the engine (and without the generated
@@ -45,7 +52,7 @@ export async function startWorkflowEngine(): Promise<void> {
 
   Bun.serve({
     hostname: "127.0.0.1", // loopback ONLY — see the security note above
-    port: WORKFLOW_PORT,
+    port: workflowPort(),
     idleTimeout: 255, // a step can be a long LLM call; same reasoning as the main server
     routes: {
       "/.well-known/workflow/v1/flow": { POST: (req: Request) => flow.default.POST(req) },
@@ -80,5 +87,5 @@ export async function startWorkflowEngine(): Promise<void> {
     },
   });
 
-  console.log(`[workflow] engine ready (handlers on 127.0.0.1:${WORKFLOW_PORT}, worker polling)`);
+  console.log(`[workflow] engine ready (handlers on 127.0.0.1:${workflowPort()}, worker polling)`);
 }

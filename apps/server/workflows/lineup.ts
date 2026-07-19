@@ -20,19 +20,13 @@
  * After editing this file you MUST re-run `bunx workflow build` — `bun --hot` does not
  * pick up workflow changes (the directives are a build-time transform).
  */
+import prisma from "@ChannelGuide/db";
+
+import type { LibraryProfile } from "@ChannelGuide/api/services/agent/library-profile";
+import { buildLibraryProfile } from "@ChannelGuide/api/services/agent/library-profile";
 import type { LineupRunArgs } from "@ChannelGuide/api/services/agent/lineup-runner";
 
-/** Compact "map" of the library the model can actually reason over (§4.1). */
-export type LibraryProfile = {
-  sourceId: string;
-  totals: { movies: number; shows: number; episodes: number };
-  /** genre -> item count, most common first. */
-  genres: { name: string; count: number }[];
-  studios: { name: string; count: number }[];
-  contentRatings: { name: string; count: number }[];
-  decades: { decade: number; count: number }[];
-  topShows: { title: string; episodes: number }[];
-};
+export type { LibraryProfile };
 
 /** One channel the plan proposes (§4.2). `number` is assigned HERE, not by the builder. */
 export type PlannedChannel = {
@@ -109,19 +103,16 @@ export async function aiLineupWorkflow(args: LineupRunArgs): Promise<LineupRepor
 // Steps — each is durable, retried, and checkpointed independently.
 // ---------------------------------------------------------------------------
 
-/** §4.1 — distill the library into a few-KB profile. PHASE 2. */
+/** §4.1 — distill the library into a few-KB profile the planner can reason over. */
 async function analyzeLibrary(sourceId: string): Promise<LibraryProfile> {
   "use step";
-  console.log(`[lineup] analyze: source=${sourceId} (stub)`);
-  return {
-    sourceId,
-    totals: { movies: 0, shows: 0, episodes: 0 },
-    genres: [],
-    studios: [],
-    contentRatings: [],
-    decades: [],
-    topShows: [],
-  };
+  const profile = await buildLibraryProfile(prisma, sourceId);
+  console.log(
+    `[lineup] analyze: ${profile.totals.movies} movies / ${profile.totals.shows} shows / ` +
+      `${profile.totals.episodes} episodes · ${profile.genres.length} genres · ` +
+      `${profile.studios.length} studios · ${profile.topShows.length} sizeable shows`,
+  );
+  return profile;
 }
 
 /** §4.2 — one big structured-output call over the profile. PHASE 3. */

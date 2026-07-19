@@ -30,9 +30,17 @@ const sourceId =
 
 if (!sourceId) throw new Error("No enabled media source found — pass a sourceId explicitly.");
 
+// Force (not ??=) our own port for BOTH the listener and the dispatch base URL: .env
+// already sets these for the dev server, and inheriting them would either collide on
+// :3152 or send dispatch to the dev server instead of this process.
+//
+// NB both processes poll the SAME queue, so if a dev server is up it may pick up a step
+// first — that's normal queue behaviour, and its output appears in ITS console. The poll
+// below still sees the run complete either way.
+const devPort = process.env.WORKFLOW_DEV_PORT ?? "3154";
 process.env.WORKFLOW_ENABLED = "1";
-process.env.WORKFLOW_LOCAL_PORT ??= "3154";
-process.env.WORKFLOW_LOCAL_BASE_URL ??= "http://127.0.0.1:3154";
+process.env.WORKFLOW_LOCAL_PORT = devPort;
+process.env.WORKFLOW_LOCAL_BASE_URL = `http://127.0.0.1:${devPort}`;
 
 await startWorkflowEngine();
 
