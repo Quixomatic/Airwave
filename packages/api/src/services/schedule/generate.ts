@@ -9,9 +9,21 @@ import {
   upsertPoolItems,
 } from "../media/media-item";
 import { resolveChannel } from "../plex/resolve";
-import { type BuildResult, type OrderingStrategy, buildSchedule } from "./timeline";
+import {
+  type BuildResult,
+  type OrderingStrategy,
+  type ScheduleCursor,
+  buildSchedule,
+} from "./timeline";
 
 const DAY_SECONDS = 86400;
+/**
+ * Default window for a "get this channel watchable fast" build. A full build lays one
+ * complete pass of the pool — for a 2,800-episode channel that's ~300 days and far too
+ * slow to run inline at channel-creation time. A windowed build stops at ~12h; the
+ * hourly `schedule-refresh` job grows it from there via {@link extendChannelSchedule}.
+ */
+export const INITIAL_WINDOW_SECONDS = 12 * 3600;
 /**
  * Floor for a build block. A pool whose single pass is longer than this (e.g. a
  * few hundred movies) schedules exactly one full pass; a short pool loops
@@ -95,15 +107,49 @@ function summarize(
   };
 }
 
+/** Persist where a build stopped (see {@link ScheduleCursor}). */
+function cursorData(cursor: ScheduleCursor) {
+  return {
+    // Postgres Int is signed 32-bit; the seed is an unsigned hash — store it signed.
+    schedulePassSeed: cursor.passSeed | 0,
+    schedulePassIndex: cursor.passIndex,
+    schedulePassPos: cursor.pos,
+  };
+}
+
+/** Read a channel's stored cursor, or null when it's at a clean pass boundary. */
+function cursorOf(channel: {
+  schedulePassSeed: number;
+  schedulePassIndex: number;
+  schedulePassPos: number;
+}): ScheduleCursor | null {
+  // pos 0 with no pass history = nothing partial to resume; let the builder seed fresh.
+  if (channel.schedulePassPos === 0 && channel.schedulePassIndex === 0) return null;
+  return {
+    passSeed: channel.schedulePassSeed >>> 0,
+    passIndex: channel.schedulePassIndex,
+    pos: channel.schedulePassPos,
+  };
+}
+
 /**
- * Build the channel's whole lineup fresh from `now` and replace the timeline. Use
- * after the filter/pool changes (it necessarily disturbs what's on now). For a
- * channel that's just running low, prefer {@link extendChannelSchedule}.
+ * Build the channel's lineup fresh from `now` and replace the timeline. Use after the
+ * filter/pool changes (it necessarily disturbs what's on now). For a channel that's
+ * just running low, prefer {@link extendChannelSchedule}.
+ *
+ * **Default: a FULL build** — one complete pass of the pool (every item scheduled),
+ * looping to the 7-day floor for short pools. That's what the admin's "Generate
+ * schedule" action wants after a filter edit.
+ *
+ * **`windowSeconds`: a capped build** — stop at roughly that much, breaking mid-pass if
+ * needed, and record a cursor so `extend` carries on from that exact item. Use it to
+ * make a new channel watchable immediately (see {@link INITIAL_WINDOW_SECONDS}) without
+ * paying for a 300-day pass up front.
  */
 export async function generateChannelSchedule(
   prisma: PrismaClient,
   channelId: string,
-  opts: { from?: Date; minDurationSeconds?: number } = {},
+  opts: { from?: Date; minDurationSeconds?: number; windowSeconds?: number } = {},
 ): Promise<ScheduleSummary> {
   const channel = await prisma.channel.findUnique({ where: { id: channelId } });
   if (!channel) throw new Error("Channel not found");
@@ -116,13 +162,22 @@ export async function generateChannelSchedule(
   const itemIds = await upsertPoolItems(prisma, channel.mediaSourceId, pool);
   const globalBumper = await getGlobalBumperConfig(prisma);
   const plan = resolveBumperPlan(globalBumper, channel);
-  const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, from, min, plan);
+  // A full rebuild always starts a brand-new pass sequence — no resume.
+  const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, from, min, plan, {
+    maxDurationSeconds: opts.windowSeconds,
+  });
 
   await prisma.$transaction([
     prisma.scheduleItem.deleteMany({ where: { channelId } }),
     prisma.scheduleItem.createMany({ data: toRows(channelId, build, itemIds) }),
-    // Stamp the config rev this full rebuild used, so Bumper Sync sees it as current.
-    prisma.channel.update({ where: { id: channelId }, data: { bumperRev: globalBumper.rev } }),
+    prisma.channel.update({
+      where: { id: channelId },
+      data: {
+        // Stamp the config rev this full rebuild used, so Bumper Sync sees it as current.
+        bumperRev: globalBumper.rev,
+        ...cursorData(build.cursor),
+      },
+    }),
   ]);
 
   return summarize(channelId, pool.length, build, from);
@@ -144,7 +199,13 @@ export type ExtendResult = {
 export async function extendChannelSchedule(
   prisma: PrismaClient,
   channelId: string,
-  opts: { minDurationSeconds?: number; thresholdSeconds?: number; force?: boolean } = {},
+  opts: {
+    minDurationSeconds?: number;
+    thresholdSeconds?: number;
+    force?: boolean;
+    /** Cap this append too (mid-pass), continuing the stored cursor. */
+    windowSeconds?: number;
+  } = {},
 ): Promise<ExtendResult> {
   const channel = await prisma.channel.findUnique({ where: { id: channelId } });
   if (!channel) throw new Error("Channel not found");
@@ -172,12 +233,20 @@ export async function extendChannelSchedule(
   // Extend appends a fresh tail under current settings but leaves the (possibly older)
   // head in place, so it deliberately does NOT re-stamp bumperRev — Bumper Sync still
   // sees a settings-changed channel as stale and does the full rebuild.
-  const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, tailEnd, min, plan);
+  //
+  // Resume mid-pass when the previous build was windowed, so a capped channel walks
+  // THROUGH its pool instead of replaying the top of it (which for IN_ORDER/BY_AIR_DATE
+  // — where every pass is the same order — would loop the first N hours forever).
+  const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, tailEnd, min, plan, {
+    maxDurationSeconds: opts.windowSeconds,
+    resumeFrom: cursorOf(channel),
+  });
 
   const pruneBefore = new Date(now.getTime() - HISTORY_KEEP_SECONDS * 1000);
   await prisma.$transaction([
     prisma.scheduleItem.deleteMany({ where: { channelId, startsAt: { lt: pruneBefore } } }),
     prisma.scheduleItem.createMany({ data: toRows(channelId, build, itemIds) }),
+    prisma.channel.update({ where: { id: channelId }, data: cursorData(build.cursor) }),
   ]);
 
   const newLast = build.entries[build.entries.length - 1];
@@ -215,7 +284,7 @@ export type RepairResult = {
 export async function repairChannelSchedule(
   prisma: PrismaClient,
   channelId: string,
-  opts: { now?: Date; minDurationSeconds?: number } = {},
+  opts: { now?: Date; minDurationSeconds?: number; windowSeconds?: number } = {},
 ): Promise<RepairResult> {
   const channel = await prisma.channel.findUnique({ where: { id: channelId } });
   if (!channel) throw new Error("Channel not found");
@@ -255,11 +324,16 @@ export async function repairChannelSchedule(
   const itemIds = await upsertPoolItems(prisma, channel.mediaSourceId, pool);
   const globalBumper = await getGlobalBumperConfig(prisma);
   const plan = resolveBumperPlan(globalBumper, channel);
-  const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, from, min, plan);
+  // Repair re-flows the tail as a fresh pass (no resume — the pool just changed under us),
+  // so it re-seeds the cursor rather than continuing the old one.
+  const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, from, min, plan, {
+    maxDurationSeconds: opts.windowSeconds,
+  });
 
   await prisma.$transaction([
     prisma.scheduleItem.deleteMany({ where: { channelId, startsAt: { gte: from } } }),
     prisma.scheduleItem.createMany({ data: toRows(channelId, build, itemIds) }),
+    prisma.channel.update({ where: { id: channelId }, data: cursorData(build.cursor) }),
   ]);
 
   return { repaired: build.entries.length > 0, replaced, added: build.entries.length, from };

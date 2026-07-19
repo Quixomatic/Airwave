@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.20] - 2026-07-19
+
+### Added
+
+- **Windowed schedule builds — a new channel becomes watchable in seconds instead of waiting on a full pass.** `buildSchedule` gained an optional **window cap** (`maxDurationSeconds`): instead of always laying one *complete* pass of the pool — for a 2,800-episode channel that's a ~300-day timeline and far too slow to run inline — a windowed build stops at roughly the requested duration, **breaking mid-pass** to do it. Because that leaves a pass half-finished, a build now also returns a **`ScheduleCursor`** (`passSeed` / `passIndex` / `pos`) persisted on the channel, and `extendChannelSchedule` **resumes from it** — so a capped channel walks *through* its pool rather than replaying the top of it. That mattered most for `IN_ORDER` / `BY_AIR_DATE` channels, where every pass is the same order: without the cursor they'd have looped their first N hours forever and never reached episode 50. Running off the end of a pass rolls cleanly into a brand-new pass from 0 (reshuffled for `SHUFFLE`), and a stale cursor — the pool shrank because the filter was edited — rolls to a fresh pass rather than wedging. `schedulePassSeed` is stored **signed** (`| 0`), since Postgres `Int` is signed 32-bit and the seed is an unsigned hash.
+- **`scripts/sim-schedule-window.ts`** — harness covering the tricky cases (mid-pass truncation, resume without repeats or gaps, pass rollover, stale cursor) against synthetic pools, so the engine can be checked without Plex or the DB.
+
+### Changed
+
+- **Schedule Backfill builds windowed (~12h) and in bigger batches (10 → 25).** A cheap windowed build means the whole lineup gets a timeline in a run or two instead of ten channels every ten minutes; the hourly Schedule Refresh grows each one from its stored cursor. **A full build is still the default everywhere else** — editing a filter and hitting *Generate schedule* rebuilds the entire timeline exactly as before.
+
+_(Schema change — requires `pnpm db:push` + `pnpm db:generate`; backend needs a restart.)_
+
 ## [0.5.19] - 2026-07-19
 
 ### Changed

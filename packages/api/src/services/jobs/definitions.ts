@@ -8,6 +8,7 @@ import { syncRecentlyAdded } from "../media/sync-recent";
 import { getPlexUser, stopTranscode } from "../plex/client";
 import { syncLibraries } from "../plex/sync-libraries";
 import {
+  INITIAL_WINDOW_SECONDS,
   extendChannelSchedule,
   generateChannelSchedule,
   repairChannelSchedule,
@@ -118,7 +119,11 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
     // Idles once every channel has a schedule; picks up newly-generated channels.
     defaultCron: "0 */10 * * * *",
     run: async (signal, ctx) => {
-      const BATCH = 10;
+      // Bigger batch than before: a WINDOWED build (~12h) is cheap, where a full build
+      // lays a channel's entire pool — for a big channel that's a ~300-day pass and
+      // minutes of work. `schedule-refresh` grows these from the stored cursor, so the
+      // whole lineup becomes watchable fast instead of 10 channels per 10 minutes.
+      const BATCH = 25;
       const channels = await prisma.channel.findMany({
         where: { enabled: true, scheduleItems: { none: {} } },
         select: { id: true, name: true },
@@ -129,7 +134,9 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
         throwIfAborted(signal);
         ctx.progress({ current: i, total: channels.length, label: channels[i]!.name });
         try {
-          await generateChannelSchedule(prisma, channels[i]!.id);
+          await generateChannelSchedule(prisma, channels[i]!.id, {
+            windowSeconds: INITIAL_WINDOW_SECONDS,
+          });
         } catch (err) {
           console.warn(`[jobs] schedule-backfill failed for "${channels[i]!.name}":`, err);
         }

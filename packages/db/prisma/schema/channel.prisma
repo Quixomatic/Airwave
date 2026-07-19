@@ -80,6 +80,17 @@ model Channel {
   // those can be listed + cleanly reverted via `clear_ai_generated`.
   aiGenerated Boolean @default(false)
 
+  // Where the rolling schedule build left off, so a WINDOWED build (a cheap 12h head
+  // start instead of a full 300-day pass) can be continued mid-pass by `extend` instead
+  // of restarting the pool from the top. A full `generateChannelSchedule` resets these.
+  // `schedulePassSeed` pins the in-progress pass's seed — the builder normally folds
+  // `startAt` into the seed, so without pinning it a resumed build would reshuffle
+  // mid-pass. Stored SIGNED (`| 0`): Postgres Int is signed 32-bit and the seed is an
+  // unsigned hash; the PRNG re-normalizes with `>>> 0` at use.
+  schedulePassSeed  Int @default(0)
+  schedulePassIndex Int @default(0)
+  schedulePassPos   Int @default(0)
+
   // Thin per-channel bumper override; the global BumperConfig owns the content.
   bumperMode BumperMode @default(INHERIT)
   // The BumperConfig.rev this channel's schedule was last built under; Bumper Sync
