@@ -17,6 +17,7 @@ import { logger } from "hono/logger";
 
 import { restApi } from "./rest";
 import { tvAuthApi } from "./tv-auth";
+import { startWorkflowEngine } from "./workflow-engine";
 
 const app = new Hono();
 
@@ -177,6 +178,15 @@ try {
   await startJobs();
 } catch (err) {
   console.error("Job scheduler startup failed:", err);
+}
+
+// Durable workflow engine for the AI lineup build (§7.3a). Independent of the job
+// scheduler above — both run in-process against the same Postgres, in different schemas.
+// Opt-in via WORKFLOW_ENABLED=1; a failure here must never stop the server booting.
+try {
+  await startWorkflowEngine();
+} catch (err) {
+  console.error("Workflow engine startup failed:", err);
 }
 
 // Bun's default idleTimeout is 10s, which kills long streaming responses — an AI chat turn (extended

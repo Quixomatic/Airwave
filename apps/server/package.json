@@ -1,14 +1,15 @@
 {
   "name": "server",
-  "version": "0.5.21",
+  "version": "0.5.22",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "build": "tsdown",
+    "build": "workflow build && tsdown",
     "check-types": "tsc -b",
     "compile": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile server",
-    "dev": "bun run --hot src/index.ts",
-    "start": "bun run dist/index.mjs"
+    "dev": "workflow build && bun run --hot src/index.ts",
+    "start": "bun run dist/index.mjs",
+    "workflow:build": "workflow build"
   },
   "dependencies": {
     "@ChannelGuide/api": "workspace:*",

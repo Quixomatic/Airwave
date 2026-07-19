@@ -10,6 +10,7 @@ import {
   updateConnection,
 } from "../services/agent/config";
 import { deleteConversation, getConversationMessages, listConversations } from "../services/agent/conversations";
+import { isLineupRunnerAvailable, requireLineupRunner } from "../services/agent/lineup-runner";
 
 const connectionInput = z.object({
   name: z.string().min(1),
@@ -35,6 +36,40 @@ export const aiRouter = router({
 
   /** A cheap round-trip that proves the connection's model actually responds. */
   test: adminProcedure.input(z.object({ id: z.string() })).mutation(({ ctx, input }) => testConnection(ctx.prisma, input.id)),
+
+  // --- the durable lineup workflow (§7.3a) ---
+  // These delegate to a runner the SERVER registers at startup — the workflow itself
+  // lives in apps/server/workflows and packages/api can't import it. See lineup-runner.ts.
+
+  /** Whether the workflow engine is wired up, so the UI can hide the action if not. */
+  lineupAvailable: adminProcedure.query(() => ({ available: isLineupRunnerAvailable() })),
+
+  /**
+   * Kick off a full AI lineup build. Returns immediately with a runId — the run outlives
+   * this request and survives a server restart. DESTRUCTIVE on re-run: it wipes existing
+   * `aiGenerated` rows, so the caller must confirm first (§5).
+   */
+  buildLineup: adminProcedure
+    .input(
+      z.object({
+        sourceId: z.string(),
+        mode: z.enum(["quality", "fast"]).optional(),
+        limit: z.number().int().positive().optional(),
+      }),
+    )
+    .mutation(({ input }) => requireLineupRunner().start(input)),
+
+  /** Poll a run's status/progress. `running` covers "suspended between steps" too. */
+  lineupRun: adminProcedure
+    .input(z.object({ runId: z.string() }))
+    .query(({ input }) => requireLineupRunner().status(input.runId)),
+
+  cancelLineupRun: adminProcedure
+    .input(z.object({ runId: z.string() }))
+    .mutation(async ({ input }) => {
+      await requireLineupRunner().cancel(input.runId);
+      return { cancelled: true };
+    }),
 
   // --- chat history ---
   conversations: adminProcedure.query(({ ctx }) => listConversations(ctx.prisma, ctx.session.user.id)),

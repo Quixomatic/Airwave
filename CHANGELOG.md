@@ -2,6 +2,27 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.22] - 2026-07-19
+
+### Added
+
+- **The AI lineup workflow is wired into the server (§7.3a Phase 1 — skeleton).** The durable engine proven in 0.5.21 now starts with the app: `startWorkflowEngine()` boots alongside `startJobs()`, runs the queue poller, and registers a runner the admin API can drive. The workflow itself (`apps/server/workflows/lineup.ts`) lays out the real shape — **analyze → plan → build → report** — as four independently checkpointed steps, each with its final signature (`LibraryProfile`, `LineupPlan`, `PlannedChannel`, `LineupReport`); the bodies are stubs that Phases 2–4 fill in. Verified end-to-end: a run starts, every step executes in order, the status poll goes `running` → `completed`, and the report comes back as the workflow's return value.
+- **Admin API for the workflow** — `ai.buildLineup` (start a run, returns a `runId` immediately), `ai.lineupRun` (poll status + report), `ai.cancelLineupRun`, and `ai.lineupAvailable` so the UI can hide the action when the engine is off. The workflow must live in `apps/server` (the SDK's CLI scans `./workflows`) while the tRPC surface lives in `packages/api`, which can't import from an app — so the server **registers** a runner at startup and the router looks it up (`services/agent/lineup-runner.ts`). Dependency direction stays correct and `packages/api` never has to know the workflow SDK exists.
+- **`scripts/run-lineup.ts`** — drives a full run from the CLI on its own ports (so it won't collide with a dev server), for developing Phases 2–4 without the admin UI.
+
+### Changed
+
+- **`pnpm dev` and `pnpm build` now run `workflow build` first**, since the `"use workflow"` directives are a build-time transform. Turbo's `build` outputs gained `.well-known/**` — otherwise a cache hit would restore a build with no handlers and every run would 404 on dispatch. Note `bun --hot` will **not** re-run the transform: after editing anything in `workflows/`, re-run `bunx workflow build`.
+
+### Security
+
+- **The workflow handlers are bound to `127.0.0.1` on their own listener** (`WORKFLOW_LOCAL_PORT`, default 3152) and are deliberately **not** mounted on the public Hono app. They execute workflow steps and have no auth — on Vercel they'd ride queue-consumer security, which self-hosting doesn't provide. They're machine-to-machine (our own worker calling back over loopback), so there's no user or session to authenticate and better-auth doesn't apply; the control is that they're unreachable off-box, the same posture as Postgres on :5433. This needs revisiting if the worker ever runs on a different host or the port is published in Docker.
+
+### Notes
+
+- Engine is **opt-in**: set `WORKFLOW_ENABLED=1` (plus `WORKFLOW_TARGET_WORLD` / `WORKFLOW_POSTGRES_URL`). Without it the server boots exactly as before and the API reports the runner as unavailable. Handler bundles are imported lazily, so a fresh checkout that hasn't run `workflow build` still starts.
+- Still a skeleton — running it creates **no channels or packages**. _(Server — needs a restart.)_
+
 ## [0.5.21] - 2026-07-19
 
 ### Added
