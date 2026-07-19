@@ -57,7 +57,9 @@ export const aiRouter = router({
         limit: z.number().int().positive().optional(),
       }),
     )
-    .mutation(({ input }) => requireLineupRunner().start(input)),
+    .mutation(({ ctx, input }) =>
+      requireLineupRunner().start({ ...input, userId: ctx.session.user.id }),
+    ),
 
   /** Poll a run's status/progress. `running` covers "suspended between steps" too. */
   lineupRun: adminProcedure

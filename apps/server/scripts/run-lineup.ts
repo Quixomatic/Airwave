@@ -44,9 +44,18 @@ process.env.WORKFLOW_LOCAL_BASE_URL = `http://127.0.0.1:${devPort}`;
 
 await startWorkflowEngine();
 
+// Channels record who created them; from the CLI, attribute to the seeded admin.
+const admin = await prisma.user.findFirst({
+  where: { role: "admin" },
+  orderBy: { createdAt: "asc" },
+  select: { id: true },
+});
+if (!admin) throw new Error("No admin user found.");
+
 const limit = value("--limit");
 const { runId } = await requireLineupRunner().start({
   sourceId,
+  userId: admin.id,
   mode: flag("--fast") ? "fast" : "quality",
   ...(limit ? { limit: Number(limit) } : {}),
 });

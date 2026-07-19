@@ -2,6 +2,23 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.25] - 2026-07-19
+
+### Added
+
+- **The AI lineup workflow now actually builds channels (§7.3a Phase 4 — no more stubs).** Each planned channel gets its own **grounded agent** that turns a plain-language theme into a verified Plex filter: it lists the filterable fields, discovers the library's **real tag values** (never guessing one it hasn't seen), previews candidate filters to check what they actually match, and only then commits. If nothing sensible matches it calls `give_up` with a reason rather than creating an empty channel, and a pool under 5 items is refused outright. Every created channel is stamped `aiGenerated`, attached to its planned package, given its plan-assigned number — and immediately gets a **windowed initial schedule** (v0.5.20) so the lineup is watchable the moment the run finishes. Builds fan out **6 at a time**, each its own durable step, so a crash resumes only the unfinished channels. Verified against a real library: 10 packages and 9 channels created with working schedules (the rest of the run hit an API credit limit), **all 135 preset channels untouched**.
+- **The planner now picks icons, and packages get palette accents.** Channel and package concepts include an `icon` from the **lucide** or **phosphor** sets (`lucide:Rocket`, `phosphor:FilmSlate`) chosen to actually evoke the channel, plus an optional broadcast-style **callsign**. Package accents come from the model out of the **16-swatch palette**; **channel** accents come from the existing `channelAccentAt` variance cycle — the same 1–3-channel run-length mechanism the preset generator uses — so the guide gets organic colour banding instead of a rigid rotation, and the counter runs across the whole lineup rather than resetting per package.
+- **Re-runs wipe the previous AI lineup first**, scoped strictly to `aiGenerated` rows — manual channels and the preset generator's `generated` rows are never touched.
+
+### Fixed
+
+- **Channel builds are now idempotent.** A durable step that fails anywhere is retried **from the top**, so a step that had already created its channel hit `Unique constraint failed on the fields: (number)` on the retry and reported the channel as skipped even though it existed. The builder now checks for an existing channel at its plan-assigned number before doing any work (and treats a unique-violation on commit as success), so a retry is a no-op instead of a failure. It also refuses to touch a channel at that number that isn't AI-generated.
+
+### Notes
+
+- A full 50-channel run is a real number of LLM calls — it will exhaust a low API credit balance partway through. Failed channels are reported individually in the run report; re-running rebuilds cleanly.
+- Running `scripts/run-lineup.ts` while the dev server is up means **two workers share one queue**, so steps may execute in either process. Harmless now that steps are idempotent, but the logs will be split.
+
 ## [0.5.24] - 2026-07-19
 
 ### Added

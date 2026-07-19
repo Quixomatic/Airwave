@@ -23,8 +23,22 @@ import type { PrismaClient } from "@ChannelGuide/db";
 import { generateObject } from "ai";
 import { z } from "zod";
 
+import { ACCENT_KEYS, channelAccentAt } from "../accents";
 import { getActiveConnection, getModel } from "./config";
 import { type LibraryProfile, formatLibraryProfile } from "./library-profile";
+
+/**
+ * The appearance vocabulary the model may choose from. Accents are a CLOSED set (the
+ * 16-swatch palette — anything else is coerced to a fallback by `toAccentKey`, so an
+ * invented colour silently degrades). Icons are open-ended by necessity — both sets have
+ * thousands of names — so the schema documents the format and the prompt gives worked
+ * examples; a bad icon name renders as a blank tile rather than breaking anything.
+ */
+const accentSchema = z.enum(ACCENT_KEYS);
+const iconDescription =
+  'Icon as "lucide:Name" or "phosphor:Name", PascalCase, from the lucide or phosphor icon sets. ' +
+  'e.g. "lucide:Tv", "lucide:Rocket", "lucide:Ghost", "lucide:Swords", "lucide:Baby", ' +
+  '"phosphor:Television", "phosphor:FilmSlate", "phosphor:PopcornBox".';
 
 /** AI channels live at 1001+, leaving 1-999 to presets/manual channels. */
 export const AI_NUMBER_BASE = 1000;
@@ -51,12 +65,21 @@ const plannedChannelSchema = z.object({
   ordering: z
     .enum(["SHUFFLE", "IN_ORDER", "BY_AIR_DATE"])
     .describe("SHUFFLE for most channels; IN_ORDER/BY_AIR_DATE for a channel meant to be watched in sequence."),
+  callsign: z
+    .string()
+    .max(6)
+    .optional()
+    .describe("Short broadcast-style callsign, uppercase, <=6 chars. e.g. 'TOONS', 'BOND', 'KAIJU'."),
+  icon: z.string().describe(iconDescription),
+  // NO channel accent here on purpose — see `channelAccentAt` in assignAppearance below.
 });
 
 const plannedPackageSchema = z.object({
   key: z.string().describe("Stable kebab-case slug for the package."),
   name: z.string().describe("Short package name shown in the guide sidebar."),
   description: z.string(),
+  icon: z.string().describe(iconDescription),
+  accent: accentSchema.describe("Accent colour key for the package as a whole."),
   channels: z.array(plannedChannelSchema).min(1),
 });
 
@@ -64,7 +87,11 @@ const planSchema = z.object({
   packages: z.array(plannedPackageSchema).min(1),
 });
 
-export type PlannedChannel = z.infer<typeof plannedChannelSchema> & { number: number };
+export type PlannedChannel = z.infer<typeof plannedChannelSchema> & {
+  number: number;
+  /** From the palette variance cycle, not the model — see `assignNumbers`. */
+  accent: string;
+};
 export type PlannedPackage = Omit<z.infer<typeof plannedPackageSchema>, "channels"> & {
   numberBase: number;
   channels: PlannedChannel[];
@@ -86,7 +113,11 @@ CONSTRAINTS:
 - Genre/studio names in the profile are Plex's OWN tag vocabulary, warts and all. It mixes movie-style and TV-style tags ("Science Fiction" vs "Sci-Fi & Fantasy", "Action/Adventure"), and things like anime are often tagged only "Animation". Work with the tags as they actually are.
 - A show's episode count tells you how much runtime it can sustain. A channel built on one 20-episode show will repeat constantly; one built on 500+ episodes can run forever.
 - Do NOT write Plex filter syntax. Describe the intent in \`theme\` — a later agent builds and verifies the actual filter.
-- Give every channel and package a unique kebab-case \`key\`.`;
+- Give every channel and package a unique kebab-case \`key\`.
+
+APPEARANCE:
+- Every channel and every package needs an \`icon\`. Pick one that genuinely evokes it — a Bond channel is not a generic TV set. Icons come from the **lucide** and **phosphor** sets, written \`lucide:Name\` / \`phosphor:Name\` in PascalCase.
+- Packages also need an \`accent\` from the 16 palette keys. Channels do NOT — their colours are assigned by a palette cycle that produces deliberate variance across the guide.`;
 
 export type PlanOptions = {
   /** Rough number of channels to aim for across the whole lineup. */
@@ -103,13 +134,25 @@ const DEFAULT_TARGET_CHANNELS = 50;
  * guide with headroom to add more later without renumbering.
  */
 function assignNumbers(packages: z.infer<typeof planSchema>["packages"]): LineupPlan {
+  // Channel accents come from the palette VARIANCE CYCLE, not the model — the same
+  // mechanism the preset generator uses (`channelAccentAt`). It walks runs of 1-3
+  // channels per colour, so the guide gets organic little bands instead of either a
+  // rigid every-one-different rotation or long single-colour stretches. The counter runs
+  // across the WHOLE lineup so the pattern carries over package boundaries too, and a
+  // channel is free to differ from the package it sits in.
+  let channelIndex = 0;
+
   return {
     packages: packages.map((pkg, pkgIndex) => {
       const numberBase = AI_NUMBER_BASE + pkgIndex * PACKAGE_BLOCK_SIZE;
       return {
         ...pkg,
         numberBase,
-        channels: pkg.channels.map((channel, i) => ({ ...channel, number: numberBase + i + 1 })),
+        channels: pkg.channels.map((channel, i) => ({
+          ...channel,
+          number: numberBase + i + 1,
+          accent: channelAccentAt(channelIndex++),
+        })),
       };
     }),
   };

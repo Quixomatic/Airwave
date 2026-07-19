@@ -16,6 +16,8 @@
 export type LineupRunArgs = {
   /** Which media source to build the lineup from. */
   sourceId: string;
+  /** Admin who triggered the run — recorded as each channel's `createdById`. */
+  userId: string;
   /** Best-quality per-channel agent loop (default) vs the cheap deterministic path. */
   mode?: "quality" | "fast";
   /** Cap the run for testing — build at most this many channels. */
