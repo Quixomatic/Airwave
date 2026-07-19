@@ -137,10 +137,22 @@ export async function runAgentChat(
   // Save the incoming turn up front (safety net if the stream never finishes).
   await persistConversation(prisma, conversationId, userId, messages).catch((e) => console.error("chat persist (pre)", e));
 
+  const modelMessages = await convertToModelMessages(stripReasoning(healDanglingToolCalls(messages)));
+  // Prompt-cache the whole prefix (system + tools + prior turns). A channel-building chat grows fast —
+  // preview_filter alone returns dozens of entries per call — and can hit 100k+ tokens; without caching
+  // EVERY turn re-ships all of it uncached to Anthropic, and that per-turn reprocessing latency is what
+  // makes a big chat feel "hung" (and occasionally lets a slow turn abort mid-reasoning). A cache
+  // breakpoint on the last message caches everything before it; the next turn reuses that prefix and only
+  // the new delta is processed fresh. Namespaced to anthropic → a no-op for other providers.
+  const lastModelMsg = modelMessages[modelMessages.length - 1] as { providerOptions?: Record<string, unknown> } | undefined;
+  if (lastModelMsg) {
+    lastModelMsg.providerOptions = { ...(lastModelMsg.providerOptions ?? {}), anthropic: { cacheControl: { type: "ephemeral" } } };
+  }
+
   const result = streamText({
     model,
     system: SYSTEM,
-    messages: await convertToModelMessages(stripReasoning(healDanglingToolCalls(messages))),
+    messages: modelMessages,
     tools: buildAgentTools(prisma, userId),
     // Generous headroom: an exploration/build turn can chain many discovery + preview tool calls.
     // Hitting the cap mid-tool-loop ends the turn with no final text (looks like "no response").

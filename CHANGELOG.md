@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.13] - 2026-07-19
+
+### Fixed
+
+- **Long AI chats no longer feel "hung" — prompt caching.** A channel-building conversation grows fast (each `preview_filter` returns dozens of show/movie entries) and was hitting **120k+ tokens re-sent to Anthropic *uncached* on every turn** — tens of seconds of reprocessing latency per reply, which read as the assistant hanging (and gave a slow turn more room to abort mid-reasoning). The chat now sets an Anthropic **`cacheControl: ephemeral`** breakpoint on the conversation prefix (system + tools + prior turns), so each turn reuses the cached prefix and only the new delta is processed fresh. Measured on a real 120k-token chat: a follow-up turn went from ~120k uncached input tokens to **~30k fresh + ~220k served from cache** — much faster and ~10× cheaper on the cached tokens. Namespaced to Anthropic, so it's a no-op for other providers. _(Backend — needs a restart.)_
+
 ## [0.5.12] - 2026-07-18
 
 ### Fixed
