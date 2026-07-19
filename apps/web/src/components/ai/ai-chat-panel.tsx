@@ -4,7 +4,7 @@ import { Button } from "@ChannelGuide/ui/components/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@ChannelGuide/ui/components/select";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { DefaultChatTransport, type UIMessage } from "ai";
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses, type UIMessage } from "ai";
 import { History, Loader2, MessageSquarePlus, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -155,7 +155,15 @@ function Thread({
   onActivity: () => void;
 }) {
   const transport = useMemo(() => new DefaultChatTransport({ api: `${serverBase()}/api/ai/chat`, credentials: "include" }), []);
-  const { messages, sendMessage, status, addToolApprovalResponse } = useChat({ id: conversationId, messages: initialMessages, transport });
+  // `sendAutomaticallyWhen` is REQUIRED for tool approvals: without it `addToolApprovalResponse` only
+  // records the decision locally (card sticks on "Working") and never POSTs the resume request that
+  // executes the approved tool. This predicate fires once the last assistant turn's approvals are answered.
+  const { messages, sendMessage, status, addToolApprovalResponse } = useChat({
+    id: conversationId,
+    messages: initialMessages,
+    transport,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+  });
 
   // Refresh the history list (titles / order) when a turn settles.
   useEffect(() => {
@@ -214,21 +222,22 @@ function Thread({
                           <ToolHeader type={name} state={p.state} />
                           <ToolContent>
                             <ToolInput input={p.input} />
-                            {awaiting && p.approval && (
-                              <div className="flex items-center justify-between gap-2 border-t p-2">
-                                <span className="text-muted-foreground text-xs">Apply this change?</span>
-                                <div className="flex gap-1">
-                                  <Button size="sm" variant="outline" onClick={() => void addToolApprovalResponse({ id: p.approval!.id, approved: false })}>
-                                    Deny
-                                  </Button>
-                                  <Button size="sm" onClick={() => void addToolApprovalResponse({ id: p.approval!.id, approved: true })}>
-                                    Approve
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
                             <ToolOutput output={p.output} errorText={p.errorText} />
                           </ToolContent>
+                          {/* Approval footer lives OUTSIDE the collapsible so it's always visible, collapsed or not. */}
+                          {awaiting && p.approval && (
+                            <div className="flex items-center justify-between gap-2 border-t p-2">
+                              <span className="text-muted-foreground text-xs">Apply this change?</span>
+                              <div className="flex gap-1">
+                                <Button size="sm" variant="outline" onClick={() => void addToolApprovalResponse({ id: p.approval!.id, approved: false })}>
+                                  Deny
+                                </Button>
+                                <Button size="sm" onClick={() => void addToolApprovalResponse({ id: p.approval!.id, approved: true })}>
+                                  Approve
+                                </Button>
+                              </div>
+                            </div>
+                          )}
                         </Tool>
                       );
                     }

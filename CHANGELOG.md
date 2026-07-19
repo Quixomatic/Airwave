@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.12] - 2026-07-18
+
+### Fixed
+
+- **The AI assistant now survives real conversations — tool approvals, resume, and persistence hardened.** Approving a write (create/update/delete channel or package) was **stuck on "Working" forever and never hit the server**: `useChat` needs `sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses` to actually POST the approval-resume — without it `addToolApprovalResponse` only records the decision locally. Added it, so an approved tool now runs, streams its result, and the card completes. Also fixed three ways a chat could **silently stop responding**: (1) a crashed/abandoned tool approval left a dangling tool call that bricked every later turn with `MissingToolResultsError` — a new `healDanglingToolCalls` guard closes out any resultless tool call the user has moved past (injecting a "not applied" result) while leaving a live approval alone; (2) interrupted turns persisted broken `streaming`/unsigned reasoning blocks that Anthropic rejected as "unsupported reasoning metadata" and that poisoned subsequent requests — reasoning fed back to the model is now sanitized to keep only complete, **signed** thinking blocks (which the approval-resume genuinely needs) and drop the rest; (3) the tool-call card crashed the whole panel (`Cannot read properties of undefined (reading 'icon')`) on the `approval-responded` state, now mapped with a catch-all fallback. Raised the per-turn tool-step cap 16 → 40 so long discovery/build loops don't end without a reply, and the **Approve / Deny** buttons now show on the collapsed tool card (persistent footer) instead of only when expanded.
+
 ## [0.5.11] - 2026-07-18
 
 ### Fixed

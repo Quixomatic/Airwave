@@ -39,6 +39,64 @@ const firstUserText = (messages: UIMessage[]): string | null => {
 };
 
 /**
+ * Sanitize reasoning parts in the model INPUT — drop only the BROKEN ones, keep the valid signed ones.
+ *
+ * Why not strip all reasoning? Anthropic's extended thinking + tool use requires the signed thinking
+ * block to REMAIN on the assistant turn whose tool call is being resumed (our approval flow: the admin
+ * approves a write, and the resume request replays that turn). Strip it and Anthropic rejects the
+ * request ("expected thinking, found tool_use") — the tool never runs and the card sticks on "Working".
+ *
+ * But an INTERRUPTED turn persists a `state:"streaming"` reasoning part with no signature, and a
+ * client round-trip can drop the signature off a done one. Those unsigned parts trigger the
+ * "unsupported reasoning metadata" warning and poison every later request. So the rule is: keep a
+ * reasoning part only if it's `done` AND still carries its provider signature; drop the rest. Reasoning
+ * stays in the DB + UI for display regardless — this only affects what we feed back to the model.
+ */
+function stripReasoning(messages: UIMessage[]): UIMessage[] {
+  const signed = (p: { providerMetadata?: Record<string, { signature?: string } | undefined> }) =>
+    Object.values(p.providerMetadata ?? {}).some((v) => !!v?.signature);
+  return messages.map((m) => ({
+    ...m,
+    parts: m.parts.filter((p) => p.type !== "reasoning" || (p.state === "done" && signed(p as never))),
+  }));
+}
+
+const isToolPart = (t: string) => t.startsWith("tool-") || t === "dynamic-tool";
+
+/**
+ * Heal DANGLING tool calls — a write tool that was proposed/approved but whose turn crashed (or was
+ * abandoned) before a result landed. Such a call has no output and no resolvable approval pairing, so
+ * `convertToModelMessages` throws `MissingToolResultsError` and the whole conversation is bricked: every
+ * later send fails, forever.
+ *
+ * We inject a synthetic "not applied" result for any resultless tool call that the user has already
+ * moved PAST (i.e. a user message exists after that assistant turn) — that turn can never be resumed, so
+ * closing it out makes the sequence valid again and the model simply sees the change didn't happen and
+ * can re-propose it. A tool call in the FINAL assistant turn (no trailing user message) is left alone —
+ * that's a live approval the admin is about to approve/deny, which the SDK resumes normally.
+ */
+function healDanglingToolCalls(messages: UIMessage[]): UIMessage[] {
+  let lastUserIdx = -1;
+  messages.forEach((m, i) => {
+    if (m.role === "user") lastUserIdx = i;
+  });
+  return messages.map((m, i) => {
+    if (m.role !== "assistant" || i >= lastUserIdx) return m;
+    let changed = false;
+    const parts = m.parts.map((p) => {
+      if (!isToolPart(p.type)) return p;
+      const tp = p as { state?: string; output?: unknown; errorText?: string; approval?: unknown };
+      const resolved = tp.state === "output-available" || tp.state === "output-error" || tp.output !== undefined || tp.errorText !== undefined;
+      if (resolved) return p;
+      changed = true;
+      const { approval: _approval, ...rest } = tp;
+      return { ...rest, state: "output-available", output: { ok: false, note: "Approval was not completed — no change was applied." } };
+    });
+    return changed ? ({ ...m, parts } as UIMessage) : m;
+  });
+}
+
+/**
  * Persist the WHOLE conversation, upserting each message by its own id. Idempotent, so it's safe to
  * call both before streaming (saves the user turn immediately) and on finish (captures the full
  * multi-step assistant turn — tool calls and all). Keyed on the message's own id (not a fresh cuid)
@@ -82,9 +140,11 @@ export async function runAgentChat(
   const result = streamText({
     model,
     system: SYSTEM,
-    messages: await convertToModelMessages(messages),
+    messages: await convertToModelMessages(stripReasoning(healDanglingToolCalls(messages))),
     tools: buildAgentTools(prisma, userId),
-    stopWhen: stepCountIs(16),
+    // Generous headroom: an exploration/build turn can chain many discovery + preview tool calls.
+    // Hitting the cap mid-tool-loop ends the turn with no final text (looks like "no response").
+    stopWhen: stepCountIs(40),
     onError: ({ error }) => console.error("chat streamText error", error),
   });
 

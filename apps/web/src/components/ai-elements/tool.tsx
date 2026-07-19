@@ -10,7 +10,13 @@ import { cn } from "@/lib/utils";
  * lifecycle (incl. `approval-requested` for write tools awaiting the admin's OK).
  */
 
-export type ToolState = "input-streaming" | "input-available" | "approval-requested" | "output-available" | "output-error";
+export type ToolState =
+  | "input-streaming"
+  | "input-available"
+  | "approval-requested"
+  | "approval-responded"
+  | "output-available"
+  | "output-error";
 
 export type ToolProps = ComponentProps<typeof Collapsible>;
 export function Tool({ className, ...props }: ToolProps) {
@@ -21,12 +27,16 @@ const STATUS: Record<ToolState, { label: string; icon: ReactNode }> = {
   "input-streaming": { label: "Preparing", icon: <CircleIcon className="size-3.5" /> },
   "input-available": { label: "Running", icon: <Loader2Icon className="size-3.5 animate-spin" /> },
   "approval-requested": { label: "Needs approval", icon: <ShieldQuestionIcon className="size-3.5 text-amber-600" /> },
+  "approval-responded": { label: "Working", icon: <Loader2Icon className="size-3.5 animate-spin" /> },
   "output-available": { label: "Done", icon: <CheckCircle2Icon className="size-3.5 text-emerald-600" /> },
   "output-error": { label: "Error", icon: <XCircleIcon className="size-3.5 text-red-600" /> },
 };
 
+// Fallback keeps the panel alive if the AI SDK ever adds another part state we don't map.
+const FALLBACK = { label: "Working", icon: <CircleIcon className="size-3.5" /> };
+
 export function ToolHeader({ type, state, className }: { type: string; state: ToolState; className?: string }) {
-  const s = STATUS[state];
+  const s = STATUS[state] ?? FALLBACK;
   return (
     <CollapsibleTrigger className={cn("flex w-full items-center gap-2 p-2 text-left text-sm", className)}>
       <WrenchIcon className="text-muted-foreground size-3.5 shrink-0" />
