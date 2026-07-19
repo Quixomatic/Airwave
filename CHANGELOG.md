@@ -2,6 +2,20 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.21] - 2026-07-19
+
+### Added
+
+- **Durable workflow engine proven on our stack (§7.3a Phase 0 — the go/no-go spike).** Groundwork for the "analyze the whole library and build every channel with real understanding" arc: Vercel's **Workflow SDK** (`workflow` + `@workflow/world-postgres`, both pinned at `4.3.0`) now runs on **Bun + Hono** against our own Postgres, with **no Nitro and no framework adapter** — `bunx workflow build` emits standalone handlers we host ourselves. The headline result: a workflow ran its first step, the **process was killed mid-flight**, and a brand-new process **resumed and finished it** — replaying the completed step's result from the event log instead of re-running it. That resumability is the whole reason for the dependency: a "build 150 channels" run takes hours and has to survive a restart. Durable state lives in **its own Postgres schemas** (`workflow`, `workflow_drizzle`, `graphile_worker`) with **zero tables in `public`**, and `prisma db push` was verified to leave all 13 of them untouched — so the workflow engine and Prisma share one database safely. Includes `workflows/spike.ts` + `scripts/spike-workflow.ts` (the harness that proves it), and `workflow-plugin.ts` + `bunfig.toml` (the required build-time transform).
+
+### Notes
+
+- **New env vars** (`apps/server/.env`, not committed): `WORKFLOW_TARGET_WORLD=@workflow/world-postgres` and `WORKFLOW_POSTGRES_URL=<DATABASE_URL without the ?schema= query string>` — the query param is forwarded as a Postgres server setting and errors with `unrecognized configuration parameter "schema"`.
+- **One-time setup:** `bunx --package @workflow/world-postgres bootstrap` creates the workflow schemas (idempotent).
+- **A build step now exists:** `bunx workflow build` must run before the server boots and again whenever `workflows/` changes — `bun --hot` will not re-run it. Not yet wired into the dev/build scripts or turbo; that lands with Phase 1.
+- Generated handler bundles (`apps/server/.well-known/`) are ~20MB and gitignored.
+- **Nothing is wired into the running server yet** — this release only proves the engine works and adds the dependencies. No behaviour change.
+
 ## [0.5.20] - 2026-07-19
 
 ### Added

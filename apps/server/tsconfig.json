@@ -9,6 +9,6 @@
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx"
   },
-  "include": ["src", "scripts"],
-  "exclude": ["dist", "capability-media"]
+  "include": ["src", "scripts", "workflows", "types"],
+  "exclude": ["dist", "capability-media", ".well-known"]
 }

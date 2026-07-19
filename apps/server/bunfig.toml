@@ -1,0 +1,4 @@
+# Workflow SDK client-mode transform. REQUIRED: `start()` reads `workflow.workflowId`,
+# which only this transform attaches — without it, starting a run throws
+# `start-invalid-workflow-function`. See workflow-plugin.ts.
+preload = ["./workflow-plugin.ts"]

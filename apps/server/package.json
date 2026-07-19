@@ -1,6 +1,6 @@
 {
   "name": "server",
-  "version": "0.5.20",
+  "version": "0.5.21",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
@@ -17,14 +17,18 @@
     "@ChannelGuide/env": "workspace:*",
     "@hono/trpc-server": "^0.4.2",
     "@trpc/server": "catalog:",
+    "@workflow/world-postgres": "4.3.0",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
     "hono": "catalog:",
+    "workflow": "4.3.0",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@ChannelGuide/config": "workspace:*",
+    "@swc/core": "1.15.3",
     "@types/bun": "catalog:",
+    "@workflow/swc-plugin": "4.1.1",
     "tsdown": "^0.22.3",
     "typescript": "catalog:"
   }

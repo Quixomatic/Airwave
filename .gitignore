@@ -71,3 +71,6 @@ apps/server/capability-media/
 packages/api/src/**/*.js
 packages/api/src/**/*.d.ts
 *.ipk
+
+# Workflow SDK generated handler bundles (bunx workflow build) — 20MB+, rebuilt on every build.
+.well-known/
