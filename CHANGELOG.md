@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.17] - 2026-07-19
+
+### Added
+
+- **Live "Thinking…" indicator in the AI chat.** While the model reasons, the chat now shows an auto-expanding **"Thinking… Ns"** ticker (with the reasoning streaming in) instead of a bare spinner, then collapses to **"Thought for Ns"** when it's done; reasoning loaded from history stays a quiet collapsed "Reasoning". There's also a standalone "Thinking…" bubble for the gap right after you send, before the first token streams back — so a long turn always reads as working, not stuck. Built by upgrading our base-lyra Reasoning AI-Elements component (no upstream registry).
+
 ## [0.5.16] - 2026-07-19
 
 ### Fixed

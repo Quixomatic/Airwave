@@ -22,7 +22,7 @@ import {
   PromptInputTextarea,
   PromptInputTools,
 } from "@/components/ai-elements/prompt-input";
-import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
+import { Reasoning, ReasoningContent, ReasoningTrigger, ThinkingIndicator } from "@/components/ai-elements/reasoning";
 import { Response } from "@/components/ai-elements/response";
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput, type ToolState } from "@/components/ai-elements/tool";
 import { PanelHeaderTitle } from "@/context/panel-header-provider";
@@ -197,11 +197,14 @@ function Thread({
                       ) : null;
                     }
                     if (part.type === "reasoning") {
-                      const text = (part as { text?: string }).text ?? "";
-                      return text ? (
-                        <Reasoning key={i}>
+                      const rp = part as { text?: string; state?: string };
+                      const text = rp.text ?? "";
+                      const streaming = rp.state === "streaming";
+                      // Render while streaming even before the first token, so "Thinking…" shows during a long think.
+                      return text || streaming ? (
+                        <Reasoning key={i} isStreaming={streaming}>
                           <ReasoningTrigger />
-                          <ReasoningContent>{text}</ReasoningContent>
+                          {text ? <ReasoningContent>{text}</ReasoningContent> : null}
                         </Reasoning>
                       ) : null;
                     }
@@ -247,6 +250,12 @@ function Thread({
               </Message>
             );
           })}
+          {/* Pre-first-token gap: request sent, nothing streamed back yet. */}
+          {status === "submitted" && (
+            <Message from="assistant">
+              <ThinkingIndicator />
+            </Message>
+          )}
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
