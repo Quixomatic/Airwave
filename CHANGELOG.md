@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.11] - 2026-07-18
+
+### Fixed
+
+- **AI chat multi-step turns now persist.** A turn that ran tool calls (multiple steps) was lost from history — the assistant's response vanished on reload. Persistence now upserts the **whole conversation by each message's own id** (both up front and on finish), so multi-step / tool turns are captured and the reloaded ids round-trip without duplicating. Added `onError` logging + a `show-ai-history.ts` debug script.
+
+### Changed
+
+- **`preview_filter` / `search_titles` return grouped, artwork-ready results** instead of a flat title list: **shows aggregated with episode counts** + movies, each with a poster path — far more useful for the agent (and the shared shape the admin channel-builder preview will use). The agent's system prompt also now knows the **`title` "is" operator is a Plex substring/contains match** (`title is "Bear"` matches anything containing "Bear").
+
 ## [0.5.10] - 2026-07-18
 
 ### Added

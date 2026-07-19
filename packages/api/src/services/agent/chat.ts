@@ -23,6 +23,10 @@ You have TOOLS to inspect the real library and build channels/packages. Work is 
   count. If a filter returns 0 or looks wrong, refine it — don't create it.
 - Filters are a tree of conditions (field, op, value as a string) combined by and/or groups. TV/show
   filtering uses show-scoped fields; check appliesTo.
+- IMPORTANT — Plex operator semantics: on the "title" field the "is" operator is a SUBSTRING (contains)
+  match, NOT exact: title is "Bear" matches ANY title containing "Bear". So to include a show, use a
+  short distinctive substring (e.g. "Bluey", "Sesame") — but beware over-matching (e.g. "Bear" would also
+  match "Berenstain Bears"), and verify with preview_filter before creating.
 - Writes (create/update/delete channel or package) require the admin's approval — propose them and
   they'll be confirmed. To change one thing (a number, a package, enabled), use update_channel with
   just that field.
@@ -33,6 +37,30 @@ const firstUserText = (messages: UIMessage[]): string | null => {
   const part = m?.parts.find((p) => p.type === "text");
   return part && "text" in part ? (part.text as string) : null;
 };
+
+/**
+ * Persist the WHOLE conversation, upserting each message by its own id. Idempotent, so it's safe to
+ * call both before streaming (saves the user turn immediately) and on finish (captures the full
+ * multi-step assistant turn — tool calls and all). Keyed on the message's own id (not a fresh cuid)
+ * so the reloaded ids round-trip and never duplicate.
+ */
+async function persistConversation(prisma: PrismaClient, conversationId: string, userId: string, messages: UIMessage[]) {
+  await prisma.aiConversation.upsert({
+    where: { id: conversationId },
+    create: { id: conversationId, userId, title: (firstUserText(messages) ?? "New chat").slice(0, 80) },
+    update: { updatedAt: new Date() },
+  });
+  const base = Date.now();
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i]!;
+    const parts = m.parts as unknown as Prisma.InputJsonValue;
+    await prisma.aiMessage.upsert({
+      where: { id: m.id },
+      create: { id: m.id, conversationId, role: m.role, parts, createdAt: new Date(base + i) },
+      update: { role: m.role, parts },
+    });
+  }
+}
 
 export async function runAgentChat(
   prisma: PrismaClient,
@@ -48,19 +76,8 @@ export async function runAgentChat(
   }
 
   const { conversationId, messages } = opts;
-
-  // Ensure the conversation row exists (client-owned id), then persist the incoming user message.
-  await prisma.aiConversation.upsert({
-    where: { id: conversationId },
-    create: { id: conversationId, userId, title: (firstUserText(messages) ?? "New chat").slice(0, 80) },
-    update: {},
-  });
-  const last = messages[messages.length - 1];
-  if (last?.role === "user") {
-    await prisma.aiMessage.create({
-      data: { conversationId, role: "user", parts: last.parts as unknown as Prisma.InputJsonValue },
-    });
-  }
+  // Save the incoming turn up front (safety net if the stream never finishes).
+  await persistConversation(prisma, conversationId, userId, messages).catch((e) => console.error("chat persist (pre)", e));
 
   const result = streamText({
     model,
@@ -68,18 +85,14 @@ export async function runAgentChat(
     messages: await convertToModelMessages(messages),
     tools: buildAgentTools(prisma, userId),
     stopWhen: stepCountIs(16),
+    onError: ({ error }) => console.error("chat streamText error", error),
   });
 
   return result.toUIMessageStreamResponse({
-    onFinish: async ({ responseMessage }) => {
-      try {
-        await prisma.aiMessage.create({
-          data: { conversationId, role: "assistant", parts: responseMessage.parts as unknown as Prisma.InputJsonValue },
-        });
-        await prisma.aiConversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
-      } catch (e) {
-        console.error("Failed to persist assistant message", e);
-      }
+    originalMessages: messages,
+    // `messages` here is the FULL updated list (original + the new assistant turn with tool parts).
+    onFinish: ({ messages: finalMessages }) => {
+      void persistConversation(prisma, conversationId, userId, finalMessages).catch((e) => console.error("chat persist (finish)", e));
     },
   });
 }

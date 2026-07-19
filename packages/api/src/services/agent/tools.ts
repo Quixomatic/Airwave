@@ -2,7 +2,7 @@ import { Prisma, type PrismaClient } from "@ChannelGuide/db";
 
 import { toAccentKey } from "../accents";
 import { normalizeCallsign } from "../generator/callsign";
-import { getFilterValues } from "../plex/client";
+import { getFilterValues, type PlexItem } from "../plex/client";
 import { fieldMeta, FILTER_FIELDS, OPS_FOR_KIND, type FilterNode } from "../plex/filter-fields";
 import { resolveFilter } from "../plex/resolve";
 import { channelSortParam } from "../plex/sort-fields";
@@ -78,6 +78,67 @@ export async function discoverFieldValues(prisma: PrismaClient, args: { mediaSou
   return { field: args.field, values: [...titles].sort((a, b) => a.localeCompare(b)) };
 }
 
+/** A single card in a preview: a SHOW (episodes aggregated + counted) or a MOVIE. */
+export type PreviewEntry = {
+  type: "show" | "movie";
+  title: string;
+  ratingKey: string;
+  /** Plex art path (feed to the source image proxy). Show poster for shows, movie poster for movies. */
+  thumbPath: string;
+  /** Episodes matched (for a show) or 1 (movie). */
+  count: number;
+  year?: number;
+  genres?: string[];
+  contentRating?: string;
+  criticRating?: number;
+};
+
+export type PreviewResult = {
+  totalItems: number; // episodes + movies (what actually schedules)
+  showCount: number;
+  movieCount: number;
+  entries: PreviewEntry[]; // shows (by episode count desc) then movies, capped
+};
+
+/** Group resolved Plex items into show/movie cards — the shared shape the admin preview + agent use. */
+export function groupPreview(items: PlexItem[]): PreviewResult {
+  const shows = new Map<string, PreviewEntry>();
+  const movies: PreviewEntry[] = [];
+  for (const it of items) {
+    const g = it.guide;
+    const showKey = g.showRatingKey;
+    if (g.showTitle && showKey) {
+      const ex = shows.get(showKey);
+      if (ex) ex.count++;
+      else
+        shows.set(showKey, {
+          type: "show",
+          title: g.showTitle,
+          ratingKey: showKey,
+          thumbPath: `/library/metadata/${showKey}/thumb`,
+          count: 1,
+          genres: g.genres?.slice(0, 4),
+          contentRating: g.contentRating,
+          criticRating: g.criticRating,
+        });
+    } else {
+      movies.push({
+        type: "movie",
+        title: it.title,
+        ratingKey: it.ratingKey,
+        thumbPath: `/library/metadata/${it.ratingKey}/thumb`,
+        count: 1,
+        year: it.year ?? g.year,
+        genres: g.genres?.slice(0, 4),
+        contentRating: g.contentRating,
+        criticRating: g.criticRating,
+      });
+    }
+  }
+  const showEntries = [...shows.values()].sort((a, b) => b.count - a.count);
+  return { totalItems: items.length, showCount: showEntries.length, movieCount: movies.length, entries: [...showEntries, ...movies].slice(0, 60) };
+}
+
 export async function previewFilter(
   prisma: PrismaClient,
   args: { mediaSourceId: string; mediaTypes: MediaType[]; filter?: FilterNode; sortField?: string; sortDir?: "asc" | "desc" },
@@ -85,14 +146,14 @@ export async function previewFilter(
   const source = await requireSource(prisma, args.mediaSourceId);
   const sort = channelSortParam("SHUFFLE", args.sortField ?? "title", args.sortDir ?? "asc");
   const items = await resolveFilter(prisma, source, args.mediaTypes, asFilterNode(args.filter), sort);
-  return { count: items.length, sampleTitles: items.slice(0, 12).map((i) => i.title) };
+  return groupPreview(items);
 }
 
 export async function searchTitles(prisma: PrismaClient, args: { mediaSourceId: string; mediaTypes: MediaType[]; query: string }) {
   const source = await requireSource(prisma, args.mediaSourceId);
   const tree: FilterNode = { type: "condition", field: "title", op: "contains", value: args.query };
   const items = await resolveFilter(prisma, source, args.mediaTypes, tree, channelSortParam("SHUFFLE", "title", "asc"));
-  return { count: items.length, titles: items.slice(0, 25).map((i) => ({ title: i.title, year: i.year })) };
+  return groupPreview(items);
 }
 
 /* ---------------- Inspection (read) -------------------------------------- */
@@ -232,7 +293,7 @@ export async function deleteChannel(prisma: PrismaClient, id: string) {
 
 /** Bulk patch (only `packageId` / `enabled`) across many channels — for organizing / the workflow. */
 export async function updateChannels(prisma: PrismaClient, ids: string[], patch: { packageId?: string | null; enabled?: boolean }) {
-  const data: Prisma.ChannelUpdateManyMutationInput = {};
+  const data: Prisma.ChannelUncheckedUpdateManyInput = {};
   if (patch.packageId !== undefined) data.packageId = patch.packageId;
   if (patch.enabled !== undefined) data.enabled = patch.enabled;
   const res = await prisma.channel.updateMany({ where: { id: { in: ids } }, data });
