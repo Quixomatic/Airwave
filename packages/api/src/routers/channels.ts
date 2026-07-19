@@ -8,6 +8,7 @@ import { runJob } from "../services/jobs/scheduler";
 import { getFilterValues } from "../services/plex/client";
 import { FILTER_FIELDS, OPS_FOR_KIND, fieldMeta } from "../services/plex/filter-fields";
 import { resolveChannel } from "../services/plex/resolve";
+import { previewItems } from "../services/agent/tools";
 import { SORT_FIELDS } from "../services/plex/sort-fields";
 import { normalizeCallsign } from "../services/generator/callsign";
 import {
@@ -274,6 +275,19 @@ export const channelsRouter = router({
     const items = await resolveChannel(ctx.prisma, input.id);
     return { count: items.length, sample: items.slice(0, 8).map((i) => i.title) };
   }),
+
+  /**
+   * Rich preview of a saved channel's pool: full PlexItems with a show's episodes coalesced up into the
+   * show (+ episode/season counts), movies passed through. Powers the channel page's artwork tiles.
+   */
+  preview: adminProcedure
+    .input(z.object({ id: z.string(), detail: z.enum(["quick", "default", "verbose"]).optional() }))
+    .query(async ({ ctx, input }) => {
+      const channel = await ctx.prisma.channel.findUnique({ where: { id: input.id }, select: { mediaSourceId: true } });
+      if (!channel) throw new TRPCError({ code: "NOT_FOUND", message: "Channel not found" });
+      const items = await resolveChannel(ctx.prisma, input.id);
+      return previewItems(ctx.prisma, channel.mediaSourceId, items, input.detail ?? "default");
+    }),
 
   /**
    * Rebuild the channel's whole lineup from now (one full pass minimum, looped to a

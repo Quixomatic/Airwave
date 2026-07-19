@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.18] - 2026-07-19
+
+### Added
+
+- **Artwork preview tiles on the channel page (auto-loading).** The channel builder's preview is no longer a plain "N items · title, title…" string — it now shows a **poster grid** of what the channel resolves to, loaded automatically when you open an existing channel. A show's episodes coalesce into one tile with an **episode-count badge** + season line; movies show their year; each tile pulls real Plex art through the existing `/img/:channelId` proxy. The grid is a **scroll-capped** container (handles hundreds of tiles), posters **lazy-load** as you scroll with a **per-tile skeleton** that fades into the image, and the preview query runs async so it never blocks the page. Backed by a new `channels.preview` procedure (full `PlexItem`s via the shared coalescing service). The channel page was also **widened** (`max-w-2xl` → `max-w-6xl`) to give the grid room. _(New tRPC procedure — needs a backend restart.)_
+
 ## [0.5.17] - 2026-07-19
 
 ### Added

@@ -14,6 +14,7 @@ import {
   type MediaType,
   type Ordering,
 } from "@/features/channels/channel-form";
+import { ChannelPreviewTiles } from "@/features/channels/channel-preview";
 import type { FilterGroup } from "@/features/channels/filter-builder";
 import { trpc, trpcClient } from "@/utils/trpc";
 
@@ -31,11 +32,11 @@ function ChannelDetail() {
   useBreadcrumb(channel.data?.name);
   const nowNext = useQuery(trpc.channels.nowNext.queryOptions({ id: channelId }));
   const schedule = useQuery(trpc.channels.schedule.queryOptions({ id: channelId, hours: 48 }));
+  // Auto-loads the resolved contents for an existing channel (refetched after a save).
+  const preview = useQuery(trpc.channels.preview.queryOptions({ id: channelId }));
   const [submitting, setSubmitting] = useState(false);
-  const [previewing, setPreviewing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [extending, setExtending] = useState(false);
-  const [preview, setPreview] = useState<{ count: number; sample: string[] } | null>(null);
 
   const refreshSchedule = async () => {
     await Promise.all([nowNext.refetch(), schedule.refetch()]);
@@ -72,17 +73,6 @@ function ChannelDetail() {
     }
   };
 
-  const doPreview = async () => {
-    setPreviewing(true);
-    try {
-      setPreview(await trpcClient.channels.resolve.query({ id: channelId }));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Preview failed");
-    } finally {
-      setPreviewing(false);
-    }
-  };
-
   const del = async () => {
     if (!window.confirm("Delete this channel?")) return;
     try {
@@ -99,13 +89,13 @@ function ChannelDetail() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <HeaderRight>
         <Button variant="outline" size="sm" render={<Link to="/watch/$channelId" params={{ channelId }} />}>
           Watch
         </Button>
-        <Button variant="outline" size="sm" onClick={doPreview} disabled={previewing}>
-          {previewing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Preview"}
+        <Button variant="outline" size="sm" onClick={() => void preview.refetch()} disabled={preview.isFetching}>
+          {preview.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh preview"}
         </Button>
         <Button variant="ghost" size="sm" className="text-destructive" onClick={del}>
           Delete
@@ -167,7 +157,7 @@ function ChannelDetail() {
                   bumperMode: v.bumperMode,
                 });
                 toast.success("Saved.");
-                await channel.refetch();
+                await Promise.all([channel.refetch(), preview.refetch()]);
               } catch (err) {
                 toast.error(err instanceof Error ? err.message : "Save failed");
               } finally {
@@ -175,12 +165,7 @@ function ChannelDetail() {
               }
             }}
           />
-          {preview && (
-            <p className="text-muted-foreground mt-4 text-xs">
-              <strong>{preview.count}</strong> items
-              {preview.sample.length > 0 ? ` · ${preview.sample.join(", ")}…` : ""}
-            </p>
-          )}
+          <ChannelPreviewTiles channelId={channelId} data={preview.data} loading={preview.isLoading} />
         </CardContent>
       </Card>
 
