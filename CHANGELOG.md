@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.24] - 2026-07-19
+
+### Added
+
+- **The AI now proposes a real lineup (§7.3a Phase 3 — the plan step).** One structured-output call over the ~630-token library profile returns a full, Zod-validated lineup: themed **packages**, each holding **channel concepts** with a name, a viewer-facing description, an ordering strategy, and a plain-language `theme` written specifically for the agent that will build the filter. On a real 584-movie / 275-show library it produced **10 packages and 50 channels** — and it's grounded, not generic: it noticed `EON Productions (22)` and proposed a **007 Marathon**; it combined `Toho Pictures` and `Orange Sky Golden Harvest` into **Kaiju & Kung Fu Theater**; it turned the biggest shows into a **Marathon Vault** of in-order complete-series channels; and it split the kids content by era and age band (**Preschool Storytime** / **Bluey & Modern Kids** / **Adventure Time Zone**) rather than lumping it into one "Kids" channel. That's the whole point of the arc: channels nobody would have written a preset for.
+- **Channel numbers are assigned at plan time, in the 1000+ block.** AI channels start at **1001**, leaving 1–999 to preset and manual channels, and each package gets its own hundred-block (1001–1099, 1101–1199, …) so its channels stay contiguous with room to grow. Numbers are assigned by us **after** generation rather than by the model — `Channel.number` is `@unique` and the build step fans out concurrently, so letting each agent pick one would race. It also makes a resumed run idempotent.
+
+### Notes
+
+- The planner deliberately **does not write Plex filters**. It proposes intent; Phase 4's per-channel agent grounds that into a real filter with `discover_field_values` + `preview_filter` and verifies the pool before creating anything — so a concept that can't be filled is discarded at build time instead of becoming a broken channel.
+- The prompt is explicit that Plex's genre/studio tags are a real-world vocabulary, not a clean taxonomy (`Science Fiction` vs `Sci-Fi & Fantasy`, anime usually tagged only `Animation`), and that a channel's episode count determines whether it can sustain a loop.
+- Uses the **active AI connection** (Settings → AI Assistant). Still creates nothing — the build step lands in Phase 4. _(Server — needs a restart; `bunx workflow build` after any change under `workflows/`.)_
+
 ## [0.5.23] - 2026-07-19
 
 ### Added

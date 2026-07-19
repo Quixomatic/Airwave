@@ -24,37 +24,15 @@ import prisma from "@ChannelGuide/db";
 
 import type { LibraryProfile } from "@ChannelGuide/api/services/agent/library-profile";
 import { buildLibraryProfile } from "@ChannelGuide/api/services/agent/library-profile";
+import type { LineupPlan, PlannedChannel } from "@ChannelGuide/api/services/agent/lineup-plan";
+import { formatLineupPlan, planLineup as planLineupService } from "@ChannelGuide/api/services/agent/lineup-plan";
 import type { LineupRunArgs } from "@ChannelGuide/api/services/agent/lineup-runner";
 
-export type { LibraryProfile };
+export type { LibraryProfile, LineupPlan, PlannedChannel };
 
-/** One channel the plan proposes (§4.2). `number` is assigned HERE, not by the builder. */
-export type PlannedChannel = {
-  key: string;
-  name: string;
-  number: number;
-  description: string;
-  /** Plain-language intent the build agent grounds into a real Plex filter. */
-  theme: string;
-  targetPoolSize: number;
-  sortField?: string;
-  sortDir?: "asc" | "desc";
-  accent?: string;
-  icon?: string;
-};
-
-export type PlannedPackage = {
-  key: string;
-  name: string;
-  description: string;
-  /** Base of this package's hundred-block: 1000, 1100, 1200… (§4.2). */
-  numberBase: number;
-  tint?: string;
-  icon?: string;
-  channels: PlannedChannel[];
-};
-
-export type LineupPlan = { packages: PlannedPackage[] };
+// PlannedChannel / PlannedPackage / LineupPlan now live with the planner service
+// (packages/api/.../lineup-plan.ts) so the Zod schema is the single source of truth —
+// they're re-exported above.
 
 export type ChannelBuildResult = {
   key: string;
@@ -115,11 +93,13 @@ async function analyzeLibrary(sourceId: string): Promise<LibraryProfile> {
   return profile;
 }
 
-/** §4.2 — one big structured-output call over the profile. PHASE 3. */
+/** §4.2 — one structured-output call over the compact profile. */
 async function planLineup(profile: LibraryProfile, limit?: number): Promise<LineupPlan> {
   "use step";
-  console.log(`[lineup] plan: ${profile.genres.length} genres, limit=${limit ?? "none"} (stub)`);
-  return { packages: [] };
+  const plan = await planLineupService(prisma, profile, limit ? { limit } : {});
+  const channels = plan.packages.reduce((n, p) => n + p.channels.length, 0);
+  console.log(`[lineup] plan: ${plan.packages.length} packages, ${channels} channels\n${formatLineupPlan(plan)}`);
+  return plan;
 }
 
 /** Create the planned packages, stamped `aiGenerated`. Returns key -> id. PHASE 4. */
