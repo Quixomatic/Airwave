@@ -56,6 +56,8 @@ export async function listConnections(prisma: PrismaClient): Promise<PublicConne
     baseUrl: c.baseUrl,
     hasKey: !!c.apiKeyEnc,
     isActive: c.isActive,
+    isPlanner: c.isPlanner,
+    isWorker: c.isWorker,
   }));
 }
 
@@ -71,11 +73,76 @@ export async function getActiveModel(prisma: PrismaClient): Promise<LanguageMode
   return c ? getModel(c) : null;
 }
 
+/**
+ * Connection ROLES. `active` is the admin chat; the other two let the lineup workflow point its two
+ * very different workloads at different models:
+ *  - `planner` — ONE big reasoning call producing the whole lineup. Quality matters most.
+ *  - `worker`  — ~50 mechanical per-channel build loops. Volume dominates the bill, so a cheap
+ *                model here is the single biggest cost lever in the run.
+ *
+ * Every role FALLS BACK to the active connection, so with one connection configured it silently
+ * fills all three and nothing needs setting up. The split only starts mattering once a second
+ * connection is added and explicitly assigned.
+ */
+export const CONNECTION_ROLES = ["active", "planner", "worker"] as const;
+export type ConnectionRole = (typeof CONNECTION_ROLES)[number];
+
+const ROLE_FIELD: Record<ConnectionRole, "isActive" | "isPlanner" | "isWorker"> = {
+  active: "isActive",
+  planner: "isPlanner",
+  worker: "isWorker",
+};
+
+/** Resolve a role to a connection, falling back to the active one when the role is unassigned. */
+export async function getConnectionForRole(
+  prisma: PrismaClient,
+  role: ConnectionRole,
+): Promise<ResolvedConnection | null> {
+  const c =
+    (await prisma.aiConnection.findFirst({ where: { [ROLE_FIELD[role]]: true } })) ??
+    (role === "active" ? null : await prisma.aiConnection.findFirst({ where: { isActive: true } }));
+  if (!c) return null;
+  return {
+    provider: c.provider,
+    model: c.model,
+    baseUrl: c.baseUrl,
+    apiKey: c.apiKeyEnc ? decryptSecret(c.apiKeyEnc) : null,
+  };
+}
+
+/**
+ * Assign a role to a connection, clearing it from whichever connection held it.
+ * `active` can't be cleared outright — the chat always needs a target.
+ */
+export async function setConnectionRole(
+  prisma: PrismaClient,
+  id: string,
+  role: ConnectionRole,
+  enabled = true,
+) {
+  const field = ROLE_FIELD[role];
+  if (!enabled && role === "active") {
+    throw new Error("The chat connection can't be unset — assign it to another connection instead.");
+  }
+  await prisma.$transaction([
+    // Exclusive: only one connection holds a given role at a time.
+    prisma.aiConnection.updateMany({ where: { [field]: true }, data: { [field]: false } }),
+    ...(enabled
+      ? [prisma.aiConnection.update({ where: { id }, data: { [field]: true } })]
+      : []),
+  ]);
+  return listConnections(prisma);
+}
+
 type ConnectionInput = { name: string; provider: string; model: string; baseUrl?: string | null; apiKey?: string };
 
-/** Create a connection. Becomes active if it's the first one. */
+/**
+ * Create a connection. The FIRST connection claims every role, so a single-connection setup needs
+ * no configuration at all — it's chat, planner and worker. Later connections start with no roles;
+ * the admin assigns them explicitly, which is the whole point of having more than one.
+ */
 export async function createConnection(prisma: PrismaClient, input: ConnectionInput) {
-  const count = await prisma.aiConnection.count();
+  const first = (await prisma.aiConnection.count()) === 0;
   await prisma.aiConnection.create({
     data: {
       name: input.name,
@@ -83,7 +150,9 @@ export async function createConnection(prisma: PrismaClient, input: ConnectionIn
       model: input.model,
       baseUrl: input.baseUrl ?? null,
       apiKeyEnc: input.apiKey ? encryptSecret(input.apiKey) : null,
-      isActive: count === 0,
+      isActive: first,
+      isPlanner: first,
+      isWorker: first,
     },
   });
   return listConnections(prisma);

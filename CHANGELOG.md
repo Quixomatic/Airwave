@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.27] - 2026-07-19
+
+### Added
+
+- **AI connections can now be assigned roles, so different work can run on different models.** Each saved connection can hold any combination of three roles: **Chat** (the admin assistant), **Planner** (heavy reasoning — designs the lineup), and **Worker** (high volume — builds each channel). This exists because an AI lineup build has two wildly different halves: **one** planning call where judgment matters, and **~50** mechanical per-channel build loops that dominate the bill. Pointing the worker at a cheaper model is the single biggest cost lever in the run — and it also makes an A/B trivial: assign Worker to one model, run a few channels, reassign, re-run, compare the filters.
+  - **A single connection needs no configuration** — the first one you add claims all three roles automatically, and the role buttons stay hidden. They appear only once a second connection exists.
+  - **Every role falls back to the Chat connection** when unassigned, so nothing breaks if a role is never set or its connection is deleted.
+  - Roles are exclusive (one connection per role) but independent, so one connection can hold several. Settings → AI Assistant shows a badge per role and a button to reassign.
+
+### Notes
+
+- _(Schema change — requires `pnpm db:push` + `pnpm db:generate`; backend needs a restart.)_
+
 ## [0.5.26] - 2026-07-19
 
 ### Fixed

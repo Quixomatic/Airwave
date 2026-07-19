@@ -34,7 +34,32 @@ const MODELS: Record<Provider, string[]> = {
 };
 const CUSTOM = "__custom__";
 
-type Conn = { id: string; name: string; provider: string; model: string; baseUrl: string | null; hasKey: boolean; isActive: boolean };
+type Conn = {
+  id: string;
+  name: string;
+  provider: string;
+  model: string;
+  baseUrl: string | null;
+  hasKey: boolean;
+  isActive: boolean;
+  isPlanner: boolean;
+  isWorker: boolean;
+};
+
+/**
+ * What each connection can be used for. Roles are independent, so one connection can hold all
+ * three — which is what happens automatically when only one is configured. The split only
+ * matters once there's a second: pointing the high-volume `worker` at a cheap model is the
+ * biggest cost lever in an AI lineup build (~50 loops vs the planner's single call).
+ */
+const ROLES = [
+  { key: "active" as const, label: "Chat", hint: "The admin assistant" },
+  { key: "planner" as const, label: "Planner", hint: "Heavy reasoning — designs the lineup" },
+  { key: "worker" as const, label: "Worker", hint: "High volume — builds each channel" },
+];
+
+const holdsRole = (c: Conn, role: "active" | "planner" | "worker") =>
+  role === "active" ? c.isActive : role === "planner" ? c.isPlanner : c.isWorker;
 
 function SettingsAi() {
   const list = useQuery(trpc.ai.list.queryOptions());
@@ -135,7 +160,11 @@ function SettingsAi() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium">{c.name}</span>
-                    {c.isActive && <Badge>Active</Badge>}
+                    {ROLES.filter((r) => holdsRole(c, r.key)).map((r) => (
+                      <Badge key={r.key} title={r.hint}>
+                        {r.label}
+                      </Badge>
+                    ))}
                     {!c.hasKey && c.provider !== "compatible" && <Badge variant="outline">No key</Badge>}
                   </div>
                   <div className="text-muted-foreground truncate text-xs">
@@ -150,11 +179,21 @@ function SettingsAi() {
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  {!c.isActive && (
-                    <Button size="sm" variant="outline" disabled={busy} onClick={() => void act(() => trpcClient.ai.setActive.mutate({ id: c.id }))}>
-                      Set active
-                    </Button>
-                  )}
+                  {/* With a single connection there's nothing to assign — it holds every role
+                      already, so the buttons would be noise. They appear once a second exists. */}
+                  {connections.length > 1 &&
+                    ROLES.filter((r) => !holdsRole(c, r.key)).map((r) => (
+                      <Button
+                        key={r.key}
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        title={`Use for ${r.label.toLowerCase()} — ${r.hint}`}
+                        onClick={() => void act(() => trpcClient.ai.setRole.mutate({ id: c.id, role: r.key }))}
+                      >
+                        {r.label}
+                      </Button>
+                    ))}
                   <Button size="icon" variant="ghost" aria-label="Test" disabled={t === "loading"} onClick={() => void runTest(c.id)}>
                     {t === "loading" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
                   </Button>

@@ -1,6 +1,14 @@
-/// A saved AI provider connection. Several can exist; exactly one is `isActive` (what the chat uses).
+/// A saved AI provider connection. Several can exist, each holding one or more ROLES.
 /// The API key is stored ENCRYPTED (app-level, AES-256-GCM) — never in plaintext. `provider` selects
 /// the adapter; `baseUrl` is for OpenAI-compatible / local endpoints (Ollama, LM Studio, OpenRouter).
+///
+/// ROLES — at most one connection holds each, and they're independent so a single connection can
+/// hold all three (which is exactly what happens when only one is configured). Separate flags rather
+/// than one `role` column precisely so they can overlap.
+///
+/// Why the split exists: the lineup workflow's cost is dominated by ~50 mechanical per-channel build
+/// loops, while the plan step is ONE call where judgment actually matters. Pointing those at
+/// different models (a strong planner, a cheap worker) is the single biggest cost lever we have.
 model AiConnection {
   id        String   @id @default(cuid())
   name      String // a human label the admin gives it ("Claude Sonnet", "Local Llama")
@@ -8,11 +16,20 @@ model AiConnection {
   model     String
   baseUrl   String?
   apiKeyEnc String? // encrypted; null for a keyless local endpoint
-  isActive  Boolean  @default(false)
+
+  /// The admin CHAT model.
+  isActive  Boolean @default(false)
+  /// Heavy reasoning — the lineup PLAN step. Falls back to `isActive` when unset.
+  isPlanner Boolean @default(false)
+  /// High-volume grunt work — the per-channel BUILD loops. Falls back to `isActive` when unset.
+  isWorker  Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([isActive])
+  @@index([isPlanner])
+  @@index([isWorker])
   @@map("ai_connection")
 }
 

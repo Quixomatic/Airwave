@@ -22,7 +22,7 @@ import type { PrismaClient } from "@ChannelGuide/db";
 import { generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 
-import { getActiveConnection, getModel } from "./config";
+import { getConnectionForRole, getModel } from "./config";
 import type { PlannedChannel } from "./lineup-plan";
 import {
   createChannel,
@@ -148,7 +148,10 @@ export async function buildPlannedChannel(
     return { ...base, status: "created", channelId: existing.id, reason: "Already built (step retry)." };
   }
 
-  const connection = await getActiveConnection(prisma);
+  // The WORKER role: this loop runs ~50 times per lineup build and dominates the run's cost,
+  // so it's the one worth pointing at a cheap model. Falls back to the active (chat)
+  // connection when no dedicated worker is configured.
+  const connection = await getConnectionForRole(prisma, "worker");
   if (!connection) return { ...base, status: "failed", reason: "No active AI connection." };
 
   // Outcome is captured from the terminal tool rather than parsed out of the model's

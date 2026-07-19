@@ -24,7 +24,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 
 import { ACCENT_KEYS, channelAccentAt } from "../accents";
-import { getActiveConnection, getModel } from "./config";
+import { getConnectionForRole, getModel } from "./config";
 import { type LibraryProfile, formatLibraryProfile } from "./library-profile";
 
 /**
@@ -177,7 +177,9 @@ export async function planLineup(
   profile: LibraryProfile,
   opts: PlanOptions = {},
 ): Promise<LineupPlan> {
-  const connection = await getActiveConnection(prisma);
+  // The PLANNER role: one big reasoning call where quality matters most. Falls back to the
+  // active (chat) connection when no dedicated planner is configured.
+  const connection = await getConnectionForRole(prisma, "planner");
   if (!connection) {
     throw new Error("No active AI connection — configure one in Settings → AI Assistant.");
   }

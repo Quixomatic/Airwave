@@ -2,10 +2,12 @@ import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
 import {
+  CONNECTION_ROLES,
   createConnection,
   deleteConnection,
   listConnections,
   setActiveConnection,
+  setConnectionRole,
   testConnection,
   updateConnection,
 } from "../services/agent/config";
@@ -33,6 +35,21 @@ export const aiRouter = router({
   delete: adminProcedure.input(z.object({ id: z.string() })).mutation(({ ctx, input }) => deleteConnection(ctx.prisma, input.id)),
 
   setActive: adminProcedure.input(z.object({ id: z.string() })).mutation(({ ctx, input }) => setActiveConnection(ctx.prisma, input.id)),
+
+  /**
+   * Assign a role to a connection. `active` = the chat; `planner` = the lineup's one big reasoning
+   * call; `worker` = the ~50 per-channel build loops (where a cheap model saves the most).
+   * Unassigned roles fall back to the active connection.
+   */
+  setRole: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        role: z.enum(CONNECTION_ROLES),
+        enabled: z.boolean().optional(),
+      }),
+    )
+    .mutation(({ ctx, input }) => setConnectionRole(ctx.prisma, input.id, input.role, input.enabled ?? true)),
 
   /** A cheap round-trip that proves the connection's model actually responds. */
   test: adminProcedure.input(z.object({ id: z.string() })).mutation(({ ctx, input }) => testConnection(ctx.prisma, input.id)),
