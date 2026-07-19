@@ -87,6 +87,10 @@ export type PreviewEntry = {
   thumbPath: string;
   /** Episodes matched (for a show) or 1 (movie). */
   count: number;
+  /** Distinct seasons the matched episodes span (shows only). */
+  seasons?: number;
+  /** A few matched episode titles (shows only) — carried for the agent's opt-in verbose view. */
+  episodeSample?: string[];
   year?: number;
   genres?: string[];
   contentRating?: string;
@@ -100,9 +104,16 @@ export type PreviewResult = {
   entries: PreviewEntry[]; // shows (by episode count desc) then movies, capped
 };
 
-/** Group resolved Plex items into show/movie cards — the shared shape the admin preview + agent use. */
+/**
+ * Group resolved Plex items into show/movie cards — the RICH shape (with poster paths, ratings, season/
+ * episode counts) that the admin preview tiles consume. The agent gets a leaner projection via
+ * `toAgentPreview` (it doesn't need artwork, and a big preview of thousands of episodes must not bloat
+ * the chat context — only the shows + how many of each matter).
+ */
 export function groupPreview(items: PlexItem[]): PreviewResult {
   const shows = new Map<string, PreviewEntry>();
+  const seasonSets = new Map<string, Set<number>>();
+  const epSamples = new Map<string, string[]>();
   const movies: PreviewEntry[] = [];
   for (const it of items) {
     const g = it.guide;
@@ -121,6 +132,14 @@ export function groupPreview(items: PlexItem[]): PreviewResult {
           contentRating: g.contentRating,
           criticRating: g.criticRating,
         });
+      if (g.season != null) {
+        let s = seasonSets.get(showKey);
+        if (!s) seasonSets.set(showKey, (s = new Set()));
+        s.add(g.season);
+      }
+      let samp = epSamples.get(showKey);
+      if (!samp) epSamples.set(showKey, (samp = []));
+      if (samp.length < 8) samp.push(g.season != null && g.episode != null ? `S${g.season}E${g.episode} · ${it.title}` : it.title);
     } else {
       movies.push({
         type: "movie",
@@ -135,8 +154,47 @@ export function groupPreview(items: PlexItem[]): PreviewResult {
       });
     }
   }
+  for (const [key, e] of shows) {
+    e.seasons = seasonSets.get(key)?.size ?? 0;
+    e.episodeSample = epSamples.get(key);
+  }
   const showEntries = [...shows.values()].sort((a, b) => b.count - a.count);
   return { totalItems: items.length, showCount: showEntries.length, movieCount: movies.length, entries: [...showEntries, ...movies].slice(0, 60) };
+}
+
+/** Lean per-show / per-movie shape (default). */
+export type AgentPreviewShow = { show: string; seasons: number; episodes: number; contentRating?: string; genres?: string[]; sampleEpisodes?: string[] };
+export type AgentPreviewMovie = { movie: string; year?: number };
+export type AgentPreview = {
+  totalItems: number;
+  showCount: number;
+  movieCount: number;
+  shows: AgentPreviewShow[];
+  movies: AgentPreviewMovie[];
+};
+
+/**
+ * Project the rich preview down to what the MODEL actually needs: which shows (with season + episode
+ * counts) and which movies — no artwork, no per-item metadata. `verbose` adds a sample of real episode
+ * titles + ratings for the rare case the agent needs to eyeball the actual episodes. This keeps big
+ * previews (thousands of episodes across dozens of shows) from ballooning the chat context.
+ */
+export function toAgentPreview(r: PreviewResult, verbose = false): AgentPreview {
+  const shows: AgentPreviewShow[] = [];
+  const movies: AgentPreviewMovie[] = [];
+  for (const e of r.entries) {
+    if (e.type === "show") {
+      shows.push({
+        show: e.title,
+        seasons: e.seasons ?? 0,
+        episodes: e.count,
+        ...(verbose ? { contentRating: e.contentRating, genres: e.genres, sampleEpisodes: e.episodeSample } : {}),
+      });
+    } else {
+      movies.push({ movie: e.title, ...(e.year ? { year: e.year } : {}) });
+    }
+  }
+  return { totalItems: r.totalItems, showCount: r.showCount, movieCount: r.movieCount, shows, movies };
 }
 
 export async function previewFilter(

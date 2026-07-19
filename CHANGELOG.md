@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.14] - 2026-07-19
+
+### Changed
+
+- **`preview_filter` / `search_titles` return a lean summary to the model — big previews no longer bloat the chat.** A preview can match thousands of episodes; the agent was being handed the full rich payload (poster paths, genres, ratings for up to 60 entries) on every call, which is what grew a conversation to 100k+ tokens. The tools now return just what the model needs to reason: **totals + which shows match (each with its season & episode counts) + which movies** — e.g. `{ show: "Pokémon", seasons: 11, episodes: 583 }`. Measured **~85% smaller** per call. Actual episode titles are available on demand via a new **`verbose: true`** tool param. The **rich shape is unchanged** for the (coming) admin preview tiles — the grouping now also computes a **season count** per show, and the lean projection happens only at the agent boundary.
+
 ## [0.5.13] - 2026-07-19
 
 ### Fixed

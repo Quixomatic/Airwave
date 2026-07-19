@@ -20,6 +20,7 @@ import {
   previewFilter,
   renumberChannels,
   searchTitles,
+  toAgentPreview,
   updateChannel,
   updateChannels,
   updatePackage,
@@ -85,20 +86,22 @@ export function buildAgentTools(prisma: PrismaClient, userId: string) {
       execute: (a) => discoverFieldValues(prisma, a),
     }),
     search_titles: tool({
-      description: "Find titles whose name contains a query (does the library have X?).",
-      inputSchema: z.object({ mediaSourceId: z.string(), mediaTypes: z.array(mediaType), query: z.string() }),
-      execute: (a) => searchTitles(prisma, a),
+      description: "Find titles whose name contains a query (does the library have X?). Returns matching shows (with season/episode counts) + movies.",
+      inputSchema: z.object({ mediaSourceId: z.string(), mediaTypes: z.array(mediaType), query: z.string(), verbose: z.boolean().optional() }),
+      execute: async ({ verbose, ...a }) => toAgentPreview(await searchTitles(prisma, a), verbose),
     }),
     preview_filter: tool({
-      description: "Resolve an UNSAVED filter tree to a count + sample titles. ALWAYS test a filter here before creating a channel.",
+      description:
+        "Resolve an UNSAVED filter tree to a SUMMARY: total item count + which shows match (each with its season & episode counts) + which movies match. ALWAYS test a filter here before creating a channel. It intentionally returns shows + counts, NOT every episode — pass verbose:true only if you actually need sample episode titles.",
       inputSchema: z.object({
         mediaSourceId: z.string(),
         mediaTypes: z.array(mediaType),
         filter: filterNode.optional(),
         sortField: z.string().optional(),
         sortDir: z.enum(["asc", "desc"]).optional(),
+        verbose: z.boolean().optional(),
       }),
-      execute: (a) => previewFilter(prisma, a),
+      execute: async ({ verbose, ...a }) => toAgentPreview(await previewFilter(prisma, a), verbose),
     }),
 
     // ---- Inspection (read) ----
