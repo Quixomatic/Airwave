@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.19] - 2026-07-19
+
+### Changed
+
+- **Channel preview grid caps at ~2 rows** (`max-h-[30rem]`, tuned for the wide desktop layout) and scrolls beyond that, so a big channel's poster grid stays compact instead of pushing the schedule far down the page.
+
 ## [0.5.18] - 2026-07-19
 
 ### Added

@@ -41,7 +41,8 @@ export function ChannelPreviewTiles({ channelId, data, loading }: { channelId: s
         {data.showCount > 0 && ` · ${plural(data.showCount, "show")}`}
         {data.movieCount > 0 && ` · ${plural(data.movieCount, "movie")}`}
       </p>
-      <div className="grid max-h-[34rem] grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+      {/* Capped to ~2 rows of posters (tuned for the wide lg:8-col desktop layout); the rest scrolls. */}
+      <div className="grid max-h-[30rem] grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
         {data.items.map((it) => (
           <PreviewTile key={it.ratingKey} channelId={channelId} item={it} />
         ))}
