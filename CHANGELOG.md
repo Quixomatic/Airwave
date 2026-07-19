@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.16] - 2026-07-19
+
+### Fixed
+
+- **The AI chat "hang" — the actual root cause: Bun's 10s server idle timeout.** The server exported the Hono app directly, so Bun served it with its **default `idleTimeout` of 10 seconds**. An AI turn (extended thinking + a large context + several tool calls) routinely goes longer than 10s before the first byte or between chunks, so Bun closed the socket mid-stream (`request timed out after 10 seconds`) and the reply never landed — which then persisted a half-finished turn. The server now exports `{ port, idleTimeout: 255, fetch }`, raising the idle timeout to Bun's maximum; each streamed byte resets the clock, so only a genuinely stalled connection is cut. The v0.5.13–0.5.15 caching + lean-preview work still matters (it keeps turns fast and cheap), but this is what was actually severing the stream. _(Server — needs a restart.)_
+
 ## [0.5.15] - 2026-07-19
 
 ### Changed

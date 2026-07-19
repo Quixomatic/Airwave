@@ -179,4 +179,12 @@ try {
   console.error("Job scheduler startup failed:", err);
 }
 
-export default app;
+// Bun's default idleTimeout is 10s, which kills long streaming responses — an AI chat turn (extended
+// thinking + a 100k-token context + multiple tool calls) easily goes >10s before/between chunks, so the
+// socket was being closed mid-stream and the chat "hung". Raise it to Bun's max (255s); each streamed
+// byte resets the idle clock, so this only bounds a truly stalled connection.
+export default {
+  port: Number(process.env.PORT) || 3000,
+  idleTimeout: 255,
+  fetch: app.fetch,
+};
