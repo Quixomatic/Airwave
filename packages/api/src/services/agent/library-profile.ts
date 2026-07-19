@@ -145,6 +145,68 @@ export async function buildLibraryProfile(
 }
 
 /**
+ * Fields worth pre-fetching into the shared build context. These are the ones a channel
+ * concept actually filters on, and their value lists are library-wide — IDENTICAL for
+ * every channel in a run.
+ *
+ * Deliberately excludes `actor` / `director` / `writer` / `producer`: those run to
+ * thousands of names and are needed rarely, so they stay behind `discover_field_values`
+ * for the occasional channel that wants one.
+ */
+const PREFETCH_FIELDS = [
+  "genre",
+  "studio",
+  "network",
+  "contentRating",
+  "collection",
+  "country",
+  "resolution",
+  "label",
+] as const;
+
+export type FilterVocabulary = { field: string; values: string[] }[];
+
+/**
+ * The library's REAL filter vocabulary, fetched once per run.
+ *
+ * WHY THIS EXISTS: previously each channel's agent called `discover_field_values` itself,
+ * which made the answer a TOOL RESULT — and tool results land *after* the prompt-cache
+ * breakpoint, so they're re-sent uncached on every subsequent step of that build (407
+ * studios ≈ 2k tokens × ~20 steps × 50 channels). Hoisting them into the shared cached
+ * prefix means the whole vocabulary is paid for ONCE per run, no truncation needed, and
+ * builds get shorter because the agent starts already knowing the tag values.
+ */
+export async function buildFilterVocabulary(
+  // The fetcher is injected rather than calling `discoverFieldValues` directly, so this
+  // module keeps its "read the local cache" character and doesn't pull in the Plex client.
+  discover: (field: string) => Promise<{ values?: { title?: string }[] | string[] }>,
+): Promise<FilterVocabulary> {
+  const out: FilterVocabulary = [];
+  for (const field of PREFETCH_FIELDS) {
+    try {
+      const result = await discover(field);
+      const raw = result.values ?? [];
+      const values = raw
+        .map((v) => (typeof v === "string" ? v : v.title))
+        .filter((v): v is string => !!v && v.trim() !== "");
+      if (values.length) out.push({ field, values });
+    } catch {
+      // A field the source can't answer for shouldn't sink the whole run — the agent can
+      // still reach it via discover_field_values if it really needs it.
+    }
+  }
+  return out;
+}
+
+/** Render the vocabulary for the shared cached prefix. Sent whole — it's cached. */
+export function formatFilterVocabulary(vocabulary: FilterVocabulary): string {
+  if (!vocabulary.length) return "(no tag values available)";
+  return vocabulary
+    .map(({ field, values }) => `${field} (${values.length}): ${values.join(", ")}`)
+    .join("\n");
+}
+
+/**
  * Render the profile as compact text for the planning prompt. Deliberately terse —
  * this sits in a cached prefix that every per-channel agent shares, so every token
  * is paid for many times over.

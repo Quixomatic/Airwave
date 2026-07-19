@@ -26,11 +26,16 @@ import prisma from "@ChannelGuide/db";
 import type { ChannelBuildResult } from "@ChannelGuide/api/services/agent/channel-builder";
 import { buildPlannedChannel } from "@ChannelGuide/api/services/agent/channel-builder";
 import type { LibraryProfile } from "@ChannelGuide/api/services/agent/library-profile";
-import { buildLibraryProfile } from "@ChannelGuide/api/services/agent/library-profile";
+import {
+  buildFilterVocabulary,
+  buildLibraryProfile,
+  formatFilterVocabulary,
+  formatLibraryProfile,
+} from "@ChannelGuide/api/services/agent/library-profile";
 import type { LineupPlan, PlannedChannel } from "@ChannelGuide/api/services/agent/lineup-plan";
 import { formatLineupPlan, planLineup as planLineupService } from "@ChannelGuide/api/services/agent/lineup-plan";
 import type { LineupRunArgs } from "@ChannelGuide/api/services/agent/lineup-runner";
-import { clearAiGenerated, createPackage } from "@ChannelGuide/api/services/agent/tools";
+import { clearAiGenerated, createPackage, discoverFieldValues } from "@ChannelGuide/api/services/agent/tools";
 import {
   INITIAL_WINDOW_SECONDS,
   generateChannelSchedule,
@@ -57,6 +62,8 @@ export type LineupReport = {
   channelsCreated: number;
   skipped: ChannelBuildResult[];
   failed: ChannelBuildResult[];
+  /** What the run cost. Surfaced so spend is visible without waiting for the bill. */
+  usage: { inputTokens: number; outputTokens: number; steps: number; channelsWithUsage: number };
 };
 
 /**
@@ -82,12 +89,25 @@ export async function aiLineupWorkflow(args: LineupRunArgs): Promise<LineupRepor
   // Fan out in bounded waves. Each build is its own durable step, so a crash resumes
   // only the unfinished ones. The cap keeps us under the provider's rate limit — every
   // build is an agent loop with several tool calls of its own.
+  // The shared, byte-identical prefix every builder gets. Because it's the same bytes for
+  // all 50 channels it costs one cache entry for the whole run — which is exactly why the
+  // full tag vocabulary lives HERE rather than being fetched per-build as a tool result
+  // (tool results sit after the cache breakpoint and are re-sent on every step).
+  const libraryContext = await buildSharedContext(args.sourceId, profile);
+
   const built: ChannelBuildResult[] = [];
   for (let i = 0; i < jobs.length; i += BUILD_CONCURRENCY) {
     const wave = jobs.slice(i, i + BUILD_CONCURRENCY);
     const results = await Promise.all(
       wave.map((job) =>
-        buildChannel(job.channel, job.packageId, args.sourceId, args.userId, args.mode ?? "quality"),
+        buildChannel(
+          job.channel,
+          job.packageId,
+          args.sourceId,
+          args.userId,
+          libraryContext,
+          args.mode ?? "quality",
+        ),
       ),
     );
     built.push(...results);
@@ -110,6 +130,30 @@ async function analyzeLibrary(sourceId: string): Promise<LibraryProfile> {
       `${profile.studios.length} studios · ${profile.topShows.length} sizeable shows`,
   );
   return profile;
+}
+
+/**
+ * Build the shared cached prefix: the library profile plus the FULL tag vocabulary.
+ *
+ * Its own step so the Plex round-trips (one per field) are checkpointed and never repeat
+ * on a resume. Sent whole, untruncated — it's cached, so size costs almost nothing after
+ * the first build, and a complete vocabulary is what stops the agent inventing tag values.
+ */
+async function buildSharedContext(sourceId: string, profile: LibraryProfile): Promise<string> {
+  "use step";
+  const vocabulary = await buildFilterVocabulary((field) =>
+    discoverFieldValues(prisma, { mediaSourceId: sourceId, mediaTypes: ["movie", "show"], field }),
+  );
+  const text = [
+    formatLibraryProfile(profile),
+    "",
+    "FILTER VOCABULARY — the exact tag values available. Use ONLY these:",
+    formatFilterVocabulary(vocabulary),
+  ].join("\n");
+  console.log(
+    `[lineup] shared context: ${vocabulary.length} fields, ${text.length} chars (~${Math.ceil(text.length / 4)} tokens, cached once for the whole run)`,
+  );
+  return text;
 }
 
 /** §4.2 — one structured-output call over the compact profile. */
@@ -162,6 +206,7 @@ async function buildChannel(
   packageId: string,
   sourceId: string,
   userId: string,
+  libraryContext: string,
   mode: "quality" | "fast",
 ): Promise<ChannelBuildResult> {
   "use step";
@@ -170,6 +215,7 @@ async function buildChannel(
     packageId,
     mediaSourceId: sourceId,
     userId,
+    libraryContext,
     mode,
   });
 
@@ -203,13 +249,31 @@ async function reportLineup(
   built: ChannelBuildResult[],
 ): Promise<LineupReport> {
   "use step";
+  const usage = built.reduce(
+    (acc, b) => {
+      if (!b.usage) return acc;
+      return {
+        inputTokens: acc.inputTokens + b.usage.inputTokens,
+        outputTokens: acc.outputTokens + b.usage.outputTokens,
+        steps: acc.steps + b.usage.steps,
+        channelsWithUsage: acc.channelsWithUsage + 1,
+      };
+    },
+    { inputTokens: 0, outputTokens: 0, steps: 0, channelsWithUsage: 0 },
+  );
+
   const report: LineupReport = {
     sourceId,
     packagesCreated: plan.packages.length,
     channelsCreated: built.filter((b) => b.status === "created").length,
     skipped: built.filter((b) => b.status === "skipped"),
     failed: built.filter((b) => b.status === "failed"),
+    usage,
   };
-  console.log(`[lineup] report: ${report.channelsCreated} channels, ${report.skipped.length} skipped`);
+  console.log(
+    `[lineup] report: ${report.channelsCreated} created, ${report.skipped.length} skipped, ${report.failed.length} failed · ` +
+      `tokens in=${usage.inputTokens.toLocaleString()} out=${usage.outputTokens.toLocaleString()} ` +
+      `over ${usage.steps} steps in ${usage.channelsWithUsage} builds`,
+  );
   return report;
 }

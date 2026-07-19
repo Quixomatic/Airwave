@@ -32,6 +32,8 @@ import {
   searchTitles,
 } from "./tools";
 
+export type ChannelUsage = { inputTokens: number; outputTokens: number; steps: number };
+
 export type ChannelBuildResult = {
   key: string;
   name: string;
@@ -40,11 +42,33 @@ export type ChannelBuildResult = {
   channelId?: string;
   poolSize?: number;
   reason?: string;
+  /** What this channel's agent loop cost. Absent when no LLM call was made. */
+  usage?: ChannelUsage;
 };
 
 /** Below this a channel loops too tightly to be worth creating. */
 const MIN_POOL_SIZE = 5;
-/** Enough room to discover values, preview a few candidate filters, and commit. */
+
+/**
+ * COST MODEL — worth understanding before changing any of this.
+ *
+ * An agent loop re-sends the whole conversation on every step, so tokens grow
+ * QUADRATICALLY with step count. What saves us is where the prompt-cache breakpoint sits:
+ *
+ *  - CACHED (shared by every channel in the run, paid once): the system prompt, the tool
+ *    definitions, the library profile, and the full filter vocabulary. Byte-identical
+ *    across all 50 builds → one cache entry, so size here is nearly free.
+ *  - NOT CACHED (re-sent every step of that build): the agent's tool calls and their
+ *    results. This is the quadratic part, and the only thing that needs rationing.
+ *
+ * Hence: the vocabulary is hoisted into the cached prefix rather than fetched as a tool
+ * result, and `preview_filter` — the one genuinely per-channel, per-iteration payload —
+ * is pinned to the leanest `detail: "quick"` projection with no way for the model to ask
+ * for `verbose` (which measured ~270k chars on a large filter).
+ *
+ * With discovery pre-loaded, builds converge in far fewer steps, so this cap is headroom
+ * for a stubborn channel rather than a routine cost.
+ */
 const MAX_STEPS = 24;
 
 const mediaTypesSchema = z.array(z.enum(["movie", "show"])).min(1);
@@ -71,10 +95,12 @@ const filterNodeSchema: z.ZodType<FilterNodeInput> = z.lazy(() =>
 const SYSTEM = `You build ONE live-TV channel by turning a description into a verified Plex filter.
 
 PROCESS — follow it in order:
-1. \`list_filter_fields\` to see what you can filter on.
-2. \`discover_field_values\` for any tag field you intend to use (genre, studio, network, contentRating…). The library's tag values are what they are — never guess a value you haven't seen. "Anime" may not exist as a genre even when the library is full of anime; "Animation" plus specific show titles may be the real route.
+1. Read the LIBRARY and FILTER VOCABULARY already given to you below. The common tag values (genre, studio, network, contentRating, collection, country, resolution, label) are listed there in full — do NOT call a tool to fetch them again.
+2. \`list_filter_fields\` if you need the operators for a field.
 3. \`preview_filter\` to test your filter and see what it actually matches. Iterate until the result genuinely matches the channel's description.
 4. \`commit_channel\` once you're satisfied.
+
+The library's tag values are what they are — never use a value that isn't in the vocabulary below. "Anime" may not exist as a genre even when the library is full of anime; "Animation" plus specific show titles may be the real route.
 
 RULES:
 - The pool must be big enough to sustain a channel. Aim near the stated target; a handful of items means constant repetition.
@@ -89,6 +115,12 @@ export type BuildChannelArgs = {
   packageId: string;
   mediaSourceId: string;
   userId: string;
+  /**
+   * The rendered library profile, IDENTICAL for every channel in a run. It both grounds
+   * the agent (it can see what's actually there before probing) and — because it's the
+   * same bytes every time — rides in the shared cached prefix rather than being re-billed.
+   */
+  libraryContext: string;
   /** `fast` skips the agent loop; reserved for the cheaper deterministic path. */
   mode?: "quality" | "fast";
 };
@@ -97,7 +129,7 @@ export async function buildPlannedChannel(
   prisma: PrismaClient,
   args: BuildChannelArgs,
 ): Promise<ChannelBuildResult> {
-  const { channel, packageId, mediaSourceId, userId } = args;
+  const { channel, packageId, mediaSourceId, userId, libraryContext } = args;
   const base = { key: channel.key, name: channel.name, number: channel.number };
 
   // IDEMPOTENCY — this runs inside a durable step, and a step that fails ANYWHERE is
@@ -122,6 +154,7 @@ export async function buildPlannedChannel(
   // Outcome is captured from the terminal tool rather than parsed out of the model's
   // prose — the loop ends when one of these fires.
   let outcome: ChannelBuildResult | null = null;
+  let usage: ChannelUsage | undefined;
 
   const tools = {
     list_filter_fields: tool({
@@ -132,7 +165,7 @@ export async function buildPlannedChannel(
 
     discover_field_values: tool({
       description:
-        "List the REAL values present in the library for a tag field (genre, studio, contentRating…). Always check before filtering on one.",
+        "List the REAL values for a tag field. The common ones (genre, studio, network, contentRating, collection, country, resolution, label) are ALREADY in your context — only call this for the rarer fields like actor, director or writer.",
       inputSchema: z.object({
         field: z.string(),
         mediaTypes: mediaTypesSchema,
@@ -225,25 +258,54 @@ export async function buildPlannedChannel(
   };
 
   try {
-    await generateText({
+    const result = await generateText({
       model: getModel(connection),
-      system: SYSTEM,
       tools,
       stopWhen: stepCountIs(MAX_STEPS),
-      prompt: [
-        `CHANNEL: ${channel.name}`,
-        `DESCRIPTION: ${channel.description}`,
-        `WHAT BELONGS ON IT: ${channel.theme}`,
-        `TARGET POOL SIZE: about ${channel.targetPoolSize} items`,
-        `ORDERING: ${channel.ordering}`,
-        "",
-        "Build and verify the filter, then commit it.",
-      ].join("\n"),
+      messages: [
+        {
+          role: "system",
+          // ONE shared, cached prefix for the WHOLE run. Anthropic caches on exact prefix
+          // match, so this string must be byte-identical across all 50 channel builds —
+          // hence the library profile lives here (shared) and the channel brief lives in
+          // the user message below (per-channel, tiny, uncached). The breakpoint sits on
+          // the system message, which caches the tool definitions with it.
+          //
+          // Get this wrong — e.g. a request-level breakpoint that swallows the channel
+          // brief — and every build has a unique prefix, shares nothing, and pays full
+          // price for the same ~4k tokens 50 times over.
+          content: `${SYSTEM}\n\nTHE LIBRARY YOU ARE BUILDING FROM:\n${libraryContext}`,
+          providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+        },
+        {
+          role: "user",
+          content: [
+            `CHANNEL: ${channel.name}`,
+            `DESCRIPTION: ${channel.description}`,
+            `WHAT BELONGS ON IT: ${channel.theme}`,
+            `TARGET POOL SIZE: about ${channel.targetPoolSize} items`,
+            `ORDERING: ${channel.ordering}`,
+            "",
+            "Build and verify the filter, then commit it.",
+          ].join("\n"),
+        },
+      ],
     });
+
+    // Record what this channel actually cost. Without per-channel numbers a run's spend
+    // is invisible until the bill arrives.
+    usage = {
+      inputTokens: result.usage?.inputTokens ?? 0,
+      outputTokens: result.usage?.outputTokens ?? 0,
+      steps: result.steps?.length ?? 0,
+    };
   } catch (err) {
-    return { ...base, status: "failed", reason: err instanceof Error ? err.message : String(err) };
+    return { ...base, status: "failed", usage, reason: err instanceof Error ? err.message : String(err) };
   }
 
   // Ran out of steps without committing or giving up.
-  return outcome ?? { ...base, status: "failed", reason: "Agent finished without committing a channel." };
+  return {
+    ...(outcome ?? { ...base, status: "failed", reason: "Agent finished without committing a channel." }),
+    usage,
+  };
 }

@@ -10,6 +10,21 @@
  *
  * Runs on its own ports so it never collides with a dev server you already have up.
  * With no sourceId it picks the first enabled media source.
+ *
+ * WATCHING A RUN LIVE — don't sit staring at a blocked terminal. The SDK ships an
+ * inspector that reads our Postgres world directly, so open a second shell:
+ *
+ *   # it reads WORKFLOW_TARGET_WORLD / WORKFLOW_POSTGRES_URL from the ENVIRONMENT
+ *   # (bunx does NOT load .env), so export them first:
+ *   export $(grep -E '^WORKFLOW_(TARGET_WORLD|POSTGRES_URL)=' .env | xargs -d '\n')
+ *
+ *   bunx workflow inspect runs                 # every run + status (R/C/F/X/P)
+ *   bunx workflow inspect steps -r <runId>     # per-step status, live as it builds
+ *   bunx workflow inspect step <stepId>        # one step's detail
+ *   bunx workflow inspect runs --web           # local dashboard (runs/steps/events)
+ *
+ * Also: if you pipe THIS script through `grep`/`head`, the output buffers and you see
+ * nothing until it exits. Run it unpiped, or background it and tail the log.
  */
 import prisma from "@ChannelGuide/db";
 

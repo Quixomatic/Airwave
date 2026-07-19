@@ -2,6 +2,20 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.26] - 2026-07-19
+
+### Fixed
+
+- **The lineup build was wildly more expensive than it needed to be.** An agent loop re-sends its whole conversation on every step, so cost grows **quadratically** with step count — and the first full run had nothing cached, a fat static prefix, and the library's entire tag vocabulary arriving as a *tool result* (407 studios ≈ 2k tokens) that was then re-sent on every subsequent step of every channel. The same problem the chat solved in v0.5.13 wasn't carried over to the builder. Three changes, all about **where the prompt-cache breakpoint sits**:
+  - **One shared cache prefix for the entire run.** The system prompt, tool definitions, library profile and filter vocabulary are now byte-identical across all 50 channel builds, with the cache breakpoint on the system message — so they cost **one cache entry for the whole run** instead of being re-billed per channel. (A request-level breakpoint, as first written, swallowed the per-channel brief and made every prefix unique — sharing nothing.)
+  - **The filter vocabulary is hoisted into that cached prefix.** Previously each agent called `discover_field_values` itself, which lands *after* the breakpoint and is therefore re-sent uncached on every step. Now it's fetched **once per run** (its own durable step) and handed to every builder pre-loaded — so it's sent whole and untruncated, builds converge in fewer steps because discovery is already done, and the agent starts out unable to invent a tag value that doesn't exist.
+  - **`preview_filter` stays pinned to the leanest projection.** It's the one genuinely per-channel, per-iteration payload — so it's hardcoded to `detail: "quick"` with **no way for the model to request `verbose`** (which measured ~270k chars on a large filter).
+
+### Added
+
+- **Token accounting.** Every channel build records its input/output tokens and step count, and the run report totals them — so a run's cost is visible immediately instead of arriving with the bill.
+- **Live run inspection, documented.** The SDK's inspector reads our Postgres world directly: `bunx workflow inspect runs`, `… steps -r <runId>` for per-step status while a build is running, and `… runs --web` for a local dashboard. Note `bunx` doesn't load `.env`, so `WORKFLOW_TARGET_WORLD` / `WORKFLOW_POSTGRES_URL` must be exported first.
+
 ## [0.5.25] - 2026-07-19
 
 ### Added
