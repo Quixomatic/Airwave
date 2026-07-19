@@ -20,7 +20,6 @@ import {
   previewFilter,
   renumberChannels,
   searchTitles,
-  toAgentPreview,
   updateChannel,
   updateChannels,
   updatePackage,
@@ -35,6 +34,10 @@ import {
 
 const mediaType = z.enum(["movie", "show"]);
 const op = z.enum(["is", "isNot", "gte", "lte", "contains", "notContains"]);
+const detail = z
+  .enum(["quick", "default", "verbose"])
+  .optional()
+  .describe("Preview depth: 'quick' = trimmed metadata, 'default' = full item metadata with episodes coalesced into their show, 'verbose' = every matched episode as a full item.");
 
 // The real recursive filter tree the resolver accepts (condition | and/or group).
 const filterNode: z.ZodType<FilterNode> = z.lazy(() =>
@@ -86,22 +89,23 @@ export function buildAgentTools(prisma: PrismaClient, userId: string) {
       execute: (a) => discoverFieldValues(prisma, a),
     }),
     search_titles: tool({
-      description: "Find titles whose name contains a query (does the library have X?). Returns matching shows (with season/episode counts) + movies.",
-      inputSchema: z.object({ mediaSourceId: z.string(), mediaTypes: z.array(mediaType), query: z.string(), verbose: z.boolean().optional() }),
-      execute: async ({ verbose, ...a }) => toAgentPreview(await searchTitles(prisma, a), verbose),
+      description:
+        "Find titles whose name contains a query (does the library have X?). Returns matching items as full PlexItems — a show's episodes are coalesced into ONE show item with episode/season counts; movies pass through.",
+      inputSchema: z.object({ mediaSourceId: z.string(), mediaTypes: z.array(mediaType), query: z.string(), detail }),
+      execute: (a) => searchTitles(prisma, a),
     }),
     preview_filter: tool({
       description:
-        "Resolve an UNSAVED filter tree to a SUMMARY: total item count + which shows match (each with its season & episode counts) + which movies match. ALWAYS test a filter here before creating a channel. It intentionally returns shows + counts, NOT every episode — pass verbose:true only if you actually need sample episode titles.",
+        "Resolve an UNSAVED filter tree to a preview: total match count + the matching items as full PlexItems. A show's many episodes are COALESCED into a single show item carrying `episodes` + `seasons` counts (so a channel of thousands of episodes shows as its handful of shows); movies pass through individually. ALWAYS test a filter here before creating a channel. Use detail='quick' for a fast glance, 'default' (full item metadata) normally, or 'verbose' to see every matched episode.",
       inputSchema: z.object({
         mediaSourceId: z.string(),
         mediaTypes: z.array(mediaType),
         filter: filterNode.optional(),
         sortField: z.string().optional(),
         sortDir: z.enum(["asc", "desc"]).optional(),
-        verbose: z.boolean().optional(),
+        detail,
       }),
-      execute: async ({ verbose, ...a }) => toAgentPreview(await previewFilter(prisma, a), verbose),
+      execute: (a) => previewFilter(prisma, a),
     }),
 
     // ---- Inspection (read) ----

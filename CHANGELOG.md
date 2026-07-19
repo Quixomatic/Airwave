@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.15] - 2026-07-19
+
+### Changed
+
+- **Preview now returns full `PlexItem`s with episodes coalesced up into the show — on the canonical schema, with 3 detail levels.** The v0.5.14 pass stripped episodes correctly but reshaped each entry into a bespoke `{ show, seasons, episodes }` stub that deviated from `PlexItem` (the type everything else speaks). Now `preview_filter` / `search_titles` return real `PlexItem`s: a show's many episodes **coalesce into a single show item** — pulled from the `MediaItem` cache so it carries the true parent-show metadata (genres, cast, studio, art) — annotated with `episodes` + `seasons` counts; movies pass through as their own item. A new **`detail`** param picks the depth: **`quick`** (guide trimmed of summary/cast/art for a fast glance), **`default`** (full item metadata, episodes coalesced), or **`verbose`** (every matched episode as a full item). Verified on a 2,816-episode filter: 16 shows at ~7k chars (quick) / ~13k (default) vs 400 episode items / ~270k (verbose). The agent gets the real metadata picture without the episode flood, and the same shape will feed the coming admin preview tiles.
+
 ## [0.5.14] - 2026-07-19
 
 ### Changed

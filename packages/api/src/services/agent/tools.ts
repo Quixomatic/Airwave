@@ -2,7 +2,7 @@ import { Prisma, type PrismaClient } from "@ChannelGuide/db";
 
 import { toAccentKey } from "../accents";
 import { normalizeCallsign } from "../generator/callsign";
-import { getFilterValues, type PlexItem } from "../plex/client";
+import { getFilterValues, type GuideMeta, type PlexItem } from "../plex/client";
 import { fieldMeta, FILTER_FIELDS, OPS_FOR_KIND, type FilterNode } from "../plex/filter-fields";
 import { resolveFilter } from "../plex/resolve";
 import { channelSortParam } from "../plex/sort-fields";
@@ -78,140 +78,116 @@ export async function discoverFieldValues(prisma: PrismaClient, args: { mediaSou
   return { field: args.field, values: [...titles].sort((a, b) => a.localeCompare(b)) };
 }
 
-/** A single card in a preview: a SHOW (episodes aggregated + counted) or a MOVIE. */
-export type PreviewEntry = {
-  type: "show" | "movie";
-  title: string;
-  ratingKey: string;
-  /** Plex art path (feed to the source image proxy). Show poster for shows, movie poster for movies. */
-  thumbPath: string;
-  /** Episodes matched (for a show) or 1 (movie). */
-  count: number;
-  /** Distinct seasons the matched episodes span (shows only). */
-  seasons?: number;
-  /** A few matched episode titles (shows only) — carried for the agent's opt-in verbose view. */
-  episodeSample?: string[];
-  year?: number;
-  genres?: string[];
-  contentRating?: string;
-  criticRating?: number;
-};
+/**
+ * A preview item IS a full PlexItem (the canonical schema), so the agent + the admin tiles read the same
+ * shape. A SHOW carries its episodes coalesced up: one PlexItem for the show + `episodes`/`seasons` counts
+ * (instead of the flood of episode items). A movie is just its PlexItem.
+ */
+export type PreviewItem = PlexItem & { episodes?: number; seasons?: number };
 
 export type PreviewResult = {
-  totalItems: number; // episodes + movies (what actually schedules)
+  totalItems: number; // episodes + movies actually matched (what schedules)
   showCount: number;
   movieCount: number;
-  entries: PreviewEntry[]; // shows (by episode count desc) then movies, capped
+  items: PreviewItem[]; // shows (episodes coalesced, by episode count desc) then movies, capped
 };
 
-/**
- * Group resolved Plex items into show/movie cards — the RICH shape (with poster paths, ratings, season/
- * episode counts) that the admin preview tiles consume. The agent gets a leaner projection via
- * `toAgentPreview` (it doesn't need artwork, and a big preview of thousands of episodes must not bloat
- * the chat context — only the shows + how many of each matter).
- */
-export function groupPreview(items: PlexItem[]): PreviewResult {
-  const shows = new Map<string, PreviewEntry>();
-  const seasonSets = new Map<string, Set<number>>();
-  const epSamples = new Map<string, string[]>();
-  const movies: PreviewEntry[] = [];
-  for (const it of items) {
-    const g = it.guide;
-    const showKey = g.showRatingKey;
-    if (g.showTitle && showKey) {
-      const ex = shows.get(showKey);
-      if (ex) ex.count++;
-      else
-        shows.set(showKey, {
-          type: "show",
-          title: g.showTitle,
-          ratingKey: showKey,
-          thumbPath: `/library/metadata/${showKey}/thumb`,
-          count: 1,
-          genres: g.genres?.slice(0, 4),
-          contentRating: g.contentRating,
-          criticRating: g.criticRating,
-        });
-      if (g.season != null) {
-        let s = seasonSets.get(showKey);
-        if (!s) seasonSets.set(showKey, (s = new Set()));
-        s.add(g.season);
-      }
-      let samp = epSamples.get(showKey);
-      if (!samp) epSamples.set(showKey, (samp = []));
-      if (samp.length < 8) samp.push(g.season != null && g.episode != null ? `S${g.season}E${g.episode} · ${it.title}` : it.title);
-    } else {
-      movies.push({
-        type: "movie",
-        title: it.title,
-        ratingKey: it.ratingKey,
-        thumbPath: `/library/metadata/${it.ratingKey}/thumb`,
-        count: 1,
-        year: it.year ?? g.year,
-        genres: g.genres?.slice(0, 4),
-        contentRating: g.contentRating,
-        criticRating: g.criticRating,
-      });
-    }
-  }
-  for (const [key, e] of shows) {
-    e.seasons = seasonSets.get(key)?.size ?? 0;
-    e.episodeSample = epSamples.get(key);
-  }
-  const showEntries = [...shows.values()].sort((a, b) => b.count - a.count);
-  return { totalItems: items.length, showCount: showEntries.length, movieCount: movies.length, entries: [...showEntries, ...movies].slice(0, 60) };
+/** How much per-item metadata the preview carries. */
+export type PreviewDetail = "quick" | "default" | "verbose";
+
+const SHOW_CAP = 60;
+const MOVIE_CAP = 300;
+const VERBOSE_CAP = 400;
+
+/** Heavy guide fields dropped for the "quick" glance (kept for "default"/"verbose"). */
+function trimGuide(g: GuideMeta): GuideMeta {
+  const out = { ...g } as Record<string, unknown>;
+  for (const k of ["summary", "tagline", "cast", "directors", "art"]) delete out[k];
+  return out as GuideMeta;
 }
 
-/** Lean per-show / per-movie shape (default). */
-export type AgentPreviewShow = { show: string; seasons: number; episodes: number; contentRating?: string; genres?: string[]; sampleEpisodes?: string[] };
-export type AgentPreviewMovie = { movie: string; year?: number };
-export type AgentPreview = {
-  totalItems: number;
-  showCount: number;
-  movieCount: number;
-  shows: AgentPreviewShow[];
-  movies: AgentPreviewMovie[];
-};
+function mediaItemToPlexItem(row: { ratingKey: string; title: string; durationMs: number; year: number | null; airDate: string | null; guide: unknown }): PlexItem {
+  return {
+    ratingKey: row.ratingKey,
+    title: row.title,
+    durationMs: row.durationMs,
+    year: row.year ?? undefined,
+    originallyAvailableAt: row.airDate ?? undefined,
+    guide: (row.guide as GuideMeta) ?? { title: row.title },
+  };
+}
 
 /**
- * Project the rich preview down to what the MODEL actually needs: which shows (with season + episode
- * counts) and which movies — no artwork, no per-item metadata. `verbose` adds a sample of real episode
- * titles + ratings for the rare case the agent needs to eyeball the actual episodes. This keeps big
- * previews (thousands of episodes across dozens of shows) from ballooning the chat context.
+ * Coalesce a resolved item set into a preview, keeping the PlexItem schema. Episodes fold UP into their
+ * parent SHOW — a single PlexItem pulled from the MediaItem cache (the real show record: genres, cast,
+ * studio, art), annotated with episode + season counts — while movies pass through as their own PlexItem.
+ * `detail`: "verbose" = no coalescing (every matched episode + movie, full items); "default" = coalesced,
+ * full guides; "quick" = coalesced with the heavy guide fields trimmed for a fast glance.
  */
-export function toAgentPreview(r: PreviewResult, verbose = false): AgentPreview {
-  const shows: AgentPreviewShow[] = [];
-  const movies: AgentPreviewMovie[] = [];
-  for (const e of r.entries) {
-    if (e.type === "show") {
-      shows.push({
-        show: e.title,
-        seasons: e.seasons ?? 0,
-        episodes: e.count,
-        ...(verbose ? { contentRating: e.contentRating, genres: e.genres, sampleEpisodes: e.episodeSample } : {}),
-      });
+export async function previewItems(
+  prisma: PrismaClient,
+  mediaSourceId: string,
+  items: PlexItem[],
+  detail: PreviewDetail = "default",
+): Promise<PreviewResult> {
+  const showKeysAll = new Set<string>();
+  let movieCountAll = 0;
+  for (const it of items) {
+    if (it.guide.showRatingKey) showKeysAll.add(it.guide.showRatingKey);
+    else movieCountAll++;
+  }
+  const header = { totalItems: items.length, showCount: showKeysAll.size, movieCount: movieCountAll };
+
+  // Verbose: no coalescing — hand back the actual matched items (capped for safety).
+  if (detail === "verbose") return { ...header, items: items.slice(0, VERBOSE_CAP) };
+
+  // Coalesce episodes → shows.
+  const agg = new Map<string, { episodes: number; seasons: Set<number> }>();
+  const movies: PlexItem[] = [];
+  for (const it of items) {
+    const key = it.guide.showRatingKey;
+    if (key) {
+      let a = agg.get(key);
+      if (!a) agg.set(key, (a = { episodes: 0, seasons: new Set() }));
+      a.episodes++;
+      if (it.guide.season != null) a.seasons.add(it.guide.season);
     } else {
-      movies.push({ movie: e.title, ...(e.year ? { year: e.year } : {}) });
+      movies.push(it);
     }
   }
-  return { totalItems: r.totalItems, showCount: r.showCount, movieCount: r.movieCount, shows, movies };
+
+  const showKeys = [...agg.keys()];
+  const rows = showKeys.length ? await prisma.mediaItem.findMany({ where: { mediaSourceId, ratingKey: { in: showKeys }, type: "show" } }) : [];
+  const rowByKey = new Map(rows.map((r) => [r.ratingKey, r]));
+
+  const showItems: PreviewItem[] = showKeys.map((key) => {
+    const a = agg.get(key)!;
+    const row = rowByKey.get(key);
+    const base: PlexItem = row ? mediaItemToPlexItem(row) : { ratingKey: key, title: "(unknown show)", durationMs: 0, guide: { title: "(unknown show)", type: "show" } };
+    return { ...base, episodes: a.episodes, seasons: a.seasons.size };
+  });
+  showItems.sort((x, y) => (y.episodes ?? 0) - (x.episodes ?? 0));
+
+  let out: PreviewItem[] = [...showItems.slice(0, SHOW_CAP), ...movies.slice(0, MOVIE_CAP)];
+  if (detail === "quick") out = out.map((i) => ({ ...i, guide: trimGuide(i.guide) }));
+  return { ...header, items: out };
 }
 
 export async function previewFilter(
   prisma: PrismaClient,
-  args: { mediaSourceId: string; mediaTypes: MediaType[]; filter?: FilterNode; sortField?: string; sortDir?: "asc" | "desc" },
+  args: { mediaSourceId: string; mediaTypes: MediaType[]; filter?: FilterNode; sortField?: string; sortDir?: "asc" | "desc"; detail?: PreviewDetail },
 ) {
   const source = await requireSource(prisma, args.mediaSourceId);
   const sort = channelSortParam("SHUFFLE", args.sortField ?? "title", args.sortDir ?? "asc");
   const items = await resolveFilter(prisma, source, args.mediaTypes, asFilterNode(args.filter), sort);
-  return groupPreview(items);
+  return previewItems(prisma, args.mediaSourceId, items, args.detail);
 }
 
-export async function searchTitles(prisma: PrismaClient, args: { mediaSourceId: string; mediaTypes: MediaType[]; query: string }) {
+export async function searchTitles(prisma: PrismaClient, args: { mediaSourceId: string; mediaTypes: MediaType[]; query: string; detail?: PreviewDetail }) {
   const source = await requireSource(prisma, args.mediaSourceId);
   const tree: FilterNode = { type: "condition", field: "title", op: "contains", value: args.query };
   const items = await resolveFilter(prisma, source, args.mediaTypes, tree, channelSortParam("SHUFFLE", "title", "asc"));
-  return groupPreview(items);
+  return previewItems(prisma, args.mediaSourceId, items, args.detail);
 }
 
 /* ---------------- Inspection (read) -------------------------------------- */
