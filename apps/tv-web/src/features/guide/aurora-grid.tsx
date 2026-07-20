@@ -781,23 +781,19 @@ function Row({
                 return <Icon size="1em" />;
               })()
             )}
-            {/* Favorite indicator badge — only when favorited AND not focused (focused already
-                shows the filled heart). A dark disc so the red heart reads against the tint. */}
+            {/* Favorite indicator — only when favorited AND not focused (focused already shows the
+                filled heart). Just the red heart tucked into the bottom-right corner, no disc; a
+                soft drop-shadow keeps it legible where it overlaps the tint edge. */}
             {favorited && !railFocused && (
               <span
                 style={{
                   position: "absolute",
-                  right: vw(-2),
-                  bottom: vw(-2),
-                  width: vw(20),
-                  height: vw(20),
-                  borderRadius: "50%",
-                  background: C.bg,
-                  border: `${vw(1.5)} solid ${C.bg}`,
+                  right: vw(-4),
+                  bottom: vw(-4),
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: vw(12),
+                  fontSize: vw(22),
+                  lineHeight: 1,
+                  filter: `drop-shadow(0 ${vw(1)} ${vw(2)} rgba(0,0,0,0.6))`,
                 }}
               >
                 <Heart size="1em" fill={C.fav} color={C.fav} />

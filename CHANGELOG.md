@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.49] - 2026-07-20
+
+### Changed
+
+- **TV: the favorite indicator on the guide rail icon is bigger and loses its dark disc.** The small corner heart that marks a favorited (unfocused) channel now sits directly on the tinted circle — no backing disc — and is roughly doubled in size, with a soft drop-shadow so it stays legible where it overlaps the circle's edge.
+
 ## [0.5.48] - 2026-07-20
 
 ### Added
