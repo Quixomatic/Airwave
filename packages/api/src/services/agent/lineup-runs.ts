@@ -48,7 +48,7 @@ export async function listLineupRuns(
            r.status,
            r.started_at,
            r.completed_at,
-           -- workflow_steps is keyed by (run_id, step_id) — there is NO `id` column.
+           -- workflow_steps is keyed by (run_id, step_id); it has no id column.
            COUNT(s.step_id)::int                                         AS total,
            COUNT(*) FILTER (WHERE s.status = 'completed')::int           AS completed,
            COUNT(*) FILTER (WHERE s.status = 'failed')::int              AS failed,
