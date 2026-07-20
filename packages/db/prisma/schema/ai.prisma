@@ -33,6 +33,70 @@ model AiConnection {
   @@map("ai_connection")
 }
 
+/// One unit of work inside an AI lineup run, recorded so the admin can see WHAT THE MODEL DID.
+///
+/// WHY THIS TABLE EXISTS — the Workflow SDK already stores each step's input/output (CBOR in its own
+/// schema, decodable via `workflow/observability`), so this is deliberately NOT a copy of that. What
+/// WDK cannot see is the inside of a step: a channel build is ONE step containing a whole
+/// `generateText` tool loop, so its previews, its filter revisions, and its reasoning are invisible.
+/// Everything that made a run's outcome what it is lived only in the server's stdout until now.
+///
+/// It is also where the COST accounting gets fixed. The run report only ever aggregated usage from
+/// per-channel builds that SUCCEEDED, which understated a run three ways: the planner call (on a
+/// pricier model) wasn't counted at all, retries were free, and everything was priced at worker
+/// rates. A row is written per attempt, so a step that failed and retried leaves both.
+///
+/// Keyed by the SDK's own ids: `getWorkflowMetadata().workflowRunId` and `getStepMetadata().stepId` /
+/// `.attempt`, which is what lets a row join back to the step timeline on the observability page.
+model AiLineupTrace {
+  id     String @id @default(cuid())
+  /// WDK's `workflowRunId` — joins these rows to `workflow.workflow_runs`.
+  runId  String
+  /// WDK's `stepId`; null for anything recorded outside a step.
+  stepId String?
+
+  /// Short step name, e.g. "planLineup" / "buildChannel".
+  stepName String
+  /// 1 on the first try. A retry writes a SECOND row rather than overwriting — that's the point.
+  attempt  Int    @default(1)
+  /// "analyze" | "context" | "plan" | "packages" | "numbering" | "build" | "report"
+  phase    String
+
+  /// Which channel this row is about, when it's a build. Null for whole-run steps.
+  channelKey    String?
+  channelNumber Int?
+  channelName   String?
+
+  /// "ok" | "skipped" | "failed"
+  status String
+  /// The model's own explanation — why it skipped, or how it settled on a filter.
+  reason String?
+
+  /// What the step was given (the brief, the proposed filter) — summarized, not the whole prefix:
+  /// the shared library context is identical for every build and would be stored dozens of times.
+  input  Json?
+  /// What it produced (the plan, the committed filter, the report).
+  output Json?
+  /// The agent's tool calls in order — the part WDK structurally cannot capture.
+  trace  Json?
+
+  model            String?
+  inputTokens      Int     @default(0)
+  outputTokens     Int     @default(0)
+  cacheReadTokens  Int     @default(0)
+  cacheWriteTokens Int     @default(0)
+  /// Agent loop steps (tool round-trips), not workflow steps.
+  agentSteps       Int     @default(0)
+
+  error      String?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([runId])
+  @@index([runId, phase])
+  @@map("ai_lineup_trace")
+}
+
 /// A persisted chat with the channel-building assistant. Retained so histories survive reloads; a
 /// prune job can trim old ones later.
 model AiConversation {

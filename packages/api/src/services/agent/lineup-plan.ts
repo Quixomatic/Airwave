@@ -26,6 +26,7 @@ import { z } from "zod";
 import { ACCENT_KEYS, channelAccentAt } from "../accents";
 import { fieldMeta, OPS_FOR_KIND } from "../plex/filter-fields";
 import { getConnectionForRole, getModel } from "./config";
+import { recordTrace, type TraceContext } from "./lineup-trace";
 
 
 /**
@@ -234,7 +235,11 @@ COVERAGE — how many channels, and which:
 - **Depth where there's depth.** A genre with 300 titles or a show with 500 episodes can support several distinct channels (by era, by mood, by sub-genre, by rating). One catch-all channel over that much material wastes it.
 - **Don't pad.** Two channels that would resolve to nearly the same pool should be one channel. Every channel must justify its own existence with a concept a viewer could describe in a sentence.
 - **Packages group channels the way a viewer thinks** — by audience, mood, or occasion. Use as many as the lineup needs; don't force channels into a package where they don't belong.
-- **REUSE AN EXISTING PACKAGE WHEN ONE FITS.** You are shown the packages already on this server. If a channel belongs in one of them, set that package's \`existingKey\` rather than inventing a near-duplicate — a lineup with "Kids & Family" *and* a new "Family Fun" is worse for the viewer than one good package. Reuse is the default when a reasonable home exists; create a new package only for a genuinely new idea the current set doesn't cover. Note the \`origin\`: an \`ai\` package is from a previous run of this same process and will be replaced, so prefer reusing \`preset\` and \`manual\` packages, which are the owner's own organisation.
+- **REUSE EXISTING PACKAGES. THIS IS NOT OPTIONAL.** You are shown every package already on this server. Before you invent ANY package, go through that list and ask whether your channels already have a home there. Set \`existingKey\` to file them into it.
+  - **A new package must be justified.** If you create one, it must cover an idea that NO existing package covers. "Kids Corner" next to an existing "Kids & Family", "Blockbuster Movies" next to "Action & Sci-Fi", or three separate animation packages where one exists — these are FAILURES. They fragment the guide and make the lineup worse than doing nothing.
+  - **A near-synonym is a duplicate.** If you find yourself naming a package something that a viewer would confuse with an existing one, you wanted \`existingKey\`.
+  - **An existing package can hold many new channels** — filing ten channels into "Kids & Family" is a good outcome, not a crowded one.
+  - Prefer \`preset\` and \`manual\` packages: those are the owner's own organisation. An \`ai\` package is from a previous run of this process and is about to be replaced anyway.
 
 MOVIES AND TV TOGETHER:
 - Real channels play both. Default \`mediaTypes\` to \`["movie","show"]\` and only narrow it when the concept genuinely demands one — a full-series marathon is shows-only; a film festival is movies-only. A kids channel, a holiday channel, a genre block: those should mix.
@@ -430,7 +435,7 @@ export async function planLineup(
    * tag values to author filters, not just the statistical shape.
    */
   libraryContext: string,
-  opts: PlanOptions & { existingPackages?: ExistingPackage[] } = {},
+  opts: PlanOptions & { existingPackages?: ExistingPackage[]; trace?: TraceContext } = {},
 ): Promise<LineupPlanDraft> {
   // The PLANNER role: one big reasoning call where quality matters most. Falls back to the
   // active (chat) connection when no dedicated planner is configured.
@@ -449,9 +454,23 @@ export async function planLineup(
    */
   const exactCount = opts.targetChannels;
 
-  const { object, usage } = await generateObject({
+  const startedAt = new Date();
+  let object: z.infer<typeof planSchema>;
+  let usage: Awaited<ReturnType<typeof generateObject>>["usage"] | undefined;
+
+  try {
+    ({ object, usage } = await generateObject({
     model: getModel(connection),
     schema: planSchema,
+    /**
+     * Pinned deliberately. A full lineup is a LOT of JSON — the last successful plan emitted
+     * 10,393 output tokens for 26 channels, and widening the field catalog invites bigger
+     * ones. Left unset, the cap is whatever the provider defaults to, and a plan that runs
+     * past it comes back as truncated JSON, which surfaces as the opaque
+     * `AI_NoObjectGeneratedError: response did not match schema` — indistinguishable from a
+     * genuine schema violation unless you inspect the raw text (see the catch below).
+     */
+    maxOutputTokens: 32_000,
     system: SYSTEM,
     prompt: [
       libraryContext,
@@ -465,7 +484,41 @@ export async function planLineup(
       "Give every channel a complete, working filter built from the vocabulary above.",
     ].join("\n"),
     providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
-  });
+    }));
+  } catch (err) {
+    /**
+     * Make a plan failure LEGIBLE. `AI_NoObjectGeneratedError` carries the raw `text` the
+     * model produced plus `finishReason`, and the two failure modes look completely different
+     * there: a truncated response ends mid-token with `finishReason: "length"`, while a real
+     * schema violation is well-formed JSON in the wrong shape. Without this the only evidence
+     * was a CBOR blob in the SDK's event log, and each retry is a full call on the planner
+     * model — so paying for a second attempt and STILL not knowing why is the worst outcome.
+     */
+    const e = err as { name?: string; text?: string; finishReason?: string; cause?: unknown };
+    if (e?.name === "AI_NoObjectGeneratedError") {
+      const text = typeof e.text === "string" ? e.text : "";
+      console.error(
+        `[plan] NoObjectGenerated — finishReason=${e.finishReason ?? "?"} ` +
+          `rawTextChars=${text.length} ` +
+          `(finishReason "length" => hit maxOutputTokens; otherwise the shape is wrong)`,
+      );
+      if (text) console.error(`[plan] raw tail: …${text.slice(-400)}`);
+      if (e.cause) console.error(`[plan] cause:`, String(e.cause).slice(0, 800));
+    }
+    if (opts.trace) {
+      await recordTrace(prisma, {
+        ...opts.trace,
+        stepName: "planLineup",
+        phase: "plan",
+        status: "failed",
+        error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+        output: { finishReason: e?.finishReason, rawTextChars: e?.text?.length ?? 0 },
+        usage: { model: connection.model },
+        startedAt,
+      });
+    }
+    throw err;
+  }
 
   console.log(
     `[plan] tokens in=${usage?.inputTokens ?? 0} out=${usage?.outputTokens ?? 0}` +
@@ -475,7 +528,31 @@ export async function planLineup(
 
   // Filters are sanitized here so a bad condition never reaches the build fan-out.
   // Numbering happens later, in its own step — see `assignChannelNumbers`.
-  return { packages: sanitizePlan(object.packages) };
+  const draft = { packages: sanitizePlan(object.packages) };
+
+  // The PLAN is the run's most valuable artifact and, until now, the least inspectable: only
+  // channels that actually got BUILT left a row anywhere, so a capped run threw away the other
+  // 28 designs. Storing it means plan quality can be judged for the price of one call.
+  if (opts.trace) {
+    await recordTrace(prisma, {
+      ...opts.trace,
+      stepName: "planLineup",
+      phase: "plan",
+      status: "ok",
+      input: { existingPackages: opts.existingPackages?.map((p) => p.key) ?? [] },
+      output: draft,
+      usage: {
+        model: connection.model,
+        inputTokens: usage?.inputTokens ?? 0,
+        outputTokens: usage?.outputTokens ?? 0,
+        cacheReadTokens: usage?.inputTokenDetails?.cacheReadTokens ?? 0,
+        cacheWriteTokens: usage?.inputTokenDetails?.cacheWriteTokens ?? 0,
+      },
+      startedAt,
+    });
+  }
+
+  return draft;
 }
 
 /** Compact one-line-per-channel rendering, for logs and the run report. */

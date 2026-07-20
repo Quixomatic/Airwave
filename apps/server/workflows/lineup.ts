@@ -22,6 +22,7 @@
  * pick up workflow changes (the directives are a build-time transform).
  */
 import prisma from "@ChannelGuide/db";
+import { getStepMetadata, getWorkflowMetadata } from "workflow";
 
 import type { ChannelBuildResult } from "@ChannelGuide/api/services/agent/channel-builder";
 import { buildPlannedChannel } from "@ChannelGuide/api/services/agent/channel-builder";
@@ -59,6 +60,22 @@ export type { LibraryProfile, LineupPlan, PlannedChannel, ChannelBuildResult };
  * channels in reasonable time, low enough to stay under provider rate limits.
  */
 const BUILD_CONCURRENCY = 6;
+
+/**
+ * Identify the run + attempt from INSIDE a step, so trace rows join back to the step timeline.
+ *
+ * Only callable within a `"use step"` function — `getStepMetadata()` throws in the workflow
+ * body — and it's read here rather than in `packages/api` because those services must never
+ * import the Workflow SDK (the inversion that keeps the server bootable with the engine off).
+ *
+ * `attempt` is the load-bearing field: a retried step writes a SECOND trace row instead of
+ * overwriting, which is what finally makes retries visible in the cost accounting.
+ */
+function traceContext() {
+  const { workflowRunId } = getWorkflowMetadata();
+  const { stepId, attempt } = getStepMetadata();
+  return { runId: workflowRunId, stepId, attempt };
+}
 
 // PlannedChannel / PlannedPackage / LineupPlan now live with the planner service
 // (packages/api/.../lineup-plan.ts) so the Zod schema is the single source of truth —
@@ -271,7 +288,10 @@ async function planLineup(
   existingPackages: ExistingPackage[],
 ): Promise<LineupPlanDraft> {
   "use step";
-  const plan = await planLineupService(prisma, libraryContext, { existingPackages });
+  const plan = await planLineupService(prisma, libraryContext, {
+    existingPackages,
+    trace: traceContext(),
+  });
   const channels = plan.packages.reduce((n, p) => n + p.channels.length, 0);
   const reused = plan.packages.filter((p) => p.existingKey).length;
   console.log(
@@ -365,6 +385,7 @@ async function buildChannel(
     userId,
     libraryContext,
     mode,
+    trace: traceContext(),
   });
 
   if (result.status === "created" && result.channelId) {

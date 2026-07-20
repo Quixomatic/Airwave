@@ -27,6 +27,7 @@ import { z } from "zod";
 
 import { getConnectionForRole, getModel } from "./config";
 import type { PlannedChannel } from "./lineup-plan";
+import { recordTrace, type TraceContext } from "./lineup-trace";
 import {
   createChannel,
   discoverFieldValues,
@@ -147,7 +148,45 @@ export type BuildChannelArgs = {
   libraryContext: string;
   /** `fast` skips the agent loop; reserved for the cheaper deterministic path. */
   mode?: "quality" | "fast";
+  /** Run/step identity, so this build's reasoning can be recorded. */
+  trace?: TraceContext;
 };
+
+/**
+ * Flatten the agent loop into a readable call list.
+ *
+ * This is the whole reason the trace table exists: a channel build is ONE workflow step, so
+ * from the outside all you ever see is "completed, 34s". What actually matters — the filter it
+ * previewed, how many items came back, what it changed, why it settled — lives in these steps
+ * and previously went nowhere but stdout.
+ *
+ * Tool RESULTS are summarized rather than stored: a single `preview_filter` result can be tens
+ * of thousands of tokens, and storing dozens of them per run would dwarf everything else. The
+ * count and a short sample are what make the decision legible.
+ */
+function summarizeAgentSteps(steps: unknown[]): unknown[] {
+  const out: unknown[] = [];
+  for (const step of steps as { content?: unknown[] }[]) {
+    for (const part of (step.content ?? []) as Record<string, unknown>[]) {
+      if (part.type === "tool-call") {
+        out.push({ call: part.toolName, input: part.input });
+      } else if (part.type === "tool-result") {
+        const r = part.output as Record<string, unknown> | undefined;
+        const count =
+          (r?.count as number) ?? (Array.isArray(r?.items) ? (r.items as unknown[]).length : undefined);
+        out.push({
+          result: part.toolName,
+          ...(count != null ? { matched: count } : {}),
+          // A short, shape-preserving sample. Enough to see WHAT matched, not the whole payload.
+          sample: JSON.stringify(r ?? {}).slice(0, 600),
+        });
+      } else if (part.type === "text" && typeof part.text === "string" && part.text.trim()) {
+        out.push({ says: part.text.slice(0, 1_000) });
+      }
+    }
+  }
+  return out;
+}
 
 export async function buildPlannedChannel(
   prisma: PrismaClient,
@@ -182,6 +221,8 @@ export async function buildPlannedChannel(
   // prose — the loop ends when one of these fires.
   let outcome: ChannelBuildResult | null = null;
   let usage: ChannelUsage | undefined;
+  let agentTrace: unknown[] = [];
+  const startedAt = new Date();
 
   const tools = {
     list_filter_fields: tool({
@@ -344,13 +385,70 @@ export async function buildPlannedChannel(
       cacheWriteTokens: result.usage?.inputTokenDetails?.cacheWriteTokens ?? 0,
       steps: result.steps?.length ?? 0,
     };
+    agentTrace = summarizeAgentSteps(result.steps ?? []);
   } catch (err) {
-    return { ...base, status: "failed", usage, reason: err instanceof Error ? err.message : String(err) };
+    const failed: ChannelBuildResult = {
+      ...base,
+      status: "failed",
+      usage,
+      reason: err instanceof Error ? err.message : String(err),
+    };
+    // A throwing build is exactly the case the old accounting lost: the step retries, and
+    // whatever it already spent went unrecorded. Trace it before rethrowing upward.
+    if (args.trace) {
+      await recordTrace(prisma, {
+        ...args.trace,
+        stepName: "buildChannel",
+        phase: "build",
+        channelKey: channel.key,
+        channelNumber: channel.number,
+        channelName: channel.name,
+        status: "failed",
+        reason: failed.reason,
+        error: failed.reason,
+        usage: { model: connection.model, ...usage },
+        startedAt,
+      });
+    }
+    return failed;
   }
 
-  // Ran out of steps without committing or giving up.
-  return {
+  const result: ChannelBuildResult = {
     ...(outcome ?? { ...base, status: "failed", reason: "Agent finished without committing a channel." }),
     usage,
   };
+
+  if (args.trace) {
+    await recordTrace(prisma, {
+      ...args.trace,
+      stepName: "buildChannel",
+      phase: "build",
+      channelKey: channel.key,
+      channelNumber: channel.number,
+      channelName: channel.name,
+      status: result.status === "created" ? "ok" : result.status === "skipped" ? "skipped" : "failed",
+      reason: result.reason,
+      // The brief only — NOT `libraryContext`, which is byte-identical across every build in
+      // the run and would be stored dozens of times over for no added information.
+      input: {
+        theme: channel.theme,
+        targetPoolSize: channel.targetPoolSize,
+        mediaTypes: channel.mediaTypes,
+        proposedFilter: channel.filter,
+      },
+      output: { status: result.status, poolSize: result.poolSize, channelId: result.channelId },
+      trace: agentTrace,
+      usage: {
+        model: connection.model,
+        inputTokens: usage?.inputTokens ?? 0,
+        outputTokens: usage?.outputTokens ?? 0,
+        cacheReadTokens: usage?.cacheReadTokens ?? 0,
+        cacheWriteTokens: usage?.cacheWriteTokens ?? 0,
+        agentSteps: usage?.steps ?? 0,
+      },
+      startedAt,
+    });
+  }
+
+  return result;
 }

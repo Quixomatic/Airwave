@@ -2,6 +2,28 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.43] - 2026-07-20
+
+### Added
+
+- **Every AI lineup run now records what the model actually did** — new `AiLineupTrace` table. The Workflow SDK already stores each step's input and output, so this deliberately isn't a copy of that; it captures the two things WDK structurally *cannot* see. First, **the inside of a step**: a channel build is one step wrapping a whole `generateText` tool loop, so its previews, filter revisions and reasoning were invisible from outside and lived only in the server's stdout. Second, **the plan itself** — only channels that got *built* left a row anywhere, so the last capped run designed 33 channels and threw 28 of them away unread. Plan quality can now be judged for the price of a single call instead of a full build.
+- **Honest cost accounting.** The run report only ever summed usage from per-channel builds that succeeded, which understated a run three ways: the planner call (on a pricier model) wasn't counted at all, **retries were free**, and everything was priced at worker rates. That's how a run showed **$0.16** when the planner alone — which ran twice — was several times that. A trace row is written **per attempt** and carries its own model, so `summarizeRunUsage` can group by model and phase and the real figure falls out.
+
+### Fixed
+
+- **A failing plan step is now legible.** `AI_NoObjectGeneratedError: response did not match schema` is emitted for two completely different problems, and we couldn't tell them apart — the only evidence was a CBOR blob in the SDK's event log that had to be decoded by hand. The error carries the raw `text` and a `finishReason`: truncation ends mid-token with `finishReason: "length"`, a genuine schema violation is well-formed JSON in the wrong shape. Both are now logged, along with a trace row. Each retry is a full call on the planner model, so paying twice and *still* not knowing why was the worst case.
+- **`maxOutputTokens` is pinned at 32k for the plan call.** It was unset, so the cap was whatever the provider defaulted to. The last successful plan emitted **10,393 output tokens** for 26 channels and the field catalog invites bigger ones, which makes silent truncation a live risk — and truncation is one of the two candidate causes of the retry above.
+
+### Changed
+
+- **Package reuse is now stated as mandatory, not encouraged.** First run with it offered reused 4 of 13 packages but still produced "Kids Corner" beside the existing "Kids & Family" and "Blockbuster Movies" beside "Action & Sci-Fi". The prompt now requires walking the existing list before inventing anything, names those exact cases as failures, and says a near-synonym *is* a duplicate.
+
+### Notes
+
+- _(Schema change — requires `pnpm db:push` + `pnpm db:generate`; backend needs a restart, then `pnpm workflow:build`.)_
+- Trace writes are best-effort and never throw into a run: losing a row is a nuisance, failing a completed channel build because we couldn't log it is not.
+- Tool *results* are summarized (match count + a short sample), not stored whole — one `preview_filter` result can be tens of thousands of tokens.
+
 ## [0.5.42] - 2026-07-20
 
 ### Added
