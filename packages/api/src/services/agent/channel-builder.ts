@@ -2,11 +2,14 @@
  * The per-channel builder (§7.3a §4.4) — turns a planned channel CONCEPT into a real
  * channel with a verified Plex filter.
  *
- * This is where the quality comes from. The planner only proposes intent ("wall-to-wall
- * Power Rangers", "Toho and Golden Harvest genre cinema"); this grounds that into an
- * actual filter tree by discovering the library's REAL tag values and previewing the
- * result before committing. A concept that can't be filled is reported as skipped rather
- * than becoming an empty channel.
+ * The planner now supplies a candidate filter (it has the whole tag vocabulary), so this is
+ * a VERIFY-AND-COMMIT loop, not an exploratory one: preview the proposal, commit if it fits,
+ * adjust once if it doesn't, give up if nothing sensible matches. A concept that can't be
+ * filled is reported as skipped rather than becoming an empty channel.
+ *
+ * Why that shape: a preview payload is re-sent on every subsequent step of the loop, so
+ * exploration is quadratic. Measured before this change: ~117k input tokens PER CHANNEL, and
+ * one build exceeded Haiku's entire 200k context on its own previews.
  *
  * It runs the same grounded tool loop the chat agent uses, minus the approval gate — the
  * gate lives in the agent-tools WRAPPER, not in these services, which is exactly why the
@@ -32,7 +35,15 @@ import {
   searchTitles,
 } from "./tools";
 
-export type ChannelUsage = { inputTokens: number; outputTokens: number; steps: number };
+export type ChannelUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  /** Input tokens served from the shared prompt cache (~0.1x price). */
+  cacheReadTokens: number;
+  /** Input tokens written to the cache (~1.25x price) — the first build pays this. */
+  cacheWriteTokens: number;
+  steps: number;
+};
 
 export type ChannelBuildResult = {
   key: string;
@@ -92,13 +103,15 @@ const filterNodeSchema: z.ZodType<FilterNodeInput> = z.lazy(() =>
   ]),
 );
 
-const SYSTEM = `You build ONE live-TV channel by turning a description into a verified Plex filter.
+const SYSTEM = `You VERIFY a proposed live-TV channel filter, then commit it.
 
-PROCESS — follow it in order:
-1. Read the LIBRARY and FILTER VOCABULARY already given to you below. The common tag values (genre, studio, network, contentRating, collection, country, resolution, label) are listed there in full — do NOT call a tool to fetch them again.
-2. \`list_filter_fields\` if you need the operators for a field.
-3. \`preview_filter\` to test your filter and see what it actually matches. Iterate until the result genuinely matches the channel's description.
-4. \`commit_channel\` once you're satisfied.
+A planner has already written a candidate filter using the library's real tag vocabulary. Your job is to check it, not to start from scratch — most channels should take two or three steps.
+
+PROCESS:
+1. \`preview_filter\` the proposed filter. Look at the count and the sample.
+2. If it genuinely matches the channel's description, \`commit_channel\` immediately. Do NOT keep exploring a filter that already works.
+3. Only if it's clearly wrong (matches nothing, matches the wrong thing, or is wildly off the target size), adjust and preview again — passing \`detail: "compact"\` on these follow-up checks, which returns the same items far more cheaply.
+4. Use \`list_filter_fields\` only if you need an operator you don't know. The tag values are already in your context below — never fetch them again.
 
 The library's tag values are what they are — never use a value that isn't in the vocabulary below. "Anime" may not exist as a genre even when the library is full of anime; "Animation" plus specific show titles may be the real route.
 
@@ -191,15 +204,21 @@ export async function buildPlannedChannel(
         filter: filterNodeSchema.optional(),
         sortField: z.string().optional(),
         sortDir: z.enum(["asc", "desc"]).optional(),
+        detail: z
+          .enum(["quick", "compact"])
+          .optional()
+          .describe(
+            'Leave unset for a first look at a new filter ("quick" — full item detail). Pass "compact" on FOLLOW-UP checks of a refinement: same items, same counts, ~4x cheaper. Preview payloads are re-sent on every later step, so compact keeps a long build affordable.',
+          ),
       }),
-      execute: async ({ mediaTypes, filter, sortField, sortDir }) =>
+      execute: async ({ mediaTypes, filter, sortField, sortDir, detail }) =>
         previewFilter(prisma, {
           mediaSourceId,
           mediaTypes,
           filter: filter as never,
           sortField,
           sortDir,
-          detail: "quick",
+          detail: detail ?? "quick",
         }),
     }),
 
@@ -293,8 +312,10 @@ export async function buildPlannedChannel(
             `WHAT BELONGS ON IT: ${channel.theme}`,
             `TARGET POOL SIZE: about ${channel.targetPoolSize} items`,
             `ORDERING: ${channel.ordering}`,
+            `MEDIA TYPES: ${channel.mediaTypes.join(", ")}`,
             "",
-            "Build and verify the filter, then commit it.",
+            "PROPOSED FILTER (verify this first):",
+            JSON.stringify(channel.filter),
           ].join("\n"),
         },
       ],
@@ -305,6 +326,11 @@ export async function buildPlannedChannel(
     usage = {
       inputTokens: result.usage?.inputTokens ?? 0,
       outputTokens: result.usage?.outputTokens ?? 0,
+      // Proof that the shared prefix is actually being served from cache rather than
+      // re-billed. Without this we were guessing about caching — twice, wrongly.
+      // NB these live under `inputTokenDetails`, not on `usage` directly.
+      cacheReadTokens: result.usage?.inputTokenDetails?.cacheReadTokens ?? 0,
+      cacheWriteTokens: result.usage?.inputTokenDetails?.cacheWriteTokens ?? 0,
       steps: result.steps?.length ?? 0,
     };
   } catch (err) {

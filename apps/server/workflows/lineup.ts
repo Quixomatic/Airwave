@@ -63,7 +63,16 @@ export type LineupReport = {
   skipped: ChannelBuildResult[];
   failed: ChannelBuildResult[];
   /** What the run cost. Surfaced so spend is visible without waiting for the bill. */
-  usage: { inputTokens: number; outputTokens: number; steps: number; channelsWithUsage: number };
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    /** Served from the shared prompt cache (~0.1x price) — proof the prefix sharing works. */
+    cacheReadTokens: number;
+    /** Written to the cache (~1.25x price) — paid once per run, by the first build. */
+    cacheWriteTokens: number;
+    steps: number;
+    channelsWithUsage: number;
+  };
 };
 
 /**
@@ -74,7 +83,13 @@ export async function aiLineupWorkflow(args: LineupRunArgs): Promise<LineupRepor
   "use workflow";
 
   const profile = await analyzeLibrary(args.sourceId);
-  const plan = await planLineup(profile, args.limit);
+
+  // Built BEFORE the plan now: the planner authors real filters, so it needs the actual tag
+  // vocabulary, not just the statistical profile. The same string is then handed to every
+  // builder byte-identically, so the whole run shares ONE prompt-cache entry.
+  const libraryContext = await buildSharedContext(args.sourceId, profile);
+
+  const plan = await planLineup(libraryContext, args.limit);
 
   // Packages first, so each channel has a real packageId to attach to. This also wipes
   // any previous AI lineup — destructive, hence the confirmation on the admin action.
@@ -89,12 +104,6 @@ export async function aiLineupWorkflow(args: LineupRunArgs): Promise<LineupRepor
   // Fan out in bounded waves. Each build is its own durable step, so a crash resumes
   // only the unfinished ones. The cap keeps us under the provider's rate limit — every
   // build is an agent loop with several tool calls of its own.
-  // The shared, byte-identical prefix every builder gets. Because it's the same bytes for
-  // all 50 channels it costs one cache entry for the whole run — which is exactly why the
-  // full tag vocabulary lives HERE rather than being fetched per-build as a tool result
-  // (tool results sit after the cache breakpoint and are re-sent on every step).
-  const libraryContext = await buildSharedContext(args.sourceId, profile);
-
   const built: ChannelBuildResult[] = [];
   for (let i = 0; i < jobs.length; i += BUILD_CONCURRENCY) {
     const wave = jobs.slice(i, i + BUILD_CONCURRENCY);
@@ -157,9 +166,9 @@ async function buildSharedContext(sourceId: string, profile: LibraryProfile): Pr
 }
 
 /** §4.2 — one structured-output call over the compact profile. */
-async function planLineup(profile: LibraryProfile, limit?: number): Promise<LineupPlan> {
+async function planLineup(libraryContext: string, limit?: number): Promise<LineupPlan> {
   "use step";
-  const plan = await planLineupService(prisma, profile, limit ? { limit } : {});
+  const plan = await planLineupService(prisma, libraryContext, limit ? { limit } : {});
   const channels = plan.packages.reduce((n, p) => n + p.channels.length, 0);
   console.log(`[lineup] plan: ${plan.packages.length} packages, ${channels} channels\n${formatLineupPlan(plan)}`);
   return plan;
@@ -255,11 +264,13 @@ async function reportLineup(
       return {
         inputTokens: acc.inputTokens + b.usage.inputTokens,
         outputTokens: acc.outputTokens + b.usage.outputTokens,
+        cacheReadTokens: acc.cacheReadTokens + b.usage.cacheReadTokens,
+        cacheWriteTokens: acc.cacheWriteTokens + b.usage.cacheWriteTokens,
         steps: acc.steps + b.usage.steps,
         channelsWithUsage: acc.channelsWithUsage + 1,
       };
     },
-    { inputTokens: 0, outputTokens: 0, steps: 0, channelsWithUsage: 0 },
+    { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, steps: 0, channelsWithUsage: 0 },
   );
 
   const report: LineupReport = {
@@ -272,8 +283,9 @@ async function reportLineup(
   };
   console.log(
     `[lineup] report: ${report.channelsCreated} created, ${report.skipped.length} skipped, ${report.failed.length} failed · ` +
-      `tokens in=${usage.inputTokens.toLocaleString()} out=${usage.outputTokens.toLocaleString()} ` +
-      `over ${usage.steps} steps in ${usage.channelsWithUsage} builds`,
+      `tokens in=${usage.inputTokens.toLocaleString()} (cacheRead ${usage.cacheReadTokens.toLocaleString()}, ` +
+      `cacheWrite ${usage.cacheWriteTokens.toLocaleString()}) ` +
+      `out=${usage.outputTokens.toLocaleString()} over ${usage.steps} steps in ${usage.channelsWithUsage} builds`,
   );
   return report;
 }

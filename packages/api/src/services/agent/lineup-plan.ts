@@ -8,12 +8,12 @@
  * "Saturday Morning 1997" or "Toddler Wind-Down" that no preset author would have
  * guessed this particular library could fill.
  *
- * It deliberately does NOT build Plex filters. The model proposes a *concept* (a name and
- * a plain-language theme); Phase 4's per-channel agent grounds that into a real filter
- * using `discover_field_values` + `preview_filter` and verifies the pool before creating
- * anything. Splitting it that way keeps this call cheap (one pass over a ~630-token
- * profile) and means a concept that can't be filled is discarded at build time rather
- * than producing a broken channel.
+ * It builds the REAL Plex filters too. It already holds the library's full tag vocabulary,
+ * so having it author the filter collapses each per-channel worker from an exploratory
+ * 16-step loop into verify-and-commit. That matters enormously: a worker's preview results
+ * are re-sent on every step of its loop, so exploration was costing ~117k tokens per channel.
+ * The worker still owns verification — a filter that matches nothing or the wrong thing is
+ * adjusted or abandoned there, so a bad proposal never becomes a broken channel.
  *
  * Channel NUMBERS are assigned here rather than by the builders: `Channel.number` is
  * `@unique` and Phase 4 fans out ~5-10 concurrent creates, so letting each agent pick
@@ -25,7 +25,7 @@ import { z } from "zod";
 
 import { ACCENT_KEYS, channelAccentAt } from "../accents";
 import { getConnectionForRole, getModel } from "./config";
-import { type LibraryProfile, formatLibraryProfile } from "./library-profile";
+
 
 /**
  * The appearance vocabulary the model may choose from. Accents are a CLOSED set (the
@@ -35,6 +35,29 @@ import { type LibraryProfile, formatLibraryProfile } from "./library-profile";
  * examples; a bad icon name renders as a blank tile rather than breaking anything.
  */
 const accentSchema = z.enum(ACCENT_KEYS);
+
+// The recursive predicate tree, matching the real FilterNode shape. The planner emits these
+// directly now: it already holds the full tag vocabulary, and having it do the work collapses
+// each worker from an exploratory 16-step loop into verify-and-commit.
+const conditionSchema = z.object({
+  type: z.literal("condition"),
+  field: z.string().describe("A field from list_filter_fields, e.g. genre / studio / collection / title / year."),
+  op: z.string().describe("e.g. is / isNot / contains / gte / lte."),
+  value: z.string(),
+});
+type FilterNodeInput =
+  | z.infer<typeof conditionSchema>
+  | { type: "group"; op: "and" | "or"; children: FilterNodeInput[] };
+const filterNodeSchema: z.ZodType<FilterNodeInput> = z.lazy(() =>
+  z.union([
+    conditionSchema,
+    z.object({
+      type: z.literal("group"),
+      op: z.enum(["and", "or"]),
+      children: z.array(filterNodeSchema),
+    }),
+  ]),
+);
 const iconDescription =
   'Icon as "lucide:Name" or "phosphor:Name", PascalCase, from the lucide or phosphor icon sets. ' +
   'e.g. "lucide:Tv", "lucide:Rocket", "lucide:Ghost", "lucide:Swords", "lucide:Baby", ' +
@@ -71,7 +94,14 @@ const plannedChannelSchema = z.object({
     .optional()
     .describe("Short broadcast-style callsign, uppercase, <=6 chars. e.g. 'TOONS', 'BOND', 'KAIJU'."),
   icon: z.string().describe(iconDescription),
-  // NO channel accent here on purpose — see `channelAccentAt` in assignAppearance below.
+  mediaTypes: z
+    .array(z.enum(["movie", "show"]))
+    .min(1)
+    .describe("Which libraries this channel draws from."),
+  filter: filterNodeSchema.describe(
+    "The actual Plex filter for this channel, built from the FILTER VOCABULARY you were given. This is the real thing — the builder verifies it against the library and only adjusts if the result doesn't match. Use ONLY field values that appear in the vocabulary.",
+  ),
+  // NO channel accent here on purpose — see `channelAccentAt` in assignNumbers below.
 });
 
 const plannedPackageSchema = z.object({
@@ -114,6 +144,13 @@ CONSTRAINTS:
 - A show's episode count tells you how much runtime it can sustain. A channel built on one 20-episode show will repeat constantly; one built on 500+ episodes can run forever.
 - Do NOT write Plex filter syntax. Describe the intent in \`theme\` — a later agent builds and verifies the actual filter.
 - Give every channel and package a unique kebab-case \`key\`.
+
+BUILDING THE FILTER (this is the important part):
+- You are given the library's **FILTER VOCABULARY** — the exact tag values that exist. Build each channel's \`filter\` from those values ONLY. A value that isn't listed will match nothing.
+- Prefer the most SPECIFIC field that captures the idea. A \`collection\` ("James Bond") or a \`studio\` ("Marvel Studios") is far sharper than a broad \`genre\`. Reach for genre only when the channel really is that broad.
+- \`title\` with \`contains\` is a substring match — good for franchises ("Star Wars"), and for a channel about specific shows, several title conditions OR'd together usually beats a genre.
+- Combine with groups when needed: \`{type:"group", op:"and"|"or", children:[…]}\`. Exclusions use the \`isNot\` operator.
+- Sanity-check the size against \`targetPoolSize\`: a filter matching 3 items can't sustain a channel, and one matching everything isn't a channel at all.
 
 APPEARANCE:
 - Every channel and every package needs an \`icon\`. Pick one that genuinely evokes it — a Bond channel is not a generic TV set. Icons come from the **lucide** and **phosphor** sets, written \`lucide:Name\` / \`phosphor:Name\` in PascalCase.
@@ -174,7 +211,11 @@ function applyLimit(plan: LineupPlan, limit?: number): LineupPlan {
 
 export async function planLineup(
   prisma: PrismaClient,
-  profile: LibraryProfile,
+  /**
+   * The rendered library profile PLUS the full filter vocabulary — the planner needs the real
+   * tag values to author filters, not just the statistical shape.
+   */
+  libraryContext: string,
   opts: PlanOptions = {},
 ): Promise<LineupPlan> {
   // The PLANNER role: one big reasoning call where quality matters most. Falls back to the
@@ -184,22 +225,34 @@ export async function planLineup(
     throw new Error("No active AI connection — configure one in Settings → AI Assistant.");
   }
 
-  const target = opts.targetChannels ?? DEFAULT_TARGET_CHANNELS;
+  // `limit` bounds GENERATION, not just the result. Trimming afterwards (as this used to do)
+  // meant every test run paid for a full ~50-channel structured output on the planner model —
+  // the most expensive artifact in the run — and then threw 90% of it away.
+  const target = opts.limit ?? opts.targetChannels ?? DEFAULT_TARGET_CHANNELS;
+  const packages = target <= 8 ? 1 : Math.max(6, Math.min(10, Math.round(target / 6)));
 
-  const { object } = await generateObject({
+  const { object, usage } = await generateObject({
     model: getModel(connection),
     schema: planSchema,
     system: SYSTEM,
     prompt: [
-      formatLibraryProfile(profile),
+      libraryContext,
       "",
-      `Propose roughly ${target} channels across 6-10 packages.`,
-      "Return the full lineup.",
+      `Propose exactly ${target} channels across ${packages} package${packages === 1 ? "" : "s"}.`,
+      "Give every channel a complete, working filter built from the vocabulary above.",
     ].join("\n"),
+    providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
   });
 
+  console.log(
+    `[plan] tokens in=${usage?.inputTokens ?? 0} out=${usage?.outputTokens ?? 0}` +
+      ` cacheRead=${usage?.inputTokenDetails?.cacheReadTokens ?? 0}` +
+      ` cacheWrite=${usage?.inputTokenDetails?.cacheWriteTokens ?? 0}`,
+  );
+
   // Numbers are assigned AFTER generation — the model shouldn't be trusted with a
-  // uniqueness constraint, and this keeps the block layout deterministic.
+  // uniqueness constraint, and this keeps the block layout deterministic. `applyLimit` is
+  // now just a backstop for a model that overshoots the requested count.
   return applyLimit(assignNumbers(object.packages), opts.limit);
 }
 

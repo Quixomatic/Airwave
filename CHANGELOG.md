@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.29] - 2026-07-19
+
+### Changed
+
+- **The planner now writes the actual filters, and the builders just verify them — the fix for a runaway token bill.** Previously the planner emitted only a *theme* ("Martial arts and Golden Harvest action") and each of the ~50 per-channel workers had to rediscover how to express that as a Plex filter, taking 3–4 preview round-trips. Because an agent loop re-sends its whole conversation on every step, those previews were re-billed repeatedly: **~117,000 input tokens per channel**, and one build exceeded Haiku's entire 200K context on its own preview results. The planner already holds the library's full tag vocabulary, so it now authors each channel's filter directly; the worker previews it once and commits, adjusting only if the result genuinely doesn't match. Verification still lives with the worker, so a bad proposal is corrected or abandoned rather than becoming a broken channel.
+- **A `limit` now bounds plan GENERATION, not just the result.** `--limit 5` used to trim the plan *after* the model had written all ~50 channels — so every test run paid for a full 50-channel structured output on the planner model (the most expensive artifact in a run) and discarded 90% of it. It's now part of the prompt.
+- **New `compact` preview projection for refinement passes.** Measured on a 316-item filter: `default` ≈ 72k tokens, `quick` ≈ 37k, **`compact` ≈ 10k** — with **no truncation**, every matched item still represented, carrying title / year / rating / genres / studio and episode-and-season counts. The first look at a new filter still uses full `quick` detail; the agent is told to pass `compact` on follow-up checks, which is where the same payload would otherwise be re-sent step after step.
+
+### Added
+
+- **Prompt-cache accounting.** Every build now records `cacheReadTokens` and `cacheWriteTokens` (from the SDK's `usage.inputTokenDetails`) alongside input/output, and the run report totals them. Cache reads cost ~0.1× and writes ~1.25×, so this is what makes the shared-prefix work verifiable instead of assumed — it had been asserted twice without evidence.
+
 ## [0.5.28] - 2026-07-19
 
 ### Added

@@ -93,7 +93,28 @@ export type PreviewResult = {
 };
 
 /** How much per-item metadata the preview carries. */
-export type PreviewDetail = "quick" | "default" | "verbose";
+export type PreviewDetail = "compact" | "quick" | "default" | "verbose";
+
+/**
+ * Fields kept by the "compact" projection — enough to judge "does this pool match the theme?"
+ * and nothing else. MEASURED: a 316-movie filter is ~37k tokens at "quick" and ~72k at
+ * "default", because even "quick" keeps thumb paths, codecs, resolution, studio, ratings and
+ * more per item. Inside an agent loop that payload is re-sent on EVERY subsequent step, so a
+ * couple of previews can exhaust a 200k context on their own. Compact keeps it to a few
+ * thousand tokens without truncating the item LIST — every match is still represented.
+ */
+function compactItem(i: PreviewItem): Record<string, unknown> {
+  const g = i.guide;
+  return {
+    title: i.title,
+    ...(i.year ? { year: i.year } : {}),
+    ...(g.contentRating ? { rated: g.contentRating } : {}),
+    ...(g.audienceRating ? { rating: g.audienceRating } : {}),
+    ...(g.genres?.length ? { genres: g.genres.slice(0, 4) } : {}),
+    ...(g.studio ? { studio: g.studio } : {}),
+    ...(i.episodes ? { episodes: i.episodes, seasons: i.seasons } : {}),
+  };
+}
 
 const SHOW_CAP = 60;
 const MOVIE_CAP = 300;
@@ -168,8 +189,11 @@ export async function previewItems(
   });
   showItems.sort((x, y) => (y.episodes ?? 0) - (x.episodes ?? 0));
 
-  let out: PreviewItem[] = [...showItems.slice(0, SHOW_CAP), ...movies.slice(0, MOVIE_CAP)];
-  if (detail === "quick") out = out.map((i) => ({ ...i, guide: trimGuide(i.guide) }));
+  const out: PreviewItem[] = [...showItems.slice(0, SHOW_CAP), ...movies.slice(0, MOVIE_CAP)];
+  // Compact keeps every item but only the fields needed to judge fit — see `compactItem`.
+  if (detail === "compact")
+    return { ...header, items: out.map(compactItem) as unknown as PreviewItem[] };
+  if (detail === "quick") return { ...header, items: out.map((i) => ({ ...i, guide: trimGuide(i.guide) })) };
   return { ...header, items: out };
 }
 
