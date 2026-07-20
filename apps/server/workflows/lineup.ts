@@ -271,14 +271,24 @@ async function listExistingPackages(): Promise<ExistingPackage[]> {
       _count: { select: { channels: true } },
     },
   });
-  const packages = rows.map((p) => ({
-    key: p.key,
-    name: p.name,
-    description: p.description,
-    origin: (p.aiGenerated ? "ai" : p.generated ? "preset" : "manual") as ExistingPackage["origin"],
-    channelCount: p._count.channels,
-  }));
-  console.log(`[lineup] existing packages: ${packages.length} offered to the planner`);
+  // EXCLUDE previous AI packages. `createPackages` wipes every `aiGenerated` package before
+  // resolving reuse, so offering one guarantees the lookup misses and falls back to creating
+  // a new package — which is exactly the near-duplicate sprawl reuse exists to prevent. The
+  // first run with reuse "reused" 15 of 15 packages, but 7 targeted the previous run's own AI
+  // packages and were silently recreated. Only the owner's real organisation is a valid target.
+  const packages = rows
+    .filter((p) => !p.aiGenerated)
+    .map((p) => ({
+      key: p.key,
+      name: p.name,
+      description: p.description,
+      origin: (p.generated ? "preset" : "manual") as ExistingPackage["origin"],
+      channelCount: p._count.channels,
+    }));
+  console.log(
+    `[lineup] existing packages: ${packages.length} offered to the planner ` +
+      `(${rows.length - packages.length} AI packages excluded — they're wiped before reuse resolves)`,
+  );
   return packages;
 }
 

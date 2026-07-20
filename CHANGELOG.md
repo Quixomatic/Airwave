@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.46] - 2026-07-20
+
+### Fixed
+
+- **Channels were being built twice, and both copies paid full price.** On a 5-channel run, three channels ran their entire agent loop a second time — about a third of all build spend, wasted. The event log showed **16 `step_started` against 12 `step_created` and zero `step_retrying`**: nothing had failed, so these were never retries. The cause is documented behaviour — the workflow body **replays whenever a step completes**, and the SDK is **at-least-once**. When the first build finished at 9.2s the body replayed, and the four builds still in flight were dispatched again. Pre-assigned channel numbers (v0.5.42) don't help: both copies agree on the number, they just both do the work.
+- **The guard now RESERVES instead of checking.** It previously looked for an existing channel at the top of the step and created it at the bottom — so every duplicate passed the check while the original was still mid-loop. The builder now creates the channel row as its **first** action, `enabled: false`, which is an atomic claim because `Channel.number` is `@unique`. A duplicate finds the row (or loses the insert race) and returns in milliseconds. Commit writes the verified filter over the planner's proposal and enables the channel, so nothing reaches the guide or `schedule-backfill` until its filter has actually been checked; `give_up`, a throw, or exhausting the step cap releases the reservation.
+- **Previous AI packages are no longer offered for reuse.** `createPackages` wipes every `aiGenerated` package *before* resolving reuse, so offering one guaranteed the lookup would miss and fall back to creating a new package. The first run with reuse enabled "reused" 15 of 15 packages — but 7 targeted the previous run's own AI packages and were silently recreated, reproducing exactly the duplicate-package sprawl reuse exists to prevent. Only preset and hand-made packages are offered now.
+
+### Notes
+
+- Root-caused by reading the SDK's `/foundations/` docs: replay re-runs the body from the top with completed steps served from the event log, in-flight steps are undocumented in that path, and idempotency is explicitly the caller's responsibility. Also worth knowing: **runs are pinned to the deployment that started them**, so rebuilding mid-run doesn't affect an in-flight run and recovering a broken one means cancel-and-restart.
+- A duplicate now costs one indexed read. It's still worth watching `step_started` vs `step_created` on a big run.
+
 ## [0.5.45] - 2026-07-20
 
 ### Fixed

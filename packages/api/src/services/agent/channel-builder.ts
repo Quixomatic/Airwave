@@ -34,6 +34,7 @@ import {
   listFilterFields,
   previewFilter,
   searchTitles,
+  updateChannel,
 } from "./tools";
 
 export type ChannelUsage = {
@@ -195,11 +196,26 @@ export async function buildPlannedChannel(
   const { channel, packageId, mediaSourceId, userId, libraryContext } = args;
   const base = { key: channel.key, name: channel.name, number: channel.number };
 
-  // IDEMPOTENCY — this runs inside a durable step, and a step that fails ANYWHERE is
-  // retried from the top. Creating the channel is a side effect, so without this guard a
-  // retry hits `Unique constraint failed on the fields: (number)` and the channel is
-  // reported as skipped even though it exists. Plan-assigned numbers make the check
-  // trivial: if this channel is already there, the work is done.
+  /**
+   * RESERVE the channel number BEFORE doing any expensive work.
+   *
+   * The Workflow SDK is at-least-once, and the workflow BODY REPLAYS whenever a step
+   * completes. A fan-out of `Promise.all` steps therefore gets its still-in-flight members
+   * re-dispatched: measured on a 5-channel run, the first build finished at 9.2s and the
+   * remaining FOUR were immediately started a second time (16 `step_started` vs 12
+   * `step_created`, and zero `step_retrying` — nothing had failed).
+   *
+   * The previous guard only CHECKED for an existing channel here and created it at the end,
+   * so every duplicate passed the check while the original was still mid-agent-loop and both
+   * ran the full ~40k-token build. It protected correctness and nothing else; roughly a third
+   * of build spend was duplicate work.
+   *
+   * Creating the row up front turns the check into an atomic CLAIM — `Channel.number` is
+   * `@unique`, so exactly one attempt can win and the loser exits in milliseconds. The
+   * reservation is `enabled: false` so a half-built channel never reaches the guide or the
+   * schedule-backfill job, and it carries the planner's proposed filter so the row is
+   * meaningful even if the agent dies before committing.
+   */
   const existing = await prisma.channel.findUnique({
     where: { number: channel.number },
     select: { id: true, aiGenerated: true },
@@ -208,7 +224,39 @@ export async function buildPlannedChannel(
     if (!existing.aiGenerated) {
       return { ...base, status: "skipped", reason: `Channel ${channel.number} is not AI-generated — refusing to touch it.` };
     }
-    return { ...base, status: "created", channelId: existing.id, reason: "Already built (step retry)." };
+    return { ...base, status: "created", channelId: existing.id, reason: "Already built (duplicate execution suppressed)." };
+  }
+
+  let reservedId: string;
+  try {
+    const reserved = await createChannel(prisma, userId, {
+      mediaSourceId,
+      name: channel.name,
+      number: channel.number,
+      packageId,
+      description: channel.description,
+      callsign: channel.callsign,
+      icon: channel.icon,
+      tint: channel.accent,
+      ordering: channel.ordering,
+      sortField: channel.sortField,
+      sortDir: channel.sortDir,
+      mediaTypes: channel.mediaTypes,
+      filter: channel.filter as never,
+      enabled: false,
+    });
+    reservedId = reserved.id;
+  } catch {
+    // Lost the race — a concurrent duplicate claimed this number between the check above
+    // and here. That attempt owns the build; this one must not repeat it.
+    const taken = await prisma.channel.findUnique({
+      where: { number: channel.number },
+      select: { id: true },
+    });
+    if (taken) {
+      return { ...base, status: "created", channelId: taken.id, reason: "Duplicate execution suppressed (lost the reservation race)." };
+    }
+    throw new Error(`Could not reserve channel number ${channel.number}`);
   }
 
   // The WORKER role: this loop runs ~50 times per lineup build and dominates the run's cost,
@@ -286,38 +334,17 @@ export async function buildPlannedChannel(
           outcome = { ...base, status: "skipped", poolSize, reason: `Only ${poolSize} items matched.` };
           return { ok: false, message: `Pool too small (${poolSize}). Broaden the filter or give_up.` };
         }
-        try {
-          const created = await createChannel(prisma, userId, {
-            mediaSourceId,
-            name: channel.name,
-            number: channel.number,
-            packageId,
-            description: channel.description,
-            callsign: channel.callsign,
-            icon: channel.icon,
-            tint: channel.accent,
-            ordering: channel.ordering,
-            sortField: channel.sortField,
-            sortDir: channel.sortDir,
-            mediaTypes,
-            filter: filter as never,
-          });
-          outcome = { ...base, status: "created", channelId: created.id, poolSize };
-          return { ok: true, channelId: created.id, number: created.number };
-        } catch (err) {
-          // Belt-and-braces against a retry racing the guard above. Treat "the channel
-          // already exists at my number" as success rather than sending the agent into a
-          // retry loop it can't fix — it has no way to resolve a numbering conflict.
-          const taken = await prisma.channel.findUnique({
-            where: { number: channel.number },
-            select: { id: true },
-          });
-          if (taken) {
-            outcome = { ...base, status: "created", channelId: taken.id, poolSize, reason: "Already existed." };
-            return { ok: true, channelId: taken.id, number: channel.number };
-          }
-          throw err;
-        }
+        // The row already exists (reserved before the loop) — commit writes the VERIFIED
+        // filter over the planner's proposal and switches the channel on. Enabling here is
+        // what makes it visible in the guide and eligible for schedule-backfill, so a
+        // channel only ever goes live once its filter has actually been checked.
+        await updateChannel(prisma, reservedId, {
+          mediaTypes,
+          filter: filter as never,
+          enabled: true,
+        });
+        outcome = { ...base, status: "created", channelId: reservedId, poolSize };
+        return { ok: true, channelId: reservedId, number: channel.number };
       },
     }),
 
@@ -325,6 +352,10 @@ export async function buildPlannedChannel(
       description: "Abandon this channel because nothing sensible matches. Explain why.",
       inputSchema: z.object({ reason: z.string() }),
       execute: async ({ reason }) => {
+        // Release the reservation — an abandoned channel must not linger as a disabled
+        // husk in the guide, and leaving it would also block a later run from reusing
+        // that number.
+        await prisma.channel.delete({ where: { id: reservedId } }).catch(() => {});
         outcome = { ...base, status: "skipped", reason };
         return { ok: true };
       },
@@ -393,6 +424,8 @@ export async function buildPlannedChannel(
       usage,
       reason: err instanceof Error ? err.message : String(err),
     };
+    // The agent loop threw — drop the reservation so the number is free for the retry.
+    await prisma.channel.delete({ where: { id: reservedId } }).catch(() => {});
     // A throwing build is exactly the case the old accounting lost: the step retries, and
     // whatever it already spent went unrecorded. Trace it before rethrowing upward.
     if (args.trace) {
@@ -413,8 +446,21 @@ export async function buildPlannedChannel(
     return failed;
   }
 
+  // `outcome` is only ever assigned inside a tool's `execute` callback, which TypeScript's
+  // control-flow analysis can't follow — it still believes the value is `null` here and
+  // narrows any property access to `never`. Reading it through an explicit annotation is
+  // what tells the compiler the callbacks may have run.
+  const settled = outcome as ChannelBuildResult | null;
+
+  // Never committed — release the reservation so an abandoned build doesn't leave a
+  // disabled husk holding its number. (`give_up` already deleted it; the catch absorbs
+  // the second delete.)
+  if (!settled || settled.status !== "created") {
+    await prisma.channel.delete({ where: { id: reservedId } }).catch(() => {});
+  }
+
   const result: ChannelBuildResult = {
-    ...(outcome ?? { ...base, status: "failed", reason: "Agent finished without committing a channel." }),
+    ...(settled ?? { ...base, status: "failed", reason: "Agent finished without committing a channel." }),
     usage,
   };
 
