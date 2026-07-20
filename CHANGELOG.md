@@ -2,6 +2,13 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.45] - 2026-07-20
+
+### Fixed
+
+- **The run detail page never rendered — `/workflows/ai-lineup/:runId` kept showing the runs list.** Adding `ai-lineup.$runId.tsx` beside `ai-lineup.tsx` silently promoted `ai-lineup.tsx` into a **layout** route for it, and a layout only renders its child through an `<Outlet />`. It had none — it rendered the list — so the URL matched, the child route existed in the generated tree, and nothing appeared. No error, in the router or the typecheck.
+- Restructured to the convention the rest of the app already uses (`channels/`, `packages/`, `sources/`): a directory with **`route.tsx`** (layout holding the `<Outlet />` and the section breadcrumb), **`index.tsx`** (the list), and **`$runId.tsx`** (the detail). The breadcrumb moved to the layout so it isn't repeated per child.
+
 ## [0.5.44] - 2026-07-20
 
 ### Added

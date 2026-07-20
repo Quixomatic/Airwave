@@ -17,8 +17,8 @@ import { ChevronRight, Loader2, RefreshCw } from "lucide-react";
 
 import { trpc } from "@/utils/trpc";
 
-export const Route = createFileRoute("/_auth/workflows/ai-lineup")({
-  staticData: { breadcrumb: "AI Lineup" },
+// Breadcrumb lives on the layout (`route.tsx`) now, so it isn't repeated on every child.
+export const Route = createFileRoute("/_auth/workflows/ai-lineup/")({
   component: AiLineupRuns,
 });
 
