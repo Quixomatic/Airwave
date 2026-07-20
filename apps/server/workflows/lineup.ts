@@ -33,8 +33,17 @@ import {
   formatFilterVocabulary,
   formatLibraryProfile,
 } from "@ChannelGuide/api/services/agent/library-profile";
-import type { LineupPlan, PlannedChannel } from "@ChannelGuide/api/services/agent/lineup-plan";
-import { formatLineupPlan, planLineup as planLineupService } from "@ChannelGuide/api/services/agent/lineup-plan";
+import type {
+  ExistingPackage,
+  LineupPlan,
+  LineupPlanDraft,
+  PlannedChannel,
+} from "@ChannelGuide/api/services/agent/lineup-plan";
+import {
+  assignChannelNumbers,
+  formatLineupPlan,
+  planLineup as planLineupService,
+} from "@ChannelGuide/api/services/agent/lineup-plan";
 import type { LineupRunArgs } from "@ChannelGuide/api/services/agent/lineup-runner";
 import { clearAiGenerated, createPackage, discoverFieldValues } from "@ChannelGuide/api/services/agent/tools";
 import {
@@ -92,12 +101,21 @@ export async function aiLineupWorkflow(args: LineupRunArgs): Promise<LineupRepor
   // builder byte-identically, so the whole run shares ONE prompt-cache entry.
   const libraryContext = await buildSharedContext(args.sourceId, profile);
 
+  // What's already on the server, so the planner can file channels into an existing
+  // package instead of minting a near-duplicate.
+  const existingPackages = await listExistingPackages();
+
   // The planner always plans the FULL lineup — sized to the library, not to a quota.
-  const plan = await planLineup(libraryContext);
+  const draft = await planLineup(libraryContext, existingPackages);
 
   // Packages first, so each channel has a real packageId to attach to. This also wipes
   // any previous AI lineup — destructive, hence the confirmation on the admin action.
-  const packageIds = await createPackages(plan);
+  const packageIds = await createPackages(draft);
+
+  // Numbering runs AFTER the wipe, so it allocates against the numbers that are actually
+  // free rather than ones about to be released. Its own step, so a resumed run replays the
+  // identical assignment instead of re-deriving it against changed state.
+  const plan = await assignNumbers(draft, packageIds);
 
   // Flatten so the concurrency cap applies across the WHOLE lineup rather than per
   // package (package sizes vary, so per-package batching would idle).
@@ -217,12 +235,59 @@ async function buildSharedContext(sourceId: string, profile: LibraryProfile): Pr
   return text;
 }
 
-/** §4.2 — one structured-output call over the compact profile. */
-async function planLineup(libraryContext: string): Promise<LineupPlan> {
+/**
+ * The packages already on the server — preset, hand-made, and any from a previous AI run.
+ * Read BEFORE the wipe on purpose: the planner should be able to see (and prefer) the
+ * owner's own organisation, and knowing which packages are `ai` tells it which ones are
+ * about to be replaced anyway.
+ */
+async function listExistingPackages(): Promise<ExistingPackage[]> {
   "use step";
-  const plan = await planLineupService(prisma, libraryContext);
+  const rows = await prisma.channelPackage.findMany({
+    orderBy: [{ sortIndex: "asc" }, { name: "asc" }],
+    select: {
+      key: true,
+      name: true,
+      description: true,
+      aiGenerated: true,
+      generated: true,
+      _count: { select: { channels: true } },
+    },
+  });
+  const packages = rows.map((p) => ({
+    key: p.key,
+    name: p.name,
+    description: p.description,
+    origin: (p.aiGenerated ? "ai" : p.generated ? "preset" : "manual") as ExistingPackage["origin"],
+    channelCount: p._count.channels,
+  }));
+  console.log(`[lineup] existing packages: ${packages.length} offered to the planner`);
+  return packages;
+}
+
+/** §4.2 — one structured-output call over the compact profile. */
+async function planLineup(
+  libraryContext: string,
+  existingPackages: ExistingPackage[],
+): Promise<LineupPlanDraft> {
+  "use step";
+  const plan = await planLineupService(prisma, libraryContext, { existingPackages });
   const channels = plan.packages.reduce((n, p) => n + p.channels.length, 0);
-  console.log(`[lineup] plan: ${plan.packages.length} packages, ${channels} channels\n${formatLineupPlan(plan)}`);
+  const reused = plan.packages.filter((p) => p.existingKey).length;
+  console.log(
+    `[lineup] plan: ${plan.packages.length} packages (${reused} reused), ${channels} channels`,
+  );
+  return plan;
+}
+
+/** Resolve every channel's number against live state — see `assignChannelNumbers`. */
+async function assignNumbers(
+  draft: LineupPlanDraft,
+  packageIds: Record<string, string>,
+): Promise<LineupPlan> {
+  "use step";
+  const plan = await assignChannelNumbers(prisma, draft, packageIds);
+  console.log(`[lineup] numbering:\n${formatLineupPlan(plan)}`);
   return plan;
 }
 
@@ -234,7 +299,7 @@ async function planLineup(libraryContext: string): Promise<LineupPlan> {
  * generator's `generated` rows are untouched (§5). It's destructive by design: re-runs
  * are wipe-and-rebuild, which is why the admin action must confirm first.
  */
-async function createPackages(plan: LineupPlan): Promise<Record<string, string>> {
+async function createPackages(plan: LineupPlanDraft): Promise<Record<string, string>> {
   "use step";
   const cleared = await clearAiGenerated(prisma, "both");
   if (cleared.channelsDeleted || cleared.packagesDeleted) {
@@ -242,16 +307,38 @@ async function createPackages(plan: LineupPlan): Promise<Record<string, string>>
   }
 
   const ids: Record<string, string> = {};
+  let created = 0;
+  let reused = 0;
+
   for (const pkg of plan.packages) {
-    const created = await createPackage(prisma, {
+    // Reuse takes effect only if the package still exists AFTER the wipe. A planner that
+    // picked a previous run's `ai` package would otherwise point at a deleted row — so the
+    // lookup happens here, post-clear, and silently falls back to creating a new one.
+    if (pkg.existingKey) {
+      const match = await prisma.channelPackage.findUnique({
+        where: { key: pkg.existingKey },
+        select: { id: true, name: true },
+      });
+      if (match) {
+        ids[pkg.key] = match.id;
+        reused++;
+        console.log(`[lineup] package "${pkg.name}" -> reusing existing "${match.name}" (${pkg.existingKey})`);
+        continue;
+      }
+      console.warn(`[lineup] package "${pkg.name}": existingKey "${pkg.existingKey}" not found — creating new`);
+    }
+
+    const made = await createPackage(prisma, {
       name: pkg.name,
       description: pkg.description,
       icon: pkg.icon,
       tint: pkg.accent,
     });
-    ids[pkg.key] = created.id;
+    ids[pkg.key] = made.id;
+    created++;
   }
-  console.log(`[lineup] createPackages: ${plan.packages.length} created`);
+
+  console.log(`[lineup] createPackages: ${created} created, ${reused} reused`);
   return ids;
 }
 

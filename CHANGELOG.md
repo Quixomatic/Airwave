@@ -2,6 +2,24 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.42] - 2026-07-20
+
+### Added
+
+- **The planner can now file channels into packages that already exist.** It previously minted every package from scratch — it had never been shown that any others existed — so a run could produce a "Family Fun" alongside your existing "Kids & Family", which is worse for the viewer than one good package. It's now given the current package list with each one's **provenance** (`preset` / `manual` / `ai`) and channel count, and can set `existingKey` on a planned package to file its channels into that one instead. Reuse is the default when a reasonable home exists; a new package is for a genuinely new idea. It's told to prefer `preset` and `manual` packages, since those are your own organisation, whereas an `ai` package is from a previous run and about to be replaced anyway.
+- **Every package gets its own hundred-block at 1000+, existing or not.** A package whose channels live at 1–999 — a preset or hand-made one — gets a fresh block carved out for its AI channels, so those stay contiguous in the guide even though the package's originals sit elsewhere. A package that already owns a 1000+ block keeps it and fills the gaps. Blocks are allocated by scanning what's actually free, and a package with more channels than a block holds spills into the next free one rather than colliding.
+- **`scripts/sim-lineup-numbering.ts`** — exercises the allocator against the real database (read-only; it only reads channel numbers) and checks the properties that matter: no collision with existing channels, no duplicates within the run, nothing below 1000, one distinct block per package.
+
+### Changed
+
+- **Numbering moved out of the plan step into its own durable step, after the wipe.** It used to be derived at plan time from the package's index, which no longer works: a reused package's block depends on live database state, and reading that *before* `clearAiGenerated` would allocate against numbers about to be freed. Keeping it a durable step preserves the property the original plan-time assignment existed for — a resumed run replays the identical numbering instead of re-deriving it against a database that has since moved.
+- `planLineup` now returns a `LineupPlanDraft` (no numbers); `assignChannelNumbers` turns it into a `LineupPlan`.
+
+### Notes
+
+- No schema change. Package reuse is resolved **after** the wipe, so a planner that picked a previous run's `ai` package falls back to creating a new one rather than pointing at a deleted row.
+- Verified: typecheck uncached, `workflow build` clean (25 steps), numbering harness green against the live library.
+
 ## [0.5.41] - 2026-07-20
 
 ### Fixed

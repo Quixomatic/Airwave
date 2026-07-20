@@ -127,6 +127,12 @@ const plannedChannelSchema = z.object({
 
 const plannedPackageSchema = z.object({
   key: z.string().describe("Stable kebab-case slug for the package."),
+  existingKey: z
+    .string()
+    .optional()
+    .describe(
+      "Set this to the `key` of an EXISTING package to file these channels into it instead of creating a new one. Leave unset to create a new package. When set, the existing package keeps its own name/description/icon/accent — the ones you give here are ignored.",
+    ),
   name: z.string().describe("Short package name shown in the guide sidebar."),
   description: z.string(),
   icon: z.string().describe(iconDescription),
@@ -138,16 +144,44 @@ const planSchema = z.object({
   packages: z.array(plannedPackageSchema).min(1),
 });
 
-export type PlannedChannel = z.infer<typeof plannedChannelSchema> & {
+/**
+ * A channel as the model emits it — no number yet.
+ *
+ * Numbering used to happen here, at plan time. It can't any more: a number now depends on
+ * which hundred-block its package owns, and for a REUSED package that's only knowable by
+ * reading the database *after* the previous AI lineup has been wiped. Assigning before the
+ * wipe would allocate against numbers that are about to be freed.
+ */
+export type PlannedChannelDraft = z.infer<typeof plannedChannelSchema>;
+
+export type PlannedChannel = PlannedChannelDraft & {
   number: number;
-  /** From the palette variance cycle, not the model — see `assignNumbers`. */
+  /** From the palette variance cycle, not the model — see `assignChannelNumbers`. */
   accent: string;
+};
+
+export type PlannedPackageDraft = Omit<z.infer<typeof plannedPackageSchema>, "channels"> & {
+  channels: PlannedChannelDraft[];
 };
 export type PlannedPackage = Omit<z.infer<typeof plannedPackageSchema>, "channels"> & {
   numberBase: number;
   channels: PlannedChannel[];
 };
+
+/** What the planner returns: the full lineup, not yet numbered. */
+export type LineupPlanDraft = { packages: PlannedPackageDraft[] };
+/** The same lineup after {@link assignChannelNumbers} has resolved every number. */
 export type LineupPlan = { packages: PlannedPackage[] };
+
+/** One existing package, offered to the planner as a possible home for new channels. */
+export type ExistingPackage = {
+  key: string;
+  name: string;
+  description: string | null;
+  /** "ai" | "preset" | "manual" — provenance matters: an AI package is about to be wiped. */
+  origin: "ai" | "preset" | "manual";
+  channelCount: number;
+};
 
 const SYSTEM = `You are a television programmer building a personal live-TV lineup out of someone's own media library.
 
@@ -200,6 +234,7 @@ COVERAGE — how many channels, and which:
 - **Depth where there's depth.** A genre with 300 titles or a show with 500 episodes can support several distinct channels (by era, by mood, by sub-genre, by rating). One catch-all channel over that much material wastes it.
 - **Don't pad.** Two channels that would resolve to nearly the same pool should be one channel. Every channel must justify its own existence with a concept a viewer could describe in a sentence.
 - **Packages group channels the way a viewer thinks** — by audience, mood, or occasion. Use as many as the lineup needs; don't force channels into a package where they don't belong.
+- **REUSE AN EXISTING PACKAGE WHEN ONE FITS.** You are shown the packages already on this server. If a channel belongs in one of them, set that package's \`existingKey\` rather than inventing a near-duplicate — a lineup with "Kids & Family" *and* a new "Family Fun" is worse for the viewer than one good package. Reuse is the default when a reasonable home exists; create a new package only for a genuinely new idea the current set doesn't cover. Note the \`origin\`: an \`ai\` package is from a previous run of this same process and will be replaced, so prefer reusing \`preset\` and \`manual\` packages, which are the owner's own organisation.
 
 MOVIES AND TV TOGETHER:
 - Real channels play both. Default \`mediaTypes\` to \`["movie","show"]\` and only narrow it when the concept genuinely demands one — a full-series marathon is shows-only; a film festival is movies-only. A kids channel, a holiday channel, a genre block: those should mix.
@@ -217,33 +252,87 @@ export type PlanOptions = {
 };
 
 /**
- * Assign channel numbers: package N owns the block starting at 1000 + (N+1)*100 … so
- * package 0 -> 1001+, package 1 -> 1101+. Keeps a package's channels contiguous in the
- * guide with headroom to add more later without renumbering.
+ * Assign every channel a number, AFTER the previous AI lineup has been wiped and packages
+ * resolved. Must run as its own durable step for two reasons: it reads live database state
+ * (so it can't run before the wipe frees the old numbers), and its result is persisted, so a
+ * resumed run reuses the identical numbering rather than re-deriving it against a database
+ * that has since changed.
+ *
+ * THE RULE: every package in the lineup owns its own hundred-block at 1000+, whether it's
+ * newly created or an existing one being reused. A package whose channels live at 1-999 (a
+ * preset or hand-made package) gets a fresh block carved out for its AI channels — so those
+ * channels stay contiguous in the guide even though the package's originals sit elsewhere.
+ * A package that already owns a 1000+ block keeps it and fills the gaps.
  */
-function assignNumbers(packages: z.infer<typeof planSchema>["packages"]): LineupPlan {
+export async function assignChannelNumbers(
+  prisma: PrismaClient,
+  draft: LineupPlanDraft,
+  packageIdByKey: Record<string, string>,
+): Promise<LineupPlan> {
+  const existing = await prisma.channel.findMany({ select: { number: true, packageId: true } });
+
+  // Every number currently spoken for — manual channels, preset channels, and any AI
+  // channel that survived the wipe. Never reuse one.
+  const taken = new Set(existing.map((c) => c.number));
+
+  // Which 1000+ block each package already occupies, if any. First one wins: a package
+  // whose channels somehow straddle blocks keeps its lowest.
+  const blockByPackageId = new Map<string, number>();
+  for (const c of existing) {
+    if (!c.packageId || c.number < AI_NUMBER_BASE) continue;
+    const block = Math.floor(c.number / PACKAGE_BLOCK_SIZE) * PACKAGE_BLOCK_SIZE;
+    const current = blockByPackageId.get(c.packageId);
+    if (current == null || block < current) blockByPackageId.set(c.packageId, block);
+  }
+
+  const usedBlocks = new Set(blockByPackageId.values());
+  const claimFreeBlock = () => {
+    let b = AI_NUMBER_BASE;
+    while (usedBlocks.has(b)) b += PACKAGE_BLOCK_SIZE;
+    usedBlocks.add(b);
+    return b;
+  };
+
   // Channel accents come from the palette VARIANCE CYCLE, not the model — the same
   // mechanism the preset generator uses (`channelAccentAt`). It walks runs of 1-3
   // channels per colour, so the guide gets organic little bands instead of either a
   // rigid every-one-different rotation or long single-colour stretches. The counter runs
-  // across the WHOLE lineup so the pattern carries over package boundaries too, and a
-  // channel is free to differ from the package it sits in.
+  // across the WHOLE lineup so the pattern carries over package boundaries too.
   let channelIndex = 0;
 
-  return {
-    packages: packages.map((pkg, pkgIndex) => {
-      const numberBase = AI_NUMBER_BASE + pkgIndex * PACKAGE_BLOCK_SIZE;
-      return {
-        ...pkg,
-        numberBase,
-        channels: pkg.channels.map((channel, i) => ({
-          ...channel,
-          number: numberBase + i + 1,
-          accent: channelAccentAt(channelIndex++),
-        })),
-      };
-    }),
-  };
+  const packages = draft.packages.map((pkg) => {
+    const packageId = packageIdByKey[pkg.key];
+    let block = packageId ? blockByPackageId.get(packageId) : undefined;
+    if (block == null) {
+      block = claimFreeBlock();
+      if (packageId) blockByPackageId.set(packageId, block);
+    }
+    const firstBlock = block;
+    let cursor = block + 1;
+
+    const channels = pkg.channels.map((channel) => {
+      // Walk to the next free slot, spilling into a fresh block if this one fills up.
+      // A package with more than ~99 channels is unlikely but must not wedge or collide.
+      for (;;) {
+        if (cursor >= block! + PACKAGE_BLOCK_SIZE) {
+          block = claimFreeBlock();
+          cursor = block + 1;
+          continue;
+        }
+        if (taken.has(cursor)) {
+          cursor++;
+          continue;
+        }
+        break;
+      }
+      taken.add(cursor);
+      return { ...channel, number: cursor++, accent: channelAccentAt(channelIndex++) };
+    });
+
+    return { ...pkg, numberBase: firstBlock, channels };
+  });
+
+  return { packages };
 }
 
 // (There used to be an `applyLimit` here that trimmed the plan. It's gone: the planner now
@@ -317,6 +406,23 @@ function sanitizePlan(packages: z.infer<typeof planSchema>["packages"]) {
   return packages;
 }
 
+/**
+ * The packages that already exist, offered to the planner as possible homes for new channels.
+ *
+ * Deliberately NOT folded into `libraryContext`: that string is the byte-identical cached
+ * prefix every per-channel worker shares, and a worker has no use for the package list. Only
+ * the planner decides where a channel lives.
+ */
+export function formatExistingPackages(packages: ExistingPackage[]): string {
+  if (!packages.length) return "(none — this is the first lineup, create packages as needed)";
+  return packages
+    .map(
+      (p) =>
+        `${p.key} — "${p.name}" (${p.origin}, ${p.channelCount} channel${p.channelCount === 1 ? "" : "s"})${p.description ? `: ${p.description}` : ""}`,
+    )
+    .join("\n");
+}
+
 export async function planLineup(
   prisma: PrismaClient,
   /**
@@ -324,8 +430,8 @@ export async function planLineup(
    * tag values to author filters, not just the statistical shape.
    */
   libraryContext: string,
-  opts: PlanOptions = {},
-): Promise<LineupPlan> {
+  opts: PlanOptions & { existingPackages?: ExistingPackage[] } = {},
+): Promise<LineupPlanDraft> {
   // The PLANNER role: one big reasoning call where quality matters most. Falls back to the
   // active (chat) connection when no dedicated planner is configured.
   const connection = await getConnectionForRole(prisma, "planner");
@@ -350,6 +456,9 @@ export async function planLineup(
     prompt: [
       libraryContext,
       "",
+      "EXISTING PACKAGES — you may file channels into any of these instead of creating a new one:",
+      formatExistingPackages(opts.existingPackages ?? []),
+      "",
       exactCount
         ? `Propose exactly ${exactCount} channel${exactCount === 1 ? "" : "s"} — a representative sample of the lineup you would build, spread across different kinds of channel rather than ${exactCount} variations on one idea.`
         : "Build the full lineup for this library. Use as many channels and packages as it genuinely takes to cover it — see COVERAGE below.",
@@ -364,10 +473,9 @@ export async function planLineup(
       ` cacheWrite=${usage?.inputTokenDetails?.cacheWriteTokens ?? 0}`,
   );
 
-  // Numbers are assigned AFTER generation — the model shouldn't be trusted with a
-  // uniqueness constraint, and this keeps the block layout deterministic. Filters are
-  // sanitized first so a bad condition never reaches the build fan-out.
-  return assignNumbers(sanitizePlan(object.packages));
+  // Filters are sanitized here so a bad condition never reaches the build fan-out.
+  // Numbering happens later, in its own step — see `assignChannelNumbers`.
+  return { packages: sanitizePlan(object.packages) };
 }
 
 /** Compact one-line-per-channel rendering, for logs and the run report. */
