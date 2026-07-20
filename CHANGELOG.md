@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.50] - 2026-07-20
+
+### Changed
+
+- **TV: an unfocused channel's number is now muted.** Every row's number rendered at full brightness, so nothing distinguished the highlighted channel. The number is now bright only on the focused row and muted (`mutedFg`) on the rest, so the current channel stands out down the rail.
+
 ## [0.5.49] - 2026-07-20
 
 ### Changed

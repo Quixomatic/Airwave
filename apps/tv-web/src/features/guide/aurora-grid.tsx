@@ -800,7 +800,9 @@ function Row({
               </span>
             )}
           </div>
-          <span style={{ fontSize: vw(34), lineHeight: 1, fontWeight: 700, color: "#e6eaf1" }}>
+          {/* Bright only on the highlighted row; muted otherwise, so the focused channel's
+              number stands out down the rail instead of every number competing at full weight. */}
+          <span style={{ fontSize: vw(34), lineHeight: 1, fontWeight: 700, color: focused ? "#e6eaf1" : C.mutedFg }}>
             {channel.number}
           </span>
         </div>
