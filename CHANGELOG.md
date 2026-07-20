@@ -2,7 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
-## [0.5.27] - 2026-07-19
+## [0.5.28] - 2026-07-19
+
+### Added
+
+- **`pnpm dev` now starts the workflow observability UI alongside the server.** The Workflow SDK ships a web UI that reads our Postgres world directly — runs, steps, events and streams, live — so a lineup build can be watched from a browser instead of scraped out of terminal logs. It comes up automatically on **http://localhost:3199?resource=run**, or on its own via `pnpm --filter server workflow:ui`. `pnpm dev` also now runs `workflow build` first, so the flow/step handlers are always current.
+
+### Notes
+
+- **The UI needs `NODE_OPTIONS=--experimental-sqlite`.** It imports `node:sqlite`, which Node keeps behind that flag until Node 23 (we run 22.12). Without it the server logs "started" and then returns **500 on every request** with `ERR_UNKNOWN_BUILTIN_MODULE` buried in its own output — it looks up but serves nothing. The flag is set in `scripts/dev.ts` / `scripts/workflow-ui.ts` rather than the npm script, because env-var prefixes in package.json aren't portable across Windows and POSIX.
+- The UI is taken down with the dev server, so a restart doesn't leave port 3199 held (an orphan makes the next start fail with `EADDRINUSE`).
+- Also bounded the engine's Postgres footprint (`WORKFLOW_POSTGRES_MAX_POOL_SIZE`, `WORKFLOW_POSTGRES_WORKER_CONCURRENCY` in `.env`): each engine instance opens a WDK pool **and** a graphile-worker pool, so a dev server plus a CLI run could exhaust `max_connections=100` and fail with `FATAL 53300`.
 
 ### Added
 

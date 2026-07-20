@@ -265,19 +265,24 @@ export async function buildPlannedChannel(
       model: getModel(connection),
       tools,
       stopWhen: stepCountIs(MAX_STEPS),
+      // The static instructions. Rendered before `messages`, so it's inside the cached span.
+      system: SYSTEM,
       messages: [
         {
-          role: "system",
-          // ONE shared, cached prefix for the WHOLE run. Anthropic caches on exact prefix
-          // match, so this string must be byte-identical across all 50 channel builds —
-          // hence the library profile lives here (shared) and the channel brief lives in
-          // the user message below (per-channel, tiny, uncached). The breakpoint sits on
-          // the system message, which caches the tool definitions with it.
+          role: "user",
+          // ONE shared, cached prefix for the WHOLE run. An Anthropic cache breakpoint
+          // caches everything UP TO AND INCLUDING the marked block — so putting it here
+          // caches tools + system + this library context, all of which are byte-identical
+          // across every channel build in the run. The per-channel brief goes in the NEXT
+          // message so it stays outside the cached span.
           //
-          // Get this wrong — e.g. a request-level breakpoint that swallows the channel
-          // brief — and every build has a unique prefix, shares nothing, and pays full
-          // price for the same ~4k tokens 50 times over.
-          content: `${SYSTEM}\n\nTHE LIBRARY YOU ARE BUILDING FROM:\n${libraryContext}`,
+          // Two ways to get this wrong, both of which cost real money:
+          //  1. A request-level breakpoint swallows the channel brief → every build has a
+          //     unique prefix, shares nothing, and re-pays for the same ~4k tokens 50×.
+          //  2. A `{role: "system"}` entry in `messages` → the AI SDK rejects the whole
+          //     request ("System messages are not allowed in the prompt or messages
+          //     fields"). Static instructions belong in the `system` parameter above.
+          content: `THE LIBRARY YOU ARE BUILDING FROM:\n${libraryContext}`,
           providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
         },
         {
