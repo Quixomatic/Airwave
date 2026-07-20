@@ -55,10 +55,17 @@ const conditionSchema = z.object({
   value: z.string(),
 });
 
-/** A group one level down: conditions only, no further nesting. */
+/**
+ * A group one level down: conditions only, no further nesting.
+ *
+ * NOTE THE FIELD NAME: groups combine with **`combinator`**, conditions compare with `op`.
+ * The resolver switches on `node.combinator` and falls through to AND (intersect) when it's
+ * missing — so emitting `op` on a group doesn't error, it silently turns every OR into an
+ * AND. That shipped once and made `(Action OR Adventure)` resolve to films tagged BOTH.
+ */
 const innerGroupSchema = z.object({
   type: z.literal("group"),
-  op: z.enum(["and", "or"]),
+  combinator: z.enum(["and", "or"]),
   children: z.array(conditionSchema).min(1),
 });
 
@@ -67,7 +74,7 @@ const filterNodeSchema = z.union([
   conditionSchema,
   z.object({
     type: z.literal("group"),
-    op: z.enum(["and", "or"]),
+    combinator: z.enum(["and", "or"]),
     children: z.array(z.union([conditionSchema, innerGroupSchema])).min(1),
   }),
 ]);
@@ -158,12 +165,30 @@ CONSTRAINTS:
 - Do NOT write Plex filter syntax. Describe the intent in \`theme\` — a later agent builds and verifies the actual filter.
 - Give every channel and package a unique kebab-case \`key\`.
 
-BUILDING THE FILTER (this is the important part):
-- You are given the library's **FILTER VOCABULARY** — the exact tag values that exist. Build each channel's \`filter\` from those values ONLY. A value that isn't listed will match nothing.
-- Prefer the most SPECIFIC field that captures the idea. A \`collection\` ("James Bond") or a \`studio\` ("Marvel Studios") is far sharper than a broad \`genre\`. Reach for genre only when the channel really is that broad.
-- \`title\` with \`contains\` is a substring match — good for franchises ("Star Wars"), and for a channel about specific shows, several title conditions OR'd together usually beats a genre.
-- Combine with groups when needed: \`{type:"group", op:"and"|"or", children:[…]}\`. Exclusions use the \`isNot\` operator.
-- Sanity-check the size against \`targetPoolSize\`: a filter matching 3 items can't sustain a channel, and one matching everything isn't a channel at all.
+BUILDING THE FILTER — this is what the whole job is judged on.
+
+A bare single-genre filter is a FAILURE. \`genre = Animation\` is not a channel, it's the entire animation library — 8,000 items with nothing in common but a tag. Anyone can write that; it's what the old rule-based generator already did. Your value is expressing an idea that a simple rule cannot.
+
+THE SHAPE THAT WORKS — a general predicate, then curated exceptions:
+
+  (contentRating = "TV-Y" AND genre = "Children"
+     AND title notContains "Zoboomafoo"
+     AND title notContains "DuckTales")
+  OR title contains "Blue's Clues & You"
+
+Read what that does: a rule broad enough to catch the right material, MINUS the specific things that match the rule but break the mood, PLUS the specific thing the rule misses. That is a curated channel. Aim for this.
+
+RULES:
+- Build from the **FILTER VOCABULARY** only — a value that isn't listed matches nothing.
+- **Combine at least two dimensions.** Genre alone is almost never enough. Pair it with contentRating, year, studio, audienceRating, or collection to express the actual idea.
+- **Use exclusions.** \`title\` + \`notContains\` removes the handful of items that technically match but don't belong. A channel with no exclusions usually hasn't been thought about.
+- **Reach for the sharpest field available.** A \`collection\` ("James Bond") or \`studio\` ("Marvel Studios") beats a genre outright.
+- **The BIGGEST SHOWS list is raw material.** For nostalgia, daypart, or mood channels, naming a handful of specific shows (title contains, OR'd) is often the only way to express the idea.
+- Group syntax: \`{type:"group", combinator:"and"|"or", children:[…]}\`. Conditions use \`op\` (is / isNot / contains / notContains / gte / lte); groups use \`combinator\`. One level of nesting is allowed inside a top-level group.
+- Sanity-check against \`targetPoolSize\`: 3 items can't sustain a channel, and a filter matching everything isn't a channel.
+
+MOVIES AND TV TOGETHER:
+- Real channels play both. Default \`mediaTypes\` to \`["movie","show"]\` and only narrow it when the concept genuinely demands one — a full-series marathon is shows-only; a film festival is movies-only. A kids channel, a holiday channel, a genre block: those should mix.
 
 APPEARANCE:
 - Every channel and every package needs an \`icon\`. Pick one that genuinely evokes it — a Bond channel is not a generic TV set. Icons come from the **lucide** and **phosphor** sets, written \`lucide:Name\` / \`phosphor:Name\` in PascalCase.

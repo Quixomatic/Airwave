@@ -91,13 +91,18 @@ const conditionSchema = z.object({
   op: z.string(),
   value: z.string(),
 });
-type FilterNodeInput = z.infer<typeof conditionSchema> | { type: "group"; op: "and" | "or"; children: FilterNodeInput[] };
+// Groups combine with `combinator`; conditions compare with `op`. The resolver reads
+// `node.combinator` and silently falls back to AND when it's absent, so getting this wrong
+// turns every OR into an AND with no error — see the note in lineup-plan.ts.
+type FilterNodeInput =
+  | z.infer<typeof conditionSchema>
+  | { type: "group"; combinator: "and" | "or"; children: FilterNodeInput[] };
 const filterNodeSchema: z.ZodType<FilterNodeInput> = z.lazy(() =>
   z.union([
     conditionSchema,
     z.object({
       type: z.literal("group"),
-      op: z.enum(["and", "or"]),
+      combinator: z.enum(["and", "or"]),
       children: z.array(filterNodeSchema),
     }),
   ]),
