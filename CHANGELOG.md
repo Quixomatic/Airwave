@@ -2,6 +2,108 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.40] - 2026-07-20
+
+### Fixed
+
+- **The planner was being told not to write filters — in the same prompt that requires them.** A leftover line from the original design read *"Do NOT write Plex filter syntax. Describe the intent in `theme` — a later agent builds and verifies the actual filter."* That stopped being true in v0.5.29, when the planner took over authoring filters so workers could verify rather than explore, but the instruction was never removed. Forty lines later the same prompt says *"BUILDING THE FILTER — this is what the whole job is judged on"*, and the schema makes `filter` required. Faced with both, the cheapest way to satisfy the prohibition *and* the schema is to emit the thinnest filter that validates and put the real thinking in `theme` — which is exactly the lazy, mechanical filters we've been getting. It now says plainly that a channel needs both, and what each is for.
+- **"Build from the FILTER VOCABULARY only" was silently banning most of the filter engine.** The vocabulary is built from eight *tag* fields (genre, studio, network, contentRating, collection, country, resolution, label), because those are the ones with value lists worth caching. But the instruction read as a restriction on **fields**, not values — so the planner never proposed `audienceRating`, `criticRating`, `duration`, `decade`, `addedWithin`, `unwatched`, `hdr` or `userRating`, none of which have tag values to be listed in the first place. The result was a planner working from a *smaller* filter vocabulary than the static preset generator it's meant to improve on: the generator builds its most distinctive channels out of score windows and duration bands, and the AI route couldn't express either. The rule now constrains tag *values* and says so explicitly.
+
+### Changed
+
+- **`collection` is demoted to a last resort.** It was advertised alongside `studio` as one of the "sharpest fields available", but this library's collections were assembled years ago and haven't been maintained — a collection that reads perfectly for a channel is likely missing most of what belongs in it. The prompt now says so outright and steers toward studio, title sets, and the numeric fields instead.
+
+### Notes
+
+- Prompt-only; no schema or API change. The planner is bundled into the workflow handlers, so **`pnpm workflow:build`** before the next run (`pnpm dev` rebuilds when stale).
+- This is the first of three: the full field catalog + rating/duration distributions land next, then existing-package reuse.
+
+## [0.5.39] - 2026-07-20
+
+### Fixed
+
+- **The builder gave up on channels it had already worked out how to fix.** On a 26-channel run it skipped 4, and in two cases its own explanation contained the correct filter — for "Star Wars Galaxy" it wrote *"the correct approach requires adding a title constraint: (Lucasfilm Ltd. OR Lucasfilm Animation) AND (title contains 'Star Wars') — this yields 177 items"* and then abandoned the channel instead of trying it. The prompt framed the planner's filter as a proposal to **accept or reject**; it now frames it as a **starting point to refine**, and states outright that diagnosing a problem isn't finishing the job: if you can describe a better filter you must build and preview it, and `give_up` is only for a library that genuinely can't support the channel.
+- **It distrusted hand-applied labels.** It refused an anime channel because your `Anime` label "includes many Western animated series" — but those labels were applied **by hand by the library's owner**, which makes them the most authoritative signal available, not a mistake to correct. Both prompts now say to trust user-curated `label` values absolutely.
+- **It judged channels by title count instead of runtime.** It skipped a classic-sitcom channel for matching "only 3 shows" — those three carry 635 episodes between them, which is weeks of programming. Both prompts now judge pools by runtime and treat `targetPoolSize` as a loose hint (overshooting is fine); `MIN_POOL_SIZE` drops 5 → 3, since the pool is counted in items and a handful of long-running shows is a strength.
+
+### Added
+
+- **Per-step breakdown on the AI Lineup page.** Opening a run now lists every step — name, status, retry attempts, duration — so the fan-out is visible while it happens, alongside each skipped/failed channel with the model's full reasoning for that outcome. The cost figure is now labelled as build-steps-only, since the planning call runs on a different model and isn't part of the per-channel totals.
+
+## [0.5.38] - 2026-07-20
+
+### Changed
+
+- **"Build Lineup with AI" now builds the whole planned lineup by default.** The 5-channel cap existed while a per-channel build cost ~215k input tokens; once the planner started authoring filters (so workers verify rather than explore) that fell to ~43k over ~4 steps, putting a full lineup around a dollar instead of twenty. Set `AI_LINEUP_BUILD_LIMIT` to a small number to go back to sampling while iterating on prompts. Note the binding constraint is now wall-clock rather than tokens: each channel resolves its filter against Plex (~35s for a large one) twice — once to verify, once to build its schedule.
+- **Jobs can carry a `detailHref`,** rendered as a "View runs & cost" link. Jobs that only *dispatch* long-running work finish instantly and their real output lives elsewhere, so the Jobs row was a dead end; the AI build now links straight to `/workflows/ai-lineup`.
+
+## [0.5.37] - 2026-07-20
+
+### Fixed
+
+- **The channel page blocked on `channels.preview` despite the preview being "lazy".** tRPC's `httpBatchLink` collapses concurrent queries into one request, and a batch resolves as a unit — so the preview (which resolves the whole filter against Plex) was landing in the same batch as `get` / `nowNext` / `schedule` and holding up first paint. Firing it independently in React Query didn't help: the transport re-coupled them. The v0.5.18 note that "the preview query runs async so it never blocks the page" was wrong — only the poster *images* were lazy, never the data.
+- Added a `splitLink` so a query can opt out of batching with `trpc: { context: { skipBatch: true } }`, and applied it to `channels.preview`. The page's fast queries now return on their own schedule while the preview loads alongside them. Use the same escape hatch for any procedure that can be slow and isn't needed for first paint.
+
+## [0.5.36] - 2026-07-20
+
+### Fixed
+
+- A comment inside the raw-SQL template literal used backticks, which closed the template string and produced `TS1005: ',' expected`. The previous commit shipped with the web package failing to typecheck — I misread turbo's "2 successful, 4 total" as a pass.
+
+## [0.5.35] - 2026-07-20
+
+### Fixed
+
+- **The AI Lineup runs list returned 500.** The query counted `workflow_steps.id`, but that table is keyed by `(run_id, step_id)` and has no `id` column at all. Counts `step_id` now. The failure was confined to the observability page — in-flight runs were completely unaffected, since the workflow engine reads those tables itself.
+
+## [0.5.34] - 2026-07-20
+
+### Fixed
+
+- **The "Build Lineup with AI" job ran uncapped.** It dispatched a run with no build limit, so a single click on a library this size would have designed a full lineup and then built *every* channel — each one an agent loop costing ~215k input tokens. It now builds **5 channels by default**, overridable with `AI_LINEUP_BUILD_LIMIT` (0 removes the cap). The planner still designs the complete lineup either way, so you see everything it would build and only pay to construct a sample; the run report and the AI Lineup page show planned-versus-built.
+
+## [0.5.33] - 2026-07-20
+
+### Changed
+
+- **The planner always designs the FULL lineup; a testing cap now limits only the build fan-out.** The interesting artifact is the plan — it's one call, and it's where the curation happens — while the per-channel builds are what actually cost money. So a capped run now shows you the entire lineup it would build and only pays to construct a sample of it. The sample is taken **round-robin across packages** rather than off the top of the list, so it spans different kinds of channel instead of exercising one package's worth of the easiest cases. The run report carries `channelsPlanned` alongside `channelsCreated`, and the observability page shows both so a capped run doesn't read as a shortfall.
+- **`pnpm dev` no longer rebuilds the workflow handlers every time.** It compares mtimes across `workflows/` and `packages/api/src` (both are inlined into the bundle) and rebuilds only when something actually changed. The unconditional ~13s build was delaying server startup enough that the admin frontend's first fetch timed out.
+- **The observability UI is no longer started by `pnpm dev`.** It's a separate long-lived process and doesn't belong coupled to the server. Both it and the handler build are now proper turbo tasks: **`pnpm workflow:ui`** and **`pnpm workflow:build`**.
+
+## [0.5.32] - 2026-07-20
+
+### Changed
+
+- **The planner is no longer told how many channels to build.** It was being handed `Propose exactly 50 channels across 8 packages` — a number with no relationship to the library, derived by arithmetic. A quota is the wrong instruction for the actual goal: too high and the model pads with near-duplicates, too low and whole sections of the library are left with nowhere to live. It now sizes the lineup to what's actually there, with the brief being **coverage**: could someone find a decent home for the vast majority of this server by browsing the lineup? It's told to walk the profile — genres, studios, decades, biggest shows — and make sure each meaningful block is served; to build several distinct channels where there's real depth (a genre with 300 titles, a show with 500 episodes) rather than one catch-all; and not to pad, since two channels resolving to nearly the same pool should be one channel.
+- `--limit` is now explicitly a **testing** control (generate exactly N as a representative sample, keeping trial runs cheap) rather than a truncation of a fixed-size plan.
+
+### Notes
+
+- **This makes a full run potentially much more expensive.** Per-channel build cost is still ~215k input tokens and ~10 agent steps — unchanged and unsolved — so a lineup that sizes itself to a large library scales that linearly. Until the worker loop is fixed, use `--limit` (or the testing cap) rather than an uncapped run.
+
+## [0.5.31] - 2026-07-20
+
+### Fixed
+
+- **Every AI-generated `OR` group was silently being treated as `AND`.** A filter group combines with **`combinator`**, but the two schemas added for the lineup workflow emitted **`op`** instead. The resolver switches on `node.combinator` and falls through to intersect when it's missing, so nothing errored — `Blockbuster Night`'s `(genre = Action OR genre = Adventure)` actually resolved to films tagged *both* Action *and* Adventure. The chat assistant was never affected (it always used `combinator`); this only hit channels built by the lineup workflow.
+
+### Changed
+
+- **The planner is now taught what a curated channel actually looks like.** It was reaching for the laziest expressible filter — `genre = Animation` for an "All-Day Toons" channel, matching ~7,900 items whose only shared trait is a tag. That's precisely what the existing rule-based generator already produces, so it added nothing. The prompt now states outright that a bare single-genre filter is a failure, and shows the real shape to aim for: **a general predicate, then curated exceptions** — the pattern behind a hand-built channel that pairs `contentRating` + `genre`, subtracts the specific titles that break the mood, and adds back the one show the rule misses. It's also told to combine at least two dimensions, to use exclusions, to reach for `collection`/`studio` over `genre`, and that the biggest-shows list is raw material for nostalgia and daypart channels.
+- **Channels now default to carrying both movies and TV**, like real channels do. `mediaTypes` defaults to `["movie","show"]` and narrows only when the concept demands it (a full-series marathon, a film festival).
+
+## [0.5.30] - 2026-07-20
+
+### Added
+
+- **Two manual jobs on Settings → Jobs.** **Clear AI Lineup** deletes every AI-generated channel and package in one click — scoped strictly to `aiGenerated` rows, so preset-generated and hand-made channels are untouched. **Build Lineup with AI** kicks off a full run without touching a terminal. The build job is a **dispatcher**: the real work is a durable workflow that outlives the request and survives restarts, so the job returns as soon as the run is started and its status means "kicked off", not "finished" — the Job table can't represent a multi-hour run.
+- **An AI lineup observability page at `/workflows/ai-lineup`.** Its own section rather than living under Channels, because it's about the workflow rather than the channels it happens to produce. Lists every run with live status and per-step progress (polling while anything is in flight), and opens a run to show what it built and **what it cost**: input/output tokens, cache reads (~0.1×) and writes (~1.25×), agent steps, **steps per channel**, and a dollar estimate. Every cost lesson in this arc so far was learned after the fact from terminal logs; this makes spend visible while a run is happening.
+
+### Notes
+
+- Run metadata is read straight out of the Workflow SDK's `workflow` schema with raw SQL — Prisma's describer deliberately can't see that schema (which is what keeps `db push` away from those tables), but plain SQL over the same connection reads it fine.
+- A run's report is stored as CBOR in `output_cbor`, so it's decoded through the SDK (`getRun().returnValue`) rather than read as JSON.
+
 ## [0.5.29] - 2026-07-19
 
 ### Changed
@@ -25,6 +127,8 @@ All notable changes to ChannelGuide are documented here.
 - **The UI needs `NODE_OPTIONS=--experimental-sqlite`.** It imports `node:sqlite`, which Node keeps behind that flag until Node 23 (we run 22.12). Without it the server logs "started" and then returns **500 on every request** with `ERR_UNKNOWN_BUILTIN_MODULE` buried in its own output — it looks up but serves nothing. The flag is set in `scripts/dev.ts` / `scripts/workflow-ui.ts` rather than the npm script, because env-var prefixes in package.json aren't portable across Windows and POSIX.
 - The UI is taken down with the dev server, so a restart doesn't leave port 3199 held (an orphan makes the next start fail with `EADDRINUSE`).
 - Also bounded the engine's Postgres footprint (`WORKFLOW_POSTGRES_MAX_POOL_SIZE`, `WORKFLOW_POSTGRES_WORKER_CONCURRENCY` in `.env`): each engine instance opens a WDK pool **and** a graphile-worker pool, so a dev server plus a CLI run could exhaust `max_connections=100` and fail with `FATAL 53300`.
+
+## [0.5.27] - 2026-07-19
 
 ### Added
 
