@@ -12,7 +12,7 @@ import {
   updateConnection,
 } from "../services/agent/config";
 import { deleteConversation, getConversationMessages, listConversations } from "../services/agent/conversations";
-import { listLineupRuns } from "../services/agent/lineup-runs";
+import { listLineupRunSteps, listLineupRuns } from "../services/agent/lineup-runs";
 import { isLineupRunnerAvailable, requireLineupRunner } from "../services/agent/lineup-runner";
 
 const connectionInput = z.object({
@@ -83,6 +83,11 @@ export const aiRouter = router({
   lineupRuns: adminProcedure
     .input(z.object({ limit: z.number().int().positive().max(100).optional() }).optional())
     .query(({ ctx, input }) => listLineupRuns(ctx.prisma, input?.limit ?? 20)),
+
+  /** Every step of one run — the fan-out breakdown for the observability page. */
+  lineupRunSteps: adminProcedure
+    .input(z.object({ runId: z.string() }))
+    .query(({ ctx, input }) => listLineupRunSteps(ctx.prisma, input.runId)),
 
   /** Poll a run's status/progress. `running` covers "suspended between steps" too. */
   lineupRun: adminProcedure

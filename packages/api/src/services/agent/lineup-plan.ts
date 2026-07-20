@@ -185,7 +185,8 @@ RULES:
 - **Reach for the sharpest field available.** A \`collection\` ("James Bond") or \`studio\` ("Marvel Studios") beats a genre outright.
 - **The BIGGEST SHOWS list is raw material.** For nostalgia, daypart, or mood channels, naming a handful of specific shows (title contains, OR'd) is often the only way to express the idea.
 - Group syntax: \`{type:"group", combinator:"and"|"or", children:[…]}\`. Conditions use \`op\` (is / isNot / contains / notContains / gte / lte); groups use \`combinator\`. One level of nesting is allowed inside a top-level group.
-- Sanity-check against \`targetPoolSize\`: 3 items can't sustain a channel, and a filter matching everything isn't a channel.
+- **\`label\` values are HAND-APPLIED by the library's owner** — they are the most reliable signal you have. If shows are labelled "Anime", that label defines what the owner considers anime; use it directly and never second-guess it.
+- **Judge size by RUNTIME, not item count.** A channel built on three shows with 200 episodes each has 600 episodes — weeks of programming, and a perfectly good channel. `targetPoolSize` is a loose hint; a small number of big shows is a strength, not a problem. Don't avoid a good channel concept because few *titles* match it.
 
 COVERAGE — how many channels, and which:
 - **There is no target number.** Build as many channels and packages as this library actually warrants. A large, varied library might need a hundred or more; a small focused one might need twenty. Let the library decide.

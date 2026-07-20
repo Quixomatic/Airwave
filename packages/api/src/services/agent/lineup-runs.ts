@@ -34,6 +34,65 @@ type RunRow = {
   running: number;
 };
 
+export type LineupRunStep = {
+  stepId: string;
+  /** Short name, e.g. "buildChannel" — the stored value is a long qualified id. */
+  name: string;
+  status: string;
+  attempt: number;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  durationSeconds: number | null;
+  /** Present when the step failed outright (as opposed to returning a skipped result). */
+  error: string | null;
+};
+
+/**
+ * Every step of one run, oldest first — the fan-out breakdown.
+ *
+ * Metadata only: a step's OUTPUT (the per-channel `ChannelBuildResult`) is CBOR in
+ * `output_cbor`, so the channel-level detail — created/skipped/failed, pool size, and the
+ * model's reasoning for a skip — is read from the run's report instead, which the page
+ * already fetches. The two are correlated in the UI by channel name.
+ */
+export async function listLineupRunSteps(
+  prisma: PrismaClient,
+  runId: string,
+): Promise<LineupRunStep[]> {
+  const rows = await prisma.$queryRawUnsafe<
+    {
+      step_id: string;
+      step_name: string;
+      status: string;
+      attempt: number;
+      started_at: Date | null;
+      completed_at: Date | null;
+      error: unknown;
+    }[]
+  >(
+    `SELECT step_id, step_name, status, attempt, started_at, completed_at, error
+     FROM workflow.workflow_steps
+     WHERE run_id = $1
+     ORDER BY created_at ASC`,
+    runId,
+  );
+
+  return rows.map((r) => ({
+    stepId: r.step_id,
+    // Stored as "step//./workflows/lineup//buildChannel" — only the tail is useful.
+    name: String(r.step_name).split("//").pop() ?? r.step_name,
+    status: r.status,
+    attempt: Number(r.attempt),
+    startedAt: r.started_at,
+    completedAt: r.completed_at,
+    durationSeconds:
+      r.started_at && r.completed_at
+        ? Math.round((r.completed_at.getTime() - r.started_at.getTime()) / 1000)
+        : null,
+    error: r.error ? String(JSON.stringify(r.error)).slice(0, 500) : null,
+  }));
+}
+
 /**
  * Recent AI lineup runs, newest first. Filtered to our workflow by name — the `workflow`
  * schema is shared with any other workflow we add later.

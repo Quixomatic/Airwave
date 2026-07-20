@@ -31,6 +31,14 @@ const PRICING: Record<string, { in: number; out: number }> = {
   "claude-haiku-4-5": { in: 1, out: 5 },
 };
 
+/** One channel's outcome from the run report. `reason` is the model's own explanation. */
+type ChannelResult = {
+  key: string;
+  name: string;
+  number: number;
+  reason?: string;
+};
+
 type Usage = {
   inputTokens: number;
   outputTokens: number;
@@ -75,6 +83,14 @@ function AiLineupRuns() {
   const report = useQuery({
     ...trpc.ai.lineupRun.queryOptions({ runId: openRun ?? "" }),
     enabled: !!openRun,
+  });
+
+  // The fan-out breakdown. Polls while the run is live so steps tick over as they finish.
+  const steps = useQuery({
+    ...trpc.ai.lineupRunSteps.queryOptions({ runId: openRun ?? "" }),
+    enabled: !!openRun,
+    refetchInterval: (q) =>
+      (q.state.data ?? []).some((s) => s.status === "running") ? 3000 : false,
   });
 
   const output = report.data?.output as
@@ -171,12 +187,67 @@ function AiLineupRuns() {
                       }
                     />
                     <Row
-                      label="Est. cost (worker rates)"
+                      label="Est. build cost (worker rates)"
                       value={`$${estimateCost(output.usage).toFixed(2)}`}
                     />
                   </div>
                 )}
+                {/* The planner runs on a different (usually pricier) model and its usage
+                    isn't part of the per-channel totals, so say so rather than letting the
+                    build figure read as the whole bill. */}
+                <p className="text-muted-foreground text-xs">
+                  Build steps only — the planning call runs on the planner model and isn't included.
+                </p>
+
+                {/* Per-channel outcomes. For a skip, `reason` is the model's own analysis of
+                    why the channel couldn't be built — the most useful thing on this page. */}
+                {[
+                  { label: "Skipped", items: output.skipped ?? [], tone: "text-amber-600" },
+                  { label: "Failed", items: output.failed ?? [], tone: "text-red-600" },
+                ].map(({ label, items, tone }) =>
+                  items.length ? (
+                    <div key={label} className="space-y-2">
+                      <p className={`text-sm font-medium ${tone}`}>
+                        {label} ({items.length})
+                      </p>
+                      {(items as ChannelResult[]).map((c) => (
+                        <div key={`${c.number}-${c.key}`} className="rounded-md border p-3">
+                          <p className="text-sm font-medium">
+                            {c.number} {c.name}
+                          </p>
+                          <p className="text-muted-foreground mt-1 text-xs whitespace-pre-wrap">
+                            {c.reason}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null,
+                )}
               </>
+            )}
+
+            {/* Step timeline — the fan-out. Each buildChannel is its own durable step. */}
+            {!!steps.data?.length && (
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Steps ({steps.data.length})</p>
+                {steps.data.map((s) => (
+                  <div
+                    key={s.stepId}
+                    className="flex items-center gap-3 rounded-md border px-3 py-1.5 text-xs"
+                  >
+                    <span className={`w-20 shrink-0 font-medium ${STATUS_TONE[s.status] ?? ""}`}>
+                      {s.status}
+                    </span>
+                    <span className="flex-1 truncate font-mono">{s.name}</span>
+                    {s.attempt > 1 && (
+                      <span className="text-amber-600">attempt {s.attempt}</span>
+                    )}
+                    <span className="text-muted-foreground w-14 shrink-0 text-right">
+                      {s.durationSeconds != null ? `${s.durationSeconds}s` : "—"}
+                    </span>
+                  </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>

@@ -57,8 +57,13 @@ export type ChannelBuildResult = {
   usage?: ChannelUsage;
 };
 
-/** Below this a channel loops too tightly to be worth creating. */
-const MIN_POOL_SIZE = 5;
+/**
+ * Below this a channel has essentially nothing to play. Deliberately tiny: the pool is
+ * counted in ITEMS (episodes for TV), so three shows with 200 episodes each is a pool of
+ * ~600 and an excellent rerun channel. Judging a channel by how many *shows* it matched is
+ * how good channels get wrongly skipped.
+ */
+const MIN_POOL_SIZE = 3;
 
 /**
  * COST MODEL — worth understanding before changing any of this.
@@ -108,21 +113,22 @@ const filterNodeSchema: z.ZodType<FilterNodeInput> = z.lazy(() =>
   ]),
 );
 
-const SYSTEM = `You VERIFY a proposed live-TV channel filter, then commit it.
-
-A planner has already written a candidate filter using the library's real tag vocabulary. Your job is to check it, not to start from scratch — most channels should take two or three steps.
+const SYSTEM = `You BUILD one live-TV channel. A planner has drafted a candidate filter from the library's real tag vocabulary — treat it as a STARTING POINT to refine, not a proposal to accept or reject.
 
 PROCESS:
-1. \`preview_filter\` the proposed filter. Look at the count and the sample.
-2. If it genuinely matches the channel's description, \`commit_channel\` immediately. Do NOT keep exploring a filter that already works.
-3. Only if it's clearly wrong (matches nothing, matches the wrong thing, or is wildly off the target size), adjust and preview again — passing \`detail: "compact"\` on these follow-up checks, which returns the same items far more cheaply.
+1. \`preview_filter\` the draft. Look at the count and the sample.
+2. If it genuinely matches the channel's description, \`commit_channel\` immediately. Don't keep exploring a filter that already works.
+3. If it's wrong, FIX IT: adjust the filter and preview again, passing \`detail: "compact"\` on these follow-up checks (same items, far cheaper). Add a title constraint, an exclusion, or another dimension — then re-preview. Repeat until it's right, then commit with a final \`quick\` preview to confirm.
 4. Use \`list_filter_fields\` only if you need an operator you don't know. The tag values are already in your context below — never fetch them again.
+
+**IF YOU CAN DESCRIBE A BETTER FILTER, YOU MUST TRY IT.** Diagnosing the problem is not finishing the job. Writing "the correct approach would be X" and then giving up is a failure — if you can name X, build X and preview it. \`give_up\` is only for when you have ALREADY tried real alternatives and the library genuinely cannot support the channel (e.g. only three matching titles exist). Never give up on your first preview.
 
 The library's tag values are what they are — never use a value that isn't in the vocabulary below. "Anime" may not exist as a genre even when the library is full of anime; "Animation" plus specific show titles may be the real route.
 
 RULES:
-- The pool must be big enough to sustain a channel. Aim near the stated target; a handful of items means constant repetition.
-- The pool must be RIGHT, not just big. A channel that matches everything is worse than a narrow one. Check the sample titles in the preview actually belong.
+- **A few shows is a GREAT channel.** Judge the pool by RUNTIME, not item count. Three sitcoms with 200 episodes each is 600 episodes — weeks of programming, and exactly what a rerun channel is. Never skip a channel because it matched few *shows*; look at the episode counts. The target pool size is a loose hint, not a requirement — overshooting it is fine, and a big pool is not a problem.
+- **TRUST USER-CURATED TAGS ABSOLUTELY.** \`label\` values were applied BY HAND by the library's owner. If a show is labelled "Anime", it is anime — full stop. Never second-guess a label because titles look misclassified to you; the owner's judgement about their own library beats yours, and a label is the single most reliable signal available.
+- The pool must be RIGHT, not just big. A channel that matches everything (no meaningful predicate at all) is worse than a narrow one. Check the sample titles actually belong — but "more items than I expected" is not a reason to reject a filter.
 - \`title\` with the "is" operator is a Plex SUBSTRING match, not exact — \`title is "Bear"\` matches anything containing "Bear".
 - For a channel about specific shows, filtering by show title (or several, OR'd together) is often better than by genre.
 - If after genuine effort nothing sensible matches, call \`give_up\` with the reason. An empty or wrong channel is worse than no channel.
