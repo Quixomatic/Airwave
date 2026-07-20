@@ -2,6 +2,23 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.44] - 2026-07-20
+
+### Added
+
+- **A dedicated page per run — `/workflows/ai-lineup/:runId`.** Clicking a run now opens it properly instead of expanding a cramped panel in the list. It shows **the full plan** (every package, channel and filter — including the ones a build cap meant were never constructed, which used to be discarded unread), **every channel build** as an expandable row with the model's own reasoning, its brief and proposed filter, its **tool calls** — what it previewed, what came back, how it revised — and its outcome, plus the SDK's step timeline with durations and retries.
+- **The cost panel here is the honest one.** Grouped by model *and* phase, counting retries and the planner call. The list page's old figure was build-steps-only priced at worker rates, which is how a run whose planner ran twice on Opus reported **$0.16**. A model with no known price shows as `unpriced` and is excluded from the total rather than being silently guessed at — an obvious gap beats a confidently wrong number, which is the mistake being corrected.
+- Builds are **expandable rows, not tabs**, so two channels' reasoning can be read side by side — comparing them is how a prompt problem becomes obvious.
+
+### Changed
+
+- The runs list is now a pure index: status, step counts, duration, and a link. All detail moved to the run page.
+
+### Notes
+
+- Runs from before v0.5.43 have no trace rows and will say so rather than rendering empty panels.
+- **`TS2589: Type instantiation is excessively deep`** — `Prisma.JsonValue` is a deeply recursive union, and inferring it through tRPC tips the *client* compiler over. Fixed properly at the source: `listRunTraces` returns an explicit DTO with the three JSON columns widened to `unknown`, which keeps the inferred router type shallow. Worth remembering for any future procedure returning a Prisma row with `Json` fields.
+
 ## [0.5.43] - 2026-07-20
 
 ### Added

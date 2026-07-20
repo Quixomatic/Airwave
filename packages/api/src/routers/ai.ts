@@ -14,6 +14,7 @@ import {
 import { deleteConversation, getConversationMessages, listConversations } from "../services/agent/conversations";
 import { listLineupRunSteps, listLineupRuns } from "../services/agent/lineup-runs";
 import { isLineupRunnerAvailable, requireLineupRunner } from "../services/agent/lineup-runner";
+import { listRunTraces, summarizeRunUsage } from "../services/agent/lineup-trace";
 
 const connectionInput = z.object({
   name: z.string().min(1),
@@ -88,6 +89,22 @@ export const aiRouter = router({
   lineupRunSteps: adminProcedure
     .input(z.object({ runId: z.string() }))
     .query(({ ctx, input }) => listLineupRunSteps(ctx.prisma, input.runId)),
+
+  /**
+   * What the MODEL did, per step and per attempt — the run detail page's substance.
+   * Distinct from `lineupRunSteps`, which is the SDK's outside view (name/status/duration).
+   */
+  lineupRunTraces: adminProcedure
+    .input(z.object({ runId: z.string() }))
+    .query(({ ctx, input }) => listRunTraces(ctx.prisma, input.runId)),
+
+  /**
+   * True spend for a run, grouped by model and phase — including retries and the planner
+   * call, both of which the build-only report left out.
+   */
+  lineupRunUsage: adminProcedure
+    .input(z.object({ runId: z.string() }))
+    .query(({ ctx, input }) => summarizeRunUsage(ctx.prisma, input.runId)),
 
   /** Poll a run's status/progress. `running` covers "suspended between steps" too. */
   lineupRun: adminProcedure

@@ -126,12 +126,56 @@ export async function recordTrace(prisma: PrismaClient, t: TraceInput): Promise<
   }
 }
 
+/**
+ * One trace row as the admin UI sees it.
+ *
+ * Declared explicitly rather than leaking the Prisma row: `Prisma.JsonValue` is a deeply
+ * recursive union, and inferring it through tRPC tips the client compiler straight into
+ * `TS2589: Type instantiation is excessively deep and possibly infinite`. Widening the three
+ * JSON columns to `unknown` keeps the inferred router type shallow — and the page treats them
+ * as opaque JSON anyway.
+ */
+export type LineupTraceRow = {
+  id: string;
+  runId: string;
+  stepId: string | null;
+  stepName: string;
+  attempt: number;
+  phase: string;
+  channelKey: string | null;
+  channelNumber: number | null;
+  channelName: string | null;
+  status: string;
+  reason: string | null;
+  input: unknown;
+  output: unknown;
+  trace: unknown;
+  model: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  agentSteps: number;
+  error: string | null;
+  startedAt: Date;
+  finishedAt: Date | null;
+};
+
 /** Every trace row for a run, oldest first — the run detail page's data. */
-export async function listRunTraces(prisma: PrismaClient, runId: string) {
-  return prisma.aiLineupTrace.findMany({
+export async function listRunTraces(
+  prisma: PrismaClient,
+  runId: string,
+): Promise<LineupTraceRow[]> {
+  const rows = await prisma.aiLineupTrace.findMany({
     where: { runId },
     orderBy: { startedAt: "asc" },
   });
+  return rows.map((r) => ({
+    ...r,
+    input: r.input as unknown,
+    output: r.output as unknown,
+    trace: r.trace as unknown,
+  }));
 }
 
 /**
