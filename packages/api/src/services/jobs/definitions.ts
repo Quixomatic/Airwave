@@ -1,6 +1,8 @@
 import prisma from "@ChannelGuide/db";
 
 import type { SyncProgress } from "../media/media-item";
+import { getLineupRunner } from "../agent/lineup-runner";
+import { clearAiGenerated } from "../agent/tools";
 import { getGlobalBumperConfig } from "../bumpers/bumper-config";
 import { generateLineup } from "../generator/generate";
 import { syncMediaItems } from "../media/sync-media";
@@ -197,6 +199,44 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
       if (stale.length > 0) {
         console.log(`[jobs] schedule-bumper-sync reconciled ${stale.length} channel(s)`);
       }
+    },
+  },
+  {
+    id: "ai-lineup-clear",
+    name: "Clear AI Lineup",
+    description:
+      "Deletes every AI-generated channel and package (the 1000+ block). Manual; leaves preset-generated and hand-made channels completely untouched.",
+    interval: "fixed",
+    defaultCron: "0 0 0 1 1 *", // manual-only; never auto-fires
+    manual: true,
+    run: async () => {
+      const { channelsDeleted, packagesDeleted } = await clearAiGenerated(prisma, "both");
+      console.log(`[jobs] ai-lineup-clear removed ${channelsDeleted} channel(s), ${packagesDeleted} package(s)`);
+    },
+  },
+  {
+    id: "ai-lineup-build",
+    name: "Build Lineup with AI",
+    description:
+      "Analyses your library and builds the whole AI lineup (packages + channels + schedules). DESTRUCTIVE: clears the existing AI lineup first. Runs as a durable background workflow — this job only kicks it off and returns; watch progress in the workflow UI.",
+    interval: "fixed",
+    defaultCron: "0 0 0 1 1 *", // manual-only; never auto-fires
+    manual: true,
+    run: async () => {
+      // DISPATCHER ONLY. The real work is a durable workflow that outlives this call and
+      // survives restarts — `start()` returns a runId immediately. So this job's status
+      // means "kicked off", NOT "finished"; the Job table can't represent a multi-hour run
+      // (its state is in-memory and `runJob` awaits the function). See §3 of the plan.
+      const runner = getLineupRunner();
+      if (!runner) throw new Error("Workflow engine isn't running — set WORKFLOW_ENABLED=1 and restart the server.");
+
+      const source = (await enabledSources())[0];
+      if (!source) throw new Error("No enabled media source.");
+      const admin = await prisma.user.findFirst({ where: { role: "admin" }, orderBy: { createdAt: "asc" }, select: { id: true } });
+      if (!admin) throw new Error("No admin user found.");
+
+      const { runId } = await runner.start({ sourceId: source.id, userId: admin.id });
+      console.log(`[jobs] ai-lineup-build dispatched run ${runId}`);
     },
   },
   {

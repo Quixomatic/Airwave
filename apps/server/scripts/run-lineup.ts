@@ -32,6 +32,22 @@ import { requireLineupRunner } from "@ChannelGuide/api/services/agent/lineup-run
 
 import { startWorkflowEngine } from "../src/workflow-engine";
 
+/**
+ * ALWAYS rebuild the handlers before running.
+ *
+ * The `"use workflow"` / `"use step"` directives are a BUILD-TIME transform, so edits to
+ * workflows/ — or to anything in packages/api that gets bundled into the step handlers —
+ * are invisible until `workflow build` runs. Skipping it doesn't error: the run executes
+ * the PREVIOUS bundle and produces plausible-looking results, which is far worse than a
+ * failure. That cost a full paid run once; hence this is automatic, not a manual step.
+ */
+const build = Bun.spawn(["bunx", "workflow", "build"], { stdio: ["ignore", "ignore", "inherit"] });
+if ((await build.exited) !== 0) {
+  console.error("[run-lineup] workflow build failed — refusing to run against a stale bundle");
+  process.exit(1);
+}
+console.log("[run-lineup] handlers rebuilt");
+
 const args = process.argv.slice(2);
 const flag = (name: string) => args.includes(name);
 const value = (name: string) => {

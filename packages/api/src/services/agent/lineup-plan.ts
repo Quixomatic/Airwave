@@ -36,28 +36,41 @@ import { getConnectionForRole, getModel } from "./config";
  */
 const accentSchema = z.enum(ACCENT_KEYS);
 
-// The recursive predicate tree, matching the real FilterNode shape. The planner emits these
-// directly now: it already holds the full tag vocabulary, and having it do the work collapses
-// each worker from an exploratory 16-step loop into verify-and-commit.
+/**
+ * The predicate tree the planner emits — capped at ONE level of grouping and deliberately
+ * NOT recursive.
+ *
+ * Two reasons it can't be the recursive `z.lazy()` shape the builder's tool input uses:
+ *  1. **Structured outputs reject recursive schemas.** `generateObject` fails the request
+ *     outright with "Circular reference detected in schema definitions: __schema0 ->
+ *     __schema0" — before inference, so it's a hard error rather than a quality problem.
+ *  2. It matches the product anyway: the admin filter-builder caps grouping at one level to
+ *     mirror Plex's real UI (top-level all/any holding conditions and groups; a group holds
+ *     only conditions). The resolver handles arbitrary depth, but nothing else authors it.
+ */
 const conditionSchema = z.object({
   type: z.literal("condition"),
-  field: z.string().describe("A field from list_filter_fields, e.g. genre / studio / collection / title / year."),
+  field: z.string().describe("A filterable field, e.g. genre / studio / collection / title / year / contentRating."),
   op: z.string().describe("e.g. is / isNot / contains / gte / lte."),
   value: z.string(),
 });
-type FilterNodeInput =
-  | z.infer<typeof conditionSchema>
-  | { type: "group"; op: "and" | "or"; children: FilterNodeInput[] };
-const filterNodeSchema: z.ZodType<FilterNodeInput> = z.lazy(() =>
-  z.union([
-    conditionSchema,
-    z.object({
-      type: z.literal("group"),
-      op: z.enum(["and", "or"]),
-      children: z.array(filterNodeSchema),
-    }),
-  ]),
-);
+
+/** A group one level down: conditions only, no further nesting. */
+const innerGroupSchema = z.object({
+  type: z.literal("group"),
+  op: z.enum(["and", "or"]),
+  children: z.array(conditionSchema).min(1),
+});
+
+/** The top level: a single condition, or a group of conditions and one-level groups. */
+const filterNodeSchema = z.union([
+  conditionSchema,
+  z.object({
+    type: z.literal("group"),
+    op: z.enum(["and", "or"]),
+    children: z.array(z.union([conditionSchema, innerGroupSchema])).min(1),
+  }),
+]);
 const iconDescription =
   'Icon as "lucide:Name" or "phosphor:Name", PascalCase, from the lucide or phosphor icon sets. ' +
   'e.g. "lucide:Tv", "lucide:Rocket", "lucide:Ghost", "lucide:Swords", "lucide:Baby", ' +

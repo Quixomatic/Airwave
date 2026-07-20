@@ -12,6 +12,7 @@ import {
   updateConnection,
 } from "../services/agent/config";
 import { deleteConversation, getConversationMessages, listConversations } from "../services/agent/conversations";
+import { listLineupRuns } from "../services/agent/lineup-runs";
 import { isLineupRunnerAvailable, requireLineupRunner } from "../services/agent/lineup-runner";
 
 const connectionInput = z.object({
@@ -77,6 +78,11 @@ export const aiRouter = router({
     .mutation(({ ctx, input }) =>
       requireLineupRunner().start({ ...input, userId: ctx.session.user.id }),
     ),
+
+  /** Recent AI lineup runs for the observability page (metadata + step counts). */
+  lineupRuns: adminProcedure
+    .input(z.object({ limit: z.number().int().positive().max(100).optional() }).optional())
+    .query(({ ctx, input }) => listLineupRuns(ctx.prisma, input?.limit ?? 20)),
 
   /** Poll a run's status/progress. `running` covers "suspended between steps" too. */
   lineupRun: adminProcedure
