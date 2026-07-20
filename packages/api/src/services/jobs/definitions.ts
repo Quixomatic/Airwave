@@ -16,6 +16,16 @@ import {
   repairChannelSchedule,
 } from "../schedule/generate";
 
+/**
+ * How many channels the admin "Build Lineup with AI" button actually constructs.
+ *
+ * The planner always designs the whole lineup; this caps the expensive part. Kept small
+ * deliberately — a per-channel build is an agent loop costing ~215k input tokens, so an
+ * uncapped run on a large library is a real bill from a single click. Override with
+ * `AI_LINEUP_BUILD_LIMIT` (0 = no cap).
+ */
+const DEFAULT_AI_BUILD_LIMIT = 5;
+
 export type JobInterval = "seconds" | "minutes" | "hours" | "days" | "fixed";
 
 /** Passed to a job's `run` so it can report live progress to the scheduler. */
@@ -218,7 +228,7 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
     id: "ai-lineup-build",
     name: "Build Lineup with AI",
     description:
-      "Analyses your library and builds the whole AI lineup (packages + channels + schedules). DESTRUCTIVE: clears the existing AI lineup first. Runs as a durable background workflow — this job only kicks it off and returns; watch progress in the workflow UI.",
+      "Analyses your library and designs a full AI lineup, then builds the first few channels of it (capped — see AI_LINEUP_BUILD_LIMIT). DESTRUCTIVE: clears the existing AI lineup first. Runs as a durable background workflow — this job only kicks it off and returns; watch progress and cost on the AI Lineup page.",
     interval: "fixed",
     defaultCron: "0 0 0 1 1 *", // manual-only; never auto-fires
     manual: true,
@@ -235,8 +245,23 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
       const admin = await prisma.user.findFirst({ where: { role: "admin" }, orderBy: { createdAt: "asc" }, select: { id: true } });
       if (!admin) throw new Error("No admin user found.");
 
-      const { runId } = await runner.start({ sourceId: source.id, userId: admin.id });
-      console.log(`[jobs] ai-lineup-build dispatched run ${runId}`);
+      // CAPPED BY DEFAULT. The planner always designs the full library-sized lineup, but
+      // only this many channels are actually built — each build is an agent loop costing
+      // ~215k tokens, so an uncapped run on a large library is a genuinely expensive
+      // operation to trigger from a button. Raise `AI_LINEUP_BUILD_LIMIT` (or set it to 0)
+      // once the per-channel cost is under control and you want the whole lineup.
+      const raw = process.env.AI_LINEUP_BUILD_LIMIT;
+      const limit = raw === undefined ? DEFAULT_AI_BUILD_LIMIT : Number(raw);
+
+      const { runId } = await runner.start({
+        sourceId: source.id,
+        userId: admin.id,
+        ...(limit > 0 ? { limit } : {}),
+      });
+      console.log(
+        `[jobs] ai-lineup-build dispatched run ${runId}` +
+          (limit > 0 ? ` (building ${limit} of the planned lineup)` : " (UNCAPPED — full lineup)"),
+      );
     },
   },
   {
