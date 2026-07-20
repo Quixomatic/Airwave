@@ -48,12 +48,30 @@ type UsageRow = {
 };
 
 /**
- * Per-model cost. Unknown models yield `null` rather than a guess — a made-up number here is
- * worse than an obvious gap, since the whole point of this panel is that the previous estimate
- * was quietly wrong.
+ * Resolve a model string to a rate, tolerating DATED ids.
+ *
+ * A connection's model is whatever the provider's API expects, which for Anthropic is often
+ * a dated variant — `claude-haiku-4-5-20251001` rather than `claude-haiku-4-5`. Exact-match
+ * lookup missed those and reported an entire run's build spend as "unpriced". Longest-prefix
+ * match handles the date suffix without pretending to know models we genuinely don't.
+ */
+function rateFor(model: string) {
+  const exact = PRICING[model];
+  if (exact) return exact;
+  const key = Object.keys(PRICING)
+    .filter((k) => model.startsWith(k))
+    // Longest wins, so `claude-opus-4-8...` can't be captured by a shorter overlapping key.
+    .sort((a, b) => b.length - a.length)[0];
+  return key ? PRICING[key] : undefined;
+}
+
+/**
+ * Per-model cost. Genuinely unknown models yield `null` rather than a guess — a made-up
+ * number here is worse than an obvious gap, since the whole point of this panel is that the
+ * previous estimate was quietly wrong.
  */
 function costOf(u: UsageRow): number | null {
-  const rate = PRICING[u.model];
+  const rate = rateFor(u.model);
   if (!rate) return null;
   const uncached = Math.max(0, u.inputTokens - u.cacheReadTokens - u.cacheWriteTokens);
   return (

@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.47] - 2026-07-20
+
+### Fixed
+
+- **A run's entire build spend showed as “unpriced”.** The cost table keys on undated model ids (`claude-haiku-4-5`), but a connection stores whatever the provider's API expects — which for Anthropic is usually the dated variant, `claude-haiku-4-5-20251001`. Exact-match lookup missed it, so 8 calls and 352k input tokens sat outside the total. Rates now resolve by **longest prefix**, so dated ids price correctly while a genuinely unknown model (say `gpt-5`) still reports `unpriced` rather than being guessed at. Verified against the last run: builds price at **$0.257**, which with the Opus plan puts it at **~$0.61** — against the **$0.16** the old build-only estimate claimed.
+
 ## [0.5.46] - 2026-07-20
 
 ### Fixed
