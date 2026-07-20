@@ -2,6 +2,27 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.41] - 2026-07-20
+
+### Fixed
+
+- **`main` didn't build — unescaped backticks in the planner prompt, shipped in v0.5.39.** The line about `targetPoolSize` used plain backticks inside a template literal, which closes and reopens the string; Bun rejects it with `Expected ";" but found "targetPoolSize"`. Since `lineup-plan.ts` is inlined into the workflow bundle, `workflow build` could not have succeeded — meaning **v0.5.39's three prompt fixes were never actually exercised by a run**, and neither was v0.5.40. This is the second time this exact bug has shipped (v0.5.36 was the first).
+- **A green `pnpm check-types` hid it.** The v0.5.40 run reported "4 successful, 4 total" with "1 cached" — the server task came from turbo's cache and never re-parsed the changed file. The task count was honest; the cache made it meaningless. **Treat a cached typecheck as no typecheck when the point is to validate an edit.**
+
+### Added
+
+- **The planner now gets the full field catalog, not just the tag vocabulary.** These were conflated, and only tag fields have listable values — so `audienceRating`, `criticRating`, `duration`, `decade`, `addedWithin`, `unwatched`, `hdr` and `userRating` were invisible to it, leaving the AI route with a *narrower* filter vocabulary than the static generator it's meant to beat (which builds its most distinctive channels out of exactly those axes). The catalog is static, costs a few hundred tokens, and rides in the same cached prefix that every fan-out shares, so it's paid once per run. Library-hygiene fields (`trash`, `duplicate`, `unmatched`, `location`, `editionTitle`) are deliberately left out as noise, and the heavy tag fields (`actor`, `director`, `writer`, `producer`) are named but still **not** preloaded — they run to thousands of values, which is why the vocabulary was trimmed in the first place.
+- **Numeric spreads in the library profile.** A threshold is meaningless without knowing where the library's mass sits: `audienceRating gte 7` is either a tight prestige channel or a third of the library. The profile now carries p10/p25/median/p75/p90 for audience score, critic score, and **movie** runtime, plus HDR and 4K counts split by movies and episodes. This is what makes a *score window* ("7.0–8.0") an expressible idea rather than a guess that resolves to 4 items or 4,000. Runtime is movies-only because `duration` is declared `appliesTo: ["movie"]`, so pooling episode lengths would describe a population the field can't filter.
+- **A deterministic sanitize pass over the planner's filters, before the build fans out.** A wider catalog means more ways to be wrong, and the likeliest mistake is a type-restricted field on a channel carrying both media types — `duration` is movies-only, `network` is shows-only, and channels now default to `["movie","show"]`. Unknown fields, operators that don't belong to a field's kind, and type-mismatched conditions are dropped and logged. A group emptied by sanitizing is dropped with it, since an empty AND/OR resolves to *everything* — the opposite of what the removed condition intended. The worker would eventually catch a bad filter via preview, but only after spending agent steps, and a silently-ignored condition can resolve to a plausible pool nobody questions.
+
+### Changed
+
+- The prompt now teaches the numeric axes: prefer a **window** to a bare floor, treat runtime as programming intent (quick-bite / matinee / event), and respect the catalog's type restrictions.
+
+### Notes
+
+- No schema change. Run `pnpm workflow:build` before the next lineup run (verified building — 21 steps, 4 workflows).
+
 ## [0.5.40] - 2026-07-20
 
 ### Fixed

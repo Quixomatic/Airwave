@@ -29,6 +29,7 @@ import type { LibraryProfile } from "@ChannelGuide/api/services/agent/library-pr
 import {
   buildFilterVocabulary,
   buildLibraryProfile,
+  formatFieldCatalog,
   formatFilterVocabulary,
   formatLibraryProfile,
 } from "@ChannelGuide/api/services/agent/library-profile";
@@ -201,7 +202,13 @@ async function buildSharedContext(sourceId: string, profile: LibraryProfile): Pr
   const text = [
     formatLibraryProfile(profile),
     "",
-    "FILTER VOCABULARY — the exact tag values available. Use ONLY these:",
+    // The CATALOG (which fields exist) is deliberately separate from the VOCABULARY (which
+    // values exist). Only tag fields have listable values, so folding the two together left
+    // every numeric/boolean field invisible — see formatFieldCatalog.
+    "FILTERABLE FIELDS — every field you can build a condition on:",
+    formatFieldCatalog(),
+    "",
+    "FILTER VOCABULARY — the exact TAG VALUES available. For these fields, use ONLY these values:",
     formatFilterVocabulary(vocabulary),
   ].join("\n");
   console.log(

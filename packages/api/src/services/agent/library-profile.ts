@@ -22,7 +22,28 @@
  */
 import type { PrismaClient } from "@ChannelGuide/db";
 
+import { FILTER_FIELDS, OPS_FOR_KIND } from "../plex/filter-fields";
+
 export type NamedCount = { name: string; count: number };
+
+/**
+ * Percentile spread for a numeric field.
+ *
+ * WHY THIS EXISTS: a numeric filter is meaningless without knowing where the library's mass
+ * sits. `audienceRating gte 7` is either a tight prestige channel or half the library
+ * depending on the distribution, and the planner cannot see individual items. Handing it
+ * percentiles is what makes a *score window* ("Hidden Gems: 7.0-8.0") an expressible idea
+ * rather than a guess that resolves to 4 items or 4,000.
+ */
+export type Distribution = {
+  /** How many items carry this field at all — the denominator for any threshold. */
+  count: number;
+  p10: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+};
 
 export type LibraryProfile = {
   sourceId: string;
@@ -33,6 +54,18 @@ export type LibraryProfile = {
   decades: { decade: number; count: number }[];
   /** Shows with enough episodes to sustain a channel, biggest first. */
   topShows: { title: string; episodes: number }[];
+  /** Movies + shows that carry a Plex audience score (0-10). */
+  audienceRating: Distribution | null;
+  /** Movies + shows that carry a critic score (0-10). */
+  criticRating: Distribution | null;
+  /**
+   * MOVIES ONLY, in minutes. `duration` is declared `appliesTo: ["movie"]` in the field
+   * catalog, so pooling episode runtimes in here would describe a population the field
+   * can't actually filter.
+   */
+  movieDurationMinutes: Distribution | null;
+  /** Counts for the boolean/badge axes, so a threshold isn't a shot in the dark. */
+  flags: { hdrMovies: number; hdrEpisodes: number; fourKMovies: number; fourKEpisodes: number };
 };
 
 /** Keep the profile small enough to sit comfortably in a cached prompt prefix. */
@@ -43,6 +76,33 @@ const MIN_EPISODES_FOR_TOP_SHOW = 5;
 
 type CountRow = { name: string | null; count: bigint | number };
 
+type PercentileRow = {
+  count: bigint | number;
+  p10: number | null;
+  p25: number | null;
+  p50: number | null;
+  p75: number | null;
+  p90: number | null;
+};
+
+/**
+ * Percentiles are null when nothing matched, so an empty result reads as "this library
+ * doesn't carry that field" rather than a spread of zeroes the planner would filter on.
+ */
+const toDistribution = (rows: PercentileRow[]): Distribution | null => {
+  const r = rows[0];
+  if (!r || Number(r.count) === 0 || r.p50 == null) return null;
+  const round = (v: number | null) => Math.round((v ?? 0) * 10) / 10;
+  return {
+    count: Number(r.count),
+    p10: round(r.p10),
+    p25: round(r.p25),
+    p50: round(r.p50),
+    p75: round(r.p75),
+    p90: round(r.p90),
+  };
+};
+
 const toCounts = (rows: CountRow[]): NamedCount[] =>
   rows
     .filter((r): r is { name: string; count: bigint | number } => !!r.name && r.name.trim() !== "")
@@ -52,7 +112,18 @@ export async function buildLibraryProfile(
   prisma: PrismaClient,
   sourceId: string,
 ): Promise<LibraryProfile> {
-  const [typeCounts, genres, studios, contentRatings, decades, topShows] = await Promise.all([
+  const [
+    typeCounts,
+    genres,
+    studios,
+    contentRatings,
+    decades,
+    topShows,
+    audienceRating,
+    criticRating,
+    movieDurations,
+    flagRows,
+  ] = await Promise.all([
     prisma.mediaItem.groupBy({
       by: ["type"],
       where: { mediaSourceId: sourceId, available: true },
@@ -123,6 +194,77 @@ export async function buildLibraryProfile(
       ORDER BY 2 DESC
       LIMIT ${LIMITS.topShows}
     `,
+
+    // Score spreads. The regex guard matters: `->>` yields text, and a malformed value
+    // would abort the whole query on the cast rather than just being skipped.
+    prisma.$queryRaw<PercentileRow[]>`
+      SELECT COUNT(*)::int AS count,
+             percentile_cont(0.1) WITHIN GROUP (ORDER BY v) AS p10,
+             percentile_cont(0.25) WITHIN GROUP (ORDER BY v) AS p25,
+             percentile_cont(0.5) WITHIN GROUP (ORDER BY v) AS p50,
+             percentile_cont(0.75) WITHIN GROUP (ORDER BY v) AS p75,
+             percentile_cont(0.9) WITHIN GROUP (ORDER BY v) AS p90
+      FROM (
+        SELECT (mi.guide ->> 'audienceRating')::float8 AS v
+        FROM media_item mi
+        WHERE mi."mediaSourceId" = ${sourceId}
+          AND mi.available = TRUE
+          AND mi.type IN ('movie', 'show')
+          AND mi.guide ->> 'audienceRating' ~ '^[0-9]+(\.[0-9]+)?$'
+      ) t
+    `,
+
+    prisma.$queryRaw<PercentileRow[]>`
+      SELECT COUNT(*)::int AS count,
+             percentile_cont(0.1) WITHIN GROUP (ORDER BY v) AS p10,
+             percentile_cont(0.25) WITHIN GROUP (ORDER BY v) AS p25,
+             percentile_cont(0.5) WITHIN GROUP (ORDER BY v) AS p50,
+             percentile_cont(0.75) WITHIN GROUP (ORDER BY v) AS p75,
+             percentile_cont(0.9) WITHIN GROUP (ORDER BY v) AS p90
+      FROM (
+        SELECT (mi.guide ->> 'criticRating')::float8 AS v
+        FROM media_item mi
+        WHERE mi."mediaSourceId" = ${sourceId}
+          AND mi.available = TRUE
+          AND mi.type IN ('movie', 'show')
+          AND mi.guide ->> 'criticRating' ~ '^[0-9]+(\.[0-9]+)?$'
+      ) t
+    `,
+
+    // MOVIES ONLY — `duration` is `appliesTo: ["movie"]`, so an episode-inclusive spread
+    // would describe a population this field can't filter. durationMs is a real column.
+    prisma.$queryRaw<PercentileRow[]>`
+      SELECT COUNT(*)::int AS count,
+             percentile_cont(0.1) WITHIN GROUP (ORDER BY v) AS p10,
+             percentile_cont(0.25) WITHIN GROUP (ORDER BY v) AS p25,
+             percentile_cont(0.5) WITHIN GROUP (ORDER BY v) AS p50,
+             percentile_cont(0.75) WITHIN GROUP (ORDER BY v) AS p75,
+             percentile_cont(0.9) WITHIN GROUP (ORDER BY v) AS p90
+      FROM (
+        SELECT mi."durationMs" / 60000.0 AS v
+        FROM media_item mi
+        WHERE mi."mediaSourceId" = ${sourceId}
+          AND mi.available = TRUE
+          AND mi.type = 'movie'
+          AND mi."durationMs" > 0
+      ) t
+    `,
+
+    // HDR and 4K are per-FILE, so they live on movies and on episodes (never on a show
+    // row). Counted separately because a "both" channel filters them at different levels.
+    prisma.$queryRaw<
+      { hdrMovies: number; hdrEpisodes: number; fourKMovies: number; fourKEpisodes: number }[]
+    >`
+      SELECT
+        COUNT(*) FILTER (WHERE mi.type = 'movie'   AND mi.guide ->> 'hdr' IS NOT NULL)::int          AS "hdrMovies",
+        COUNT(*) FILTER (WHERE mi.type = 'episode' AND mi.guide ->> 'hdr' IS NOT NULL)::int          AS "hdrEpisodes",
+        COUNT(*) FILTER (WHERE mi.type = 'movie'   AND lower(mi.guide ->> 'resolution') = '4k')::int AS "fourKMovies",
+        COUNT(*) FILTER (WHERE mi.type = 'episode' AND lower(mi.guide ->> 'resolution') = '4k')::int AS "fourKEpisodes"
+      FROM media_item mi
+      WHERE mi."mediaSourceId" = ${sourceId}
+        AND mi.available = TRUE
+        AND mi.type IN ('movie', 'episode')
+    `,
   ]);
 
   const byType = Object.fromEntries(typeCounts.map((c) => [c.type, c._count])) as Record<string, number>;
@@ -141,6 +283,15 @@ export async function buildLibraryProfile(
       .filter((d): d is { decade: number; count: bigint | number } => d.decade != null)
       .map((d) => ({ decade: Number(d.decade), count: Number(d.count) })),
     topShows: toCounts(topShows).map((s) => ({ title: s.name, episodes: s.count })),
+    audienceRating: toDistribution(audienceRating),
+    criticRating: toDistribution(criticRating),
+    movieDurationMinutes: toDistribution(movieDurations),
+    flags: {
+      hdrMovies: Number(flagRows[0]?.hdrMovies ?? 0),
+      hdrEpisodes: Number(flagRows[0]?.hdrEpisodes ?? 0),
+      fourKMovies: Number(flagRows[0]?.fourKMovies ?? 0),
+      fourKEpisodes: Number(flagRows[0]?.fourKEpisodes ?? 0),
+    },
   };
 }
 
@@ -207,12 +358,62 @@ export function formatFilterVocabulary(vocabulary: FilterVocabulary): string {
 }
 
 /**
+ * Fields deliberately kept OUT of the advertised catalog.
+ *
+ * Two reasons, both about signal: library-hygiene flags (`trash`, `duplicate`, `unmatched`)
+ * and storage details (`location`, `editionTitle`) describe the library's bookkeeping rather
+ * than its content, and a channel built on one of them is never what anybody wanted. They
+ * remain reachable through `list_filter_fields` if a build genuinely needs one.
+ */
+const CATALOG_EXCLUDE = new Set(["trash", "duplicate", "unmatched", "location", "editionTitle"]);
+
+/**
+ * Tag fields whose value lists run to thousands of names, so they are NOT preloaded into the
+ * cached prefix — the whole reason the vocabulary is limited to eight fields. Advertised by
+ * name so the planner knows they exist and can reach them via `discover_field_values`.
+ */
+const HEAVY_TAG_FIELDS = new Set(["actor", "director", "writer", "producer"]);
+
+/**
+ * The field catalog: WHICH fields can be filtered on, and how.
+ *
+ * This is separate from the tag VOCABULARY (which values exist) on purpose. The vocabulary is
+ * expensive and limited to eight cheap tag fields; the catalog is static, costs a few hundred
+ * tokens, and rides in the same cached prefix. Conflating the two is what previously left the
+ * planner unable to use `audienceRating`, `duration`, `decade` or the boolean badges at all —
+ * fields that have no tag values to list and so never appeared anywhere it could see them.
+ *
+ * `appliesTo` is carried through because it's load-bearing: `duration` is movies-only while
+ * `network` is shows-only, and channels default to carrying BOTH media types.
+ */
+export function formatFieldCatalog(): string {
+  const rows = FILTER_FIELDS.filter((f) => !CATALOG_EXCLUDE.has(f.field)).map((f) => {
+    const ops = OPS_FOR_KIND[f.kind].join(" | ");
+    const scope = f.appliesTo ? ` [${f.appliesTo.join("+")} only]` : "";
+    const values = f.tagId
+      ? HEAVY_TAG_FIELDS.has(f.field)
+        ? " — tag; values NOT preloaded, use discover_field_values"
+        : " — tag; values listed in the vocabulary below"
+      : "";
+    return `${f.field} (${f.kind}: ${ops})${scope}${values}`;
+  });
+  return rows.join("\n");
+}
+
+/** One-line percentile rendering: the shape of a numeric axis at a glance. */
+const formatDistribution = (label: string, d: Distribution | null, unit = ""): string =>
+  d
+    ? `${label}: ${d.count} items — p10 ${d.p10}${unit}, p25 ${d.p25}${unit}, median ${d.p50}${unit}, p75 ${d.p75}${unit}, p90 ${d.p90}${unit}`
+    : `${label}: not recorded in this library`;
+
+/**
  * Render the profile as compact text for the planning prompt. Deliberately terse —
  * this sits in a cached prefix that every per-channel agent shares, so every token
  * is paid for many times over.
  */
 export function formatLibraryProfile(profile: LibraryProfile): string {
   const list = (items: NamedCount[]) => items.map((i) => `${i.name} (${i.count})`).join(", ");
+  const f = profile.flags;
   return [
     `LIBRARY: ${profile.totals.movies} movies, ${profile.totals.shows} shows, ${profile.totals.episodes} episodes.`,
     `GENRES: ${list(profile.genres) || "none recorded"}`,
@@ -220,5 +421,12 @@ export function formatLibraryProfile(profile: LibraryProfile): string {
     `CONTENT RATINGS: ${list(profile.contentRatings) || "none recorded"}`,
     `DECADES: ${profile.decades.map((d) => `${d.decade}s (${d.count})`).join(", ") || "none recorded"}`,
     `BIGGEST SHOWS: ${profile.topShows.map((s) => `${s.title} (${s.episodes} eps)`).join(", ") || "none"}`,
+    "",
+    "NUMERIC SPREADS — use these to pick thresholds that actually divide the library.",
+    "A score window (e.g. 7.0-8.0) carves out a distinctive channel; a bare floor usually doesn't.",
+    formatDistribution("AUDIENCE RATING (0-10)", profile.audienceRating),
+    formatDistribution("CRITIC RATING (0-10)", profile.criticRating),
+    formatDistribution("MOVIE RUNTIME (movies only)", profile.movieDurationMinutes, "m"),
+    `HDR: ${f.hdrMovies} movies, ${f.hdrEpisodes} episodes · 4K: ${f.fourKMovies} movies, ${f.fourKEpisodes} episodes`,
   ].join("\n");
 }

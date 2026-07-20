@@ -24,6 +24,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 
 import { ACCENT_KEYS, channelAccentAt } from "../accents";
+import { fieldMeta, OPS_FOR_KIND } from "../plex/filter-fields";
 import { getConnectionForRole, getModel } from "./config";
 
 
@@ -50,7 +51,7 @@ const accentSchema = z.enum(ACCENT_KEYS);
  */
 const conditionSchema = z.object({
   type: z.literal("condition"),
-  field: z.string().describe("A filterable field, e.g. genre / studio / collection / title / year / contentRating."),
+  field: z.string().describe("A filterable field, e.g. genre / studio / title / year / decade / contentRating / audienceRating / duration."),
   op: z.string().describe("e.g. is / isNot / contains / gte / lte."),
   value: z.string(),
 });
@@ -162,7 +163,7 @@ WHAT MAKES A GOOD LINEUP:
 CONSTRAINTS:
 - Genre/studio names in the profile are Plex's OWN tag vocabulary, warts and all. It mixes movie-style and TV-style tags ("Science Fiction" vs "Sci-Fi & Fantasy", "Action/Adventure"), and things like anime are often tagged only "Animation". Work with the tags as they actually are.
 - A show's episode count tells you how much runtime it can sustain. A channel built on one 20-episode show will repeat constantly; one built on 500+ episodes can run forever.
-- Do NOT write Plex filter syntax. Describe the intent in \`theme\` — a later agent builds and verifies the actual filter.
+- Write BOTH: \`theme\` describes the intent in plain language (it becomes the brief for the agent that verifies your work), and \`filter\` is the real Plex filter you author for it. They are not alternatives — a channel needs both.
 - Give every channel and package a unique kebab-case \`key\`.
 
 BUILDING THE FILTER — this is what the whole job is judged on.
@@ -179,14 +180,19 @@ THE SHAPE THAT WORKS — a general predicate, then curated exceptions:
 Read what that does: a rule broad enough to catch the right material, MINUS the specific things that match the rule but break the mood, PLUS the specific thing the rule misses. That is a curated channel. Aim for this.
 
 RULES:
-- Build from the **FILTER VOCABULARY** only — a value that isn't listed matches nothing.
+- **Tag values must come from the FILTER VOCABULARY** — for a tag field (genre, studio, network, contentRating, collection, country, resolution, label) a value that isn't listed matches nothing. This constrains VALUES, not which FIELDS you may use: numeric, date and boolean fields have no value list and are filtered by range or true/false.
 - **Combine at least two dimensions.** Genre alone is almost never enough. Pair it with contentRating, year, studio, audienceRating, or collection to express the actual idea.
 - **Use exclusions.** \`title\` + \`notContains\` removes the handful of items that technically match but don't belong. A channel with no exclusions usually hasn't been thought about.
-- **Reach for the sharpest field available.** A \`collection\` ("James Bond") or \`studio\` ("Marvel Studios") beats a genre outright.
+- **Reach for the sharpest field available.** A \`studio\` ("Marvel Studios") or a specific set of titles beats a broad genre outright.
+- **\`collection\` is a LAST RESORT.** This library's collections were assembled years ago and have not been maintained, so they are stale and incomplete — a collection that sounds perfect for a channel is probably missing most of what should be in it. Prefer studio, title sets, or the numeric fields. Only use a collection when nothing else can express the idea, and never build a channel's whole identity on one.
 - **The BIGGEST SHOWS list is raw material.** For nostalgia, daypart, or mood channels, naming a handful of specific shows (title contains, OR'd) is often the only way to express the idea.
 - Group syntax: \`{type:"group", combinator:"and"|"or", children:[…]}\`. Conditions use \`op\` (is / isNot / contains / notContains / gte / lte); groups use \`combinator\`. One level of nesting is allowed inside a top-level group.
 - **\`label\` values are HAND-APPLIED by the library's owner** — they are the most reliable signal you have. If shows are labelled "Anime", that label defines what the owner considers anime; use it directly and never second-guess it.
-- **Judge size by RUNTIME, not item count.** A channel built on three shows with 200 episodes each has 600 episodes — weeks of programming, and a perfectly good channel. `targetPoolSize` is a loose hint; a small number of big shows is a strength, not a problem. Don't avoid a good channel concept because few *titles* match it.
+- **The NUMERIC fields are where the best channels come from.** Tag intersection alone gives you genre blocks anyone could write. \`audienceRating\`, \`criticRating\`, \`duration\`, \`decade\`, \`year\`, \`addedWithin\`, \`unwatched\`, \`hdr\` and \`userRating\` are what turn a genre into a channel with a point of view. Use the NUMERIC SPREADS above to pick thresholds that actually divide this library.
+- **Prefer a WINDOW to a floor.** \`audienceRating gte 7\` selects a third of the library and overlaps everything else. A window — \`gte 7\` AND \`lte 8\` — carves out a distinct, nameable channel ("the good-not-great pile"). Deliberately going LOW is also a channel: an unrated or sub-median block is where the schlock lives, and that is the entire point of some channels.
+- **Runtime is programming intent, not trivia.** Under ~20 minutes is a quick-bite channel; 60-100 is a matinee; 150+ is an event. \`duration\` is MOVIES ONLY.
+- **Watch the type restrictions.** The catalog marks fields as movie-only or show-only. A condition on a field the channel's \`mediaTypes\` doesn't cover is dropped before it ever runs, so either narrow \`mediaTypes\` or pick a field that applies to both.
+- **Judge size by RUNTIME, not item count.** A channel built on three shows with 200 episodes each has 600 episodes — weeks of programming, and a perfectly good channel. \`targetPoolSize\` is a loose hint; a small number of big shows is a strength, not a problem. Don't avoid a good channel concept because few *titles* match it.
 
 COVERAGE — how many channels, and which:
 - **There is no target number.** Build as many channels and packages as this library actually warrants. A large, varied library might need a hundred or more; a small focused one might need twenty. Let the library decide.
@@ -244,6 +250,73 @@ function assignNumbers(packages: z.infer<typeof planSchema>["packages"]): Lineup
 // always emits the full lineup, and any testing cap is applied to the BUILD fan-out in the
 // workflow — see `sampleAcrossPackages`.)
 
+type LooseNode = { type?: string; field?: string; op?: string; children?: LooseNode[] };
+
+/**
+ * Drop conditions the filter engine can't honour, BEFORE the build fans out.
+ *
+ * Widening the planner's field catalog means more ways to be wrong: an invented field, an
+ * operator that doesn't belong to the field's kind, or — the likely one — a type-restricted
+ * field on a channel that carries both media types. `duration` is `appliesTo: ["movie"]` and
+ * `network` is shows-only, while channels now default to `["movie","show"]`, so that
+ * combination is a natural mistake rather than an exotic one.
+ *
+ * Repairing here is deliberate: the worker WOULD eventually catch a bad filter via preview,
+ * but only after spending agent steps on it, and a silently-ignored condition can also
+ * resolve to a plausible-looking pool that nobody questions. A deterministic check costs
+ * nothing and turns a quiet wrong answer into a logged one.
+ */
+function sanitizeFilter(
+  node: LooseNode | undefined,
+  mediaTypes: string[],
+  warn: (msg: string) => void,
+): LooseNode | undefined {
+  if (!node) return undefined;
+
+  if (node.type === "group") {
+    const children = (node.children ?? [])
+      .map((c) => sanitizeFilter(c, mediaTypes, warn))
+      .filter((c): c is LooseNode => !!c);
+    // A group emptied by sanitizing must not survive: an empty AND/OR resolves to
+    // "everything", which is the opposite of what the dropped condition intended.
+    if (!children.length) return undefined;
+    return { ...node, children };
+  }
+
+  const meta = fieldMeta(node.field ?? "");
+  if (!meta) {
+    warn(`unknown field "${node.field}" — condition dropped`);
+    return undefined;
+  }
+  if (node.op && !OPS_FOR_KIND[meta.kind].includes(node.op as never)) {
+    warn(`operator "${node.op}" is not valid for ${meta.field} (${meta.kind}) — condition dropped`);
+    return undefined;
+  }
+  if (meta.appliesTo && !mediaTypes.every((t) => meta.appliesTo!.includes(t as never))) {
+    warn(
+      `field "${meta.field}" applies to ${meta.appliesTo.join("+")} only but the channel carries ${mediaTypes.join("+")} — condition dropped`,
+    );
+    return undefined;
+  }
+  return node;
+}
+
+/** Run every planned channel's filter through {@link sanitizeFilter}, logging what changed. */
+function sanitizePlan(packages: z.infer<typeof planSchema>["packages"]) {
+  let dropped = 0;
+  for (const pkg of packages) {
+    for (const channel of pkg.channels) {
+      const cleaned = sanitizeFilter(channel.filter as LooseNode, channel.mediaTypes, (msg) => {
+        dropped++;
+        console.warn(`[plan] ${channel.name}: ${msg}`);
+      });
+      channel.filter = cleaned as typeof channel.filter;
+    }
+  }
+  if (dropped) console.warn(`[plan] sanitized ${dropped} invalid condition(s) before build`);
+  return packages;
+}
+
 export async function planLineup(
   prisma: PrismaClient,
   /**
@@ -292,8 +365,9 @@ export async function planLineup(
   );
 
   // Numbers are assigned AFTER generation — the model shouldn't be trusted with a
-  // uniqueness constraint, and this keeps the block layout deterministic.
-  return assignNumbers(object.packages);
+  // uniqueness constraint, and this keeps the block layout deterministic. Filters are
+  // sanitized first so a bad condition never reaches the build fan-out.
+  return assignNumbers(sanitizePlan(object.packages));
 }
 
 /** Compact one-line-per-channel rendering, for logs and the run report. */
