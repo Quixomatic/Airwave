@@ -19,12 +19,16 @@ import {
 /**
  * How many channels the admin "Build Lineup with AI" button actually constructs.
  *
- * The planner always designs the whole lineup; this caps the expensive part. Kept small
- * deliberately — a per-channel build is an agent loop costing ~215k input tokens, so an
- * uncapped run on a large library is a real bill from a single click. Override with
- * `AI_LINEUP_BUILD_LIMIT` (0 = no cap).
+ * **0 = no cap** — build the whole planned lineup, which is now the default. The cap existed
+ * while a per-channel build cost ~215k input tokens; after the planner started authoring
+ * filters (so workers verify rather than explore) that fell to ~43k and ~4 steps, making a
+ * full lineup roughly a dollar rather than twenty. Set `AI_LINEUP_BUILD_LIMIT` to a small
+ * number to go back to sampling — useful when iterating on prompts.
+ *
+ * Note the real constraint is now WALL CLOCK, not tokens: each channel resolves its filter
+ * against Plex (~35s for a large one) twice — once to verify, once to build the schedule.
  */
-const DEFAULT_AI_BUILD_LIMIT = 5;
+const DEFAULT_AI_BUILD_LIMIT = 0;
 
 export type JobInterval = "seconds" | "minutes" | "hours" | "days" | "fixed";
 
@@ -41,6 +45,12 @@ export type JobDefinition = {
   name: string;
   /** One-line, human-readable explanation of what the job does (shown on the Jobs page). */
   description: string;
+  /**
+   * Optional admin route with more detail about this job's work — rendered as a link on the
+   * Jobs page. For jobs that only DISPATCH long-running work (the AI lineup build), the
+   * interesting output lives elsewhere and the Jobs row alone is a dead end.
+   */
+  detailHref?: string;
   interval: JobInterval;
   defaultCron: string;
   /** Manual jobs are never auto-scheduled — run-now only (e.g. lineup generation). */
@@ -228,7 +238,8 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
     id: "ai-lineup-build",
     name: "Build Lineup with AI",
     description:
-      "Analyses your library and designs a full AI lineup, then builds the first few channels of it (capped — see AI_LINEUP_BUILD_LIMIT). DESTRUCTIVE: clears the existing AI lineup first. Runs as a durable background workflow — this job only kicks it off and returns; watch progress and cost on the AI Lineup page.",
+      "Analyses your library, designs a full AI lineup, and builds it (packages + channels + schedules). DESTRUCTIVE: clears the existing AI lineup first. Runs as a durable background workflow — this job only kicks it off and returns; watch progress and cost on the AI Lineup page.",
+    detailHref: "/workflows/ai-lineup",
     interval: "fixed",
     defaultCron: "0 0 0 1 1 *", // manual-only; never auto-fires
     manual: true,

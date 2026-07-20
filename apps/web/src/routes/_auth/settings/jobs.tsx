@@ -1,9 +1,9 @@
 import { Button } from "@ChannelGuide/ui/components/button";
 import { Card } from "@ChannelGuide/ui/components/card";
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import cronstrue from "cronstrue";
-import { Loader2, Pencil, Play, X } from "lucide-react";
+import { ArrowUpRight, Loader2, Pencil, Play, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -18,6 +18,7 @@ type Job = {
   id: string;
   name: string;
   description: string;
+  detailHref?: string;
   interval: "seconds" | "minutes" | "hours" | "days" | "fixed";
   cronSchedule: string;
   nextRunAt: string | Date | null;
@@ -83,6 +84,17 @@ function SettingsJobs() {
                 )}
               </div>
               <p className="text-muted-foreground mt-0.5 text-xs">{job.description}</p>
+              {/* Dispatcher jobs finish instantly but their real work lives elsewhere —
+                  without this the Jobs row is a dead end. */}
+              {job.detailHref && (
+                <Link
+                  to={job.detailHref}
+                  className="text-primary mt-1 inline-flex items-center gap-1 text-xs hover:underline"
+                >
+                  View runs &amp; cost
+                  <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              )}
               <p className="text-muted-foreground mt-1 text-xs">
                 {describeCron(job.cronSchedule)} · next {formatWhen(job.nextRunAt)}
                 {job.lastFinishedAt ? ` · last ran ${formatWhen(job.lastFinishedAt)}` : ""}
