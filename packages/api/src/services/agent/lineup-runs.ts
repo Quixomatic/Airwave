@@ -48,7 +48,8 @@ export async function listLineupRuns(
            r.status,
            r.started_at,
            r.completed_at,
-           COUNT(s.id)::int                                              AS total,
+           -- workflow_steps is keyed by (run_id, step_id) — there is NO `id` column.
+           COUNT(s.step_id)::int                                         AS total,
            COUNT(*) FILTER (WHERE s.status = 'completed')::int           AS completed,
            COUNT(*) FILTER (WHERE s.status = 'failed')::int              AS failed,
            COUNT(*) FILTER (WHERE s.status = 'running')::int             AS running
