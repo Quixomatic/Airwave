@@ -78,7 +78,14 @@ function AiLineupRuns() {
   });
 
   const output = report.data?.output as
-    | { channelsCreated?: number; packagesCreated?: number; skipped?: unknown[]; failed?: unknown[]; usage?: Usage }
+    | {
+        channelsCreated?: number;
+        channelsPlanned?: number;
+        packagesCreated?: number;
+        skipped?: unknown[];
+        failed?: unknown[];
+        usage?: Usage;
+      }
     | undefined;
 
   return (
@@ -138,7 +145,12 @@ function AiLineupRuns() {
             {output && (
               <>
                 <div className="flex flex-wrap gap-2">
-                  <Badge>{output.channelsCreated ?? 0} channels</Badge>
+                  <Badge>{output.channelsCreated ?? 0} channels built</Badge>
+                  {/* The planner designs the whole lineup even when only a sample is built,
+                      so show both — otherwise a capped run reads as a shortfall. */}
+                  {!!output.channelsPlanned && output.channelsPlanned !== output.channelsCreated && (
+                    <Badge variant="outline">{output.channelsPlanned} planned</Badge>
+                  )}
                   <Badge variant="outline">{output.packagesCreated ?? 0} packages</Badge>
                   {!!output.skipped?.length && <Badge variant="outline">{output.skipped.length} skipped</Badge>}
                   {!!output.failed?.length && <Badge variant="outline">{output.failed.length} failed</Badge>}

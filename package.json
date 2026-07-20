@@ -15,7 +15,9 @@
     "db:push": "turbo run db:push -F @ChannelGuide/db",
     "db:studio": "turbo run db:studio -F @ChannelGuide/db",
     "db:generate": "turbo run db:generate -F @ChannelGuide/db",
-    "db:migrate": "turbo run db:migrate -F @ChannelGuide/db"
+    "db:migrate": "turbo run db:migrate -F @ChannelGuide/db",
+    "workflow:build": "turbo run workflow:build -F server",
+    "workflow:ui": "turbo run workflow:ui -F server"
   },
   "dependencies": {
     "@ChannelGuide/env": "workspace:*",

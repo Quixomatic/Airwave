@@ -20,6 +20,18 @@
       "cache": false,
       "persistent": true
     },
+    // The Workflow SDK's flow/step handlers. `pnpm dev` rebuilds these only when stale;
+    // run this directly after editing anything under `workflows/` if you're not restarting.
+    "workflow:build": {
+      "cache": false,
+      "outputs": [".well-known/**"]
+    },
+    // The workflow observability web UI (runs, steps, events, streams). Long-lived and
+    // deliberately separate from `dev` — start it only when you want to watch a run.
+    "workflow:ui": {
+      "cache": false,
+      "persistent": true
+    },
     "db:push": {
       "cache": false
     },

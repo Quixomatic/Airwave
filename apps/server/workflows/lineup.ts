@@ -59,6 +59,8 @@ const BUILD_CONCURRENCY = 6;
 export type LineupReport = {
   sourceId: string;
   packagesCreated: number;
+  /** How many channels the planner designed — the full lineup, regardless of any build cap. */
+  channelsPlanned: number;
   channelsCreated: number;
   skipped: ChannelBuildResult[];
   failed: ChannelBuildResult[];
@@ -89,17 +91,28 @@ export async function aiLineupWorkflow(args: LineupRunArgs): Promise<LineupRepor
   // builder byte-identically, so the whole run shares ONE prompt-cache entry.
   const libraryContext = await buildSharedContext(args.sourceId, profile);
 
-  const plan = await planLineup(libraryContext, args.limit);
+  // The planner always plans the FULL lineup — sized to the library, not to a quota.
+  const plan = await planLineup(libraryContext);
 
   // Packages first, so each channel has a real packageId to attach to. This also wipes
   // any previous AI lineup — destructive, hence the confirmation on the admin action.
   const packageIds = await createPackages(plan);
 
   // Flatten so the concurrency cap applies across the WHOLE lineup rather than per
-  // package (packages vary from 4 to 7 channels, so per-package batching would idle).
-  const jobs = plan.packages.flatMap((pkg) =>
+  // package (package sizes vary, so per-package batching would idle).
+  const allJobs = plan.packages.flatMap((pkg) =>
     pkg.channels.map((channel) => ({ channel, packageId: packageIds[pkg.key]! })),
   );
+
+  // `limit` caps the BUILD fan-out, not the plan. The plan is one call and it's the
+  // interesting artifact; the per-channel builds are what cost real money. So a capped run
+  // still shows you the whole lineup it would build, and only pays to construct a sample.
+  // Interleaved across packages rather than taking the first N, so the sample spans
+  // different kinds of channel instead of one package's worth.
+  const jobs = args.limit ? sampleAcrossPackages(allJobs, args.limit) : allJobs;
+  if (args.limit && allJobs.length > jobs.length) {
+    console.log(`[lineup] planned ${allJobs.length} channels; building ${jobs.length} (limit)`);
+  }
 
   // Fan out in bounded waves. Each build is its own durable step, so a crash resumes
   // only the unfinished ones. The cap keeps us under the provider's rate limit — every
@@ -123,6 +136,38 @@ export async function aiLineupWorkflow(args: LineupRunArgs): Promise<LineupRepor
   }
 
   return await reportLineup(args.sourceId, plan, built);
+}
+
+/**
+ * Pick `limit` jobs spread ACROSS packages rather than the first N.
+ *
+ * Taking the head of the list gives you one package's worth of channels, which is a poor
+ * sample: the first package is usually the most obvious one (franchises, blockbusters), so
+ * a capped run would only ever exercise the easy cases and never the interpretive channels
+ * that are the real test. Round-robin gives a cross-section of the lineup instead.
+ *
+ * Pure function over the flattened list — no I/O — so it's safe in the workflow body.
+ */
+function sampleAcrossPackages<T extends { packageId: string }>(jobs: T[], limit: number): T[] {
+  const byPackage = new Map<string, T[]>();
+  for (const j of jobs) {
+    const list = byPackage.get(j.packageId);
+    if (list) list.push(j);
+    else byPackage.set(j.packageId, [j]);
+  }
+  const queues = [...byPackage.values()];
+  const out: T[] = [];
+  for (let round = 0; out.length < limit; round++) {
+    let placed = false;
+    for (const q of queues) {
+      if (round >= q.length) continue;
+      out.push(q[round]!);
+      placed = true;
+      if (out.length >= limit) break;
+    }
+    if (!placed) break; // every queue exhausted
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -166,9 +211,9 @@ async function buildSharedContext(sourceId: string, profile: LibraryProfile): Pr
 }
 
 /** §4.2 — one structured-output call over the compact profile. */
-async function planLineup(libraryContext: string, limit?: number): Promise<LineupPlan> {
+async function planLineup(libraryContext: string): Promise<LineupPlan> {
   "use step";
-  const plan = await planLineupService(prisma, libraryContext, limit ? { limit } : {});
+  const plan = await planLineupService(prisma, libraryContext);
   const channels = plan.packages.reduce((n, p) => n + p.channels.length, 0);
   console.log(`[lineup] plan: ${plan.packages.length} packages, ${channels} channels\n${formatLineupPlan(plan)}`);
   return plan;
@@ -276,6 +321,9 @@ async function reportLineup(
   const report: LineupReport = {
     sourceId,
     packagesCreated: plan.packages.length,
+    // The planner always plans the FULL lineup; a testing cap limits only what gets built.
+    // Surfacing both makes that gap explicit instead of looking like a shortfall.
+    channelsPlanned: plan.packages.reduce((n, p) => n + p.channels.length, 0),
     channelsCreated: built.filter((b) => b.status === "created").length,
     skipped: built.filter((b) => b.status === "skipped"),
     failed: built.filter((b) => b.status === "failed"),

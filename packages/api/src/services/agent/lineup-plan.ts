@@ -207,12 +207,6 @@ export type PlanOptions = {
    * lineup to the library. Only set this if you specifically need a fixed-size lineup.
    */
   targetChannels?: number;
-  /**
-   * Testing cap: generate exactly this many channels so a trial run is cheap. Bounds
-   * GENERATION, not just the result — the planner's structured output is the single most
-   * expensive artifact in a run, so trimming afterwards wastes most of what you paid for.
-   */
-  limit?: number;
 };
 
 /**
@@ -245,19 +239,9 @@ function assignNumbers(packages: z.infer<typeof planSchema>["packages"]): Lineup
   };
 }
 
-/** Drop channels beyond `limit`, then any package left empty. Used for scoped test runs. */
-function applyLimit(plan: LineupPlan, limit?: number): LineupPlan {
-  if (!limit) return plan;
-  let remaining = limit;
-  const packages: PlannedPackage[] = [];
-  for (const pkg of plan.packages) {
-    if (remaining <= 0) break;
-    const channels = pkg.channels.slice(0, remaining);
-    remaining -= channels.length;
-    if (channels.length) packages.push({ ...pkg, channels });
-  }
-  return { packages };
-}
+// (There used to be an `applyLimit` here that trimmed the plan. It's gone: the planner now
+// always emits the full lineup, and any testing cap is applied to the BUILD fan-out in the
+// workflow — see `sampleAcrossPackages`.)
 
 export async function planLineup(
   prisma: PrismaClient,
@@ -276,19 +260,14 @@ export async function planLineup(
   }
 
   /**
-   * How many channels to ask for.
-   *
-   * A fixed quota is the wrong instruction for the real goal — the lineup should be however
-   * many channels it takes to cover the library well, which depends entirely on what's in it.
-   * A quota makes the model pad with near-duplicates when it's too high, or leave whole
-   * sections of the library unreachable when it's too low.
-   *
-   * So: `limit` (a deliberate testing cap, keeps a trial run cheap) pins an exact count;
-   * `targetChannels` is an explicit caller override; otherwise the model decides from
-   * coverage. `limit` bounds GENERATION rather than trimming afterwards — trimming meant
-   * paying for a full lineup on the planner model and discarding most of it.
+   * The planner ALWAYS produces the full lineup — a quota is the wrong instruction for a
+   * coverage goal (too high and it pads with near-duplicates, too low and parts of the
+   * library have nowhere to live). Any testing cap is applied to the BUILD fan-out instead,
+   * not here: the plan is one call and it's the interesting artifact, while the per-channel
+   * builds are what actually cost money. So you can see the whole lineup it would build and
+   * only pay to construct a sample of it.
    */
-  const exactCount = opts.limit ?? opts.targetChannels;
+  const exactCount = opts.targetChannels;
 
   const { object, usage } = await generateObject({
     model: getModel(connection),
@@ -312,9 +291,8 @@ export async function planLineup(
   );
 
   // Numbers are assigned AFTER generation — the model shouldn't be trusted with a
-  // uniqueness constraint, and this keeps the block layout deterministic. `applyLimit` is
-  // now just a backstop for a model that overshoots the requested count.
-  return applyLimit(assignNumbers(object.packages), opts.limit);
+  // uniqueness constraint, and this keeps the block layout deterministic.
+  return assignNumbers(object.packages);
 }
 
 /** Compact one-line-per-channel rendering, for logs and the run report. */

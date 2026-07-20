@@ -1,59 +1,59 @@
 /**
- * Dev entrypoint — builds the workflow handlers, starts the workflow **observability web UI**,
- * then runs the server with hot reload. Wired to `pnpm dev`.
+ * Dev entrypoint — rebuilds the workflow handlers IF they're stale, then runs the server
+ * with hot reload. Wired to `pnpm dev`.
  *
- * Why a script instead of a package.json one-liner: the web UI needs `NODE_OPTIONS`
- * (see below) and we need two long-lived children. Env-var prefixes and `&` backgrounding
- * in npm scripts both behave differently on Windows vs POSIX; spawning from Bun is portable.
+ * Why a script rather than a package.json one-liner: the staleness check needs real logic,
+ * and shell differences between Windows and POSIX make conditional builds in npm scripts
+ * unportable.
  *
- * THE WEB UI GOTCHA: `workflow inspect --web` imports `node:sqlite`, which Node keeps behind
- * `--experimental-sqlite` until Node 23 (we're on 22.12). Without the flag the server starts
- * and reports SUCCESS, then 500s on every request with `ERR_UNKNOWN_BUILTIN_MODULE` buried in
- * its own log — it looks like the UI is up when nothing works.
- *
- * The UI reads our Postgres world directly, so it needs WORKFLOW_TARGET_WORLD /
- * WORKFLOW_POSTGRES_URL in the environment (`bun --env-file=.env` supplies them).
+ * The observability UI is a separate concern — `pnpm workflow:ui`.
  */
-const WORKFLOW_UI_PORT = process.env.WORKFLOW_UI_PORT ?? "3199";
 
-/** Build the flow/step handlers. `bun --hot` does NOT re-run this — edits to workflows/ need a restart. */
-const build = Bun.spawn(["bunx", "workflow", "build"], { stdio: ["ignore", "inherit", "inherit"] });
-if ((await build.exited) !== 0) {
-  console.error("[dev] workflow build failed");
-  process.exit(1);
+/**
+ * Rebuild the flow/step handlers — but ONLY when something they're built from has changed.
+ *
+ * `workflow build` takes ~10-20s, and running it on every `pnpm dev` delayed server startup
+ * enough that the admin frontend's first fetch timed out. Most restarts don't touch a
+ * workflow, so compare mtimes and skip when the bundle is already current.
+ *
+ * The bundle inlines `packages/api` too, so that has to be part of the staleness check —
+ * a change to a service the workflow calls is just as invalidating as one to workflows/.
+ * `bun --hot` never re-runs this, so a missed rebuild means silently running old code.
+ */
+async function newestMtime(dir: string): Promise<number> {
+  const glob = new Bun.Glob("**/*.{ts,tsx,js}");
+  let newest = 0;
+  for await (const file of glob.scan({ cwd: dir, absolute: true })) {
+    const { mtimeMs } = await Bun.file(file).stat().catch(() => ({ mtimeMs: 0 }));
+    if (mtimeMs > newest) newest = mtimeMs;
+  }
+  return newest;
 }
 
-// Observability UI — runs, steps, events, streams. Optional: a failure here must never stop the
-// server, so it's spawned fire-and-forget and its exit is only logged.
-const ui = Bun.spawn(
-  [
-    "bunx",
-    "workflow",
-    "inspect",
-    "runs",
-    "--web",
-    "--noBrowser",
-    "--webPort",
-    WORKFLOW_UI_PORT,
-  ],
-  {
-    stdio: ["ignore", "ignore", "ignore"],
-    env: { ...process.env, NODE_OPTIONS: "--experimental-sqlite" },
-  },
-);
-console.log(`[dev] workflow UI → http://localhost:${WORKFLOW_UI_PORT}?resource=run`);
-ui.exited.then((code) => {
-  if (code !== 0) console.warn(`[dev] workflow UI exited (${code}) — server unaffected`);
-});
+const bundle = Bun.file("./.well-known/workflow/v1/flow.js");
+const bundleMtime = (await bundle.exists()) ? (await bundle.stat()).mtimeMs : 0;
+const sourceMtime = Math.max(await newestMtime("./workflows"), await newestMtime("../../packages/api/src"));
+
+if (bundleMtime > sourceMtime) {
+  console.log("[dev] workflow handlers up to date — skipping build");
+} else {
+  console.log("[dev] workflow sources changed — rebuilding handlers…");
+  const build = Bun.spawn(["bunx", "workflow", "build"], { stdio: ["ignore", "inherit", "inherit"] });
+  if ((await build.exited) !== 0) {
+    console.error("[dev] workflow build failed");
+    process.exit(1);
+  }
+}
+
+// The observability UI is deliberately NOT started here — run it separately with
+// `pnpm workflow:ui` when you want it. Baking a second long-lived process into `dev`
+// slowed startup and coupled two unrelated things.
 
 const server = Bun.spawn(["bun", "run", "--hot", "src/index.ts"], {
   stdio: ["inherit", "inherit", "inherit"],
 });
 
-// Take the UI down with the server so a restart doesn't leave the port held (an orphaned UI
-// makes the next start fail with EADDRINUSE).
 const shutdown = () => {
-  ui.kill();
   server.kill();
   process.exit(0);
 };
