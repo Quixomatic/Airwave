@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import * as LucideIcons from "lucide-react";
-import { History, ListFilter, Menu, Settings as SettingsIcon, Star, User } from "lucide-react";
+import { History, LayoutGrid, ListFilter, Menu, Settings as SettingsIcon, Star, User } from "lucide-react";
 import React, { useEffect, useRef } from "react";
 
 import type { Package } from "../../lib/api";
@@ -54,12 +54,32 @@ function pkgIcon(id: string | null): React.ReactNode {
 }
 
 /** The flat, D-pad-indexable item list (actions first, then filters). Built from the package list;
- *  AuroraGrid uses it to bound the selection and to know what each index does on activate. */
-export function buildSidebarItems(packages: Package[]): SidebarItem[] {
+ *  AuroraGrid uses it to bound the selection and to know what each index does on activate.
+ *
+ *  When a filter lens is applied, a **"Show All"** item is prepended to the FILTER group so the
+ *  filter can be cleared without scrolling the whole package list back to the currently-lit lens.
+ *  It's omitted when nothing is filtered (the "Guide" action already covers that case, and an
+ *  ever-present "Show All" over an unfiltered grid would just be noise). Safe to add/remove
+ *  conditionally: the list only changes while focus is outside the sidebar — selecting a lens
+ *  immediately returns focus to the grid, and re-entering the sidebar resets selection to 0. */
+export function buildSidebarItems(packages: Package[], lens: Lens): SidebarItem[] {
+  const filtered = lens.type !== "all";
   return [
     { key: "guide", label: "Guide", icon: <Menu size={24} />, kind: "lens", lens: { type: "all" }, group: "action" },
     { key: "settings", label: "Settings", icon: <SettingsIcon size={24} />, kind: "settings", group: "action" },
     { key: "account", label: "Account", icon: <User size={24} />, kind: "account", group: "action" },
+    ...(filtered
+      ? [
+          {
+            key: "show-all",
+            label: "Show All",
+            icon: <LayoutGrid size={24} />,
+            kind: "lens" as const,
+            lens: { type: "all" as const },
+            group: "filter" as const,
+          },
+        ]
+      : []),
     { key: "favorites", label: "Favorites", icon: <Star size={24} />, kind: "lens", lens: { type: "favorites" }, group: "filter" },
     { key: "recents", label: "Recents", icon: <History size={24} />, kind: "lens", lens: { type: "recents" }, group: "filter" },
     ...packages.map<SidebarItem>((p) => ({

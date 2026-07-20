@@ -2,6 +2,20 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.48] - 2026-07-20
+
+### Added
+
+- **TV: a "Show All" button at the top of the guide sidebar's filter list when a filter is applied.** Clearing a filter previously meant scrolling the whole package list back to the currently-lit lens and selecting it again to toggle it off. Now, whenever a lens other than "all" is active, a **Show All** circle appears first in the filter group — above Favorites and Recents — so one press clears back to every channel. It's hidden when nothing is filtered (the Guide action already covers that, and a permanent "Show All" over an unfiltered grid is just noise). Safe to add and remove on the fly: the item list only changes while focus is in the grid — selecting a lens returns focus there, and re-entering the sidebar resets selection to the top — so the index shift never lands mid-navigation.
+
+### Changed
+
+- **TV: the guide channel rail's tinted icon now matches the featured panel's tile, and absorbs the favorite affordance.** The rail's little accent circle was too small to read — it's now the **exact** size, tint, and accent-ring treatment as the featured now-playing tile (same `vw(64 × FEATURE_SCALE)` dimensions and `1px` accent border, expressed the same way so the two stay locked together). It also became the single favorite control: the separate heart button beside it is gone. Focus the rail and the circle gains the blue focus ring and its glyph turns into a **heart** — filled red if the channel is favorited, a white outline if not — and OK toggles it. A favorited channel that *isn't* focused shows a small red heart badge tucked into the circle's bottom-right, so favorites are still spottable while scanning. The channel number is top-aligned so it stays put regardless of the circle's height.
+
+### Notes
+
+- _(TV client — first `apps/tv-web` source change since v0.5.2; needs a rebuild + `ares-install` to the C2.)_
+
 ## [0.5.47] - 2026-07-20
 
 ### Fixed

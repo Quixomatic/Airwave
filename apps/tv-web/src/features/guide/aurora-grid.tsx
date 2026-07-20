@@ -140,7 +140,10 @@ export function AuroraGrid({
   // Active guide lens (which channels the sidebar filter shows) + the sidebar's package list.
   const [lens, setLens] = useState<Lens>({ type: "all" });
   const { data: pkgData } = usePackages();
-  const sidebarItems = useMemo(() => buildSidebarItems(pkgData?.packages ?? []), [pkgData]);
+  // `lens` is a dep because the item list gains/loses the "Show All" entry when a filter is
+  // applied/cleared. This only ever recomputes while focus is in the grid (activating a lens
+  // leaves the sidebar), so the index shift never lands mid-navigation.
+  const sidebarItems = useMemo(() => buildSidebarItems(pkgData?.packages ?? [], lens), [pkgData, lens]);
 
   // Per-user favorites — the rail's heart + the "Favorites" lens.
   const { data: favData } = useFavorites();
@@ -727,65 +730,81 @@ function Row({
           boxShadow: focused ? `inset 4px 0 0 ${accent}` : "none",
         }}
       >
-        {/* top: tinted channel icon left (+ the favorite heart while the rail is focused),
-            channel number pushed right — same height */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: vw(34) }}>
-          <div style={{ display: "flex", alignItems: "center", gap: vw(12), minWidth: 0 }}>
-            <span
-              style={{
-                width: vw(34),
-                height: vw(34),
-                borderRadius: "50%",
-                background: hexA(accent, 0.2),
-                color: accent,
-                flexShrink: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: vw(20),
-              }}
-            >
-              {(() => {
+        {/* top: the tinted channel-icon circle (left) + channel number (right).
+            The circle is the SINGLE favorite affordance now — matched to the featured panel's
+            tile (size / accent ring / tint), and it doubles as the favorite toggle:
+              • rail focused  → a circular blue focus ring + the circle's glyph becomes a HEART
+                                (filled red if favorited, white outline if not); OK/click toggles.
+              • favorited, not focused → the channel glyph, plus a small red heart badge tucked
+                                into the bottom-right so favorites are spottable while scanning.
+              • otherwise     → just the channel glyph.
+            Number is align-items:flex-start so it stays put no matter how tall the circle is. */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+          {/* role=button, not <button>: on the C2's Chrome 108 `display:flex` on a real <button>
+              mis-centers its child, so a div is used for the centered glyph/heart. */}
+          <div
+            role="button"
+            tabIndex={-1}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite();
+            }}
+            title={favorited ? "Remove favorite" : "Add favorite"}
+            style={{
+              position: "relative",
+              // Identical to the featured panel's tile: it renders fv(64)=vw(64*FEATURE_SCALE),
+              // glyph fv(34). Expressed the same way so the two stay locked together.
+              width: vw(64 * FEATURE_SCALE),
+              height: vw(64 * FEATURE_SCALE),
+              borderRadius: "50%",
+              background: hexA(accent, 0.2),
+              border: `1px solid ${hexA(accent, 0.35)}`,
+              color: accent,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: vw(34 * FEATURE_SCALE),
+              cursor: "pointer",
+              // Focus ring lives on the circle now (moved off the old heart button). An outline
+              // takes no layout space and sits outside the border, so it never nudges anything.
+              outline: railFocused ? `${vw(3)} solid ${C.ring}` : "none",
+              outlineOffset: railFocused ? vw(2) : 0,
+            }}
+          >
+            {railFocused ? (
+              // Focused → the circle asks "favorite?": filled red when it is, white outline when not.
+              <Heart size="1em" fill={favorited ? C.fav : "none"} color={favorited ? C.fav : "#c3c9d4"} />
+            ) : (
+              (() => {
                 const Icon = channelIcon(channel.icon ?? channel.package?.icon);
                 return <Icon size="1em" />;
-              })()}
-            </span>
-            {/* Favorite toggle. A favorited channel ALWAYS shows its filled heart, so you can spot
-                your favorites while scanning the guide; the empty heart only appears while the rail
-                itself is focused (the affordance to add one). stopPropagation so a pointer click
-                hearts the channel instead of tuning it (the row's onClick tunes). */}
-            {(railFocused || favorited) && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFavorite();
-                }}
-                title={favorited ? "Remove favorite" : "Add favorite"}
+              })()
+            )}
+            {/* Favorite indicator badge — only when favorited AND not focused (focused already
+                shows the filled heart). A dark disc so the red heart reads against the tint. */}
+            {favorited && !railFocused && (
+              <span
                 style={{
+                  position: "absolute",
+                  right: vw(-2),
+                  bottom: vw(-2),
+                  width: vw(20),
+                  height: vw(20),
+                  borderRadius: "50%",
+                  background: C.bg,
+                  border: `${vw(1.5)} solid ${C.bg}`,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  // Rail focused → ring the heart with a circular outline in the program-focus blue,
-                  // so it's clear OK toggles the favorite. Padding is CONSTANT (an outline takes no
-                  // layout space, so only it toggles) — the heart never moves when focus lands.
-                  padding: vw(7),
-                  border: "none",
-                  borderRadius: "50%",
-                  background: "transparent",
-                  outline: railFocused ? `${vw(3)} solid ${C.ring}` : "none",
-                  outlineOffset: railFocused ? vw(1) : 0,
-                  cursor: "pointer",
-                  fontSize: vw(26),
-                  lineHeight: 1,
-                  color: favorited ? C.fav : "#c3c9d4",
-                  flexShrink: 0,
+                  fontSize: vw(12),
                 }}
               >
-                <Heart size="1em" fill={favorited ? C.fav : "none"} />
-              </button>
+                <Heart size="1em" fill={C.fav} color={C.fav} />
+              </span>
             )}
           </div>
-          <span style={{ fontSize: vw(34), lineHeight: 1, fontWeight: 700, color: "#e6eaf1", display: "flex", alignItems: "center", height: vw(34) }}>
+          <span style={{ fontSize: vw(34), lineHeight: 1, fontWeight: 700, color: "#e6eaf1" }}>
             {channel.number}
           </span>
         </div>
