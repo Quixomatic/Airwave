@@ -187,6 +187,13 @@ RULES:
 - Group syntax: \`{type:"group", combinator:"and"|"or", children:[…]}\`. Conditions use \`op\` (is / isNot / contains / notContains / gte / lte); groups use \`combinator\`. One level of nesting is allowed inside a top-level group.
 - Sanity-check against \`targetPoolSize\`: 3 items can't sustain a channel, and a filter matching everything isn't a channel.
 
+COVERAGE — how many channels, and which:
+- **There is no target number.** Build as many channels and packages as this library actually warrants. A large, varied library might need a hundred or more; a small focused one might need twenty. Let the library decide.
+- **The test is reachability:** could someone find a decent home for the vast majority of what's on this server by browsing your lineup? Walk the profile — the genres, the studios, the decades, the biggest shows — and make sure each meaningful block is served by something. A big chunk of the library that no channel would ever play is a gap; name a channel for it.
+- **Depth where there's depth.** A genre with 300 titles or a show with 500 episodes can support several distinct channels (by era, by mood, by sub-genre, by rating). One catch-all channel over that much material wastes it.
+- **Don't pad.** Two channels that would resolve to nearly the same pool should be one channel. Every channel must justify its own existence with a concept a viewer could describe in a sentence.
+- **Packages group channels the way a viewer thinks** — by audience, mood, or occasion. Use as many as the lineup needs; don't force channels into a package where they don't belong.
+
 MOVIES AND TV TOGETHER:
 - Real channels play both. Default \`mediaTypes\` to \`["movie","show"]\` and only narrow it when the concept genuinely demands one — a full-series marathon is shows-only; a film festival is movies-only. A kids channel, a holiday channel, a genre block: those should mix.
 
@@ -195,13 +202,18 @@ APPEARANCE:
 - Packages also need an \`accent\` from the 16 palette keys. Channels do NOT — their colours are assigned by a palette cycle that produces deliberate variance across the guide.`;
 
 export type PlanOptions = {
-  /** Rough number of channels to aim for across the whole lineup. */
+  /**
+   * Force an exact channel count. Leave unset for the real behaviour — the model sizes the
+   * lineup to the library. Only set this if you specifically need a fixed-size lineup.
+   */
   targetChannels?: number;
-  /** Hard cap for testing — trims the plan after generation. */
+  /**
+   * Testing cap: generate exactly this many channels so a trial run is cheap. Bounds
+   * GENERATION, not just the result — the planner's structured output is the single most
+   * expensive artifact in a run, so trimming afterwards wastes most of what you paid for.
+   */
   limit?: number;
 };
-
-const DEFAULT_TARGET_CHANNELS = 50;
 
 /**
  * Assign channel numbers: package N owns the block starting at 1000 + (N+1)*100 … so
@@ -263,11 +275,20 @@ export async function planLineup(
     throw new Error("No active AI connection — configure one in Settings → AI Assistant.");
   }
 
-  // `limit` bounds GENERATION, not just the result. Trimming afterwards (as this used to do)
-  // meant every test run paid for a full ~50-channel structured output on the planner model —
-  // the most expensive artifact in the run — and then threw 90% of it away.
-  const target = opts.limit ?? opts.targetChannels ?? DEFAULT_TARGET_CHANNELS;
-  const packages = target <= 8 ? 1 : Math.max(6, Math.min(10, Math.round(target / 6)));
+  /**
+   * How many channels to ask for.
+   *
+   * A fixed quota is the wrong instruction for the real goal — the lineup should be however
+   * many channels it takes to cover the library well, which depends entirely on what's in it.
+   * A quota makes the model pad with near-duplicates when it's too high, or leave whole
+   * sections of the library unreachable when it's too low.
+   *
+   * So: `limit` (a deliberate testing cap, keeps a trial run cheap) pins an exact count;
+   * `targetChannels` is an explicit caller override; otherwise the model decides from
+   * coverage. `limit` bounds GENERATION rather than trimming afterwards — trimming meant
+   * paying for a full lineup on the planner model and discarding most of it.
+   */
+  const exactCount = opts.limit ?? opts.targetChannels;
 
   const { object, usage } = await generateObject({
     model: getModel(connection),
@@ -276,7 +297,9 @@ export async function planLineup(
     prompt: [
       libraryContext,
       "",
-      `Propose exactly ${target} channels across ${packages} package${packages === 1 ? "" : "s"}.`,
+      exactCount
+        ? `Propose exactly ${exactCount} channel${exactCount === 1 ? "" : "s"} — a representative sample of the lineup you would build, spread across different kinds of channel rather than ${exactCount} variations on one idea.`
+        : "Build the full lineup for this library. Use as many channels and packages as it genuinely takes to cover it — see COVERAGE below.",
       "Give every channel a complete, working filter built from the vocabulary above.",
     ].join("\n"),
     providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
