@@ -33,7 +33,13 @@ function ChannelDetail() {
   const nowNext = useQuery(trpc.channels.nowNext.queryOptions({ id: channelId }));
   const schedule = useQuery(trpc.channels.schedule.queryOptions({ id: channelId, hours: 48 }));
   // Auto-loads the resolved contents for an existing channel (refetched after a save).
-  const preview = useQuery(trpc.channels.preview.queryOptions({ id: channelId }));
+  // `skipBatch` keeps this OUT of the page's query batch. It resolves the whole filter
+  // against Plex and can take seconds on a big channel; batched, it held up `get` /
+  // `nowNext` / `schedule` and blocked first paint — the tiles lazy-load their images, but
+  // the batch meant the page still waited on the preview data itself.
+  const preview = useQuery(
+    trpc.channels.preview.queryOptions({ id: channelId }, { trpc: { context: { skipBatch: true } } }),
+  );
   const [submitting, setSubmitting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [extending, setExtending] = useState(false);

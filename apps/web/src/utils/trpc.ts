@@ -1,7 +1,7 @@
 import type { AppRouter } from "@ChannelGuide/api/routers/index";
 import { env } from "@ChannelGuide/env/web";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
-import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import { createTRPCClient, httpBatchLink, httpLink, splitLink } from "@trpc/client";
 import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
 import { toast } from "sonner";
 
@@ -47,16 +47,30 @@ export const queryClient = new QueryClient({
   }),
 });
 
+const url = `${getServerUrl(env.VITE_SERVER_URL)}/trpc`;
+// Signature matches tRPC's `FetchEsque` (which accepts RequestInfo, not just string | URL).
+const withCredentials = (input: URL | RequestInfo, options?: RequestInit) =>
+  fetch(input, { ...options, credentials: "include" });
+
+/**
+ * Batching is the right default — it collapses a page's queries into one round trip.
+ * But a batch resolves as a UNIT: the response waits for the slowest query in it, so one
+ * slow procedure stalls every fast one it happens to be batched with. Firing a query
+ * "independently" in React Query does NOT avoid this; the transport re-couples them.
+ *
+ * That bit the channel page: `channels.preview` resolves a whole filter against Plex and
+ * was landing in the same batch as `get` / `nowNext` / `schedule`, so the page couldn't
+ * render until the preview finished — the exact thing it was supposed to load lazily.
+ *
+ * Opt a slow query out with `trpc: { context: { skipBatch: true } }` and it gets its own
+ * request. Use it for anything that can be slow and isn't needed for first paint.
+ */
 export const trpcClient = createTRPCClient<AppRouter>({
   links: [
-    httpBatchLink({
-      url: `${getServerUrl(env.VITE_SERVER_URL)}/trpc`,
-      fetch(url, options) {
-        return fetch(url, {
-          ...options,
-          credentials: "include",
-        });
-      },
+    splitLink({
+      condition: (op) => op.context.skipBatch === true,
+      true: httpLink({ url, fetch: withCredentials }),
+      false: httpBatchLink({ url, fetch: withCredentials }),
     }),
   ],
 });
