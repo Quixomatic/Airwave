@@ -2,6 +2,23 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.12] - 2026-07-21
+
+The admin Guide page is rebuilt on the TV app's **Aurora** design and framed as a TV, so the admin's "what's on" view feels like the 10-foot client it drives.
+
+### Changed
+
+- **Admin: the Guide is the TV's Aurora grid now.** The old flat table is replaced by a look-port of `apps/tv-web`'s Aurora design — a featured now-playing panel over a horizontal time-grid with tinted "on now" cells (two-tone progress fill), the day/time axis, and a pulsing now-marker. It's mouse-driven (hover a program to feature it, click to tune) and theme-aware. The subtle geometry (lane math, program clamping) is carried over verbatim; sizing is fluid, scaled off the measured container width. New `features/guide/aurora-guide.tsx`; the shared `channels.guide` service already returns the rich `GuideMeta` it needs.
+- **Presented inside a TV device mockup.** The guide "screen" sits in a dark plastic bezel (chin + power LED) on a center-pedestal stand, full-bleed and inset from the content edges. The body is a fixed **16:9** that measures the available area and scales to fit — so it stays TV-shaped when the content narrows (e.g. the AI side panel opens). The bezel/stand lighten in dark mode so the device reads against the dark background.
+- **A "Guide preview" badge** above the TV toggles the **screen** light/dark independently of the admin theme (defaulting to it, and snapping back when the app theme flips), and toggles a **preview of the empty state**.
+- **Empty state = skeleton + message.** A fresh install renders the guide's own structure as *static* (non-animated) placeholders with a centered "No channels yet" card over them, rather than bare text.
+- **The current viewing session** shows as a compact live chip in the sub-header's top-left (replacing the old "Now watching" panel).
+
+### Added
+
+- **`Skeleton` gains an `animate` prop** (`@ChannelGuide/ui`) — set `false` for a cheap static placeholder; the animated shimmer uses a `fixed`-attachment gradient that gets expensive across many elements.
+- **A `.light` class** in the UI globals mirrors `:root`'s light tokens, so a subtree can be *forced* light even under a `.dark` root (the guide's screen light/dark toggle relies on it; `.dark` already forced dark this way).
+
 ## [0.6.11] - 2026-07-21
 
 ### Fixed

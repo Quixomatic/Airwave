@@ -13,7 +13,11 @@
   --text-sm: 0.8125rem;
 }
 
-:root {
+/* `.light` re-declares the light tokens so a subtree can be FORCED light even under a `.dark`
+   root (custom properties otherwise inherit the ancestor's values) — used by the guide's TV
+   preview light/dark toggle. `.dark` (below) already forces dark the same way. */
+:root,
+.light {
   --background: oklch(1 0 0);
   --foreground: oklch(0.31 0 0);
   --card: oklch(1 0 0);
