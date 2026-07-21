@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.3] - 2026-07-21
+
+### Changed
+
+- **Admin: the channel form's section headings are larger and sit on a subtle background.** Each collapsible heading is now `text-base` semibold on a muted `bg-muted/50` bar (hover-darkened), so the sections read as distinct blocks instead of thin divider lines.
+
 ## [0.6.2] - 2026-07-21
 
 ### Changed

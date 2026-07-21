@@ -64,14 +64,14 @@ function Section({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between py-3 text-left text-sm font-medium"
+        className="bg-muted/50 hover:bg-muted flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-base font-semibold transition-colors"
       >
         {title}
         <ChevronDown
           className={cn("text-muted-foreground h-4 w-4 transition-transform", open && "rotate-180")}
         />
       </button>
-      {open && <div className="space-y-4 pb-4">{children}</div>}
+      {open && <div className="space-y-4 px-1 pt-4 pb-2">{children}</div>}
     </div>
   );
 }
@@ -163,7 +163,7 @@ export function ChannelForm({
   };
 
   return (
-    <form id={formId} onSubmit={handleSubmit} className="divide-y">
+    <form id={formId} onSubmit={handleSubmit} className="space-y-3">
       <Section title="Details">
         {/* Fixed side-column widths (not `auto`) + items-end so the three input boxes line up
             on one baseline regardless of label width. */}
