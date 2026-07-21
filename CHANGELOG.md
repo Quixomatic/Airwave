@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.57] - 2026-07-21
+
+### Changed
+
+- **Admin: the channel create/edit form now uses the design-system components throughout, and the top row lines up.** An audit turned up several raw HTML controls: the Name/Callsign/Number row is fixed so the three inputs align on one baseline (explicit side-column widths + `items-end` instead of `auto` columns with hardcoded widths); the **Active** checkbox is now a **Switch**; the Movies / TV Shows checkboxes use the `Checkbox` component; and the five native `<select>`s (Ordering, Package, Sort by, Direction, Bumpers) are now the base-lyra `Select`. Shared by both the New and Edit channel pages.
+
+### Added
+
+- **`Switch` component** added to `@ChannelGuide/ui` from the `@coss` (base-lyra) registry — base-ui underneath, matching the existing checkbox.
+
 ## [0.5.56] - 2026-07-21
 
 ### Changed

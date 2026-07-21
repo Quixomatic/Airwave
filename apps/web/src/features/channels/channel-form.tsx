@@ -1,5 +1,8 @@
+import { Checkbox } from "@ChannelGuide/ui/components/checkbox";
 import { Input } from "@ChannelGuide/ui/components/input";
 import { Label } from "@ChannelGuide/ui/components/label";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@ChannelGuide/ui/components/select";
+import { Switch } from "@ChannelGuide/ui/components/switch";
 import { Textarea } from "@ChannelGuide/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -126,7 +129,9 @@ export function ChannelForm({
 
   return (
     <form id={formId} onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-[1fr_auto_auto] gap-3">
+      {/* Fixed side-column widths (not `auto`) + items-end so the three input boxes line up on
+          one baseline regardless of label width. */}
+      <div className="grid grid-cols-[1fr_7rem_7rem] items-end gap-3">
         <div className="space-y-2">
           <Label htmlFor="cname">Name</Label>
           <Input
@@ -140,7 +145,7 @@ export function ChannelForm({
           <Label htmlFor="ccall">Callsign</Label>
           <Input
             id="ccall"
-            className="w-24 uppercase"
+            className="uppercase"
             value={callsign}
             maxLength={6}
             onChange={(e) => setCallsign(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
@@ -151,7 +156,6 @@ export function ChannelForm({
           <Label htmlFor="cnum">Number</Label>
           <Input
             id="cnum"
-            className="w-24"
             value={number}
             onChange={(e) => setNumber(e.target.value)}
             placeholder="auto"
@@ -173,11 +177,11 @@ export function ChannelForm({
         <Label>Content</Label>
         <div className="flex gap-4 text-sm">
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={movies} onChange={(e) => setMovies(e.target.checked)} />
+            <Checkbox checked={movies} onCheckedChange={(v) => setMovies(v === true)} />
             Movies
           </label>
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={tv} onChange={(e) => setTv(e.target.checked)} />
+            <Checkbox checked={tv} onCheckedChange={(v) => setTv(v === true)} />
             TV Shows
           </label>
         </div>
@@ -196,31 +200,36 @@ export function ChannelForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label htmlFor="cord">Ordering</Label>
-          <select
-            id="cord"
-            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+          <Select
             value={ordering === "SHUFFLE" ? "SHUFFLE" : "SORTED"}
-            onChange={(e) => setOrdering(e.target.value === "SHUFFLE" ? "SHUFFLE" : "IN_ORDER")}
+            onValueChange={(v) => setOrdering(v === "SHUFFLE" ? "SHUFFLE" : "IN_ORDER")}
           >
-            <option value="SHUFFLE">Shuffle</option>
-            <option value="SORTED">Sorted by…</option>
-          </select>
+            <SelectTrigger id="cord" className="w-full">
+              <SelectValue>{(v) => (v === "SHUFFLE" ? "Shuffle" : "Sorted by…")}</SelectValue>
+            </SelectTrigger>
+            <SelectPopup>
+              <SelectItem value="SHUFFLE">Shuffle</SelectItem>
+              <SelectItem value="SORTED">Sorted by…</SelectItem>
+            </SelectPopup>
+          </Select>
         </div>
         <div className="space-y-2">
           <Label htmlFor="cpkg">Package</Label>
-          <select
-            id="cpkg"
-            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-            value={packageId}
-            onChange={(e) => setPackageId(e.target.value)}
-          >
-            <option value="">None</option>
-            {packages.data?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <Select value={packageId} onValueChange={(v) => setPackageId(v ?? "")}>
+            <SelectTrigger id="cpkg" className="w-full">
+              <SelectValue>
+                {(v) => (v ? (packages.data?.find((p) => p.id === v)?.name ?? "…") : "None")}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectPopup>
+              <SelectItem value="">None</SelectItem>
+              {packages.data?.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
         </div>
       </div>
 
@@ -228,36 +237,38 @@ export function ChannelForm({
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label htmlFor="csort">Sort by</Label>
-            <select
-              id="csort"
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-              value={sortField}
-              onChange={(e) => setSortField(e.target.value)}
-            >
-              {sortFields.data?.map((s) => (
-                <option key={s.field} value={s.field}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+            <Select value={sortField} onValueChange={(v) => setSortField(v ?? "title")}>
+              <SelectTrigger id="csort" className="w-full">
+                <SelectValue>
+                  {(v) => sortFields.data?.find((s) => s.field === v)?.label ?? "Select…"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPopup>
+                {sortFields.data?.map((s) => (
+                  <SelectItem key={s.field} value={s.field}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="cdir">Direction</Label>
-            <select
-              id="cdir"
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-              value={sortDir}
-              onChange={(e) => setSortDir(e.target.value as "asc" | "desc")}
-            >
-              <option value="asc">Ascending</option>
-              <option value="desc">Descending</option>
-            </select>
+            <Select value={sortDir} onValueChange={(v) => setSortDir(v as "asc" | "desc")}>
+              <SelectTrigger id="cdir" className="w-full">
+                <SelectValue>{(v) => (v === "desc" ? "Descending" : "Ascending")}</SelectValue>
+              </SelectTrigger>
+              <SelectPopup>
+                <SelectItem value="asc">Ascending</SelectItem>
+                <SelectItem value="desc">Descending</SelectItem>
+              </SelectPopup>
+            </Select>
           </div>
         </div>
       )}
 
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+        <Switch checked={enabled} onCheckedChange={(v) => setEnabled(v === true)} />
         Active
         <span className="text-muted-foreground text-xs">
           — inactive channels aren't selectable in the guide
@@ -267,18 +278,20 @@ export function ChannelForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label htmlFor="cbump">Bumpers</Label>
-          <select
-            id="cbump"
-            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-            value={bumperMode}
-            onChange={(e) => setBumperMode(e.target.value as BumperMode)}
-          >
-            {BUMPER_MODE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          <Select value={bumperMode} onValueChange={(v) => setBumperMode(v as BumperMode)}>
+            <SelectTrigger id="cbump" className="w-full">
+              <SelectValue>
+                {(v) => BUMPER_MODE_OPTIONS.find((o) => o.value === v)?.label ?? "Select…"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectPopup>
+              {BUMPER_MODE_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
           <p className="text-muted-foreground text-xs">
             Break content is configured globally in{" "}
             <Link to="/bumpers" className="text-primary hover:underline">
