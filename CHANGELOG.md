@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.55] - 2026-07-21
+
+### Changed
+
+- **Admin: the Channels page's "New channel" button moved to the top header.** It now sits in the top-right header slot, just left of the AI Assistant button, instead of in the sub-header, and uses the same `outline` style as Auto-generate (no longer the primary blue). "Auto-generate" stays in the sub-header.
+
 ## [0.5.54] - 2026-07-21
 
 ### Changed

@@ -7,7 +7,7 @@ import { Loader2, Plus, Sparkles, Tv } from "lucide-react";
 import { useEffect } from "react";
 
 import { resolveTile } from "@/features/icons/app-icon";
-import { HeaderRight } from "@/context/header-provider";
+import { HeaderRight, TopHeaderRight } from "@/context/header-provider";
 import { trpc, trpcClient } from "@/utils/trpc";
 import { toast } from "sonner";
 
@@ -67,11 +67,17 @@ function ChannelsList() {
           )}
           Auto-generate
         </Button>
-        <Button size="sm" render={<Link to="/channels/new" />}>
+      </HeaderRight>
+
+      {/* New channel lives in the TOP header's right slot, to the left of the AI Assistant
+          button. The slot is a flex row and the portal appends after the assistant, so
+          `order-first` pulls this ahead of it visually. */}
+      <TopHeaderRight>
+        <Button variant="outline" size="sm" className="order-first" render={<Link to="/channels/new" />}>
           <Plus className="mr-2 h-4 w-4" />
           New channel
         </Button>
-      </HeaderRight>
+      </TopHeaderRight>
 
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Channels</h1>
