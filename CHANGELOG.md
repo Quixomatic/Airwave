@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.2] - 2026-07-21
+
+### Changed
+
+- **Admin: the channel form is now grouped into collapsible sections, with content + filter last.** Instead of one long scroll, the fields are split into three **independent** collapsibles (several can be open at once; it's not an accordion): **Details** (name / callsign / number / description / active), **Options** (package, ordering + sort, bumpers, appearance), and **Content & filter** — the Movies/TV type checkboxes joined with the predicate builder. Content & filter is deliberately last: the two jointly define what plays, and the resolved preview tiles render right below the form, so it reads top-to-bottom.
+
 ## [0.6.1] - 2026-07-21
 
 ### Added
