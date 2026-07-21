@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.9] - 2026-07-21
+
+### Changed
+
+- **Admin: the workflow pages match everything else now.** Settings → Workflows, the AI-lineup runs list, and the per-run detail page all moved from Cards to Frames. The workflows list and the runs list are proper divide-y row lists (like channels/packages/sources) instead of bordered cards nested inside a card. A run's status is a **coloured badge** (green completed, blue running, red failed, muted cancelled).
+
 ## [0.6.8] - 2026-07-21
 
 ### Changed

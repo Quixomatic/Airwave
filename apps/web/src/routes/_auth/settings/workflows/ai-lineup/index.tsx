@@ -9,8 +9,15 @@
  * moved to `/settings/workflows/ai-lineup/$runId`. This page stays a scannable index of
  * what ran, when, and how far it got.
  */
+import { Badge } from "@ChannelGuide/ui/components/badge";
 import { Button } from "@ChannelGuide/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@ChannelGuide/ui/components/card";
+import {
+  Frame,
+  FrameDescription,
+  FrameHeader,
+  FramePanel,
+  FrameTitle,
+} from "@ChannelGuide/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronRight, Loader2, RefreshCw } from "lucide-react";
@@ -22,10 +29,11 @@ export const Route = createFileRoute("/_auth/settings/workflows/ai-lineup/")({
   component: AiLineupRuns,
 });
 
-const STATUS_TONE: Record<string, string> = {
-  completed: "text-emerald-600",
-  running: "text-blue-600",
-  failed: "text-red-600",
+/** Coloured outline pill per run status. */
+const STATUS_BADGE: Record<string, string> = {
+  completed: "border-emerald-500/30 bg-emerald-500/15 text-emerald-600",
+  running: "border-blue-500/30 bg-blue-500/15 text-blue-600",
+  failed: "border-red-500/30 bg-red-500/15 text-red-600",
   cancelled: "text-muted-foreground",
 };
 
@@ -37,9 +45,12 @@ function AiLineupRuns() {
   });
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>AI lineup runs</CardTitle>
+    <Frame>
+      <FrameHeader className="flex-row items-center justify-between">
+        <div>
+          <FrameTitle>AI lineup runs</FrameTitle>
+          <FrameDescription>Every run of the AI lineup builder — status, steps, and duration.</FrameDescription>
+        </div>
         <Button
           size="sm"
           variant="outline"
@@ -52,26 +63,27 @@ function AiLineupRuns() {
             <RefreshCw className="h-4 w-4" />
           )}
         </Button>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {runs.isLoading && <p className="text-muted-foreground text-sm">Loading…</p>}
+      </FrameHeader>
+      <FramePanel className="p-0">
+        {runs.isLoading && <p className="text-muted-foreground p-4 text-sm">Loading…</p>}
         {runs.data?.length === 0 && (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground p-4 text-sm">
             No runs yet — start one from Settings → Jobs → “Build Lineup with AI”.
           </p>
         )}
+        <div className="divide-border divide-y">
         {runs.data?.map((r) => (
           <Link
             key={r.runId}
             to="/settings/workflows/ai-lineup/$runId"
             params={{ runId: r.runId }}
-            className="hover:bg-muted/50 flex w-full items-center gap-3 rounded-md border p-3 text-left"
+            className="hover:bg-muted/50 flex items-center gap-3 p-4 text-left"
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className={`text-sm font-medium ${STATUS_TONE[r.status] ?? ""}`}>
+                <Badge variant="outline" className={`capitalize ${STATUS_BADGE[r.status] ?? ""}`}>
                   {r.status}
-                </span>
+                </Badge>
                 <span className="text-muted-foreground truncate font-mono text-xs">{r.runId}</span>
               </div>
               <div className="text-muted-foreground text-xs">
@@ -88,7 +100,8 @@ function AiLineupRuns() {
             <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
           </Link>
         ))}
-      </CardContent>
-    </Card>
+        </div>
+      </FramePanel>
+    </Frame>
   );
 }

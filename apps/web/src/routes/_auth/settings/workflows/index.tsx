@@ -5,7 +5,13 @@
  * "Workflows" tab and the natural home for any future durable workflow (a scheduled rebuild,
  * a bulk re-resolve, etc.), so it's a list rather than a redirect.
  */
-import { Card, CardContent, CardHeader, CardTitle } from "@ChannelGuide/ui/components/card";
+import {
+  Frame,
+  FrameDescription,
+  FrameHeader,
+  FramePanel,
+  FrameTitle,
+} from "@ChannelGuide/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronRight, Workflow } from "lucide-react";
@@ -22,14 +28,15 @@ function WorkflowsIndex() {
   const runCount = runs.data?.length ?? 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Workflows</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
+    <Frame>
+      <FrameHeader>
+        <FrameTitle>Workflows</FrameTitle>
+        <FrameDescription>Durable background workflows and their runs.</FrameDescription>
+      </FrameHeader>
+      <FramePanel className="divide-border divide-y p-0">
         <Link
           to="/settings/workflows/ai-lineup"
-          className="hover:bg-muted/50 flex items-center gap-3 rounded-md border p-3"
+          className="hover:bg-muted/50 flex items-center gap-3 p-4"
         >
           <span className="bg-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-md">
             <Workflow className="h-4 w-4" />
@@ -43,7 +50,7 @@ function WorkflowsIndex() {
           </div>
           <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
         </Link>
-      </CardContent>
-    </Card>
+      </FramePanel>
+    </Frame>
   );
 }

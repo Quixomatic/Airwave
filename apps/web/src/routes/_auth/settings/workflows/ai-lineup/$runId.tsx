@@ -12,9 +12,9 @@
  */
 import { Badge } from "@ChannelGuide/ui/components/badge";
 import { Button } from "@ChannelGuide/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@ChannelGuide/ui/components/card";
+import { Frame, FrameHeader, FramePanel, FrameTitle } from "@ChannelGuide/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { ChevronDown, ChevronRight, Loader2, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
@@ -148,10 +148,7 @@ function RunDetail() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Link to="/settings/workflows/ai-lineup" className="text-muted-foreground text-sm hover:underline">
-          ← All runs
-        </Link>
+      <div className="flex items-center justify-end">
         <Button
           size="sm"
           variant="outline"
@@ -170,11 +167,11 @@ function RunDetail() {
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-mono text-sm">{runId}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <Frame>
+        <FrameHeader>
+          <FrameTitle className="font-mono text-sm">{runId}</FrameTitle>
+        </FrameHeader>
+        <FramePanel className="space-y-3">
           {/* The honest cost: every model, every phase, every ATTEMPT. */}
           <div className="space-y-2">
             <p className="text-sm font-medium">Cost by model &amp; phase</p>
@@ -209,17 +206,17 @@ function RunDetail() {
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </FramePanel>
+      </Frame>
 
       {/* THE PLAN — the run's most valuable artifact, and previously discarded entirely for
           any channel that a build cap meant we never constructed. */}
       {plan && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">The plan</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        <Frame>
+          <FrameHeader>
+            <FrameTitle className="text-sm">The plan</FrameTitle>
+          </FrameHeader>
+          <FramePanel className="space-y-2">
             <div className="text-muted-foreground flex flex-wrap gap-3 text-xs">
               <span>{n(plan.inputTokens)} in</span>
               <span>{n(plan.outputTokens)} out</span>
@@ -239,17 +236,17 @@ function RunDetail() {
               Full plan JSON — every package, channel and filter
             </button>
             {open.has(plan.id) && <Json value={plan.output} />}
-          </CardContent>
-        </Card>
+          </FramePanel>
+        </Frame>
       )}
 
       {/* THE FAN-OUT. Expandable rather than tabbed so two channels' reasoning can be read
           side by side — comparing them is how a prompt problem becomes obvious. */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Channel builds ({builds.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
+      <Frame>
+        <FrameHeader>
+          <FrameTitle className="text-sm">Channel builds ({builds.length})</FrameTitle>
+        </FrameHeader>
+        <FramePanel className="space-y-2">
           {!builds.length && (
             <p className="text-muted-foreground text-sm">No build traces recorded.</p>
           )}
@@ -304,16 +301,16 @@ function RunDetail() {
               )}
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </FramePanel>
+      </Frame>
 
       {/* Everything else that traced (failed plan attempts included). */}
       {!!others.length && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Other steps ({others.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        <Frame>
+          <FrameHeader>
+            <FrameTitle className="text-sm">Other steps ({others.length})</FrameTitle>
+          </FrameHeader>
+          <FramePanel className="space-y-2">
             {others.map((t) => (
               <div key={t.id} className="rounded-md border">
                 <button
@@ -340,16 +337,16 @@ function RunDetail() {
                 )}
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </FramePanel>
+        </Frame>
       )}
 
       {/* The SDK's outside view — durations and retries per step. */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Step timeline ({steps.data?.length ?? 0})</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-1">
+      <Frame>
+        <FrameHeader>
+          <FrameTitle className="text-sm">Step timeline ({steps.data?.length ?? 0})</FrameTitle>
+        </FrameHeader>
+        <FramePanel className="space-y-1">
           {steps.data?.map((s) => (
             <div
               key={s.stepId}
@@ -365,8 +362,8 @@ function RunDetail() {
               </span>
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </FramePanel>
+      </Frame>
     </div>
   );
 }
