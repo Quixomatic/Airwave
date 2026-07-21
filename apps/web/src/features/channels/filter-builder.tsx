@@ -1,5 +1,6 @@
 import { Button } from "@ChannelGuide/ui/components/button";
 import { Input } from "@ChannelGuide/ui/components/input";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@ChannelGuide/ui/components/select";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, X } from "lucide-react";
 
@@ -74,8 +75,6 @@ const OP_LABEL: Record<FilterOp, string> = {
   contains: "contains",
   notContains: "does not contain",
 };
-const SELECT =
-  "border-input bg-background h-8 rounded-md border px-2 text-sm";
 
 type SharedProps = {
   fields: FieldMeta[];
@@ -131,14 +130,18 @@ function GroupEditor({
       <div className="flex items-center justify-between">
         <div className="text-muted-foreground flex items-center gap-2 text-xs">
           Match
-          <select
-            className={SELECT}
+          <Select
             value={group.combinator}
-            onChange={(e) => onChange({ ...group, combinator: e.target.value as "and" | "or" })}
+            onValueChange={(v) => onChange({ ...group, combinator: (v ?? "and") as "and" | "or" })}
           >
-            <option value="and">all (AND)</option>
-            <option value="or">any (OR)</option>
-          </select>
+            <SelectTrigger className="w-32 min-w-0">
+              <SelectValue>{(v) => (v === "or" ? "any (OR)" : "all (AND)")}</SelectValue>
+            </SelectTrigger>
+            <SelectPopup>
+              <SelectItem value="and">all (AND)</SelectItem>
+              <SelectItem value="or">any (OR)</SelectItem>
+            </SelectPopup>
+          </Select>
           of:
         </div>
         {onRemove && !isRoot && (
@@ -232,55 +235,71 @@ function ConditionEditor({
 
   return (
     <div className="flex items-center gap-2">
-      <select
-        className={SELECT}
+      <Select
         value={condition.field}
-        onChange={(e) => {
-          const m = fields.find((f) => f.field === e.target.value);
-          onChange({ ...condition, field: e.target.value, op: m?.operators[0] ?? "is", value: "" });
+        onValueChange={(v) => {
+          const next = v ?? condition.field;
+          const m = fields.find((f) => f.field === next);
+          onChange({ ...condition, field: next, op: m?.operators[0] ?? "is", value: "" });
         }}
       >
-        {fields.map((f) => (
-          <option key={f.field} value={f.field}>
-            {f.label}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger className="w-44">
+          <SelectValue>{(v) => fields.find((f) => f.field === v)?.label ?? "…"}</SelectValue>
+        </SelectTrigger>
+        <SelectPopup>
+          {fields.map((f) => (
+            <SelectItem key={f.field} value={f.field}>
+              {f.label}
+            </SelectItem>
+          ))}
+        </SelectPopup>
+      </Select>
 
-      <select
-        className={SELECT}
+      <Select
         value={condition.op}
-        onChange={(e) => onChange({ ...condition, op: e.target.value as FilterOp })}
+        onValueChange={(v) => onChange({ ...condition, op: (v ?? "is") as FilterOp })}
       >
-        {(meta?.operators ?? ["is"]).map((op) => (
-          <option key={op} value={op}>
-            {OP_LABEL[op]}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger className="w-36">
+          <SelectValue>{(v) => OP_LABEL[v as FilterOp] ?? String(v)}</SelectValue>
+        </SelectTrigger>
+        <SelectPopup>
+          {(meta?.operators ?? ["is"]).map((op) => (
+            <SelectItem key={op} value={op}>
+              {OP_LABEL[op]}
+            </SelectItem>
+          ))}
+        </SelectPopup>
+      </Select>
 
       {meta?.kind === "bool" ? (
-        <select
-          className={`${SELECT} flex-1`}
+        <Select
           value={condition.value || "true"}
-          onChange={(e) => onChange({ ...condition, value: e.target.value })}
+          onValueChange={(v) => onChange({ ...condition, value: v ?? "true" })}
         >
-          <option value="true">true</option>
-          <option value="false">false</option>
-        </select>
+          <SelectTrigger className="min-w-0 flex-1">
+            <SelectValue>{(v) => (v === "false" ? "false" : "true")}</SelectValue>
+          </SelectTrigger>
+          <SelectPopup>
+            <SelectItem value="true">true</SelectItem>
+            <SelectItem value="false">false</SelectItem>
+          </SelectPopup>
+        </Select>
       ) : isTag ? (
-        <select
-          className={`${SELECT} flex-1`}
+        <Select
           value={condition.value}
-          onChange={(e) => onChange({ ...condition, value: e.target.value })}
+          onValueChange={(v) => onChange({ ...condition, value: v ?? "" })}
         >
-          <option value="">Select…</option>
-          {values.data?.map((v) => (
-            <option key={v} value={v}>
-              {v}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="min-w-0 flex-1">
+            <SelectValue>{(v) => (v ? String(v) : "Select…")}</SelectValue>
+          </SelectTrigger>
+          <SelectPopup>
+            {values.data?.map((v) => (
+              <SelectItem key={v} value={v}>
+                {v}
+              </SelectItem>
+            ))}
+          </SelectPopup>
+        </Select>
       ) : meta?.kind === "date" ? (
         <Input
           type="date"

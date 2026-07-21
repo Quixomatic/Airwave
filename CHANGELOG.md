@@ -2,6 +2,15 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.0] - 2026-07-21
+
+Opens the 0.6.x line.
+
+### Changed
+
+- **Admin: the filter builder is on the design-system `Select` too.** Following v0.5.57, the nested predicate builder still had five native `<select>`s — the group combinator (all/any), and per condition the field, operator, boolean value, and tag value. All are now the base-lyra `Select`, so the whole channel form is consistent. The tag-value picker being a popup is also a real improvement — a native `<select>` of hundreds of genre/studio values was unwieldy.
+- **The filter-builder selects now match the input height.** They were `size="sm"` (28px) sitting next to `h-8` (32px) value inputs in the same row, which looked off; they're default height now, so selects and inputs line up.
+
 ## [0.5.57] - 2026-07-21
 
 ### Changed
