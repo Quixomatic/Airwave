@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.11] - 2026-07-21
+
+### Fixed
+
+- **Admin: the About page reads "About Airwave" with the live version.** It was hardcoded to `0.1.13`. The version now comes from the web app's own `package.json` via a new `lib/app-info.ts` (which also centralizes `APP_NAME`), so the `/version-bump` flow keeps the About page current automatically instead of it drifting stale.
+
 ## [0.6.10] - 2026-07-21
 
 ### Changed
