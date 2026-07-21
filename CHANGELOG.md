@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.51] - 2026-07-21
+
+### Changed
+
+- **Admin: the AI lineup observability moved under Settings.** It was a standalone top-level section at `/workflows/ai-lineup`; it now lives at **Settings → Workflows**, matching Jobs & Cache. A new **Workflows** tab lists the durable workflows (just the AI lineup builder today), `/settings/workflows/ai-lineup` is its runs list, and `/settings/workflows/ai-lineup/:runId` is the per-run detail. The "Build Lineup with AI" job's link and all internal navigation were repointed. No behaviour change — same pages, better home.
+
 ## [0.5.50] - 2026-07-20
 
 ### Changed

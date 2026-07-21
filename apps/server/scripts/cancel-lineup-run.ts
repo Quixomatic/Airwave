@@ -1,7 +1,7 @@
 /**
  * Cancel an in-flight AI lineup run.
  *
- * There is no cancel button on `/workflows/ai-lineup` yet, and a failing step RETRIES — each
+ * There is no cancel button on `/settings/workflows/ai-lineup` yet, and a failing step RETRIES — each
  * retry of `planLineup` is a fresh (expensive) call on the planner model. So there needs to
  * be a way to stop a run that's clearly not going to succeed.
  *

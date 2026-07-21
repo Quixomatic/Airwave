@@ -20,7 +20,7 @@ import { useState } from "react";
 
 import { trpc } from "@/utils/trpc";
 
-export const Route = createFileRoute("/_auth/workflows/ai-lineup/$runId")({
+export const Route = createFileRoute("/_auth/settings/workflows/ai-lineup/$runId")({
   staticData: { breadcrumb: "Run" },
   component: RunDetail,
 });
@@ -149,7 +149,7 @@ function RunDetail() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Link to="/workflows/ai-lineup" className="text-muted-foreground text-sm hover:underline">
+        <Link to="/settings/workflows/ai-lineup" className="text-muted-foreground text-sm hover:underline">
           ← All runs
         </Link>
         <Button

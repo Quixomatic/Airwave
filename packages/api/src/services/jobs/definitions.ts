@@ -239,7 +239,7 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
     name: "Build Lineup with AI",
     description:
       "Analyses your library, designs a full AI lineup, and builds it (packages + channels + schedules). DESTRUCTIVE: clears the existing AI lineup first. Runs as a durable background workflow — this job only kicks it off and returns; watch progress and cost on the AI Lineup page.",
-    detailHref: "/workflows/ai-lineup",
+    detailHref: "/settings/workflows/ai-lineup",
     interval: "fixed",
     defaultCron: "0 0 0 1 1 *", // manual-only; never auto-fires
     manual: true,

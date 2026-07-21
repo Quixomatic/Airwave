@@ -6,7 +6,7 @@
  *
  * Detail deliberately does NOT live here. A run's substance — the full plan, and every
  * channel build's tool calls and reasoning — is far more than a list row can hold, so it
- * moved to `/workflows/ai-lineup/$runId` (v0.5.44). This page stays a scannable index of
+ * moved to `/settings/workflows/ai-lineup/$runId`. This page stays a scannable index of
  * what ran, when, and how far it got.
  */
 import { Button } from "@ChannelGuide/ui/components/button";
@@ -18,7 +18,7 @@ import { ChevronRight, Loader2, RefreshCw } from "lucide-react";
 import { trpc } from "@/utils/trpc";
 
 // Breadcrumb lives on the layout (`route.tsx`) now, so it isn't repeated on every child.
-export const Route = createFileRoute("/_auth/workflows/ai-lineup/")({
+export const Route = createFileRoute("/_auth/settings/workflows/ai-lineup/")({
   component: AiLineupRuns,
 });
 
@@ -63,7 +63,7 @@ function AiLineupRuns() {
         {runs.data?.map((r) => (
           <Link
             key={r.runId}
-            to="/workflows/ai-lineup/$runId"
+            to="/settings/workflows/ai-lineup/$runId"
             params={{ runId: r.runId }}
             className="hover:bg-muted/50 flex w-full items-center gap-3 rounded-md border p-3 text-left"
           >
