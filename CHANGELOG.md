@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.10] - 2026-07-21
+
+### Changed
+
+- **Admin: the run detail page's Refresh is now a labelled button in the first frame's header.** It moved out of the floating icon-only button above the page into the header of the run (cost) frame, alongside the run id, and reads "Refresh" with its icon.
+
 ## [0.6.9] - 2026-07-21
 
 ### Changed

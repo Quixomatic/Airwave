@@ -148,28 +148,26 @@ function RunDetail() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            void traces.refetch();
-            void steps.refetch();
-            void usage.refetch();
-          }}
-          disabled={traces.isFetching}
-        >
-          {traces.isFetching ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
-
       <Frame>
-        <FrameHeader>
+        <FrameHeader className="flex-row items-center justify-between">
           <FrameTitle className="font-mono text-sm">{runId}</FrameTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              void traces.refetch();
+              void steps.refetch();
+              void usage.refetch();
+            }}
+            disabled={traces.isFetching}
+          >
+            {traces.isFetching ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            Refresh
+          </Button>
         </FrameHeader>
         <FramePanel className="space-y-3">
           {/* The honest cost: every model, every phase, every ATTEMPT. */}
