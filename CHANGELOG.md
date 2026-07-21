@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.1] - 2026-07-21
+
+### Added
+
+- **Admin: channel identity in the sub-header on the channel page.** The channel detail page's sub-header (left) now shows **tinted icon tile · callsign · CH NN**, dot-separated and sized to match the breadcrumb tile above it — so which channel you're editing is clear at a glance. The tile inherits the package's icon/tint when the channel has none of its own (the `channels.get` payload now carries `packageIcon`/`packageTint` for that).
+
 ## [0.6.0] - 2026-07-21
 
 Opens the 0.6.x line.

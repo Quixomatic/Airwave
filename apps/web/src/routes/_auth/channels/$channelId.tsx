@@ -2,12 +2,15 @@ import { Button } from "@ChannelGuide/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@ChannelGuide/ui/components/card";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Tv } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { AccentIconTile } from "@ChannelGuide/ui/components/accent-icon-tile";
+
 import { useBreadcrumb } from "@/context/breadcrumb-provider";
-import { HeaderRight } from "@/context/header-provider";
+import { HeaderLeft, HeaderRight } from "@/context/header-provider";
+import { resolveTile } from "@/features/icons/app-icon";
 import {
   ChannelForm,
   type BumperMode,
@@ -94,8 +97,32 @@ function ChannelDetail() {
     return <div className="text-muted-foreground mx-auto max-w-2xl text-sm">Loading…</div>;
   }
 
+  const tile = resolveTile({
+    icon: channel.data.icon,
+    tint: channel.data.tint,
+    inheritedIcon: channel.data.packageIcon,
+    inheritedTint: channel.data.packageTint,
+    defaultIcon: Tv,
+  });
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
+      {/* Channel identity in the sub-header left: tinted icon tile · callsign · CH NN,
+          each piece the same size, dot-separated. */}
+      <HeaderLeft>
+        <div className="text-muted-foreground flex items-center gap-1.5 text-sm">
+          <AccentIconTile icon={tile.Icon} tint={tile.tint} size="md" />
+          <span aria-hidden>·</span>
+          {channel.data.callsign && (
+            <>
+              <span className="tabular-nums">{channel.data.callsign}</span>
+              <span aria-hidden>·</span>
+            </>
+          )}
+          <span className="tabular-nums">CH {String(channel.data.number).padStart(2, "0")}</span>
+        </div>
+      </HeaderLeft>
+
       <HeaderRight>
         <Button variant="outline" size="sm" render={<Link to="/watch/$channelId" params={{ channelId }} />}>
           Watch

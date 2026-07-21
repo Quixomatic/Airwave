@@ -68,7 +68,11 @@ export const channelsRouter = router({
   get: adminProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
     const channel = await ctx.prisma.channel.findUnique({
       where: { id: input.id },
-      include: { definitions: { orderBy: { sortIndex: "asc" }, take: 1 } },
+      include: {
+        definitions: { orderBy: { sortIndex: "asc" }, take: 1 },
+        // For the header identity tile — a channel with no own icon/tint inherits the package's.
+        package: { select: { icon: true, tint: true } },
+      },
     });
     if (!channel) throw new TRPCError({ code: "NOT_FOUND", message: "Channel not found." });
     const def = channel.definitions[0];
@@ -92,6 +96,8 @@ export const channelsRouter = router({
       packageId: channel.packageId,
       icon: channel.icon,
       tint: channel.tint,
+      packageIcon: channel.package?.icon ?? null,
+      packageTint: channel.package?.tint ?? null,
       mediaTypes: filter.mediaTypes ?? ["movie", "show"],
       filter: filter.filter ?? null,
     };
