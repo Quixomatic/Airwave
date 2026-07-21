@@ -21,7 +21,8 @@ model BumperConfig {
   id      String  @id @default(cuid())
   /// Singleton guard: always "global" so upsert-by-key returns the one row.
   key     String  @unique @default("global")
-  enabled Boolean @default(false)
+  /// Enabled by default so a first-time install has interstitial breaks out of the box.
+  enabled Boolean @default(true)
 
   /// Bumped on every settings change. Each channel's schedule is stamped with the
   /// rev it was built under (Channel.bumperRev); Bumper Sync rebuilds any channel
@@ -30,7 +31,7 @@ model BumperConfig {
 
   // ── Interstitial break lengths (contextual — chosen per program transition) ─
   /// Fallback length when no specific tier applies, in seconds.
-  interstitialSeconds Int @default(8)
+  interstitialSeconds Int @default(15)
   /// After a movie — a real intermission (you just watched a feature).
   afterMovieSeconds   Int @default(120)
   /// After a TV episode — a normal between-shows breather.

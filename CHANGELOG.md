@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.19] - 2026-07-21
+
+### Changed
+
+- **Bumpers are enabled by default on a fresh install.** The global `BumperConfig` singleton now defaults to `enabled: true` (was `false`) with a **15-second** fallback interstitial (was 8) — matching the tuned settings this deployment runs — so interstitial breaks work out of the box instead of needing to be switched on. Only affects new installs: column defaults apply when the singleton is first created, so existing configs are untouched.
+
+### Notes
+
+- Schema change (column defaults only) — `pnpm db:push` was run; on an already-created singleton it changes nothing.
+
 ## [0.6.18] - 2026-07-21
 
 ### Changed
