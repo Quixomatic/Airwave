@@ -1,4 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@ChannelGuide/ui/components/card";
+import {
+  Frame,
+  FrameDescription,
+  FrameHeader,
+  FramePanel,
+  FrameTitle,
+} from "@ChannelGuide/ui/components/frame";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_auth/settings/about")({
@@ -9,15 +15,15 @@ export const Route = createFileRoute("/_auth/settings/about")({
 function SettingsAbout() {
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>About ChannelGuide</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <p className="text-muted-foreground">
+      <Frame>
+        <FrameHeader>
+          <FrameTitle>About ChannelGuide</FrameTitle>
+          <FrameDescription>
             A self-hostable service that turns your own media-server library into curated live TV
             channels.
-          </p>
+          </FrameDescription>
+        </FrameHeader>
+        <FramePanel className="text-sm">
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
             <dt className="text-muted-foreground">Version</dt>
             <dd className="tabular-nums">0.1.13</dd>
@@ -33,8 +39,8 @@ function SettingsAbout() {
               </a>
             </dd>
           </dl>
-        </CardContent>
-      </Card>
+        </FramePanel>
+      </Frame>
     </div>
   );
 }

@@ -1,9 +1,17 @@
+import { Badge } from "@ChannelGuide/ui/components/badge";
 import { Button } from "@ChannelGuide/ui/components/button";
 import { Card } from "@ChannelGuide/ui/components/card";
+import {
+  Frame,
+  FrameDescription,
+  FrameHeader,
+  FramePanel,
+  FrameTitle,
+} from "@ChannelGuide/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import cronstrue from "cronstrue";
-import { ArrowUpRight, Loader2, Pencil, Play, X } from "lucide-react";
+import { ArrowUpRight, CalendarClock, Clock, Hand, History, Loader2, Pencil, Play, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -61,19 +69,38 @@ function SettingsJobs() {
 
   return (
     <div className="space-y-4">
-      <p className="text-muted-foreground text-sm">
-        ChannelGuide runs maintenance tasks on a schedule — metadata sync, library scans, and topping
-        up channel schedules. Trigger any of them now or change how often they run. Running a job
-        manually doesn't change its schedule.
-      </p>
-
-      <Card className="divide-border divide-y p-0">
+      <Frame>
+        <FrameHeader>
+          <FrameTitle>Jobs &amp; cache</FrameTitle>
+          <FrameDescription>
+            ChannelGuide runs maintenance tasks on a schedule — metadata sync, library scans, and
+            topping up channel schedules. Trigger any of them now or change how often they run.
+            Running a job manually doesn't change its schedule.
+          </FrameDescription>
+        </FrameHeader>
+        <FramePanel className="divide-border divide-y p-0">
         {jobs.data?.map((job) => (
           <div key={job.id} className="space-y-2.5 p-4">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium">{job.name}</p>
+                {/* Auto = runs on a schedule; Manual = run-now only (never auto-fires). */}
+                <Badge
+                  variant="outline"
+                  className={
+                    job.interval === "fixed"
+                      ? "gap-1 border-amber-500/30 bg-amber-500/15 text-amber-600"
+                      : "gap-1 border-sky-500/30 bg-sky-500/15 text-sky-600"
+                  }
+                >
+                  {job.interval === "fixed" ? (
+                    <Hand className="size-3" />
+                  ) : (
+                    <CalendarClock className="size-3" />
+                  )}
+                  {job.interval === "fixed" ? "Manual" : "Auto"}
+                </Badge>
                 {job.running && (
                   <span className="text-primary inline-flex items-center gap-1 text-xs">
                     <Loader2 className="h-3 w-3 animate-spin" /> running
@@ -95,12 +122,38 @@ function SettingsJobs() {
                   <ArrowUpRight className="h-3 w-3" />
                 </Link>
               )}
-              <p className="text-muted-foreground mt-1 text-xs">
-                {describeCron(job.cronSchedule)} · next {formatWhen(job.nextRunAt)}
-                {job.lastFinishedAt ? ` · last ran ${formatWhen(job.lastFinishedAt)}` : ""}
-              </p>
+              {/* Schedule details as badges. Manual (fixed) jobs never auto-fire, so no
+                  cron/"next" — just the last run if there was one. */}
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {job.interval !== "fixed" && (
+                  <>
+                    <Badge variant="outline" className="text-muted-foreground gap-1 font-normal">
+                      <CalendarClock className="size-3" /> {describeCron(job.cronSchedule)}
+                    </Badge>
+                    <Badge variant="outline" className="text-muted-foreground gap-1 font-normal">
+                      <Clock className="size-3" /> Next {formatWhen(job.nextRunAt)}
+                    </Badge>
+                  </>
+                )}
+                {job.lastFinishedAt && (
+                  <Badge variant="outline" className="gap-1 border-emerald-500/30 bg-emerald-500/15 font-normal text-emerald-600">
+                    <History className="size-3" /> Last ran {formatWhen(job.lastFinishedAt)}
+                  </Badge>
+                )}
+              </div>
             </div>
 
+            {/* Edit before Run. Manual (fixed) jobs have no schedule to edit — show the button
+                disabled rather than hiding it, so the row layout stays consistent. */}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setEditing(job)}
+              disabled={job.interval === "fixed"}
+              title={job.interval === "fixed" ? "Manual jobs have no schedule to edit" : "Edit schedule"}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
             {job.running ? (
               <Button variant="outline" size="sm" onClick={() => cancel(job)}>
                 <X className="mr-1 h-3.5 w-3.5" /> Cancel
@@ -108,11 +161,6 @@ function SettingsJobs() {
             ) : (
               <Button variant="outline" size="sm" onClick={() => run(job)}>
                 <Play className="mr-1 h-3.5 w-3.5" /> Run now
-              </Button>
-            )}
-            {job.interval !== "fixed" && (
-              <Button variant="ghost" size="icon-sm" onClick={() => setEditing(job)}>
-                <Pencil className="h-3.5 w-3.5" />
               </Button>
             )}
             </div>
@@ -123,7 +171,8 @@ function SettingsJobs() {
         {jobs.data?.length === 0 && (
           <p className="text-muted-foreground p-4 text-sm">No jobs defined.</p>
         )}
-      </Card>
+        </FramePanel>
+      </Frame>
 
       {editing && (
         <EditScheduleModal

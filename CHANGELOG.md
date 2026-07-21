@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.8] - 2026-07-21
+
+### Changed
+
+- **Admin: the settings pages are on Frames now too.** General, AI Assistant, Jobs & Cache, and About all moved from Cards to the coss Frame treatment (title + description header over a raised panel), matching the rest of the admin. (The Jobs schedule-editor is still a Card — it's a modal, not a page section.)
+- **Jobs page polish.**
+  - Each job carries an **Auto** (sky) or **Manual** (amber) badge, with an icon.
+  - The schedule details are **badges** now instead of a text line — outline pills for the cron cadence and next run, and a **green “Last ran …”** badge.
+  - **Manual jobs no longer show a cron / “next run”** (they never auto-fire) — just the last run.
+  - The **Edit** button comes **before** Run, and for a manual job it's shown **disabled** (with a tooltip) rather than hidden, so the row layout stays consistent.
+  - More gap between a job's action buttons.
+
 ## [0.6.7] - 2026-07-21
 
 ### Changed

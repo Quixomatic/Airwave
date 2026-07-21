@@ -1,6 +1,6 @@
 import { Badge } from "@ChannelGuide/ui/components/badge";
 import { Button } from "@ChannelGuide/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@ChannelGuide/ui/components/card";
+import { Frame, FrameHeader, FramePanel, FrameTitle } from "@ChannelGuide/ui/components/frame";
 import { Input } from "@ChannelGuide/ui/components/input";
 import { Label } from "@ChannelGuide/ui/components/label";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@ChannelGuide/ui/components/select";
@@ -176,11 +176,11 @@ function SettingsAi() {
   return (
     <div className="space-y-4">
       {/* Saved connections */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Connections</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
+      <Frame>
+        <FrameHeader>
+          <FrameTitle>Connections</FrameTitle>
+        </FrameHeader>
+        <FramePanel className="space-y-2">
           {connections.length === 0 && <p className="text-muted-foreground text-sm">No connections yet — add one below.</p>}
           {connections.map((c) => {
             const t = test[c.id];
@@ -225,16 +225,16 @@ function SettingsAi() {
               </div>
             );
           })}
-        </CardContent>
-      </Card>
+        </FramePanel>
+      </Frame>
 
       {/* Role assignments — a dropdown per use, instead of toggle buttons on every card. */}
       {connections.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>How connections are used</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Frame>
+          <FrameHeader>
+            <FrameTitle>How connections are used</FrameTitle>
+          </FrameHeader>
+          <FramePanel className="space-y-4">
             <p className="text-muted-foreground text-sm">
               Point each job at a connection. A single connection covers all three automatically; the
               split only matters once you add a second (e.g. a cheap model for the high-volume worker).
@@ -271,16 +271,16 @@ function SettingsAi() {
                 </div>
               );
             })}
-          </CardContent>
-        </Card>
+          </FramePanel>
+        </Frame>
       )}
 
       {/* Add / edit form */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{editingId ? "Edit connection" : "Add connection"}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-5">
+      <Frame>
+        <FrameHeader>
+          <FrameTitle>{editingId ? "Edit connection" : "Add connection"}</FrameTitle>
+        </FrameHeader>
+        <FramePanel className="space-y-5">
           <p className="text-muted-foreground text-sm">
             Your API key is encrypted at rest. Local models work via any OpenAI-compatible endpoint (Ollama, LM Studio, vLLM) — only
             models trained for tool-calling will drive the agent well.
@@ -366,8 +366,8 @@ function SettingsAi() {
               </Button>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </FramePanel>
+      </Frame>
     </div>
   );
 }
