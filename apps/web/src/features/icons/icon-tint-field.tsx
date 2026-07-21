@@ -41,15 +41,15 @@ export function IconTintField({
         trigger={
           <button
             type="button"
-            className="hover:bg-accent focus-visible:ring-ring rounded-md p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            className="hover:bg-accent focus-visible:ring-ring rounded-lg p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
             title="Choose icon"
           >
-            <AccentIconTile icon={preview.Icon} tint={preview.tint} size="lg" />
+            <AccentIconTile icon={preview.Icon} tint={preview.tint} size="xl" />
           </button>
         }
       />
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-2">
         {ACCENT_PALETTE.map((s) => (
           <AccentSwatch
             key={s.key}
@@ -77,7 +77,7 @@ export function IconTintField({
   );
 }
 
-/** A vivid color dot for the accent picker (small surface → the saturated value). */
+/** A vivid rounded-square swatch for the accent picker (small surface → the saturated value). */
 function AccentSwatch({
   vivid,
   name,
@@ -95,7 +95,7 @@ function AccentSwatch({
       onClick={onClick}
       title={name}
       className={cn(
-        "size-5 rounded-full ring-offset-1 ring-offset-background transition-shadow",
+        "size-6 rounded-md ring-offset-2 ring-offset-background transition-shadow",
         selected && "ring-foreground ring-2",
       )}
       style={{ background: vivid }}

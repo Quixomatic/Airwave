@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.16] - 2026-07-21
+
+### Changed
+
+- **Admin: the channel/package icon + accent control is bigger and clearer.** The tinted-icon preview (which opens the icon picker) is now a large `xl` tile — much easier to see the chosen look — and the accent swatches are larger **rounded squares** instead of small circles. Adds an `xl` size to `AccentIconTile`.
+
 ## [0.6.15] - 2026-07-21
 
 ### Added
