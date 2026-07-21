@@ -25,8 +25,10 @@ import { Skeleton } from "@ChannelGuide/ui/components/skeleton";
 import { Switch } from "@ChannelGuide/ui/components/switch";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
+import type { LucideIcon } from "lucide-react";
 import {
   ArrowUpDown,
+  Blocks,
   Filter,
   LayoutGrid,
   ListOrdered,
@@ -39,10 +41,11 @@ import {
   Tv,
   X,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/empty-state";
+import { Modal } from "@/components/modal";
 import { HeaderLeft, HeaderRight, TopHeaderRight } from "@/context/header-provider";
 import { resolveTile } from "@/features/icons/app-icon";
 import { trpc, trpcClient } from "@/utils/trpc";
@@ -134,19 +137,31 @@ function ChannelsList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [genJob?.lastFinishedAt]);
 
-  const autoGenerate = async () => {
-    if (
-      !window.confirm(
-        "Auto-generate the lineup? This rebuilds all auto-generated packages/channels from your library — your manually-created channels are left untouched.",
-      )
-    )
-      return;
+  const ai = useQuery(trpc.ai.list.queryOptions());
+  const aiConns = ai.data ?? [];
+  const aiHasActive = aiConns.some((c) => c.isActive);
+  // The AI lineup needs a planner + worker; both fall back to the chat (active) connection, so it's
+  // available as long as something resolves for each.
+  const aiAvailable =
+    (aiConns.some((c) => c.isPlanner) || aiHasActive) && (aiConns.some((c) => c.isWorker) || aiHasActive);
+  const [genOpen, setGenOpen] = useState(false);
+  const [genRunning, setGenRunning] = useState(false);
+
+  const runGenerator = async (id: "lineup-generate" | "ai-lineup-build") => {
+    setGenRunning(true);
     try {
-      await trpcClient.jobs.run.mutate({ id: "lineup-generate" });
-      toast.success("Generating lineup…");
+      await trpcClient.jobs.run.mutate({ id });
+      toast.success(
+        id === "lineup-generate"
+          ? "Generating lineup…"
+          : "AI lineup build started — watch progress under Settings → Workflows.",
+      );
       await jobs.refetch();
+      setGenOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to start generation");
+    } finally {
+      setGenRunning(false);
     }
   };
 
@@ -344,7 +359,7 @@ function ChannelsList() {
             <FrameTitle>Channels</FrameTitle>
             <FrameDescription>Live channels built from your enabled libraries.</FrameDescription>
           </div>
-          <Button variant="outline" size="sm" className="shrink-0" onClick={autoGenerate} disabled={generating}>
+          <Button variant="outline" size="sm" className="shrink-0" onClick={() => setGenOpen(true)} disabled={generating}>
             {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
             Auto-generate
           </Button>
@@ -456,7 +471,83 @@ function ChannelsList() {
           )}
         </FramePanel>
       </Frame>
+
+      <Modal open={genOpen} onClose={() => !genRunning && setGenOpen(false)} className="max-w-lg">
+        <h2 className="font-semibold">Generate a lineup</h2>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Pick how to build your channels. Each rebuilds only the channels it created before — your
+          manual channels are untouched.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <GeneratorTile
+            icon={Blocks}
+            title="Preset generator"
+            desc="Rebuild the lineup from the built-in preset catalog. Fast, deterministic, and needs no AI."
+            onClick={() => void runGenerator("lineup-generate")}
+            disabled={genRunning}
+          />
+          <GeneratorTile
+            icon={Sparkles}
+            title="AI lineup"
+            desc="Design a custom lineup with AI, curated from your library's actual content."
+            onClick={() => void runGenerator("ai-lineup-build")}
+            disabled={genRunning || !aiAvailable}
+            footer={
+              !aiAvailable ? (
+                <Link to="/settings/ai" className="text-primary mt-2 inline-block text-xs hover:underline">
+                  Requires an AI connection — set one up →
+                </Link>
+              ) : undefined
+            }
+          />
+        </div>
+      </Modal>
     </div>
+  );
+}
+
+/** One choice in the Auto-generate picker — a big tile. Disabled tiles (e.g. AI without a
+ *  connection) render as a dimmed card that can still show a footer link. */
+function GeneratorTile({
+  icon: Icon,
+  title,
+  desc,
+  onClick,
+  disabled,
+  footer,
+}: {
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+  onClick: () => void;
+  disabled?: boolean;
+  footer?: ReactNode;
+}) {
+  const body = (
+    <>
+      <div className="bg-muted mb-2.5 flex size-10 items-center justify-center rounded-lg">
+        <Icon className="size-5" />
+      </div>
+      <div className="font-medium">{title}</div>
+      <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{desc}</p>
+    </>
+  );
+  if (disabled) {
+    return (
+      <div className="rounded-xl border p-4 opacity-70">
+        {body}
+        {footer}
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="hover:border-primary/60 hover:bg-accent/40 focus-visible:ring-ring rounded-xl border p-4 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+    >
+      {body}
+    </button>
   );
 }
 

@@ -29,6 +29,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/empty-state";
+import { Modal } from "@/components/modal";
 import { HeaderLeft, HeaderRight, TopHeaderRight } from "@/context/header-provider";
 import { resolveTile } from "@/features/icons/app-icon";
 import { trpc, trpcClient } from "@/utils/trpc";
@@ -75,12 +76,14 @@ function PackagesList() {
   const emptyResult = !!packages.data && packages.data.length === 0;
 
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshOpen, setRefreshOpen] = useState(false);
   const refreshStyling = async () => {
     setRefreshing(true);
     try {
       await trpcClient.generator.regeneratePackages.mutate();
       toast.success("Package styling refreshed from presets.");
       await packages.refetch();
+      setRefreshOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Refresh failed");
     } finally {
@@ -208,8 +211,8 @@ function PackagesList() {
               package from its edit page.
             </FrameDescription>
           </div>
-          <Button variant="outline" size="sm" className="shrink-0" onClick={refreshStyling} disabled={refreshing}>
-            {refreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+          <Button variant="outline" size="sm" className="shrink-0" onClick={() => setRefreshOpen(true)}>
+            <Sparkles className="mr-2 h-4 w-4" />
             Refresh styling
           </Button>
         </FrameHeader>
@@ -284,6 +287,24 @@ function PackagesList() {
           )}
         </FramePanel>
       </Frame>
+
+      <Modal open={refreshOpen} onClose={() => !refreshing && setRefreshOpen(false)}>
+        <h2 className="font-semibold">Refresh package styling?</h2>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Re-applies the built-in preset catalog's styling — <strong>name, description, icon, tint, and
+          sort order</strong> — to your auto-generated packages. It doesn't add, remove, or change any
+          channels.
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setRefreshOpen(false)} disabled={refreshing}>
+            Cancel
+          </Button>
+          <Button onClick={refreshStyling} disabled={refreshing}>
+            {refreshing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Refresh styling
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

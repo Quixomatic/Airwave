@@ -43,6 +43,8 @@ type PublicConnection = {
   baseUrl: string | null;
   hasKey: boolean;
   isActive: boolean;
+  isPlanner: boolean;
+  isWorker: boolean;
 };
 
 /** All saved connections (active first, then newest). */
@@ -121,9 +123,8 @@ export async function setConnectionRole(
   enabled = true,
 ) {
   const field = ROLE_FIELD[role];
-  if (!enabled && role === "active") {
-    throw new Error("The chat connection can't be unset — assign it to another connection instead.");
-  }
+  // Any role — including chat — may be cleared. Clearing chat turns the assistant off; the AI lineup
+  // then becomes unavailable too once nothing resolves for planner/worker (they fall back to chat).
   await prisma.$transaction([
     // Exclusive: only one connection holds a given role at a time.
     prisma.aiConnection.updateMany({ where: { [field]: true }, data: { [field]: false } }),

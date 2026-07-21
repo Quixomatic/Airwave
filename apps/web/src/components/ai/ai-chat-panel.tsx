@@ -25,6 +25,7 @@ import {
 import { Reasoning, ReasoningContent, ReasoningTrigger, ThinkingIndicator } from "@/components/ai-elements/reasoning";
 import { Response } from "@/components/ai-elements/response";
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput, type ToolState } from "@/components/ai-elements/tool";
+import { EmptyState } from "@/components/empty-state";
 import { PanelHeaderTitle } from "@/context/panel-header-provider";
 import { cn } from "@/lib/utils";
 import { trpc, trpcClient } from "@/utils/trpc";
@@ -56,20 +57,29 @@ export function AiChatPanel() {
   const conversations = useQuery(trpc.ai.conversations.queryOptions());
   const connections = useQuery(trpc.ai.list.queryOptions());
 
-  // No model configured yet → an empty state over the whole panel with a link to set one up.
-  if (connections.data && connections.data.length === 0) {
+  // Chat needs a connection assigned to the CHAT role. None connected (or Chat cleared to disable it)
+  // → an empty state over the whole panel with a link to Settings.
+  const hasConns = (connections.data?.length ?? 0) > 0;
+  const chatOff = !!connections.data && !connections.data.some((c) => c.isActive);
+  if (chatOff) {
     return (
       <>
         <Title />
-        <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-          <div className="bg-primary/10 flex size-14 items-center justify-center rounded-2xl">
-            <Sparkles className="text-primary size-7" />
-          </div>
-          <div className="text-base font-semibold">No model connected</div>
-          <p className="text-muted-foreground max-w-xs text-sm">
-            Connect an AI model to build channels from your library just by chatting.
-          </p>
-          <Button onClick={() => void navigate({ to: "/settings/ai" })}>Set up a model</Button>
+        <div className="flex h-full items-center justify-center">
+          <EmptyState
+            icon={Sparkles}
+            title={hasConns ? "Chat is turned off" : "No model connected"}
+            description={
+              hasConns
+                ? "No connection is assigned to Chat. Pick one under “How connections are used” in AI settings."
+                : "Connect an AI model to build channels from your library just by chatting."
+            }
+            action={
+              <Button onClick={() => void navigate({ to: "/settings/ai" })}>
+                {hasConns ? "Open AI settings" : "Set up a model"}
+              </Button>
+            }
+          />
         </div>
       </>
     );

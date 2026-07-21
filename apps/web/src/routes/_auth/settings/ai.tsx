@@ -67,10 +67,10 @@ const ROLES = [
  * fall-back option); `planner`/`worker` fall back to the chat connection when unassigned, so
  * they offer a "Same as chat" choice that clears the role.
  */
-const ROLE_SELECTS: { key: RoleKey; label: string; hint: string; canFallback: boolean }[] = [
-  { key: "active", label: "Chat connection", hint: "The admin assistant.", canFallback: false },
-  { key: "planner", label: "AI lineup — planner", hint: "One heavy call that designs the whole lineup. Quality matters most.", canFallback: true },
-  { key: "worker", label: "AI lineup — worker", hint: "Builds every channel (dozens of loops) — the single biggest cost lever, so point it at a cheaper model.", canFallback: true },
+const ROLE_SELECTS: { key: RoleKey; label: string; hint: string; fallbackLabel: string }[] = [
+  { key: "active", label: "Chat connection", hint: "The admin assistant. Set to None to turn the chat assistant off.", fallbackLabel: "None (off)" },
+  { key: "planner", label: "AI lineup — planner", hint: "One heavy call that designs the whole lineup. Quality matters most.", fallbackLabel: "Same as chat" },
+  { key: "worker", label: "AI lineup — worker", hint: "Builds every channel (dozens of loops) — the single biggest cost lever, so point it at a cheaper model.", fallbackLabel: "Same as chat" },
 ];
 
 /** Sentinel Select value for "no explicit connection — fall back to the chat one". */
@@ -260,14 +260,14 @@ function SettingsAi() {
                     <SelectTrigger className="w-64" disabled={busy}>
                       <SelectValue>
                         {(v) =>
-                          v === FALLBACK
-                            ? "Same as chat"
+                          v === FALLBACK || !v
+                            ? r.fallbackLabel
                             : (connections.find((c) => c.id === v)?.name ?? "Select…")
                         }
                       </SelectValue>
                     </SelectTrigger>
                     <SelectPopup>
-                      {r.canFallback && <SelectItem value={FALLBACK}>Same as chat</SelectItem>}
+                      <SelectItem value={FALLBACK}>{r.fallbackLabel}</SelectItem>
                       {connections.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
                           {c.name}

@@ -1,6 +1,7 @@
 import prisma from "@ChannelGuide/db";
 
 import type { SyncProgress } from "../media/media-item";
+import { getConnectionForRole } from "../agent/config";
 import { getLineupRunner } from "../agent/lineup-runner";
 import { clearAiGenerated } from "../agent/tools";
 import { getGlobalBumperConfig } from "../bumpers/bumper-config";
@@ -253,6 +254,17 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
 
       const source = (await enabledSources())[0];
       if (!source) throw new Error("No enabled media source.");
+
+      // AI must be configured — planner + worker fall back to the chat connection, so at least one
+      // connection has to resolve for both, else the run would fail mid-plan.
+      const [planner, worker] = await Promise.all([
+        getConnectionForRole(prisma, "planner"),
+        getConnectionForRole(prisma, "worker"),
+      ]);
+      if (!planner || !worker) {
+        throw new Error("No AI connection is configured for the lineup — set one up in Settings → AI Assistant.");
+      }
+
       const admin = await prisma.user.findFirst({ where: { role: "admin" }, orderBy: { createdAt: "asc" }, select: { id: true } });
       if (!admin) throw new Error("No admin user found.");
 

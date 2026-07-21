@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.22] - 2026-07-21
+
+### Added
+
+- **Auto-generate is a picker modal now — preset vs AI.** The Channels "Auto-generate" button opens a modal with two tiles: **Preset generator** (rebuild from the built-in catalog — kicks off the `lineup-generate` job) and **AI lineup** (design a custom lineup — kicks off `ai-lineup-build`, which dispatches the durable workflow). The **AI tile is disabled until an AI connection is configured** (a planner + worker must resolve — they fall back to the chat connection), with a link to Settings → AI Assistant. The AI-lineup job also now guards up front that a planner + worker resolve before it dispatches.
+- **A confirmation modal for "Refresh styling"** (Packages) that spells out what it does — re-applies the preset catalog's package styling (name / description / icon / tint / order) without touching any channels.
+- **A reusable `Modal`** (`components/modal.tsx`) — a lightweight overlay + card (Escape / click-outside close) backing the two above.
+
+### Changed
+
+- **The AI Chat connection can be turned off.** AI settings' Chat role got a **None (off)** option (planner/worker keep "Same as chat"); the server no longer refuses to unset chat. The AI assistant side panel now shows a clear empty state (shared `EmptyState`) when Chat has no connection assigned.
+
 ## [0.6.21] - 2026-07-21
 
 ### Fixed
