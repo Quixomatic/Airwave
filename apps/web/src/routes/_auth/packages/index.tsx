@@ -39,12 +39,17 @@ const SORT_LABEL: Record<SortKey, string> = { order: "Order", name: "Name", chan
 
 /** URL-backed list state (search/filter/sort), forwarded to the server `packages.list`. Defaults
  *  omitted from the URL (empty = the default view). */
-type PackagesSearch = { q?: string; gen?: "auto" | "manual"; sort?: SortKey; dir?: "desc" };
+type Provenance = "preset" | "ai" | "manual";
+type PackagesSearch = { q?: string; gen?: Provenance; sort?: SortKey; dir?: "desc" };
+const PROVENANCE_LABEL: Record<Provenance, string> = { preset: "Auto", ai: "AI", manual: "Manual" };
 
 export const Route = createFileRoute("/_auth/packages/")({
   validateSearch: (search: Record<string, unknown>): PackagesSearch => ({
     q: typeof search.q === "string" && search.q.trim() ? search.q : undefined,
-    gen: search.gen === "auto" || search.gen === "manual" ? search.gen : undefined,
+    gen:
+      search.gen === "preset" || search.gen === "ai" || search.gen === "manual"
+        ? (search.gen as Provenance)
+        : undefined,
     sort: SORT_KEYS.includes(search.sort as SortKey) && search.sort !== "order" ? (search.sort as SortKey) : undefined,
     dir: search.dir === "desc" ? "desc" : undefined,
   }),
@@ -99,7 +104,7 @@ function PackagesList() {
           <div className="flex flex-wrap items-center gap-1.5">
             {search.q?.trim() && <FilterPill label={`“${search.q}”`} onClear={() => setSearch({ q: undefined })} />}
             {search.gen && (
-              <FilterPill label={search.gen === "auto" ? "Auto" : "Manual"} onClear={() => setSearch({ gen: undefined })} />
+              <FilterPill label={PROVENANCE_LABEL[search.gen]} onClear={() => setSearch({ gen: undefined })} />
             )}
             {(search.sort || search.dir) && (
               <FilterPill
@@ -145,10 +150,11 @@ function PackagesList() {
                 <DropdownMenuSubContent>
                   <DropdownMenuRadioGroup
                     value={search.gen ?? "all"}
-                    onValueChange={(v) => setSearch({ gen: v === "all" ? undefined : (v as "auto" | "manual") })}
+                    onValueChange={(v) => setSearch({ gen: v === "all" ? undefined : (v as Provenance) })}
                   >
                     <DropdownMenuRadioItem value="all">Any</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="auto">Auto (generated)</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="preset">Auto (preset)</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="ai">AI-generated</DropdownMenuRadioItem>
                     <DropdownMenuRadioItem value="manual">Manual</DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
                 </DropdownMenuSubContent>
@@ -255,6 +261,11 @@ function PackagesList() {
                         {p.generated && (
                           <span className="border-border text-muted-foreground rounded border px-1 text-[10px] uppercase">
                             Auto
+                          </span>
+                        )}
+                        {p.aiGenerated && (
+                          <span className="rounded border border-violet-500/30 px-1 text-[10px] uppercase text-violet-600">
+                            AI
                           </span>
                         )}
                       </p>

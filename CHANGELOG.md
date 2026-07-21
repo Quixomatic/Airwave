@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.21] - 2026-07-21
+
+### Fixed
+
+- **The Packages provenance filter now separates AI-generated from manual.** It previously conflated AI-lineup packages with hand-made ones — there are two distinct flags (`generated` = preset/static generator, `aiGenerated` = AI lineup), and manual is neither. The Filter → Type menu now offers **Auto (preset) / AI-generated / Manual**, `packages.list` filters on the correct flag and returns `aiGenerated`, and package rows show an **AI** badge alongside the existing **Auto** badge.
+
 ## [0.6.20] - 2026-07-21
 
 ### Added

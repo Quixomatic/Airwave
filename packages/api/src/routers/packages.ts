@@ -28,7 +28,8 @@ export const packagesRouter = router({
       z
         .object({
           q: z.string().optional(),
-          gen: z.enum(["auto", "manual"]).optional(), // auto = preset-generated, manual = hand-made
+          // Provenance: preset (static generator), ai (AI lineup), or manual (neither flag).
+          gen: z.enum(["preset", "ai", "manual"]).optional(),
           sort: z.enum(["order", "name", "channels"]).optional(),
           dir: z.enum(["asc", "desc"]).optional(),
         })
@@ -46,8 +47,12 @@ export const packagesRouter = router({
           { description: { contains: q, mode: "insensitive" } },
         ];
       }
-      if (input?.gen === "auto") where.generated = true;
-      else if (input?.gen === "manual") where.generated = false;
+      if (input?.gen === "preset") where.generated = true;
+      else if (input?.gen === "ai") where.aiGenerated = true;
+      else if (input?.gen === "manual") {
+        where.generated = false;
+        where.aiGenerated = false;
+      }
 
       const byName: Prisma.ChannelPackageOrderByWithRelationInput = { name: "asc" };
       const orderBy: Prisma.ChannelPackageOrderByWithRelationInput[] =
@@ -70,6 +75,7 @@ export const packagesRouter = router({
         icon: p.icon,
         tint: p.tint,
         generated: p.generated,
+        aiGenerated: p.aiGenerated,
         channelCount: p._count.channels,
       }));
     }),
