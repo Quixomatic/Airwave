@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.54] - 2026-07-21
+
+### Changed
+
+- **Admin: the AI Assistant header button now shows its label.** It was an icon-only Sparkles button (with just an `aria-label`); it's now a full button — Sparkles + "AI Assistant" — so the entry point to the assistant panel is obvious rather than a bare icon.
+
 ## [0.5.53] - 2026-07-21
 
 ### Added

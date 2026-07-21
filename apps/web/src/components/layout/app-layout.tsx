@@ -77,11 +77,11 @@ function AiPanelTrigger() {
   return (
     <Button
       variant={globalPanelType === "chat" ? "secondary" : "ghost"}
-      size="icon"
-      aria-label="AI assistant"
+      size="sm"
       onClick={() => toggleGlobalPanel("chat")}
     >
       <Sparkles className="h-4 w-4" />
+      AI Assistant
     </Button>
   );
 }
