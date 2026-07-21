@@ -12,6 +12,7 @@ import { previewItems } from "../services/agent/tools";
 import { SORT_FIELDS } from "../services/plex/sort-fields";
 import { normalizeCallsign } from "../services/generator/callsign";
 import {
+  INITIAL_WINDOW_SECONDS,
   extendChannelSchedule,
   generateChannelSchedule,
   getChannelTimeline,
@@ -204,6 +205,26 @@ export const channelsRouter = router({
           definitions: { create: { kind: "PREDICATE", plexFilter } },
         },
       });
+
+      // Give the new channel a WINDOWED initial schedule inline — the same thing the AI lineup
+      // builder does per channel — so it's watchable the moment it's created instead of waiting for
+      // the next schedule-backfill run. The window caps it at ~12h (INITIAL_WINDOW_SECONDS) so a
+      // broad pool doesn't lay a ~300-day pass up front; `schedule-refresh` then grows it from the
+      // stored cursor. Best-effort: a build failure leaves the channel for schedule-backfill (which
+      // picks up any enabled channel with no schedule) rather than failing the creation.
+      if (channel.enabled) {
+        try {
+          await generateChannelSchedule(ctx.prisma, channel.id, {
+            windowSeconds: INITIAL_WINDOW_SECONDS,
+          });
+        } catch (err) {
+          console.warn(
+            `[channels] initial schedule build failed for "${channel.name}" (backfill will retry):`,
+            err,
+          );
+        }
+      }
+
       return { id: channel.id };
     }),
 

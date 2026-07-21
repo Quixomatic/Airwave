@@ -2,6 +2,13 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.14] - 2026-07-21
+
+### Changed
+
+- **New channels get a windowed initial schedule inline, on every creation path.** Manually-created channels (`channels.create`) and the static preset generator (`generateLineup`) now build a ~12h windowed initial schedule the moment a channel is created — the same thing the AI lineup builder already did — so a channel is watchable immediately instead of waiting for the next `schedule-backfill` tick (which trickles 25 channels per 10 min). `schedule-refresh` then grows each channel from its stored cursor to the full 7-day horizon on the next hourly pass (it extends when a tail drops below 2 days of runway). Best-effort per channel: a build failure leaves the channel for `schedule-backfill` rather than aborting creation/generation.
+- Note: the generator now resolves each filter twice — once for the min-items check, once inside the schedule build — the same double-resolve the AI path has. Passing the already-resolved pool through is a future optimization.
+
 ## [0.6.13] - 2026-07-21
 
 ### Added

@@ -3,6 +3,7 @@ import type { PrismaClient } from "@ChannelGuide/db";
 import { channelAccentAt } from "../accents";
 import type { SyncProgress } from "../media/media-item";
 import { resolveFilter } from "../plex/resolve";
+import { INITIAL_WINDOW_SECONDS, generateChannelSchedule } from "../schedule/generate";
 import { normalizeCallsign, uniqueCallsign } from "./callsign";
 import { PRESET_PACKAGES, type PresetPackage } from "./presets";
 
@@ -107,7 +108,7 @@ export async function generateLineup(
         skipped.push({ name: ch.name, count: items.length, needed: ch.minItems });
         continue;
       }
-      await prisma.channel.create({
+      const created = await prisma.channel.create({
         data: {
           name: ch.name,
           number: nextFree(ch.number),
@@ -136,6 +137,17 @@ export async function generateLineup(
           },
         },
       });
+      // Build a WINDOWED initial schedule inline (like the AI + manual paths) so each generated
+      // channel is watchable the moment generation finishes rather than trickling in via
+      // schedule-backfill (25/10min); `schedule-refresh` grows it out from the stored cursor.
+      // Best-effort — a failure leaves it for backfill instead of aborting the whole run. (Note: the
+      // filter resolves twice here — once above for the min-items check, once inside — the same
+      // double-resolve the AI path has; passing the pool through is a future optimisation.)
+      try {
+        await generateChannelSchedule(prisma, created.id, { windowSeconds: INITIAL_WINDOW_SECONDS });
+      } catch (err) {
+        console.warn(`[generator] initial schedule build failed for "${ch.name}" (backfill will retry):`, err);
+      }
       channelsCreated++;
     }
   }
