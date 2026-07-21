@@ -1,3 +1,4 @@
+import { AccentIconTile } from "@ChannelGuide/ui/components/accent-icon-tile";
 import { Button } from "@ChannelGuide/ui/components/button";
 import {
   Frame,
@@ -8,16 +9,19 @@ import {
 } from "@ChannelGuide/ui/components/frame";
 import { Input } from "@ChannelGuide/ui/components/input";
 import { Label } from "@ChannelGuide/ui/components/label";
+import { Switch } from "@ChannelGuide/ui/components/switch";
 import { Textarea } from "@ChannelGuide/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { LayoutGrid, Loader2 } from "lucide-react";
+import { LayoutGrid, Loader2, Tv } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { EmptyState } from "@/components/empty-state";
 import { useBreadcrumb } from "@/context/breadcrumb-provider";
 import { HeaderRight } from "@/context/header-provider";
 import { IconTintField } from "@/features/icons/icon-tint-field";
+import { resolveTile } from "@/features/icons/app-icon";
 import { trpc, trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/packages/$packageId")({
@@ -81,6 +85,15 @@ function PackageDetail() {
       toast.error(err instanceof Error ? err.message : "Regenerate failed");
     } finally {
       setRegenerating(false);
+    }
+  };
+
+  const toggleChannel = async (id: string, enabled: boolean) => {
+    try {
+      await trpcClient.channels.setEnabled.mutate({ id, enabled });
+      await pkg.refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update channel");
     }
   };
 
@@ -157,27 +170,57 @@ function PackageDetail() {
         </FrameHeader>
         <FramePanel className="p-0">
           {pkg.data.channels.length > 0 ? (
-            <ul className="divide-border divide-y">
-              {pkg.data.channels.map((c) => (
-                <li key={c.id} className="flex items-center gap-3 px-4 py-3">
-                  <span className="text-muted-foreground w-10 shrink-0 tabular-nums text-sm">
-                    {c.number}
-                  </span>
-                  <Link
-                    to="/channels/$channelId"
-                    params={{ channelId: c.id }}
-                    className="hover:text-primary flex-1 truncate text-sm"
-                  >
-                    {c.name}
-                  </Link>
-                  {!c.enabled && <span className="text-muted-foreground text-xs">disabled</span>}
-                </li>
-              ))}
+            <ul className="divide-y">
+              {pkg.data.channels.map((c) => {
+                // Same row as the Channels page — the tile inherits this package's icon/tint when the
+                // channel sets none of its own.
+                const tile = resolveTile({
+                  icon: c.icon,
+                  tint: c.tint,
+                  inheritedIcon: pkg.data!.icon,
+                  inheritedTint: pkg.data!.tint,
+                  defaultIcon: Tv,
+                });
+                return (
+                  <li key={c.id} className="flex items-center">
+                    <Link
+                      to="/channels/$channelId"
+                      params={{ channelId: c.id }}
+                      className={`hover:bg-muted/50 flex flex-1 items-center gap-3 px-4 py-3 ${c.enabled ? "" : "opacity-50"}`}
+                    >
+                      <span className="text-muted-foreground w-8 text-sm tabular-nums">{c.number}</span>
+                      <AccentIconTile icon={tile.Icon} tint={tile.tint} size="lg" />
+                      <span className="flex-1 truncate text-sm font-medium">
+                        {c.name}
+                        {c.callsign && (
+                          <span className="text-muted-foreground ml-2 font-mono text-xs">{c.callsign}</span>
+                        )}
+                      </span>
+                      {!c.enabled && (
+                        <span className="border-border text-muted-foreground rounded border px-1.5 py-0.5 text-xs">
+                          Inactive
+                        </span>
+                      )}
+                      <span className="text-muted-foreground text-xs capitalize">
+                        {c.ordering.toLowerCase().replace("_", " ")}
+                      </span>
+                    </Link>
+                    <label
+                      className="px-4"
+                      title={c.enabled ? "Active — click to deactivate" : "Inactive — click to activate"}
+                    >
+                      <Switch checked={c.enabled} onCheckedChange={(v) => toggleChannel(c.id, v === true)} />
+                    </label>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
-            <p className="text-muted-foreground p-4 text-sm">
-              No channels in this package yet. Assign one from its edit page (Package dropdown).
-            </p>
+            <EmptyState
+              icon={LayoutGrid}
+              title="No channels in this package"
+              description="Assign a channel to this package from its edit page (the Package dropdown)."
+            />
           )}
         </FramePanel>
       </Frame>

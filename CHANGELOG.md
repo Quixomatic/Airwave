@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.18] - 2026-07-21
+
+### Changed
+
+- **Admin: the package detail page's channel list matches the Channels page.** Its channels now render with the same row as the main Channels list — tinted icon tile (inheriting the package's icon/tint), number, name + callsign, an **Inactive** badge, the ordering, and an **active toggle** — instead of a bare number + name. The empty state uses the shared `EmptyState` too. `packages.get` now returns each channel's icon/tint/callsign/ordering.
+
 ## [0.6.17] - 2026-07-21
 
 ### Changed

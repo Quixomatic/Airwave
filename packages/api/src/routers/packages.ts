@@ -44,7 +44,16 @@ export const packagesRouter = router({
       include: {
         channels: {
           orderBy: { number: "asc" },
-          select: { id: true, number: true, name: true, enabled: true },
+          select: {
+            id: true,
+            number: true,
+            name: true,
+            enabled: true,
+            callsign: true,
+            icon: true,
+            tint: true,
+            ordering: true,
+          },
         },
       },
     });
