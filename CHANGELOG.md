@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.20] - 2026-07-21
+
+### Added
+
+- **Search, filter, and sort on the Channels and Packages pages — server-side, URL-backed.** Each list gained a compact sub-header toolbar: a keyword **search**, a **Filter** menu (Channels: by package / order type / status; Packages: Auto vs Manual), and a **Sort** menu (field + ascending/descending). The filtering/sorting runs **server-side** — `channels.list` / `packages.list` now take `q` / filter / `sort` / `dir` params and build the Prisma `where`/`orderBy`; the UI just forwards the state. It all lives in the **URL** (`?q=&sort=…`), so reload / back / share preserve the view, and empty params = the default (number/order ascending). The sub-header's **left** shows the active filters as **dismissible pills** (each with an ✕), or "All channels" / "All packages" when nothing's applied. Both lists show a **skeleton** while loading and a distinct "no matches" state.
+
+### Changed
+
+- **Auto-generate** (Channels) and **Refresh styling** (Packages) moved into their list's frame header; **New channel** / **New package** stay in the top header. (Refresh styling re-applies the preset catalog's package metadata — name/description/icon/tint/order — to the auto-generated packages, without touching channels.)
+
 ## [0.6.19] - 2026-07-21
 
 ### Changed

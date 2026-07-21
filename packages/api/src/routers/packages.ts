@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@ChannelGuide/db";
+import { Prisma, type PrismaClient } from "@ChannelGuide/db";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -21,22 +21,58 @@ async function uniqueKey(prisma: PrismaClient, base: string): Promise<string> {
 }
 
 export const packagesRouter = router({
-  list: adminProcedure.query(async ({ ctx }) => {
-    const packages = await ctx.prisma.channelPackage.findMany({
-      orderBy: [{ sortIndex: "asc" }, { name: "asc" }],
-      include: { _count: { select: { channels: true } } },
-    });
-    return packages.map((p) => ({
-      id: p.id,
-      key: p.key,
-      name: p.name,
-      description: p.description,
-      icon: p.icon,
-      tint: p.tint,
-      generated: p.generated,
-      channelCount: p._count.channels,
-    }));
-  }),
+  // Server-side search / filter / sort (the UI drives it via URL params). Input is optional so
+  // no-arg callers (e.g. the channel form / channels filter) still get the full list.
+  list: adminProcedure
+    .input(
+      z
+        .object({
+          q: z.string().optional(),
+          gen: z.enum(["auto", "manual"]).optional(), // auto = preset-generated, manual = hand-made
+          sort: z.enum(["order", "name", "channels"]).optional(),
+          dir: z.enum(["asc", "desc"]).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const q = input?.q?.trim();
+      const sort = input?.sort ?? "order";
+      const dir = input?.dir ?? "asc";
+
+      const where: Prisma.ChannelPackageWhereInput = {};
+      if (q) {
+        where.OR = [
+          { name: { contains: q, mode: "insensitive" } },
+          { description: { contains: q, mode: "insensitive" } },
+        ];
+      }
+      if (input?.gen === "auto") where.generated = true;
+      else if (input?.gen === "manual") where.generated = false;
+
+      const byName: Prisma.ChannelPackageOrderByWithRelationInput = { name: "asc" };
+      const orderBy: Prisma.ChannelPackageOrderByWithRelationInput[] =
+        sort === "name"
+          ? [{ name: dir }]
+          : sort === "channels"
+            ? [{ channels: { _count: dir } }, byName]
+            : [{ sortIndex: dir }, byName]; // "order" (default)
+
+      const packages = await ctx.prisma.channelPackage.findMany({
+        where,
+        orderBy,
+        include: { _count: { select: { channels: true } } },
+      });
+      return packages.map((p) => ({
+        id: p.id,
+        key: p.key,
+        name: p.name,
+        description: p.description,
+        icon: p.icon,
+        tint: p.tint,
+        generated: p.generated,
+        channelCount: p._count.channels,
+      }));
+    }),
 
   get: adminProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
     const pkg = await ctx.prisma.channelPackage.findUnique({

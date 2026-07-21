@@ -1,3 +1,4 @@
+import { Prisma } from "@ChannelGuide/db";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -49,22 +50,68 @@ const nodeSchema: z.ZodType<FilterNodeInput> = z.lazy(() =>
 );
 
 export const channelsRouter = router({
-  list: adminProcedure.query(async ({ ctx }) => {
-    return ctx.prisma.channel.findMany({
-      orderBy: { number: "asc" },
-      select: {
-        id: true,
-        number: true,
-        name: true,
-        callsign: true,
-        ordering: true,
-        enabled: true,
-        icon: true,
-        tint: true,
-        package: { select: { id: true, name: true, icon: true, tint: true } },
-      },
-    });
-  }),
+  // Server-side search / filter / sort (the UI drives it via URL params). Input is optional so
+  // no-arg callers (e.g. the watch page) still get the full list, number-ascending.
+  list: adminProcedure
+    .input(
+      z
+        .object({
+          q: z.string().optional(),
+          pkg: z.string().optional(), // a package id, or "none" for unassigned
+          ordering: z.enum(["SHUFFLE", "IN_ORDER", "BY_AIR_DATE"]).optional(),
+          status: z.enum(["active", "inactive"]).optional(),
+          sort: z.enum(["number", "name", "callsign", "status", "package"]).optional(),
+          dir: z.enum(["asc", "desc"]).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const q = input?.q?.trim();
+      const pkg = input?.pkg;
+      const sort = input?.sort ?? "number";
+      const dir = input?.dir ?? "asc";
+
+      const where: Prisma.ChannelWhereInput = {};
+      if (q) {
+        where.OR = [
+          { name: { contains: q, mode: "insensitive" } },
+          { callsign: { contains: q, mode: "insensitive" } },
+        ];
+      }
+      if (pkg === "none") where.packageId = null;
+      else if (pkg) where.packageId = pkg;
+      if (input?.ordering) where.ordering = input.ordering;
+      if (input?.status) where.enabled = input.status === "active";
+
+      // Always fall back to number for a stable secondary order.
+      const byNumber: Prisma.ChannelOrderByWithRelationInput = { number: "asc" };
+      const orderBy: Prisma.ChannelOrderByWithRelationInput[] =
+        sort === "name"
+          ? [{ name: dir }, byNumber]
+          : sort === "callsign"
+            ? [{ callsign: dir }, byNumber]
+            : sort === "status"
+              ? [{ enabled: dir === "asc" ? "desc" : "asc" }, byNumber] // asc = active first
+              : sort === "package"
+                ? [{ package: { name: dir } }, byNumber]
+                : [{ number: dir }];
+
+      return ctx.prisma.channel.findMany({
+        where,
+        orderBy,
+        select: {
+          id: true,
+          number: true,
+          name: true,
+          callsign: true,
+          ordering: true,
+          enabled: true,
+          icon: true,
+          tint: true,
+          package: { select: { id: true, name: true, icon: true, tint: true } },
+        },
+      });
+    }),
 
   get: adminProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
     const channel = await ctx.prisma.channel.findUnique({
