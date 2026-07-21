@@ -177,6 +177,29 @@ export const channelsRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Gate creation on source readiness (also enforced in the UI): a channel can only be built
+      // from a source that's CONNECTED to a media server and has had a metadata SYNC run — without
+      // synced media there's nothing to resolve, filter, or schedule against.
+      const source = await ctx.prisma.mediaSource.findUnique({
+        where: { id: input.mediaSourceId },
+        select: { enabled: true, baseUrl: true, _count: { select: { mediaItems: true } } },
+      });
+      if (!source) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Media source not found." });
+      }
+      if (!source.enabled || !source.baseUrl) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "This media source isn't connected to a media server. Connect it before creating channels.",
+        });
+      }
+      if (source._count.mediaItems === 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Run a metadata sync on this source before creating channels — there's no synced media to build from yet.",
+        });
+      }
+
       const number =
         input.number ??
         ((await ctx.prisma.channel.aggregate({ _max: { number: true } }))._max.number ?? 0) + 1;

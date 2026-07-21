@@ -10,7 +10,7 @@ import {
 import { Switch } from "@ChannelGuide/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Loader2, Plus, Sparkles, Tv } from "lucide-react";
+import { Loader2, Plus, Server, Sparkles, Tv } from "lucide-react";
 import { useEffect } from "react";
 
 import { EmptyState } from "@/components/empty-state";
@@ -25,6 +25,11 @@ export const Route = createFileRoute("/_auth/channels/")({
 
 function ChannelsList() {
   const channels = useQuery(trpc.channels.list.queryOptions());
+  const sources = useQuery(trpc.sources.list.queryOptions());
+  // Channel creation needs a READY source (connected + synced). Block it (here and in the API) until
+  // one exists. Only block once sources have loaded, so we don't flicker the button on first paint.
+  const blockCreate = !!sources.data && !sources.data.some((s) => s.ready);
+  const showEmpty = !!channels.data && channels.data.length === 0;
   const jobs = useQuery({
     ...trpc.jobs.list.queryOptions(),
     refetchInterval: (q) =>
@@ -81,10 +86,23 @@ function ChannelsList() {
           button. The slot is a flex row and the portal appends after the assistant, so
           `order-first` pulls this ahead of it visually. */}
       <TopHeaderRight>
-        <Button variant="outline" size="sm" className="order-first" render={<Link to="/channels/new" />}>
-          <Plus className="mr-2 h-4 w-4" />
-          New channel
-        </Button>
+        {blockCreate ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="order-first"
+            disabled
+            title="Connect and sync a media source first"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            New channel
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" className="order-first" render={<Link to="/channels/new" />}>
+            <Plus className="mr-2 h-4 w-4" />
+            New channel
+          </Button>
+        )}
       </TopHeaderRight>
 
       <Frame>
@@ -108,18 +126,32 @@ function ChannelsList() {
         )}
 
         <FramePanel className="p-0">
-          {channels.data && channels.data.length === 0 ? (
-            <EmptyState
-              icon={Tv}
-              title="No channels yet"
-              description="Build a channel from your enabled libraries, or use Auto-generate for a full lineup."
-              action={
-                <Button size="sm" render={<Link to="/channels/new" />}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  New channel
-                </Button>
-              }
-            />
+          {showEmpty ? (
+            blockCreate ? (
+              <EmptyState
+                icon={Server}
+                title="Connect a media source first"
+                description="Channels are built from a synced media source. Connect one and run a metadata sync to get started."
+                action={
+                  <Button size="sm" render={<Link to="/sources" />}>
+                    <Server className="mr-2 h-4 w-4" />
+                    Go to Sources
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={Tv}
+                title="No channels yet"
+                description="Build a channel from your enabled libraries, or use Auto-generate for a full lineup."
+                action={
+                  <Button size="sm" render={<Link to="/channels/new" />}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    New channel
+                  </Button>
+                }
+              />
+            )
           ) : (
           <ul className="divide-y">
             {channels.data?.map((c) => {

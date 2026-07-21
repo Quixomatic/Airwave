@@ -2,6 +2,13 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.15] - 2026-07-21
+
+### Added
+
+- **Channel creation is gated on media-source readiness — enforced in the UI *and* the API.** A channel can only be built from a source that's **connected** to a media server (enabled + a resolved base URL) **and** has had a metadata **sync** run — without synced media there's nothing to resolve, filter, or schedule against. `channels.create` now rejects an unready source with a clear message; the Channels page disables **New channel** (with a tooltip) and its empty state points you to Sources until a source is ready; and the channel form guards with a state-specific reason (no sources / none connected / none synced). `sources.list` now reports `connected` / `synced` / `ready` per source, surfaced as a **Disconnected / Not synced / Ready** badge on the Sources list.
+- **A "Danger zone" on the source detail page, with a type-DELETE confirmation.** Removing a source cascade-deletes every channel, schedule, and cached item built from it, so the action moved into a distinct destructive-titled section and now requires typing `DELETE` in a confirmation modal — replacing the one-tap `window.confirm`.
+
 ## [0.6.14] - 2026-07-21
 
 ### Changed

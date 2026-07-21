@@ -1,3 +1,4 @@
+import { Badge } from "@ChannelGuide/ui/components/badge";
 import { Button } from "@ChannelGuide/ui/components/button";
 import {
   Frame,
@@ -67,6 +68,19 @@ function SourcesList() {
                       <p className="truncate text-sm font-medium">{s.name}</p>
                       <p className="text-muted-foreground truncate text-xs">{s.baseUrl}</p>
                     </div>
+                    {!s.connected ? (
+                      <Badge variant="outline" className="border-red-500/30 text-red-600">
+                        Disconnected
+                      </Badge>
+                    ) : !s.synced ? (
+                      <Badge variant="outline" className="border-amber-500/30 text-amber-600">
+                        Not synced
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-emerald-500/30 text-emerald-600">
+                        Ready
+                      </Badge>
+                    )}
                     <span className="text-muted-foreground text-xs uppercase">{s.type}</span>
                   </Link>
                 </li>

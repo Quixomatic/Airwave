@@ -6,7 +6,7 @@ import { syncLibraries } from "../services/plex/sync-libraries";
 
 export const sourcesRouter = router({
   list: adminProcedure.query(async ({ ctx }) => {
-    return ctx.prisma.mediaSource.findMany({
+    const sources = await ctx.prisma.mediaSource.findMany({
       orderBy: { createdAt: "asc" },
       select: {
         id: true,
@@ -15,7 +15,15 @@ export const sourcesRouter = router({
         baseUrl: true,
         machineIdentifier: true,
         enabled: true,
+        _count: { select: { mediaItems: true } },
       },
+    });
+    // Derive readiness for channel creation: a source is usable only once it's CONNECTED (enabled +
+    // a resolved baseUrl) and SYNCED (its metadata cache has at least one item to build from).
+    return sources.map(({ _count, ...s }) => {
+      const connected = s.enabled && s.baseUrl != null;
+      const synced = _count.mediaItems > 0;
+      return { ...s, itemCount: _count.mediaItems, connected, synced, ready: connected && synced };
     });
   }),
 

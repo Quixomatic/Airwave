@@ -117,7 +117,8 @@ export function ChannelForm({
   onSubmit: (values: ChannelFormValues & { mediaSourceId: string }) => void;
 }) {
   const sources = useQuery(trpc.sources.list.queryOptions());
-  const sourceId = sources.data?.[0]?.id ?? "";
+  // Only a READY source (connected + synced) can back a channel; fall back to the first ready one.
+  const sourceId = sources.data?.find((s) => s.ready)?.id ?? "";
   const packages = useQuery(trpc.packages.list.queryOptions());
   const sortFields = useQuery(trpc.channels.sortFields.queryOptions());
 
@@ -146,13 +147,22 @@ export function ChannelForm({
   ];
 
   if (sources.data && !sourceId) {
+    // No usable source — say exactly which step is missing so the fix is obvious.
+    const anyConnected = sources.data.some((s) => s.connected);
+    const message =
+      sources.data.length === 0
+        ? "Connect a Plex server before creating channels."
+        : !anyConnected
+          ? "No media source is connected to a server yet — connect one before creating channels."
+          : "Run a metadata sync on a source before creating channels — there's no synced media to build from yet.";
     return (
       <p className="text-muted-foreground text-sm">
-        Connect a Plex server in{" "}
+        {message}{" "}
+        Go to{" "}
         <Link to="/sources" className="text-primary hover:underline">
           Sources
-        </Link>{" "}
-        first.
+        </Link>
+        .
       </p>
     );
   }
