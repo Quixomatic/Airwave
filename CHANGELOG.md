@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.53] - 2026-07-21
+
+### Added
+
+- **Dev: React Grab in the admin frontend.** `grab init` wired **react-grab** into `apps/web` — a dev tool for selecting page context to hand to a coding agent. It's a **DEV-only dynamic import** in `main.tsx` (`if (import.meta.env.DEV) import("react-grab")`), so it never ships in the production bundle. Added as a devDependency via pnpm (init was run with `--skip-install` to keep the workspace lockfile clean).
+
 ## [0.5.52] - 2026-07-21
 
 ### Changed

@@ -1,6 +1,6 @@
 {
   "name": "web",
-  "version": "0.5.52",
+  "version": "0.5.53",
   "private": true,
   "type": "module",
   "scripts": {
@@ -49,6 +49,7 @@
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "^6.0.3",
     "postcss": "^8.5.16",
+    "react-grab": "^0.1.48",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "^8.1.3"
