@@ -8,6 +8,8 @@ import {
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+import { ServerSetup } from "./features/setup/server-setup";
+import { hasServerUrl } from "./lib/server-url";
 import { routeTree } from "./routeTree.gen";
 import { queryClient } from "./utils/query";
 import "./styles.css";
@@ -34,8 +36,9 @@ declare module "@tanstack/react-router" {
   }
 }
 
+// Gate the whole app on having a server to talk to. Until one is stored (or baked in for dev), show
+// the setup screen instead of the router — onboarding stores the URL and reloads, so everything below
+// re-initialises against it (auth client, REST base, queries).
 createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <RouterProvider router={router} />
-  </StrictMode>,
+  <StrictMode>{hasServerUrl() ? <RouterProvider router={router} /> : <ServerSetup />}</StrictMode>,
 );

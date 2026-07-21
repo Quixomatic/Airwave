@@ -37,6 +37,9 @@ const bearerCors = cors({
 });
 app.use("/api/v1/*", bearerCors);
 app.use("/api/tv/auth/*", bearerCors);
+// The health probe is how a TV app discovers/validates a server (LAN scan + manual entry), from a
+// different origin — so it needs permissive CORS like the rest of the bearer surface.
+app.use("/api/health", bearerCors);
 
 // Cookie/admin surface (tRPC + web auth) — allowlisted origins + credentials.
 const allowedOrigins = [env.CORS_ORIGIN, ...(env.TV_APP_ORIGIN ? [env.TV_APP_ORIGIN] : [])];
@@ -162,9 +165,20 @@ app.route("/api/v1", restApi);
 // establish the session the TV carries as a bearer token to /api/v1.
 app.route("/api/tv/auth", tvAuthApi);
 
-app.get("/", (c) => {
-  return c.text("OK");
-});
+// Lightweight health check (used by the Docker healthcheck / uptime monitors).
+app.get("/api/health", (c) => c.json({ ok: true }));
+
+// Single-container deploy: serve the built admin SPA when SERVE_WEB_DIR points at it. Registered
+// LAST so it never shadows the API routes above; the `*` GET fallback returns index.html so
+// client-side routes (deep links, reloads) work. Unset in dev — the admin runs on its own Vite
+// server there, same-origin only in production.
+const WEB_DIR = process.env.SERVE_WEB_DIR;
+if (WEB_DIR) {
+  app.use("*", serveStatic({ root: WEB_DIR }));
+  app.get("*", serveStatic({ path: "index.html", root: WEB_DIR }));
+} else {
+  app.get("/", (c) => c.text("ChannelGuide server — the admin web runs separately in dev."));
+}
 
 // Bootstrap the first admin from env (idempotent; no-op if ADMIN_* unset).
 try {

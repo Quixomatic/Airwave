@@ -2,6 +2,13 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.25] - 2026-07-21
+
+### Added
+
+- **TV app: a "Connect to your server" onboarding.** A self-hosted server lives at a different address per install, so the TV app no longer bakes the URL in. On first launch it shows a setup screen that **scans the local network** (a WebRTC-derived subnet → sweep of `/api/health`) *and* accepts a **manually-entered** address, validates it, stores it on the device, and reloads against it. **Settings → About** shows the connected server with a **Change server** action. The server base URL is now runtime (localStorage), with `VITE_SERVER_URL` only a dev default.
+- **Server enablers for self-host:** a public `/api/health` endpoint (CORS-open, so a TV app can discover/validate a server cross-origin) and optional single-container static serving of the built admin SPA via `SERVE_WEB_DIR` (foundation for the upcoming Docker image).
+
 ## [0.6.24] - 2026-07-21
 
 ### Added

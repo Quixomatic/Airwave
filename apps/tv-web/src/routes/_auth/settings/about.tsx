@@ -1,15 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { APP_NAME, APP_VERSION } from "../../../lib/app-info";
-import { PageHeader, useSettingsPage } from "../../../features/settings/settings-ui";
+import { PageHeader, SectionLabel, SettingRow, useSettingsPage } from "../../../features/settings/settings-ui";
+import { SERVER_URL } from "../../../lib/auth-client";
+import { clearStoredServerUrl } from "../../../lib/server-url";
 
-/** /settings/about — app identity + version. */
+/** /settings/about — app identity + version + the connected server. */
 export const Route = createFileRoute("/_auth/settings/about")({
   component: About,
 });
 
 function About() {
-  useSettingsPage(0, () => {}); // no focusable rows; ◄/Back returns to the rail
+  // Clearing the stored server + reloading drops the app back to the onboarding/setup screen.
+  const changeServer = () => {
+    clearStoredServerUrl();
+    window.location.reload();
+  };
+  const { sel } = useSettingsPage(1, (i) => {
+    if (i === 0) changeServer();
+  });
 
   return (
     <div>
@@ -39,6 +48,16 @@ function About() {
         {APP_NAME} turns your own media-server library into curated, always-on TV channels — a broadcast-style guide with live
         tune-in, DVR, and deterministic scheduling, playing straight from your server.
       </p>
+
+      <div style={{ maxWidth: 640 }}>
+        <SectionLabel>Server</SectionLabel>
+        <SettingRow
+          label="Change server"
+          sublabel={SERVER_URL || "Not connected"}
+          focused={sel === 0}
+          onClick={changeServer}
+        />
+      </div>
     </div>
   );
 }
