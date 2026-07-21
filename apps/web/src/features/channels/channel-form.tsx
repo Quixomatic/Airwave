@@ -11,6 +11,7 @@ import { ChevronDown, Tv } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
+import { HeaderRight } from "@/context/header-provider";
 import { IconTintField } from "@/features/icons/icon-tint-field";
 import { trpc } from "@/utils/trpc";
 
@@ -164,6 +165,19 @@ export function ChannelForm({
 
   return (
     <form id={formId} onSubmit={handleSubmit} className="space-y-3">
+      {/* Active is a channel-status toggle, not a form field — it lives in the sub-header's
+          right portal (order-first, so it sits left of Watch/Save). Portaled out of the <form>
+          but still wired to `enabled`, which handleSubmit reads from React state. */}
+      <HeaderRight>
+        <label
+          className="order-first mr-1 flex items-center gap-2 text-sm"
+          title="Inactive channels aren't selectable in the guide"
+        >
+          <Switch checked={enabled} onCheckedChange={(v) => setEnabled(v === true)} />
+          Active
+        </label>
+      </HeaderRight>
+
       <Section title="Details">
         {/* Fixed side-column widths (not `auto`) + items-end so the three input boxes line up
             on one baseline regardless of label width. */}
@@ -209,13 +223,6 @@ export function ChannelForm({
           />
         </div>
 
-        <label className="flex items-center gap-2 text-sm">
-          <Switch checked={enabled} onCheckedChange={(v) => setEnabled(v === true)} />
-          Active
-          <span className="text-muted-foreground text-xs">
-            — inactive channels aren't selectable in the guide
-          </span>
-        </label>
       </Section>
 
       {/* Package + ordering + bumpers + appearance grouped as one "Options" section. */}

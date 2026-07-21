@@ -2,14 +2,14 @@ import { Button } from "@ChannelGuide/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@ChannelGuide/ui/components/card";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Loader2, Tv } from "lucide-react";
+import { Loader2, Tv } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { AccentIconTile } from "@ChannelGuide/ui/components/accent-icon-tile";
 
 import { useBreadcrumb } from "@/context/breadcrumb-provider";
-import { HeaderLeft, HeaderRight } from "@/context/header-provider";
+import { HeaderLeft, HeaderRight, TopHeaderRight } from "@/context/header-provider";
 import { resolveTile } from "@/features/icons/app-icon";
 import {
   ChannelForm,
@@ -123,28 +123,28 @@ function ChannelDetail() {
         </div>
       </HeaderLeft>
 
-      <HeaderRight>
-        <Button variant="outline" size="sm" render={<Link to="/watch/$channelId" params={{ channelId }} />}>
+      {/* Watch + Refresh preview live in the TOP header (left of the AI Assistant button via
+          order-first). Delete + Save stay in the sub-header — Save is a normal outline button
+          like Watch/Refresh (no primary emphasis), Delete a plain ghost (red was heavier than
+          warranted; it confirms first). */}
+      <TopHeaderRight>
+        <Button variant="outline" size="sm" className="order-first" render={<Link to="/watch/$channelId" params={{ channelId }} />}>
           Watch
         </Button>
-        <Button variant="outline" size="sm" onClick={() => void preview.refetch()} disabled={preview.isFetching}>
+        <Button variant="outline" size="sm" className="order-first" onClick={() => void preview.refetch()} disabled={preview.isFetching}>
           {preview.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh preview"}
         </Button>
-        <Button variant="ghost" size="sm" className="text-destructive" onClick={del}>
+      </TopHeaderRight>
+
+      <HeaderRight>
+        <Button variant="ghost" size="sm" onClick={del}>
           Delete
         </Button>
-        <Button type="submit" form={FORM_ID} size="sm" disabled={submitting}>
+        <Button type="submit" form={FORM_ID} variant="outline" size="sm" disabled={submitting}>
           {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Save
         </Button>
       </HeaderRight>
-
-      <Link
-        to="/channels"
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
-      >
-        <ArrowLeft className="h-4 w-4" /> Channels
-      </Link>
 
       <Card>
         <CardHeader>
@@ -198,6 +198,15 @@ function ChannelDetail() {
               }
             }}
           />
+        </CardContent>
+      </Card>
+
+      {/* Preview is its own card — it's the resolved OUTPUT of the filter, not a form field. */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Preview</CardTitle>
+        </CardHeader>
+        <CardContent>
           <ChannelPreviewTiles channelId={channelId} data={preview.data} loading={preview.isLoading} />
         </CardContent>
       </Card>

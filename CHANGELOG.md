@@ -2,6 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.4] - 2026-07-21
+
+### Changed
+
+- **Admin: the channel page's chrome is tidied up.**
+  - The **preview** moved to its own card (it's the resolved output of the filter, not a form field).
+  - **Active** moved out of the form body into the sub-header's right side — it's a channel-status toggle, not a field. (Portaled from the form, still wired to the same state.)
+  - **Watch** and **Refresh preview** moved up into the **top** header (left of the AI Assistant button).
+  - **Save** is now a normal outline button like Watch/Refresh (no primary-blue emphasis); **Delete** is a plain ghost button (the red was heavier than warranted — it confirms first anyway).
+  - The redundant **"← Channels"** back-link above the form is gone; the breadcrumb already covers it.
+
 ## [0.6.3] - 2026-07-21
 
 ### Changed
