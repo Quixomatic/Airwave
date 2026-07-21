@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.24] - 2026-07-21
+
+### Added
+
+- **Update your display name from Settings → General.** The previously-empty page now has a **Profile** section with an editable Name — saved through better-auth's `updateUser` (it owns the user record + session, refreshed on save) — with your email shown read-only beneath it.
+
 ## [0.6.23] - 2026-07-21
 
 ### Changed
