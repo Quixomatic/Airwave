@@ -174,7 +174,7 @@ function SettingsAi() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <div className="space-y-4">
       {/* Saved connections */}
       <Card>
         <CardHeader>

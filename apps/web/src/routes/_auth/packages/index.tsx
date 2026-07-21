@@ -35,7 +35,7 @@ function PackagesList() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="space-y-4">
       <HeaderRight>
         {hasGenerated && (
           <Button variant="outline" size="sm" onClick={refreshStyling} disabled={refreshing}>

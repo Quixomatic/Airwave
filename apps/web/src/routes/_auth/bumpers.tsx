@@ -90,7 +90,7 @@ function BumpersPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="space-y-6">
       <HeaderRight>
         <Button type="submit" form={FORM_ID} size="sm" disabled={saving}>
           {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

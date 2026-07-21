@@ -15,7 +15,7 @@ function SourcesList() {
   const sources = useQuery(trpc.sources.list.queryOptions());
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div>
       {/* New source sits in the TOP header's right slot, left of the AI Assistant button.
           The slot is a flex row and the portal appends after the assistant, so `order-first`
           pulls this ahead of it. Outline style to match the other pages' header actions. */}

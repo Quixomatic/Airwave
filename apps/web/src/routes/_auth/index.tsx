@@ -13,7 +13,7 @@ function RouteComponent() {
   const privateData = useQuery(trpc.privateData.queryOptions());
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div>
       <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
       <p className="text-muted-foreground mt-1 text-sm">
         Welcome{session.data?.user.name ? `, ${session.data.user.name}` : ""}.

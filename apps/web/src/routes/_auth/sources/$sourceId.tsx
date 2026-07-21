@@ -91,7 +91,7 @@ function SourceDetail() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <Link
         to="/sources"
         className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"

@@ -57,7 +57,7 @@ function ChannelsList() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div>
       <HeaderRight>
         <Button variant="outline" size="sm" onClick={autoGenerate} disabled={generating}>
           {generating ? (

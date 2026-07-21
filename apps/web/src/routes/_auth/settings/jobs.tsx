@@ -60,7 +60,7 @@ function SettingsJobs() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
+    <div className="space-y-4">
       <p className="text-muted-foreground text-sm">
         ChannelGuide runs maintenance tasks on a schedule — metadata sync, library scans, and topping
         up channel schedules. Trigger any of them now or change how often they run. Running a job

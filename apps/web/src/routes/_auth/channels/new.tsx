@@ -20,7 +20,7 @@ function NewChannel() {
   const [submitting, setSubmitting] = useState(false);
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div>
       <HeaderRight>
         <Button type="submit" form={FORM_ID} size="sm" disabled={submitting}>
           {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

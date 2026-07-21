@@ -2,6 +2,13 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.6] - 2026-07-21
+
+### Changed
+
+- **Admin: page content width is now consistent, set once in the layout.** Every page used to hand-roll `mx-auto max-w-*` and they'd drifted (2xl / 3xl / 4xl / 5xl / 6xl). The layout now centers content at a single **`max-w-6xl`** by default, and pages no longer set their own width — so channels, packages, sources, settings, bumpers, users and the dashboard all match. A page that genuinely needs full width opts out with `staticData: { fullBleed: true }` (the mechanism the guide grid already uses).
+- **Admin: the package create/edit form gets the Frame treatment** to match the channel form — a Frame with a title + description header and a raised FramePanel, replacing the plain Card. The package's channel-list panel is a Frame too, and the redundant "← Packages" back-link is gone (the breadcrumb covers it).
+
 ## [0.6.5] - 2026-07-21
 
 ### Changed

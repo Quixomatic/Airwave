@@ -112,7 +112,7 @@ function ChannelDetail() {
   });
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="space-y-6">
       {/* Channel identity in the sub-header left: tinted icon tile · callsign · CH NN,
           each piece the same size, dot-separated. */}
       <HeaderLeft>

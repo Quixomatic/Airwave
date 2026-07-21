@@ -104,9 +104,18 @@ function TopHeader() {
 function PageContent() {
   const matches = useMatches();
   const fullBleed = matches.some((m) => m.staticData?.fullBleed === true);
+  // Default: a centered, max-width column with page padding — so every page is consistent
+  // and individual pages no longer hand-roll `mx-auto max-w-*`. A page that genuinely needs
+  // the full width opts out with `staticData: { fullBleed: true }` (e.g. the guide grid).
   return (
-    <div className={cn("flex-1 overflow-auto", fullBleed ? "" : "p-6")}>
-      <Outlet />
+    <div className="flex-1 overflow-auto">
+      {fullBleed ? (
+        <Outlet />
+      ) : (
+        <div className="mx-auto max-w-6xl p-6">
+          <Outlet />
+        </div>
+      )}
     </div>
   );
 }

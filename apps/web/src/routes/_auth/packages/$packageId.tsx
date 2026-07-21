@@ -1,11 +1,17 @@
 import { Button } from "@ChannelGuide/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@ChannelGuide/ui/components/card";
+import {
+  Frame,
+  FrameDescription,
+  FrameHeader,
+  FramePanel,
+  FrameTitle,
+} from "@ChannelGuide/ui/components/frame";
 import { Input } from "@ChannelGuide/ui/components/input";
 import { Label } from "@ChannelGuide/ui/components/label";
 import { Textarea } from "@ChannelGuide/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, LayoutGrid, Loader2 } from "lucide-react";
+import { LayoutGrid, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -94,7 +100,7 @@ function PackageDetail() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="space-y-6">
       <HeaderRight>
         {pkg.data.generated && (
           <Button variant="outline" size="sm" onClick={regenChannels} disabled={regenerating}>
@@ -111,18 +117,12 @@ function PackageDetail() {
         </Button>
       </HeaderRight>
 
-      <Link
-        to="/packages"
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
-      >
-        <ArrowLeft className="h-4 w-4" /> Packages
-      </Link>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Edit package</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Frame>
+        <FrameHeader>
+          <FrameTitle>Edit package</FrameTitle>
+          <FrameDescription>Name, description, and how this package looks in the guide.</FrameDescription>
+        </FrameHeader>
+        <FramePanel>
           <form id={FORM_ID} onSubmit={save} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="pname">Name</Label>
@@ -147,14 +147,15 @@ function PackageDetail() {
               />
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </FramePanel>
+      </Frame>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Channels ({pkg.data.channels.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
+      <Frame>
+        <FrameHeader>
+          <FrameTitle>Channels ({pkg.data.channels.length})</FrameTitle>
+          <FrameDescription>Channels filed into this package.</FrameDescription>
+        </FrameHeader>
+        <FramePanel className="p-0">
           {pkg.data.channels.length > 0 ? (
             <ul className="divide-border divide-y">
               {pkg.data.channels.map((c) => (
@@ -178,8 +179,8 @@ function PackageDetail() {
               No channels in this package yet. Assign one from its edit page (Package dropdown).
             </p>
           )}
-        </CardContent>
-      </Card>
+        </FramePanel>
+      </Frame>
     </div>
   );
 }

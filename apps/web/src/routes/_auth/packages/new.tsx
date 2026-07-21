@@ -1,10 +1,16 @@
 import { Button } from "@ChannelGuide/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@ChannelGuide/ui/components/card";
+import {
+  Frame,
+  FrameDescription,
+  FrameHeader,
+  FramePanel,
+  FrameTitle,
+} from "@ChannelGuide/ui/components/frame";
 import { Input } from "@ChannelGuide/ui/components/input";
 import { Label } from "@ChannelGuide/ui/components/label";
 import { Textarea } from "@ChannelGuide/ui/components/textarea";
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, LayoutGrid, Loader2 } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { LayoutGrid, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -51,7 +57,7 @@ function NewPackage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div>
       <HeaderRight>
         <Button type="submit" form={FORM_ID} size="sm" disabled={submitting}>
           {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -59,18 +65,12 @@ function NewPackage() {
         </Button>
       </HeaderRight>
 
-      <Link
-        to="/packages"
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
-      >
-        <ArrowLeft className="h-4 w-4" /> Packages
-      </Link>
-
-      <Card className="mt-4">
-        <CardHeader>
-          <CardTitle>New package</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Frame>
+        <FrameHeader>
+          <FrameTitle>New package</FrameTitle>
+          <FrameDescription>Name, description, and how this package looks in the guide.</FrameDescription>
+        </FrameHeader>
+        <FramePanel>
           <form id={FORM_ID} onSubmit={submit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="pname">Name</Label>
@@ -104,8 +104,8 @@ function NewPackage() {
               </p>
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </FramePanel>
+      </Frame>
     </div>
   );
 }
