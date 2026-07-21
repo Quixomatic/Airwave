@@ -82,9 +82,10 @@ export async function getActiveModel(prisma: PrismaClient): Promise<LanguageMode
  *  - `worker`  — ~50 mechanical per-channel build loops. Volume dominates the bill, so a cheap
  *                model here is the single biggest cost lever in the run.
  *
- * Every role FALLS BACK to the active connection, so with one connection configured it silently
- * fills all three and nothing needs setting up. The split only starts mattering once a second
- * connection is added and explicitly assigned.
+ * A single connection auto-claims all three roles on creation, so a one-connection setup needs no
+ * configuration. Roles are EXPLICIT (no runtime fallback): the UI's "Same as chat" copies the chat
+ * connection onto the planner/worker flag, and clearing a role turns it off — so a missing planner or
+ * worker genuinely means the AI lineup is unavailable.
  */
 export const CONNECTION_ROLES = ["active", "planner", "worker"] as const;
 export type ConnectionRole = (typeof CONNECTION_ROLES)[number];
@@ -95,14 +96,12 @@ const ROLE_FIELD: Record<ConnectionRole, "isActive" | "isPlanner" | "isWorker"> 
   worker: "isWorker",
 };
 
-/** Resolve a role to a connection, falling back to the active one when the role is unassigned. */
+/** Resolve a role to the connection that explicitly holds it (no fallback — a cleared role is off). */
 export async function getConnectionForRole(
   prisma: PrismaClient,
   role: ConnectionRole,
 ): Promise<ResolvedConnection | null> {
-  const c =
-    (await prisma.aiConnection.findFirst({ where: { [ROLE_FIELD[role]]: true } })) ??
-    (role === "active" ? null : await prisma.aiConnection.findFirst({ where: { isActive: true } }));
+  const c = await prisma.aiConnection.findFirst({ where: { [ROLE_FIELD[role]]: true } });
   if (!c) return null;
   return {
     provider: c.provider,

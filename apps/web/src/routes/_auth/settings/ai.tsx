@@ -63,18 +63,19 @@ const ROLES = [
 ];
 
 /**
- * The three role dropdowns. `active` is required (the chat always needs a target, so no
- * fall-back option); `planner`/`worker` fall back to the chat connection when unassigned, so
- * they offer a "Same as chat" choice that clears the role.
+ * The three role dropdowns. Roles are EXPLICIT: `active` (chat) is a connection or None; planner/
+ * worker are a connection, "Same as chat" (copies chat's current connection onto the flag), or None
+ * (off). A cleared planner/worker genuinely disables the AI lineup.
  */
-const ROLE_SELECTS: { key: RoleKey; label: string; hint: string; fallbackLabel: string }[] = [
-  { key: "active", label: "Chat connection", hint: "The admin assistant. Set to None to turn the chat assistant off.", fallbackLabel: "None (off)" },
-  { key: "planner", label: "AI lineup — planner", hint: "One heavy call that designs the whole lineup. Quality matters most.", fallbackLabel: "Same as chat" },
-  { key: "worker", label: "AI lineup — worker", hint: "Builds every channel (dozens of loops) — the single biggest cost lever, so point it at a cheaper model.", fallbackLabel: "Same as chat" },
+const ROLE_SELECTS: { key: RoleKey; label: string; hint: string }[] = [
+  { key: "active", label: "Chat connection", hint: "The admin assistant. Set to None to turn it off." },
+  { key: "planner", label: "AI lineup — planner", hint: "One heavy call that designs the whole lineup. Quality matters most." },
+  { key: "worker", label: "AI lineup — worker", hint: "Builds every channel (dozens of loops) — the single biggest cost lever, so point it at a cheaper model." },
 ];
 
-/** Sentinel Select value for "no explicit connection — fall back to the chat one". */
-const FALLBACK = "__fallback__";
+/** Select sentinels: NONE = the role is off; SAME (planner/worker) = copy the chat connection onto the flag. */
+const NONE = "__none__";
+const SAME = "__same__";
 
 const holdsRole = (c: Conn, role: RoleKey) =>
   role === "active" ? c.isActive : role === "planner" ? c.isPlanner : c.isWorker;
@@ -151,18 +152,31 @@ function SettingsAi() {
     }
   };
 
-  /** Which connection currently holds a role (id), or FALLBACK if none does. */
-  const holderId = (role: RoleKey) => connections.find((c) => holdsRole(c, role))?.id ?? FALLBACK;
+  /** The connection id holding a role, or undefined. */
+  const roleHolderId = (role: RoleKey) => connections.find((c) => holdsRole(c, role))?.id;
+  const activeId = connections.find((c) => c.isActive)?.id;
 
-  /** Assign a role to a connection, or (value === FALLBACK) clear it back to the chat default. */
-  const assignRole = (role: RoleKey, value: string) =>
-    void act(() =>
-      value === FALLBACK
-        ? // Clearing needs an id, but `setConnectionRole` clears the role from whoever holds it
-          // regardless — so the current holder's id (or any connection) works as the target.
-          trpcClient.ai.setRole.mutate({ id: holderId(role), role, enabled: false })
-        : trpcClient.ai.setRole.mutate({ id: value, role, enabled: true }),
-    );
+  const applyRole = (id: string, role: RoleKey, enabled: boolean) =>
+    void act(() => trpcClient.ai.setRole.mutate({ id, role, enabled }));
+
+  /** Apply a role dropdown choice: NONE clears the flag; SAME copies the chat connection onto the
+   *  planner/worker flag; an id assigns that specific connection. */
+  const onRoleChange = (role: RoleKey, value: string) => {
+    if (value === NONE) {
+      const holder = roleHolderId(role);
+      if (holder) applyRole(holder, role, false);
+      return;
+    }
+    if (value === SAME) {
+      if (activeId) applyRole(activeId, role, true);
+      else {
+        const holder = roleHolderId(role);
+        if (holder) applyRole(holder, role, false);
+      }
+      return;
+    }
+    applyRole(value, role, true);
+  };
 
   const runTest = async (id: string) => {
     setTest((t) => ({ ...t, [id]: "loading" }));
@@ -247,32 +261,31 @@ function SettingsAi() {
               split only matters once you add a second (e.g. a cheap model for the high-volume worker).
             </p>
             {ROLE_SELECTS.map((r) => {
-              const current = holderId(r.key);
-              // active is always held by exactly one connection; planner/worker may be FALLBACK.
-              const value = current;
+              const value = roleHolderId(r.key) ?? NONE;
               return (
                 <div key={r.key} className="grid grid-cols-[1fr_auto] items-center gap-4">
                   <div className="min-w-0">
                     <Label>{r.label}</Label>
                     <p className="text-muted-foreground text-xs">{r.hint}</p>
                   </div>
-                  <Select value={value} onValueChange={(v) => assignRole(r.key, v as string)}>
+                  <Select value={value} onValueChange={(v) => onRoleChange(r.key, v as string)}>
                     <SelectTrigger className="w-64" disabled={busy}>
                       <SelectValue>
                         {(v) =>
-                          v === FALLBACK || !v
-                            ? r.fallbackLabel
+                          v === NONE || !v
+                            ? "None"
                             : (connections.find((c) => c.id === v)?.name ?? "Select…")
                         }
                       </SelectValue>
                     </SelectTrigger>
                     <SelectPopup>
-                      <SelectItem value={FALLBACK}>{r.fallbackLabel}</SelectItem>
+                      {r.key !== "active" && <SelectItem value={SAME}>Same as chat</SelectItem>}
                       {connections.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
                           {c.name}
                         </SelectItem>
                       ))}
+                      <SelectItem value={NONE}>None</SelectItem>
                     </SelectPopup>
                   </Select>
                 </div>

@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.23] - 2026-07-21
+
+### Changed
+
+- **AI connection roles are explicit now — no silent fallback.** The AI lineup's planner/worker roles used to fall back to the chat connection at runtime, so they couldn't be turned off independently. Now each role resolves only to the connection explicitly flagged for it: AI settings offers **Same as chat** (copies chat's *current* connection onto the flag), a specific connection, or **None** (off) for planner/worker (Chat is a connection or None). Clearing planner or worker genuinely **disables the AI lineup** — the "Auto-generate → AI lineup" tile disables and the build job refuses to start. A single-connection setup still auto-claims all three roles on creation, so the common case is unchanged.
+
 ## [0.6.22] - 2026-07-21
 
 ### Added

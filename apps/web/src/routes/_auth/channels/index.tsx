@@ -139,11 +139,8 @@ function ChannelsList() {
 
   const ai = useQuery(trpc.ai.list.queryOptions());
   const aiConns = ai.data ?? [];
-  const aiHasActive = aiConns.some((c) => c.isActive);
-  // The AI lineup needs a planner + worker; both fall back to the chat (active) connection, so it's
-  // available as long as something resolves for each.
-  const aiAvailable =
-    (aiConns.some((c) => c.isPlanner) || aiHasActive) && (aiConns.some((c) => c.isWorker) || aiHasActive);
+  // Roles are explicit — the AI lineup needs a connection flagged for planner AND worker.
+  const aiAvailable = aiConns.some((c) => c.isPlanner) && aiConns.some((c) => c.isWorker);
   const [genOpen, setGenOpen] = useState(false);
   const [genRunning, setGenRunning] = useState(false);
 
