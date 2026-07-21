@@ -1,5 +1,6 @@
 import { AccentIconTile } from "@ChannelGuide/ui/components/accent-icon-tile";
 import { ACCENT_PALETTE } from "@ChannelGuide/ui/lib/accent-palette";
+import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -41,10 +42,11 @@ export function IconTintField({
         trigger={
           <button
             type="button"
-            className="hover:bg-accent focus-visible:ring-ring rounded-lg p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            className="hover:bg-accent focus-visible:ring-ring flex items-center gap-1 rounded-lg p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
             title="Choose icon"
           >
             <AccentIconTile icon={preview.Icon} tint={preview.tint} size="xl" />
+            <ChevronDown className="text-muted-foreground size-4 shrink-0" />
           </button>
         }
       />

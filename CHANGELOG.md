@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.17] - 2026-07-21
+
+### Changed
+
+- **Admin: the icon control shows a chevron and the preview is a touch smaller.** The tinted-icon preview now has a dropdown **chevron** beside it so it reads as editable (it opens the icon picker), and the `xl` preview tile is dialed back from 64px to 56px.
+
 ## [0.6.16] - 2026-07-21
 
 ### Changed

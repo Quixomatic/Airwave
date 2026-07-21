@@ -18,7 +18,7 @@ const SIZE: Record<Size, { tile: string; icon: string }> = {
   sm: { tile: "size-4 rounded-[3px]", icon: "!size-2.5" },
   md: { tile: "size-5 rounded-[4px]", icon: "!size-3" },
   lg: { tile: "size-7 rounded-md", icon: "!size-4" },
-  xl: { tile: "size-16 rounded-xl", icon: "!size-8" },
+  xl: { tile: "size-14 rounded-xl", icon: "!size-7" },
 };
 
 function hexA(hex: string, a: number): string {
