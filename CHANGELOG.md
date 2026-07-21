@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.52] - 2026-07-21
+
+### Changed
+
+- **Admin: connection roles are now a clear dropdown per use, not toggle buttons on every card.** Settings → AI Assistant used to put up to three role buttons on each connection card, which was genuinely confusing — three buttons × N cards, each toggling a role. There's now a single **"How connections are used"** section with one dropdown each for **Chat**, **AI lineup — planner**, and **AI lineup — worker**; you just pick the connection for each job. Planner and worker offer a **"Same as chat"** option (they fall back to the chat connection when unassigned); chat is required. The connection cards keep their role **badges** so you can still see at a glance what each one is used for.
+
 ## [0.5.51] - 2026-07-21
 
 ### Changed

@@ -52,13 +52,30 @@ type Conn = {
  * matters once there's a second: pointing the high-volume `worker` at a cheap model is the
  * biggest cost lever in an AI lineup build (~50 loops vs the planner's single call).
  */
+type RoleKey = "active" | "planner" | "worker";
+
+/** The compact badge labels shown on each connection card. */
 const ROLES = [
   { key: "active" as const, label: "Chat", hint: "The admin assistant" },
   { key: "planner" as const, label: "Planner", hint: "Heavy reasoning — designs the lineup" },
   { key: "worker" as const, label: "Worker", hint: "High volume — builds each channel" },
 ];
 
-const holdsRole = (c: Conn, role: "active" | "planner" | "worker") =>
+/**
+ * The three role dropdowns. `active` is required (the chat always needs a target, so no
+ * fall-back option); `planner`/`worker` fall back to the chat connection when unassigned, so
+ * they offer a "Same as chat" choice that clears the role.
+ */
+const ROLE_SELECTS: { key: RoleKey; label: string; hint: string; canFallback: boolean }[] = [
+  { key: "active", label: "Chat connection", hint: "The admin assistant.", canFallback: false },
+  { key: "planner", label: "AI lineup — planner", hint: "One heavy call that designs the whole lineup. Quality matters most.", canFallback: true },
+  { key: "worker", label: "AI lineup — worker", hint: "Builds every channel (dozens of loops) — the single biggest cost lever, so point it at a cheaper model.", canFallback: true },
+];
+
+/** Sentinel Select value for "no explicit connection — fall back to the chat one". */
+const FALLBACK = "__fallback__";
+
+const holdsRole = (c: Conn, role: RoleKey) =>
   role === "active" ? c.isActive : role === "planner" ? c.isPlanner : c.isWorker;
 
 function SettingsAi() {
@@ -133,6 +150,19 @@ function SettingsAi() {
     }
   };
 
+  /** Which connection currently holds a role (id), or FALLBACK if none does. */
+  const holderId = (role: RoleKey) => connections.find((c) => holdsRole(c, role))?.id ?? FALLBACK;
+
+  /** Assign a role to a connection, or (value === FALLBACK) clear it back to the chat default. */
+  const assignRole = (role: RoleKey, value: string) =>
+    void act(() =>
+      value === FALLBACK
+        ? // Clearing needs an id, but `setConnectionRole` clears the role from whoever holds it
+          // regardless — so the current holder's id (or any connection) works as the target.
+          trpcClient.ai.setRole.mutate({ id: holderId(role), role, enabled: false })
+        : trpcClient.ai.setRole.mutate({ id: value, role, enabled: true }),
+    );
+
   const runTest = async (id: string) => {
     setTest((t) => ({ ...t, [id]: "loading" }));
     try {
@@ -179,21 +209,9 @@ function SettingsAi() {
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  {/* With a single connection there's nothing to assign — it holds every role
-                      already, so the buttons would be noise. They appear once a second exists. */}
-                  {connections.length > 1 &&
-                    ROLES.filter((r) => !holdsRole(c, r.key)).map((r) => (
-                      <Button
-                        key={r.key}
-                        size="sm"
-                        variant="outline"
-                        disabled={busy}
-                        title={`Use for ${r.label.toLowerCase()} — ${r.hint}`}
-                        onClick={() => void act(() => trpcClient.ai.setRole.mutate({ id: c.id, role: r.key }))}
-                      >
-                        {r.label}
-                      </Button>
-                    ))}
+                  {/* Role assignment moved to its own section below — the per-card buttons were
+                      confusing (three of them, each toggling a role, on every card). The badges
+                      above still show what each connection is used for. */}
                   <Button size="icon" variant="ghost" aria-label="Test" disabled={t === "loading"} onClick={() => void runTest(c.id)}>
                     {t === "loading" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
                   </Button>
@@ -209,6 +227,53 @@ function SettingsAi() {
           })}
         </CardContent>
       </Card>
+
+      {/* Role assignments — a dropdown per use, instead of toggle buttons on every card. */}
+      {connections.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>How connections are used</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground text-sm">
+              Point each job at a connection. A single connection covers all three automatically; the
+              split only matters once you add a second (e.g. a cheap model for the high-volume worker).
+            </p>
+            {ROLE_SELECTS.map((r) => {
+              const current = holderId(r.key);
+              // active is always held by exactly one connection; planner/worker may be FALLBACK.
+              const value = current;
+              return (
+                <div key={r.key} className="grid grid-cols-[1fr_auto] items-center gap-4">
+                  <div className="min-w-0">
+                    <Label>{r.label}</Label>
+                    <p className="text-muted-foreground text-xs">{r.hint}</p>
+                  </div>
+                  <Select value={value} onValueChange={(v) => assignRole(r.key, v as string)}>
+                    <SelectTrigger className="w-64" disabled={busy}>
+                      <SelectValue>
+                        {(v) =>
+                          v === FALLBACK
+                            ? "Same as chat"
+                            : (connections.find((c) => c.id === v)?.name ?? "Select…")
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectPopup>
+                      {r.canFallback && <SelectItem value={FALLBACK}>Same as chat</SelectItem>}
+                      {connections.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectPopup>
+                  </Select>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Add / edit form */}
       <Card>
