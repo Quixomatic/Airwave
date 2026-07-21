@@ -6,7 +6,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { ChevronRight, LayoutGrid, Plus } from "lucide-react";
 
 import { resolveTile } from "@/features/icons/app-icon";
-import { HeaderRight } from "@/context/header-provider";
+import { HeaderRight, TopHeaderRight } from "@/context/header-provider";
 import { trpc, trpcClient } from "@/utils/trpc";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -43,10 +43,16 @@ function PackagesList() {
             Refresh styling
           </Button>
         )}
-        <Button size="sm" render={<Link to="/packages/new" />}>
+      </HeaderRight>
+
+      {/* New package sits in the TOP header's right slot, left of the AI Assistant button.
+          The slot is a flex row and the portal appends after the assistant, so `order-first`
+          pulls this ahead of it. Outline style to match the page's other actions. */}
+      <TopHeaderRight>
+        <Button variant="outline" size="sm" className="order-first" render={<Link to="/packages/new" />}>
           <Plus className="mr-1 h-4 w-4" /> New package
         </Button>
-      </HeaderRight>
+      </TopHeaderRight>
 
       <p className="text-muted-foreground text-sm">
         Packages group channels into a lineup (e.g. "Kids & Family"). Assign a channel to a package

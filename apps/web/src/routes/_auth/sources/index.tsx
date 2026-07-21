@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Plus, Server as ServerIcon } from "lucide-react";
 
+import { TopHeaderRight } from "@/context/header-provider";
 import { trpc } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/sources/")({
@@ -15,17 +16,21 @@ function SourcesList() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Sources</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Media servers ChannelGuide builds channels from and serves content to.
-          </p>
-        </div>
-        <Button render={<Link to="/sources/new" />}>
+      {/* New source sits in the TOP header's right slot, left of the AI Assistant button.
+          The slot is a flex row and the portal appends after the assistant, so `order-first`
+          pulls this ahead of it. Outline style to match the other pages' header actions. */}
+      <TopHeaderRight>
+        <Button variant="outline" size="sm" className="order-first" render={<Link to="/sources/new" />}>
           <Plus className="mr-2 h-4 w-4" />
-          Add source
+          New source
         </Button>
+      </TopHeaderRight>
+
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Sources</h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Media servers ChannelGuide builds channels from and serves content to.
+        </p>
       </div>
 
       <Card className="mt-6">

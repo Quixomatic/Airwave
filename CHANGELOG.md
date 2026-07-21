@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.5.56] - 2026-07-21
+
+### Changed
+
+- **Admin: "New package" and "Add source" moved to the top header too.** Same treatment as v0.5.55 — both now sit in the top-right header slot, left of the AI Assistant button, in the `outline` style. Packages' "Refresh styling" stays in the sub-header; the Sources page's heading no longer needs its inline button row.
+
 ## [0.5.55] - 2026-07-21
 
 ### Changed
