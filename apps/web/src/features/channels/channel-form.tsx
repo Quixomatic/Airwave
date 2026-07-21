@@ -1,13 +1,25 @@
+import { Button } from "@ChannelGuide/ui/components/button";
 import { Checkbox } from "@ChannelGuide/ui/components/checkbox";
+import {
+  Collapsible,
+  CollapsiblePanel,
+  CollapsibleTrigger,
+} from "@ChannelGuide/ui/components/collapsible";
+import {
+  Frame,
+  FrameDescription,
+  FrameHeader,
+  FramePanel,
+  FrameTitle,
+} from "@ChannelGuide/ui/components/frame";
 import { Input } from "@ChannelGuide/ui/components/input";
 import { Label } from "@ChannelGuide/ui/components/label";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@ChannelGuide/ui/components/select";
 import { Switch } from "@ChannelGuide/ui/components/switch";
 import { Textarea } from "@ChannelGuide/ui/components/textarea";
-import { cn } from "@ChannelGuide/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ChevronDown, Tv } from "lucide-react";
+import { ChevronDown, Info, ListFilter, SlidersHorizontal, Tv, type LucideIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -46,34 +58,38 @@ const BUMPER_MODE_OPTIONS: { value: BumperMode; label: string }[] = [
 ];
 
 /**
- * One collapsible section of the form — independent (its own open state, several can be open
- * at once), with a heading that toggles it. Not an accordion on purpose: editing a channel
- * often means having a couple of sections open together.
+ * One collapsible section. The toggle is a standard inline-width ghost button — an icon, the
+ * title, then the chevron right after it — sitting on the muted Frame; the section's CONTENT is
+ * a raised FramePanel that animates open/closed. Independent open state, several open at once.
  */
 function Section({
   title,
+  icon: Icon,
   defaultOpen = true,
   children,
 }: {
   title: string;
+  icon: LucideIcon;
   defaultOpen?: boolean;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="bg-muted/50 hover:bg-muted flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-base font-semibold transition-colors"
+    <Collapsible defaultOpen={defaultOpen}>
+      {/* `ms-2.5` insets the trigger so its icon lines up with the px-5 content of the header
+          above and the FramePanel below. `aria-expanded:bg-transparent` cancels the ghost
+          variant's `aria-expanded:bg-muted` — otherwise an OPEN section keeps a faint bg. */}
+      <CollapsibleTrigger
+        className="ms-2.5 gap-2 font-semibold aria-expanded:bg-transparent data-panel-open:[&>svg:last-child]:rotate-180"
+        render={<Button variant="ghost" size="sm" type="button" />}
       >
+        <Icon className="size-4 shrink-0" />
         {title}
-        <ChevronDown
-          className={cn("text-muted-foreground h-4 w-4 transition-transform", open && "rotate-180")}
-        />
-      </button>
-      {open && <div className="space-y-4 px-1 pt-4 pb-2">{children}</div>}
-    </div>
+        <ChevronDown className="text-muted-foreground size-4 shrink-0 transition-transform" />
+      </CollapsibleTrigger>
+      <CollapsiblePanel>
+        <FramePanel className="mt-2 space-y-4">{children}</FramePanel>
+      </CollapsiblePanel>
+    </Collapsible>
   );
 }
 
@@ -87,10 +103,17 @@ function Section({
 export function ChannelForm({
   initial,
   formId,
+  title,
+  subtitle,
   onSubmit,
 }: {
   initial?: Partial<ChannelFormValues>;
   formId: string;
+  /** Frame title — the form IS the container now (no outer Card), so it carries its own heading. */
+  title?: string;
+  /** Frame subtitle under the title (named `subtitle`, not `description`, to avoid colliding with
+   *  the channel's own description field). */
+  subtitle?: string;
   onSubmit: (values: ChannelFormValues & { mediaSourceId: string }) => void;
 }) {
   const sources = useQuery(trpc.sources.list.queryOptions());
@@ -164,7 +187,7 @@ export function ChannelForm({
   };
 
   return (
-    <form id={formId} onSubmit={handleSubmit} className="space-y-3">
+    <form id={formId} onSubmit={handleSubmit}>
       {/* Active is a channel-status toggle, not a form field — it lives in the sub-header's
           right portal (order-first, so it sits left of Watch/Save). Portaled out of the <form>
           but still wired to `enabled`, which handleSubmit reads from React state. */}
@@ -178,7 +201,17 @@ export function ChannelForm({
         </label>
       </HeaderRight>
 
-      <Section title="Details">
+      {/* Frame (muted) → header (title + subtitle) → per-section collapsibles. Each section's
+          toggle is on the muted Frame; its content is a raised FramePanel. gap-3 gives the
+          triggers breathing room from each other and their panels. */}
+      <Frame className="gap-3 p-2">
+        {(title || subtitle) && (
+          <FrameHeader>
+            {title && <FrameTitle>{title}</FrameTitle>}
+            {subtitle && <FrameDescription>{subtitle}</FrameDescription>}
+          </FrameHeader>
+        )}
+        <Section title="Details" icon={Info}>
         {/* Fixed side-column widths (not `auto`) + items-end so the three input boxes line up
             on one baseline regardless of label width. */}
         <div className="grid grid-cols-[1fr_7rem_7rem] items-end gap-3">
@@ -226,7 +259,7 @@ export function ChannelForm({
       </Section>
 
       {/* Package + ordering + bumpers + appearance grouped as one "Options" section. */}
-      <Section title="Options">
+      <Section title="Options" icon={SlidersHorizontal}>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label htmlFor="cpkg">Package</Label>
@@ -345,7 +378,7 @@ export function ChannelForm({
 
       {/* Content types + filter together, LAST — they jointly define what plays, and the
           resolved preview tiles render right below the form. */}
-      <Section title="Content & filter">
+      <Section title="Content & filter" icon={ListFilter}>
         <div className="space-y-2">
           <Label>Content</Label>
           <div className="flex gap-4 text-sm">
@@ -366,6 +399,7 @@ export function ChannelForm({
           mediaTypes={mediaTypes}
         />
       </Section>
+      </Frame>
     </form>
   );
 }

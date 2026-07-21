@@ -2,6 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.5] - 2026-07-21
+
+### Changed
+
+- **Admin: the channel page is rebuilt on coss's Frame components — much cleaner.** The Edit/New channel form is now a **Frame** (muted container) with a proper **FrameTitle + FrameDescription** header and no redundant wrapping Card. Its sections are **collapsible** (base-ui Collapsible): each toggle is a standard inline-width ghost button with a **section icon**, the title, and a chevron just to its right; the section's content lives in its own raised **FramePanel**. Independent open state (several open at once). The **Preview** and **Schedule** blocks became Frames too, each with a title + description and its action in the header — **Refresh preview** in Preview's header, Extend/Generate in Schedule's (Watch stays in the top header).
+- **Frame styling tuned once, for all frames.** The `Frame` component now defaults to `p-2` with a uniform gap between header and panels (instead of stock `p-1`), so every frame gets the same breathing room. Fixed two rough edges on the collapsible triggers: an **open** section no longer keeps a faint background (the ghost button's `aria-expanded:bg-muted` is cancelled), and the triggers are inset to line up with the header/panel content above and below them.
+
+### Added
+
+- **`Frame`, `Field`, `Form` components** added to `@ChannelGuide/ui` from the `@coss` (base-lyra) registry; `Collapsible` was already present. Base-ui underneath, matching the rest of the kit.
+
 ## [0.6.4] - 2026-07-21
 
 ### Changed

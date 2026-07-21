@@ -1,7 +1,6 @@
 import { Button } from "@ChannelGuide/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@ChannelGuide/ui/components/card";
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -29,21 +28,11 @@ function NewChannel() {
         </Button>
       </HeaderRight>
 
-      <Link
-        to="/channels"
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
-      >
-        <ArrowLeft className="h-4 w-4" /> Channels
-      </Link>
-
-      <Card className="mt-4">
-        <CardHeader>
-          <CardTitle>New channel</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ChannelForm
-            formId={FORM_ID}
-            onSubmit={async (v) => {
+      <ChannelForm
+        formId={FORM_ID}
+        title="New channel"
+        subtitle="What this channel plays, how it's ordered, and how it looks."
+        onSubmit={async (v) => {
               setSubmitting(true);
               try {
                 const res = await trpcClient.channels.create.mutate({
@@ -72,8 +61,6 @@ function NewChannel() {
               }
             }}
           />
-        </CardContent>
-      </Card>
     </div>
   );
 }

@@ -1,5 +1,11 @@
 import { Button } from "@ChannelGuide/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@ChannelGuide/ui/components/card";
+import {
+  Frame,
+  FrameDescription,
+  FrameHeader,
+  FramePanel,
+  FrameTitle,
+} from "@ChannelGuide/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Loader2, Tv } from "lucide-react";
@@ -131,9 +137,6 @@ function ChannelDetail() {
         <Button variant="outline" size="sm" className="order-first" render={<Link to="/watch/$channelId" params={{ channelId }} />}>
           Watch
         </Button>
-        <Button variant="outline" size="sm" className="order-first" onClick={() => void preview.refetch()} disabled={preview.isFetching}>
-          {preview.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh preview"}
-        </Button>
       </TopHeaderRight>
 
       <HeaderRight>
@@ -146,14 +149,12 @@ function ChannelDetail() {
         </Button>
       </HeaderRight>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Edit channel</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ChannelForm
-            formId={FORM_ID}
-            initial={{
+      {/* No wrapping Card — the form's Frame is its own container and carries the title. */}
+      <ChannelForm
+        formId={FORM_ID}
+        title="Edit channel"
+        subtitle="What this channel plays, how it's ordered, and how it looks."
+        initial={{
               name: channel.data.name,
               callsign: channel.data.callsign ?? "",
               number: String(channel.data.number),
@@ -198,22 +199,30 @@ function ChannelDetail() {
               }
             }}
           />
-        </CardContent>
-      </Card>
 
-      {/* Preview is its own card — it's the resolved OUTPUT of the filter, not a form field. */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Preview</CardTitle>
-        </CardHeader>
-        <CardContent>
+      {/* Preview — the resolved OUTPUT of the filter, its own Frame. Refresh lives in its
+          header (like Schedule's actions). */}
+      <Frame>
+        <FrameHeader className="flex-row items-center justify-between">
+          <div>
+            <FrameTitle>Preview</FrameTitle>
+            <FrameDescription>What this channel's filter currently resolves to.</FrameDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void preview.refetch()} disabled={preview.isFetching}>
+            {preview.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh preview"}
+          </Button>
+        </FrameHeader>
+        <FramePanel>
           <ChannelPreviewTiles channelId={channelId} data={preview.data} loading={preview.isLoading} />
-        </CardContent>
-      </Card>
+        </FramePanel>
+      </Frame>
 
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle>Schedule</CardTitle>
+      <Frame>
+        <FrameHeader className="flex-row items-center justify-between">
+          <div>
+            <FrameTitle>Schedule</FrameTitle>
+            <FrameDescription>The materialized timeline — what's on now and next.</FrameDescription>
+          </div>
           <div className="flex gap-2">
             {nowNext.data?.endsAt && (
               <Button variant="ghost" size="sm" onClick={extend} disabled={extending}>
@@ -224,8 +233,8 @@ function ChannelDetail() {
               {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Generate schedule"}
             </Button>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </FrameHeader>
+        <FramePanel className="space-y-4">
           {nowNext.data?.current ? (
             <div className="space-y-1.5">
               <div className="flex items-baseline justify-between gap-2">
@@ -299,8 +308,8 @@ function ChannelDetail() {
               )}
             </ol>
           )}
-        </CardContent>
-      </Card>
+        </FramePanel>
+      </Frame>
     </div>
   );
 }
