@@ -1,10 +1,17 @@
 import { Button } from "@ChannelGuide/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@ChannelGuide/ui/components/card";
+import {
+  Frame,
+  FrameDescription,
+  FrameHeader,
+  FramePanel,
+  FrameTitle,
+} from "@ChannelGuide/ui/components/frame";
 import { Input } from "@ChannelGuide/ui/components/input";
 import { Label } from "@ChannelGuide/ui/components/label";
+import { Switch } from "@ChannelGuide/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -92,18 +99,12 @@ function SourceDetail() {
 
   return (
     <div className="space-y-6">
-      <Link
-        to="/sources"
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
-      >
-        <ArrowLeft className="h-4 w-4" /> Sources
-      </Link>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Connection</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Frame>
+        <FrameHeader>
+          <FrameTitle>Connection</FrameTitle>
+          <FrameDescription>How this media server is labelled and reached.</FrameDescription>
+        </FrameHeader>
+        <FramePanel className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Label</Label>
             <div className="flex gap-2">
@@ -120,12 +121,15 @@ function SourceDetail() {
           <p className="text-muted-foreground text-xs">
             {source.data.baseUrl} · {source.data.machineIdentifier}
           </p>
-        </CardContent>
-      </Card>
+        </FramePanel>
+      </Frame>
 
-      <Card>
-        <CardHeader className="flex-row items-center justify-between">
-          <CardTitle>Libraries</CardTitle>
+      <Frame>
+        <FrameHeader className="flex-row items-center justify-between">
+          <div>
+            <FrameTitle>Libraries</FrameTitle>
+            <FrameDescription>Which libraries ChannelGuide builds channels from.</FrameDescription>
+          </div>
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={syncMetadata} disabled={syncing}>
               {syncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -140,9 +144,9 @@ function SourceDetail() {
               Rescan
             </Button>
           </div>
-        </CardHeader>
+        </FrameHeader>
         {syncing && <SyncProgress progress={syncJob?.progress ?? null} />}
-        <CardContent className="p-0">
+        <FramePanel className="p-0">
           <ul className="divide-y">
             {source.data.libraries.map((lib) => (
               <li key={lib.id} className="flex items-center justify-between px-4 py-3">
@@ -151,10 +155,9 @@ function SourceDetail() {
                   <p className="text-muted-foreground text-xs capitalize">{lib.type}</p>
                 </div>
                 <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
+                  <Switch
                     checked={lib.enabled}
-                    onChange={(e) => toggleLibrary(lib.id, e.target.checked)}
+                    onCheckedChange={(v) => toggleLibrary(lib.id, v === true)}
                   />
                   Enabled
                 </label>
@@ -166,8 +169,8 @@ function SourceDetail() {
               </li>
             )}
           </ul>
-        </CardContent>
-      </Card>
+        </FramePanel>
+      </Frame>
 
       <Button variant="ghost" className="text-destructive" onClick={remove}>
         Remove source

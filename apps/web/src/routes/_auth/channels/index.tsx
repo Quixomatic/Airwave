@@ -1,6 +1,13 @@
-import { Button } from "@ChannelGuide/ui/components/button";
-import { Card, CardContent } from "@ChannelGuide/ui/components/card";
 import { AccentIconTile } from "@ChannelGuide/ui/components/accent-icon-tile";
+import { Button } from "@ChannelGuide/ui/components/button";
+import {
+  Frame,
+  FrameDescription,
+  FrameHeader,
+  FramePanel,
+  FrameTitle,
+} from "@ChannelGuide/ui/components/frame";
+import { Switch } from "@ChannelGuide/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Loader2, Plus, Sparkles, Tv } from "lucide-react";
@@ -79,29 +86,27 @@ function ChannelsList() {
         </Button>
       </TopHeaderRight>
 
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Channels</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Live channels built from your enabled libraries.
-        </p>
-      </div>
+      <Frame>
+        <FrameHeader>
+          <FrameTitle>Channels</FrameTitle>
+          <FrameDescription>Live channels built from your enabled libraries.</FrameDescription>
+        </FrameHeader>
 
-      {generating && (
-        <div className="border-primary/30 bg-primary/5 mt-4 rounded-md border px-4 py-3 text-sm">
-          <div className="flex items-center gap-2">
-            <Loader2 className="text-primary h-4 w-4 animate-spin" />
-            <span>
-              Generating lineup{genJob?.progress ? ` — ${genJob.progress.label}` : ""}
-              {genJob?.progress && genJob.progress.total > 0
-                ? ` (${genJob.progress.current}/${genJob.progress.total})`
-                : ""}
-            </span>
+        {generating && (
+          <div className="border-primary/30 bg-primary/5 rounded-md border px-4 py-3 text-sm">
+            <div className="flex items-center gap-2">
+              <Loader2 className="text-primary h-4 w-4 animate-spin" />
+              <span>
+                Generating lineup{genJob?.progress ? ` — ${genJob.progress.label}` : ""}
+                {genJob?.progress && genJob.progress.total > 0
+                  ? ` (${genJob.progress.current}/${genJob.progress.total})`
+                  : ""}
+              </span>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <Card className="mt-6">
-        <CardContent className="p-0">
+        <FramePanel className="p-0">
           <ul className="divide-y">
             {channels.data?.map((c) => {
               const tile = resolveTile({
@@ -146,11 +151,7 @@ function ChannelsList() {
                   className="px-4"
                   title={c.enabled ? "Active — click to deactivate" : "Inactive — click to activate"}
                 >
-                  <input
-                    type="checkbox"
-                    checked={c.enabled}
-                    onChange={(e) => toggle(c.id, e.target.checked)}
-                  />
+                  <Switch checked={c.enabled} onCheckedChange={(v) => toggle(c.id, v === true)} />
                 </label>
               </li>
               );
@@ -165,8 +166,8 @@ function ChannelsList() {
               </li>
             )}
           </ul>
-        </CardContent>
-      </Card>
+        </FramePanel>
+      </Frame>
     </div>
   );
 }

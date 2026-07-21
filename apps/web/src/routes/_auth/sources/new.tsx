@@ -1,15 +1,17 @@
 import { Button } from "@ChannelGuide/ui/components/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@ChannelGuide/ui/components/card";
+  Frame,
+  FrameDescription,
+  FrameHeader,
+  FramePanel,
+  FrameTitle,
+} from "@ChannelGuide/ui/components/frame";
 import { Input } from "@ChannelGuide/ui/components/input";
 import { Label } from "@ChannelGuide/ui/components/label";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@ChannelGuide/ui/components/select";
+import { Switch } from "@ChannelGuide/ui/components/switch";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Loader2, Tv } from "lucide-react";
+import { Loader2, Tv } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -120,23 +122,16 @@ function NewSource() {
 
   return (
     <div>
-      <Link
-        to="/sources"
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
-      >
-        <ArrowLeft className="h-4 w-4" /> Sources
-      </Link>
-
-      <Card className="mt-4">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Frame>
+        <FrameHeader>
+          <FrameTitle className="flex items-center gap-2">
             <Tv className="text-primary h-5 w-5" /> Add a Plex server
-          </CardTitle>
-          <CardDescription>
+          </FrameTitle>
+          <FrameDescription>
             Sign in with Plex, pick your server, and confirm the connection details.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+          </FrameDescription>
+        </FrameHeader>
+        <FramePanel className="space-y-6">
           {!auth ? (
             <Button size="lg" onClick={signInWithPlex} disabled={connecting}>
               {connecting ? (
@@ -154,23 +149,29 @@ function NewSource() {
 
               <div className="space-y-2">
                 <Label htmlFor="server">Server</Label>
-                <select
-                  id="server"
-                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                <Select
                   value={machineId}
-                  onChange={(e) => {
-                    const s = servers.find((x) => x.clientIdentifier === e.target.value);
+                  onValueChange={(v) => {
+                    const s = servers.find((x) => x.clientIdentifier === v);
                     if (s) selectServer(s);
                   }}
                 >
-                  {servers.length === 0 && <option value="">No servers found</option>}
-                  {servers.map((s) => (
-                    <option key={s.clientIdentifier} value={s.clientIdentifier}>
-                      {s.name}
-                      {s.owned ? "" : " (shared)"}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="server" className="w-full">
+                    <SelectValue>
+                      {(v) =>
+                        servers.find((x) => x.clientIdentifier === v)?.name ?? "No servers found"
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectPopup>
+                    {servers.map((s) => (
+                      <SelectItem key={s.clientIdentifier} value={s.clientIdentifier}>
+                        {s.name}
+                        {s.owned ? "" : " (shared)"}
+                      </SelectItem>
+                    ))}
+                  </SelectPopup>
+                </Select>
               </div>
 
               <div className="grid grid-cols-[1fr_auto] gap-3">
@@ -190,7 +191,7 @@ function NewSource() {
               </div>
 
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={ssl} onChange={(e) => setSsl(e.target.checked)} />
+                <Switch checked={ssl} onCheckedChange={(v) => setSsl(v === true)} />
                 Use SSL
               </label>
 
@@ -219,8 +220,8 @@ function NewSource() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </FramePanel>
+      </Frame>
     </div>
   );
 }

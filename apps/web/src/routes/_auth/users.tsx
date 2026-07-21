@@ -1,12 +1,33 @@
+import { Badge } from "@ChannelGuide/ui/components/badge";
 import { Button } from "@ChannelGuide/ui/components/button";
-import { Card, CardContent } from "@ChannelGuide/ui/components/card";
+import {
+  Frame,
+  FrameDescription,
+  FrameHeader,
+  FramePanel,
+  FrameTitle,
+} from "@ChannelGuide/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Loader2, UserPlus, Users } from "lucide-react";
+import { Loader2, ShieldCheck, User, UserPlus, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { trpc, trpcClient } from "@/utils/trpc";
+
+/** Role pill — admin gets an amber shield, everyone else a muted user outline. */
+function RoleBadge({ role }: { role?: string | null }) {
+  const admin = role === "admin";
+  return (
+    <Badge
+      variant={admin ? "default" : "outline"}
+      className={admin ? "gap-1 border-amber-500/30 bg-amber-500/15 text-amber-600" : "gap-1"}
+    >
+      {admin ? <ShieldCheck className="size-3" /> : <User className="size-3" />}
+      {admin ? "Admin" : "User"}
+    </Badge>
+  );
+}
 
 export const Route = createFileRoute("/_auth/users")({
   staticData: { breadcrumb: "Users", breadcrumbIcon: Users, breadcrumbTint: "emerald" },
@@ -34,25 +55,22 @@ function UsersPage() {
 
   return (
     <div>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Admin-created and imported Plex users who can sign in.
-          </p>
-        </div>
-        <Button onClick={importUsers} disabled={importing}>
-          {importing ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <UserPlus className="mr-2 h-4 w-4" />
-          )}
-          Import Plex Users
-        </Button>
-      </div>
-
-      <Card className="mt-6">
-        <CardContent className="p-0">
+      <Frame>
+        <FrameHeader className="flex-row items-center justify-between">
+          <div>
+            <FrameTitle>Users</FrameTitle>
+            <FrameDescription>Admin-created and imported Plex users who can sign in.</FrameDescription>
+          </div>
+          <Button size="sm" onClick={importUsers} disabled={importing}>
+            {importing ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <UserPlus className="mr-2 h-4 w-4" />
+            )}
+            Import Plex Users
+          </Button>
+        </FrameHeader>
+        <FramePanel className="p-0">
           <ul className="divide-y">
             {users.data?.map((u) => (
               <li key={u.id} className="flex items-center justify-between px-4 py-3">
@@ -60,9 +78,7 @@ function UsersPage() {
                   <p className="truncate text-sm font-medium">{u.name || u.email}</p>
                   <p className="text-muted-foreground truncate text-xs">{u.email}</p>
                 </div>
-                <span className="text-muted-foreground rounded-full border px-2 py-0.5 text-xs capitalize">
-                  {u.role ?? "user"}
-                </span>
+                <RoleBadge role={u.role} />
               </li>
             ))}
             {users.data?.length === 0 && (
@@ -71,8 +87,8 @@ function UsersPage() {
               </li>
             )}
           </ul>
-        </CardContent>
-      </Card>
+        </FramePanel>
+      </Frame>
     </div>
   );
 }

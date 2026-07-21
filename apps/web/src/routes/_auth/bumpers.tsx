@@ -1,7 +1,14 @@
 import { Button } from "@ChannelGuide/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@ChannelGuide/ui/components/card";
+import {
+  Frame,
+  FrameDescription,
+  FrameHeader,
+  FramePanel,
+  FrameTitle,
+} from "@ChannelGuide/ui/components/frame";
 import { Input } from "@ChannelGuide/ui/components/input";
 import { Label } from "@ChannelGuide/ui/components/label";
+import { Switch } from "@ChannelGuide/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Clapperboard, Loader2 } from "lucide-react";
@@ -109,34 +116,30 @@ function BumpersPage() {
       </div>
 
       <form id={FORM_ID} onSubmit={save} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Enable</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Frame>
+          <FrameHeader>
+            <FrameTitle>Enable</FrameTitle>
+          </FrameHeader>
+          <FramePanel>
             <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={(e) => setEnabled(e.target.checked)}
-              />
+              <Switch checked={enabled} onCheckedChange={(v) => setEnabled(v === true)} />
               Enable bumpers
               <span className="text-muted-foreground text-xs">
                 — master switch; channels can still opt out individually
               </span>
             </label>
-          </CardContent>
-        </Card>
+          </FramePanel>
+        </Frame>
 
-        <Card className={enabled ? "" : "opacity-60"}>
-          <CardHeader>
-            <CardTitle>Break lengths</CardTitle>
-            <p className="text-muted-foreground text-xs">
+        <Frame className={enabled ? "" : "opacity-60"}>
+          <FrameHeader>
+            <FrameTitle>Break lengths</FrameTitle>
+            <FrameDescription>
               The break length adapts to the moment — long after a feature, barely there between
               episodes of the same show. First matching rule wins.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            </FrameDescription>
+          </FrameHeader>
+          <FramePanel className="space-y-4">
             <SecondsField
               label="After a movie"
               hint="A real intermission — you just watched a feature."
@@ -177,14 +180,14 @@ function BumpersPage() {
               unit="seconds"
               disabled={!enabled}
             />
-          </CardContent>
-        </Card>
+          </FramePanel>
+        </Frame>
 
-        <Card className={enabled ? "" : "opacity-60"}>
-          <CardHeader>
-            <CardTitle>Interstitial extras</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Frame className={enabled ? "" : "opacity-60"}>
+          <FrameHeader>
+            <FrameTitle>Interstitial extras</FrameTitle>
+          </FrameHeader>
+          <FramePanel className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="bmusic">Interstitial music (optional)</Label>
               <Input
@@ -208,8 +211,8 @@ function BumpersPage() {
                 already in place for both.
               </p>
             </div>
-          </CardContent>
-        </Card>
+          </FramePanel>
+        </Frame>
       </form>
     </div>
   );

@@ -2,6 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.7] - 2026-07-21
+
+### Changed
+
+- **Admin: sources, users, bumpers, and the channel/package lists are on Frames now.** Following the channel/package forms, these pages moved from Cards to the coss **Frame** treatment — a title + description header over a raised panel. The **channels** and **packages** lists keep their good bits (tinted icon tiles, numbers, callsigns, Auto/Inactive/package badges). Redundant back-links dropped (breadcrumb covers them).
+- **Toggles are Switches now, consistently.** The source **Libraries** enable, the channel-list **Active** toggle, the bumpers **Enable** master switch, and the new-source **Use SSL** are all the `Switch` component instead of native checkboxes. The new-source **Server** picker is the base-lyra `Select` too.
+- **Users page: admin/user role badges got some life** — an amber shield for **Admin**, a muted user outline for everyone else, instead of a plain grey pill.
+
 ## [0.6.6] - 2026-07-21
 
 ### Changed
