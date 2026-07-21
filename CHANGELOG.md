@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.26] - 2026-07-21
+
+### Changed
+
+- **Database schema is now managed by Prisma migrations instead of `db push`** — the first step of the self-host/Docker work. A baseline `0_init` migration (generated from the current schema) was added under `packages/db/prisma/migrations`, and the existing development database was marked as already-applied (non-destructively — nothing was recreated or reset). A fresh install (e.g. the upcoming Docker image) now builds its schema by running the migration. Added a `db:migrate:deploy` script (`prisma migrate deploy`) for the container startup to apply pending migrations safely (never resets, never prompts). Going forward, schema changes are authored with `pnpm db:migrate` (`prisma migrate dev`) and committed as migrations; `db push` is dev-scratch only.
+
 ## [0.6.25] - 2026-07-21
 
 ### Added
