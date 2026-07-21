@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { ChevronRight, LayoutGrid, Plus } from "lucide-react";
 
+import { EmptyState } from "@/components/empty-state";
 import { resolveTile } from "@/features/icons/app-icon";
 import { HeaderRight, TopHeaderRight } from "@/context/header-provider";
 import { trpc, trpcClient } from "@/utils/trpc";
@@ -69,9 +70,20 @@ function PackagesList() {
           </FrameDescription>
         </FrameHeader>
         <FramePanel className="p-0">
-          {packages.data && packages.data.length > 0 ? (
+          {packages.data && packages.data.length === 0 ? (
+            <EmptyState
+              icon={LayoutGrid}
+              title="No packages yet"
+              description="Packages group channels into a lineup (e.g. “Kids & Family”). Create one to organize your guide."
+              action={
+                <Button size="sm" render={<Link to="/packages/new" />}>
+                  <Plus className="mr-1 h-4 w-4" /> New package
+                </Button>
+              }
+            />
+          ) : (
             <div className="divide-border divide-y">
-              {packages.data.map((p) => {
+              {packages.data?.map((p) => {
                 const tile = resolveTile({
                   icon: p.icon,
                   tint: p.tint,
@@ -107,10 +119,6 @@ function PackagesList() {
                 );
               })}
             </div>
-          ) : (
-            <p className="text-muted-foreground p-8 text-center text-sm">
-              No packages yet. Create one to group your channels.
-            </p>
           )}
         </FramePanel>
       </Frame>

@@ -13,6 +13,7 @@ import { Loader2, ShieldCheck, User, UserPlus, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { EmptyState } from "@/components/empty-state";
 import { trpc, trpcClient } from "@/utils/trpc";
 
 /** Role pill — admin gets an amber shield, everyone else a muted user outline. */
@@ -71,22 +72,35 @@ function UsersPage() {
           </Button>
         </FrameHeader>
         <FramePanel className="p-0">
-          <ul className="divide-y">
-            {users.data?.map((u) => (
-              <li key={u.id} className="flex items-center justify-between px-4 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{u.name || u.email}</p>
-                  <p className="text-muted-foreground truncate text-xs">{u.email}</p>
-                </div>
-                <RoleBadge role={u.role} />
-              </li>
-            ))}
-            {users.data?.length === 0 && (
-              <li className="text-muted-foreground px-4 py-6 text-center text-sm">
-                No users yet.
-              </li>
-            )}
-          </ul>
+          {users.data && users.data.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title="No users yet"
+              description="Import your Plex server's shared users, or they'll appear here once created."
+              action={
+                <Button size="sm" onClick={importUsers} disabled={importing}>
+                  {importing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <UserPlus className="mr-2 h-4 w-4" />
+                  )}
+                  Import Plex Users
+                </Button>
+              }
+            />
+          ) : (
+            <ul className="divide-y">
+              {users.data?.map((u) => (
+                <li key={u.id} className="flex items-center justify-between px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{u.name || u.email}</p>
+                    <p className="text-muted-foreground truncate text-xs">{u.email}</p>
+                  </div>
+                  <RoleBadge role={u.role} />
+                </li>
+              ))}
+            </ul>
+          )}
         </FramePanel>
       </Frame>
     </div>

@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.13] - 2026-07-21
+
+### Added
+
+- **Admin: proper empty states across the list views.** A new reusable `EmptyState` component (centered tinted icon + title + guidance + call-to-action) replaces the thin one-line "nothing here" text on **Channels**, **Packages**, **Sources**, **Users**, and **Settings → AI connections**. Each carries a fitting icon and CTA — New channel / New package / Add source / Import Plex Users, and a pointer to the add-connection form. All are guarded to show only after the data has loaded, so there's no empty flash during the initial fetch.
+
 ## [0.6.12] - 2026-07-21
 
 The admin Guide page is rebuilt on the TV app's **Aurora** design and framed as a TV, so the admin's "what's on" view feels like the 10-foot client it drives.

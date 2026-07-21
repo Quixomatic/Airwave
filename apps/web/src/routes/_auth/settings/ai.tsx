@@ -9,6 +9,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { CheckCircle2, Loader2, Pencil, Plug, Trash2, XCircle } from "lucide-react";
 import { useState } from "react";
 
+import { EmptyState } from "@/components/empty-state";
 import { trpc, trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/settings/ai")({
@@ -181,7 +182,13 @@ function SettingsAi() {
           <FrameTitle>Connections</FrameTitle>
         </FrameHeader>
         <FramePanel className="space-y-2">
-          {connections.length === 0 && <p className="text-muted-foreground text-sm">No connections yet — add one below.</p>}
+          {list.data && connections.length === 0 && (
+            <EmptyState
+              icon={Plug}
+              title="No connections yet"
+              description="Add a provider connection below to power the AI assistant and the AI lineup builder."
+            />
+          )}
           {connections.map((c) => {
             const t = test[c.id];
             return (

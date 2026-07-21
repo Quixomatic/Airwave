@@ -13,6 +13,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { Loader2, Plus, Sparkles, Tv } from "lucide-react";
 import { useEffect } from "react";
 
+import { EmptyState } from "@/components/empty-state";
 import { resolveTile } from "@/features/icons/app-icon";
 import { HeaderRight, TopHeaderRight } from "@/context/header-provider";
 import { trpc, trpcClient } from "@/utils/trpc";
@@ -107,6 +108,19 @@ function ChannelsList() {
         )}
 
         <FramePanel className="p-0">
+          {channels.data && channels.data.length === 0 ? (
+            <EmptyState
+              icon={Tv}
+              title="No channels yet"
+              description="Build a channel from your enabled libraries, or use Auto-generate for a full lineup."
+              action={
+                <Button size="sm" render={<Link to="/channels/new" />}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  New channel
+                </Button>
+              }
+            />
+          ) : (
           <ul className="divide-y">
             {channels.data?.map((c) => {
               const tile = resolveTile({
@@ -156,16 +170,8 @@ function ChannelsList() {
               </li>
               );
             })}
-            {channels.data?.length === 0 && (
-              <li className="text-muted-foreground px-4 py-8 text-center text-sm">
-                No channels yet.{" "}
-                <Link to="/channels/new" className="text-primary hover:underline">
-                  Add one
-                </Link>
-                .
-              </li>
-            )}
           </ul>
+          )}
         </FramePanel>
       </Frame>
     </div>
