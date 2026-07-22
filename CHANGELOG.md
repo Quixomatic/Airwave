@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.30] - 2026-07-21
+
+### Added
+
+- **A self-hosting quick-start in the README** — Docker/Dockge deploy steps (grab the compose + `.env`, set the public URLs / secret / admin / PUID·PGID·TZ, `docker compose up -d`), the GHCR image reference, first-run flow (admin → Plex sync → TV onboarding), and how to build the image yourself (staging the `media-v1` capability media). Also updated the dev DB setup to use `pnpm db:migrate` (migrations) instead of `db push`.
+
+### Notes
+
+- Completes the self-host/Docker groundwork: Prisma migrations baseline, the single `CG_ROLE` image, the compose stack + `.env.example`, the GHCR publish Action, and the README. Next: cut a `v*` tag to publish the first image, flip the GHCR package to public, and verify a clean deploy.
+
 ## [0.6.29] - 2026-07-21
 
 ### Added
