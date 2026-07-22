@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.45] - 2026-07-22
+
+### Fixed
+
+- **"Change server" on the installed webOS/Tizen app now reaches the server-selection screen** instead of dropping to the login page. `apps/tv-web/.env.production` carried a leftover dev `VITE_SERVER_URL` (`192.168.1.156:3000`) that got baked into the native build — so clearing the stored server fell back to that baked URL, the app still thought it "had a server", and routed to `/login`. That default is now **empty**, so the packaged app bakes no server URL and returns to the setup/scan screen. (The Docker web player is unaffected — it gets its URL from the container env, which overrides `.env.production`.)
+
+### Changed
+
+- **The change-server action is context-aware:** "Change server" on the installed app (signs out **and** clears the stored server → setup screen), "Sign out" on the browser web player (where the server is fixed by the build → login screen). Both use the two-tap confirm. Adds a `hasBakedServer()` helper.
+
 ## [0.6.44] - 2026-07-22
 
 ### Added

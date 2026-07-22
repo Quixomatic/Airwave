@@ -41,3 +41,14 @@ export const SERVER_URL = getStoredServerUrl() || BAKED;
 export function hasServerUrl(): boolean {
   return SERVER_URL !== "";
 }
+
+/**
+ * Whether the server URL is BAKED at build time (`VITE_SERVER_URL`) — true for the browser web
+ * player (a fixed deployment that always talks to one server), false for the installed app (which
+ * onboards to a user-chosen server). When baked, there's no server to "change" and clearing the
+ * stored URL just falls back to the baked one — so the UI offers "Sign out" instead of "Change
+ * server", and never tries to reach the (unreachable) setup screen.
+ */
+export function hasBakedServer(): boolean {
+  return BAKED !== "";
+}

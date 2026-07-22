@@ -11,7 +11,7 @@ import {
   setNetworkOverride,
   type Network,
 } from "../../../lib/plex-connection";
-import { clearStoredServerUrl } from "../../../lib/server-url";
+import { clearStoredServerUrl, hasBakedServer } from "../../../lib/server-url";
 
 const NETWORK_LABEL: Record<Network, string> = {
   local: "Local network",
@@ -29,10 +29,14 @@ function About() {
   // A reload then lands on onboarding (native app, no baked URL) or the login screen (web player,
   // baked URL) — never straight back into the guide, which would otherwise re-run the diagnostic
   // because you'd still be "logged in". Two-tap confirm so a stray OK can't sign you out.
+  // On the web player the server URL is baked in (a fixed deployment) → there's no server to change,
+  // so this is just "Sign out" (lands on /login). On the installed app it clears the stored server
+  // too, so the reload lands on the server-setup screen.
+  const baked = hasBakedServer();
   const [armChange, setArmChange] = useState(false);
   const changeServer = () => {
     setToken(null);
-    clearStoredServerUrl();
+    if (!baked) clearStoredServerUrl();
     window.location.reload();
   };
   const [network, setNetwork] = useState<Network | null>(getNetwork());
@@ -102,10 +106,12 @@ function About() {
       <div style={{ maxWidth: 640 }}>
         <SectionLabel>Server</SectionLabel>
         <SettingRow
-          label={armChange ? "Sign out & change server?" : "Change server"}
+          label={baked ? "Sign out" : "Change server"}
           sublabel={
             armChange
-              ? "Press OK again to confirm — this signs you out of the current server"
+              ? baked
+                ? "Press OK again to sign out of this server"
+                : "Press OK again to sign out and return to server setup"
               : SERVER_URL || "Not connected"
           }
           focused={sel === 0}
