@@ -11,7 +11,12 @@ model MediaSource {
   id                String          @id @default(cuid())
   type              MediaSourceType @default(PLEX)
   name              String
-  baseUrl           String? // resolved/pinned connection URI
+  baseUrl           String? // resolved/pinned connection URI (server → Plex; also the LAN URL, since the server runs alongside Plex)
+  // The server's OFF-network Plex connection URIs (from plex.tv /resources), kept fresh by the
+  // hourly plex-connection-refresh job. A client that can't reach `baseUrl` on the LAN falls back
+  // to remoteUrl (WAN), then relayUrl (last resort, ~2 Mbps). baseUrl covers the local case.
+  remoteUrl         String? // Plex remote/WAN connection URI
+  relayUrl          String? // Plex relay connection URI
   machineIdentifier String? // Plex server clientIdentifier
   token             String // owner/admin token — encrypted at rest
   clientIdentifier  String? // the X-Plex-Client-Identifier used to obtain the token

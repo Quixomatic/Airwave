@@ -8,7 +8,7 @@ import { getGlobalBumperConfig } from "../bumpers/bumper-config";
 import { generateLineup } from "../generator/generate";
 import { syncMediaItems } from "../media/sync-media";
 import { syncRecentlyAdded } from "../media/sync-recent";
-import { getPlexUser, stopTranscode } from "../plex/client";
+import { getPlexUser, resolveConnectionUrls, stopTranscode } from "../plex/client";
 import { syncLibraries } from "../plex/sync-libraries";
 import {
   INITIAL_WINDOW_SECONDS,
@@ -407,6 +407,36 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
           await getPlexUser(source.clientIdentifier ?? "channelguide-server", source.token);
         } catch {
           console.warn(`[jobs] Plex token check failed for source "${source.name}"`);
+        }
+      }
+    },
+  },
+  {
+    id: "plex-connection-refresh",
+    name: "Plex Connection Refresh",
+    description:
+      "Refreshes each source's current LAN / remote / relay connection URLs from plex.tv, so clients can reach the media server on- or off-network even as its WAN IP changes. Runs hourly.",
+    interval: "hours",
+    // hourly — plex.tv's /resources reflects the present WAN IP, so this keeps the remote URL
+    // fresh for a client that probes local → remote → relay at launch (dynamic-IP safe).
+    defaultCron: "0 0 * * * *",
+    run: async (signal) => {
+      for (const source of await enabledSources()) {
+        throwIfAborted(signal);
+        if (!source.machineIdentifier) continue;
+        try {
+          const conns = await resolveConnectionUrls(
+            source.clientIdentifier ?? "channelguide-server",
+            source.token,
+            source.machineIdentifier,
+          );
+          if (conns)
+            await prisma.mediaSource.update({
+              where: { id: source.id },
+              data: { remoteUrl: conns.remoteUrl, relayUrl: conns.relayUrl },
+            });
+        } catch {
+          console.warn(`[jobs] Plex connection refresh failed for source "${source.name}"`);
         }
       }
     },

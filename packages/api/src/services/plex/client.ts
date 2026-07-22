@@ -110,6 +110,44 @@ export async function getServers(clientId: string, token: string): Promise<PlexS
     }));
 }
 
+export type ConnectionUrls = {
+  remoteUrl: string | null;
+  relayUrl: string | null;
+};
+
+/**
+ * The OFF-network Plex connection URIs. The ChannelGuide server always runs alongside Plex, so
+ * the stored `baseUrl` already IS the local URL and the server uses it for everything — only a
+ * TV app that's away from home needs these, to fall back to when it can't reach `baseUrl` on the
+ * LAN: remoteUrl (WAN) then relayUrl (last resort). With `includeHttps=1` each `uri` is the HTTPS
+ * `plex.direct` form, so prefer https (mixed-content-safe for an HTTPS client).
+ */
+export function pickConnectionUrls(connections: PlexConnection[]): ConnectionUrls {
+  const https = connections.filter((c) => c.protocol === "https");
+  const pool = https.length ? https : connections;
+  return {
+    remoteUrl: pool.find((c) => !c.local && !c.relay)?.uri ?? null,
+    relayUrl: pool.find((c) => c.relay)?.uri ?? null,
+  };
+}
+
+/**
+ * Fetch the CURRENT off-network connection URIs for one server (matched by clientIdentifier /
+ * `machineIdentifier`). plex.tv's `/resources` always reflects the present state — the PMS
+ * re-publishes on WAN-IP change — so this is how we keep the remote URL fresh. Returns null if
+ * the token can no longer reach that server.
+ */
+export async function resolveConnectionUrls(
+  clientId: string,
+  token: string,
+  machineIdentifier: string,
+): Promise<ConnectionUrls | null> {
+  const servers = await getServers(clientId, token);
+  const server = servers.find((s) => s.clientIdentifier === machineIdentifier);
+  if (!server) return null;
+  return pickConnectionUrls(server.connections);
+}
+
 export type PlexSharedUser = {
   plexId: string;
   email: string | null;

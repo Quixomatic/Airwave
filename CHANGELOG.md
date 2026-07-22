@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.35] - 2026-07-22
+
+### Added
+
+- **Media sources now store the Plex server's off-network connection URLs** (`remoteUrl` + `relayUrl`) — groundwork for playing channels on a TV that's away from home. The ChannelGuide server always runs alongside Plex, so it keeps using `baseUrl` (effectively the LAN URL) for everything; only a remote TV needs the WAN/relay URL to reach Plex. These are captured from plex.tv's `/resources` at connect time and kept current by a new **Plex Connection Refresh** job (hourly) — because `/resources` always reflects the present WAN IP, that handles dynamic-IP drift automatically. The admin token already authorizes every one of these URLs, so nothing else is needed. (The TV-side check that picks local-vs-remote at launch is a later step; this release only captures the data.) Adds a `probe-plex-connections.ts` diagnostic script.
+
+### Notes
+
+- Schema change — new `MediaSource.remoteUrl` / `relayUrl` columns (migration `add_source_remote_urls`). Applies automatically on deploy via `migrate deploy`.
+
 ## [0.6.34] - 2026-07-22
 
 ### Fixed

@@ -42,10 +42,18 @@ export const plexRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Capture the server's current off-network connection URIs (remote/relay) so a TV app
+      // away from home can fall back to them. Best-effort — the hourly plex-connection-refresh
+      // job keeps them current (and handles dynamic-WAN-IP drift), so a hiccup here is fine.
+      const conns = await plex
+        .resolveConnectionUrls(input.clientId, input.token, input.machineIdentifier)
+        .catch(() => null);
       const data = {
         type: "PLEX" as const,
         name: input.name,
         baseUrl: input.baseUrl,
+        remoteUrl: conns?.remoteUrl ?? null,
+        relayUrl: conns?.relayUrl ?? null,
         machineIdentifier: input.machineIdentifier,
         token: input.token,
         clientIdentifier: input.clientId,
