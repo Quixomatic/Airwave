@@ -79,7 +79,9 @@ RUN pnpm --filter @ChannelGuide/db db:generate \
  && pnpm --filter server build
 
 # --- Runtime user (remapped to PUID/PGID by the entrypoint) -------------------------
-RUN groupadd -g 1000 app && useradd -u 1000 -g app -d /home/app -m -s /bin/bash app
+# node:22 already ships a uid/gid 1000 (`node`), so don't force 1000 here — let the system
+# pick free ids. The entrypoint remaps `app` to PUID/PGID at runtime (with -o for non-unique).
+RUN groupadd app && useradd -g app -d /home/app -m -s /bin/bash app
 
 RUN cp /app/docker/entrypoint.sh /usr/local/bin/entrypoint.sh \
  && chmod +x /usr/local/bin/entrypoint.sh

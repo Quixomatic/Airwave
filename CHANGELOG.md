@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.31] - 2026-07-22
+
+### Fixed
+
+- **Docker image build failed creating the runtime user** — `node:22-bookworm-slim` already ships a `node` user at uid/gid 1000, so forcing the `app` user to 1000 collided (`groupadd` exit 4). The build now lets the system assign free ids; the entrypoint still remaps `app` to your PUID/PGID at runtime. Caught by the first GHCR publish run.
+
 ## [0.6.30] - 2026-07-21
 
 ### Added
