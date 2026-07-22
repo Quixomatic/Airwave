@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.37] - 2026-07-22
+
+### Added
+
+- **TV Settings → About: a "Force connection (testing)" toggle** below the connection indicator, to exercise the remote/relay playback path from the home LAN without going off-network. It cycles **Auto → Remote → Relay** and overrides the launch probe (persisted on the device); the indicator above reflects the effective connection. Auto returns to following the probe.
+
 ## [0.6.36] - 2026-07-22
 
 ### Added

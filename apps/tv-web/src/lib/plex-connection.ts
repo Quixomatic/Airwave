@@ -12,26 +12,45 @@ import { SERVER_URL, getToken } from "./auth-client";
 
 export type Network = "local" | "remote" | "relay";
 
-const KEY = "cg-tv-network";
+const KEY = "cg-tv-network"; // the probed value
+const OVERRIDE_KEY = "cg-tv-network-override"; // a manual test override (Settings → About) — wins
 
-function readStored(): Network | null {
+function read(key: string): Network | null {
   try {
-    const v = localStorage.getItem(KEY);
+    const v = localStorage.getItem(key);
     return v === "local" || v === "remote" || v === "relay" ? v : null;
   } catch {
     return null;
   }
 }
 
-let current: Network | null = readStored();
+let probed: Network | null = read(KEY);
+let override: Network | null = read(OVERRIDE_KEY);
 
-/** The network chosen at the last probe — what `/media` requests are stamped with. */
+/** The EFFECTIVE network `/media` requests are stamped with — a manual override wins over the
+ * probe (so you can force remote from the LAN to test it). */
 export function getNetwork(): Network | null {
-  return current;
+  return override ?? probed;
 }
 
-function setNetwork(n: Network) {
-  current = n;
+/** The manual test override, or null when following the launch probe. */
+export function getNetworkOverride(): Network | null {
+  return override;
+}
+
+/** Force a network for testing (or null to follow the probe). Persisted on the device. */
+export function setNetworkOverride(n: Network | null) {
+  override = n;
+  try {
+    if (n) localStorage.setItem(OVERRIDE_KEY, n);
+    else localStorage.removeItem(OVERRIDE_KEY);
+  } catch {
+    /* non-fatal */
+  }
+}
+
+function setProbed(n: Network) {
+  probed = n;
   try {
     localStorage.setItem(KEY, n);
   } catch {
@@ -83,10 +102,10 @@ export async function probeConnection(): Promise<Network> {
   ];
   for (const [net, url] of candidates) {
     if (url && (await reachable(url))) {
-      setNetwork(net);
+      setProbed(net);
       return net;
     }
   }
-  setNetwork("local");
+  setProbed("local");
   return "local";
 }

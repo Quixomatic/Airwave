@@ -4,7 +4,13 @@ import { useState } from "react";
 import { APP_NAME, APP_VERSION } from "../../../lib/app-info";
 import { PageHeader, SectionLabel, SettingRow, useSettingsPage } from "../../../features/settings/settings-ui";
 import { SERVER_URL } from "../../../lib/auth-client";
-import { getNetwork, probeConnection, type Network } from "../../../lib/plex-connection";
+import {
+  getNetwork,
+  getNetworkOverride,
+  probeConnection,
+  setNetworkOverride,
+  type Network,
+} from "../../../lib/plex-connection";
 import { clearStoredServerUrl } from "../../../lib/server-url";
 
 const NETWORK_LABEL: Record<Network, string> = {
@@ -25,19 +31,31 @@ function About() {
     window.location.reload();
   };
   const [network, setNetwork] = useState<Network | null>(getNetwork());
+  const [override, setOverride] = useState<Network | null>(getNetworkOverride());
   const [checking, setChecking] = useState(false);
+
   // Re-probe which Plex connection this device reaches (local → remote → relay).
   const recheck = () => {
     if (checking) return;
     setChecking(true);
     probeConnection()
-      .then((n) => setNetwork(n))
+      .then(() => setNetwork(getNetwork()))
       .finally(() => setChecking(false));
   };
 
-  const { sel } = useSettingsPage(2, (i) => {
+  // Force a connection for testing (cycle Auto → Remote → Relay). Lets you exercise the remote/
+  // relay path from the home LAN. "Auto" follows the launch probe.
+  const cycleOverride = () => {
+    const next: Network | null = override === null ? "remote" : override === "remote" ? "relay" : null;
+    setNetworkOverride(next);
+    setOverride(next);
+    setNetwork(getNetwork());
+  };
+
+  const { sel } = useSettingsPage(3, (i) => {
     if (i === 0) changeServer();
     if (i === 1) recheck();
+    if (i === 2) cycleOverride();
   });
 
   return (
@@ -82,6 +100,12 @@ function About() {
           sublabel={checking ? "Checking…" : network ? `${NETWORK_LABEL[network]} — tap to recheck` : "Not determined — tap to check"}
           focused={sel === 1}
           onClick={recheck}
+        />
+        <SettingRow
+          label="Force connection (testing)"
+          sublabel={override ? `Forced: ${NETWORK_LABEL[override]} — tap to change` : "Off — following auto probe"}
+          focused={sel === 2}
+          onClick={cycleOverride}
         />
       </div>
     </div>
