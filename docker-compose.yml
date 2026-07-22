@@ -112,8 +112,11 @@ services:
     environment:
       CG_ROLE: tvweb
       TV_WEB_PORT: 3002
-      # Baked into the TV player build — the address browsers use to reach the server.
-      VITE_SERVER_URL: ${SERVER_PUBLIC_URL}
+      # Baked into the player build — the address the visitor's BROWSER uses to reach the server.
+      # Defaults to the admin's server URL. Override with TV_SERVER_URL to point the player at its
+      # OWN public domain (e.g. reverse-proxied at https://airwave-tv…/ with /api forwarded to the
+      # server) so the server itself can stay unexposed on the LAN.
+      VITE_SERVER_URL: ${TV_SERVER_URL:-${SERVER_PUBLIC_URL}}
       PUID: ${PUID:-1000}
       PGID: ${PGID:-1000}
       UMASK: ${UMASK:-022}

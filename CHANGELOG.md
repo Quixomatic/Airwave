@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.41] - 2026-07-22
+
+### Added
+
+- **`TV_SERVER_URL` — point the TV web player at its own domain, independent of the admin's server URL.** Defaults to `SERVER_PUBLIC_URL` (so a plain LAN setup is unchanged), but can be set to the player's own public domain — e.g. when the player is reverse-proxied at `https://airwave-tv.example/` with `/api` + `/img` forwarded to the server. That lets the **player be exposed publicly while the server stays unexposed on the LAN**: the visitor's browser only ever talks to the public HTTPS player domain, and the proxy bridges `/api` to the LAN server internally (no CORS, no mixed content, no cert on the server).
+
 ## [0.6.40] - 2026-07-22
 
 ### Added
