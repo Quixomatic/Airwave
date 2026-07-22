@@ -33,6 +33,15 @@ export function createAuth() {
     };
   }
 
+  // Cross-origin admin cookies want sameSite:none;secure — but browsers ONLY honor a
+  // Secure cookie over HTTPS (localhost is the one http exception). On a plain-HTTP LAN
+  // deploy (http://<host>:port) a Secure cookie is silently dropped, so admin login would
+  // fail. Derive the attributes from the scheme: HTTPS → none/secure (also covers cross-site
+  // setups); HTTP → lax/insecure, which still works because the admin web and the server
+  // share a host, so requests between their ports are same-site. (Admin + server on
+  // *different* hosts over plain HTTP is unsupported — put a TLS proxy in front.)
+  const httpsAuth = env.BETTER_AUTH_URL.startsWith("https:");
+
   return betterAuth({
     database: prismaAdapter(prisma, { provider: "postgresql" }),
 
@@ -66,8 +75,8 @@ export function createAuth() {
 
     advanced: {
       defaultCookieAttributes: {
-        sameSite: "none",
-        secure: true,
+        sameSite: httpsAuth ? "none" : "lax",
+        secure: httpsAuth,
         httpOnly: true,
       },
     },

@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.32] - 2026-07-22
+
+### Fixed
+
+- **Admin login now works on a plain-HTTP self-host** (e.g. `http://<nas-ip>:port`). The session cookie was hardcoded `sameSite: none; secure: true`, and browsers only honor a `Secure` cookie over HTTPS — so on a LAN IP over HTTP the cookie was silently dropped and login failed. The cookie attributes now derive from the `BETTER_AUTH_URL` scheme: **HTTPS → `none`/`secure`** (unchanged, and supports cross-site setups), **HTTP → `lax`/insecure**, which works because the admin web and the server share a host (their ports are same-site). Admin + server on *different* hosts over plain HTTP is unsupported — front it with a TLS proxy.
+
 ## [0.6.31] - 2026-07-22
 
 ### Fixed
