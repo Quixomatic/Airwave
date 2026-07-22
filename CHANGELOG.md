@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.46] - 2026-07-22
+
+### Fixed
+
+- **A fresh install (zero channels) now loads the full TV guide interface** — sidebar, featured chrome, and the context-aware empty-state grid — instead of a dead-end "No channels yet." card with no navigation. `GuideScreen` was short-circuiting to a bare centered message *before* mounting the guide, so on a brand-new server the sidebar never rendered and you couldn't reach Settings / Change server / the filter lenses. The v0.6.44 empty-state work (skeleton grid + nav-trap fix) already handled this inside `AuroraGrid`, but only the *filtered*-empty cases (Favorites / Recents / package filter) ever got there, because those still have a non-empty raw channel list. Removed the early return so the genuinely-empty case renders the same real interface.
+
 ## [0.6.45] - 2026-07-22
 
 ### Fixed

@@ -43,8 +43,11 @@ export function GuideScreen({
     return <Centered>Couldn't load the guide.</Centered>;
   }
   if (!data) return <Centered>Loading…</Centered>;
-  if (!data.channels.length) return <Centered>No channels yet.</Centered>;
 
+  // NOTE: no early return for an empty channel list. AuroraGrid renders the full interface
+  // (sidebar + featured chrome + its own context-aware GuideGhost empty state) even with zero
+  // channels, so a fresh install still gets the sidebar to reach Settings/scan — a plain
+  // "No channels yet." card here would strand the user with no navigation.
   return (
     <AuroraGrid
       channels={data.channels}
