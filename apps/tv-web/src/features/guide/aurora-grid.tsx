@@ -5,6 +5,7 @@ import { Heart, Star } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { GuideGridChannel, GuideGridProgram } from "../../lib/api";
+import { LAYER, useKeyLayer } from "../../lib/input";
 import { C } from "../../lib/theme";
 import { channelTint } from "../../lib/tint";
 import { useFavorites, useSetFavorite } from "../../hooks/use-favorites";
@@ -327,119 +328,114 @@ export function AuroraGrid({
   // The strategy a channel change uses to pick the highlighted program (toggle at the top).
   const pickForChannel = TIME_ALIGN_CHANNEL_NAV ? pickAtCursor : pickAtLive;
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      // The full-screen player owns the keys while it's up.
-      if (player.layout === "full") return;
-      const isBack = e.keyCode === 461 || ["Backspace", "GoBack", "BrowserBack", "XF86Back"].includes(e.key);
+  // The guide's zone machine. Off the stack entirely while the full-screen player is up (which is
+  // what the old `if (player.layout === "full") return` did by hand).
+  //
+  // Returning `true` claims the key. The sidebar / rail / mini-feed branches claim EVERY key,
+  // matching the blanket `preventDefault()` those branches used to call before returning.
+  useKeyLayer({
+    id: "guide",
+    priority: LAYER.BASE,
+    active: player.layout !== "full",
+    onKey(e) {
       // Channel-number entry owns OK (commit) + Back (cancel) while active — defer so we don't tune
       // the focused channel or exit the app under it. Arrows fall through (break out + navigate).
-      if (player.numberEntryActiveRef.current && (isBack || e.key === "Enter")) return;
+      // TEMPORARY: goes away once number entry is a MODAL layer, since it will then claim these
+      // keys before the guide is ever consulted.
+      if (player.numberEntryActiveRef.current && (e.key === "back" || e.key === "ok")) return false;
 
       // Sidebar focused → its circles own the keys (Up/Down cycle, OK activates, Right/Back → grid).
       if (zone === "sidebar") {
-        e.preventDefault();
-        if (isBack || e.key === "ArrowRight") setZone("grid");
-        else if (e.key === "ArrowUp") setSidebarSel((s) => Math.max(0, s - 1));
-        else if (e.key === "ArrowDown") setSidebarSel((s) => Math.min(sidebarItems.length - 1, s + 1));
-        else if (e.key === "Enter") activateSidebar(sidebarSel);
-        return;
+        if (e.key === "back" || e.key === "right") setZone("grid");
+        else if (e.key === "up") setSidebarSel((s) => Math.max(0, s - 1));
+        else if (e.key === "down") setSidebarSel((s) => Math.min(sidebarItems.length - 1, s + 1));
+        else if (e.key === "ok") activateSidebar(sidebarSel);
+        return true;
       }
 
       // Rail focused (the channel cell) → the waypoint between grid and sidebar. Left opens the
       // sidebar; Up/Down browse channels rail-first; Right/Back returns to the grid; OK toggles
       // this channel's favorite (the heart shown beside the rail icon).
       if (zone === "rail") {
-        e.preventDefault();
-        if (e.key === "ArrowLeft") {
+        if (e.key === "left") {
           setZone("sidebar");
           setSidebarSel(0);
-        } else if (isBack || e.key === "ArrowRight") {
+        } else if (e.key === "back" || e.key === "right") {
           setZone("grid");
-        } else if (e.key === "ArrowUp") {
+        } else if (e.key === "up") {
           setFc((c) => Math.max(0, c - 1));
-        } else if (e.key === "ArrowDown") {
+        } else if (e.key === "down") {
           setFc((c) => Math.min(channels.length - 1, c + 1));
-        } else if (e.key === "Enter" && focusedChannel) {
+        } else if (e.key === "ok" && focusedChannel) {
           toggleFavorite(focusedChannel.id);
         }
-        return;
+        return true;
       }
 
       // Mini feed focused → its two buttons own the keys (Down returns to the grid; nothing sits
       // above it now that the nav pill is gone).
       if (player.miniFocused) {
-        e.preventDefault();
-        if (isBack) player.stop();
-        else if (e.key === "ArrowLeft") player.miniMove(-1);
-        else if (e.key === "ArrowRight") player.miniMove(1);
-        else if (e.key === "Enter") player.miniActivate();
-        else if (e.key === "ArrowDown") player.blurMini();
-        return;
+        if (e.key === "back") player.stop();
+        else if (e.key === "left") player.miniMove(-1);
+        else if (e.key === "right") player.miniMove(1);
+        else if (e.key === "ok") player.miniActivate();
+        else if (e.key === "down") player.blurMini();
+        return true;
       }
 
       // Back: a playing mini feed → stop the feed + session; otherwise exit the app.
-      if (isBack) {
-        e.preventDefault();
+      if (e.key === "back") {
         if (player.layout === "mini") player.stop();
         else (window as unknown as { webOS?: { platformBack?: () => void } }).webOS?.platformBack?.();
-        return;
+        return true;
       }
 
       const n = channels.length;
       if (!n) {
         // Empty grid (a filter with no channels, or a fresh install): there's nothing to browse,
-        // but Left must still reach the sidebar so you're not trapped in an empty guide. (Back is
-        // handled above.) Without this the old `if (!n) return` swallowed every key here.
-        if (e.key === "ArrowLeft") {
-          e.preventDefault();
+        // but Left must still reach the sidebar so you're not trapped in an empty guide.
+        if (e.key === "left") {
           setZone("sidebar");
           setSidebarSel(0);
+          return true;
         }
-        return;
+        return false;
       }
+
       switch (e.key) {
-        case "ArrowRight":
-          e.preventDefault();
+        case "right":
           setFp((p) => Math.min((focusedChannel?.programs.length ?? 1) - 1, p + 1));
-          break;
-        case "ArrowLeft":
-          e.preventDefault();
+          return true;
+        case "left":
           // Left off the leftmost program → the channel rail (favorite waypoint), then the sidebar.
           if (fp === 0) setZone("rail");
           else setFp((p) => Math.max(0, p - 1));
-          break;
-        case "ArrowDown": {
-          e.preventDefault();
+          return true;
+        case "down": {
           const nc = Math.min(n - 1, fc + 1);
           setFc(nc);
           setFp(pickForChannel(nc));
-          break;
+          return true;
         }
-        case "ArrowUp": {
-          e.preventDefault();
+        case "up": {
           // At the top row, Up docks into the mini feed if one's playing (nothing above it
           // otherwise — Guide/Settings/Account moved into the sidebar).
           if (fc === 0) {
             if (player.layout === "mini") player.focusMini();
-            break;
+            return true;
           }
           const nc = Math.max(0, fc - 1);
           setFc(nc);
           setFp(pickForChannel(nc));
-          break;
+          return true;
         }
-        case "Enter":
-          e.preventDefault();
+        case "ok":
           if (focusedChannel) onTune(focusedChannel.id);
-          break;
-        default:
-          break;
+          return true;
       }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [channels, fc, fp, focusedChannel, onTune, player, zone, onSettings, sidebarSel, sidebarItems, activateSidebar, toggleFavorite]);
+      return false;
+    },
+  });
 
   // The lens list can shrink under the focus (e.g. unfavoriting the channel you're on while in the
   // Favorites lens), which would leave `fc` pointing past the end.

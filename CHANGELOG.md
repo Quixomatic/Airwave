@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.2] - 2026-07-22
+
+### Changed
+
+- **The guide is now a dispatcher layer.** `aurora-grid`'s zone machine (grid / rail / sidebar / mini-feed focus) moved off its own `window` listener and onto the input stack. The `if (player.layout === "full") return` guard is gone — the layer is simply off the stack while the full-screen player is up. The handler also stopped being the app's only bubble-phase listener (every other one was capture), which meant it could never win a key contest it didn't already have a ref guard for. **No behavior change intended.**
+
+### Notes
+
+- One temporary guard remains: the guide still checks `numberEntryActiveRef` for OK/Back. It goes away when channel-number entry becomes a `MODAL` layer in the next step, at which point number entry claims those keys before the guide is ever consulted.
+
 ## [0.7.1] - 2026-07-22
 
 ### Added
