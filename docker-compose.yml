@@ -46,7 +46,9 @@ services:
       # Where browsers/TV reach the SERVER, and where the admin web is loaded FROM.
       BETTER_AUTH_URL: ${SERVER_PUBLIC_URL}
       CORS_ORIGIN: ${WEB_PUBLIC_URL}
-      TV_APP_ORIGIN: ${TV_APP_ORIGIN:-}
+      # The TV web player's origin, allow-listed for its login flow (empty unless the tvweb
+      # service is enabled — see COMPOSE_PROFILES / TV_WEB_PUBLIC_URL in .env).
+      TV_APP_ORIGIN: ${TV_WEB_PUBLIC_URL:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
@@ -92,6 +94,34 @@ services:
     healthcheck:
       # First start compiles the SPA (vite) before serving — allow generous start_period.
       test: ["CMD-SHELL", "curl -fsS http://localhost:3001/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 180s
+
+  # OPTIONAL — the 10-foot TV app as a browser web player (auth-gated). Off by default; enable it
+  # by adding `tvweb` to COMPOSE_PROFILES in .env, and set TV_WEB_PUBLIC_URL (that address is also
+  # allow-listed on the server as TV_APP_ORIGIN for the TV login flow).
+  tvweb:
+    image: ${CG_IMAGE:-ghcr.io/quixomatic/channelguide:latest}
+    restart: unless-stopped
+    profiles: ["tvweb"]
+    depends_on:
+      server:
+        condition: service_started
+    environment:
+      CG_ROLE: tvweb
+      TV_WEB_PORT: 3002
+      # Baked into the TV player build — the address browsers use to reach the server.
+      VITE_SERVER_URL: ${SERVER_PUBLIC_URL}
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      UMASK: ${UMASK:-022}
+      TZ: ${TZ:-UTC}
+    ports:
+      - "${TV_WEB_PORT:-36022}:3002"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3002/ || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10

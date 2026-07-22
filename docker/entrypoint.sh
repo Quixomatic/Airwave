@@ -77,6 +77,21 @@ case "${CG_ROLE}" in
     exec gosu app env HOME=/home/app bun /app/docker/serve-web.ts
     ;;
 
+  tvweb)
+    # The 10-foot TV app, served as a browser web player. Same image; builds at startup with the
+    # server URL baked in (so it connects without the device-onboarding step), then serves the SPA.
+    if [ -z "${VITE_SERVER_URL:-}" ]; then
+      echo "[entrypoint] ERROR: VITE_SERVER_URL is required for CG_ROLE=tvweb" >&2
+      exit 1
+    fi
+    echo "[entrypoint] building TV web player (VITE_SERVER_URL=${VITE_SERVER_URL})…"
+    pnpm --filter tv-web build
+
+    echo "[entrypoint] serving TV web player on :${TV_WEB_PORT:-3002}…"
+    exec gosu app env HOME=/home/app WEB_DIST=/app/apps/tv-web/dist WEB_PORT="${TV_WEB_PORT:-3002}" \
+      bun /app/docker/serve-web.ts
+    ;;
+
   *)
     echo "[entrypoint] ERROR: unknown CG_ROLE '${CG_ROLE}' (expected 'server' or 'web')" >&2
     exit 1

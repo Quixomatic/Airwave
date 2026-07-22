@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.40] - 2026-07-22
+
+### Added
+
+- **The TV app can be served as an auth-gated browser web player from the Docker image** — a third `CG_ROLE=tvweb` that builds the 10-foot TV app at startup (with the server URL baked in, so it connects without device onboarding) and serves it on its own port. Off by default; enable it by adding `tvweb` to `COMPOSE_PROFILES` in `.env` and setting `TV_WEB_PUBLIC_URL` + `TV_WEB_PORT`. The player's URL is auto-allow-listed on the server (`TV_APP_ORIGIN`) so its login flow (`/api/auth/*`, which a browser CORS-enforces — unlike the native webOS app) works. Anyone with an account can open it as a web player. Reuses the same image + static server; no rebuild of the app itself.
+
 ## [0.6.39] - 2026-07-22
 
 ### Added
