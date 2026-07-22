@@ -2,6 +2,27 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.4] - 2026-07-22
+
+### Added
+
+- **The four screens that never had D-pad support now have it.** Login, server setup, the capability diagnostic and the remote key probe were reachable *only* by the magic-remote pointer — arrow keys did nothing on any of them, because D-pad support wasn't a property of the app, it was something each screen had to hand-roll and these four never did. Now:
+  - **Login** — ▲▼ moves between "Log in with Plex" and "Log in with a code", OK activates; Back returns from the code screen to the chooser.
+  - **Server setup** — ▲▼ moves over the address field, Connect, any found servers, and Scan; OK activates.
+  - **Diagnostic** — OK now activates **Continue** (and **Skip** on the error screen) once the run finishes, instead of the button being pointer-only.
+- **A `useDpadList` hook** for exactly this shape — a screen declares how many items it has and what OK does, and it's navigable. No listener, no key constants, no zone plumbing.
+- **A logo slot on the login screen**, above the sign-in choices: drop a `logo.png` into `apps/tv-web/public/` and it appears. Until then it renders nothing (not a broken image), so the layout is identical either way.
+
+### Fixed
+
+- **The diagnostic's Back key now uses the full key set.** Its inline test was missing `GoBack` and `BrowserBack` — the one copy of the back-key check that had drifted from the other seven. It's now the shared normalization, so it can't drift again.
+
+### Notes
+
+- **Server setup handles the on-screen keyboard properly.** While the address field is focused the keyboard owns the keys (LG documents that keydown/keyup don't fire for it apart from Enter and Back), so the screen claims *nothing* except Back — which closes the keyboard and hands control to the D-pad list. OK on the address field re-opens it. Enter still connects, as before.
+- **The remote key probe deliberately keeps no D-pad navigation** — it must swallow every key to measure it, so its Clear/Exit buttons stay pointer-only and double-Back remains the keyboard escape. It's now an `exclusive` `MODAL` layer instead of a raw pair of listeners.
+- **Every hand-rolled `window` key listener in the app is now gone.** All input flows through the one dispatcher.
+
 ## [0.7.3] - 2026-07-22
 
 ### Changed

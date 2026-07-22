@@ -3,7 +3,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, plexLink } from "../../lib/api";
 import { authClient } from "../../lib/auth-client";
 import { SERVER_URL, setToken } from "../../lib/auth-client";
+import { useDpadList } from "../../lib/input";
 import { Qr } from "../../lib/qr";
+
+const ACCENT = "#4a9fe0";
 
 /* -------------------------------------------------------------------------- */
 /*  Login — two device-code flows: Plex (plex.tv/link) and ChannelGuide code   */
@@ -104,8 +107,28 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
     }, (data.interval ?? 5) * 1000);
   }, [onSignedIn]);
 
+  // Two focusable buttons on the chooser; one ("← Back") once a code is pending. Back on the
+  // pending view returns to the chooser, matching what the on-screen button does.
+  const choices = pending ? [() => reset(null)] : [startPlex, startDevice];
+  const { sel } = useDpadList({
+    id: "login",
+    count: choices.length,
+    onActivate: (i) => choices[i]?.(),
+    onBack: () => {
+      if (!pending) return false; // nothing above the chooser — let it fall through
+      reset(null);
+      return true;
+    },
+  });
+
+  /** D-pad focus ring, matching the rest of the 10-foot UI (simulated focus, not DOM focus). */
+  const ring = (i: number) =>
+    sel === i ? { outline: `3px solid ${ACCENT}`, outlineOffset: 4 } : undefined;
+
   return (
     <div className="mx-auto flex min-h-full max-w-3xl flex-col items-center justify-center gap-8 p-10 text-center">
+      <Logo />
+
       <div>
         <h1 className="text-4xl font-semibold tracking-tight">ChannelGuide</h1>
         <p className="mt-2 text-zinc-400">Sign in to start watching.</p>
@@ -117,7 +140,11 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
           <p className="max-w-sm text-zinc-400">{pending.instruction}</p>
           <Qr value={pending.qrValue} />
           <p className="font-mono text-5xl font-bold tracking-[0.3em]">{pending.code}</p>
-          <button onClick={() => reset(null)} className="text-sm text-zinc-500 hover:text-zinc-300">
+          <button
+            onClick={() => reset(null)}
+            style={ring(0)}
+            className="rounded-lg px-4 py-2 text-sm text-zinc-400 transition hover:text-zinc-200"
+          >
             ← Back
           </button>
         </div>
@@ -125,12 +152,14 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
         <div className="flex w-full max-w-md flex-col gap-4">
           <button
             onClick={startPlex}
+            style={ring(0)}
             className="rounded-xl bg-amber-500 px-6 py-5 text-xl font-semibold text-black transition hover:bg-amber-400"
           >
             Log in with Plex
           </button>
           <button
             onClick={startDevice}
+            style={ring(1)}
             className="rounded-xl border border-zinc-700 px-6 py-5 text-xl font-semibold text-zinc-200 transition hover:bg-zinc-800"
           >
             Log in with a code
@@ -141,5 +170,23 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
       {error && <p className="text-red-400">{error}</p>}
       <p className="text-xs text-zinc-600">Server: {SERVER_URL}</p>
     </div>
+  );
+}
+
+/**
+ * The brand mark above the sign-in choices. Drop a `logo.png` (or `.svg`) into `apps/tv-web/public/`
+ * and it appears here automatically; until then this renders nothing rather than a broken image, so
+ * the layout is identical either way.
+ */
+function Logo() {
+  const [ok, setOk] = useState(true);
+  if (!ok) return null;
+  return (
+    <img
+      src="/logo.png"
+      alt=""
+      onError={() => setOk(false)}
+      style={{ maxWidth: "min(38vw, 420px)", maxHeight: "22vh", objectFit: "contain" }}
+    />
   );
 }

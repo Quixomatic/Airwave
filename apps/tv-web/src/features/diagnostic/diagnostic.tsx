@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, type CapTest } from "../../lib/api";
 import { SERVER_URL } from "../../lib/auth-client";
 import { deviceId, markCapsDone } from "../../lib/device";
+import { LAYER, useKeyLayer } from "../../lib/input";
 
 type Auto = {
   decoded: boolean;
@@ -171,26 +172,36 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
     };
   }, [tests]);
 
-  // Back exits (and marks done so onboarding doesn't re-trigger).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.keyCode === 461 || e.key === "Backspace" || e.key === "XF86Back") {
-        e.preventDefault();
-        e.stopPropagation();
-        markCapsDone();
-        videoRef.current?.pause();
-        onExit();
+  // Back exits (and marks done so onboarding doesn't re-trigger); OK does the same once the run has
+  // finished, so the Continue button is reachable by remote instead of pointer-only. (It also gets
+  // the correct back-key set now — the old inline test here was missing GoBack/BrowserBack.)
+  const finish = () => {
+    markCapsDone();
+    videoRef.current?.pause();
+    onExit();
+  };
+  useKeyLayer({
+    id: "diagnostic",
+    priority: LAYER.BASE,
+    onKey(e) {
+      if (e.key === "back") {
+        finish();
+        return true;
       }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [onExit]);
+      // Mid-run there's nothing to confirm — only the finished screen has a button.
+      if (e.key === "ok" && (done || error)) {
+        finish();
+        return true;
+      }
+      return false;
+    },
+  });
 
   if (error) {
     return (
       <div style={{ position: "fixed", inset: 0, background: "#060a14", color: "#f1f5f9", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20, textAlign: "center", padding: 40 }}>
         <p style={{ color: "#f87171", fontSize: 20, maxWidth: 560 }}>{error}</p>
-        <button onClick={onExit} style={{ borderRadius: 12, border: "1px solid rgba(148,163,184,0.25)", background: "transparent", color: "#e6eaf1", padding: "12px 28px", fontSize: 17, cursor: "pointer" }}>
+        <button onClick={onExit} style={{ borderRadius: 12, border: "1px solid rgba(148,163,184,0.25)", background: "transparent", color: "#e6eaf1", padding: "12px 28px", fontSize: 17, cursor: "pointer", outline: `3px solid ${ACCENT}`, outlineOffset: 4 }}>
           Skip
         </button>
       </div>
@@ -270,7 +281,7 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
           onClick={onExit}
-          style={{ marginTop: 34, borderRadius: 14, background: ACCENT, color: "#04060c", padding: "14px 44px", fontSize: 18, fontWeight: 700, border: "none", cursor: "pointer" }}
+          style={{ marginTop: 34, borderRadius: 14, background: ACCENT, color: "#04060c", padding: "14px 44px", fontSize: 18, fontWeight: 700, border: "none", cursor: "pointer", outline: "3px solid rgba(255,255,255,0.85)", outlineOffset: 4 }}
         >
           Continue
         </motion.button>

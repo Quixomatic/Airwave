@@ -1,5 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+
+import { LAYER, useKeyLayer } from "../../lib/input";
 
 /**
  * /remote — a remote-key probe (reachable from Settings, like /diagnostic). Press any button on
@@ -28,8 +30,6 @@ type KeyEntry = {
 };
 
 const MAX_ROWS = 60;
-const BACK_KEYS = ["Backspace", "GoBack", "BrowserBack", "XF86Back"];
-const isBack = (e: KeyboardEvent) => e.keyCode === 461 || BACK_KEYS.includes(e.key);
 
 function RemoteProbeRoute() {
   const navigate = useNavigate();
@@ -54,32 +54,33 @@ function RemoteProbeRoute() {
     setRows((r) => [entry, ...r].slice(0, MAX_ROWS));
   }, []);
 
-  useEffect(() => {
-    const onDown = (e: KeyboardEvent) => {
-      // Swallow everything so probing never navigates the app.
-      e.preventDefault();
-      e.stopPropagation();
-      push(e, "keydown");
+  // MODAL + exclusive: the probe must swallow EVERYTHING so pressing buttons never navigates the
+  // app — that's the whole point of the tool. It logs the RAW event (`e.raw`), not our normalized
+  // key, because what you're here to inspect is exactly what the device reports.
+  //
+  // This is the one screen that deliberately has no D-pad navigation: its own Clear/Exit buttons
+  // stay pointer-only, because making them focusable would mean not swallowing the keys we're
+  // trying to measure. Double-press Back is the keyboard escape hatch.
+  useKeyLayer({
+    id: "remote-probe",
+    priority: LAYER.MODAL,
+    mode: "exclusive",
+    onKey(e) {
+      push(e.raw, "keydown");
       // Exit on a DOUBLE Back (each press is still logged above); a single Back stays so its
       // event is inspectable.
-      if (isBack(e)) {
+      if (e.key === "back") {
         const now = Date.now();
         if (now - lastBackRef.current < 800) exit();
         else lastBackRef.current = now;
       }
-    };
-    const onUp = (e: KeyboardEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      push(e, "keyup");
-    };
-    window.addEventListener("keydown", onDown, true);
-    window.addEventListener("keyup", onUp, true);
-    return () => {
-      window.removeEventListener("keydown", onDown, true);
-      window.removeEventListener("keyup", onUp, true);
-    };
-  }, [push, exit]);
+      return true;
+    },
+    onKeyUp(e) {
+      push(e.raw, "keyup");
+      return true;
+    },
+  });
 
   const last = rows[0];
 

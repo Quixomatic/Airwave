@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { LAYER, useDpadList, useKeyLayer, useVirtualKeyboard } from "../../lib/input";
 import { normalizeServerUrl, setStoredServerUrl } from "../../lib/server-url";
 import { scanForServers } from "../../lib/server-scan";
 
@@ -8,6 +9,15 @@ import { scanForServers } from "../../lib/server-scan";
  * at a different address per install (a LAN IP or an exposed domain), so we let the user scan the
  * local network or type the address, validate it against `/api/health`, store it on the device, and
  * reload so the whole app re-initialises against it. Styled to match the diagnostic/guide screens.
+ *
+ * ## Input model (the fiddly bit)
+ * The address field takes the platform's on-screen keyboard, and while that keyboard is up it owns
+ * the keys — LG documents that keydown/keyup don't even fire for it apart from Enter and Back. So
+ * this screen has two states:
+ *  - **Editing** (the field has DOM focus, keyboard up): we claim NOTHING except Back, which blurs
+ *    the field and closes the keyboard. Enter reaches the input's own handler → Connect.
+ *  - **Navigating** (keyboard closed): D-pad moves a simulated cursor over [address, Connect,
+ *    scan results…, Scan], OK activates. OK on the address field focuses it → back to editing.
  */
 
 const ACCENT = "#4a9fe0";
@@ -23,12 +33,24 @@ export function ServerSetup() {
   const [progress, setProgress] = useState(0);
   const [found, setFound] = useState<string[]>([]);
 
-  // Autofocus + caret at the end (so the remote/keyboard types after "http://").
-  useEffect(() => {
+  // Is the address field currently taking input (and so owning the keys)? Tracked from real DOM
+  // focus, which works in the browser web player too; the webOS keyboard event is a second signal
+  // for the installed app, where the keyboard can close without the field blurring.
+  const [editing, setEditing] = useState(true);
+  const keyboardUp = useVirtualKeyboard();
+
+  const focusInput = () => {
     const el = inputRef.current;
     if (!el) return;
     el.focus();
     el.setSelectionRange(el.value.length, el.value.length);
+  };
+  const blurInput = () => inputRef.current?.blur();
+
+  // Autofocus + caret at the end (so the remote/keyboard types after "http://").
+  useEffect(() => {
+    focusInput();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const saveAndReload = (target: string) => {
@@ -81,6 +103,60 @@ export function ServerSetup() {
     setScanned(true);
   };
 
+  // The focusable list, in visual order. Indices are derived (address 0, Connect 1, then whatever
+  // the scan section is currently showing) so the D-pad order always matches what's on screen.
+  const scanItems: { key: string; run: () => void }[] = scanning
+    ? []
+    : scanned
+      ? [
+          ...found.map((s) => ({ key: s, run: () => saveAndReload(s) })),
+          { key: "rescan", run: () => void runScan() },
+        ]
+      : [{ key: "scan", run: () => void runScan() }];
+  const items = [
+    { key: "address", run: focusInput },
+    { key: "connect", run: () => void connect() },
+    ...scanItems,
+  ];
+  const SCAN_BASE = 2;
+
+  const { sel } = useDpadList({
+    id: "server-setup",
+    count: items.length,
+    active: !editing,
+    onActivate: (i) => items[i]?.run(),
+    // First screen in the app — there's nowhere to go back to, so let Back fall through.
+    onBack: () => false,
+  });
+
+  // While the field is taking input, the on-screen keyboard owns the keys. Claim ONLY Back, which
+  // closes the keyboard and hands control to the D-pad list.
+  useKeyLayer({
+    id: "server-setup-editing",
+    priority: LAYER.BASE,
+    active: editing,
+    onKey(e) {
+      if (e.key === "back") {
+        blurInput();
+        return true;
+      }
+      return false;
+    },
+  });
+
+  // The installed app can close the keyboard without blurring the field (the system Done/Back);
+  // treat that as leaving edit mode. Only fires on a true→false transition, so the browser web
+  // player (which never reports a keyboard) is unaffected.
+  const sawKeyboard = useRef(false);
+  useEffect(() => {
+    if (sawKeyboard.current && !keyboardUp) blurInput();
+    sawKeyboard.current = keyboardUp;
+  }, [keyboardUp]);
+
+  /** The D-pad focus ring — only while navigating; editing has the caret instead. */
+  const ring = (i: number): React.CSSProperties =>
+    !editing && sel === i ? { outline: `3px solid ${ACCENT}`, outlineOffset: 3 } : {};
+
   const ghost: React.CSSProperties = {
     borderRadius: 14,
     border: "1px solid rgba(148,163,184,0.25)",
@@ -120,6 +196,8 @@ export function ServerSetup() {
           ref={inputRef}
           value={url}
           onChange={(e) => setUrl(e.target.value)}
+          onFocus={() => setEditing(true)}
+          onBlur={() => setEditing(false)}
           onKeyDown={(e) => {
             if (e.key === "Enter") void connect();
           }}
@@ -137,8 +215,9 @@ export function ServerSetup() {
             borderRadius: 16,
             background: "#0b1120",
             color: "#f1f5f9",
-            border: `1px solid ${error ? "#f87171" : "rgba(148,163,184,0.25)"}`,
+            border: `1px solid ${error ? "#f87171" : editing ? ACCENT : "rgba(148,163,184,0.25)"}`,
             outline: "none",
+            ...ring(0),
           }}
         />
 
@@ -157,10 +236,17 @@ export function ServerSetup() {
             border: "none",
             cursor: "pointer",
             opacity: checking ? 0.6 : 1,
+            ...ring(1),
           }}
         >
           {checking ? "Connecting…" : "Connect"}
         </button>
+
+        {!editing && (
+          <div style={{ textAlign: "center", marginTop: 10, fontSize: 14, color: "#64748b" }}>
+            Press OK on the address to type it · ▲▼ to move
+          </div>
+        )}
 
         <div style={{ height: 24, marginTop: 12, textAlign: "center" }}>
           {error && <span style={{ color: "#f87171", fontSize: 16 }}>{error}</span>}
@@ -188,7 +274,7 @@ export function ServerSetup() {
             {found.length > 0 ? (
               <>
                 <div style={{ color: "#94a3b8", fontSize: 14, textAlign: "center" }}>Found on your network</div>
-                {found.map((s) => (
+                {found.map((s, i) => (
                   <button
                     key={s}
                     onClick={() => saveAndReload(s)}
@@ -203,12 +289,16 @@ export function ServerSetup() {
                       fontSize: 18,
                       fontFamily: "monospace",
                       cursor: "pointer",
+                      ...ring(SCAN_BASE + i),
                     }}
                   >
                     {s}
                   </button>
                 ))}
-                <button onClick={() => void runScan()} style={{ ...ghost, alignSelf: "center", marginTop: 4 }}>
+                <button
+                  onClick={() => void runScan()}
+                  style={{ ...ghost, alignSelf: "center", marginTop: 4, ...ring(SCAN_BASE + found.length) }}
+                >
                   Scan again
                 </button>
               </>
@@ -217,14 +307,14 @@ export function ServerSetup() {
                 <span style={{ color: "#94a3b8", fontSize: 15 }}>
                   No servers found automatically — enter the address above.
                 </span>
-                <button onClick={() => void runScan()} style={{ ...ghost, alignSelf: "center" }}>
+                <button onClick={() => void runScan()} style={{ ...ghost, alignSelf: "center", ...ring(SCAN_BASE) }}>
                   Scan again
                 </button>
               </div>
             )}
           </div>
         ) : (
-          <button onClick={() => void runScan()} style={{ ...ghost, width: "100%" }}>
+          <button onClick={() => void runScan()} style={{ ...ghost, width: "100%", ...ring(SCAN_BASE) }}>
             Scan for servers on my network
           </button>
         )}
