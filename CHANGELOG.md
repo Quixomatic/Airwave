@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.33] - 2026-07-22
+
+### Fixed
+
+- **`WORKFLOW_ENABLED=1` now works on a fresh Docker database.** The AI-lineup workflow engine keeps its state in its own Postgres schema (drizzle-managed `workflow` tables + graphile-worker), which had no bootstrap in the container — so on a fresh install the engine failed to start (`relation "workflow.workflow_runs" does not exist`, caught and non-fatal, but the AI lineup builder was unusable). The server role's entrypoint now runs the world's schema bootstrap when `WORKFLOW_ENABLED=1`, before the server starts. It's a migration runner (records what it applied, skips it thereafter), so it's idempotent and safe on every boot; a failure is non-fatal (the API still boots). Added a `workflow:bootstrap` script to the server package.
+
 ## [0.6.32] - 2026-07-22
 
 ### Fixed

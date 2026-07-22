@@ -45,6 +45,17 @@ case "${CG_ROLE}" in
     echo "[entrypoint] applying database migrations (prisma migrate deploy)…"
     gosu app env HOME=/home/app pnpm --filter @ChannelGuide/db db:migrate:deploy
 
+    # Durable workflow engine (AI lineup builder) keeps its state in its OWN Postgres
+    # schema (drizzle-managed `workflow` + graphile-worker). Bootstrap it when enabled —
+    # the setup is a migration runner (records what it applied, skips it next time), so
+    # this is idempotent and safe to run on every start. Non-fatal: if it fails the API
+    # still boots (the engine self-disables on a missing schema).
+    if [ "${WORKFLOW_ENABLED:-}" = "1" ]; then
+      echo "[entrypoint] bootstrapping workflow engine schema…"
+      gosu app env HOME=/home/app pnpm --filter server workflow:bootstrap \
+        || echo "[entrypoint] WARNING: workflow schema bootstrap failed — the AI lineup engine may not start." >&2
+    fi
+
     echo "[entrypoint] starting API server on :${PORT:-3000}…"
     # cwd = apps/server so Bun loads bunfig.toml (workflow preload) and resolves the
     # generated ./.well-known handlers relative to the bundle — same as `pnpm start`.
