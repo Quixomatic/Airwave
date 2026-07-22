@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { SettingsSidebar, SETTINGS_SLIVER_W } from "../../../features/settings/settings-sidebar";
 import { SettingsCtx } from "../../../features/settings/settings-ui";
+import { LAYER, useKeyLayer } from "../../../lib/input";
 
 /**
  * /settings — a master-detail shell. A sliver sidebar (the guide's glass-circle treatment, dedicated
@@ -26,8 +27,6 @@ const NAV: { key: string; label: string; icon: React.ReactNode; to: string }[] =
   { key: "about", label: "About", icon: <Info size={24} />, to: "/settings/about" },
 ];
 
-const BACK_KEYS = ["Backspace", "GoBack", "BrowserBack", "XF86Back"];
-const isBack = (e: KeyboardEvent) => e.keyCode === 461 || BACK_KEYS.includes(e.key);
 const KEY_BY_PATH: Record<string, string> = {
   "/settings": "general",
   "/settings/user": "user",
@@ -66,34 +65,33 @@ function SettingsShell() {
     [navigate],
   );
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (zone !== "rail") return;
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        e.stopPropagation();
-        setSel((s) => Math.max(0, s - 1));
-      } else if (e.key === "ArrowDown") {
-        e.preventDefault();
-        e.stopPropagation();
-        setSel((s) => Math.min(NAV.length - 1, s + 1));
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        e.stopPropagation();
-        activate(sel);
-      } else if (e.key === "ArrowRight") {
-        e.preventDefault();
-        e.stopPropagation();
-        if (activeKey) setZone("content");
-      } else if (isBack(e)) {
-        e.preventDefault();
-        e.stopPropagation();
-        void navigate({ to: "/" });
+  // The category rail. Only on the stack while the rail is focused — the content zone is owned by
+  // each subpage's `useSettingsPage` layer, so the two can never both act on a key.
+  useKeyLayer({
+    id: "settings-rail",
+    priority: LAYER.BASE,
+    active: zone === "rail",
+    onKey(e) {
+      switch (e.key) {
+        case "up":
+          setSel((s) => Math.max(0, s - 1));
+          return true;
+        case "down":
+          setSel((s) => Math.min(NAV.length - 1, s + 1));
+          return true;
+        case "ok":
+          activate(sel);
+          return true;
+        case "right":
+          if (activeKey) setZone("content");
+          return true;
+        case "back":
+          void navigate({ to: "/" });
+          return true;
       }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [zone, sel, activeKey, activate, navigate]);
+      return false;
+    },
+  });
 
   const expanded = zone === "rail";
 

@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 
+import { LAYER, useKeyLayer } from "../../lib/input";
+
 /**
  * Shared bits for the settings subpages: the zone context (is the CONTENT focused, and how to hand
  * focus back to the rail), a per-page D-pad option-nav hook, and the header / row primitives so
@@ -7,8 +9,6 @@ import React, { createContext, useContext, useEffect, useRef, useState } from "r
  * their options and call `useSettingsPage`.
  */
 
-const BACK_KEYS = ["Backspace", "GoBack", "BrowserBack", "XF86Back"];
-const isBack = (e: KeyboardEvent) => e.keyCode === 461 || BACK_KEYS.includes(e.key);
 export const SETTINGS_ACCENT = "#4a9fe0";
 
 export type SettingsCtxValue = { active: boolean; returnToRail: () => void };
@@ -26,33 +26,37 @@ export function useSettingsPage(count: number, onActivate: (i: number) => void) 
   const cbRef = useRef(onActivate);
   cbRef.current = onActivate;
 
+  // Keep the cursor in range when the row count shrinks under it (or the page becomes active).
   useEffect(() => {
     if (!active) return;
     setSel((s) => Math.min(s, Math.max(0, count - 1)));
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        e.stopPropagation();
-        setSel((s) => Math.max(0, s - 1));
-      } else if (e.key === "ArrowDown") {
-        e.preventDefault();
-        e.stopPropagation();
-        // max() guards a zero-row page (an info-only subpage like About): `count - 1` would be
-        // -1 and drive sel negative. Clamped at 0, nothing focuses and ◄/Back still works.
-        setSel((s) => Math.min(Math.max(0, count - 1), s + 1));
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        e.stopPropagation();
-        cbRef.current(selRef.current);
-      } else if (e.key === "ArrowLeft" || isBack(e)) {
-        e.preventDefault();
-        e.stopPropagation();
-        returnToRail();
+  }, [active, count]);
+
+  useKeyLayer({
+    id: "settings-page",
+    priority: LAYER.BASE,
+    active,
+    onKey(e) {
+      switch (e.key) {
+        case "up":
+          setSel((s) => Math.max(0, s - 1));
+          return true;
+        case "down":
+          // max() guards a zero-row page (an info-only subpage like About): `count - 1` would be
+          // -1 and drive sel negative. Clamped at 0, nothing focuses and ◄/Back still works.
+          setSel((s) => Math.min(Math.max(0, count - 1), s + 1));
+          return true;
+        case "ok":
+          cbRef.current(selRef.current);
+          return true;
+        case "left":
+        case "back":
+          returnToRail();
+          return true;
       }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [active, count, returnToRail]);
+      return false;
+    },
+  });
 
   return { sel: active ? sel : -1, active };
 }

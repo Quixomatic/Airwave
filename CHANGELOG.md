@@ -2,6 +2,20 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.1] - 2026-07-22
+
+### Added
+
+- **A centralized TV input dispatcher** (`lib/input/`) — one `window` keydown listener for the whole app, routing each press through a priority-ordered stack of layers (`BASE` → `CHROME` → `OVERLAY` → `MODAL`). Layers declare what they consume; anything unclaimed falls through to the layer beneath, so a screen that isn't on top simply never sees the key. Replaces the pattern where ~10 components each added their own listener and had to guess whether they were currently in charge. Includes: semantic key normalization (`lib/input/keys.ts`) so raw keycodes are translated exactly once at the boundary; three layer modes (`transparent` / `exclusive` / `passive`); a counted **semaphore** pause (not a boolean — so two holders can't unblock each other); a root-level interceptor slot; and our own held-key bookkeeping, since TV firmware often doesn't set `KeyboardEvent.repeat`.
+
+### Changed
+
+- **Settings is the first screen migrated to the dispatcher** — the category rail and the per-subpage option navigation are now two layers whose `active` flags are mutually exclusive, instead of two window listeners that each early-returned on the other's zone. **No behavior change intended:** same keys, same transitions, same two-tap confirms.
+
+### Notes
+
+- First step of the input-controller arc; the guide, player, and the four screens that have no D-pad support at all (login, server setup, diagnostic, remote probe) follow in subsequent releases. Migration is deliberately one screen at a time so any regression bisects to a single commit.
+
 ## [0.7.0] - 2026-07-22
 
 ### Added
