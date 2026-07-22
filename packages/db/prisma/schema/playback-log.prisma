@@ -21,6 +21,9 @@ model PlaybackLog {
   decision         Json? // { videoDecision, audioDecision, videoCodec, audioCodec, container }
   caps             Json? // { videoCodecs, audioCodecs } advertised by the client
 
+  // Which Plex connection the server resolved this stream to (client's probe/override).
+  connection String? // "local" | "remote" | "relay"
+
   // How it actually went on the panel
   outcome       String? // "playing" | "not_decoding" | "error"
   decodedWidth  Int? // video.videoWidth (0 = never decoded)

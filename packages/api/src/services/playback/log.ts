@@ -17,6 +17,7 @@ export type PlaybackLogInput = {
   sourceAudioCodec?: string | null;
   decision?: Prisma.InputJsonValue;
   caps?: Prisma.InputJsonValue;
+  connection?: string | null;
   outcome?: string | null;
   decodedWidth?: number | null;
   decodedHeight?: number | null;
@@ -39,6 +40,7 @@ export async function logPlayback(prisma: PrismaClient, userId: string, i: Playb
       sourceAudioCodec: i.sourceAudioCodec ?? null,
       decision: i.decision ?? Prisma.JsonNull,
       caps: i.caps ?? Prisma.JsonNull,
+      connection: i.connection ?? null,
       outcome: i.outcome ?? null,
       decodedWidth: i.decodedWidth ?? null,
       decodedHeight: i.decodedHeight ?? null,

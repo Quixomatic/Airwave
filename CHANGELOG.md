@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.39] - 2026-07-22
+
+### Added
+
+- **Playback logs now record which Plex connection streamed each tune** (local / remote / relay), so `scripts/show-play-log.ts` can correlate connection with outcome — e.g. confirming a title played (or failed) specifically on the remote/relay path. New `PlaybackLog.connection` column (migration `add_playlog_connection`); the TV client includes it in each log row from the `/media` response.
+
+### Notes
+
+- Schema change — applies on deploy via `migrate deploy`. The server must be restarted for the log to capture the new field.
+
 ## [0.6.38] - 2026-07-22
 
 ### Added

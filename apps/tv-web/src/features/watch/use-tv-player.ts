@@ -234,6 +234,7 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
     sourceAudioCodec: string | null;
     decision: MediaInfo["decision"] | null;
     caps: unknown;
+    connection: string | null;
   } | null>(null);
   // The audio-track readout from a direct-play + client-side track switch (what the panel
   // exposed + which we selected), merged into the next PlaybackLog row's `caps` JSON.
@@ -479,6 +480,7 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
           sourceAudioCodec: info.audioCodec ?? null,
           decision: info.decision ?? null,
           caps: { capsSource: info.capsSource },
+          connection: info.connection ?? null,
         };
         window.setTimeout(() => {
           if (gen === genRef.current) recordLog();

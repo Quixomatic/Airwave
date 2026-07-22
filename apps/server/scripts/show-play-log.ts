@@ -15,7 +15,7 @@ async function main() {
     const t = new Date(r.createdAt).toLocaleTimeString("en-US", { hour12: false });
     const dims = r.decodedWidth ? `${r.decodedWidth}x${r.decodedHeight}` : "0x0";
     console.log(
-      `${t} [${(r.outcome ?? "?").toUpperCase().padEnd(12)}] ${(r.channelName ?? r.channelId ?? "?").slice(0, 20).padEnd(20)} "${(r.title ?? "").slice(0, 26)}"`,
+      `${t} [${(r.outcome ?? "?").toUpperCase().padEnd(12)}] ${(r.connection ?? "?").toUpperCase().padEnd(6)} ${(r.channelName ?? r.channelId ?? "?").slice(0, 20).padEnd(20)} "${(r.title ?? "").slice(0, 26)}"`,
     );
     console.log(
       `        mode=${(r.mode ?? "?").padEnd(6)} src=${r.sourceContainer ?? "?"}/${r.sourceVideoCodec ?? "?"}/${r.sourceAudioCodec ?? "?"} ` +
