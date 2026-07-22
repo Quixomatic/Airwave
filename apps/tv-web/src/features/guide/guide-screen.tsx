@@ -2,7 +2,7 @@ import { useEffect } from "react";
 
 import { useGuide } from "../../hooks/use-guide";
 import { ApiError, api } from "../../lib/api";
-import { CAPS_DONE_KEY, gatherDeviceReport } from "../../lib/device";
+import { capsDoneForCurrentServer, gatherDeviceReport } from "../../lib/device";
 import { AuroraGrid } from "./aurora-grid";
 
 /**
@@ -30,7 +30,9 @@ export function GuideScreen({
   }, []);
 
   useEffect(() => {
-    if (!localStorage.getItem(CAPS_DONE_KEY)) onDiagnostic();
+    // Run the diagnostic on first sign-in AND whenever this device is pointed at a new server
+    // (that server has no capability profile for it yet).
+    if (!capsDoneForCurrentServer()) onDiagnostic();
   }, [onDiagnostic]);
 
   useEffect(() => {

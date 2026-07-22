@@ -6,10 +6,37 @@
  * sign-in so we can design the per-device Plex capability profile.
  */
 
+import { SERVER_URL } from "./server-url";
+
 const DEVICE_ID_KEY = "cg-device-id";
 
-/** Set once the capability onboarding has run on this device. */
+/**
+ * Records WHICH server the capability diagnostic last ran against (stores that server's URL).
+ * The capability profile is measured device-side but stored in the SERVER's DB per deviceId — so
+ * if the device is pointed at a DIFFERENT server, that server has no profile for it. Keying the
+ * "done" flag by server URL makes the diagnostic re-run on a server switch, so the new server
+ * gets this device's profile too. See [[project-tv-client-api]].
+ */
 export const CAPS_DONE_KEY = "cg-caps-done";
+
+/** Whether the diagnostic has been completed against the CURRENT server. */
+export function capsDoneForCurrentServer(): boolean {
+  try {
+    return localStorage.getItem(CAPS_DONE_KEY) === SERVER_URL;
+  } catch {
+    return false;
+  }
+}
+
+/** Record that the diagnostic completed against the current server (so it doesn't re-run until
+ * the device is pointed at a different one). */
+export function markCapsDone() {
+  try {
+    localStorage.setItem(CAPS_DONE_KEY, SERVER_URL);
+  } catch {
+    /* non-fatal */
+  }
+}
 
 export function deviceId(): string {
   let id = localStorage.getItem(DEVICE_ID_KEY);

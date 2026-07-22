@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.43] - 2026-07-22
+
+### Fixed
+
+- **The TV capability diagnostic now re-runs when a device is pointed at a different server.** The device's decode-capability profile is measured on-device but stored in the *server's* database (per `deviceId`), so switching a TV to another server left that server with no profile — and playback fell back to the (unreliable) `canPlayType` guess. The "already ran" flag now records *which server* the diagnostic ran against, so a server switch (via Settings → About → Change server, or a rebuilt web player pointed elsewhere) automatically re-runs the diagnostic against the new server. First sign-in and same-server relaunches are unchanged.
+
 ## [0.6.42] - 2026-07-22
 
 ### Changed

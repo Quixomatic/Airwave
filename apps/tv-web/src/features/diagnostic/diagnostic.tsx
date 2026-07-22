@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { api, type CapTest } from "../../lib/api";
 import { SERVER_URL } from "../../lib/auth-client";
-import { CAPS_DONE_KEY, deviceId } from "../../lib/device";
+import { deviceId, markCapsDone } from "../../lib/device";
 
 type Auto = {
   decoded: boolean;
@@ -52,7 +52,7 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
       .then((r) => setTests(r.tests))
       .catch(() => {
         setError("Could not load the diagnostic matrix (is the server running?)");
-        localStorage.setItem(CAPS_DONE_KEY, "1"); // don't nag on every login if it's broken
+        markCapsDone(); // don't nag on every login if it's broken
       });
   }, []);
 
@@ -161,7 +161,7 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
         upsert(test, r, audioOk);
       }
 
-      localStorage.setItem(CAPS_DONE_KEY, "1");
+      markCapsDone();
       setDone(true);
       videoRef.current?.pause();
     })();
@@ -177,7 +177,7 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
       if (e.keyCode === 461 || e.key === "Backspace" || e.key === "XF86Back") {
         e.preventDefault();
         e.stopPropagation();
-        localStorage.setItem(CAPS_DONE_KEY, "1");
+        markCapsDone();
         videoRef.current?.pause();
         onExit();
       }
