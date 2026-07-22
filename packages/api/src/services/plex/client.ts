@@ -611,6 +611,11 @@ export type PlaybackOptions = {
    * client sets this only after a NATIVE attempt errored at runtime — the last-resort
    * rung of the native-first ladder. */
   forceHls?: boolean;
+  /** The base URL to STAMP onto the returned playback URL (what the client streams from).
+   * The server's own Plex fetches always use `baseUrl` (it's on the LAN); this only changes
+   * the base the CLIENT hits — set to the source's remote/relay URL for an off-network TV.
+   * Defaults to `baseUrl`. See broker.resolveMedia + [[remote-playback]]. */
+  clientBaseUrl?: string;
 };
 
 // Formats a browser can play from the original file (so we can direct-play + client-seek).
@@ -696,6 +701,10 @@ export async function getPlaybackInfo(
   const media = data.MediaContainer?.Metadata?.[0]?.Media?.[0];
   const part = media?.Part?.[0];
   if (!part?.key) return null;
+
+  // The base the CLIENT streams from. The server's fetches above/below stay on `baseUrl`
+  // (LAN); only the returned URL uses the client's chosen connection (local/remote/relay).
+  const clientBase = opts.clientBaseUrl ?? baseUrl;
 
   const streams = part.Stream ?? [];
   const audioStreams = streams.filter((s) => s.streamType === 2);
@@ -789,7 +798,7 @@ export async function getPlaybackInfo(
   }
 
   if (canDirect || directAudio) {
-    const url = `${baseUrl}${part.key}?X-Plex-Token=${encodeURIComponent(token)}`;
+    const url = `${clientBase}${part.key}?X-Plex-Token=${encodeURIComponent(token)}`;
     return {
       mode: "direct",
       url,
@@ -924,7 +933,7 @@ export async function getPlaybackInfo(
   // (start → native <video src>). Plex bakes `offset` into both, so the client plays
   // from 0 (no seek) for either transcode mode.
   const startPath = protocol === "hls" ? "start.m3u8" : "start";
-  const url = `${baseUrl}/video/:/transcode/universal/${startPath}?${qs}`;
+  const url = `${clientBase}/video/:/transcode/universal/${startPath}?${qs}`;
   return {
     mode: protocol === "hls" ? "hls" : "http",
     url,

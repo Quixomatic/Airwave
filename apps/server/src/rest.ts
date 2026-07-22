@@ -148,6 +148,9 @@ api.get("/channels/:id/media", async (c) => {
         directContainers: (c.req.query("dcontainers") ?? "").split(",").filter(Boolean),
       }
     : undefined;
+  // Which stored connection the TV streams from (it probes local/remote/relay at launch and
+  // sends its pick here). Only "remote"/"relay" are meaningful; anything else = local (default).
+  const network = c.req.query("network");
   try {
     return c.json(
       await resolveMedia(prisma, c.req.param("id"), ratingKey, offsetSeconds, {
@@ -157,11 +160,27 @@ api.get("/channels/:id/media", async (c) => {
         caps,
         deviceId: c.req.query("deviceId"),
         forceHls: c.req.query("forceHls") === "1",
+        connection: network === "remote" || network === "relay" ? network : undefined,
       }),
     );
   } catch (err) {
     return onError(err);
   }
+});
+
+/**
+ * The media server's reachable connection URLs, so a TV can probe local-vs-remote at launch
+ * and then send `?network=` on /media. The server itself always uses the LAN `baseUrl`; these
+ * are only for the client. No token is included (it's added at /media resolve time).
+ */
+api.get("/connections", async (c) => {
+  const source = await prisma.mediaSource.findFirst({
+    where: { enabled: true, type: "PLEX" },
+    orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+    select: { baseUrl: true, remoteUrl: true, relayUrl: true },
+  });
+  if (!source) return c.json({ error: "No media source" }, 404);
+  return c.json({ local: source.baseUrl, remote: source.remoteUrl, relay: source.relayUrl });
 });
 
 /** Record a tune's diagnostics to the DB (test log). */

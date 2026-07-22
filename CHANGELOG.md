@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.36] - 2026-07-22
+
+### Added
+
+- **Remote playback — the TV app streams from the right Plex connection whether it's home or away** (finishes the arc started in 0.6.35). The server exposes the media server's reachable URLs at `GET /api/v1/connections`, and playback resolve (`/media`) takes `?network=local|remote|relay`, maps it to the source's stored `baseUrl`/`remoteUrl`/`relayUrl`, and stamps **only that base** onto the URL the client streams — the server itself always fetches Plex over the LAN `baseUrl`, and it only ever uses one of its own known URLs (never a client-supplied one, so the admin token can't be pointed anywhere). The TV app **probes the candidates once at launch** (local → remote → relay, via a short no-cors `/identity` check), remembers the reachable one on the device (localStorage), and sends it on every `/media` call automatically. **Settings → About** shows the resolved connection (Local / Remote / Relay) with tap-to-recheck. The admin token authorizes all three, so nothing else is needed auth-wise.
+
+### Notes
+
+- On the home LAN this resolves to **Local** (the previous behavior); the remote/relay paths only engage off-network, and require the source's `remoteUrl`/`relayUrl` to be populated (the hourly **Plex Connection Refresh** job, or re-saving the source). The TV-side launch probe needs on-device validation (webOS).
+
 ## [0.6.35] - 2026-07-22
 
 ### Added

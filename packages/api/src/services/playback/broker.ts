@@ -37,6 +37,11 @@ export type ResolveMediaOptions = {
   deviceId?: string;
   /** Set by the client after a NATIVE attempt errored → force the hls.js/MSE path. */
   forceHls?: boolean;
+  /** Which stored connection the CLIENT streams from — "local" (baseUrl), "remote" (WAN), or
+   * "relay". The server always fetches Plex over baseUrl; this only picks the base stamped onto
+   * the returned URL, for a TV that's away from home. A remote/relay with no stored URL falls
+   * back to local. Default "local". See [[remote-playback]]. */
+  connection?: "local" | "remote" | "relay";
 };
 
 /** Resolve a playable URL for one item at one offset (client-driven). */
@@ -52,6 +57,15 @@ export async function resolveMedia(
   // over its canPlayType self-report — measure, don't guess. See
   // capabilities/native-caps.ts + [[project-tv-playback-protocol]].
   const measured = opts.deviceId ? await getDeviceNativeCaps(prisma, opts.deviceId) : null;
+
+  // Which base the CLIENT streams from. The server always fetches over baseUrl (LAN); a TV
+  // that's off-network asks for "remote"/"relay". Fall back to local if that URL isn't stored.
+  const requested = opts.connection ?? "local";
+  const chosenUrl =
+    requested === "remote" ? source.remoteUrl : requested === "relay" ? source.relayUrl : source.baseUrl;
+  const clientBaseUrl = chosenUrl ?? source.baseUrl!;
+  const connection: "local" | "remote" | "relay" = chosenUrl ? requested : "local";
+
   const info = await getPlaybackInfo(
     source.baseUrl!,
     source.token,
@@ -64,10 +78,16 @@ export async function resolveMedia(
       subtitleStreamId: opts.subtitleStreamId,
       caps: measured ?? opts.caps,
       forceHls: opts.forceHls,
+      clientBaseUrl,
     },
   );
   if (!info) throw notFound("No playable media part.");
-  return { ...info, offsetSeconds, capsSource: measured ? "measured" : opts.caps ? "reported" : "default" };
+  return {
+    ...info,
+    offsetSeconds,
+    connection,
+    capsSource: measured ? "measured" : opts.caps ? "reported" : "default",
+  };
 }
 
 /** Stop a Plex transcode session (client calls on program change / teardown). */

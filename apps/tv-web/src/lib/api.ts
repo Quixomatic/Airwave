@@ -1,4 +1,5 @@
 import { SERVER_URL, getToken } from "./auth-client";
+import { getNetwork } from "./plex-connection";
 
 /**
  * Thin client for ChannelGuide's CUSTOM endpoints — the REST guide/playback API
@@ -183,6 +184,9 @@ export type MediaInfo = {
   /** Which capability set drove the decision: the panel's measured diagnostic map,
    * its canPlayType self-report, or the default browser assumption. */
   capsSource?: "measured" | "reported" | "default";
+  /** Which stored connection the returned URL streams from — echoes the device's probe pick
+   *  (falls back to "local" if the requested remote/relay URL wasn't stored). */
+  connection?: "local" | "remote" | "relay";
   container?: string;
   videoCodec?: string;
   audioCodec?: string;
@@ -326,6 +330,10 @@ export const api = {
       p.set("acodecs", opts.caps.audioCodecs.join(","));
       p.set("dcontainers", opts.caps.directContainers.join(","));
     }
+    // Stream from the connection this device probed at launch (only when off-network — local is
+    // the server default). The server maps this to the source's stored remote/relay URL.
+    const net = getNetwork();
+    if (net === "remote" || net === "relay") p.set("network", net);
     return request<MediaInfo>(`/api/v1/channels/${channelId}/media?${p.toString()}`);
   },
 

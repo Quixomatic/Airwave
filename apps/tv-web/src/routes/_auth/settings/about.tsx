@@ -1,9 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 
 import { APP_NAME, APP_VERSION } from "../../../lib/app-info";
 import { PageHeader, SectionLabel, SettingRow, useSettingsPage } from "../../../features/settings/settings-ui";
 import { SERVER_URL } from "../../../lib/auth-client";
+import { getNetwork, probeConnection, type Network } from "../../../lib/plex-connection";
 import { clearStoredServerUrl } from "../../../lib/server-url";
+
+const NETWORK_LABEL: Record<Network, string> = {
+  local: "Local network",
+  remote: "Remote (WAN)",
+  relay: "Relay",
+};
 
 /** /settings/about — app identity + version + the connected server. */
 export const Route = createFileRoute("/_auth/settings/about")({
@@ -16,8 +24,20 @@ function About() {
     clearStoredServerUrl();
     window.location.reload();
   };
-  const { sel } = useSettingsPage(1, (i) => {
+  const [network, setNetwork] = useState<Network | null>(getNetwork());
+  const [checking, setChecking] = useState(false);
+  // Re-probe which Plex connection this device reaches (local → remote → relay).
+  const recheck = () => {
+    if (checking) return;
+    setChecking(true);
+    probeConnection()
+      .then((n) => setNetwork(n))
+      .finally(() => setChecking(false));
+  };
+
+  const { sel } = useSettingsPage(2, (i) => {
     if (i === 0) changeServer();
+    if (i === 1) recheck();
   });
 
   return (
@@ -56,6 +76,12 @@ function About() {
           sublabel={SERVER_URL || "Not connected"}
           focused={sel === 0}
           onClick={changeServer}
+        />
+        <SettingRow
+          label="Media connection"
+          sublabel={checking ? "Checking…" : network ? `${NETWORK_LABEL[network]} — tap to recheck` : "Not determined — tap to check"}
+          focused={sel === 1}
+          onClick={recheck}
         />
       </div>
     </div>
