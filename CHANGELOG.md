@@ -2,6 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.27] - 2026-07-21
+
+### Added
+
+- **A Docker image for self-hosting — one image, two roles.** A single multi-arch image (built on `node:22` + Bun) runs as either the API **server** or the admin **web**, selected at runtime by `CG_ROLE`, so `docker-compose` runs it twice with each service's own `.env`. The server role applies `prisma migrate deploy` then runs the prebuilt Bun bundle; the web role builds the SPA at startup with that deployment's `VITE_SERVER_URL` (each self-host lives at a different address) and serves it. The URL-independent parts — the server bundle **and** the workflow-SDK handlers (`.well-known`) — are built once at image-build time, never per-boot. Runs unprivileged with **PUID/PGID/UMASK/TZ** remapping via `gosu` (for TrueNAS datasets). New: `Dockerfile`, `docker/entrypoint.sh`, `docker/serve-web.ts` (a dependency-free Bun static server with SPA fallback), `.dockerignore`, `.gitattributes` (LF-locks the entrypoint).
+- **Capability-probe media is baked into the image** (429MB of frozen test clips, published as the `media-v1` release asset) so the TV capability diagnostic works out of the box — no ffmpeg, no runtime download. The build stages it from `docker/cap-media/` (CI/local pull it with `gh release download media-v1`), with a public-URL fallback; no token is ever embedded in the image.
+
+### Notes
+
+- Groundwork for the self-host arc — the `docker-compose.yml` + `.env.example`, the GitHub Action that builds/publishes to GHCR, and the README quick-start follow in subsequent releases.
+
 ## [0.6.26] - 2026-07-21
 
 ### Changed

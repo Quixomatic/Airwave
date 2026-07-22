@@ -67,6 +67,10 @@ temp
 # Generated capability-probe test media (large, regeneratable)
 apps/server/capability-media/
 
+# Capability media tarball staged for the Docker build (pulled from the media-v1 release,
+# baked into the image). Keep the dir (.gitkeep) so the Dockerfile COPY has a source.
+docker/cap-media/*.tar.gz
+
 # Stray tsc build-mode emit in the (TS-only) api source tree (belongs in dist/, not src/)
 packages/api/src/**/*.js
 packages/api/src/**/*.d.ts

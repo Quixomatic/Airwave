@@ -1,0 +1,31 @@
+# --- VCS / CI meta ---
+.git
+.github
+.gitignore
+.gitattributes
+
+# --- Reference material, docs, agent memory (large, not needed to build) ---
+.refs
+.docs
+.plans
+.claude
+memory
+**/*.md
+
+# --- Secrets: NEVER bake local env into the image (creds, tokens, DB URL) ---
+# All runtime config comes from the container environment (compose / .env), not the image.
+**/.env
+**/.env.*
+!**/.env.example
+
+# --- Dependencies & build output (reinstalled / rebuilt inside the image) ---
+**/node_modules
+**/dist
+**/.well-known
+**/.turbo
+.turbo
+
+# --- App-local generated / packaging artifacts ---
+apps/tv-web/*.ipk
+apps/server/capability-media
+**/*.log
