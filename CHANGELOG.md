@@ -2,6 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.5] - 2026-07-22
+
+### Added
+
+- **The remote's green button jumps focus to the mini player.** From anywhere in the guide, pressing green when a mini feed is playing focuses it and shows its two buttons — exactly as if you'd d-padded all the way up to it, minus the travel.
+- **A hint strip along the bottom of the mini feed** showing that shortcut, in the Sling style: the green key is drawn as the physical button it refers to (a wide, thin, rounded green bar, which is what's on the LG remote) followed by "to focus". It appears only while the feed is playing and *un*focused, and fades out once focused — at which point the two buttons are on screen and the hint has done its job. Purely decorative (`pointer-events: none`), over a soft gradient so it sits on the video rather than on a hard bar.
+
+### Notes
+
+- This completes the input-controller arc (v0.7.1 → v0.7.5). It was chosen as the arc's acceptance test *before* the dispatcher was written: under the old system a new key meant another `window` listener plus a guard added to every existing handler, and the app had **no** color-button handling at all to extend. Under the layer stack it's five lines inside the guide's existing handler — no new listener, no new state, no other file touched.
+
 ## [0.7.4] - 2026-07-22
 
 ### Added

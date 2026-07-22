@@ -338,6 +338,13 @@ export function AuroraGrid({
     priority: LAYER.BASE,
     active: player.layout !== "full",
     onKey(e) {
+      // GREEN jumps straight to the mini feed from anywhere in the guide — the shortcut for
+      // d-padding all the way up to it. Same destination as ▲ from the top row, minus the travel.
+      if (e.key === "green" && player.layout === "mini" && !player.miniFocused) {
+        player.focusMini();
+        return true;
+      }
+
       // Sidebar focused → its circles own the keys (Up/Down cycle, OK activates, Right/Back → grid).
       if (zone === "sidebar") {
         if (e.key === "back" || e.key === "right") setZone("grid");

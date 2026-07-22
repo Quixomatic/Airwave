@@ -322,6 +322,11 @@ function PlayerHost({
         />
       )}
 
+      {/* Sling-style affordance: while the mini feed is playing but NOT focused, show that the
+          green button jumps to it (equivalent to d-padding all the way up). Hidden once focused,
+          since the two buttons are then on screen and the hint has served its purpose. */}
+      {layout === "mini" && !miniFocused && <GreenHint />}
+
       {/* Mini feed focus overlay — two buttons: go full, or close the feed. */}
       {layout === "mini" && miniFocused && (
         <div
@@ -341,6 +346,51 @@ function PlayerHost({
           <MiniButton label="Close" icon={<X size={26} />} selected={miniSel === 1} accent={accent} onClick={onClose} />
         </div>
       )}
+    </motion.div>
+  );
+}
+
+/**
+ * The "press ▭ to focus" strip along the bottom of the mini feed. The glyph is drawn as the
+ * physical key it refers to — the LG remote's green color button is a wide, thin, rounded bar — so
+ * it reads at 10 feet without a legend. Deliberately drawn rather than lettered: on the remote the
+ * button carries no text, only a shape and a colour.
+ */
+function GreenHint() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.5, duration: 0.25 }}
+      style={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 9,
+        padding: "7px 0 8px",
+        // Fades into the video rather than sitting on a hard bar.
+        background: "linear-gradient(to top, rgba(6,10,20,0.82), rgba(6,10,20,0))",
+        pointerEvents: "none",
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 30,
+          height: 11,
+          borderRadius: 6,
+          background: "#22c55e",
+          boxShadow: "0 0 10px rgba(34,197,94,0.55)",
+          flexShrink: 0,
+        }}
+      />
+      <span style={{ fontSize: 14, fontWeight: 600, color: "#e6eaf1", letterSpacing: 0.2, whiteSpace: "nowrap" }}>
+        to focus
+      </span>
     </motion.div>
   );
 }
