@@ -14,11 +14,15 @@ export function GuideScreen({
   onTune,
   onSettings,
   onDiagnostic,
+  onAccount,
   onSignOut,
 }: {
   onTune: (channelId: string) => void;
   onSettings: () => void;
   onDiagnostic: () => void;
+  /** Sidebar Account circle → the User settings page. */
+  onAccount: () => void;
+  /** Forced sign-out — only for an expired/invalid token (a 401 from the guide fetch). */
   onSignOut: () => void;
 }) {
   const { data, error } = useGuide(180);
@@ -54,7 +58,7 @@ export function GuideScreen({
       serverTime={data.serverTime}
       onTune={onTune}
       onSettings={onSettings}
-      onSignOut={onSignOut}
+      onAccount={onAccount}
     />
   );
 }

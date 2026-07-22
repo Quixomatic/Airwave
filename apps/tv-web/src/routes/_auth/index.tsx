@@ -19,6 +19,9 @@ function GuideRoute() {
       onTune={(channelId) => player.tune(channelId)}
       onSettings={() => void navigate({ to: "/settings" })}
       onDiagnostic={() => void navigate({ to: "/diagnostic" })}
+      // The sidebar's Account circle opens the User page — sign-out lives there behind a confirm.
+      onAccount={() => void navigate({ to: "/settings/user" })}
+      // Only fires when the token is rejected (401), not from any UI affordance.
       onSignOut={() => {
         setToken(null);
         void navigate({ to: "/login" });

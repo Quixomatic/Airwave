@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { ArrowLeft, Cpu, Info, SlidersHorizontal, UserRound } from "lucide-react";
+import { ArrowLeft, Cpu, Info, Server, SlidersHorizontal, UserRound } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { SettingsSidebar, SETTINGS_SLIVER_W } from "../../../features/settings/settings-sidebar";
@@ -21,22 +21,21 @@ const NAV: { key: string; label: string; icon: React.ReactNode; to: string }[] =
   { key: "guide", label: "Back to Guide", icon: <ArrowLeft size={24} />, to: "/" },
   { key: "general", label: "General", icon: <SlidersHorizontal size={24} />, to: "/settings" },
   { key: "user", label: "User", icon: <UserRound size={24} />, to: "/settings/user" },
+  { key: "server", label: "Server", icon: <Server size={24} />, to: "/settings/server" },
   { key: "device", label: "Device", icon: <Cpu size={24} />, to: "/settings/device" },
   { key: "about", label: "About", icon: <Info size={24} />, to: "/settings/about" },
 ];
 
 const BACK_KEYS = ["Backspace", "GoBack", "BrowserBack", "XF86Back"];
 const isBack = (e: KeyboardEvent) => e.keyCode === 461 || BACK_KEYS.includes(e.key);
-const keyForPath = (p: string) =>
-  p === "/settings/user"
-    ? "user"
-    : p === "/settings/device"
-      ? "device"
-      : p === "/settings/about"
-        ? "about"
-        : p === "/settings"
-          ? "general"
-          : "";
+const KEY_BY_PATH: Record<string, string> = {
+  "/settings": "general",
+  "/settings/user": "user",
+  "/settings/server": "server",
+  "/settings/device": "device",
+  "/settings/about": "about",
+};
+const keyForPath = (p: string) => KEY_BY_PATH[p] ?? "";
 
 function SettingsShell() {
   const navigate = useNavigate();

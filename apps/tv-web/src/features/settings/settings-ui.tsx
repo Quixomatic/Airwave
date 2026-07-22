@@ -37,7 +37,9 @@ export function useSettingsPage(count: number, onActivate: (i: number) => void) 
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
         e.stopPropagation();
-        setSel((s) => Math.min(count - 1, s + 1));
+        // max() guards a zero-row page (an info-only subpage like About): `count - 1` would be
+        // -1 and drive sel negative. Clamped at 0, nothing focuses and ◄/Back still works.
+        setSel((s) => Math.min(Math.max(0, count - 1), s + 1));
       } else if (e.key === "Enter") {
         e.preventDefault();
         e.stopPropagation();

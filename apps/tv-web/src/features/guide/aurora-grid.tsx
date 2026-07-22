@@ -100,13 +100,14 @@ export function AuroraGrid({
   serverTime,
   onTune,
   onSettings,
-  onSignOut,
+  onAccount,
 }: {
   channels: GuideGridChannel[];
   serverTime: string;
   onTune: (channelId: string) => void;
   onSettings: () => void;
-  onSignOut: () => void;
+  /** The sidebar's Account circle — opens the User settings page (where you can sign out). */
+  onAccount: () => void;
 }) {
   const now = useMemo(() => new Date(serverTime), [serverTime]);
   const T0 = useMemo(() => {
@@ -236,7 +237,9 @@ export function AuroraGrid({
       if (!item) return;
       setSidebarSel(index);
       if (item.kind === "settings") return onSettings();
-      if (item.kind === "account") return onSignOut();
+      // Account opens the User settings page — signing out lives there behind a confirm, so a
+      // stray OK on this circle can't sign you out.
+      if (item.kind === "account") return onAccount();
       if (item.lens) {
         // Selecting the filter that's already applied toggles it OFF — back to all channels.
         // (Guide IS the "all" lens, so it never toggles; it just clears.)
@@ -246,7 +249,7 @@ export function AuroraGrid({
         setZone("grid");
       }
     },
-    [sidebarItems, onSettings, onSignOut, lens],
+    [sidebarItems, onSettings, onAccount, lens],
   );
 
   // On a lens change, land focus on the first shown channel's live program (the filtered channel

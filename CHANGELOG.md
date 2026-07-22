@@ -2,6 +2,22 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.0] - 2026-07-22
+
+### Added
+
+- **A dedicated TV Settings → Server page.** The connected server and Plex-connection controls used to sit on the About page, which made no sense — About is app identity. They now have their own category in the settings rail (between User and Device), laid out like the Device page: an info strip (Address · Media connection · Connection mode), a **Plex connection** section (media-connection recheck, Force connection for testing), and the **Change server / Sign out** action with its two-tap confirm.
+- **The User page now shows who's signed in** — avatar (the account's picture, falling back to an initials circle), name, email, and a role pill, above the sign-out action. Reads the better-auth session over bearer; no new endpoint.
+
+### Changed
+
+- **The guide sidebar's Account circle opens the User settings page** instead of signing you out on the spot. Sign-out still lives one press away, but now behind the same two-tap confirm as Change server — so a stray OK on the sidebar can't drop you to the login screen. (A rejected token still signs out automatically, as before.)
+- **About is now purely app identity** — name, tagline, version, description, and a pointer to where the server and account settings moved.
+
+### Fixed
+
+- `useSettingsPage` no longer drives its selection index negative on a settings subpage with zero focusable rows (About is now one); ◄/Back still returns to the category rail.
+
 ## [0.6.46] - 2026-07-22
 
 ### Fixed
