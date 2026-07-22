@@ -48,6 +48,9 @@ export type Delivery = {
   audioDecision: string | null;
   /** When a direct-play uses a client-side audio-track switch (Avatar case), the chosen track's label. */
   directAudioLabel: string | null;
+  /** Which Plex connection the server resolved this stream to (local / remote / relay) — the actual
+   *  base the bytes come from, so a forced/off-network test can confirm it isn't silently local. */
+  connection: "local" | "remote" | "relay" | null;
 };
 
 export type PlayerStatus = {
@@ -380,6 +383,7 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
             videoDecision: info.decision?.videoDecision ?? null,
             audioDecision: info.decision?.audioDecision ?? null,
             directAudioLabel: info.directAudio?.label ?? null,
+            connection: info.connection ?? null,
           },
           session: info.session,
           paramsKey: paramsKeyRef.current,

@@ -412,6 +412,12 @@ const MODE_LABEL: Record<Delivery["mode"], string> = {
   hls: "HLS Transcode",
 };
 
+const CONN_LABEL: Record<NonNullable<Delivery["connection"]>, string> = {
+  local: "Local",
+  remote: "Remote",
+  relay: "Relay",
+};
+
 // Small tucked-away readout of HOW the current program is being delivered (mode / container /
 // video+audio codec, each with Plex's copy-vs-transcode call) — for diagnosing a bad channel
 // without leaving the couch. Shown at the bottom of the Info view.
@@ -432,6 +438,20 @@ function DeliveryReadout({ delivery, accent }: { delivery: Delivery; accent: str
         {delivery.container && chip(delivery.container)}
         {delivery.videoCodec && chip(delivery.videoCodec, delivery.videoDecision)}
         {delivery.audioCodec && chip(delivery.audioCodec, delivery.directAudioLabel ?? delivery.audioDecision)}
+        {delivery.connection && (
+          <span
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              padding: "5px 12px",
+              borderRadius: 6,
+              background: delivery.connection === "local" ? "rgba(148,163,184,0.14)" : `${accent}22`,
+              color: delivery.connection === "local" ? "#dfe4ec" : accent,
+            }}
+          >
+            {CONN_LABEL[delivery.connection].toUpperCase()}
+          </span>
+        )}
       </div>
     </div>
   );

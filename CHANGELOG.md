@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.38] - 2026-07-22
+
+### Added
+
+- **The player's Info view now shows which Plex connection is streaming** (Local / Remote / Relay), alongside the existing delivery chips (Direct Play, container, codecs). It reflects the **server-resolved** connection from the `/media` response — so when you force Remote for a test, you can confirm it's actually remote and didn't silently fall back to Local (which happens if `remoteUrl` isn't populated). Remote/relay render in the channel accent color to stand out.
+
 ## [0.6.37] - 2026-07-22
 
 ### Added
