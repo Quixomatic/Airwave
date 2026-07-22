@@ -2,6 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.44] - 2026-07-22
+
+### Added
+
+- **A proper empty state for the TV guide** — when the (filtered) channel list is empty (a fresh install, or a Favorites / Recents / package filter with nothing in it), the guide now renders its *own* structure as static, non-animated skeleton placeholders behind a centered, context-aware message ("No favorites yet", "Nothing watched yet", …) instead of a broken-looking blank. Mirrors the admin guide-preview's skeleton approach (no shimmer — measured to be too costly at scale on the C2).
+
+### Fixed
+
+- **You can no longer get trapped in an empty guide.** The D-pad key handler bailed on *every* key when there were zero channels, so ◄ could never reach the sidebar. Left now always opens the sidebar from an empty grid.
+- **"Change server" now signs you out** (the bearer token is server-specific) in addition to clearing the stored server, behind a **two-tap confirm** (press OK, then OK again). Previously it only cleared the server URL — so on the web player (where the server URL is baked in) it fell straight back into the guide still logged in, which re-triggered the capability diagnostic and never reached the scan/manual-entry screen. Now it lands on onboarding (native app) or the login screen (web player), and never re-runs the diagnostic mid-session.
+
 ## [0.6.43] - 2026-07-22
 
 ### Fixed

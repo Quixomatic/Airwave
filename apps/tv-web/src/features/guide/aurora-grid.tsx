@@ -384,7 +384,17 @@ export function AuroraGrid({
       }
 
       const n = channels.length;
-      if (!n) return;
+      if (!n) {
+        // Empty grid (a filter with no channels, or a fresh install): there's nothing to browse,
+        // but Left must still reach the sidebar so you're not trapped in an empty guide. (Back is
+        // handled above.) Without this the old `if (!n) return` swallowed every key here.
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          setZone("sidebar");
+          setSidebarSel(0);
+        }
+        return;
+      }
       switch (e.key) {
         case "ArrowRight":
           e.preventDefault();
@@ -520,23 +530,43 @@ export function AuroraGrid({
       {/* Reserves the sliver's space, since the sidebar itself is out of flow. */}
       <div style={{ width: SIDEBAR_SLIVER_W, flexShrink: 0 }} />
       <div style={{ width: colW, flexShrink: 0, display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
-      {focusedChannel && focusedProgram ? (
-        <FeaturedPanel channel={focusedChannel} program={focusedProgram} now={now} accent={channelTint(focusedChannel) ?? accentOf(fc)} slotRef={player.miniSlotRef} showSlot={player.layout !== "off"} />
-      ) : (
-        <div style={{ height: vw(600) }} />
+      {channels.length > 0 && (
+        <>
+          {focusedChannel && focusedProgram ? (
+            <FeaturedPanel channel={focusedChannel} program={focusedProgram} now={now} accent={channelTint(focusedChannel) ?? accentOf(fc)} slotRef={player.miniSlotRef} showSlot={player.layout !== "off"} />
+          ) : (
+            <div style={{ height: vw(600) }} />
+          )}
+          <TimeHeader T0={T0} railPx={railPx} laneX={laneX} />
+        </>
       )}
-      <TimeHeader T0={T0} railPx={railPx} laneX={laneX} />
 
       {/* Grid area — flex:1 so it fills all remaining height on any screen. */}
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
         {channels.length === 0 && (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: vw(44), fontWeight: 600 }}>
-            {lens.type === "favorites"
-              ? "No favorite channels yet"
-              : lens.type === "recents"
-                ? "No recently watched channels yet"
-                : "No channels in this filter"}
-          </div>
+          <GuideGhost
+            railPx={railPx}
+            rowPx={rowPx}
+            laneW={laneW}
+            message={
+              lens.type === "favorites"
+                ? "No favorites yet"
+                : lens.type === "recents"
+                  ? "Nothing watched yet"
+                  : lens.type === "packages"
+                    ? "No channels in this filter"
+                    : "No channels yet"
+            }
+            sub={
+              lens.type === "favorites"
+                ? "Highlight a channel and press the heart to add it here."
+                : lens.type === "recents"
+                  ? "Channels you tune into show up here, most recent first."
+                  : lens.type === "packages"
+                    ? "Try another filter, or press ◄ to open the sidebar and clear it."
+                    : "Once channels are set up on your server, they'll appear here."
+            }
+          />
         )}
         <div
           ref={scrollRef}
@@ -588,7 +618,7 @@ export function AuroraGrid({
             })}
           </div>
         </div>
-        {nowMins >= 0 && nowMins <= WINDOW_MIN && (
+        {channels.length > 0 && nowMins >= 0 && nowMins <= WINDOW_MIN && (
           <>
             {/* Vertical now-line hidden for now — the triangle marker alone reads the
                 current time. Flip SHOW_NOW_LINE to bring the full line back. */}
@@ -640,6 +670,90 @@ export function AuroraGrid({
 
 /** spec px → device px at the current width (for exact left-offsets). */
 const vwNum = (width: number, px: number) => (px / DESIGN_W) * width;
+
+/** A single static (non-animated) placeholder block — the guide's skeleton tone. Animation is
+ *  deliberately omitted (measured: shimmering ~50 blocks tanks the C2's frame rate, same lesson as
+ *  the admin guide's `animate={false}` skeletons). */
+function GBlock({
+  w,
+  h,
+  r = vw(10),
+  style,
+}: {
+  w: number | string;
+  h: number | string;
+  r?: number | string;
+  style?: React.CSSProperties;
+}) {
+  return <div style={{ width: w, height: h, borderRadius: r, background: "rgba(148,163,184,0.09)", flexShrink: 0, ...style }} />;
+}
+
+// Program-block widths per ghost row (fractions of the lane), varied so it reads like a real grid.
+const GHOST_ROWS = [
+  [0.3, 0.32, 0.28],
+  [0.46, 0.26, 0.22],
+  [0.22, 0.5, 0.24],
+  [0.36, 0.3, 0.28],
+  [0.5, 0.24, 0.2],
+  [0.26, 0.38, 0.3],
+];
+
+/**
+ * The guide's OWN structure rendered as static skeletons, behind a centered message. Shown when the
+ * (filtered) channel list is empty — a fresh install, or a favorites/recents/package filter with
+ * nothing in it — so the screen reads as "the guide, but empty" instead of a broken blank (and the
+ * D-pad can still Left back to the sidebar; see the empty-grid handler in the key nav).
+ */
+function GuideGhost({
+  railPx,
+  rowPx,
+  laneW,
+  message,
+  sub,
+}: {
+  railPx: number;
+  rowPx: number;
+  laneW: number;
+  message: string;
+  sub?: string;
+}) {
+  return (
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+      {/* the skeleton itself — dimmed so the message reads on top */}
+      <div style={{ position: "absolute", inset: 0, opacity: 0.55 }}>
+        {/* featured-panel ghost */}
+        <div style={{ display: "flex", gap: vw(30), padding: `${vw(44)} ${vw(48)}`, height: vw(520) }}>
+          <GBlock w={vw(64)} h={vw(64)} r="50%" />
+          <div style={{ display: "flex", flexDirection: "column", gap: vw(18), flex: 1, minWidth: 0 }}>
+            <GBlock w={vw(560)} h={vw(58)} />
+            <GBlock w={vw(320)} h={vw(34)} />
+            <GBlock w={vw(820)} h={vw(30)} style={{ marginTop: vw(14) }} />
+            <GBlock w={vw(700)} h={vw(30)} />
+          </div>
+        </div>
+        {/* channel-row ghosts (rail icon + number, then program blocks) */}
+        {GHOST_ROWS.map((pattern, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", height: rowPx, gap: vw(12), padding: `0 ${vw(16)}` }}>
+            <div style={{ width: railPx, display: "flex", alignItems: "center", gap: vw(14), flexShrink: 0 }}>
+              <GBlock w={vw(60)} h={vw(60)} r="50%" />
+              <GBlock w={vw(52)} h={vw(38)} />
+            </div>
+            <div style={{ display: "flex", gap: vw(12), flex: 1, overflow: "hidden" }}>
+              {pattern.map((f, j) => (
+                <GBlock key={j} w={Math.max(1, laneW * f)} h={vw(90)} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* the centered empty-state message */}
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: vw(48) }}>
+        <div style={{ fontSize: vw(56), fontWeight: 800, letterSpacing: "-0.5px", color: "#e2e8f0" }}>{message}</div>
+        {sub && <div style={{ marginTop: vw(16), fontSize: vw(30), color: "#94a3b8", maxWidth: vw(1200), lineHeight: 1.45 }}>{sub}</div>}
+      </div>
+    </div>
+  );
+}
 
 function TimeHeader({
   T0,

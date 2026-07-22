@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { APP_NAME, APP_VERSION } from "../../../lib/app-info";
-import { PageHeader, SectionLabel, SettingRow, useSettingsPage } from "../../../features/settings/settings-ui";
-import { SERVER_URL } from "../../../lib/auth-client";
+import { PageHeader, Pill, SectionLabel, SettingRow, useSettingsPage } from "../../../features/settings/settings-ui";
+import { SERVER_URL, setToken } from "../../../lib/auth-client";
 import {
   getNetwork,
   getNetworkOverride,
@@ -25,8 +25,13 @@ export const Route = createFileRoute("/_auth/settings/about")({
 });
 
 function About() {
-  // Clearing the stored server + reloading drops the app back to the onboarding/setup screen.
+  // Change server = SIGN OUT (the bearer token is server-specific) AND drop the stored server URL.
+  // A reload then lands on onboarding (native app, no baked URL) or the login screen (web player,
+  // baked URL) — never straight back into the guide, which would otherwise re-run the diagnostic
+  // because you'd still be "logged in". Two-tap confirm so a stray OK can't sign you out.
+  const [armChange, setArmChange] = useState(false);
   const changeServer = () => {
+    setToken(null);
     clearStoredServerUrl();
     window.location.reload();
   };
@@ -53,10 +58,17 @@ function About() {
   };
 
   const { sel } = useSettingsPage(3, (i) => {
-    if (i === 0) changeServer();
-    if (i === 1) recheck();
-    if (i === 2) cycleOverride();
+    if (i === 0) {
+      if (armChange) changeServer();
+      else setArmChange(true);
+    } else if (i === 1) recheck();
+    else if (i === 2) cycleOverride();
   });
+
+  // Disarm the change-server confirm if focus moves off that row.
+  useEffect(() => {
+    if (sel !== 0) setArmChange(false);
+  }, [sel]);
 
   return (
     <div>
@@ -90,10 +102,18 @@ function About() {
       <div style={{ maxWidth: 640 }}>
         <SectionLabel>Server</SectionLabel>
         <SettingRow
-          label="Change server"
-          sublabel={SERVER_URL || "Not connected"}
+          label={armChange ? "Sign out & change server?" : "Change server"}
+          sublabel={
+            armChange
+              ? "Press OK again to confirm — this signs you out of the current server"
+              : SERVER_URL || "Not connected"
+          }
           focused={sel === 0}
-          onClick={changeServer}
+          right={armChange ? <Pill tone="warn">Confirm</Pill> : undefined}
+          onClick={() => {
+            if (armChange) changeServer();
+            else setArmChange(true);
+          }}
         />
         <SettingRow
           label="Media connection"
