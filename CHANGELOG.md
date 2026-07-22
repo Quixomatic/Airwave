@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.28] - 2026-07-21
+
+### Added
+
+- **A `docker-compose.yml` + `.env.example` for the self-host stack** (Dockge-ready). Three services — `postgres:16`, the API `server`, and the admin `web` (the last two are the same image, split by `CG_ROLE`) — wired with health checks, `depends_on` ordering, a named Postgres volume (with a commented bind-mount option for TrueNAS datasets), and PUID/PGID/UMASK/TZ passthrough. One stack `.env` drives everything: the public URLs browsers/TV actually use (`SERVER_PUBLIC_URL` / `WEB_PUBLIC_URL`, which back `VITE_SERVER_URL` + auth/CORS), published host ports, Postgres credentials, `BETTER_AUTH_SECRET`, an optional seeded first admin, and optional OAuth / Plex / workflow-engine toggles. `DATABASE_URL` and the workflow Postgres URL are derived from the Postgres settings by compose.
+
+### Notes
+
+- Continuing the self-host arc — the GitHub Action (build + publish to GHCR) and the README quick-start follow next.
+
 ## [0.6.27] - 2026-07-21
 
 ### Added

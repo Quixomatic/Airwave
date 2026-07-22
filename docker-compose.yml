@@ -1,0 +1,101 @@
+# ============================================================================
+#  ChannelGuide — self-host stack (Dockge / docker compose)
+#
+#  One image, run three ways: Postgres, the API `server`, and the admin `web`
+#  (server + web are the SAME image, selected by CG_ROLE). Copy .env.example to
+#  .env, fill it in, then bring the stack up.
+#
+#  The server serves the API + the TV REST surface; the admin web builds itself
+#  at first start against SERVER_PUBLIC_URL and serves the SPA. Both apps are
+#  reachable at the PUBLISHED host ports you set in .env.
+# ============================================================================
+name: channelguide
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: ${TZ:-UTC}
+    volumes:
+      - channelguide_pgdata:/var/lib/postgresql/data
+      # TrueNAS dataset instead of a named volume? Replace the line above with a
+      # bind mount to your dataset, e.g.:
+      #   - /mnt/tank/apps/channelguide/pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  server:
+    image: ${CG_IMAGE:-ghcr.io/quixomatic/channelguide:latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      CG_ROLE: server
+      PORT: 3000
+      # Built from the Postgres settings — points at the postgres service by name.
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      # Where browsers/TV reach the SERVER, and where the admin web is loaded FROM.
+      BETTER_AUTH_URL: ${SERVER_PUBLIC_URL}
+      CORS_ORIGIN: ${WEB_PUBLIC_URL}
+      TV_APP_ORIGIN: ${TV_APP_ORIGIN:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      PLEX_CLIENT_IDENTIFIER: ${PLEX_CLIENT_IDENTIFIER:-}
+      # Durable AI-lineup workflow engine — off unless WORKFLOW_ENABLED=1 in .env.
+      WORKFLOW_ENABLED: ${WORKFLOW_ENABLED:-}
+      WORKFLOW_TARGET_WORLD: ${WORKFLOW_TARGET_WORLD:-@workflow/world-postgres}
+      WORKFLOW_LOCAL_BASE_URL: ${WORKFLOW_LOCAL_BASE_URL:-http://127.0.0.1:3152}
+      WORKFLOW_POSTGRES_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      UMASK: ${UMASK:-022}
+      TZ: ${TZ:-UTC}
+    ports:
+      - "${SERVER_PORT:-36020}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  web:
+    image: ${CG_IMAGE:-ghcr.io/quixomatic/channelguide:latest}
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_started
+    environment:
+      CG_ROLE: web
+      WEB_PORT: 3001
+      # Baked into the admin build — the address browsers use to reach the server.
+      VITE_SERVER_URL: ${SERVER_PUBLIC_URL}
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      UMASK: ${UMASK:-022}
+      TZ: ${TZ:-UTC}
+    ports:
+      - "${WEB_PORT:-36021}:3001"
+    healthcheck:
+      # First start compiles the SPA (vite) before serving — allow generous start_period.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3001/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 180s
+
+volumes:
+  channelguide_pgdata:
