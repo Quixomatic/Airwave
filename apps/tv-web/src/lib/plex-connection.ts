@@ -63,7 +63,7 @@ function setProbed(n: Network) {
  * yields an opaque response that still resolves on a successful connection and throws otherwise —
  * enough to tell whether this base is reachable from the current network without needing CORS.
  */
-async function reachable(base: string, timeoutMs = 2000): Promise<boolean> {
+async function reachable(base: string, timeoutMs = 4000): Promise<boolean> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -106,6 +106,10 @@ export async function probeConnection(): Promise<Network> {
       return net;
     }
   }
-  setProbed("local");
-  return "local";
+  // Nothing answered in time — usually a slow/flaky connection, not truly unreachable. Fall back
+  // to the most universally-reachable URL we have: relay tunnels through Plex so it works from
+  // anywhere; local (raw http) is useless off-LAN and mixed-content-blocked on an HTTPS player.
+  const fallback: Network = conns.relay ? "relay" : conns.remote ? "remote" : "local";
+  setProbed(fallback);
+  return fallback;
 }

@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.42] - 2026-07-22
+
+### Changed
+
+- **The TV connection probe is more forgiving on slow/marginal connections.** The reachability check timeout went 2s → 4s (a remote/relay TLS handshake over weak cellular can take longer than 2s), and when *nothing* answers in time the probe now falls back to **Relay** instead of Local — relay tunnels through Plex so it works from anywhere, whereas Local (raw http) is useless off-LAN and mixed-content-blocked on an HTTPS player.
+
 ## [0.6.41] - 2026-07-22
 
 ### Added
