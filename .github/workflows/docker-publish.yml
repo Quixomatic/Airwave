@@ -1,0 +1,88 @@
+# Build + publish the ChannelGuide Docker image to GHCR.
+#
+# Triggers:
+#   • push a version tag  → git tag v0.6.30 && git push origin v0.6.30
+#       publishes ghcr.io/quixomatic/channelguide:{0.6.30, 0.6, latest}
+#   • manual (workflow_dispatch) → publishes a :sha-<short> image for testing
+#
+# The image is ONE artifact that runs as either the API server or the admin web
+# (CG_ROLE). Capability-probe media is pulled from the private `media-v1` release
+# into the build context first (GITHUB_TOKEN has access), then baked in.
+#
+# NOTE: the first publish creates a PRIVATE package. Flip it to public once at
+#   GitHub → Packages → channelguide → Package settings → Change visibility.
+# Repo visibility is independent — the repo can stay private.
+name: Publish Docker image
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/quixomatic/channelguide
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch capability media (private media-v1 release)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p docker/cap-media
+          gh release download media-v1 \
+            --repo "${{ github.repository }}" \
+            --pattern capability-media.tar.gz \
+            --dir docker/cap-media --clobber
+          ls -lh docker/cap-media
+
+      - name: Set up QEMU (arm64 emulation)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata (tags + labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref_name, '-') }}
+            type=sha,enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Build & push (multi-arch)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          # arm64 builds via QEMU emulation (slower). For amd64-only + faster builds,
+          # drop linux/arm64 here.
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false

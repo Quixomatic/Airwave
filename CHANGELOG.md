@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.29] - 2026-07-21
+
+### Added
+
+- **A GitHub Action that builds and publishes the image to GHCR** (`.github/workflows/docker-publish.yml`). Pushing a `v*` tag (e.g. `git tag v0.6.30 && git push origin v0.6.30`) builds a multi-arch image (linux/amd64 + linux/arm64 via QEMU) and publishes `ghcr.io/quixomatic/channelguide` tagged `{version}`, `{major}.{minor}`, and `latest`; a manual run publishes a `sha-<short>` image for testing. The job first pulls the capability-media from the private `media-v1` release into the build context (the built-in `GITHUB_TOKEN` has access), then bakes it in — no secret ever enters the image. Uses GitHub Actions layer cache.
+
+### Notes
+
+- The first publish creates a **private** package; flip it to public once (GitHub → Packages → channelguide → Package settings → Change visibility). Repo visibility is independent — the repo can stay private while the image is public.
+
 ## [0.6.28] - 2026-07-21
 
 ### Added
