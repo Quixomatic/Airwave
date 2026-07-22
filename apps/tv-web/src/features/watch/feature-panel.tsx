@@ -22,7 +22,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import type { GuideMeta } from "../../lib/api";
-import { usePlayer } from "./player-ctx";
+import { LAYER, useKeyLayer } from "../../lib/input";
 import type { Delivery, ScrubberView } from "./use-tv-player";
 
 /**
@@ -108,7 +108,6 @@ export function FeaturePanel({
   const [focus, setFocus] = useState<{ row: 0 | 1; col: number }>({ row: 0, col: 0 });
   const [openMenu, setOpenMenu] = useState<MenuKey>(null);
   const [infoMode, setInfoMode] = useState(false);
-  const { numberEntryActiveRef } = usePlayer();
   const scrubberRef = useRef<HTMLButtonElement | null>(null);
   const ctlRefs = useRef<(HTMLElement | null)[]>([]);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -132,55 +131,58 @@ export function FeaturePanel({
     else ctlRefs.current[focus.col]?.focus();
   }, [focus]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const isBack =
-        e.keyCode === 461 || ["Backspace", "GoBack", "BrowserBack", "XF86Back"].includes(e.key);
-      // Channel-number entry owns OK (commit) + Back (cancel) while active — defer to it.
-      if (numberEntryActiveRef.current && (isBack || e.key === "Enter")) return;
-      if (isBack) {
-        e.preventDefault();
-        e.stopPropagation();
+  // Owns the keys while the panel is open. Number entry (OVERLAY) and channel surf (MODAL) sit
+  // above, so their old hand-checked guards are gone.
+  //
+  // NOTE: this is the one place in the app that drives REAL DOM focus (the scrubber + control
+  // buttons above), so OK is deliberately NOT claimed on the control row — leaving it unconsumed
+  // lets the natively-focused button/dropdown-trigger fire its own click. Same reason the
+  // `openMenu` branch returns false: base-ui owns the keys while a dropdown is open.
+  useKeyLayer({
+    id: "feature-panel",
+    priority: LAYER.CHROME,
+    onKey(e) {
+      if (e.key === "back") {
         if (infoMode) setInfoMode(false);
         else if (openMenu) setOpenMenu(null);
         else onClose();
-        return;
+        return true;
       }
       armHide();
-      if (infoMode) return; // details view — Back exits it; no nav
-      if (openMenu) return; // base-ui owns keys while a dropdown is open
+      if (infoMode) return false; // details view — Back exits it; no nav
+      if (openMenu) return false; // base-ui owns keys while a dropdown is open
       if (focus.row === 0) {
-        if (e.key === "ArrowLeft") {
-          e.preventDefault();
-          onSeekBack();
-        } else if (e.key === "ArrowRight") {
-          e.preventDefault();
-          onSeekForward();
-        } else if (e.key === "Enter") {
-          e.preventDefault();
-          onPlayPause();
-        } else if (e.key === "ArrowDown") {
-          e.preventDefault();
-          setFocus({ row: 1, col: 0 });
+        switch (e.key) {
+          case "left":
+            onSeekBack();
+            return true;
+          case "right":
+            onSeekForward();
+            return true;
+          case "ok":
+            onPlayPause();
+            return true;
+          case "down":
+            setFocus({ row: 1, col: 0 });
+            return true;
         }
-      } else {
-        if (e.key === "ArrowLeft") {
-          e.preventDefault();
-          setFocus((f) => ({ row: 1, col: Math.max(0, f.col - 1) }));
-        } else if (e.key === "ArrowRight") {
-          e.preventDefault();
-          setFocus((f) => ({ row: 1, col: Math.min(CTL_COUNT - 1, f.col + 1) }));
-        } else if (e.key === "ArrowUp") {
-          e.preventDefault();
-          setFocus({ row: 0, col: 0 });
-        }
-        // Enter passes through → native button / dropdown-trigger handles it.
+        return false;
       }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openMenu, focus, onClose, infoMode]);
+      switch (e.key) {
+        case "left":
+          setFocus((f) => ({ row: 1, col: Math.max(0, f.col - 1) }));
+          return true;
+        case "right":
+          setFocus((f) => ({ row: 1, col: Math.min(CTL_COUNT - 1, f.col + 1) }));
+          return true;
+        case "up":
+          setFocus({ row: 0, col: 0 });
+          return true;
+      }
+      // OK passes through → native button / dropdown-trigger handles it.
+      return false;
+    },
+  });
 
   const focused = (i: number) => focus.row === 1 && focus.col === i;
   const glass = (i: number, circle = false): React.CSSProperties => ({

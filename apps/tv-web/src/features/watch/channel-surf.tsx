@@ -4,6 +4,7 @@ import * as LucideIcons from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { imageUrl, type GuideGridProgram } from "../../lib/api";
+import { LAYER, useKeyLayer } from "../../lib/input";
 import { channelVivid } from "../../lib/tint";
 import { useGuide } from "../../hooks/use-guide";
 import { usePlayer } from "./player-ctx";
@@ -16,15 +17,14 @@ import { usePlayer } from "./player-ctx";
  * without changing, and ~12s of no input auto-hides it.
  *
  * Virtualized horizontally (@tanstack/react-virtual) like the guide grid, so 100+ tiles — and their
- * cover-art images — stay cheap: only the visible window loads. It owns ◄/►/OK/Back while up
- * (`surfActiveRef`), so number entry / CH▲/▼ / the player chrome all defer.
+ * cover-art images — stay cheap: only the visible window loads. It registers as the app's top
+ * (MODAL, exclusive) input layer while up, so number entry / CH▲/▼ / the player chrome all defer.
  */
 
 const TILE_W = 300;
 const GAP = 22;
 const ART_H = Math.round((TILE_W * 9) / 16); // 16:9
 const AUTO_HIDE_MS = 12_000;
-const BACK_KEYS = ["Backspace", "GoBack", "BrowserBack", "XF86Back"];
 
 const LUCIDE = LucideIcons as unknown as Record<string, React.ComponentType<{ size?: number | string }>>;
 const channelIcon = (id?: string | null) =>
@@ -47,7 +47,7 @@ export function ChannelSurf({
   onClose: () => void;
 }) {
   const { data: guide } = useGuide();
-  const { tune, surfActiveRef } = usePlayer();
+  const { tune } = usePlayer();
 
   const channels = useMemo(
     () => [...(guide?.channels ?? [])].sort((a, b) => (a.number ?? 0) - (b.number ?? 0)),
@@ -88,14 +88,6 @@ export function ChannelSurf({
     paddingEnd: pad,
   });
 
-  // Own the keys while mounted.
-  useEffect(() => {
-    surfActiveRef.current = true;
-    return () => {
-      surfActiveRef.current = false;
-    };
-  }, [surfActiveRef]);
-
   // Auto-hide, in its OWN effect so it isn't reset by unrelated re-renders (the player status ticks
   // ~2×/s and would otherwise keep restarting the countdown). `onClose` is read through a ref so this
   // effect stays mount-only and the timer actually reaches 12s.
@@ -130,39 +122,41 @@ export function ChannelSurf({
     [len, virtualizer],
   );
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const isBack = e.keyCode === 461 || BACK_KEYS.includes(e.key);
-      if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        resetHide();
-        move(-1);
-      } else if (e.key === "ArrowRight") {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        resetHide();
-        move(1);
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        const ch = channels[focusedRef.current];
-        if (ch && ch.id !== currentChannelId) tune(ch.id);
-        onCloseRef.current();
-      } else if (isBack) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        onCloseRef.current();
-      } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-        // Swallow (don't leak to the chrome), keep surf open.
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        resetHide();
+  // MODAL + exclusive: while surf is up it owns every key — nothing leaks to the chrome, the guide,
+  // or channel-number entry. (That last one used to be enforced by number entry checking
+  // `surfActiveRef`; being the top layer does it now.) ▲/▼ are claimed explicitly so they keep the
+  // carousel alive rather than doing nothing.
+  useKeyLayer({
+    id: "channel-surf",
+    priority: LAYER.MODAL,
+    mode: "exclusive",
+    onKey(e) {
+      switch (e.key) {
+        case "left":
+          resetHide();
+          move(-1);
+          return true;
+        case "right":
+          resetHide();
+          move(1);
+          return true;
+        case "ok": {
+          const ch = channels[focusedRef.current];
+          if (ch && ch.id !== currentChannelId) tune(ch.id);
+          onCloseRef.current();
+          return true;
+        }
+        case "back":
+          onCloseRef.current();
+          return true;
+        case "up":
+        case "down":
+          resetHide();
+          return true;
       }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [move, channels, currentChannelId, tune, resetHide]);
+      return false;
+    },
+  });
 
   return (
     <motion.div

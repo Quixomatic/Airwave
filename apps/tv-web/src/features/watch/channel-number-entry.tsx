@@ -2,6 +2,7 @@ import { useRouterState } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 
+import { LAYER, useKeyLayer } from "../../lib/input";
 import { usePlayer } from "./player-ctx";
 import { useChannelNav } from "./use-channel-nav";
 
@@ -21,16 +22,6 @@ import { useChannelNav } from "./use-channel-nav";
 
 const DISMISS_MS = 6000; // inactivity → clear the buffer (never commits)
 const FLASH_MS = 950; // how long an invalid number flashes red before clearing
-const BACK_KEYS = ["Backspace", "GoBack", "BrowserBack", "XF86Back"];
-const ARROW_KEYS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
-
-const digitOf = (e: KeyboardEvent): string | null => {
-  if (/^[0-9]$/.test(e.key)) return e.key;
-  if (e.keyCode >= 48 && e.keyCode <= 57) return String(e.keyCode - 48);
-  if (e.keyCode >= 96 && e.keyCode <= 105) return String(e.keyCode - 96); // numpad
-  return null;
-};
-
 const menuOpen = () => !!document.querySelector('[role="menu"],[role="listbox"]');
 const inputFocused = () => {
   const el = document.activeElement as HTMLElement | null;
@@ -40,7 +31,7 @@ const inputFocused = () => {
 export function ChannelNumberEntry() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { byNumber, maxNumber, tune } = useChannelNav();
-  const { numberEntryActiveRef, surfActiveRef, channelStep } = usePlayer();
+  const { channelStep } = usePlayer();
 
   const [buffer, setBuffer] = useState("");
   const [flash, setFlash] = useState(false);
@@ -50,110 +41,99 @@ export function ChannelNumberEntry() {
 
   const maxDigits = Math.max(1, String(maxNumber || 0).length);
 
-  useEffect(() => {
-    const setBuf = (v: string) => {
-      bufferRef.current = v;
-      // Zone flag, set SYNCHRONOUSLY so a following OK/Back keydown sees the current state and the
-      // guide / full-screen chrome defer to us (they check this ref at event time).
-      numberEntryActiveRef.current = v.length > 0;
-      setBuffer(v);
-    };
-    const clearDismiss = () => window.clearTimeout(dismissTimer.current);
-    const clearFlash = () => window.clearTimeout(flashTimer.current);
-    const cancel = () => {
-      clearDismiss();
-      clearFlash();
-      setFlash(false);
+  const setBuf = (v: string) => {
+    bufferRef.current = v;
+    setBuffer(v);
+  };
+  const clearDismiss = () => window.clearTimeout(dismissTimer.current);
+  const clearFlash = () => window.clearTimeout(flashTimer.current);
+  const cancel = () => {
+    clearDismiss();
+    clearFlash();
+    setFlash(false);
+    setBuf("");
+  };
+  const armDismiss = () => {
+    clearDismiss();
+    dismissTimer.current = window.setTimeout(cancel, DISMISS_MS);
+  };
+  const append = (d: string) => {
+    if (bufferRef.current.length >= maxDigits) return; // ignore digits past the widest channel number
+    clearFlash();
+    setFlash(false);
+    setBuf(bufferRef.current + d);
+    armDismiss();
+  };
+  const commit = () => {
+    clearDismiss();
+    const n = parseInt(bufferRef.current, 10);
+    const ch = Number.isFinite(n) ? byNumber(n) : null;
+    if (ch) {
       setBuf("");
-    };
-    const armDismiss = () => {
-      clearDismiss();
-      dismissTimer.current = window.setTimeout(cancel, DISMISS_MS);
-    };
-    const append = (d: string) => {
-      if (bufferRef.current.length >= maxDigits) return; // ignore digits past the widest channel number
-      clearFlash();
-      setFlash(false);
-      setBuf(bufferRef.current + d);
-      armDismiss();
-    };
-    const commit = () => {
-      clearDismiss();
-      const n = parseInt(bufferRef.current, 10);
-      const ch = Number.isFinite(n) ? byNumber(n) : null;
-      if (ch) {
+      tune(ch.id); // tune() takes it full-screen
+    } else {
+      // No such channel — flash the number red briefly, then clear. Never tunes.
+      setFlash(true);
+      flashTimer.current = window.setTimeout(() => {
+        setFlash(false);
         setBuf("");
-        tune(ch.id); // tune() takes it full-screen
-      } else {
-        // No such channel — flash the number red briefly, then clear. Never tunes.
-        setFlash(true);
-        flashTimer.current = window.setTimeout(() => {
-          setFlash(false);
-          setBuf("");
-        }, FLASH_MS);
-      }
-    };
+      }, FLASH_MS);
+    }
+  };
 
-    const onKey = (e: KeyboardEvent) => {
+  // OVERLAY: above the guide and the player chrome, so OK/Back reach ONLY number entry while a
+  // number is part-typed — no ref handshake needed, since those layers simply aren't consulted.
+  // Channel surf sits ABOVE this (MODAL) and swallows everything, which is what used to be the
+  // `surfActiveRef` early-return here.
+  useKeyLayer({
+    id: "number-entry",
+    priority: LAYER.OVERLAY,
+    onKey(e) {
       // Armed only while browsing/watching (the "/" route covers guide + full player + mini), and
       // never while a dropdown menu or a text field owns the keys.
-      if (pathname !== "/" || menuOpen() || inputFocused()) return;
-      if (surfActiveRef.current) return; // channel surf owns ◄/►/OK/Back — don't arm entry or CH▲/▼
+      if (pathname !== "/" || menuOpen() || inputFocused()) return false;
 
-      // CH▲/▼ = PageUp/PageDown (keyCode 33/34) on the webOS remote: step one channel (clamped,
-      // in-flight-locked in the provider). preventDefault so it never page-scrolls; abandons any
+      // CH▲/▼: step one channel (clamped, in-flight-locked in the provider). Abandons any
       // in-progress number entry first.
-      if (e.keyCode === 33 || e.keyCode === 34) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
+      if (e.key === "chUp" || e.key === "chDown") {
         if (bufferRef.current.length > 0) cancel();
-        channelStep(e.keyCode === 33 ? 1 : -1);
-        return;
+        channelStep(e.key === "chUp" ? 1 : -1);
+        return true;
       }
 
-      const digit = digitOf(e);
-      if (digit != null) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        append(digit);
-        return;
+      if (e.key === "digit" && e.digit != null) {
+        append(String(e.digit));
+        return true;
       }
 
-      if (bufferRef.current.length === 0) return; // below only applies mid-entry
+      if (bufferRef.current.length === 0) return false; // below only applies mid-entry
 
-      // stopImmediatePropagation (not just stopPropagation) so that when THIS listener runs before a
-      // sibling window listener (guide / player chrome), that sibling never fires. Paired with those
-      // handlers' `numberEntryActiveRef` guard (which covers the reverse order), the zoning is
-      // order-independent: OK/Back reach ONLY number entry while it's active.
-      if (e.key === "Enter" || e.keyCode === 13) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
+      if (e.key === "ok") {
         commit();
-        return;
+        return true;
       }
       // Back breaks out and is CONSUMED (peels the overlay like other overlays; a second Back then
       // does its normal thing).
-      if (e.keyCode === 461 || BACK_KEYS.includes(e.key)) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
+      if (e.key === "back") {
         cancel();
-        return;
+        return true;
       }
       // An arrow breaks out but PASSES THROUGH — you changed your mind and want to navigate.
-      if (ARROW_KEYS.includes(e.key)) {
+      if (e.key === "up" || e.key === "down" || e.key === "left" || e.key === "right") {
         cancel();
-        return;
+        return false;
       }
-    };
+      return false;
+    },
+  });
 
-    window.addEventListener("keydown", onKey, true);
+  useEffect(() => {
     return () => {
-      window.removeEventListener("keydown", onKey, true);
       clearDismiss();
       clearFlash();
-      numberEntryActiveRef.current = false;
     };
-  }, [pathname, byNumber, maxNumber, tune, maxDigits, numberEntryActiveRef, surfActiveRef, channelStep]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const pad = "_".repeat(Math.max(0, maxDigits - buffer.length));
 

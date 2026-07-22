@@ -33,13 +33,20 @@ import { physicalId, toKeyEvent, type KeyEvent } from "./keys";
  */
 
 export const LAYER = {
-  /** Screens: guide, settings content, login, setup, diagnostic. */
+  /** Screens: guide, settings, login, setup, diagnostic. */
   BASE: 0,
   /** Player chrome + feature panel — sits over a screen. */
   CHROME: 100,
-  /** Full-screen overlays like channel surf. */
+  /**
+   * Transient global capture that still lets navigation through: channel-number entry (it claims
+   * digits/CH/OK/Back but deliberately lets arrows pass so you can navigate away mid-entry).
+   */
   OVERLAY: 200,
-  /** Modals that own the keys outright: number entry, the key probe. */
+  /**
+   * Full takeover — owns every key, nothing leaks downward: channel surf, the remote key probe.
+   * Above OVERLAY on purpose: while surf is open, digits must NOT start channel-number entry
+   * (previously enforced by number entry checking `surfActiveRef`).
+   */
   MODAL: 300,
 } as const;
 

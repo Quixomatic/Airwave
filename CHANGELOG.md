@@ -2,6 +2,21 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.3] - 2026-07-22
+
+### Changed
+
+- **The whole player cluster is on the dispatcher, and the mutex refs are gone.** Full-screen chrome, the feature panel, channel surf, and channel-number entry are now four layers at declared priorities: chrome/panel at `CHROME`, number entry at `OVERLAY` (it claims digits/CH/OK/Back but lets arrows through so you can navigate away mid-entry), channel surf at `MODAL` + exclusive (it owns every key while up). **No behavior change intended.**
+
+### Removed
+
+- **`numberEntryActiveRef` and `surfActiveRef`** — the two shared boolean mutexes that five different handlers had to read at event time to decide whether they were in charge. Stack position now produces the same outcomes: a layer that isn't on top simply isn't consulted. Channel surf outranking number entry is what used to be number entry's `if (surfActiveRef.current) return`.
+- **Every `stopImmediatePropagation` call.** With one listener there are no siblings to shout down; it now appears only in a comment explaining why it used to be needed.
+
+### Notes
+
+- The feature panel deliberately still does **not** claim OK on its control row — it's the one place driving real DOM focus, so leaving OK unconsumed lets the natively-focused button or dropdown trigger fire its own click. Same reason its `openMenu` branch declines every key: base-ui owns them while a dropdown is open.
+
 ## [0.7.2] - 2026-07-22
 
 ### Changed

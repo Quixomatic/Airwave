@@ -338,12 +338,6 @@ export function AuroraGrid({
     priority: LAYER.BASE,
     active: player.layout !== "full",
     onKey(e) {
-      // Channel-number entry owns OK (commit) + Back (cancel) while active — defer so we don't tune
-      // the focused channel or exit the app under it. Arrows fall through (break out + navigate).
-      // TEMPORARY: goes away once number entry is a MODAL layer, since it will then claim these
-      // keys before the guide is ever consulted.
-      if (player.numberEntryActiveRef.current && (e.key === "back" || e.key === "ok")) return false;
-
       // Sidebar focused → its circles own the keys (Up/Down cycle, OK activates, Right/Back → grid).
       if (zone === "sidebar") {
         if (e.key === "back" || e.key === "right") setZone("grid");

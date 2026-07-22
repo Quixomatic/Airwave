@@ -29,14 +29,6 @@ export type PlayerCtx = {
   miniActivate: () => void;
   /** Remote CH▲/▼: step the lineup by one (dir +1 = up/next), clamped, behind the in-flight lock. */
   channelStep: (dir: 1 | -1) => void;
-  /** True while channel-number entry is capturing input. The guide and full-screen chrome read this
-   *  (synchronously, at event time) to DEFER the keys number entry owns — OK commits it and Back
-   *  cancels it, so neither should also tune / exit / pop to mini. A ref (not state) so the keydown
-   *  handlers see the current value without re-registering. */
-  numberEntryActiveRef: RefObject<boolean>;
-  /** True while the channel-surf carousel is open. Number entry, CH▲/▼, and the full-screen chrome
-   *  all defer to it (it owns ◄/►/OK/Back while up). Same rationale as `numberEntryActiveRef`. */
-  surfActiveRef: RefObject<boolean>;
 };
 
 export const Ctx = createContext<PlayerCtx | null>(null);

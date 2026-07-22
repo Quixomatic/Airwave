@@ -8,6 +8,7 @@ import { FeaturePanel } from "./feature-panel";
 import { usePlayer } from "./player-ctx";
 import type { useTvPlayer } from "./use-tv-player";
 import type { GuideChannel } from "../../lib/api";
+import { LAYER, useKeyLayer } from "../../lib/input";
 import { channelVivid } from "../../lib/tint";
 
 /**
@@ -56,40 +57,39 @@ export function FullChrome({
 }) {
   const { status, controls, tracks } = player;
   const accent = accentForChannel(channel);
-  const { numberEntryActiveRef, surfActiveRef } = usePlayer();
 
   // Open the channel overlay on tune (auto-hides after the panel's timeout, or on Back).
   const [panelOpen, setPanelOpen] = useState(true);
   // Channel surf (◄/► with the chrome closed) — opens centered on the current channel.
   const [surfOpen, setSurfOpen] = useState(false);
 
-  // Remote: panel closed → OK/Up/Down opens it, Back returns to the guide (keeps
-  // playing as a mini feed). When the panel is open the FeaturePanel owns the keys.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (panelOpen) return;
-      if (surfActiveRef.current) return; // the surf carousel owns keys while it's open
-      const isBack = e.keyCode === 461 || ["Backspace", "GoBack", "BrowserBack", "XF86Back"].includes(e.key);
-      // Channel-number entry owns OK (commit) + Back (cancel) while active — don't also pop to mini.
-      if (numberEntryActiveRef.current && (isBack || e.key === "Enter")) return;
-      if (isBack) {
-        e.preventDefault();
-        e.stopPropagation();
-        onBack();
-      } else if (e.key === "Enter" || e.key === "ArrowUp" || e.key === "ArrowDown") {
-        e.preventDefault();
-        e.stopPropagation();
-        setPanelOpen(true);
-      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-        // Chrome closed → ◄/► slides up the channel-surf carousel (centered on the current channel).
-        e.preventDefault();
-        e.stopPropagation();
-        setSurfOpen(true);
+  // Remote: panel closed → OK/Up/Down opens it, Back returns to the guide (keeps playing as a mini
+  // feed). Only on the stack while the panel is CLOSED — when it's open the FeaturePanel's own layer
+  // owns the keys. Channel surf (MODAL) and number entry (OVERLAY) both sit above this layer, so
+  // they no longer need to be checked by hand.
+  useKeyLayer({
+    id: "player-chrome",
+    priority: LAYER.CHROME,
+    active: !panelOpen,
+    onKey(e) {
+      switch (e.key) {
+        case "back":
+          onBack();
+          return true;
+        case "ok":
+        case "up":
+        case "down":
+          setPanelOpen(true);
+          return true;
+        case "left":
+        case "right":
+          // Chrome closed → ◄/► slides up the channel-surf carousel (centered on the current channel).
+          setSurfOpen(true);
+          return true;
       }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [panelOpen, onBack, numberEntryActiveRef, surfActiveRef]);
+      return false;
+    },
+  });
 
   const isBumper = status.state === "bumper";
 
