@@ -28,6 +28,7 @@ import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput, type ToolState } 
 import { EmptyState } from "@/components/empty-state";
 import { PanelHeaderTitle } from "@/context/panel-header-provider";
 import { cn } from "@/lib/utils";
+import { uuid } from "@/lib/uuid";
 import { trpc, trpcClient } from "@/utils/trpc";
 
 /**
@@ -52,7 +53,7 @@ const Title = () => (
 
 export function AiChatPanel() {
   const navigate = useNavigate();
-  const [activeId, setActiveId] = useState<string>(() => crypto.randomUUID());
+  const [activeId, setActiveId] = useState<string>(() => uuid());
   const [showHistory, setShowHistory] = useState(false);
   const conversations = useQuery(trpc.ai.conversations.queryOptions());
   const connections = useQuery(trpc.ai.list.queryOptions());
@@ -86,7 +87,7 @@ export function AiChatPanel() {
   }
 
   const newChat = () => {
-    setActiveId(crypto.randomUUID());
+    setActiveId(uuid());
     setShowHistory(false);
   };
   const del = async (id: string) => {

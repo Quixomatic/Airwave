@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.6.34] - 2026-07-22
+
+### Fixed
+
+- **Creating a channel (and the AI chat) no longer crashes on a plain-HTTP self-host.** `crypto.randomUUID()` is only defined in a **secure context** (HTTPS or localhost), so on a LAN-IP-over-HTTP admin (e.g. `http://192.168.1.10:36021`) it was `undefined` and threw `TypeError: crypto.randomUUID is not a function` (channel filter builder, AI chat panel). Added a `uuid()` helper (`apps/web/src/lib/uuid.ts`) that uses `crypto.randomUUID()` when available and otherwise builds a v4 UUID from `crypto.getRandomValues()` (which works in non-secure contexts), and routed all web call sites through it.
+
 ## [0.6.33] - 2026-07-22
 
 ### Fixed

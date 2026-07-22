@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Plus, X } from "lucide-react";
 
 import { trpc } from "@/utils/trpc";
+import { uuid } from "@/lib/uuid";
 
 export type FilterOp = "is" | "isNot" | "gte" | "lte" | "contains" | "notContains";
 export type FilterCondition = {
@@ -24,7 +25,7 @@ export type FilterNode = FilterCondition | FilterGroup;
 
 type FieldMeta = { field: string; label: string; kind: string; operators: FilterOp[] };
 
-const uid = () => crypto.randomUUID();
+const uid = () => uuid();
 export const emptyGroup = (): FilterGroup => ({
   type: "group",
   id: uid(),
