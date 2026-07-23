@@ -1,28 +1,23 @@
 import { useRouter } from "expo-router";
-import { Pressable, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Text, View } from "react-native";
 
-import { C } from "@/lib/theme";
+import { PageHeader, SettingRow, useSettingsPage } from "@/features/settings/settings-ui";
 
-/**
- * TEMPORARY settings stub — here only so the guide's Settings/Account navigation resolves while we
- * lock the guide's visual parity. The full settings port (the sliver-sidebar shell + General / User
- * / Server / Device / About subpages, at parity with tv-web) is the next piece.
- */
-export default function Settings() {
+/** /settings — General (the landing subpage), ported from tv-web. */
+export default function General() {
   const router = useRouter();
+  const rows = [{ label: "Back to guide", sublabel: "Return to live TV", onPress: () => router.replace("/guide") }];
+  const { sel } = useSettingsPage(rows.length, (i) => rows[i]!.onPress());
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-      <View style={{ padding: 20, gap: 12 }}>
-        <Text style={{ fontSize: 30, fontWeight: "800", color: C.fg }}>Settings</Text>
-        <Text style={{ color: C.mutedFg }}>Full settings parity is being ported next.</Text>
-        <Pressable onPress={() => router.push("/settings/user")} style={{ borderRadius: 12, backgroundColor: "rgba(255,255,255,0.05)", paddingHorizontal: 20, paddingVertical: 16 }}>
-          <Text style={{ fontSize: 18, color: C.fg }}>User</Text>
-        </Pressable>
-        <Pressable onPress={() => router.replace("/guide")} style={{ borderRadius: 12, backgroundColor: "rgba(255,255,255,0.05)", paddingHorizontal: 20, paddingVertical: 16 }}>
-          <Text style={{ fontSize: 18, color: C.fg }}>Back to guide</Text>
-        </Pressable>
-      </View>
-    </SafeAreaView>
+    <View>
+      <PageHeader title="General" subtitle="App-wide preferences." />
+      {rows.map((r, i) => (
+        <SettingRow key={r.label} label={r.label} sublabel={r.sublabel} focused={sel === i} onPress={r.onPress} />
+      ))}
+      <Text style={{ marginTop: 20, fontSize: 15, color: "#64748b" }}>
+        ChannelGuide — your media server as live TV channels. More general preferences will live here.
+      </Text>
+    </View>
   );
 }

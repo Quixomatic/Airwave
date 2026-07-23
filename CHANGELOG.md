@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.11] - 2026-07-23
+
+### Added
+
+- **tv-native: the full settings system, ported at parity.** The master-detail shell (`app/settings/_layout.tsx`) with the sliver category rail (the guide's glass-circle treatment, slide + shadow) and the selected subpage; the same rail ↔ content zone machine as tv-web, driven by touch (tap the collapsed rail to expand, tap a category) and D-pad (rail ▲/▼ + OK / ► into content / Back to guide), with each page's options via a ported `useSettingsPage`. Ported primitives: `PageHeader`, `SettingRow` (focus ring), `SectionLabel`, `Pill`, `Toggle`.
+  - **General**, **About** (app identity + version), **User** (the better-auth session card — avatar / name / email / role — + two-tap Sign out), **Server** (address + two-tap Change server → onboarding).
+  - **Device** shows the device info strip; its measured playback capabilities + per-codec overrides + recent errors come with the player arc (they need the capability diagnostic — the one that confirms iPadOS drops to HLS). **Server's** media-connection / force-connection rows likewise arrive with the player (they need the Plex connection probe).
+
+### Notes
+
+- The two deferred sections (Device caps, Server media-connection) are gated on the capability diagnostic + connection probe, which are playback concerns — next arc, not a simplification. Everything else is full parity.
+
 ## [0.7.10] - 2026-07-23
 
 ### Added
