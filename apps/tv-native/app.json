@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "ChannelGuide",
+    "slug": "channelguide",
+    "version": "0.7.6",
+    "scheme": "channelguide",
+    "orientation": "default",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "backgroundColor": "#060a14",
+    "splash": {
+      "backgroundColor": "#060a14",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.channelguide.tv"
+    },
+    "android": {
+      "package": "com.channelguide.tv",
+      "adaptiveIcon": {
+        "backgroundColor": "#060a14"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "@react-native-tvos/config-tv",
+        {
+          "showVerboseWarnings": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

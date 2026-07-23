@@ -1,0 +1,40 @@
+{
+  "name": "tv-native",
+  "version": "0.7.6",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "dev": "expo start",
+    "dev:android": "expo start --android",
+    "dev:ios": "expo start --ios",
+    "start": "expo start",
+    "prebuild": "expo prebuild",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@tanstack/react-query": "^5.101.2",
+    "@types/react": "~19.2.17",
+    "expo": "^57.0.8",
+    "expo-router": "~57.0.8",
+    "expo-secure-store": "~57.0.1",
+    "expo-status-bar": "~57.0.1",
+    "lucide-react-native": "^1.25.0",
+    "nativewind": "^4.2.6",
+    "phosphor-react-native": "^3.0.6",
+    "react": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-qrcode-svg": "^6.3.21",
+    "react-native-reanimated": "4.5.0",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.2",
+    "react-native-svg": "15.15.4",
+    "react-native-worklets": "0.10.0",
+    "typescript": "~6.0.3"
+  },
+  "devDependencies": {
+    "@react-native-tvos/config-tv": "^0.1.6",
+    "tailwindcss": "^3.4.19"
+  }
+}

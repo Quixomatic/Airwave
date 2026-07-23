@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.6] - 2026-07-23
+
+### Added
+
+- **`apps/tv-native` — the foundation of the native client** (Expo SDK 57 · React Native 0.86 · React 19). One codebase targeting iOS / iPadOS / tvOS / Android / Android TV / Fire TV, reusing the existing `/api/v1` REST surface unchanged. Stack per your spec: **expo-router** (file-based routing, typed routes), **Reanimated 4** (worklets plugin), **NativeWind 4** (Tailwind v3, isolated from the web apps' v4) with the color tokens ported verbatim from tv-web's `theme.ts`, **lucide-react-native + phosphor-react-native**, TanStack Query (same lib as tv-web). The **`@react-native-tvos/config-tv`** plugin is wired so `EXPO_TV=1 expo prebuild` swaps in `react-native-tvos` for the TV targets — no separate fork install.
+- **Ported foundation:** the theme palette (`src/lib/theme.ts`), the bearer REST client (`src/lib/api.ts` — the same `request()` helper tv-web uses, not tRPC), and the session store (`src/lib/auth.ts` — token in `expo-secure-store`, server URL in `AsyncStorage`; the native analogue of tv-web's `auth-client` + `server-url`).
+- **First runnable screen — login** (`app/login.tsx`), the Plex device-link flow fully wired (start → QR/code → poll → token → guide), styled to match tv-web. Plus a signed-in placeholder that proves the session + API round-trip against a live server.
+
+### Notes
+
+- Integrated into the monorepo: `apps/*` already in the workspace, so `pnpm dev` starts `expo start` alongside server/web/tv-web, and `pnpm check-types` includes it. Set `EXPO_PUBLIC_SERVER_URL` in `apps/tv-native/.env` to skip onboarding while iterating.
+- **Windows dev note:** this box can build/bundle/typecheck but can't render iOS/tvOS — run via Expo Go / a dev client / EAS Build. Next increments: the better-auth Expo client (the "Log in with a code" option), then the guide grid, player, and capability diagnostic — each ported for full appearance + behavior parity with tv-web.
+
 ## [0.7.5] - 2026-07-22
 
 ### Added
