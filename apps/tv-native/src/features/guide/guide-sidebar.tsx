@@ -2,7 +2,7 @@ import * as LucideIcons from "lucide-react-native";
 import { History, LayoutGrid, ListFilter, Menu, Settings as SettingsIcon, Star, User } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import { View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
 import type { Package } from "@/lib/api";
@@ -13,10 +13,10 @@ import { GlassCircleButton } from "./glass-button";
 import { SIDEBAR_EXPANDED_W, SIDEBAR_SLIVER_W } from "./layout";
 
 /**
- * The guide's left sidebar, ported from tv-web's `guide-sidebar.tsx` — a collapsed sliver of glass
- * circles (actions Guide/Settings/Account + one "Filters" stand-in) that expands to reveal the
- * lenses (Favorites, Recents, each package in its tint). Same sliver (92) / expanded (300) widths,
- * same overlay behavior (absolute, grows over the grid; the layout only ever reserves the sliver).
+ * The guide's left sidebar, ported from tv-web — a collapsed sliver of glass circles that expands to
+ * reveal the lenses. Same sliver (92) / expanded (300) widths and overlay behavior. Touch model
+ * mirrors the TV's "enter the sidebar to use it": tapping the collapsed sliver expands it (the
+ * circles are non-interactive until then); expanded, tapping a lens applies it and collapses.
  */
 export type Lens =
   | { type: "all" }
@@ -40,10 +40,10 @@ function pkgIcon(id: string | null): ReactNode {
   const Comp = id && id.startsWith("lucide:") ? LU[id.slice(7)] ?? LucideIcons.Folder : LucideIcons.Folder;
   return <Comp size={24} color="#f1f5f9" />;
 }
+const ic = (Cmp: React.ComponentType<{ size?: number; color?: string }>) => <Cmp size={24} color="#f1f5f9" />;
 
 export function buildSidebarItems(packages: Package[], lens: Lens): SidebarItem[] {
   const filtered = lens.type !== "all";
-  const ic = (C: React.ComponentType<{ size?: number; color?: string }>) => <C size={24} color="#f1f5f9" />;
   return [
     { key: "guide", label: "Guide", icon: ic(Menu), kind: "lens", lens: { type: "all" }, group: "action" },
     { key: "settings", label: "Settings", icon: ic(SettingsIcon), kind: "settings", group: "action" },
@@ -77,20 +77,16 @@ export function lensEquals(a: Lens | undefined, b: Lens): boolean {
 export function GuideSidebar({
   items,
   expanded,
-  focused,
-  sel,
   lens,
   onActivate,
-  onExpandFilters,
+  onExpand,
 }: {
   items: SidebarItem[];
   expanded: boolean;
-  focused: boolean;
-  sel: number;
   lens: Lens;
   onActivate: (index: number) => void;
-  /** Touch: tapping the collapsed "Filters" stand-in expands the sidebar to reveal the lenses. */
-  onExpandFilters?: () => void;
+  /** Touch: tapping the collapsed sliver expands it to reveal the lenses. */
+  onExpand: () => void;
 }) {
   const actions = items.filter((i) => i.group === "action");
   const filters = items.filter((i) => i.group === "filter");
@@ -102,73 +98,72 @@ export function GuideSidebar({
   }, [expanded, w]);
   const animStyle = useAnimatedStyle(() => ({ width: w.value }));
 
+  const base = {
+    position: "absolute" as const,
+    left: 0,
+    top: 0,
+    bottom: 0,
+    overflow: "hidden" as const,
+    backgroundColor: C.sidebarBg,
+    borderRightWidth: 1,
+    borderRightColor: C.border,
+    zIndex: 25,
+  };
+
+  // Collapsed: the whole sliver is one tap target that expands. Circles are visual only.
+  if (!expanded) {
+    return (
+      <Animated.View style={[base, animStyle]}>
+        <Pressable onPress={onExpand} style={{ flex: 1, flexDirection: "column", gap: 14, paddingVertical: 24, paddingHorizontal: 18 }}>
+          {actions.map((it) => (
+            <GlassCircleButton
+              key={it.key}
+              icon={it.icon}
+              expanded={false}
+              active={it.lens ? lensEquals(it.lens, lens) : false}
+              accent={it.accent}
+            />
+          ))}
+          <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: 4 }} />
+          <GlassCircleButton icon={<ListFilter size={24} color="#f1f5f9" />} expanded={false} active={!!activeFilter} accent={activeFilter?.accent} />
+        </Pressable>
+      </Animated.View>
+    );
+  }
+
+  // Expanded: interactive circles + labels; the lens list scrolls (packages exceed the screen).
   return (
-    <Animated.View
-      style={[
-        {
-          position: "absolute",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          overflow: "hidden",
-          flexDirection: "column",
-          gap: 14,
-          paddingVertical: 24,
-          paddingHorizontal: 18,
-          backgroundColor: C.sidebarBg,
-          borderRightWidth: 1,
-          borderRightColor: C.border,
-          zIndex: 25,
-        },
-        animStyle,
-      ]}
-    >
-      {actions.map((it, i) => (
-        <View key={it.key} style={{ flexShrink: 0 }}>
+    <Animated.View style={[base, animStyle]}>
+      <View style={{ flex: 1, flexDirection: "column", gap: 14, paddingVertical: 24, paddingHorizontal: 18 }}>
+        {actions.map((it, i) => (
           <GlassCircleButton
+            key={it.key}
             icon={it.icon}
             label={it.label}
-            expanded={expanded}
-            focused={focused && sel === i}
+            expanded
             active={it.lens ? lensEquals(it.lens, lens) : false}
             accent={it.accent}
             onPress={() => onActivate(i)}
           />
-        </View>
-      ))}
-
-      <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: 4, flexShrink: 0 }} />
-
-      <View style={{ flex: 1, minHeight: 0, gap: 14 }}>
-        {expanded ? (
-          filters.map((it, i) => {
+        ))}
+        <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: 4 }} />
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 14 }} showsVerticalScrollIndicator={false}>
+          {filters.map((it, i) => {
             const idx = actions.length + i;
             return (
-              <View key={it.key} style={{ flexShrink: 0 }}>
-                <GlassCircleButton
-                  icon={it.icon}
-                  label={it.label}
-                  sublabel={it.sublabel}
-                  expanded
-                  focused={focused && sel === idx}
-                  active={it.lens ? lensEquals(it.lens, lens) : false}
-                  accent={it.accent}
-                  onPress={() => onActivate(idx)}
-                />
-              </View>
+              <GlassCircleButton
+                key={it.key}
+                icon={it.icon}
+                label={it.label}
+                sublabel={it.sublabel}
+                expanded
+                active={it.lens ? lensEquals(it.lens, lens) : false}
+                accent={it.accent}
+                onPress={() => onActivate(idx)}
+              />
             );
-          })
-        ) : (
-          <View style={{ flexShrink: 0 }}>
-            <GlassCircleButton
-              icon={<ListFilter size={24} color="#f1f5f9" />}
-              expanded={false}
-              active={!!activeFilter}
-              accent={activeFilter?.accent}
-              onPress={onExpandFilters}
-            />
-          </View>
-        )}
+          })}
+        </ScrollView>
       </View>
     </Animated.View>
   );

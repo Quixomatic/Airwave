@@ -208,11 +208,9 @@ export function AuroraGrid({
       <GuideSidebar
         items={sidebarItems}
         expanded={sidebarExpanded}
-        focused={false}
-        sel={-1}
         lens={lens}
         onActivate={activateSidebar}
-        onExpandFilters={() => setSidebarExpanded(true)}
+        onExpand={() => setSidebarExpanded(true)}
       />
     </View>
   );
