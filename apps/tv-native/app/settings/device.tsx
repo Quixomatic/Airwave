@@ -1,16 +1,19 @@
+import { useRouter } from "expo-router";
 import { Platform, Text, useWindowDimensions, View } from "react-native";
 
-import { PageHeader, SectionLabel, useSettingsPage } from "@/features/settings/settings-ui";
+import { PageHeader, SectionLabel, SettingRow, useSettingsPage } from "@/features/settings/settings-ui";
 
 /**
- * /settings/device — this device's info, ported from tv-web's device page. tv-web also shows the
- * measured playback capabilities + per-codec overrides + recent errors; those come from the
- * capability diagnostic + device-caps API, which land with the player arc (that's what measures
- * that iPadOS drops everything to HLS). This page grows those sections then.
+ * /settings/device — device info + tools, ported from tv-web's device page. The measured playback
+ * capabilities + per-codec overrides + recent errors (also on tv-web's page) come next; the
+ * "Run capability diagnostic" tool re-measures this device against the current server.
  */
 export default function DeviceSettings() {
+  const router = useRouter();
   const { width, height } = useWindowDimensions();
-  useSettingsPage(0, () => {});
+
+  const tools = [{ label: "Run capability diagnostic", sublabel: "Re-measure what this device plays natively", onPress: () => router.push("/diagnostic") }];
+  const { sel } = useSettingsPage(tools.length, (i) => tools[i]!.onPress());
 
   return (
     <View>
@@ -22,11 +25,16 @@ export default function DeviceSettings() {
         <Info label="TV" value={Platform.isTV ? "Yes" : "No"} />
       </View>
 
+      <SectionLabel small>Tools</SectionLabel>
+      {tools.map((t, i) => (
+        <SettingRow key={t.label} label={t.label} sublabel={t.sublabel} focused={sel === i} onPress={t.onPress} />
+      ))}
+
       <SectionLabel>Playback capabilities</SectionLabel>
       <Text style={{ fontSize: 14, color: "#64748b", maxWidth: 640, lineHeight: 20 }}>
-        The capability diagnostic measures what this device decodes natively (and, on iPadOS/tvOS,
-        confirms playback drops to HLS). It lands with the player — the per-codec overrides and recent
-        playback issues will appear here then.
+        The diagnostic measures what this device decodes natively (and, on iPadOS/tvOS, confirms
+        playback drops to HLS). The per-codec overrides + recent playback issues shown on tv-web's
+        Device page land here next.
       </Text>
     </View>
   );

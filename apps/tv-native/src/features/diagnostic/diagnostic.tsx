@@ -66,7 +66,9 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
           resolve(r);
         };
         try {
-          player.replace(`${getServerUrl()}${test.url}`);
+          // Object form ({ uri }), matching the working channel player — a raw string source
+          // silently failed to load (every clip showed the can't-play indicator).
+          player.replace({ uri: `${getServerUrl()}${test.url}` });
           player.play();
         } catch {
           resolve({ decoded: false, error: "load error" });
