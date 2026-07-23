@@ -2,6 +2,20 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.19] - 2026-07-23
+
+### Added
+
+- **`@ChannelGuide/mpv-player` — a new Expo native video module powered by mpv (libmpv/MPVKit), a full replacement for both AVPlayer (expo-video) and libVLC (expo-libvlc-player).** mpv is ffmpeg-based, so it **estimates HTTP seeks**: `loadfile … start=<offset>` opens a live channel AT its offset via a byte-range request instead of the sequential read-to-offset that made libVLC take ~40–60s on un-indexed Plex MKVs (proven on-device via the `[vlc]` timeline: `buffering 0%` for the whole delay). It direct-plays every codec/container and handles HDR/Dolby-Vision. Renders via MPVKit's `avfoundation` VO into an `AVSampleBufferDisplayLayer` with `hwdec=videotoolbox`; core ported from plezy's proven `MpvPlayerCoreBase`. Targets **iOS · iPadOS · tvOS** now (MPVKit SPM + a config plugin that wires it into the Xcode target — the Expo equivalent of plezy's `wire_mpv.rb`); **Android / Android TV / Fire TV** (libmpv-android) is structured in and implemented next. The JS contract is a **seekable media element** (`source`/`startTime`/`seek(seconds)` + `onLoad`/`onProgress`/`onBuffering`/`onError`) so the proven tv-web/tv-native effectiveTime + DVR logic maps onto it 1:1.
+
+### Changed
+
+- **tv-native playback swapped from libVLC → mpv.** `use-tv-player`, `player-context`, and the capability `diagnostic` now drive `<MpvPlayerView>`: the clock reads `onProgress` currentTime (seconds, absolute — like an HTML `<video>`, matching tv-web); direct-play opens at the offset via `startTime`; DVR seeks are a fast `seek()`; PlaybackLog + heartbeat retained. Removed the libVLC-era workarounds (`time`-prop, `--input-fast-seek`, the forceHls threshold) — mpv seeks like a real media element, so none are needed.
+
+### Notes
+
+- **Needs a fresh EAS development build** (native module + MPVKit SPM). The config-plugin SPM wiring (`app.plugin.js`) is the piece most likely to need a build-cycle to land, and the Swift compiles for the first time on that build. libVLC (`expo-libvlc-player`) + `expo-video` remain installed during the transition; they'll be removed once mpv is proven on-device. Why this route: libVLC couldn't byte-range-seek un-indexed MKV over HTTP (confirmed in the library's own source — instance-only options aren't reachable through the wrapper), and the C2's native player estimates the seek where libVLC won't; on iPad there's no native MKV path, so mpv (which estimates like the C2) is the fix.
+
 ## [0.7.18] - 2026-07-23
 
 ### Changed

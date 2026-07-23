@@ -1,6 +1,6 @@
 {
   "name": "tv-native",
-  "version": "0.7.18",
+  "version": "0.7.19",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -12,6 +12,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@ChannelGuide/mpv-player": "workspace:*",
     "@better-auth/expo": "^1.6.23",
     "@expo/metro-runtime": "~55.0.12",
     "@react-native-async-storage/async-storage": "2.2.0",

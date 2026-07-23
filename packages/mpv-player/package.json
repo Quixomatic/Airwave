@@ -1,0 +1,27 @@
+{
+  "name": "@ChannelGuide/mpv-player",
+  "version": "0.0.0",
+  "description": "Expo native video player powered by mpv — a full replacement for AVPlayer and libVLC. Apple (MPVKit) + Android/Android TV/Fire TV (libmpv-android). Direct-plays every codec/container and does fast ffmpeg-estimated HTTP seeks.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "private": true,
+  "expo": {
+    "name": "mpv-player",
+    "platforms": ["ios", "tvos", "android"]
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.17",
+    "expo": "~55.0.28",
+    "react": "19.2.0",
+    "react-native": "0.83.6",
+    "typescript": "catalog:"
+  }
+}

@@ -2,7 +2,7 @@
   "expo": {
     "name": "ChannelGuide",
     "slug": "channelguide",
-    "version": "0.7.18",
+    "version": "0.7.19",
     "scheme": "channelguide",
     "orientation": "landscape",
     "userInterfaceStyle": "dark",
@@ -13,7 +13,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.channelguide.tv"
+      "bundleIdentifier": "com.channelguide.tv",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.channelguide.tv",
@@ -31,7 +34,8 @@
         }
       ],
       "expo-video",
-      "expo-libvlc-player"
+      "expo-libvlc-player",
+      "@ChannelGuide/mpv-player"
     ],
     "extra": {
       "router": {},

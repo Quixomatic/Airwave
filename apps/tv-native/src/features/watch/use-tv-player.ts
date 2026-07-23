@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useVideoPlayer } from "expo-video";
+import type { MpvPlayerViewRef } from "@ChannelGuide/mpv-player";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { api, type GuideMeta, type MediaInfo, type Track, type TimelineSlot } from "@/lib/api";
@@ -7,7 +7,7 @@ import { deviceId } from "@/lib/device";
 
 /**
  * The tv-native channel player — the effectiveTime clock + DVR ported from tv-web's `use-tv-player`,
- * driving an **expo-video** player (AVPlayer/ExoPlayer). Derives the current slot + offset from real
+ * driving an **mpv** view (`@ChannelGuide/mpv-player`, source-prop + event-driven, seconds — a real seekable media element). Derives the current slot + offset from real
  * playback position, rolls at boundaries, and — the DVR — `goTo(anyTime)` rewinds OUT of the current
  * program through the bumper into the previous one. Emits a multi-segment scrubber view.
  *
@@ -66,16 +66,17 @@ const titleOf = (g?: GuideMeta | null) => (!g ? "" : g.showTitle ? `${g.showTitl
 
 export type PlayerOptions = { quality?: string; audioStreamId?: string; subtitleStreamId?: string };
 
-export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
-  const player = useVideoPlayer(null, (p) => {
-    p.timeUpdateEventInterval = 0.5;
-    p.staysActiveInBackground = false;
-  });
+export function useTvPlayer(channelId: string | null, options: PlayerOptions = {}) {
+  const viewRef = useRef<MpvPlayerViewRef>(null);
+  const [source, setSource] = useState<string | null>(null);
+  const [startTime, setStartTime] = useState(0); // mpv open-at position (seconds) — loadfile … start=<offset>
+  const positionSecRef = useRef(0); // latest onProgress currentTime (seconds); the effectiveTime clock reads this
+  const playingRef = useRef(false);
   const paramsKey = `${options.quality ?? ""}|${options.audioStreamId ?? ""}|${options.subtitleStreamId ?? ""}`;
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
-  const timeline = useQuery({ queryKey: ["timeline", channelId], queryFn: () => api.timeline(channelId, 360, 180), refetchInterval: 120_000 });
+  const timeline = useQuery({ queryKey: ["timeline", channelId], queryFn: () => api.timeline(channelId!, 360, 180), refetchInterval: 120_000, enabled: !!channelId });
 
   const clockOffset = useRef(0);
   const slotsRef = useRef<SlotEntry[]>([]);
@@ -85,35 +86,48 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
   const lastTick = useRef(Date.now());
   const genRef = useRef(0);
   const transitioning = useRef(false);
+  const decodedDimsRef = useRef({ w: 0, h: 0 }); // onFirstPlay MediaInfo dims, for PlaybackLog
+  const logCtxRef = useRef<Record<string, unknown> | null>(null); // last program-load context
+  const loadStartRef = useRef(0); // Date.now() at setSource, for the [vlc] event timeline in Metro
+  const currentUrlRef = useRef<string | null>(null); // last loaded URL — a same-URL goTo = DVR seek within the current direct file
 
   const [tracks, setTracks] = useState<{ audio: Track[]; subtitle: Track[] }>({ audio: [], subtitle: [] });
   const [status, setStatus] = useState<PlayerStatus>({ loading: true, buffering: false, state: "idle", guide: null, paused: false, bumperRemaining: null, canRestart: false, error: null, scrubber: null, delivery: null });
 
   const now = useCallback(() => (Date.now() + clockOffset.current) / 1000, []);
 
+  // PlaybackLog: one row per program load — the server's decision (mode/codecs/connection, captured in
+  // goTo) + the real on-device outcome (libVLC first-play dims, or an error message).
+  const recordLog = useCallback((outcome: "playing" | "not_decoding" | "error", errorDetail?: string | null) => {
+    const ctx = logCtxRef.current;
+    if (!ctx) return;
+    const dims = decodedDimsRef.current;
+    void api.logPlayback({ ...ctx, outcome, decodedWidth: dims.w, decodedHeight: dims.h, error: errorDetail ?? null }).catch(() => {});
+  }, []);
+
   const currentEffective = useCallback((): number => {
     const cur = currentRef.current;
     if (!cur) return now();
-    if (cur.kind === "PROGRAM") return cur.baselineReady ? cur.startS + cur.offset + (player.currentTime - cur.playStartCurrentTime) : cur.startS + cur.offset;
+    if (cur.kind === "PROGRAM") return cur.baselineReady ? cur.startS + cur.offset + (positionSecRef.current - cur.playStartCurrentTime) : cur.startS + cur.offset;
     return bumperEffRef.current;
-  }, [now, player]);
+  }, [now]);
 
   const goTo = useCallback(
     async (target: number) => {
       const slots = slotsRef.current;
-      if (slots.length === 0 || transitioning.current) return;
+      if (!channelId || slots.length === 0 || transitioning.current) return;
       transitioning.current = true;
       try {
         const clamped = Math.min(now(), Math.max(slots[0]!.startS, target));
         const entry = slots.find((s) => clamped >= s.startS && clamped < s.endS);
         if (!entry) {
           currentRef.current = null;
-          player.pause();
+          setSource(null);
           setStatus((s) => ({ ...s, loading: false, state: "off" }));
           return;
         }
         if (entry.slot.kind === "BUMPER" || !entry.slot.ratingKey) {
-          player.pause();
+          void viewRef.current?.pause();
           currentRef.current = { index: slots.indexOf(entry), kind: "BUMPER", startS: entry.startS, endS: entry.endS, ratingKey: null, guide: entry.slot.guide, offset: 0, playStartCurrentTime: 0, baselineReady: true, session: null };
           bumperEffRef.current = clamped;
           pausedRef.current = false;
@@ -144,24 +158,92 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
         currentRef.current = loaded;
         pausedRef.current = false;
         setTracks({ audio: info.audioTracks, subtitle: info.subtitleTracks });
-        void player.replaceAsync({ uri: info.url }).then(() => player.play()).catch(() => {});
-        const sub = player.addListener("statusChange", ({ status: st }) => {
-          if (st !== "readyToPlay" || currentRef.current !== loaded) return;
-          if (info.mode === "direct" && offset > 0) {
-            player.currentTime = offset;
-            loaded.playStartCurrentTime = offset;
-          } else {
-            loaded.playStartCurrentTime = player.currentTime;
-          }
+        // mpv loads by setting the source prop; `startTime` opens direct-play AT the offset (loadfile
+        // start=). Baseline is set in onLoad/onFirstFrame — see the event handlers below.
+        logCtxRef.current = {
+          deviceId: deviceId(),
+          channelId,
+          ratingKey: entry.slot.ratingKey,
+          title: titleOf(entry.slot.guide),
+          mode: info.mode,
+          sourceContainer: info.container ?? null,
+          sourceVideoCodec: info.videoCodec ?? null,
+          sourceAudioCodec: info.audioCodec ?? null,
+          decision: info.decision ?? null,
+          connection: info.connection ?? null,
+        };
+        loadStartRef.current = Date.now();
+        const sameMedia = info.url === currentUrlRef.current;
+        currentUrlRef.current = info.url;
+        if (sameMedia && info.mode === "direct") {
+          // DVR seek WITHIN the same direct file (same URL → no reload): mpv seeks fast (ffmpeg estimate).
+          console.log(`[mpv] SEEK ${offset}s (same media)`);
+          loaded.playStartCurrentTime = offset;
           loaded.baselineReady = true;
-          sub.remove();
-        });
+          positionSecRef.current = offset;
+          void viewRef.current?.seek(offset);
+        } else {
+          decodedDimsRef.current = { w: 0, h: 0 };
+          positionSecRef.current = 0;
+          console.log(`[mpv] LOAD mode=${info.mode} offset=${offset}s conn=${info.connection ?? "?"} ${info.container ?? "?"}/${info.videoCodec ?? "?"}/${info.audioCodec ?? "?"} ${info.url.slice(0, 90)}`);
+          setStartTime(info.mode === "direct" ? offset : 0);
+          setSource(info.url);
+        }
       } finally {
         transitioning.current = false;
       }
     },
-    [channelId, now, player],
+    [channelId, now],
   );
+
+  // mpv view events — returned as `videoEvents`, spread onto <MpvPlayerView>. currentTime is in SECONDS
+  // (mpv `time-pos` — absolute media time, exactly like an HTML <video>, so the tv-web clock maps 1:1).
+  const onProgress = useCallback((e: { nativeEvent: { currentTime: number } }) => {
+    positionSecRef.current = e.nativeEvent.currentTime;
+  }, []);
+  // Baseline once per loaded program: direct-play opened AT the offset (loadfile start=), HLS/http starts
+  // at ~0. Anchor the clock to where playback begins. Guarded so resume-from-pause never re-anchors.
+  const applyBaseline = useCallback(() => {
+    const loaded = currentRef.current;
+    if (!loaded || loaded.kind !== "PROGRAM" || loaded.baselineReady) return;
+    loaded.playStartCurrentTime = loaded.mode === "direct" && loaded.offset > 0 ? loaded.offset : positionSecRef.current;
+    loaded.baselineReady = true;
+  }, []);
+  // onLoad = mpv `file-loaded` (parsed dims/duration): PlaybackLog + baseline + "playing".
+  const onLoad = useCallback(
+    (e: { nativeEvent: { duration: number; width: number; height: number } }) => {
+      const { width, height } = e.nativeEvent;
+      console.log(`[mpv] +${Date.now() - loadStartRef.current}ms LOADED ${width}x${height}`);
+      decodedDimsRef.current = { w: width, h: height };
+      playingRef.current = true;
+      applyBaseline();
+      recordLog(width > 0 && height > 0 ? "playing" : "not_decoding");
+      setStatus((s) => (s.buffering ? { ...s, buffering: false } : s));
+    },
+    [applyBaseline, recordLog],
+  );
+  // onFirstFrame = mpv `playback-restart` (first painted frame after load/seek).
+  const onFirstFrame = useCallback(() => {
+    console.log(`[mpv] +${Date.now() - loadStartRef.current}ms FIRST-FRAME`);
+    applyBaseline();
+    setStatus((s) => (s.buffering ? { ...s, buffering: false } : s));
+  }, [applyBaseline]);
+  const onBuffering = useCallback((e: { nativeEvent: { buffering: boolean } }) => {
+    const buffering = e.nativeEvent.buffering;
+    setStatus((s) => (s.buffering === buffering ? s : { ...s, buffering }));
+  }, []);
+  const onError = useCallback(
+    (e: { nativeEvent: { message: string } }) => {
+      const message = e.nativeEvent.message;
+      console.log(`[mpv] +${Date.now() - loadStartRef.current}ms ERROR ${message}`);
+      setStatus((s) => ({ ...s, loading: false, error: message || "Playback failed" }));
+      recordLog("error", message);
+    },
+    [recordLog],
+  );
+  const onEnd = useCallback((e: { nativeEvent: { reason: string } }) => {
+    console.log(`[mpv] END ${e.nativeEvent.reason}`);
+  }, []);
 
   // Multi-segment scrubber view — the PROGRAM you're in is the expanded middle, flanked by fixed
   // left/right peeks (prev tail + bumper, upcoming bumper + next head). Ported from tv-web.
@@ -250,16 +332,38 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
     return () => clearInterval(id);
   }, [now, goTo, currentEffective, buildScrubber]);
 
-  // Buffering feedback from the player status.
+  // Heartbeat the watch session (~10s) for Now Watching + orphan-transcode reap; end it on unmount.
   useEffect(() => {
-    const sub = player.addListener("statusChange", ({ status: st }) => {
-      setStatus((s) => {
-        const buffering = st === "loading";
-        return s.buffering === buffering ? s : { ...s, buffering };
-      });
-    });
-    return () => sub.remove();
-  }, [player]);
+    const id = setInterval(() => {
+      const cur = currentRef.current;
+      if (!channelId || !cur) return;
+      void api.heartbeat({ channelId, state: cur.kind === "BUMPER" ? "bumper" : "program", ratingKey: cur.ratingKey, title: titleOf(cur.guide), transcodeSession: cur.session ?? null }).catch(() => {});
+    }, 10_000);
+    return () => clearInterval(id);
+  }, [channelId]);
+  useEffect(() => () => void api.endSession().catch(() => {}), []);
+
+  // Channel change (incl. → null on Close): release the current media + reset the clock. A non-null
+  // change leaves the mounted <MpvPlayerView> and swaps its source (mpv loadfile replace) below; null
+  // unmounts it (deinit → mpv teardown). The new channel's timeline (keyed query) bootstraps below.
+  const prevChannelRef = useRef(channelId);
+  useEffect(() => {
+    if (prevChannelRef.current === channelId) return;
+    prevChannelRef.current = channelId;
+    genRef.current++; // invalidate any in-flight goTo resolve
+    currentRef.current = null;
+    positionSecRef.current = 0;
+    transitioning.current = false;
+    if (!channelId) {
+      // Close: pause + release. The view is conditionally rendered on `source`, so nulling it unmounts
+      // the MpvPlayerView (deinit → mpv_terminate_destroy); pause() first halts audio so nothing leaks.
+      void viewRef.current?.pause();
+      setSource(null);
+    }
+    // Channel change (channelId non-null): leave the old source playing in the mounted view — bootstrap
+    // swaps in the new URL below. One player, one surface, no remount (no double-audio, no re-attach).
+    setStatus((s) => ({ ...s, loading: !!channelId, state: "idle", error: null, guide: null, scrubber: null, delivery: null, paused: false }));
+  }, [channelId]);
 
   // Build slots + bootstrap at live on first load.
   useEffect(() => {
@@ -283,9 +387,13 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
       togglePause: () => {
         const cur = currentRef.current;
         if (cur?.kind === "PROGRAM") {
-          if (player.playing) player.pause();
-          else player.play();
-          pausedRef.current = player.playing;
+          if (playingRef.current) {
+            void viewRef.current?.pause();
+            pausedRef.current = true;
+          } else {
+            void viewRef.current?.play();
+            pausedRef.current = false;
+          }
         } else {
           pausedRef.current = !pausedRef.current;
         }
@@ -300,8 +408,13 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
         else void goTo(cur.startS);
       },
     }),
-    [goTo, now, currentEffective, player],
+    [goTo, now, currentEffective],
   );
 
-  return { player, status, controls, tracks, titleOf };
+  const videoEvents = useMemo(
+    () => ({ onLoad, onFirstFrame, onProgress, onBuffering, onError, onEnd }),
+    [onLoad, onFirstFrame, onProgress, onBuffering, onError, onEnd],
+  );
+
+  return { viewRef, source, startTime, videoEvents, status, controls, tracks, titleOf };
 }

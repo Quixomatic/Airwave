@@ -1,0 +1,223 @@
+import Foundation
+import Libmpv
+import QuartzCore
+
+/// Events surfaced from the mpv render/event loop up to the Expo view.
+protocol MpvCoreDelegate: AnyObject {
+  func mpvDidLoad(duration: Double, width: Int, height: Int)
+  func mpvFirstFrame()
+  func mpvProgress(time: Double)
+  func mpvBuffering(_ buffering: Bool)
+  func mpvError(_ message: String)
+  func mpvEnd(reason: String)
+}
+
+/// A focused libmpv wrapper (ported/trimmed from plezy's `MpvPlayerCoreBase`): create → options →
+/// `mpv_initialize`, `loadfile … start=<offset>` (the fast ffmpeg-estimated seek), and property
+/// observation → delegate events. Renders via the `avfoundation` VO into a caller-supplied layer.
+final class MpvCore {
+  weak var delegate: MpvCoreDelegate?
+
+  private var mpv: OpaquePointer?
+  private let queue = DispatchQueue(label: "mpv-player.core", qos: .userInitiated)
+  private var wakeupContext: UnsafeMutableRawPointer?
+  private var isDisposing = false
+  private var loadedEmitted = false
+  private var firstFrameEmitted = false
+
+  // MARK: setup
+
+  /// Create + initialize mpv, rendering into `layer` (its pointer is handed to mpv as `wid`, which the
+  /// MPVKit `avfoundation` VO draws into). Extra `options` override the defaults.
+  func setup(layer: CALayer, options: [String: String]) -> Bool {
+    mpv = mpv_create()
+    guard let mpv else { return false }
+
+    // Point the avfoundation VO at our layer.
+    var wid = Int64(Int(bitPattern: Unmanaged.passUnretained(layer).toOpaque()))
+    checkError(mpv_set_option(mpv, "wid", MPV_FORMAT_INT64, &wid))
+
+    // Defaults (overridable via `options`).
+    var opts: [String: String] = [
+      "vo": "avfoundation",
+      "hwdec": "videotoolbox",
+      "hwdec-codecs": "all",
+      "target-colorspace-hint": "auto",
+      // Keep the last frame at EOF so a seek-back after the program ends still works.
+      "keep-open": "yes",
+      // Big, forward-biased network cache for smooth LAN direct-play + resilient seeks.
+      "cache": "yes",
+      "demuxer-max-bytes": "150MiB",
+      "demuxer-max-back-bytes": "50MiB",
+    ]
+    #if targetEnvironment(simulator)
+      opts["hwdec"] = "no"
+    #endif
+    for (k, v) in options { opts[k] = v }
+    for (k, v) in opts { checkError(mpv_set_option_string(mpv, k, v)) }
+
+    let rc = mpv_initialize(mpv)
+    if rc < 0 {
+      mpv_terminate_destroy(mpv)
+      self.mpv = nil
+      return false
+    }
+
+    // Observe the state we surface to JS.
+    mpv_observe_property(mpv, 0, "time-pos", MPV_FORMAT_DOUBLE)
+    mpv_observe_property(mpv, 0, "duration", MPV_FORMAT_DOUBLE)
+    mpv_observe_property(mpv, 0, "width", MPV_FORMAT_INT64)
+    mpv_observe_property(mpv, 0, "height", MPV_FORMAT_INT64)
+    mpv_observe_property(mpv, 0, "paused-for-cache", MPV_FORMAT_FLAG)
+
+    // Retain self for the (non-retaining) wakeup callback; released in dispose().
+    let ctx = Unmanaged.passRetained(self).toOpaque()
+    wakeupContext = ctx
+    mpv_set_wakeup_callback(mpv, { context in
+      guard let context else { return }
+      Unmanaged<MpvCore>.fromOpaque(context).takeUnretainedValue().readEvents()
+    }, ctx)
+    return true
+  }
+
+  // MARK: control
+
+  /// Load `url`, opening AT `startTime` seconds (mpv estimates the byte position → a range seek, not a
+  /// sequential read from the head). Replaces any current file.
+  func load(url: String, startTime: Double) {
+    loadedEmitted = false
+    firstFrameEmitted = false
+    var args = ["loadfile", url, "replace"]
+    if startTime > 0 { args.append("start=\(Int(startTime))") }
+    command(args)
+  }
+
+  func stop() { command(["stop"]) }
+  func setPaused(_ paused: Bool) { setProperty("pause", paused ? "yes" : "no") }
+  func setMuted(_ muted: Bool) { setProperty("mute", muted ? "yes" : "no") }
+  func setVolume(_ volume: Double) { setProperty("volume", String(volume)) }
+  func setAudioTrack(_ id: Int) { setProperty("aid", id < 0 ? "no" : String(id)) }
+  func setSubtitleTrack(_ id: Int) { setProperty("sid", id < 0 ? "no" : String(id)) }
+
+  /// Absolute seek in seconds. mpv estimates → fast even on un-indexed MKV.
+  func seek(_ seconds: Double) { command(["seek", String(seconds), "absolute"]) }
+
+  func dispose() {
+    isDisposing = true
+    let handle = mpv
+    let ctx = wakeupContext
+    mpv = nil
+    wakeupContext = nil
+    queue.async {
+      if let handle {
+        mpv_set_wakeup_callback(handle, nil, nil)
+        mpv_terminate_destroy(handle)
+      }
+      if let ctx { Unmanaged<MpvCore>.fromOpaque(ctx).release() }
+    }
+  }
+
+  // MARK: mpv primitives
+
+  private func command(_ args: [String]) {
+    guard let mpv else { return }
+    var cargs: [UnsafeMutablePointer<CChar>?] = args.map { strdup($0) }
+    cargs.append(nil)
+    cargs.withUnsafeMutableBufferPointer { buf in
+      _ = mpv_command(mpv, buf.baseAddress)
+    }
+    cargs.forEach { free($0) }
+  }
+
+  private func setProperty(_ name: String, _ value: String) {
+    guard let mpv else { return }
+    _ = mpv_set_property_string(mpv, name, value)
+  }
+
+  // MARK: event loop
+
+  private func readEvents() {
+    queue.async { [weak self] in
+      guard let self, !self.isDisposing, let mpv = self.mpv else { return }
+      while true {
+        guard let ev = mpv_wait_event(mpv, 0) else { break }
+        let event = ev.pointee
+        if event.event_id == MPV_EVENT_NONE { break }
+        self.handle(event)
+      }
+    }
+  }
+
+  private func handle(_ event: mpv_event) {
+    switch event.event_id {
+    case MPV_EVENT_FILE_LOADED:
+      emitLoad()
+    case MPV_EVENT_PLAYBACK_RESTART:
+      if !firstFrameEmitted {
+        firstFrameEmitted = true
+        DispatchQueue.main.async { self.delegate?.mpvFirstFrame() }
+      }
+    case MPV_EVENT_END_FILE:
+      var reason = "unknown"
+      var errMsg: String?
+      if let p = event.data?.assumingMemoryBound(to: mpv_event_end_file.self) {
+        switch p.pointee.reason {
+        case MPV_END_FILE_REASON_EOF: reason = "eof"
+        case MPV_END_FILE_REASON_STOP: reason = "stop"
+        case MPV_END_FILE_REASON_ERROR:
+          reason = "error"
+          errMsg = String(cString: mpv_error_string(p.pointee.error))
+        case MPV_END_FILE_REASON_REDIRECT: reason = "redirect"
+        default: reason = "unknown"
+        }
+      }
+      let r = reason
+      let m = errMsg
+      DispatchQueue.main.async {
+        if let m { self.delegate?.mpvError(m) }
+        self.delegate?.mpvEnd(reason: r)
+      }
+    case MPV_EVENT_PROPERTY_CHANGE:
+      guard let data = event.data else { break }
+      handleProperty(data.assumingMemoryBound(to: mpv_event_property.self).pointee)
+    default:
+      break
+    }
+  }
+
+  private func handleProperty(_ prop: mpv_event_property) {
+    let name = String(cString: prop.name)
+    switch name {
+    case "time-pos":
+      if prop.format == MPV_FORMAT_DOUBLE, let d = prop.data?.assumingMemoryBound(to: Double.self).pointee {
+        DispatchQueue.main.async { self.delegate?.mpvProgress(time: d) }
+      }
+    case "paused-for-cache":
+      if prop.format == MPV_FORMAT_FLAG, let f = prop.data?.assumingMemoryBound(to: Int32.self).pointee {
+        DispatchQueue.main.async { self.delegate?.mpvBuffering(f != 0) }
+      }
+    case "duration", "width", "height":
+      emitLoad()
+    default:
+      break
+    }
+  }
+
+  /// Emit onLoad once we have duration + dimensions (from file-loaded or the property observers).
+  private func emitLoad() {
+    guard let mpv, !loadedEmitted else { return }
+    var dur = 0.0, w = Int64(0), h = Int64(0)
+    mpv_get_property(mpv, "duration", MPV_FORMAT_DOUBLE, &dur)
+    mpv_get_property(mpv, "width", MPV_FORMAT_INT64, &w)
+    mpv_get_property(mpv, "height", MPV_FORMAT_INT64, &h)
+    guard w > 0, h > 0 else { return }
+    loadedEmitted = true
+    DispatchQueue.main.async {
+      self.delegate?.mpvDidLoad(duration: dur, width: Int(w), height: Int(h))
+    }
+  }
+
+  private func checkError(_ status: CInt) {
+    if status < 0 { print("[MpvCore] error: \(String(cString: mpv_error_string(status)))") }
+  }
+}

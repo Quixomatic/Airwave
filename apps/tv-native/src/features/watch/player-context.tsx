@@ -1,8 +1,7 @@
-import { VideoView } from "expo-video";
+import { MpvPlayerView } from "@ChannelGuide/mpv-player";
 import { Maximize2, X } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, Text, useWindowDimensions, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import { useGuide } from "@/hooks/queries";
 import { api } from "@/lib/api";
@@ -22,7 +21,6 @@ import { accentForChannel, FullChrome } from "./watch";
 export { usePlayer } from "./player-ctx";
 
 const MINI_IDLE_FULLSCREEN_MS = 60_000;
-const SPRING = { mass: 1, stiffness: 320, damping: 34, overshootClamping: true };
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [activeChannelId, setActive] = useState<string | null>(null);
@@ -103,21 +101,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       {children}
       {/* Global channel-number entry + CH▲/▼ (guide + full player). */}
       <ChannelNumberEntry />
-      {activeChannelId && (
-        <PlayerHost
-          key={activeChannelId}
-          channelId={activeChannelId}
-          layout={layout}
-          miniFocused={miniFocused}
-          miniSel={miniSel}
-          miniSlot={miniSlot}
-          onFocusMini={focusMini}
-          onBack={goMini}
-          onGoFull={goFull}
-          onClose={stop}
-          onPlaying={releaseChannelLock}
-        />
-      )}
+      {/* One persistent PlayerHost — never unmounted (that leaks the native VLC player). Channel
+          changes + Close flow through channelId (null = released/idle), not a remount. */}
+      <PlayerHost
+        channelId={activeChannelId}
+        layout={layout}
+        miniFocused={miniFocused}
+        miniSel={miniSel}
+        miniSlot={miniSlot}
+        onFocusMini={focusMini}
+        onBack={goMini}
+        onGoFull={goFull}
+        onClose={stop}
+        onPlaying={releaseChannelLock}
+      />
     </Ctx.Provider>
   );
 }
@@ -134,7 +131,7 @@ function PlayerHost({
   onClose,
   onPlaying,
 }: {
-  channelId: string;
+  channelId: string | null;
   layout: Layout;
   miniFocused: boolean;
   miniSel: 0 | 1;
@@ -157,7 +154,7 @@ function PlayerHost({
     api.qualities().then((r) => setQualities(r.qualities)).catch(() => {});
   }, []);
   const tv = useTvPlayer(channelId, { quality, audioStreamId, subtitleStreamId });
-  const { player, status } = tv;
+  const { status } = tv;
 
   // Release the CH▲/▼ lock once this channel is actually showing content.
   useEffect(() => {
@@ -174,26 +171,25 @@ function PlayerHost({
       ? { ...miniSlot, radius: 14, opacity: 1 }
       : { ...hiddenMini, radius: 14, opacity: 0 };
 
-  const x = useSharedValue(target.x);
-  const y = useSharedValue(target.y);
-  const w = useSharedValue(target.width);
-  const h = useSharedValue(target.height);
-  const r = useSharedValue(target.radius);
-  const op = useSharedValue(target.opacity);
-  useEffect(() => {
-    x.value = withSpring(target.x, SPRING);
-    y.value = withSpring(target.y, SPRING);
-    w.value = withSpring(target.width, SPRING);
-    h.value = withSpring(target.height, SPRING);
-    r.value = withSpring(target.radius, SPRING);
-    op.value = withSpring(target.opacity, SPRING);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target.x, target.y, target.width, target.height, target.radius, target.opacity]);
-  const hostStyle = useAnimatedStyle(() => ({ left: x.value, top: y.value, width: w.value, height: h.value, borderRadius: r.value, opacity: op.value }));
-
+  // NO animation (deliberate — James's call): the mini↔full transition jumps instantly. A
+  // Reanimated-animated container SIZE doesn't drive RN's real layout pass, and libVLC's native surface
+  // only (re)binds on a real layout — so the animation left the video decoded-but-unpainted until a
+  // manual resize. Plain style = a real layout on every change = the surface attaches + repaints.
   return (
-    <Animated.View style={[{ position: "absolute", overflow: "hidden", backgroundColor: "#000", zIndex: full ? 50 : 15 }, hostStyle]} pointerEvents={layout === "off" ? "none" : "auto"}>
-      <VideoView player={player} style={{ flex: 1 }} contentFit={full ? "contain" : "cover"} nativeControls={false} />
+    <View
+      style={{ position: "absolute", overflow: "hidden", backgroundColor: "#000", zIndex: full ? 50 : 15, left: target.x, top: target.y, width: target.width, height: target.height, borderRadius: target.radius, opacity: target.opacity }}
+      pointerEvents={layout === "off" ? "none" : "auto"}
+    >
+      {/* Mount ON DEMAND (only when there's a source), not always: an always-mounted view is created
+          while hidden/tiny at app start, so its native surface attaches to that bad frame and never
+          re-attaches to full (decodes but never paints). Rendering only when a source exists mounts it
+          fresh + visible at the current (full) size → the surface attaches correctly. It stays mounted
+          across channel changes (source just swaps) and unmounts on Close (clean teardown). absoluteFill
+          pins it to the container's exact bounds (the container size comes from a Reanimated style,
+          which doesn't drive flex layout). */}
+      {tv.source != null && (
+        <MpvPlayerView ref={tv.viewRef} source={tv.source} startTime={tv.startTime} {...tv.videoEvents} style={StyleSheet.absoluteFill} contentFit={full ? "contain" : "cover"} />
+      )}
 
       {/* bumper interstitial */}
       {status.state === "bumper" && status.guide && (
@@ -239,7 +235,7 @@ function PlayerHost({
           <MiniButton label="Close" icon={<X size={26} color={miniSel === 1 ? "#06121f" : "#dfe4ec"} />} selected={miniSel === 1} accent={accent} onPress={onClose} />
         </View>
       )}
-    </Animated.View>
+    </View>
   );
 }
 

@@ -217,6 +217,10 @@ export const api = {
 
   endSession: () => request<unknown>("/api/v1/sessions/end", { method: "POST", body: "{}" }),
 
+  /** One PlaybackLog row per program load: what the server decided (mode/codecs/connection) + the
+   *  real on-device outcome (playing/not_decoding/error + decoded dims). Powers the play-log readout. */
+  logPlayback: (data: Record<string, unknown>) => request<{ ok: true; id: string }>("/api/v1/playback/log", { method: "POST", body: JSON.stringify(data) }),
+
   reportDevice: (report: unknown) => request<{ ok: true; id: string }>("/api/v1/devices/report", { method: "POST", body: JSON.stringify(report) }),
 
   capsManifest: () => request<{ tests: CapTest[] }>("/api/v1/caps/manifest"),
