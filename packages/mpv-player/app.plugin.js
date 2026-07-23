@@ -1,15 +1,149 @@
-const { withInfoPlist, createRunOncePlugin } = require("@expo/config-plugins");
+const {
+  withInfoPlist,
+  withXcodeProject,
+  createRunOncePlugin,
+} = require("@expo/config-plugins");
 
-// Local network access — libmpv's HTTP does its own connections; iOS may prompt for LAN access.
-// (The MPVKit Swift Package itself is linked to the pod via `spm_dependency` in ios/MpvPlayer.podspec,
-// not here — that's the target where our Swift actually compiles.)
-function withMpvPlayer(config) {
+const MPVKIT_URL = "https://github.com/edde746/MPVKit";
+const MPVKIT_VERSION = "1.0.12";
+const MPVKIT_PRODUCT = "MPVKit";
+
+// ---------------------------------------------------------------------------
+// 1. Local-network usage description — libmpv opens its own HTTP connections,
+//    so iOS may prompt for LAN access when streaming from a media server.
+// ---------------------------------------------------------------------------
+function withLocalNetwork(config) {
   return withInfoPlist(config, (config) => {
     config.modResults.NSLocalNetworkUsageDescription =
       config.modResults.NSLocalNetworkUsageDescription ||
       "Used to stream video from media servers on your local network.";
     return config;
   });
+}
+
+// ---------------------------------------------------------------------------
+// 2. Link the MPVKit Swift Package on the APP target (plezy's proven model).
+//
+//    The podspec's `spm_dependency` adds MPVKit to the *Pods* project so our
+//    Swift COMPILES (`import Libmpv`). But React Native's static-linking SPM
+//    path only pulls MPVKit's direct dependencies — it drops the transitive
+//    `Libass` framework (which sits under `_FFmpeg`), so the app link fails with
+//    `Undefined symbol: _ass_add_font`. Linking the `MPVKit` product on the APP
+//    target too makes Xcode resolve the FULL package graph and pull every
+//    transitive xcframework (Libass, FFmpeg, …) into the final binary — exactly
+//    how the `.refs/plezy` Flutter client wires it (tvos/scripts/wire_mpv.rb).
+//    Both references resolve to the one workspace-level SPM package, and the
+//    binary xcframeworks link lazily, so this supplements the missing frameworks
+//    without duplicating symbols.
+// ---------------------------------------------------------------------------
+function withMpvkitAppTargetSPM(config) {
+  return withXcodeProject(config, (config) => {
+    const proj = config.modResults;
+    const objects = proj.hash.project.objects;
+
+    const app = proj.getTarget("com.apple.product-type.application");
+    if (!app) {
+      throw new Error(
+        "[@ChannelGuide/mpv-player] Could not find the application target to link MPVKit."
+      );
+    }
+    const nativeTarget = app.target;
+
+    // --- (a) XCRemoteSwiftPackageReference (idempotent by repositoryURL) ---
+    objects.XCRemoteSwiftPackageReference =
+      objects.XCRemoteSwiftPackageReference || {};
+    let pkgRefUuid = Object.keys(objects.XCRemoteSwiftPackageReference).find(
+      (key) => {
+        const o = objects.XCRemoteSwiftPackageReference[key];
+        return (
+          o &&
+          typeof o === "object" &&
+          typeof o.repositoryURL === "string" &&
+          o.repositoryURL.includes("edde746/MPVKit")
+        );
+      }
+    );
+    if (!pkgRefUuid) {
+      pkgRefUuid = proj.generateUuid();
+      objects.XCRemoteSwiftPackageReference[pkgRefUuid] = {
+        isa: "XCRemoteSwiftPackageReference",
+        repositoryURL: `"${MPVKIT_URL}"`,
+        requirement: {
+          kind: "exactVersion",
+          version: `"${MPVKIT_VERSION}"`,
+        },
+      };
+      objects.XCRemoteSwiftPackageReference[`${pkgRefUuid}_comment`] =
+        `XCRemoteSwiftPackageReference "MPVKit"`;
+
+      const projObj = proj.getFirstProject().firstProject;
+      projObj.packageReferences = projObj.packageReferences || [];
+      projObj.packageReferences.push({
+        value: pkgRefUuid,
+        comment: `XCRemoteSwiftPackageReference "MPVKit"`,
+      });
+    }
+
+    // --- (b) XCSwiftPackageProductDependency (idempotent by productName) ---
+    objects.XCSwiftPackageProductDependency =
+      objects.XCSwiftPackageProductDependency || {};
+    let prodDepUuid = Object.keys(objects.XCSwiftPackageProductDependency).find(
+      (key) => {
+        const o = objects.XCSwiftPackageProductDependency[key];
+        return o && typeof o === "object" && o.productName === MPVKIT_PRODUCT;
+      }
+    );
+    if (!prodDepUuid) {
+      prodDepUuid = proj.generateUuid();
+      objects.XCSwiftPackageProductDependency[prodDepUuid] = {
+        isa: "XCSwiftPackageProductDependency",
+        package: pkgRefUuid,
+        package_comment: `XCRemoteSwiftPackageReference "MPVKit"`,
+        productName: MPVKIT_PRODUCT,
+      };
+      objects.XCSwiftPackageProductDependency[`${prodDepUuid}_comment`] =
+        MPVKIT_PRODUCT;
+
+      nativeTarget.packageProductDependencies =
+        nativeTarget.packageProductDependencies || [];
+      nativeTarget.packageProductDependencies.push({
+        value: prodDepUuid,
+        comment: MPVKIT_PRODUCT,
+      });
+    }
+
+    // --- (c) PBXBuildFile + Frameworks build-phase entry (the actual LINK) ---
+    objects.PBXBuildFile = objects.PBXBuildFile || {};
+    const alreadyLinked = Object.keys(objects.PBXBuildFile).some((key) => {
+      const o = objects.PBXBuildFile[key];
+      return o && typeof o === "object" && o.productRef === prodDepUuid;
+    });
+    if (!alreadyLinked) {
+      const buildFileUuid = proj.generateUuid();
+      objects.PBXBuildFile[buildFileUuid] = {
+        isa: "PBXBuildFile",
+        productRef: prodDepUuid,
+        productRef_comment: MPVKIT_PRODUCT,
+      };
+      objects.PBXBuildFile[`${buildFileUuid}_comment`] =
+        `${MPVKIT_PRODUCT} in Frameworks`;
+
+      const frameworksPhase = proj.pbxFrameworksBuildPhaseObj(app.uuid);
+      frameworksPhase.files = frameworksPhase.files || [];
+      frameworksPhase.files.push({
+        value: buildFileUuid,
+        comment: `${MPVKIT_PRODUCT} in Frameworks`,
+      });
+    }
+
+    return config;
+  });
+}
+
+function withMpvPlayer(config) {
+  config = withLocalNetwork(config);
+  config = withMpvkitAppTargetSPM(config);
+  return config;
 }
 
 module.exports = createRunOncePlugin(withMpvPlayer, "mpv-player", "0.0.0");

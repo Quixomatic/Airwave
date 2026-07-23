@@ -33,15 +33,7 @@
           "showVerboseWarnings": false
         }
       ],
-      "@ChannelGuide/mpv-player",
-      [
-        "expo-build-properties",
-        {
-          "ios": {
-            "useFrameworks": "dynamic"
-          }
-        }
-      ]
+      "@ChannelGuide/mpv-player"
     ],
     "extra": {
       "router": {},

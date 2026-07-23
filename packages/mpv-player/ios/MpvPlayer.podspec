@@ -7,6 +7,7 @@ Pod::Spec.new do |s|
   s.homepage       = 'https://github.com/Quixomatic/ChannelGuide'
   s.platforms      = { :ios => '15.1', :tvos => '15.1' }
   s.source         = { git: '' }
+  s.static_framework = true
 
   s.dependency 'ExpoModulesCore'
 

@@ -21,7 +21,6 @@
     "@types/react": "~19.2.17",
     "better-auth": "catalog:",
     "expo": "^55.0.28",
-    "expo-build-properties": "~55.0.16",
     "expo-constants": "~55.0.17",
     "expo-dev-client": "~55.0.37",
     "expo-linear-gradient": "~55.0.16",
