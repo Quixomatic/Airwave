@@ -8,6 +8,7 @@ import { useGuide } from "@/hooks/queries";
 import { api } from "@/lib/api";
 import { C } from "@/lib/theme";
 
+import { ChannelNumberEntry } from "./channel-number-entry";
 import { Ctx, type Layout, type PlayerCtx } from "./player-ctx";
 import { useTvPlayer } from "./use-tv-player";
 import { accentForChannel, FullChrome } from "./watch";
@@ -100,6 +101,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={value}>
       {children}
+      {/* Global channel-number entry + CH▲/▼ (guide + full player). */}
+      <ChannelNumberEntry />
       {activeChannelId && (
         <PlayerHost
           key={activeChannelId}

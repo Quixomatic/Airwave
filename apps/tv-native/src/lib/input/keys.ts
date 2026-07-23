@@ -4,9 +4,12 @@
  * so normalization is just a rename to our vocabulary. Everything downstream (the dispatcher, the
  * guide's zone machine) deals in `SemanticKey`, identical to tv-web.
  */
-export type SemanticKey = "up" | "down" | "left" | "right" | "ok" | "back" | "unknown";
+export type SemanticKey = "up" | "down" | "left" | "right" | "ok" | "back" | "chUp" | "chDown" | "digit" | "unknown";
 
-export type KeyEvent = { key: SemanticKey };
+/** `digit` carries 0–9 in `digit`. (Number/channel keys don't arrive via `useTVEventHandler` on the
+ *  current RN-TV targets — the on-screen keypad / CH buttons drive that logic directly; these types
+ *  exist so a future native key path or a webOS build can feed the same handlers.) */
+export type KeyEvent = { key: SemanticKey; digit?: number };
 
 /** react-native-tvos `useTVEventHandler` eventType → SemanticKey. */
 export function tvEventToKey(eventType: string): SemanticKey {

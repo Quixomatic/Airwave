@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.17] - 2026-07-23
+
+### Added
+
+- **tv-native: channel-number entry + CH up/down (the last chrome piece).** tv-web types channel numbers on the LG remote's number pad; tv-native has none (the Apple TV / RN-TV remotes have no digits, and  doesn't deliver them), so the input path is adapted for touch: an **on-screen numeric keypad** (opened by a floating # button on the guide + full player) types a channel number → tunes it (flashes if it does not exist), with the typed buffer shown in a top-right slide-in; and **CH up/down buttons** float on the full player (a while-watching gesture) stepping the ordered lineup via the existing in-flight-locked . The dispatcher still carries // semantic keys so a future native key path (a number-remote Android TV) or a webOS build feeds the same handlers.
+
+### Notes
+
+- Completes the ported chrome. The remaining work is the **libVLC video swap** ( for direct-play parity), which needs a **development build** (Android free / iPad Apple-Dev + EAS) — a surgical swap of the video element inside the finished chrome. Session summary: ; plan: .
+
 ## [0.7.16] - 2026-07-23
 
 ### Added
