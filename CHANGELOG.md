@@ -2,6 +2,21 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.20] - 2026-07-23
+
+**mpv now direct-plays the Plex library on iPad, at the live offset.** The `@ChannelGuide/mpv-player` engine (v0.7.19) built after a long EAS link fight, but no direct-play channel would start. This release lands the fixes that make it actually work end to end — confirmed on-device tuning real channels (4K HEVC/TrueHD/DTS-MA direct-play, opening at the live offset).
+
+### Fixed
+
+- **THE channel-playback bug — mpv 0.38+ `loadfile` signature.** mpv 0.38 inserted an `index` argument: `loadfile <url> <flags> <index> <options>`. We sent `["loadfile", url, "replace", "start=<offset>"]`, so `start=` landed in the index slot → malformed command → **no file loads and mpv emits zero events**. Every direct-play channel (which opens at a live offset via `start=`) silently failed; HLS/offset-0 channels took the 3-arg path and played — the exact split the PlaybackLog watchdog revealed. Also explains the "channel switch from the mini player keeps playing the old channel" symptom: the malformed `replace` never executed. Fix: pass the `-1` (default) index, matching the plezy reference's `loadfile <uri> replace -1 <options>`. (`packages/mpv-player/ios/MpvCore.swift`)
+- **MPVKit link — duplicate MoltenVK / missing Libass.** Resolved the EAS link wall: RN's `spm_dependency` merges MPVKit's static libs into the pod (MoltenVK force-loads → ~545 duplicate `_vk*` symbols) and only pulls a shallow closure (drops transitive `Libass` → `_ass_add_font`). The **app target is now the sole owner** of MPVKit (`app.plugin.js` adds the SPM product to the app's native target — full transitive closure, one copy); the pod compiles `import Libmpv` against **vendored libmpv headers** (`ios/libmpv/`) and links nothing. (`useFrameworks: dynamic` is a dead end under SDK 55's static ExpoModulesCore.)
+- **Diagnostic freeze (OOM).** The capability diagnostic cycled one reused mpv instance through 49 mixed-codec 4K clips, stacking VideoToolbox decoder sessions/surfaces until the app froze (~clip 8). Now each clip runs in a fresh instance that is destroyed afterward (mount `MpvPlayerView` only while a clip is under test). Confirmed: all 49 complete.
+- **onLoad robustness** — also emit the loaded dimensions on mpv's `playback-restart` (a frame is decoded by then), fixing a first-frame-painted-but-`0x0` case where `onLoad` never fired.
+
+### Added
+
+- **PlaybackLog watchdog in tv-native** (ported from tv-web): post one row ~6s after every load regardless of `onLoad`/`onError`, capturing `firstFrame`/`buffering` so a stuck load still records ground truth — read with `apps/server/scripts/show-play-log.ts`. Plus `BUFFERING`/`FIRST-PROGRESS` Metro logging. This is what pinpointed the `loadfile` bug.
+
 ## [0.7.19] - 2026-07-23
 
 ### Added
