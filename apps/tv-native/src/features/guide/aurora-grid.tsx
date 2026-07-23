@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, Text, useWindowDimensions, View } from "react-native";
 
 import type { GuideGridChannel, GuideGridProgram, GuideMeta } from "@/lib/api";
+import { LAYER, useKeyLayer } from "@/lib/input";
 import { C } from "@/lib/theme";
 import { channelTint } from "@/lib/tint";
 import { usePackages } from "@/hooks/queries";
@@ -79,7 +80,11 @@ export function AuroraGrid({
   const [lens, setLens] = useState<Lens>({ type: "all" });
   const { data: pkgData } = usePackages();
   const sidebarItems = useMemo(() => buildSidebarItems(pkgData?.packages ?? [], lens), [pkgData, lens]);
-  const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  // The zone machine — grid ↔ rail ↔ sidebar, ported from tv-web's aurora-grid. Both touch and the
+  // D-pad dispatcher drive this same state (sidebar expanded ⇔ zone === "sidebar").
+  const [zone, setZone] = useState<"grid" | "rail" | "sidebar">("grid");
+  const [sidebarSel, setSidebarSel] = useState(0);
+  const sidebarExpanded = zone === "sidebar";
 
   // Recents/favorites lenses filter the channel list (favorites via the passed set).
   const channels = useMemo(() => {
@@ -108,24 +113,90 @@ export function AuroraGrid({
   const activateSidebar = (index: number) => {
     const item = sidebarItems[index];
     if (!item) return;
+    setSidebarSel(index);
     if (item.kind === "settings") return onSettings();
     if (item.kind === "account") return onAccount();
     if (item.lens) {
       const next: Lens = item.lens.type !== "all" && lensEquals(item.lens, lens) ? { type: "all" } : item.lens;
       setLens(next);
-      setSidebarExpanded(false);
+      setZone("grid");
     }
   };
 
-  const selectChannel = (index: number, programIndex?: number) => {
-    if (index === fc && programIndex === undefined) {
+  // Touch: tap to focus, tap the already-focused thing to activate — the same intent D-pad expresses
+  // with move + OK, on the same zone/fc/fp state.
+  const onProgramTap = (index: number, pi: number) => {
+    if (zone === "grid" && index === fc && fp === pi) {
       const ch = channels[index];
       if (ch) onTune(ch.id);
       return;
     }
+    setZone("grid");
     setFc(index);
-    setFp(programIndex ?? liveProgramIndex(channels[index]?.programs ?? [], now.getTime()));
+    setFp(pi);
   };
+  const onRailTap = (index: number) => {
+    if (zone === "rail" && index === fc) {
+      const ch = channels[index];
+      if (ch) onToggleFavorite(ch.id);
+      return;
+    }
+    setZone("rail");
+    setFc(index);
+  };
+
+  // D-pad — the aurora-grid zone machine, ported. Drives the exact same state as touch.
+  useKeyLayer({
+    id: "guide",
+    priority: LAYER.BASE,
+    onKey(e) {
+      if (zone === "sidebar") {
+        if (e.key === "back" || e.key === "right") setZone("grid");
+        else if (e.key === "up") setSidebarSel((s) => Math.max(0, s - 1));
+        else if (e.key === "down") setSidebarSel((s) => Math.min(sidebarItems.length - 1, s + 1));
+        else if (e.key === "ok") activateSidebar(sidebarSel);
+        return true;
+      }
+      if (zone === "rail") {
+        if (e.key === "left") { setZone("sidebar"); setSidebarSel(0); }
+        else if (e.key === "back" || e.key === "right") setZone("grid");
+        else if (e.key === "up") setFc((c) => Math.max(0, c - 1));
+        else if (e.key === "down") setFc((c) => Math.min(channels.length - 1, c + 1));
+        else if (e.key === "ok" && focusedChannel) onToggleFavorite(focusedChannel.id);
+        return true;
+      }
+      const n = channels.length;
+      if (!n) {
+        if (e.key === "left") { setZone("sidebar"); setSidebarSel(0); return true; }
+        return false;
+      }
+      switch (e.key) {
+        case "right":
+          setFp((p) => Math.min((focusedChannel?.programs.length ?? 1) - 1, p + 1));
+          return true;
+        case "left":
+          if (fp === 0) setZone("rail");
+          else setFp((p) => Math.max(0, p - 1));
+          return true;
+        case "down": {
+          const nc = Math.min(n - 1, fc + 1);
+          setFc(nc);
+          setFp(liveProgramIndex(channels[nc]!.programs, now.getTime()));
+          return true;
+        }
+        case "up": {
+          const nc = Math.max(0, fc - 1);
+          setFc(nc);
+          setFp(liveProgramIndex(channels[nc]!.programs, now.getTime()));
+          return true;
+        }
+        case "ok":
+          if (focusedChannel) onTune(focusedChannel.id);
+          return true;
+      }
+      return false;
+    },
+  });
 
   return (
     <View style={{ flex: 1, flexDirection: "row", backgroundColor: C.bg }}>
@@ -154,17 +225,17 @@ export function AuroraGrid({
             <FlashList
               data={channels}
               keyExtractor={(c) => c.id}
-              extraData={{ fc, fp }}
+              extraData={{ fc, fp, zone }}
               renderItem={({ item, index }) => (
                 <Row
                   channel={item}
                   accent={channelTint(item) ?? accentOf(index)}
-                  focused={index === fc}
-                  focusedProgramId={index === fc ? focusedProgram?.id : undefined}
+                  focused={index === fc && zone !== "sidebar"}
+                  railFocused={zone === "rail" && index === fc}
+                  focusedProgramId={zone === "grid" && index === fc ? focusedProgram?.id : undefined}
                   favorited={favoriteIds.has(item.id)}
-                  onPressRow={() => selectChannel(index)}
-                  onPressProgram={(pi) => selectChannel(index, pi)}
-                  onToggleFavorite={() => onToggleFavorite(item.id)}
+                  onPressRow={() => onRailTap(index)}
+                  onPressProgram={(pi) => onProgramTap(index, pi)}
                   now={now}
                   rowPx={rowPx}
                   railPx={railPx}
@@ -203,15 +274,17 @@ export function AuroraGrid({
 
       {/* Scrim behind the expanded sidebar — tap to collapse. */}
       {sidebarExpanded && (
-        <Pressable onPress={() => setSidebarExpanded(false)} style={{ position: "absolute", inset: 0, backgroundColor: "rgba(6,10,20,0.55)", zIndex: 24 }} />
+        <Pressable onPress={() => setZone("grid")} style={{ position: "absolute", inset: 0, backgroundColor: "rgba(6,10,20,0.55)", zIndex: 24 }} />
       )}
 
       <GuideSidebar
         items={sidebarItems}
         expanded={sidebarExpanded}
+        focused={zone === "sidebar"}
+        sel={sidebarSel}
         lens={lens}
         onActivate={activateSidebar}
-        onExpand={() => setSidebarExpanded(true)}
+        onExpand={() => { setZone("sidebar"); setSidebarSel(0); }}
       />
     </View>
   );
@@ -237,11 +310,11 @@ function Row({
   channel,
   accent,
   focused,
+  railFocused,
   focusedProgramId,
   favorited,
   onPressRow,
   onPressProgram,
-  onToggleFavorite,
   now,
   rowPx,
   railPx,
@@ -254,11 +327,11 @@ function Row({
   channel: GuideGridChannel;
   accent: string;
   focused: boolean;
+  railFocused: boolean;
   focusedProgramId?: string;
   favorited: boolean;
   onPressRow: () => void;
   onPressProgram: (programIndex: number) => void;
-  onToggleFavorite: () => void;
   now: Date;
   rowPx: number;
   railPx: number;
@@ -273,21 +346,23 @@ function Row({
 
   return (
     <View style={{ height: rowPx, flexDirection: "row", borderTopWidth: 1, borderTopColor: C.rowBorder }}>
-      {/* Rail */}
+      {/* Rail — tap to focus; tap again (rail-focused) toggles favorite. The circle mirrors tv-web:
+          when rail-focused it becomes the favorite heart (filled red if favorited, else outline). */}
       <Pressable onPress={onPressRow} style={{ width: railPx, paddingVertical: vw(18), paddingHorizontal: vw(20), justifyContent: "space-between", backgroundColor: focused ? hexA(accent, 0.12) : "transparent" }}>
         {focused && <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: vw(4), backgroundColor: accent }} />}
         <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
-          <Pressable
-            onPress={onToggleFavorite}
-            style={{ width: circle, height: circle, borderRadius: circle / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, 0.2), borderWidth: 1, borderColor: hexA(accent, 0.35) }}
-          >
-            <Icon size={vw(34 * FEATURE_SCALE)} color={accent} />
-            {favorited && (
+          <View style={{ width: circle, height: circle, borderRadius: circle / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, 0.2), borderWidth: railFocused ? 2 : 1, borderColor: railFocused ? C.ring : hexA(accent, 0.35) }}>
+            {railFocused ? (
+              <Heart size={vw(34 * FEATURE_SCALE)} color={favorited ? C.fav : "#c3c9d4"} fill={favorited ? C.fav : "none"} />
+            ) : (
+              <Icon size={vw(34 * FEATURE_SCALE)} color={accent} />
+            )}
+            {favorited && !railFocused && (
               <View style={{ position: "absolute", right: -vw(4), bottom: -vw(4) }}>
                 <Heart size={vw(22)} color={C.fav} fill={C.fav} />
               </View>
             )}
-          </Pressable>
+          </View>
           <Text style={{ fontSize: vw(34), fontWeight: "700", color: focused ? "#e6eaf1" : C.mutedFg }}>{channel.number}</Text>
         </View>
         <Text numberOfLines={2} style={{ fontSize: vw(23), color: C.mutedFg, lineHeight: vw(23) * 1.2 }}>

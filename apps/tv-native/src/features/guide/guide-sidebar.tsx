@@ -77,12 +77,17 @@ export function lensEquals(a: Lens | undefined, b: Lens): boolean {
 export function GuideSidebar({
   items,
   expanded,
+  focused,
+  sel,
   lens,
   onActivate,
   onExpand,
 }: {
   items: SidebarItem[];
   expanded: boolean;
+  /** D-pad focus is in the sidebar (drives the ring on the `sel`'d circle). Always false on touch. */
+  focused: boolean;
+  sel: number;
   lens: Lens;
   onActivate: (index: number) => void;
   /** Touch: tapping the collapsed sliver expands it to reveal the lenses. */
@@ -114,13 +119,13 @@ export function GuideSidebar({
     // Interactive circles + labels; the lens list scrolls (packages exceed the screen).
     <View style={{ flex: 1, gap: 14, paddingVertical: 24, paddingHorizontal: 18 }}>
       {actions.map((it, i) => (
-        <GlassCircleButton key={it.key} icon={it.icon} label={it.label} expanded active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(i)} />
+        <GlassCircleButton key={it.key} icon={it.icon} label={it.label} expanded focused={focused && sel === i} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(i)} />
       ))}
       <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: 4 }} />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 14 }} showsVerticalScrollIndicator={false}>
         {filters.map((it, i) => {
           const idx = actions.length + i;
-          return <GlassCircleButton key={it.key} icon={it.icon} label={it.label} sublabel={it.sublabel} expanded active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(idx)} />;
+          return <GlassCircleButton key={it.key} icon={it.icon} label={it.label} sublabel={it.sublabel} expanded focused={focused && sel === idx} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(idx)} />;
         })}
       </ScrollView>
     </View>

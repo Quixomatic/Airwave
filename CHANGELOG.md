@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.10] - 2026-07-23
+
+### Added
+
+- **tv-native guide: the unified zone machine (touch + D-pad), ported from tv-web.** The guide now runs the same grid ↔ rail ↔ sidebar state machine as tv-web, driven by **both** input methods:
+  - **Touch:** tap to focus, tap the already-focused thing to activate — tap a program to focus it (the featured panel + highlight follow), tap it again to tune; tap a channel rail to focus it (the icon circle becomes the favorite heart), tap again to toggle favorite. Same intent D-pad expresses with move + OK.
+  - **D-pad:** the aurora-grid key handler (grid: ◄/► browse programs, ▲/▼ change channel, ◄ off the first program → rail, OK → tune; rail: ◄ → sidebar, ▲/▼ change channel, OK → favorite; sidebar: ▲/▼ + OK), registered as a `useKeyLayer` on the ported input dispatcher — fires on the TV build via `useTVInput`, no-op on iPad.
+- The rail's focus states now match tv-web (accent row highlight + inset bar, and the rail-focused heart affordance), and the sidebar takes D-pad focus (`focused`/`sel` → the ring on the selected circle).
+
+### Notes
+
+- One state, two inputs — sidebar expanded ⇔ `zone === "sidebar"`. Touch is exercisable on iPad now; the D-pad path is faithful and lights up on the tvOS / Android TV build.
+
 ## [0.7.9] - 2026-07-23
 
 ### Added
