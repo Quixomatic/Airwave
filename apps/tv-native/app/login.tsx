@@ -5,6 +5,7 @@ import QRCode from "react-native-qrcode-svg";
 
 import { ApiError, plexLink } from "@/lib/api";
 import { getServerUrl, setToken } from "@/lib/auth";
+import { authClient } from "@/lib/auth-client";
 
 /**
  * Login — the native port of tv-web's device-code login. The Plex device-link flow
@@ -62,6 +63,39 @@ export default function Login() {
     }
   }, [router]);
 
+  // ChannelGuide device code (better-auth deviceAuthorization) — mirrors tv-web's startDevice.
+  const startDevice = useCallback(async () => {
+    setError(null);
+    const { data, error: codeErr } = await authClient().device.code({ client_id: "channelguide-tv" });
+    if (codeErr || !data) {
+      setError(codeErr?.error_description ?? "Could not start device login.");
+      return;
+    }
+    setPending({
+      heading: "Log in with a code",
+      instruction: `Go to ${data.verification_uri} and enter this code, or scan:`,
+      code: data.user_code,
+      qrValue: data.verification_uri_complete ?? data.verification_uri,
+    });
+    stopPolling();
+    pollRef.current = setInterval(async () => {
+      const { data: tok, error: tokErr } = await authClient().device.token({
+        grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+        device_code: data.device_code,
+        client_id: "channelguide-tv",
+      });
+      if (tok?.access_token) {
+        stopPolling();
+        await setToken(tok.access_token);
+        router.replace("/guide");
+        return;
+      }
+      if (tokErr?.error === "expired_token" || tokErr?.error === "access_denied") {
+        reset("That code expired or was denied — try again.");
+      }
+    }, (data.interval ?? 5) * 1000);
+  }, [router]);
+
   return (
     <View className="flex-1 items-center justify-center gap-8 bg-bg p-10">
       <View className="items-center">
@@ -90,7 +124,7 @@ export default function Login() {
             <Text className="text-xl font-semibold text-black">Log in with Plex</Text>
           </Pressable>
           <Pressable
-            onPress={() => setError("Code login is coming in a later build — use Plex for now.")}
+            onPress={startDevice}
             className="items-center rounded-xl border border-white/15 px-6 py-5 active:opacity-70"
           >
             <Text className="text-xl font-semibold text-fg">Log in with a code</Text>

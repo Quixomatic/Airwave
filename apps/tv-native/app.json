@@ -2,7 +2,7 @@
   "expo": {
     "name": "ChannelGuide",
     "slug": "channelguide",
-    "version": "0.7.6",
+    "version": "0.7.7",
     "scheme": "channelguide",
     "orientation": "default",
     "userInterfaceStyle": "dark",
@@ -31,9 +31,6 @@
           "showVerboseWarnings": false
         }
       ]
-    ],
-    "experiments": {
-      "typedRoutes": true
-    }
+    ]
   }
 }

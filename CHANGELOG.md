@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.7] - 2026-07-23
+
+### Added
+
+- **tv-native: both login options + onboarding, at parity with tv-web.**
+  - **"Log in with a code"** now works — the better-auth device-authorization flow via the official **`@better-auth/expo`** client (pinned to `1.6.23` to match the server), same `authClient.device.code/token` API as tv-web. The client is built lazily since the native server URL hydrates asynchronously at startup.
+  - **Onboarding / server-setup screen** (`app/setup.tsx`), ported from tv-web's `ServerSetup`: manual address entry validated against `/api/health`, plus **LAN auto-scan** — the native port of `server-scan.ts` using `expo-network` for the device IP (tv-web leaks it via WebRTC, which RN has no equivalent for) then the same /24 `/api/health` sweep. The entry gate now routes to setup when no server is configured.
+
+### Notes
+
+- Typed routes are off for now: expo-router generates route types into the gitignored `.expo/`, which isn't present in a clean checkout, so leaving them on would break `pnpm check-types`. Routing is identical at runtime; compile-time route-string checking can return later behind a type-gen step. Runtime verification (Expo Go) still pending on device.
+
 ## [0.7.6] - 2026-07-23
 
 ### Added
