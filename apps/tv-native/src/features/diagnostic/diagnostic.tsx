@@ -198,6 +198,21 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
         </View>
       </View>
 
+      {/* DEBUG (temporary) — the current clip URL + which tests passed, so we can see whether the
+          mp4/mov clips play (reachability) vs the mkv/avi/webm ones failing (correct on iPadOS). */}
+      {cur && <Text style={{ marginTop: 12, fontSize: 11, color: "#475569", maxWidth: frameW }} numberOfLines={1}>{getServerUrl()}{cur.url}</Text>}
+      <View style={{ width: frameW, marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+        {tests?.map((t) => {
+          const r = rows[t.id];
+          const color = !r ? "#334155" : r.decoded ? "#3fa66a" : "#7c2d2d";
+          return (
+            <View key={t.id} style={{ backgroundColor: color, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 }}>
+              <Text style={{ fontSize: 9, color: "#e6eaf1" }}>{t.container}/{t.video}</Text>
+            </View>
+          );
+        })}
+      </View>
+
       {done && (
         <Pressable onPress={finish} style={{ marginTop: 30, borderRadius: 14, backgroundColor: C.accent, paddingHorizontal: 44, paddingVertical: 14 }}>
           <Text style={{ color: "#04060c", fontSize: 18, fontWeight: "700" }}>Continue</Text>
