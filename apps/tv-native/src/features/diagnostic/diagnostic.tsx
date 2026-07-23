@@ -65,15 +65,12 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
           clearTimeout(hard);
           resolve(r);
         };
-        try {
-          // Object form ({ uri }), matching the working channel player — a raw string source
-          // silently failed to load (every clip showed the can't-play indicator).
-          player.replace({ uri: `${getServerUrl()}${test.url}` });
-          player.play();
-        } catch {
-          resolve({ decoded: false, error: "load error" });
-          return;
-        }
+        // replaceAsync (not the deprecated sync replace) — and its rejection tells us a clip
+        // genuinely failed to LOAD (404 / Range / unreachable) vs failed to DECODE.
+        player
+          .replaceAsync({ uri: `${getServerUrl()}${test.url}` })
+          .then(() => player.play())
+          .catch((e: unknown) => finish({ decoded: false, error: `load: ${e instanceof Error ? e.message : "failed"}` }));
         const poll = setInterval(() => {
           try {
             if (player.status === "error") return finish({ decoded: false, error: "decode error" });
@@ -201,6 +198,11 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
       {/* DEBUG (temporary) — the current clip URL + which tests passed, so we can see whether the
           mp4/mov clips play (reachability) vs the mkv/avi/webm ones failing (correct on iPadOS). */}
       {cur && <Text style={{ marginTop: 12, fontSize: 11, color: "#475569", maxWidth: frameW }} numberOfLines={1}>{getServerUrl()}{cur.url}</Text>}
+      {(() => {
+        const last = tests?.slice(0, idx + 1).reverse().find((t) => rows[t.id]);
+        const err = last ? rows[last.id]?.error : undefined;
+        return err ? <Text style={{ fontSize: 11, color: "#f0a92a", maxWidth: frameW, marginTop: 2 }} numberOfLines={1}>last error: {err}</Text> : null;
+      })()}
       <View style={{ width: frameW, marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
         {tests?.map((t) => {
           const r = rows[t.id];

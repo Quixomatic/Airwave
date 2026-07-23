@@ -100,8 +100,8 @@ export function useTvPlayer(channelId: string) {
         if (gen !== genRef.current) return;
         const loaded: Current = { index: slots.indexOf(entry), kind: "PROGRAM", startS: entry.startS, endS: entry.endS, ratingKey: entry.slot.ratingKey, guide: entry.slot.guide, offset, playStartCurrentTime: 0, baselineReady: false, session: info.session, mode: info.mode };
         currentRef.current = loaded;
-        player.replace({ uri: info.url });
-        player.play();
+        // replaceAsync (not the deprecated sync replace) — loads off the main thread.
+        void player.replaceAsync({ uri: info.url }).then(() => player.play()).catch(() => {});
         // Capture the playback baseline once ready — direct-play seeks to the offset first (it isn't
         // baked in), HLS/http start at ~0 (baked). effective derives from this baseline either way.
         const sub = player.addListener("statusChange", ({ status }) => {
