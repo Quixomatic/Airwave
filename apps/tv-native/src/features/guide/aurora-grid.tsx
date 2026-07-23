@@ -1,9 +1,10 @@
 import { FlashList } from "@shopify/flash-list";
 import { LinearGradient } from "expo-linear-gradient";
 import { Heart, Star } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, useWindowDimensions, View } from "react-native";
 
+import { usePlayer } from "@/features/watch/player-ctx";
 import type { GuideGridChannel, GuideGridProgram, GuideMeta } from "@/lib/api";
 import { LAYER, useKeyLayer } from "@/lib/input";
 import { C } from "@/lib/theme";
@@ -464,6 +465,29 @@ function FeaturedPanel({ channel, program, now, accent, vw, onTune }: { channel:
   const Icon = channelIcon(channel.icon ?? channel.package?.icon);
   const tile = fv(64);
 
+  // The mini feed docks into a slot on the right of the featured panel (like tv-web). Reserve the
+  // slot when a mini feed is playing, measure its screen rect, and hand it to the player — the
+  // persistent PlayerHost animates the video there. Clear it when there's no mini / on unmount.
+  const player = usePlayer();
+  const miniActive = player.layout === "mini";
+  const slotRef = useRef<View>(null);
+  const measureSlot = useCallback(() => {
+    slotRef.current?.measureInWindow((sx, sy, sw, sh) => {
+      if (sw > 0 && sh > 0) player.setMiniSlot({ x: sx, y: sy, width: sw, height: sh });
+    });
+  }, [player]);
+  useEffect(() => {
+    if (!miniActive) {
+      player.setMiniSlot(null);
+      return;
+    }
+    const raf = requestAnimationFrame(measureSlot);
+    return () => {
+      cancelAnimationFrame(raf);
+      player.setMiniSlot(null);
+    };
+  }, [miniActive, measureSlot, player]);
+
   return (
     <Pressable onPress={onTune} style={{ flexDirection: "row", alignItems: "flex-start", paddingTop: fv(40), paddingHorizontal: fv(64) }}>
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -523,6 +547,10 @@ function FeaturedPanel({ channel, program, now, accent, vw, onTune }: { channel:
           <View style={{ height: "100%", borderRadius: 999, backgroundColor: accent, width: `${pct}%` }} />
         </View>
       </View>
+
+      {/* The mini-feed dock: a transparent placeholder that reserves the space + reports its rect;
+          the persistent player renders the live video on top of it. Only while a mini feed plays. */}
+      {miniActive && <View ref={slotRef} onLayout={measureSlot} style={{ width: fv(970), alignSelf: "stretch", borderRadius: 14, marginLeft: fv(40) }} />}
     </Pressable>
   );
 }

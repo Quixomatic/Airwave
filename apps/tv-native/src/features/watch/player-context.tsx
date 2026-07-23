@@ -154,14 +154,14 @@ function PlayerHost({
   }, [status.state, status.loading, onPlaying]);
 
   const full = layout === "full";
-  // full → fill the screen; mini + docked → the featured slot; mini with no slot (e.g. on Settings)
-  // → hidden (audio keeps playing).
-  const fallbackMini = { x: vw - vw * 0.42 - 24, y: 90, width: vw * 0.42, height: (vw * 0.42 * 9) / 16 };
+  // full → fill the screen; mini + docked → the featured slot; mini with no slot (e.g. on Settings,
+  // where the guide's dock is unmounted) → hidden (audio keeps playing), matching tv-web.
+  const hiddenMini = { x: vw - vw * 0.42, y: 80, width: vw * 0.42, height: (vw * 0.42 * 9) / 16 };
   const target = full
     ? { x: 0, y: 0, width: vw, height: vh, radius: 0, opacity: 1 }
     : miniSlot
       ? { ...miniSlot, radius: 14, opacity: 1 }
-      : { ...fallbackMini, radius: 14, opacity: layout === "mini" ? 1 : 0 };
+      : { ...hiddenMini, radius: 14, opacity: 0 };
 
   const x = useSharedValue(target.x);
   const y = useSharedValue(target.y);
