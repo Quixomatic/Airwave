@@ -14,7 +14,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
-    "postinstall": "prisma generate",
+    "postinstall": "node -e \"process.exit(process.env.EAS_BUILD?0:1)\" || prisma generate",
     "db:studio": "prisma studio"
   },
   "dependencies": {
