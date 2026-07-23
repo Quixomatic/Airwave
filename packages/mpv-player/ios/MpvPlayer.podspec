@@ -11,15 +11,23 @@ Pod::Spec.new do |s|
 
   s.dependency 'ExpoModulesCore'
 
-  # Swift/C interop for libmpv.
+  # The MPVKit Swift Package (github.com/edde746/MPVKit — the fork with the iOS/tvOS `avfoundation` VO
+  # + HDR/Dolby-Vision that plezy proves). Linked to THIS pod (not the app target) via React Native's
+  # `spm_dependency` macro, so the module is visible where our Swift compiles. Linking the `MPVKit`
+  # product also makes the bundled `Libmpv` binary target importable (how plezy uses the raw C API).
+  spm_dependency(s,
+    url: 'https://github.com/edde746/MPVKit',
+    requirement: {
+      kind: 'upToNextMajorVersion',
+      minimumVersion: '1.0.13'
+    },
+    products: ['MPVKit']
+  )
+
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
     'SWIFT_COMPILATION_MODE' => 'wholemodule'
   }
-
-  # NOTE: The MPVKit Swift Package (github.com/edde746/MPVKit) is added to the app's Xcode target by
-  # this module's config plugin (see ../plugin) — the Expo equivalent of plezy's tvos/scripts/wire_mpv.rb.
-  # MPVKit is SPM-only (no podspec), so it can't be a `s.dependency` here.
 
   s.source_files = '**/*.{h,m,mm,swift}'
 end
