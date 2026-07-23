@@ -4,10 +4,10 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "dev": "expo start",
-    "dev:android": "expo start --android",
-    "dev:ios": "expo start --ios",
-    "start": "expo start",
+    "dev": "expo start --dev-client",
+    "dev:android": "expo start --dev-client --android",
+    "dev:ios": "expo start --dev-client --ios",
+    "start": "expo start --dev-client",
     "prebuild": "expo prebuild",
     "check-types": "tsc --noEmit"
   },
