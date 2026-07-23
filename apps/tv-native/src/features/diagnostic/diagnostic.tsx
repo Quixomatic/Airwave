@@ -46,31 +46,41 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
     if (!tests) return;
     let cancelled = false;
 
+    // Ground-truth decode signal: does playback actually advance? If the clip decodes, currentTime
+    // moves; an unsupported codec/container errors (status "error") or never advances (timeout).
+    const played = () => {
+      try {
+        return player.currentTime > 0.4;
+      } catch {
+        return false;
+      }
+    };
     const runOne = (test: CapTest): Promise<Auto> =>
       new Promise((resolve) => {
         let settled = false;
         const finish = (r: Auto) => {
           if (settled) return;
           settled = true;
+          clearInterval(poll);
           clearTimeout(hard);
-          sub.remove();
           resolve(r);
         };
-        const sub = player.addListener("statusChange", ({ status, error: e }) => {
-          if (status === "readyToPlay") {
-            // Reached playable → let it run briefly, then record as decoded.
-            setTimeout(() => finish({ decoded: true }), 1800);
-          } else if (status === "error") {
-            finish({ decoded: false, error: e?.message ?? "decode error" });
-          }
-        });
-        const hard = setTimeout(() => finish({ decoded: false, error: "timeout (no frame)" }), 10000);
         try {
           player.replace(`${getServerUrl()}${test.url}`);
           player.play();
         } catch {
-          finish({ decoded: false, error: "load error" });
+          resolve({ decoded: false, error: "load error" });
+          return;
         }
+        const poll = setInterval(() => {
+          try {
+            if (player.status === "error") return finish({ decoded: false, error: "decode error" });
+            if (played()) return finish({ decoded: true });
+          } catch {
+            /* keep polling */
+          }
+        }, 250);
+        const hard = setTimeout(() => finish({ decoded: played(), error: played() ? undefined : "timeout (no frame)" }), 8000);
       });
 
     const upsert = (test: CapTest, r: Auto) =>
