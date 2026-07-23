@@ -123,8 +123,10 @@ final class MpvCore {
     guard let mpv else { return }
     var cargs: [UnsafeMutablePointer<CChar>?] = args.map { strdup($0) }
     cargs.append(nil)
-    cargs.withUnsafeMutableBufferPointer { buf in
-      _ = mpv_command(mpv, buf.baseAddress)
+    cargs.withUnsafeBufferPointer { buffer in
+      // mpv_command wants `const char **` — rebind the strdup'd mutable pointers to const (plezy's pattern).
+      var constPointers = buffer.map { $0.map { UnsafePointer($0) } }
+      _ = mpv_command(mpv, &constPointers)
     }
     cargs.forEach { free($0) }
   }
