@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.13] - 2026-07-23
+
+### Added
+
+- **tv-native: the capability diagnostic — measured profile → direct-play (fixes the buffering).** Ported from tv-web's `Diagnostic`: plays each capability-matrix clip through expo-video and records whether it reaches ready-to-play (decodes) or errors, posting per-device results to the server. Same flow + framed-video/progress appearance; the measurement adapts to native (AVPlayer/ExoPlayer expose no decoded-frame counts, so "reached readyToPlay without erroring" is the decode signal — which is what confirms iPadOS drops the un-decodable containers to HLS). Runs automatically on first sign-in / server switch (per-server done-flag), reports device info, `deviceId` + caps-done hydrated at startup.
+
+### Changed
+
+- **The player uses the measured profile instead of forcing HLS.** `/media` now gets this device's `deviceId`, so the server direct-plays what the device supports and only transcodes what it can't — no more transcoding everything (the cause of the constant buffering). Added mode-aware playback baseline: direct-play seeks to the offset, HLS/http start at the baked offset; `effective = startS + offset + (currentTime − baseline)` handles both.
+
 ## [0.7.12] - 2026-07-23
 
 ### Added

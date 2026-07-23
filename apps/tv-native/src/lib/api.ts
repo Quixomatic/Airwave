@@ -74,6 +74,21 @@ export const plexLink = {
     request<PlexPoll>("/api/tv/auth/plex/poll", { method: "POST", body: JSON.stringify({ pinId }) }),
 };
 
+/** A capability-matrix test clip (the diagnostic plays each and records whether it decodes). */
+export type CapTest = {
+  id: string;
+  category: string;
+  container: string;
+  video: string;
+  audio: string;
+  feature: string | null;
+  subtitle: string | null;
+  diagnostic: string;
+  realSample: boolean;
+  manual: Array<"audio" | "hdr" | "subtitle">;
+  url: string;
+};
+
 // --- REST guide API (/api/v1, bearer) — ported from tv-web ---------------------
 
 /** A channel package (the guide sidebar's filter list). */
@@ -199,6 +214,11 @@ export const api = {
     request<unknown>("/api/v1/sessions/heartbeat", { method: "POST", body: JSON.stringify(body) }),
 
   endSession: () => request<unknown>("/api/v1/sessions/end", { method: "POST", body: "{}" }),
+
+  reportDevice: (report: unknown) => request<{ ok: true; id: string }>("/api/v1/devices/report", { method: "POST", body: JSON.stringify(report) }),
+
+  capsManifest: () => request<{ tests: CapTest[] }>("/api/v1/caps/manifest"),
+  capsResult: (data: Record<string, unknown>) => request<{ ok: true }>("/api/v1/caps/result", { method: "POST", body: JSON.stringify(data) }),
   favorites: () => request<{ channelIds: string[] }>("/api/v1/favorites"),
   setFavorite: (channelId: string, favorite: boolean) =>
     request<{ channelId: string; favorited: boolean }>("/api/v1/favorites", {

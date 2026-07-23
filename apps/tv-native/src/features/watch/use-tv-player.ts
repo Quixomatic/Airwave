@@ -3,6 +3,7 @@ import { useVideoPlayer } from "expo-video";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, type GuideMeta, type MediaInfo, type TimelineSlot } from "@/lib/api";
+import { deviceId } from "@/lib/device";
 
 /**
  * The tv-native channel player — increment 1: the effectiveTime clock model ported from tv-web's
@@ -15,7 +16,22 @@ import { api, type GuideMeta, type MediaInfo, type TimelineSlot } from "@/lib/ap
  * iPadOS plays reliably until the capability diagnostic provides a measured profile).
  */
 type SlotEntry = { slot: TimelineSlot; startS: number; endS: number };
-type Current = { index: number; kind: "PROGRAM" | "BUMPER"; startS: number; endS: number; ratingKey: string | null; guide: GuideMeta; offset: number; session: string | null; mode?: MediaInfo["mode"] };
+type Current = {
+  index: number;
+  kind: "PROGRAM" | "BUMPER";
+  startS: number;
+  endS: number;
+  ratingKey: string | null;
+  guide: GuideMeta;
+  offset: number;
+  /** The player.currentTime baseline captured once playback starts — HLS/http start at ~0 (offset
+   *  baked in the transcode), direct-play starts at `offset` (we seek there). effective =
+   *  startS + offset + (currentTime − playStartCurrentTime) handles both. */
+  playStartCurrentTime: number;
+  baselineReady: boolean;
+  session: string | null;
+  mode?: MediaInfo["mode"];
+};
 
 export type PlayerStatus = {
   loading: boolean;
@@ -64,7 +80,7 @@ export function useTvPlayer(channelId: string) {
         // Bumper (or a program with no media) — a client-rendered interstitial; nothing to stream.
         if (entry.slot.kind === "BUMPER" || !entry.slot.ratingKey) {
           player.pause();
-          currentRef.current = { index: slots.indexOf(entry), kind: "BUMPER", startS: entry.startS, endS: entry.endS, ratingKey: null, guide: entry.slot.guide, offset: 0, session: null };
+          currentRef.current = { index: slots.indexOf(entry), kind: "BUMPER", startS: entry.startS, endS: entry.endS, ratingKey: null, guide: entry.slot.guide, offset: 0, playStartCurrentTime: 0, baselineReady: true, session: null };
           bumperEffRef.current = clamped;
           return;
         }
@@ -73,18 +89,32 @@ export function useTvPlayer(channelId: string) {
         setStatus((s) => ({ ...s, loading: true, error: null }));
         let info: MediaInfo;
         try {
-          info = await api.media(channelId, entry.slot.ratingKey, offset, { forceHls: true });
+          // Use this device's MEASURED profile (from the diagnostic) so the server direct-plays what
+          // the device supports and only transcodes what it can't — no more force-HLS-everything.
+          info = await api.media(channelId, entry.slot.ratingKey, offset, { deviceId: deviceId() });
         } catch (err) {
           if (gen !== genRef.current) return;
           setStatus((s) => ({ ...s, loading: false, error: err instanceof Error ? err.message : "Playback failed" }));
           return;
         }
         if (gen !== genRef.current) return;
-        currentRef.current = { index: slots.indexOf(entry), kind: "PROGRAM", startS: entry.startS, endS: entry.endS, ratingKey: entry.slot.ratingKey, guide: entry.slot.guide, offset, session: info.session, mode: info.mode };
-        // HLS transcode bakes the offset in server-side → play from 0. (Direct-play seek comes with
-        // the native-first increment.)
+        const loaded: Current = { index: slots.indexOf(entry), kind: "PROGRAM", startS: entry.startS, endS: entry.endS, ratingKey: entry.slot.ratingKey, guide: entry.slot.guide, offset, playStartCurrentTime: 0, baselineReady: false, session: info.session, mode: info.mode };
+        currentRef.current = loaded;
         player.replace({ uri: info.url });
         player.play();
+        // Capture the playback baseline once ready — direct-play seeks to the offset first (it isn't
+        // baked in), HLS/http start at ~0 (baked). effective derives from this baseline either way.
+        const sub = player.addListener("statusChange", ({ status }) => {
+          if (status !== "readyToPlay" || currentRef.current !== loaded) return;
+          if (info.mode === "direct" && offset > 0) {
+            player.currentTime = offset;
+            loaded.playStartCurrentTime = offset;
+          } else {
+            loaded.playStartCurrentTime = player.currentTime;
+          }
+          loaded.baselineReady = true;
+          sub.remove();
+        });
       } finally {
         transitioning.current = false;
       }
@@ -102,7 +132,7 @@ export function useTvPlayer(channelId: string) {
       if (!cur) return;
       let effective: number;
       if (cur.kind === "PROGRAM") {
-        effective = cur.startS + cur.offset + player.currentTime;
+        effective = cur.baselineReady ? cur.startS + cur.offset + (player.currentTime - cur.playStartCurrentTime) : cur.startS + cur.offset;
         if (effective >= cur.endS - 0.25) {
           void goTo(cur.endS);
           return;

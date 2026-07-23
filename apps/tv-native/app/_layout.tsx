@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { loadSession } from "@/lib/auth";
+import { loadDevice } from "@/lib/device";
 import { useTVInput } from "@/lib/input";
 import { C } from "@/lib/theme";
 
@@ -30,7 +31,7 @@ export default function RootLayout() {
   useTVInput();
 
   useEffect(() => {
-    void loadSession().finally(() => setReady(true));
+    void Promise.all([loadSession(), loadDevice()]).finally(() => setReady(true));
   }, []);
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: C.bg }} />;

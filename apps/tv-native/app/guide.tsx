@@ -1,9 +1,11 @@
 import { useRouter } from "expo-router";
+import { useEffect } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AuroraGrid } from "@/features/guide/aurora-grid";
 import { useFavorites, useGuide, useSetFavorite } from "@/hooks/queries";
+import { capsDoneForCurrentServer } from "@/lib/device";
 import { C } from "@/lib/theme";
 
 /**
@@ -17,6 +19,12 @@ export default function GuideRoute() {
   const setFavorite = useSetFavorite();
 
   const favoriteIds = new Set(favData?.channelIds ?? []);
+
+  // First sign-in (or a server switch) → run the capability diagnostic so the server has this
+  // device's profile before playback (else /media can't pick direct-play vs HLS correctly).
+  useEffect(() => {
+    if (!capsDoneForCurrentServer()) router.replace("/diagnostic");
+  }, [router]);
 
   if (isLoading || (!data && !error)) {
     return (
