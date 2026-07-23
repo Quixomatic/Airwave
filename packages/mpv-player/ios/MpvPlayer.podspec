@@ -15,11 +15,13 @@ Pod::Spec.new do |s|
   # + HDR/Dolby-Vision that plezy proves). Linked to THIS pod (not the app target) via React Native's
   # `spm_dependency` macro, so the module is visible where our Swift compiles. Linking the `MPVKit`
   # product also makes the bundled `Libmpv` binary target importable (how plezy uses the raw C API).
+  # Pinned to 1.0.12 — the exact version plezy ships in production. 1.0.13 has a libass version skew
+  # (its libmpv references `ass_add_font` but its bundled libass lacks it → undefined symbol at link).
   spm_dependency(s,
     url: 'https://github.com/edde746/MPVKit',
     requirement: {
-      kind: 'upToNextMajorVersion',
-      minimumVersion: '1.0.13'
+      kind: 'exactVersion',
+      version: '1.0.12'
     },
     products: ['MPVKit']
   )
