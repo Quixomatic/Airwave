@@ -2,6 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.16] - 2026-07-23
+
+### Added
+
+- **tv-native: channel surf + full-chrome parity fixes (chrome increment 3).** The channel-surf carousel (◄/► from the closed chrome): a horizontal FlashList of channel tiles (cover art, live progress, channel/program, the focused tile scaled + accent-bordered, a "Watching" flag on the current channel), opening centered on what you are watching; ◄/► move (wrapping), OK tunes, Back closes, ~12s auto-hides; top MODAL layer + touch.
+- **Full chrome now matches tv-web exactly:** the missing **top-right glass channel chip** (Tv icon + number + name), and the control row rebuilt to the real layout — five **pill** buttons (Play/Pause · Restart · Channel Surf · Info · Continue Watching/Jump to Live) then the three **circle** selectors pushed right (Audio · Subtitles · Quality, with SlidersHorizontal). Seek is ±10s.
+
+### Notes
+
+- Channel-number entry is the last chrome increment; then the libVLC video swap.
+
 ## [0.7.15] - 2026-07-23
 
 ### Added

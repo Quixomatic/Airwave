@@ -1,12 +1,15 @@
-import { ArrowLeft } from "lucide-react-native";
+import { ArrowLeft, Tv } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { useGuide } from "@/hooks/queries";
 import type { GuideChannel } from "@/lib/api";
 import { LAYER, useKeyLayer } from "@/lib/input";
 import { channelVivid } from "@/lib/tint";
 
+import { ChannelSurf } from "./channel-surf";
 import { FeaturePanel } from "./feature-panel";
+import { usePlayer } from "./player-ctx";
 import type { useTvPlayer } from "./use-tv-player";
 
 /**
@@ -44,8 +47,10 @@ export function FullChrome({
   onBack: () => void;
 }) {
   const accent = accentForChannel(channel);
+  const { tune } = usePlayer();
+  const { data: guide } = useGuide(180);
   const [panelOpen, setPanelOpen] = useState(true);
-  const [surfOpen, setSurfOpen] = useState(false); // channel surf — increment 3
+  const [surfOpen, setSurfOpen] = useState(false);
 
   // Player-chrome input layer — active only when the panel/surf are closed (they own the keys when
   // open). Back → mini, OK/▲/▼ → open the panel, ◄/► → channel surf.
@@ -79,8 +84,16 @@ export function FullChrome({
 
       {panelOpen && (
         <>
+          {/* Glass channel chip, top-right — the "what am I watching" banner (tv-web parity). */}
+          <View style={{ position: "absolute", top: 28, right: 40, flexDirection: "row", alignItems: "center", gap: 12, height: 56, paddingLeft: 12, paddingRight: 22, borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", backgroundColor: "rgba(18,24,38,0.55)" }}>
+            <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: `${accent}33` }}>
+              <Tv size={20} color={accent} />
+            </View>
+            <Text style={{ fontSize: 22, fontWeight: "700", color: accent }}>{channel?.number}</Text>
+            <Text style={{ fontSize: 22, fontWeight: "600", color: "#e6eaf1" }}>{channel?.name}</Text>
+          </View>
           {/* touch back-to-guide affordance (D-pad uses Back) */}
-          <Pressable onPress={onBack} style={{ position: "absolute", top: 24, left: 24, zIndex: 2, borderRadius: 999, backgroundColor: "rgba(18,24,38,0.6)", padding: 10 }}>
+          <Pressable onPress={onBack} style={{ position: "absolute", top: 28, left: 24, zIndex: 2, borderRadius: 999, backgroundColor: "rgba(18,24,38,0.6)", padding: 10 }}>
             <ArrowLeft size={24} color="#f1f5f9" />
           </Pressable>
           <FeaturePanel
@@ -103,8 +116,14 @@ export function FullChrome({
         </>
       )}
 
-      {/* ChannelSurf mounts here in increment 3; for now surf just closes back to the video. */}
-      {surfOpen && <Pressable style={StyleSheet.absoluteFill} onPress={() => setSurfOpen(false)} />}
+      {surfOpen && (
+        <ChannelSurf
+          channels={[...(guide?.channels ?? [])].sort((a, b) => a.number - b.number)}
+          currentChannelId={channel?.id ?? ""}
+          onTune={(id) => tune(id)}
+          onClose={() => setSurfOpen(false)}
+        />
+      )}
     </View>
   );
 }

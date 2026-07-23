@@ -1,6 +1,7 @@
-import { AudioLines, Captions, Gauge, Info, Pause, Play, Radio, RotateCcw, Star, Tv } from "lucide-react-native";
+import { AudioLines, Captions, Clapperboard, Info, Pause, Play, Radio, RotateCcw, SlidersHorizontal, Star, Tv } from "lucide-react-native";
+import type { ComponentType } from "react";
 import { useEffect, useRef, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 import type { GuideChannel } from "@/lib/api";
@@ -17,7 +18,7 @@ import type { useTvPlayer } from "./use-tv-player";
 type Player = ReturnType<typeof useTvPlayer>;
 type PickerKey = "audio" | "subtitle" | "quality" | null;
 
-const SEEK = 15;
+const SEEK = 10;
 const CTL_COUNT = 8;
 
 function fmt(total: number): string {
@@ -55,7 +56,6 @@ export function FeaturePanel({
   onClose: () => void;
   onOpenSurf: () => void;
 }) {
-  const { width } = useWindowDimensions();
   const { status, controls, tracks } = player;
   const g = status.guide;
   const sc = status.scrubber;
@@ -168,16 +168,7 @@ export function FeaturePanel({
   const behind = sc?.behindS ?? 0;
   const scrubFocused = focus.row === 0 && !infoMode && !picker;
 
-  const controlDefs = [
-    { icon: status.paused ? Play : Pause, key: "pause" },
-    { icon: RotateCcw, key: "restart" },
-    { icon: Tv, key: "surf" },
-    { icon: Info, key: "info" },
-    { icon: Radio, key: "live" },
-    { icon: AudioLines, key: "audio" },
-    { icon: Captions, key: "subs" },
-    { icon: Gauge, key: "quality" },
-  ];
+  const ctlFocused = (i: number) => focus.row === 1 && focus.col === i && !picker && !infoMode;
 
   return (
     <LinearGradient colors={["transparent", "rgba(6,10,20,0.4)", "rgba(6,10,20,0.92)"]} locations={[0, 0.35, 0.75]} style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingTop: 96, paddingHorizontal: 56, paddingBottom: 40 }}>
@@ -242,17 +233,18 @@ export function FeaturePanel({
             </View>
           </Pressable>
 
-          {/* controls */}
-          <View style={{ flexDirection: "row", gap: 12, marginTop: 18 }}>
-            {controlDefs.map((c, i) => {
-              const Icon = c.icon;
-              const f = focus.row === 1 && focus.col === i && !picker;
-              return (
-                <Pressable key={c.key} onPress={() => activateControl(i)} style={{ width: 54, height: 54, borderRadius: 27, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: f ? "rgba(59,130,246,0.4)" : "rgba(255,255,255,0.12)", backgroundColor: f ? "rgba(59,130,246,0.28)" : "rgba(18,24,38,0.55)" }}>
-                  <Icon size={24} color="#f1f5f9" />
-                </Pressable>
-              );
-            })}
+          {/* controls — 5 pill buttons (icon + label), then the 3 circle selectors pushed right */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginTop: 20 }}>
+            <Ctl icon={status.paused ? Play : Pause} label={status.paused ? "Play" : "Pause"} focused={ctlFocused(0)} onPress={() => activateControl(0)} />
+            <Ctl icon={RotateCcw} label="Restart" dim={!status.canRestart} focused={ctlFocused(1)} onPress={() => activateControl(1)} />
+            <Ctl icon={Tv} label="Channel Surf" focused={ctlFocused(2)} onPress={() => activateControl(2)} />
+            <Ctl icon={Info} label="Info" focused={ctlFocused(3)} onPress={() => activateControl(3)} />
+            <Ctl icon={atLive ? Clapperboard : Radio} label={atLive ? "Continue Watching" : "Jump to Live"} focused={ctlFocused(4)} onPress={() => activateControl(4)} />
+            <View style={{ marginLeft: "auto", flexDirection: "row", gap: 12 }}>
+              <Ctl icon={AudioLines} focused={ctlFocused(5)} onPress={() => activateControl(5)} />
+              <Ctl icon={Captions} focused={ctlFocused(6)} onPress={() => activateControl(6)} />
+              <Ctl icon={SlidersHorizontal} focused={ctlFocused(7)} onPress={() => activateControl(7)} />
+            </View>
           </View>
         </>
       )}
@@ -279,6 +271,33 @@ export function FeaturePanel({
         accent={accent}
       />
     </LinearGradient>
+  );
+}
+
+/** A control: a pill (icon + label) when `label` is given, else a circle icon button. */
+function Ctl({ icon: Icon, label, focused, dim, onPress }: { icon: ComponentType<{ size?: number; color?: string }>; label?: string; focused: boolean; dim?: boolean; onPress: () => void }) {
+  const circle = !label;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: circle ? 0 : 9,
+        height: 54,
+        width: circle ? 54 : undefined,
+        paddingHorizontal: circle ? 0 : 20,
+        borderRadius: circle ? 27 : 999,
+        justifyContent: "center",
+        borderWidth: 1,
+        borderColor: focused ? "rgba(59,130,246,0.4)" : "rgba(255,255,255,0.12)",
+        backgroundColor: focused ? "rgba(59,130,246,0.28)" : "rgba(18,24,38,0.55)",
+        opacity: dim ? 0.4 : 1,
+      }}
+    >
+      <Icon size={24} color="#f1f5f9" />
+      {label && <Text style={{ fontSize: 17, fontWeight: "600", color: "#f1f5f9" }}>{label}</Text>}
+    </Pressable>
   );
 }
 
