@@ -12,6 +12,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@ChannelGuide/key-input": "workspace:*",
     "@ChannelGuide/mpv-player": "workspace:*",
     "@better-auth/expo": "^1.6.23",
     "@expo/metro-runtime": "~55.0.12",
@@ -21,6 +22,7 @@
     "@types/react": "~19.2.17",
     "better-auth": "catalog:",
     "expo": "^55.0.28",
+    "expo-blur": "~55.0.16",
     "expo-constants": "~55.0.17",
     "expo-dev-client": "~55.0.37",
     "expo-linear-gradient": "~55.0.16",

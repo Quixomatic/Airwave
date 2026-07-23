@@ -1,26 +1,28 @@
+import { BlurView } from "expo-blur";
 import { usePathname } from "expo-router";
-import { ChevronDown, ChevronUp, Delete, Hash } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import Animated, { FadeInDown, FadeOutUp } from "react-native-reanimated";
 
 import { useGuide } from "@/hooks/queries";
 import { LAYER, useKeyLayer } from "@/lib/input";
-import { C } from "@/lib/theme";
 
 import { usePlayer } from "./player-ctx";
 
 /**
- * Channel-number entry + CH▲/▼, ported from tv-web — but adapted for a platform with no number pad.
- * tv-web types digits on the LG remote; here the input path is an **on-screen keypad** (touch, and the
- * Apple TV / RN-TV remotes have no digits) plus **CH▲/▼ buttons** while watching. The dispatcher layer
- * still handles `digit`/`chUp`/`chDown` for a future native key path / webOS.
+ * Global channel-number entry — a mechanical port of tv-web's `channel-number-entry.tsx`. Anywhere on
+ * the guide / full player / mini feed, typing a digit (hardware keyboard via the input dispatcher) arms
+ * a channel-number buffer shown as a **top-center glass card that slides down**; **OK — and only OK** (a
+ * toddler mashing digits must never tune on its own) commits it, tuning full-screen if the channel
+ * exists or flashing red if it doesn't. An arrow breaks out and passes through to navigation; Back
+ * breaks out and is consumed; inactivity quietly dismisses WITHOUT tuning. CH▲/▼ step the lineup.
  *
- * Global (mounted by PlayerProvider): a floating **keypad** button on the guide + full player opens a
- * numeric pad; typing shows a top-right buffer; OK/Go commits (tunes the channel if it exists, flashes
- * if not). CH▲/▼ float on the full player (a while-watching gesture) and step the lineup.
+ * Rendered once by PlayerProvider (always mounted) so it's armed globally. Its dispatcher layer is
+ * OVERLAY priority — above the guide/chrome — but only CONSUMES what it uses (digits + CH always; OK/
+ * Back/arrows only while a number is part-typed), so other handlers are untouched otherwise.
  */
-const DISMISS_MS = 6000;
-const FLASH_MS = 950;
+const DISMISS_MS = 6000; // inactivity → clear the buffer (never commits)
+const FLASH_MS = 950; // how long an invalid number flashes red before clearing
 
 export function ChannelNumberEntry() {
   const pathname = usePathname();
@@ -33,7 +35,6 @@ export function ChannelNumberEntry() {
 
   const [buffer, setBuffer] = useState("");
   const [flash, setFlash] = useState(false);
-  const [padOpen, setPadOpen] = useState(false);
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bufferRef = useRef("");
@@ -54,11 +55,12 @@ export function ChannelNumberEntry() {
   };
   const append = useCallback(
     (d: string) => {
-      if (bufferRef.current.length >= maxDigits) return;
+      if (bufferRef.current.length >= maxDigits) return; // ignore digits past the widest channel number
       setFlash(false);
       setBuffer((b) => b + d);
       armDismiss();
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [maxDigits],
   );
   const commit = useCallback(() => {
@@ -67,8 +69,9 @@ export function ChannelNumberEntry() {
     const ch = Number.isFinite(n) ? byNumber(n) : undefined;
     if (ch) {
       setBuffer("");
-      player.tune(ch.id);
+      player.tune(ch.id); // tune() takes it full-screen
     } else {
+      // No such channel — flash red briefly, then clear. Never tunes.
       setFlash(true);
       flashTimer.current = setTimeout(() => {
         setFlash(false);
@@ -79,121 +82,75 @@ export function ChannelNumberEntry() {
 
   useEffect(() => () => clearTimers(), []);
 
-  // Dispatcher layer (OVERLAY) — future/webOS remote path. Digits/CH don't arrive via
-  // useTVEventHandler on the current targets, so this is dormant there; the on-screen controls drive
-  // the same logic. Only active while a number is part-typed (so it doesn't eat OK/Back otherwise).
+  // Armed only while browsing/watching — never on login/settings/etc.
+  const active = pathname === "/guide" || player.layout === "full" || player.layout === "mini";
+
   useKeyLayer({
     id: "number-entry",
     priority: LAYER.OVERLAY,
     onKey(e) {
-      if (e.key === "chUp") {
-        player.channelStep(1);
+      if (!active) return false;
+
+      // CH▲/▼: step one channel (clamped, in-flight-locked in the provider). Abandons any in-progress
+      // number entry first.
+      if (e.key === "chUp" || e.key === "chDown") {
+        if (bufferRef.current.length > 0) cancel();
+        player.channelStep(e.key === "chUp" ? 1 : -1);
         return true;
       }
-      if (e.key === "chDown") {
-        player.channelStep(-1);
-        return true;
-      }
+
       if (e.key === "digit" && e.digit != null) {
         append(String(e.digit));
         return true;
       }
-      if (bufferRef.current.length === 0) return false;
+
+      if (bufferRef.current.length === 0) return false; // below only applies mid-entry
+
       if (e.key === "ok") {
         commit();
         return true;
       }
+      // Back breaks out and is CONSUMED (peels the overlay).
       if (e.key === "back") {
         cancel();
         return true;
+      }
+      // An arrow breaks out but PASSES THROUGH — you changed your mind and want to navigate.
+      if (e.key === "up" || e.key === "down" || e.key === "left" || e.key === "right") {
+        cancel();
+        return false;
       }
       return false;
     },
   });
 
-  const onGuide = pathname === "/guide";
-  const watching = player.layout === "full";
-  const showControls = onGuide || watching;
-  if (!showControls) return null;
+  if (buffer.length === 0 && !flash) return null;
 
   const pad = "_".repeat(Math.max(0, maxDigits - buffer.length));
 
+  // Top-CENTER, dropped 28px from the top edge (consistent with the full-chrome channel pill). The card
+  // slides down on enter / up on exit (Reanimated), mirroring tv-web's framer-motion y:-30 → 0.
   return (
-    <>
-      {/* the typed-number buffer — top-right slide-in */}
-      {buffer.length > 0 && (
-        <View style={{ position: "absolute", top: 28, right: 40, zIndex: 60, flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 14, backgroundColor: flash ? "rgba(120,40,40,0.9)" : "rgba(18,24,38,0.85)", borderWidth: 1, borderColor: flash ? "#f87171" : "rgba(148,163,184,0.25)" }}>
-          <Hash size={22} color={flash ? "#f87171" : C.accent} />
-          <Text style={{ fontSize: 30, fontWeight: "800", letterSpacing: 4, color: "#f1f5f9", fontVariant: ["tabular-nums"] }}>
-            {buffer}
-            <Text style={{ color: "#475569" }}>{pad}</Text>
+    <View pointerEvents="none" style={{ position: "absolute", top: 28, left: 0, right: 0, alignItems: "center", zIndex: 70 }}>
+      <Animated.View
+        entering={FadeInDown.duration(250)}
+        exiting={FadeOutUp.duration(250)}
+        style={{ minWidth: 220, borderRadius: 18, overflow: "hidden", borderWidth: 1, borderColor: flash ? "rgba(239,68,68,0.6)" : "rgba(255,255,255,0.12)" }}
+      >
+        {/* Same glass treatment as the full-chrome channel pill (small element → real blur is cheap). */}
+        <BlurView intensity={50} tint="dark" style={{ paddingVertical: 16, paddingHorizontal: 34, alignItems: "center", backgroundColor: "rgba(18,24,38,0.45)" }}>
+          <Text style={{ fontSize: 13, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: flash ? "#fca5a5" : "rgba(255,255,255,0.85)" }}>
+            Channel
           </Text>
-        </View>
-      )}
-
-      {/* CH▲/▼ — floating on the full player (a while-watching gesture) */}
-      {watching && (
-        <View style={{ position: "absolute", right: 28, top: "38%", zIndex: 40, gap: 12 }}>
-          <RoundBtn icon={<ChevronUp size={26} color="#f1f5f9" />} onPress={() => player.channelStep(1)} />
-          <RoundBtn icon={<ChevronDown size={26} color="#f1f5f9" />} onPress={() => player.channelStep(-1)} />
-        </View>
-      )}
-
-      {/* keypad FAB — opens the numeric pad (touch input path) */}
-      <Pressable onPress={() => setPadOpen(true)} style={{ position: "absolute", right: 28, bottom: 28, zIndex: 40, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(18,24,38,0.8)", borderWidth: 1, borderColor: "rgba(148,163,184,0.25)" }}>
-        <Hash size={26} color={C.accent} />
-      </Pressable>
-
-      {/* the numeric keypad */}
-      <Modal visible={padOpen} transparent animationType="fade" onRequestClose={() => setPadOpen(false)}>
-        <Pressable onPress={() => setPadOpen(false)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center" }}>
-          <Pressable onPress={(e) => e.stopPropagation()} style={{ padding: 20, borderRadius: 20, backgroundColor: "#0b1120", borderWidth: 1, borderColor: "rgba(148,163,184,0.2)", gap: 12 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 6, alignSelf: "center" }}>
-              <Hash size={22} color={C.accent} />
-              <Text style={{ fontSize: 32, fontWeight: "800", letterSpacing: 4, color: flash ? "#f87171" : "#f1f5f9", fontVariant: ["tabular-nums"] }}>{buffer || "—"}</Text>
-            </View>
-            {[
-              ["1", "2", "3"],
-              ["4", "5", "6"],
-              ["7", "8", "9"],
-            ].map((row, i) => (
-              <View key={i} style={{ flexDirection: "row", gap: 12 }}>
-                {row.map((d) => (
-                  <Key key={d} label={d} onPress={() => append(d)} />
-                ))}
-              </View>
-            ))}
-            <View style={{ flexDirection: "row", gap: 12 }}>
-              <Key label="⌫" onPress={() => setBuffer((b) => b.slice(0, -1))} />
-              <Key label="0" onPress={() => append("0")} />
-              <Key
-                label="Go"
-                accent
-                onPress={() => {
-                  commit();
-                  setPadOpen(false);
-                }}
-              />
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </>
-  );
-}
-
-function RoundBtn({ icon, onPress }: { icon: React.ReactNode; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={{ width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(18,24,38,0.8)", borderWidth: 1, borderColor: "rgba(148,163,184,0.25)" }}>
-      {icon}
-    </Pressable>
-  );
-}
-
-function Key({ label, onPress, accent }: { label: string; onPress: () => void; accent?: boolean }) {
-  return (
-    <Pressable onPress={onPress} style={{ width: 76, height: 64, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: accent ? C.accent : "rgba(148,163,184,0.1)" }}>
-      {label === "⌫" ? <Delete size={24} color="#f1f5f9" /> : <Text style={{ fontSize: 26, fontWeight: "700", color: accent ? "#04060c" : "#f1f5f9" }}>{label}</Text>}
-    </Pressable>
+          <Text style={{ fontSize: 68, fontWeight: "800", lineHeight: 72, color: flash ? "#ef4444" : "#fff", fontVariant: ["tabular-nums"] }}>
+            {buffer}
+            <Text style={{ color: "rgba(255,255,255,0.3)" }}>{pad}</Text>
+          </Text>
+          <Text style={{ fontSize: 15, fontWeight: "500", color: flash ? "#fca5a5" : "rgba(255,255,255,0.8)", marginTop: 2 }}>
+            {flash ? `No channel ${buffer}` : "OK to watch · Back to cancel"}
+          </Text>
+        </BlurView>
+      </Animated.View>
+    </View>
   );
 }

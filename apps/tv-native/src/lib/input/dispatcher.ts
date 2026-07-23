@@ -1,3 +1,4 @@
+import { addHardwareKeyListener } from "@ChannelGuide/key-input";
 import { useEffect, useRef } from "react";
 import * as RN from "react-native";
 
@@ -23,10 +24,11 @@ function sortLayers() {
   layers.sort((a, b) => b.priority - a.priority || b.seq - a.seq);
 }
 
-/** Run a key through the stack top→bottom until a layer claims it (returns true). */
-export function dispatchKey(key: SemanticKey): boolean {
+/** Run a key through the stack top→bottom until a layer claims it (returns true). `digit` carries 0–9
+ *  for a `digit` key (from the hardware-keyboard source / a future number-remote). */
+export function dispatchKey(key: SemanticKey, digit?: number): boolean {
   if (key === "unknown") return false;
-  const e: KeyEvent = { key };
+  const e: KeyEvent = { key, digit };
   for (const layer of [...layers]) {
     if (layer.onKey?.(e) === true) return true;
   }
@@ -64,4 +66,21 @@ export function useTVInput() {
       dispatchKey(tvEventToKey(e.eventType));
     });
   }
+}
+
+/**
+ * The HARDWARE-KEYBOARD event source (`@ChannelGuide/key-input`) — call once at the app root alongside
+ * `useTVInput`. On iPad/tvOS it reads GCKeyboard (a Magic Keyboard, any BT keyboard, a keyboard-equipped
+ * remote) and feeds the SAME dispatcher, so the D-pad zone machine + channel-number entry are finally
+ * drivable on a device with no TV remote. The native layer already maps to our vocabulary
+ * (up/down/left/right/ok/back/chUp/chDown/digit); here we just forward it. No-op if the native module
+ * isn't in the build yet (older binary). Android/Fire TV get the same contract via `onKeyDown` later.
+ */
+export function useHardwareKeyInput() {
+  useEffect(() => {
+    const sub = addHardwareKeyListener((e) => {
+      dispatchKey(e.key as SemanticKey, e.digit >= 0 ? e.digit : undefined);
+    });
+    return () => sub.remove();
+  }, []);
 }

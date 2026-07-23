@@ -11,7 +11,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { PlayerProvider } from "@/features/watch/player-context";
 import { loadSession } from "@/lib/auth";
 import { loadDevice } from "@/lib/device";
-import { useTVInput } from "@/lib/input";
+import { useHardwareKeyInput, useTVInput } from "@/lib/input";
 import { C } from "@/lib/theme";
 
 const queryClient = new QueryClient({
@@ -27,9 +27,11 @@ const queryClient = new QueryClient({
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
 
-  // The TV D-pad event source → the input dispatcher (no-op on iPad, where there's no remote;
-  // touch drives the same state). Faithful to tv-web's single-source dispatcher model.
+  // Input sources → the one dispatcher (tv-web's model). `useTVInput` = the TV remote D-pad (TV builds
+  // only). `useHardwareKeyInput` = a physical keyboard/remote via GCKeyboard — this is what makes the
+  // D-pad zone machine + channel-number entry drivable on the iPad. Touch drives the same state too.
   useTVInput();
+  useHardwareKeyInput();
 
   useEffect(() => {
     void Promise.all([loadSession(), loadDevice()]).finally(() => setReady(true));

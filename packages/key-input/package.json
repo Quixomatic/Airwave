@@ -1,0 +1,27 @@
+{
+  "name": "@ChannelGuide/key-input",
+  "version": "0.0.0",
+  "description": "Hardware-keyboard input source for tv-native — emits semantic D-pad/number keys so the input dispatcher + zone machine are drivable from a physical keyboard or remote. iOS/tvOS = GameController GCKeyboard; Android/Android TV/Fire TV (onKeyDown) implemented next.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "private": true,
+  "expo": {
+    "name": "key-input",
+    "platforms": ["ios", "tvos", "android"]
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.17",
+    "expo": "~55.0.28",
+    "react": "19.2.0",
+    "react-native": "0.83.6",
+    "typescript": "catalog:"
+  }
+}
