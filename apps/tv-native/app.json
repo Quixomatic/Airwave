@@ -2,11 +2,10 @@
   "expo": {
     "name": "ChannelGuide",
     "slug": "channelguide",
-    "version": "0.7.17",
+    "version": "0.7.18",
     "scheme": "channelguide",
     "orientation": "landscape",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
     "backgroundColor": "#060a14",
     "splash": {
       "backgroundColor": "#060a14",
@@ -31,7 +30,8 @@
           "showVerboseWarnings": false
         }
       ],
-      "expo-video"
+      "expo-video",
+      "expo-libvlc-player"
     ]
   }
 }

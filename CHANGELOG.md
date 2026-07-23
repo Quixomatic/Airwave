@@ -2,6 +2,21 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.18] - 2026-07-23
+
+### Changed
+
+- **tv-native upgraded to Expo SDK 55 (React Native 0.83.6 / React 19.2) — the groundwork for the libVLC video engine.** The SDK-54 pin only ever existed because Expo Go can't load a newer SDK; committing to a **development build** removes that ceiling, so the project moves to **SDK 55** — the exact pair `expo-libvlc-player` is built against (Expo ~55.0.27 / RN 0.83.6). `expo install --fix` realigned every native module (Reanimated 4.2.1, worklets 0.7.4, screens 4.23, gesture-handler 2.30, svg 15.15, expo-router 55, expo-video 55, React 19.2). `expo-doctor` is **19/19** and typecheck is green. SDK-55 config migration: `newArchEnabled` dropped from `app.json` (new arch is the SDK-55 default), Metro `watchFolders` now appends to Expo's defaults instead of replacing them.
+
+### Added
+
+- **`expo-dev-client` + `expo-libvlc-player` (7.1.6)**, with the libVLC config plugin wired into `app.json`. libVLC direct-plays the full container/codec matrix (MKV · HEVC · E-AC3 · DTS · TrueHD) the way the Plex app does — the root fix for both the capability diagnostic (AVPlayer can't open the raw cap-media clips) and transcode-everything playback on iPad.
+- **`eas.json`** with `development` (internal-distribution dev client), `preview`, and `production` build profiles, and **eas-cli** for the cloud iOS build (no Mac needed).
+
+### Notes
+
+- **Toolchain/dependency release — no behavior change yet.** libVLC is installed and will compile into the dev build, but the playback code still runs on expo-video; the swap to the event-driven `LibVlcPlayerView` (`use-tv-player.ts` + `diagnostic.tsx`) follows once the first iOS development build proves the toolchain. `LibVlcPlayerView` is a ref-based view (`source` prop, `onTimeChanged`/`onEncounteredError`/`onBuffering` events, ms-based `seek`), so the swap re-works `use-tv-player`'s internals while keeping its `status`/`controls` interface unchanged for the chrome. Next: `eas login`/`init`/`device:create` → `eas build --profile development --platform ios`. Plan: `.plans/tv-native.md`.
+
 ## [0.7.17] - 2026-07-23
 
 ### Added
