@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.8] - 2026-07-23
+
+### Changed
+
+- **tv-native pinned to Expo SDK 54** (from the bleeding-edge 57 that `expo install` had defaulted to). SDK 57 is newer than any published Expo Go, so it couldn't load on a device at all; SDK 54 is what the current App Store Expo Go supports. Realigned via `expo install --fix`: React 19.1, React Native 0.81.5, expo-router 6, **Reanimated 4.1** (so the `react-native-worklets` Babel plugin stays correct), and the expo-router peer packages (expo-linking/constants/metro-runtime) pulled to their SDK-54 versions. No app-code changes — typecheck + `expo config` green.
+
 ## [0.7.7] - 2026-07-23
 
 ### Added
