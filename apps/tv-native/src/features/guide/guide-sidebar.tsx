@@ -94,77 +94,57 @@ export function GuideSidebar({
 
   const w = useSharedValue(expanded ? SIDEBAR_EXPANDED_W : SIDEBAR_SLIVER_W);
   useEffect(() => {
-    w.value = withSpring(expanded ? SIDEBAR_EXPANDED_W : SIDEBAR_SLIVER_W, { stiffness: 320, damping: 34 });
+    // Match tv-web's Framer spring (stiffness 320 / damping 34) but clamp the overshoot — Reanimated's
+    // spring solver bounces harder than Framer's at these params; overshootClamping gives the clean
+    // decelerating slide tv-web has.
+    w.value = withSpring(expanded ? SIDEBAR_EXPANDED_W : SIDEBAR_SLIVER_W, {
+      mass: 1,
+      stiffness: 320,
+      damping: 34,
+      overshootClamping: true,
+    });
   }, [expanded, w]);
-  const animStyle = useAnimatedStyle(() => ({ width: w.value }));
+  // Width + the drop shadow fade in together (tv-web animates boxShadow 0→0.5 alpha with the width).
+  const outerStyle = useAnimatedStyle(() => {
+    const t = (w.value - SIDEBAR_SLIVER_W) / (SIDEBAR_EXPANDED_W - SIDEBAR_SLIVER_W);
+    return { width: w.value, shadowOpacity: 0.5 * t };
+  });
 
-  const base = {
-    position: "absolute" as const,
-    left: 0,
-    top: 0,
-    bottom: 0,
-    overflow: "hidden" as const,
-    backgroundColor: C.sidebarBg,
-    borderRightWidth: 1,
-    borderRightColor: C.border,
-    zIndex: 25,
-  };
+  const content = expanded ? (
+    // Interactive circles + labels; the lens list scrolls (packages exceed the screen).
+    <View style={{ flex: 1, gap: 14, paddingVertical: 24, paddingHorizontal: 18 }}>
+      {actions.map((it, i) => (
+        <GlassCircleButton key={it.key} icon={it.icon} label={it.label} expanded active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(i)} />
+      ))}
+      <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: 4 }} />
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 14 }} showsVerticalScrollIndicator={false}>
+        {filters.map((it, i) => {
+          const idx = actions.length + i;
+          return <GlassCircleButton key={it.key} icon={it.icon} label={it.label} sublabel={it.sublabel} expanded active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(idx)} />;
+        })}
+      </ScrollView>
+    </View>
+  ) : (
+    // Collapsed: the whole sliver is one tap target that expands. Circles are visual only.
+    <Pressable onPress={onExpand} style={{ flex: 1, gap: 14, paddingVertical: 24, paddingHorizontal: 18 }}>
+      {actions.map((it) => (
+        <GlassCircleButton key={it.key} icon={it.icon} expanded={false} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} />
+      ))}
+      <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: 4 }} />
+      <GlassCircleButton icon={<ListFilter size={24} color="#f1f5f9" />} expanded={false} active={!!activeFilter} accent={activeFilter?.accent} />
+    </Pressable>
+  );
 
-  // Collapsed: the whole sliver is one tap target that expands. Circles are visual only.
-  if (!expanded) {
-    return (
-      <Animated.View style={[base, animStyle]}>
-        <Pressable onPress={onExpand} style={{ flex: 1, flexDirection: "column", gap: 14, paddingVertical: 24, paddingHorizontal: 18 }}>
-          {actions.map((it) => (
-            <GlassCircleButton
-              key={it.key}
-              icon={it.icon}
-              expanded={false}
-              active={it.lens ? lensEquals(it.lens, lens) : false}
-              accent={it.accent}
-            />
-          ))}
-          <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: 4 }} />
-          <GlassCircleButton icon={<ListFilter size={24} color="#f1f5f9" />} expanded={false} active={!!activeFilter} accent={activeFilter?.accent} />
-        </Pressable>
-      </Animated.View>
-    );
-  }
-
-  // Expanded: interactive circles + labels; the lens list scrolls (packages exceed the screen).
+  // Outer: casts the drop shadow (NO overflow — iOS clips a view's own shadow when overflow:hidden).
+  // Inner: overflow:hidden clips the labels during the slide + carries the surface + right border.
   return (
-    <Animated.View style={[base, animStyle]}>
-      <View style={{ flex: 1, flexDirection: "column", gap: 14, paddingVertical: 24, paddingHorizontal: 18 }}>
-        {actions.map((it, i) => (
-          <GlassCircleButton
-            key={it.key}
-            icon={it.icon}
-            label={it.label}
-            expanded
-            active={it.lens ? lensEquals(it.lens, lens) : false}
-            accent={it.accent}
-            onPress={() => onActivate(i)}
-          />
-        ))}
-        <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: 4 }} />
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 14 }} showsVerticalScrollIndicator={false}>
-          {filters.map((it, i) => {
-            const idx = actions.length + i;
-            return (
-              <GlassCircleButton
-                key={it.key}
-                icon={it.icon}
-                label={it.label}
-                sublabel={it.sublabel}
-                expanded
-                active={it.lens ? lensEquals(it.lens, lens) : false}
-                accent={it.accent}
-                onPress={() => onActivate(idx)}
-              />
-            );
-          })}
-        </ScrollView>
-      </View>
+    <Animated.View
+      style={[
+        { position: "absolute", left: 0, top: 0, bottom: 0, zIndex: 25, shadowColor: "#000", shadowOffset: { width: 24, height: 0 }, shadowRadius: 30, elevation: expanded ? 16 : 0 },
+        outerStyle,
+      ]}
+    >
+      <View style={{ flex: 1, overflow: "hidden", backgroundColor: C.sidebarBg, borderRightWidth: 1, borderRightColor: C.border }}>{content}</View>
     </Animated.View>
   );
 }

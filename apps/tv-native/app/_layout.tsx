@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { loadSession } from "@/lib/auth";
+import { useTVInput } from "@/lib/input";
 import { C } from "@/lib/theme";
 
 const queryClient = new QueryClient({
@@ -23,6 +24,10 @@ const queryClient = new QueryClient({
  */
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
+
+  // The TV D-pad event source → the input dispatcher (no-op on iPad, where there's no remote;
+  // touch drives the same state). Faithful to tv-web's single-source dispatcher model.
+  useTVInput();
 
   useEffect(() => {
     void loadSession().finally(() => setReady(true));
