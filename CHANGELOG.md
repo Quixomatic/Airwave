@@ -2,6 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.15] - 2026-07-23
+
+### Added
+
+- **tv-native: the full-screen feature panel (chrome increment 2), ported from tv-web.** Expanded `use-tv-player` with the DVR — `currentEffective`, `goTo(anyTime)` (rewind out of the current program through the bumper into the previous one), the multi-segment `buildScrubber`, controls (pause / seek ±15s / jump-to-live / restart), tracks, and paused/delivery status. The `FeaturePanel` UI on top: the multi-segment scrubber (per-slot segments, accent fill to the thumb, red LIVE marker, position / −behind labels), the control row (Pause · Restart · Surf · Info · Live · Audio · Subs · Quality), the Info view (year/rating/genres/cast/directors/studio + delivery readout), and Audio/Subtitle/Quality pickers. Quality/track changes re-resolve `/media` at the same spot.
+- Wiring: OK/tap opens the panel, Back peels it (info → picker → close) and returns to mini; the panel owns the keys while open (its own `useKeyLayer`), with row 0 (scrubber) ⇄ row 1 (controls) D-pad nav and touch on every control. A touch back-to-guide affordance for iPad.
+
+### Notes
+
+- Increment 2 of the chrome. Channel surf (◄/► from the closed chrome) and channel-number entry are the next increments; the surf button currently closes back to the video until then.
+
 ## [0.7.14] - 2026-07-23
 
 ### Added

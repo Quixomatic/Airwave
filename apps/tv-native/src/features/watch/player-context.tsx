@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, Text, useWindowDimensions, View } from "r
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
 import { useGuide } from "@/hooks/queries";
+import { api } from "@/lib/api";
 import { C } from "@/lib/theme";
 
 import { Ctx, type Layout, type PlayerCtx } from "./player-ctx";
@@ -145,7 +146,14 @@ function PlayerHost({
   const { data: guide } = useGuide(180);
   const channel = guide?.channels.find((c) => c.id === channelId);
   const accent = accentForChannel(channel);
-  const tv = useTvPlayer(channelId);
+  const [quality, setQuality] = useState("original");
+  const [audioStreamId, setAudioStreamId] = useState<string | undefined>(undefined);
+  const [subtitleStreamId, setSubtitleStreamId] = useState<string | undefined>(undefined);
+  const [qualities, setQualities] = useState<{ id: string; label: string }[]>([]);
+  useEffect(() => {
+    api.qualities().then((r) => setQualities(r.qualities)).catch(() => {});
+  }, []);
+  const tv = useTvPlayer(channelId, { quality, audioStreamId, subtitleStreamId });
   const { player, status } = tv;
 
   // Release the CH▲/▼ lock once this channel is actually showing content.
@@ -201,7 +209,20 @@ function PlayerHost({
         </View>
       )}
 
-      {full && <FullChrome channel={channel} player={tv} onBack={onBack} />}
+      {full && (
+        <FullChrome
+          channel={channel}
+          player={tv}
+          quality={quality}
+          audioStreamId={audioStreamId}
+          subtitleStreamId={subtitleStreamId}
+          qualities={qualities}
+          onSelectQuality={setQuality}
+          onSelectAudio={setAudioStreamId}
+          onSelectSub={setSubtitleStreamId}
+          onBack={onBack}
+        />
+      )}
 
       {/* mini: tap to focus; green hint while unfocused; two buttons when focused. */}
       {layout === "mini" && !miniFocused && (

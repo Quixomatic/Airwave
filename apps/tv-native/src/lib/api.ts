@@ -207,6 +207,8 @@ export const api = {
     return request<MediaInfo>(`/api/v1/channels/${channelId}/media?${p.toString()}`);
   },
 
+  qualities: () => request<{ qualities: { id: string; label: string }[] }>("/api/v1/qualities"),
+
   stop: (channelId: string, session: string) =>
     request<{ ok: true }>(`/api/v1/channels/${channelId}/stop`, { method: "POST", body: JSON.stringify({ session }) }),
 
