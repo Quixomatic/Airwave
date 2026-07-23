@@ -8,6 +8,7 @@ import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { PlayerProvider } from "@/features/watch/player-context";
 import { loadSession } from "@/lib/auth";
 import { loadDevice } from "@/lib/device";
 import { useTVInput } from "@/lib/input";
@@ -41,13 +42,15 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <StatusBar style="light" />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: C.bg },
-              animation: "fade",
-            }}
-          />
+          <PlayerProvider>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: C.bg },
+                animation: "fade",
+              }}
+            />
+          </PlayerProvider>
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

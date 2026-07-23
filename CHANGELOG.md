@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.14] - 2026-07-23
+
+### Added
+
+- **tv-native: the persistent player (chrome increment 1), ported from tv-web.** Playback now lives at the root (`PlayerProvider` in the layout) so it survives guide↔watch navigation: tapping a channel plays it **full-screen**, Back drops it to a **mini feed** (still playing), Close stops it — one video, repositioned between full and mini with a Reanimated spring (no route change; the `/watch` route is retired). Mini feed: tap to focus → the two buttons (Full screen / Close) + the Sling-style green-button "to focus" hint. **CH▲/▼** steps the ordered lineup (clamped, behind the in-flight lock). Bumper "Up next" interstitial in both layouts. The guide tunes via `player.tune()`.
+
+### Notes
+
+- Increment 1 of the player chrome (the video engine stays expo-video for now; the libVLC swap is later and only replaces the video element inside this chrome). Next increments: the full feature panel (scrubber/DVR + controls + info), channel surf, and channel-number entry — each mounts into this host. The mini currently docks to a fallback position; exact featured-slot docking + the guide↔mini D-pad wiring come with those.
+
 ## [0.7.13] - 2026-07-23
 
 ### Added

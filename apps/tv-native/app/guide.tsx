@@ -4,6 +4,7 @@ import { ActivityIndicator, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AuroraGrid } from "@/features/guide/aurora-grid";
+import { usePlayer } from "@/features/watch/player-context";
 import { useFavorites, useGuide, useSetFavorite } from "@/hooks/queries";
 import { capsDoneForCurrentServer } from "@/lib/device";
 import { C } from "@/lib/theme";
@@ -14,6 +15,7 @@ import { C } from "@/lib/theme";
  */
 export default function GuideRoute() {
   const router = useRouter();
+  const player = usePlayer();
   const { data, error, isLoading } = useGuide(180);
   const { data: favData } = useFavorites();
   const setFavorite = useSetFavorite();
@@ -48,7 +50,7 @@ export default function GuideRoute() {
         serverTime={data!.serverTime}
         favoriteIds={favoriteIds}
         onToggleFavorite={(channelId) => setFavorite.mutate({ channelId, favorite: !favoriteIds.has(channelId) })}
-        onTune={(channelId) => router.push(`/watch/${channelId}`)}
+        onTune={(channelId) => player.tune(channelId)}
         onSettings={() => router.push("/settings")}
         onAccount={() => router.push("/settings/user")}
       />
