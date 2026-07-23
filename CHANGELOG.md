@@ -2,6 +2,22 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.9] - 2026-07-23
+
+### Added
+
+- **tv-native: the Aurora guide, ported for exact parity** — not a simplified lineup, the real thing. Faithful ports of tv-web's guide internals:
+  - The **`vw` scaling system** (2560-design → dp via screen width), same constants (`CH_FRAC`, `ROW_FRAC`, `FEATURE_SCALE 0.76`, `WINDOW_MIN 180`, `LEAD_MIN 30`, sliver 92 / expanded 300).
+  - The **featured panel** — tinted channel icon tile, number + name in accent, genres/tagline, title with S/E, the 4K/HD/HDR/audio gradient badges, year·rating·critic-star line, 2-line summary, time range + status + progress bar.
+  - The **time-grid**: `TimeHeader` with the day label + 30-min ticks, and rows with the channel rail (icon circle / number / name, favorite heart) and absolutely-time-positioned program cells — the live cell carrying the two-tone accent gradient (`expo-linear-gradient`) + the on-air bar, selection outline, and the now-marker triangle.
+  - The **sidebar**: the sliver + expand overlay system (Reanimated spring width matching Framer), the glass circle buttons, actions (Guide/Settings/Account) + the Filters stand-in that expands to the lenses (Favorites/Recents/packages in their tints).
+  - The **GuideGhost** skeleton empty state.
+  - Virtualization via **FlashList** (recycling — the RN equivalent of tv-web's `@tanstack/react-virtual`). Touch: tap a row to select (featured + highlight follow), tap again to tune; tap the Filters circle to expand the sidebar.
+
+### Notes
+
+- Ported blind (no iOS render on this Windows box), so appearance is faithful to the source styles but the last pixels get locked against a device screenshot — RN translates gradients/shadows/fonts slightly differently than CSS. Settings pages (the sliver-shell + subpages) and the player are the next ports; the current `/settings` routes are temporary stubs only so guide navigation resolves.
+
 ## [0.7.8] - 2026-07-23
 
 ### Changed

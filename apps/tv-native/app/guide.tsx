@@ -1,30 +1,49 @@
 import { useRouter } from "expo-router";
-import { Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { setToken } from "@/lib/auth";
+import { AuroraGrid } from "@/features/guide/aurora-grid";
+import { useFavorites, useGuide, useSetFavorite } from "@/hooks/queries";
+import { C } from "@/lib/theme";
 
 /**
- * Placeholder for the guide (home). The real Aurora grid lands next. For the foundation this just
- * proves the signed-in route resolves and sign-out works end-to-end (token cleared → back to login).
+ * The guide route — fetches the cross-channel grid + favorites and renders the Aurora grid
+ * (featured panel, time-grid, sidebar sliver/expand, now-marker, GuideGhost), at parity with tv-web.
  */
-export default function Guide() {
+export default function GuideRoute() {
   const router = useRouter();
+  const { data, error, isLoading } = useGuide(180);
+  const { data: favData } = useFavorites();
+  const setFavorite = useSetFavorite();
+
+  const favoriteIds = new Set(favData?.channelIds ?? []);
+
+  if (isLoading || (!data && !error)) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: C.bg }}>
+        <ActivityIndicator color={C.accent} />
+      </View>
+    );
+  }
+  if (error) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: C.bg, padding: 40 }}>
+        <Text style={{ color: C.mutedFg, fontSize: 18 }}>Couldn't load the guide.</Text>
+      </View>
+    );
+  }
+
   return (
-    <View className="flex-1 items-center justify-center gap-6 bg-bg p-10">
-      <Text className="text-3xl font-bold text-fg">You're in.</Text>
-      <Text className="max-w-md text-center text-muted">
-        The guide grid goes here. This screen confirms login, the session store, and the API client
-        all work against your live server.
-      </Text>
-      <Pressable
-        onPress={async () => {
-          await setToken(null);
-          router.replace("/login");
-        }}
-        className="rounded-xl border border-white/15 px-6 py-4 active:opacity-70"
-      >
-        <Text className="text-lg font-semibold text-fg">Sign out</Text>
-      </Pressable>
-    </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top", "bottom"]}>
+      <AuroraGrid
+        channels={data!.channels}
+        serverTime={data!.serverTime}
+        favoriteIds={favoriteIds}
+        onToggleFavorite={(channelId) => setFavorite.mutate({ channelId, favorite: !favoriteIds.has(channelId) })}
+        onTune={(channelId) => router.push(`/watch/${channelId}`)}
+        onSettings={() => router.push("/settings")}
+        onAccount={() => router.push("/settings/user")}
+      />
+    </SafeAreaView>
   );
 }

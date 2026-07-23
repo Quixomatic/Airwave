@@ -1,6 +1,6 @@
 {
   "name": "tv-native",
-  "version": "0.7.8",
+  "version": "0.7.9",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -15,11 +15,13 @@
     "@better-auth/expo": "^1.6.23",
     "@expo/metro-runtime": "~6.1.2",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@shopify/flash-list": "2.0.2",
     "@tanstack/react-query": "^5.101.2",
     "@types/react": "~19.1.17",
     "better-auth": "catalog:",
     "expo": "^54.0.36",
     "expo-constants": "~18.0.13",
+    "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.12",
     "expo-network": "~8.0.8",
     "expo-router": "~6.0.24",

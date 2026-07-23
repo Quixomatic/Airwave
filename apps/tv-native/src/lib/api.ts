@@ -73,3 +73,82 @@ export const plexLink = {
   poll: (pinId: number) =>
     request<PlexPoll>("/api/tv/auth/plex/poll", { method: "POST", body: JSON.stringify({ pinId }) }),
 };
+
+// --- REST guide API (/api/v1, bearer) — ported from tv-web ---------------------
+
+/** A channel package (the guide sidebar's filter list). */
+export type Package = {
+  id: string;
+  key: string;
+  name: string;
+  icon: string | null;
+  tint: string | null;
+  channelCount: number;
+};
+
+export type GuideChannel = {
+  id: string;
+  number: number;
+  name: string;
+  callsign: string | null;
+  icon: string | null;
+  tint: string | null;
+  package: { id: string; key: string; icon: string | null; tint: string | null; name: string } | null;
+};
+
+/** Full denormalized guide metadata (mirrors the server's GuideMeta) — ported from tv-web. */
+export type GuideMeta = {
+  title: string;
+  type?: string;
+  year?: number;
+  contentRating?: string;
+  summary?: string;
+  tagline?: string;
+  studio?: string;
+  directors?: string[];
+  genres?: string[];
+  cast?: string[];
+  audienceRating?: number;
+  criticRating?: number;
+  durationMs?: number;
+  thumb?: string;
+  art?: string;
+  addedAt?: string;
+  resolution?: string;
+  audioChannels?: number;
+  hdr?: string; // "HDR10" | "Dolby Vision" | "HLG" when HDR, else undefined
+  dynamicAudio?: string; // "Atmos" | "DTS:X", else undefined
+  videoCodec?: string;
+  showTitle?: string;
+  showRatingKey?: string;
+  season?: number;
+  episode?: number;
+};
+
+export type GuideGridProgram = {
+  id: string;
+  ratingKey: string | null;
+  startsAt: string;
+  durationSeconds: number;
+  guide: GuideMeta;
+};
+
+export type GuideGridChannel = GuideChannel & { programs: GuideGridProgram[] };
+
+export type GuideGrid = {
+  serverTime: string;
+  windowMinutes: number;
+  channels: GuideGridChannel[];
+};
+
+export const api = {
+  packages: () => request<{ packages: Package[] }>("/api/v1/packages"),
+  favorites: () => request<{ channelIds: string[] }>("/api/v1/favorites"),
+  setFavorite: (channelId: string, favorite: boolean) =>
+    request<{ channelId: string; favorited: boolean }>("/api/v1/favorites", {
+      method: "POST",
+      body: JSON.stringify({ channelId, favorite }),
+    }),
+  recents: () => request<{ channelIds: string[] }>("/api/v1/recents"),
+  guide: (forwardMinutes = 180) => request<GuideGrid>(`/api/v1/guide?forwardMinutes=${forwardMinutes}`),
+};
