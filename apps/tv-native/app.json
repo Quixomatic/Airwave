@@ -32,6 +32,13 @@
       ],
       "expo-video",
       "expo-libvlc-player"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "49e8c4ad-45d5-4dbc-a3c8-0b99297fbc00"
+      }
+    },
+    "owner": "quixomatic"
   }
 }
