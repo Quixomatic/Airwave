@@ -141,8 +141,64 @@ export type GuideGrid = {
   channels: GuideGridChannel[];
 };
 
+export type TimelineSlot = {
+  id: string;
+  kind: "PROGRAM" | "BUMPER";
+  ratingKey: string | null;
+  startsAt: string;
+  durationSeconds: number;
+  guide: GuideMeta;
+};
+export type Timeline = { serverTime: string; slots: TimelineSlot[] };
+
+export type Track = { id: string; lang: string; label: string };
+
+export type MediaInfo = {
+  mode: "direct" | "http" | "hls";
+  url: string;
+  session: string | null;
+  offsetSeconds: number;
+  capsSource?: "measured" | "reported" | "default";
+  connection?: "local" | "remote" | "relay";
+  container?: string;
+  videoCodec?: string;
+  audioCodec?: string;
+  audioTracks: Track[];
+  subtitleTracks: Track[];
+  decision?: { videoDecision?: string; audioDecision?: string; videoCodec?: string; audioCodec?: string; container?: string };
+};
+
 export const api = {
   packages: () => request<{ packages: Package[] }>("/api/v1/packages"),
+
+  timeline: (channelId: string, backMinutes = 360, forwardMinutes = 180) =>
+    request<Timeline>(`/api/v1/channels/${channelId}/timeline?backMinutes=${backMinutes}&forwardMinutes=${forwardMinutes}`),
+
+  /** Resolve a program to a playable URL. `deviceId` lets the server use this device's MEASURED
+   *  capability profile (from the diagnostic); `forceHls` forces an HLS transcode (what AVPlayer /
+   *  expo-video reliably plays on iPadOS until the diagnostic lands). */
+  media: (
+    channelId: string,
+    ratingKey: string,
+    offsetSeconds: number,
+    opts: { deviceId?: string; forceHls?: boolean; quality?: string; audioStreamId?: string; subtitleStreamId?: string } = {},
+  ) => {
+    const p = new URLSearchParams({ ratingKey, offsetSeconds: String(offsetSeconds) });
+    if (opts.deviceId) p.set("deviceId", opts.deviceId);
+    if (opts.forceHls) p.set("forceHls", "1");
+    if (opts.quality && opts.quality !== "original") p.set("quality", opts.quality);
+    if (opts.audioStreamId) p.set("audioStreamId", opts.audioStreamId);
+    if (opts.subtitleStreamId) p.set("subtitleStreamId", opts.subtitleStreamId);
+    return request<MediaInfo>(`/api/v1/channels/${channelId}/media?${p.toString()}`);
+  },
+
+  stop: (channelId: string, session: string) =>
+    request<{ ok: true }>(`/api/v1/channels/${channelId}/stop`, { method: "POST", body: JSON.stringify({ session }) }),
+
+  heartbeat: (body: { channelId: string; state: "program" | "bumper" | "off"; ratingKey?: string | null; title?: string | null; delaySeconds?: number; positionAt?: string | null; transcodeSession?: string | null }) =>
+    request<unknown>("/api/v1/sessions/heartbeat", { method: "POST", body: JSON.stringify(body) }),
+
+  endSession: () => request<unknown>("/api/v1/sessions/end", { method: "POST", body: "{}" }),
   favorites: () => request<{ channelIds: string[] }>("/api/v1/favorites"),
   setFavorite: (channelId: string, favorite: boolean) =>
     request<{ channelId: string; favorited: boolean }>("/api/v1/favorites", {

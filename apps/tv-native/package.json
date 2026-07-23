@@ -1,6 +1,6 @@
 {
   "name": "tv-native",
-  "version": "0.7.11",
+  "version": "0.7.12",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -27,6 +27,7 @@
     "expo-router": "~6.0.24",
     "expo-secure-store": "~15.0.8",
     "expo-status-bar": "~3.0.9",
+    "expo-video": "~3.0.16",
     "lucide-react-native": "^1.25.0",
     "nativewind": "^4.2.6",
     "phosphor-react-native": "^3.0.6",

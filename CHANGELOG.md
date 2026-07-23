@@ -2,6 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.12] - 2026-07-23
+
+### Added
+
+- **tv-native: native video plays — the player foundation (increment 1 of the player arc).** `expo-video` (AVPlayer/ExoPlayer, bundled in Expo Go) driven by the effectiveTime clock ported from tv-web's `use-tv-player.ts`: resolve a program → play at the right offset, derive the current slot from real playback position, and roll at program/bumper boundaries. A full-screen watch screen (`app/watch/[channelId]`) with `VideoView`, the bumper "Up next" interstitial, and minimal now-playing chrome. Ported the media/timeline REST API (`/media`, `/timeline`, `MediaInfo`/`TimelineSlot`, heartbeat/stop/endSession).
+- HLS is forced for now so iPadOS plays reliably until the capability diagnostic provides a measured profile (AVPlayer can't direct-play most containers; the diagnostic is what confirms that and drops to HLS).
+
+### Notes
+
+- Increment 1 of the player. Next, layered with on-device iteration (the web hook is 745 lines built entirely on the HTML `<video>` + hls.js API — a different engine, so it ports in stages): the DVR scrubber + rewind, the full feature-panel chrome, the mini player, channel surf, channel-number entry, ch up/down, and the capability diagnostic.
+
 ## [0.7.11] - 2026-07-23
 
 ### Added
