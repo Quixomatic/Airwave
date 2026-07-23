@@ -6,11 +6,11 @@ All notable changes to ChannelGuide are documented here.
 
 ### Added
 
-- **tv-native: channel-number entry + CH up/down (the last chrome piece).** tv-web types channel numbers on the LG remote's number pad; tv-native has none (the Apple TV / RN-TV remotes have no digits, and  doesn't deliver them), so the input path is adapted for touch: an **on-screen numeric keypad** (opened by a floating # button on the guide + full player) types a channel number → tunes it (flashes if it does not exist), with the typed buffer shown in a top-right slide-in; and **CH up/down buttons** float on the full player (a while-watching gesture) stepping the ordered lineup via the existing in-flight-locked . The dispatcher still carries // semantic keys so a future native key path (a number-remote Android TV) or a webOS build feeds the same handlers.
+- **tv-native: channel-number entry + CH up/down (the last chrome piece).** tv-web types channel numbers on the LG remote's number pad; tv-native has none (the Apple TV / RN-TV remotes have no digits, and `useTVEventHandler` doesn't deliver them), so the input path is adapted for touch: an **on-screen numeric keypad** (opened by a floating # button on the guide + full player) types a channel number → tunes it (flashes if it does not exist), with the typed buffer shown in a top-right slide-in; and **CH up/down buttons** float on the full player (a while-watching gesture) stepping the ordered lineup via the existing in-flight-locked `channelStep`. The dispatcher still carries `digit`/`chUp`/`chDown` semantic keys so a future native key path (a number-remote Android TV, or a hardware keyboard) or a webOS build feeds the same handlers.
 
 ### Notes
 
-- Completes the ported chrome. The remaining work is the **libVLC video swap** ( for direct-play parity), which needs a **development build** (Android free / iPad Apple-Dev + EAS) — a surgical swap of the video element inside the finished chrome. Session summary: ; plan: .
+- Completes the ported chrome. The remaining work is the **libVLC video swap** (`expo-libvlc-player`, for direct-play parity), which needs a **development build** (Android free / iPad Apple-Dev + EAS) — a surgical swap of the video element inside the finished chrome. Session summary: `.docs/summaries/2026-07-23-input-controller-and-tv-native.md`; plan: `.plans/tv-native.md`.
 
 ## [0.7.16] - 2026-07-23
 
