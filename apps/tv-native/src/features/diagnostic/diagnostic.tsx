@@ -1,6 +1,6 @@
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
 
 import { api, type CapTest } from "@/lib/api";
 import { getServerUrl } from "@/lib/auth";
@@ -28,6 +28,7 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
   const [rows, setRows] = useState<Record<string, Auto>>({});
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inspect, setInspect] = useState<string | null>(null); // tapped test id (debug)
 
   // Report this device + fetch the matrix.
   useEffect(() => {
@@ -208,12 +209,27 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
           const r = rows[t.id];
           const color = !r ? "#334155" : r.decoded ? "#3fa66a" : "#7c2d2d";
           return (
-            <View key={t.id} style={{ backgroundColor: color, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 }}>
+            <Pressable key={t.id} onPress={() => setInspect(t.id)} style={{ backgroundColor: color, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 3, borderWidth: inspect === t.id ? 1 : 0, borderColor: "#fff" }}>
               <Text style={{ fontSize: 9, color: "#e6eaf1" }}>{t.container}/{t.video}</Text>
-            </View>
+            </Pressable>
           );
         })}
       </View>
+
+      {/* tapped-chip detail (debug) */}
+      {inspect && (() => {
+        const t = tests?.find((x) => x.id === inspect);
+        const r = t ? rows[t.id] : undefined;
+        if (!t) return null;
+        return (
+          <View style={{ width: frameW, marginTop: 10, padding: 12, borderRadius: 10, backgroundColor: "rgba(148,163,184,0.08)" }}>
+            <Text style={{ color: "#e6eaf1", fontSize: 13, fontWeight: "700" }}>{t.id}</Text>
+            <Text style={{ color: "#94a3b8", fontSize: 12, marginTop: 2 }}>container {t.container} · video {t.video} · audio {t.audio}{t.feature ? ` · ${t.feature}` : ""}</Text>
+            <Text style={{ color: r?.decoded ? "#5cc98a" : "#f0a92a", fontSize: 12, marginTop: 4 }}>{r ? (r.decoded ? "DECODED (native)" : `FAILED — ${r.error ?? "unknown"}`) : "not tested yet"}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}><Text style={{ color: "#475569", fontSize: 10, marginTop: 4 }}>{getServerUrl()}{t.url}</Text></ScrollView>
+          </View>
+        );
+      })()}
 
       {done && (
         <Pressable onPress={finish} style={{ marginTop: 30, borderRadius: 14, backgroundColor: C.accent, paddingHorizontal: 44, paddingVertical: 14 }}>
