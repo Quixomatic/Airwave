@@ -7,7 +7,13 @@ Pod::Spec.new do |s|
   s.homepage       = 'https://github.com/Quixomatic/ChannelGuide'
   s.platforms      = { :ios => '15.1', :tvos => '15.1' }
   s.source         = { git: '' }
-  s.static_framework = true
+
+  # NOTE: deliberately NOT `static_framework = true`. With it, CocoaPods merges
+  # MPVKit's binary deps into libMpvPlayer.a — MoltenVK (force-loaded via its
+  # ObjC/Metal `+load`) then exists BOTH inside the pod archive AND as the
+  # app-target SPM copy (app.plugin.js), producing ~545 duplicate `_vk*`/`_mvk*`
+  # symbols at the app link. As a plain static lib the pod embeds only its own
+  # objects and just references the single app-target MPVKit copy.
 
   s.dependency 'ExpoModulesCore'
 
