@@ -33,8 +33,6 @@
           "showVerboseWarnings": false
         }
       ],
-      "expo-video",
-      "expo-libvlc-player",
       "@ChannelGuide/mpv-player"
     ],
     "extra": {
