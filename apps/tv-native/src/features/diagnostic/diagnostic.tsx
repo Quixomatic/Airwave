@@ -126,7 +126,9 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
         // Release this clip before the next (source=null → mpv stop) so cycling ~49 clips doesn't
         // accumulate decoders. The pause lets teardown complete before the next loadfile.
         setSource(null);
-        await new Promise((r) => setTimeout(r, 250));
+        // Let the just-unmounted instance's async mpv_terminate_destroy fully release
+        // (VideoToolbox sessions + surfaces) before the next clip's instance is created.
+        await new Promise((r) => setTimeout(r, 400));
         if (cancelled) return;
         results[test.id] = auto;
         setRows((r) => ({ ...r, [test.id]: auto }));
@@ -208,14 +210,20 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
       <Text style={{ color: "#f1f5f9", fontSize: 26, fontWeight: "800", marginBottom: 18 }}>Checking playback support</Text>
 
       <View style={{ width: frameW, height: frameH, borderRadius: 16, overflow: "hidden", backgroundColor: "#000", borderWidth: 1, borderColor: "rgba(148,163,184,0.2)" }}>
-        <MpvPlayerView
-          source={source}
-          muted
-          contentFit="contain"
-          style={{ flex: 1 }}
-          onLoad={(e) => ctxRef.current?.onLoad(e.nativeEvent)}
-          onError={(e) => ctxRef.current?.onError(e.nativeEvent.message)}
-        />
+        {/* Mount the player ONLY while a clip is under test. Nulling `source` between clips (below)
+            unmounts it → `deinit` → `mpv_terminate_destroy`, so each clip runs in a FRESH instance
+            that is fully destroyed afterward. Cycling one reused instance across 49 clips of mixed
+            4K codecs stacks VideoToolbox decoder sessions + surfaces → OOM/freeze (~clip 8). */}
+        {source != null && (
+          <MpvPlayerView
+            source={source}
+            muted
+            contentFit="contain"
+            style={{ flex: 1 }}
+            onLoad={(e) => ctxRef.current?.onLoad(e.nativeEvent)}
+            onError={(e) => ctxRef.current?.onError(e.nativeEvent.message)}
+          />
+        )}
         {!done && (
           <View style={{ position: "absolute", right: 12, bottom: 12 }}>
             <ActivityIndicator color={C.accent} />

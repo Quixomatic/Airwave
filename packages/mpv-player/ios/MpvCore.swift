@@ -87,7 +87,11 @@ final class MpvCore {
   func load(url: String, startTime: Double) {
     loadedEmitted = false
     firstFrameEmitted = false
-    var args = ["loadfile", url, "replace"]
+    // mpv 0.38+ loadfile signature is `loadfile <url> <flags> <index> <options>` — the `index` arg was
+    // inserted before options. It MUST be present (`-1` = default position), or the options string lands
+    // in the index slot, the command is malformed, no file loads, and mpv emits ZERO events (silent
+    // failure). Matches plezy's `loadfile <uri> replace -1 <options>`.
+    var args = ["loadfile", url, "replace", "-1"]
     if startTime > 0 { args.append("start=\(Int(startTime))") }
     command(args)
   }
@@ -155,6 +159,9 @@ final class MpvCore {
     case MPV_EVENT_FILE_LOADED:
       emitLoad()
     case MPV_EVENT_PLAYBACK_RESTART:
+      // A frame is now decoded → width/height are guaranteed available. Emit onLoad here too (in case the
+      // file-loaded / property-change paths didn't yet have dimensions), then the first-frame signal.
+      emitLoad()
       if !firstFrameEmitted {
         firstFrameEmitted = true
         DispatchQueue.main.async { self.delegate?.mpvFirstFrame() }

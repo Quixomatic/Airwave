@@ -90,6 +90,9 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   const logCtxRef = useRef<Record<string, unknown> | null>(null); // last program-load context
   const loadStartRef = useRef(0); // Date.now() at setSource, for the [vlc] event timeline in Metro
   const currentUrlRef = useRef<string | null>(null); // last loaded URL — a same-URL goTo = DVR seek within the current direct file
+  const firstProgressRef = useRef(false); // did the first onProgress arrive for the current load?
+  const bufferingRef = useRef(false); // latest onBuffering state — for the watchdog's stuck-diagnosis
+  const loggedRef = useRef(false); // already logged this load (onLoad/onError)? the watchdog skips if so
 
   const [tracks, setTracks] = useState<{ audio: Track[]; subtitle: Track[] }>({ audio: [], subtitle: [] });
   const [status, setStatus] = useState<PlayerStatus>({ loading: true, buffering: false, state: "idle", guide: null, paused: false, bumperRemaining: null, canRestart: false, error: null, scrubber: null, delivery: null });
@@ -98,11 +101,17 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
 
   // PlaybackLog: one row per program load — the server's decision (mode/codecs/connection, captured in
   // goTo) + the real on-device outcome (libVLC first-play dims, or an error message).
-  const recordLog = useCallback((outcome: "playing" | "not_decoding" | "error", errorDetail?: string | null) => {
+  const recordLog = useCallback((outcome?: "playing" | "not_decoding" | "error", errorDetail?: string | null) => {
     const ctx = logCtxRef.current;
     if (!ctx) return;
+    loggedRef.current = true;
     const dims = decodedDimsRef.current;
-    void api.logPlayback({ ...ctx, outcome, decodedWidth: dims.w, decodedHeight: dims.h, error: errorDetail ?? null }).catch(() => {});
+    const decoded = dims.w > 0 && dims.h > 0;
+    const finalOutcome = outcome ?? (decoded ? "playing" : "not_decoding");
+    // For a stuck load (watchdog, no onLoad/onError) record WHY: did a frame ever arrive, was mpv buffering?
+    const diag =
+      errorDetail ?? (finalOutcome === "not_decoding" ? `stuck: firstFrame=${firstProgressRef.current} buffering=${bufferingRef.current}` : null);
+    void api.logPlayback({ ...ctx, outcome: finalOutcome, decodedWidth: dims.w, decodedHeight: dims.h, error: diag }).catch(() => {});
   }, []);
 
   const currentEffective = useCallback((): number => {
@@ -185,9 +194,17 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
         } else {
           decodedDimsRef.current = { w: 0, h: 0 };
           positionSecRef.current = 0;
+          firstProgressRef.current = false;
+          bufferingRef.current = false;
+          loggedRef.current = false;
           console.log(`[mpv] LOAD mode=${info.mode} offset=${offset}s conn=${info.connection ?? "?"} ${info.container ?? "?"}/${info.videoCodec ?? "?"}/${info.audioCodec ?? "?"} ${info.url.slice(0, 90)}`);
           setStartTime(info.mode === "direct" ? offset : 0);
           setSource(info.url);
+          // Watchdog (tv-web's pattern): whether or not onLoad/onError ever fires, post ONE PlaybackLog
+          // row ~6s later capturing the real outcome — so a stuck load still records (firstFrame/buffering).
+          setTimeout(() => {
+            if (gen === genRef.current && !loggedRef.current) recordLog();
+          }, 6000);
         }
       } finally {
         transitioning.current = false;
@@ -200,6 +217,10 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   // (mpv `time-pos` — absolute media time, exactly like an HTML <video>, so the tv-web clock maps 1:1).
   const onProgress = useCallback((e: { nativeEvent: { currentTime: number } }) => {
     positionSecRef.current = e.nativeEvent.currentTime;
+    if (!firstProgressRef.current) {
+      firstProgressRef.current = true;
+      console.log(`[mpv] +${Date.now() - loadStartRef.current}ms FIRST-PROGRESS t=${e.nativeEvent.currentTime.toFixed(1)}s`);
+    }
   }, []);
   // Baseline once per loaded program: direct-play opened AT the offset (loadfile start=), HLS/http starts
   // at ~0. Anchor the clock to where playback begins. Guarded so resume-from-pause never re-anchors.
@@ -230,6 +251,8 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   }, [applyBaseline]);
   const onBuffering = useCallback((e: { nativeEvent: { buffering: boolean } }) => {
     const buffering = e.nativeEvent.buffering;
+    bufferingRef.current = buffering;
+    console.log(`[mpv] +${Date.now() - loadStartRef.current}ms BUFFERING ${buffering}`);
     setStatus((s) => (s.buffering === buffering ? s : { ...s, buffering }));
   }, []);
   const onError = useCallback(
