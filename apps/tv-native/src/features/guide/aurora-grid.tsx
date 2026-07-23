@@ -27,6 +27,7 @@ import {
   ROW_FRAC,
   SIDEBAR_SLIVER_W,
   subLine,
+  UI_SCALE,
   vwOf,
   WINDOW_MIN,
 } from "./layout";
@@ -66,8 +67,8 @@ export function AuroraGrid({
   }, [now]);
 
   const colW = Math.max(1, width - SIDEBAR_SLIVER_W);
-  const railPx = colW * CH_FRAC;
-  const rowPx = width * ROW_FRAC;
+  const railPx = colW * CH_FRAC * UI_SCALE;
+  const rowPx = width * ROW_FRAC * UI_SCALE;
   const laneW = Math.max(1, colW - railPx);
   const ppm = laneW / WINDOW_MIN;
   const minsFrom = useCallback((iso: string | Date) => ((typeof iso === "string" ? new Date(iso).getTime() : iso.getTime()) - T0.getTime()) / MIN, [T0]);

@@ -11,8 +11,16 @@ import type { GuideGridProgram } from "@/lib/api";
  */
 export const DESIGN_W = 2560;
 
-/** spec px (at 2560 wide) → dp at the given screen width. */
-export const vwOf = (width: number, px: number) => (px / DESIGN_W) * width;
+/**
+ * A global scale-up knob. tv-web's `vw` sizes everything off WIDTH assuming a 16:9 TV; the iPad is
+ * taller than 16:9 (~3:2 / 4:3), so pure width-scaling leaves the UI small with slack vertical space
+ * (and the content-sized featured panel under-fills). `UI_SCALE` multiplies the whole layout —
+ * fonts, row/rail/featured sizing — so it fills the taller screen. One knob; dial to taste.
+ */
+export const UI_SCALE = 1.3;
+
+/** spec px (at 2560 wide) → dp at the given screen width, scaled up for the device's taller aspect. */
+export const vwOf = (width: number, px: number) => (px / DESIGN_W) * width * UI_SCALE;
 
 export const ACCENTS = ["#2f9e8f", "#4a9fe0", "#3b82f6", "#8b5cf6", "#3fa66a", "#d08b2f", "#d0587e", "#7c8aa3"];
 
