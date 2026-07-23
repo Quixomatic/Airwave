@@ -1,0 +1,14 @@
+// Compile-only clang module for the pod's Swift (`import Libmpv`).
+//
+// The pod must NOT link MPVKit — if it does (via `spm_dependency`), CocoaPods
+// merges MPVKit's static libs (notably the force-loaded MoltenVK) into
+// libMpvPlayer.a, which then collides with the app-target's MPVKit copy at the
+// final link (~545 duplicate `_vk*`/`_mvk*` symbols). So instead the pod
+// compiles against these vendored libmpv public headers (client.h is ABI-stable
+// C, and every mpv_* call we make predates mpv 0.30), and the ACTUAL symbols are
+// provided once by the app-target's MPVKit link (see app.plugin.js). At link
+// time the pod's undefined mpv_* references resolve against that single copy.
+module Libmpv {
+    header "mpv/client.h"
+    export *
+}
