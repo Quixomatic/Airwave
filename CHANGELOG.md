@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.34] - 2026-07-24
+
+### Fixed
+
+- **Scrubber snapping to 0:00 on a quality change — the actual root cause.** The DVR clock is `startS + offset + (currentTime − playStartCurrentTime)`, so the baseline `playStartCurrentTime` must be the first position of the NEW stream. tv-native anchored it on `onProgress` with no guard, so on a quality switch a **stale `onProgress` from the outgoing stream** (fired after the current program was swapped but before the new source loaded) anchored the new program's baseline to the wrong position — and it never re-anchored, so the scrubber sat at the program start. Fixed with tv-web's per-load guard, adapted to mpv: a baseline **barrier armed only after the new source's `onLoad`**, so stale cross-stream progress can't anchor it; then the first real position of the new stream anchors the clock (mode-agnostic — works for direct and any HLS timestamping). Offset playback, DVR seek, and bumper rollover paths are unchanged.
+
 ## [0.7.33] - 2026-07-24
 
 ### Fixed

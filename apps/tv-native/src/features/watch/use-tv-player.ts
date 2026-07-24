@@ -91,6 +91,8 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   const loadStartRef = useRef(0); // Date.now() at setSource, for the [vlc] event timeline in Metro
   const currentUrlRef = useRef<string | null>(null); // last loaded URL — a same-URL goTo = DVR seek within the current direct file
   const firstProgressRef = useRef(false); // did the first onProgress arrive for the current load?
+  const baselineArmedRef = useRef(false); // onLoad barrier: only anchor the baseline once the NEW source
+  // has loaded, so a stale onProgress from the outgoing stream can't anchor the new program's baseline.
   const bufferingRef = useRef(false); // latest onBuffering state — for the watchdog's stuck-diagnosis
   const loggedRef = useRef(false); // already logged this load (onLoad/onError)? the watchdog skips if so
 
@@ -196,12 +198,12 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
           void viewRef.current?.play();
         } else {
           decodedDimsRef.current = { w: 0, h: 0 };
-          // Direct opens AT the offset (loadfile start=), so seed the position there — otherwise, in the
-          // window between onLoad (baseline anchors playStartCurrentTime=offset) and mpv's first onProgress
-          // (reports ~offset), currentEffective = startS+offset+(0−offset) = startS and the scrubber snaps
-          // to the program START. HLS/http start at ~0. (The same-media seek path already seeds this.)
-          positionSecRef.current = info.mode === "direct" ? offset : 0;
+          positionSecRef.current = 0;
           firstProgressRef.current = false;
+          // Disarm: the baseline anchors only after THIS new source's onLoad fires (barrier below), so a
+          // stale onProgress from the outgoing stream can't anchor it. Until then currentEffective uses
+          // the baselineReady=false path (startS + offset = the target), which is already correct.
+          baselineArmedRef.current = false;
           bufferingRef.current = false;
           loggedRef.current = false;
           console.log(`[mpv] LOAD mode=${info.mode} offset=${offset}s conn=${info.connection ?? "?"} ${info.container ?? "?"}/${info.videoCodec ?? "?"}/${info.audioCodec ?? "?"} ${info.url.slice(0, 90)}`);
@@ -225,40 +227,32 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   const onProgress = useCallback((e: { nativeEvent: { currentTime: number } }) => {
     const t = e.nativeEvent.currentTime;
     positionSecRef.current = t;
-    // HLS/http baseline: anchor to the FIRST real reported position (whatever mpv timestamps the
-    // server-positioned stream as — 0-based OR offset-based; we don't need to know which). Matches
-    // tv-web's baseline-on-"playing". Direct is anchored deterministically in applyBaseline (we passed
-    // loadfile start=offset), so this only fires for the modes we can't predict. Guarded so a
-    // resume-from-pause never re-anchors.
+    // Baseline (tv-web's model, mode-agnostic): the clock is `startS + offset + (currentTime −
+    // playStartCurrentTime)`, so anchor playStartCurrentTime to the FIRST real position of the NEW
+    // stream — wherever it actually opens (direct → the offset; HLS → 0-based or offset-based, doesn't
+    // matter). ARMED only after the new source's onLoad (barrier), so a stale onProgress from the
+    // outgoing stream can't anchor it. `baselineReady` guards resume-from-pause from re-anchoring.
     const loaded = currentRef.current;
-    if (loaded && loaded.kind === "PROGRAM" && !loaded.baselineReady) {
+    if (loaded && loaded.kind === "PROGRAM" && !loaded.baselineReady && baselineArmedRef.current) {
       loaded.playStartCurrentTime = t;
       loaded.baselineReady = true;
+      baselineArmedRef.current = false;
     }
     if (!firstProgressRef.current) {
       firstProgressRef.current = true;
       console.log(`[mpv] +${Date.now() - loadStartRef.current}ms FIRST-PROGRESS t=${t.toFixed(1)}s`);
     }
   }, []);
-  // Direct-play opens deterministically AT the offset (loadfile start=offset) — anchor the clock there
-  // as soon as it loads. HLS/http open at a server-positioned spot whose REPORTED time we can't predict,
-  // so those defer to onProgress (above) to anchor to the first real position. Guarded against re-anchor.
-  const applyBaseline = useCallback(() => {
-    const loaded = currentRef.current;
-    if (!loaded || loaded.kind !== "PROGRAM" || loaded.baselineReady) return;
-    if (loaded.mode === "direct" && loaded.offset > 0) {
-      loaded.playStartCurrentTime = loaded.offset;
-      loaded.baselineReady = true;
-    }
-  }, []);
-  // onLoad = mpv `file-loaded` (parsed dims/duration): PlaybackLog + baseline + "playing".
+  // onLoad = mpv `file-loaded` (parsed dims/duration): PlaybackLog + ARM the baseline barrier + "playing".
   const onLoad = useCallback(
     (e: { nativeEvent: { duration: number; width: number; height: number } }) => {
       const { width, height } = e.nativeEvent;
       console.log(`[mpv] +${Date.now() - loadStartRef.current}ms LOADED ${width}x${height}`);
       decodedDimsRef.current = { w: width, h: height };
       playingRef.current = true;
-      applyBaseline();
+      // The new source is now loaded → arm baseline anchoring (the next onProgress belongs to THIS
+      // stream, not the outgoing one). Skip if already anchored (same-media seek path sets it inline).
+      if (currentRef.current?.kind === "PROGRAM" && !currentRef.current.baselineReady) baselineArmedRef.current = true;
       // A fresh program load: resume unless the user paused. mpv's `pause` persists across loadfile,
       // so after a bumper (which paused) the next program would paint its first frame but stay paused —
       // exactly tv-web's `tryPlay(video)` on every load.
@@ -266,14 +260,13 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
       recordLog(width > 0 && height > 0 ? "playing" : "not_decoding");
       setStatus((s) => (s.buffering ? { ...s, buffering: false } : s));
     },
-    [applyBaseline, recordLog],
+    [recordLog],
   );
   // onFirstFrame = mpv `playback-restart` (first painted frame after load/seek).
   const onFirstFrame = useCallback(() => {
     console.log(`[mpv] +${Date.now() - loadStartRef.current}ms FIRST-FRAME`);
-    applyBaseline();
     setStatus((s) => (s.buffering ? { ...s, buffering: false } : s));
-  }, [applyBaseline]);
+  }, []);
   const onBuffering = useCallback((e: { nativeEvent: { buffering: boolean } }) => {
     const buffering = e.nativeEvent.buffering;
     bufferingRef.current = buffering;
