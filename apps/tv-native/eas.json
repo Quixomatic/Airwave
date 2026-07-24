@@ -11,6 +11,17 @@
         "RCT_HERMES_V1_ENABLED": "1"
       }
     },
+    "development-android": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "development-androidtv": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_TV": "1"
+      }
+    },
     "preview": {
       "distribution": "internal"
     },

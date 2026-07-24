@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.7] - 2026-07-24
+
+### Added
+
+- **Android / Android TV / Fire TV build config for tv-native.** `expo-build-properties` now sets `android.minSdkVersion: 26` (the `libmpv-android` AAR's floor; the Fire TV Stick 4K Max is API 30, well above). New EAS profiles: **`development-android`** (tablet dev client) and **`development-androidtv`** (`EXPO_TV=1` → `config-tv` emits the leanback manifest + banner + `LEANBACK_LAUNCHER` intent for the Android TV emulator + a sideloaded Fire Stick). The first Android build compiles + validates the v0.8.4 Kotlin mpv engine. Key-input stays inert on Android (graceful, via `requireOptionalNativeModule`) until its Kotlin `onKeyDown` lands — D-pad still works via `useTVEventHandler`.
+
 ## [0.8.6] - 2026-07-24
 
 ### Added

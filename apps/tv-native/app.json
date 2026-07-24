@@ -2,7 +2,7 @@
   "expo": {
     "name": "ChannelGuide",
     "slug": "channelguide",
-    "version": "0.8.6",
+    "version": "0.8.7",
     "scheme": "channelguide",
     "orientation": "landscape",
     "userInterfaceStyle": "dark",
@@ -39,6 +39,9 @@
         {
           "ios": {
             "buildReactNativeFromSource": true
+          },
+          "android": {
+            "minSdkVersion": 26
           }
         }
       ]
