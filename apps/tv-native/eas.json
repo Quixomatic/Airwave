@@ -5,7 +5,10 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "REACT_NATIVE_NODE_MODULES_DIR": "/Users/expo/workingdir/build/apps/tv-native/node_modules"
+      }
     },
     "preview": {
       "distribution": "internal"

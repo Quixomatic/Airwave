@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.1] - 2026-07-24
+
+### Fixed
+
+- **EAS iOS build broke at `pod install` after the `react-native-tvos` alias (v0.8.0).** `react-native-gesture-handler`'s podspec detects the RN version via `require.resolve('react-native/package.json')`, which pnpm **realpath-resolves to the physical `react-native-tvos` directory** — so it finds no `react-native` folder there and falls back to the unset `REACT_NATIVE_NODE_MODULES_DIR` env var, crashing with `no implicit conversion of nil into String`. Fixed by setting `REACT_NATIVE_NODE_MODULES_DIR` (the escape hatch RNGH's own error message documents) to the app's `node_modules` — where a `react-native` symlink *does* resolve — in the EAS `development` profile env. (The `[Expo-precompiled] … xcframework not found` lines in the same log are a harmless 404 cache-miss for the `0.83.6-0` fork version; those modules just build from source.)
+
 ## [0.8.0] - 2026-07-24
 
 Opens the **v0.8.x multi-platform native arc** — extending `apps/tv-native` from iPad-only to Android / Android TV / Fire TV / Apple TV. Full plan + blueprint in the tv-native plan §9.
