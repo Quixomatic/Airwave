@@ -1,6 +1,9 @@
 {
-  "platforms": ["apple"],
+  "platforms": ["apple", "android"],
   "apple": {
     "modules": ["KeyInputModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.keyinput.KeyInputModule"]
   }
 }

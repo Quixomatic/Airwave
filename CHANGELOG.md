@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.10] - 2026-07-24
+
+### Added
+
+- **Android hardware-key input (`packages/key-input/android`) — first implementation (pending build validation).** The Kotlin twin of the iOS GCKeyboard module: it wraps the Activity's `Window.Callback` (via Kotlin interface delegation, so all other callbacks pass through) and intercepts `dispatchKeyEvent`, emitting the same semantic `onKey {key, digit}` the JS dispatcher consumes. It **only** consumes the keys `useTVEventHandler` doesn't deliver — **digits** (0–9 + numpad) and **channel up/down** (`CHANNEL_UP/DOWN` + `[`/`]`/`=`/`-` for a Bluetooth keyboard) — and lets D-pad/OK/Back fall through, so there's **no double-dispatch** on the TV build. Enables channel-number entry + CH± from a BT keyboard / number remote on Android TV / Fire TV. Registered via `expo-module.config` android; degrades gracefully until compiled. Validated on the next Android build.
+
 ## [0.8.9] - 2026-07-24
 
 ### Added
