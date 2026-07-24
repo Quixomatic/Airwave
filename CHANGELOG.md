@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.28] - 2026-07-24
+
+### Changed
+
+- **Audio/Subtitles/Quality picker is now a centered glass modal with full D-pad/keyboard nav.** Replaced the anchored dropdown (which had layout + navigation problems) with a centered modal styled like the channel-number entry — `expo-blur` glass, border, generous padding, a title, and a scrollable list. It's fully navigable: **up/down** move an accent-filled focus row (auto-scrolling to keep it in view), **OK** selects, **Back** or an outside tap closes; touch taps a row directly. The current selection is check-marked. Conditionally-mounted Modal (no stacking).
+
 ## [0.7.27] - 2026-07-24
 
 ### Fixed

@@ -1,7 +1,8 @@
 import { AudioLines, Captions, Check, Clapperboard, Info, Pause, Play, Radio, RotateCcw, SlidersHorizontal, Star, Tv } from "lucide-react-native";
 import type { ComponentType } from "react";
 import { useEffect, useRef, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 
 import type { GuideChannel } from "@/lib/api";
@@ -65,6 +66,32 @@ export function FeaturePanel({
   const [focus, setFocus] = useState<{ row: 0 | 1; col: number }>({ row: 0, col: 0 });
   const [infoMode, setInfoMode] = useState(false);
   const [picker, setPicker] = useState<PickerKey>(null);
+  const [pickerSel, setPickerSel] = useState(0);
+
+  // Items + current value for whichever picker is open — shared by the modal render and the D-pad nav.
+  const pickerItems =
+    picker === "audio"
+      ? [{ value: "", label: "Default" }, ...tracks.audio.map((t) => ({ value: t.id, label: t.label }))]
+      : picker === "subtitle"
+        ? [{ value: "off", label: "Off" }, ...tracks.subtitle.map((t) => ({ value: t.id, label: t.label }))]
+        : picker === "quality"
+          ? qualities.map((q) => ({ value: q.id, label: q.label }))
+          : [];
+  const pickerCurrent = picker === "audio" ? audioStreamId ?? "" : picker === "subtitle" ? subtitleStreamId ?? "off" : quality;
+  const pickerTitle = picker === "audio" ? "Audio" : picker === "subtitle" ? "Subtitles" : "Quality";
+  const applyPick = (v: string) => {
+    if (picker === "audio") onSelectAudio(v || undefined);
+    else if (picker === "subtitle") onSelectSub(v);
+    else if (picker === "quality") onSelectQuality(v);
+    setPicker(null);
+  };
+  // When a picker opens, focus its current selection.
+  useEffect(() => {
+    if (!picker) return;
+    const idx = pickerItems.findIndex((it) => it.value === pickerCurrent);
+    setPickerSel(idx >= 0 ? idx : 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picker]);
 
   const isEpisode = !!g?.showTitle && g?.season != null && g?.episode != null;
   const title = isEpisode ? g?.showTitle : g?.title;
@@ -126,7 +153,24 @@ export function FeaturePanel({
         return true;
       }
       armHide();
-      if (infoMode || picker) return true; // info/picker own the keys; Back (above) exits them
+      // Picker open — D-pad/keyboard navigates the list (Back, handled above, closes it).
+      if (picker) {
+        if (e.key === "up") {
+          setPickerSel((s) => Math.max(0, s - 1));
+          return true;
+        }
+        if (e.key === "down") {
+          setPickerSel((s) => Math.min(pickerItems.length - 1, s + 1));
+          return true;
+        }
+        if (e.key === "ok") {
+          const it = pickerItems[pickerSel];
+          if (it) applyPick(it.value);
+          return true;
+        }
+        return true;
+      }
+      if (infoMode) return true; // details view owns the keys; Back (above) exits it
       if (focus.row === 0) {
         switch (e.key) {
           case "left":
@@ -245,26 +289,15 @@ export function FeaturePanel({
         </>
       )}
 
-      {/* picker — an anchored glass dropdown that opens UPWARD from its selector button (tv-web's
-          side="top" align="end"). No native <Modal>, so no stacking; right-offset aligns it to the
-          Audio / Subtitles / Quality circle it belongs to. */}
+      {/* picker — a centered glass modal (same treatment as channel-number entry): scrollable, D-pad /
+          keyboard navigable (up/down move focus, OK selects, Back closes), and touch. */}
       {picker !== null && (
-        <PickerDropdown
-          rightOffset={picker === "audio" ? 188 : picker === "subtitle" ? 122 : 56}
-          items={
-            picker === "audio"
-              ? [{ value: "", label: "Default" }, ...tracks.audio.map((t) => ({ value: t.id, label: t.label }))]
-              : picker === "subtitle"
-                ? [{ value: "off", label: "Off" }, ...tracks.subtitle.map((t) => ({ value: t.id, label: t.label }))]
-                : qualities.map((q) => ({ value: q.id, label: q.label }))
-          }
-          current={picker === "audio" ? audioStreamId ?? "" : picker === "subtitle" ? subtitleStreamId ?? "off" : quality}
-          onPick={(v) => {
-            if (picker === "audio") onSelectAudio(v || undefined);
-            else if (picker === "subtitle") onSelectSub(v);
-            else onSelectQuality(v);
-            setPicker(null);
-          }}
+        <PickerModal
+          title={pickerTitle}
+          items={pickerItems}
+          current={pickerCurrent}
+          sel={pickerSel}
+          onPick={applyPick}
           onClose={() => setPicker(null)}
           accent={accent}
         />
@@ -353,62 +386,51 @@ function DeliveryReadout({ delivery, accent }: { delivery: Delivery; accent: str
   );
 }
 
-/** An anchored glass dropdown (Aurora-styled — matches the sidebar glass + Info chips) opening upward
- *  from its selector circle. Rendered in a transparent, CONDITIONALLY-MOUNTED Modal so a tap ANYWHERE
- *  closes it (its own full-screen window catches the touch) and there's no visible-toggle stacking. The
- *  menu itself claims its touches so a tap inside doesn't close it; Back closes it via the panel's key
- *  layer. `rightOffset` aligns the menu's right edge with its own button. */
-function PickerDropdown({ rightOffset, items, current, onPick, onClose, accent }: { rightOffset: number; items: { value: string; label: string }[]; current: string; onPick: (v: string) => void; onClose: () => void; accent: string }) {
+const PICKER_ITEM_H = 62; // approx row height (padding + margin + text) — for auto-scroll to the focus
+
+/** Centered glass picker modal — the same blur + border treatment as the channel-number entry, with
+ *  generous padding. Scrollable; the D-pad-focused row is accent-filled and the current selection is
+ *  check-marked. Nav comes from the panel's key layer (up/down/OK/Back); a row tap picks; an outside
+ *  tap closes. Conditionally mounted (no visible-toggle stacking); the card claims its own touches. */
+function PickerModal({ title, items, current, sel, onPick, onClose, accent }: { title: string; items: { value: string; label: string }[]; current: string; sel: number; onPick: (v: string) => void; onClose: () => void; accent: string }) {
+  const { height } = useWindowDimensions();
+  const scrollRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: Math.max(0, sel * PICKER_ITEM_H - 2 * PICKER_ITEM_H), animated: true });
+  }, [sel]);
   return (
     <Modal transparent visible animationType="fade" onRequestClose={onClose}>
-      {/* full-screen backdrop — a tap anywhere outside the menu closes it (faint dim to focus it) */}
-      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.18)" }}>
+      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(4,6,12,0.6)", alignItems: "center", justifyContent: "center", padding: 40 }}>
         <View
           onStartShouldSetResponder={() => true}
-          style={{
-            position: "absolute",
-            bottom: 102,
-            right: rightOffset,
-            minWidth: 210,
-            maxWidth: 360,
-            maxHeight: 336,
-            borderRadius: 14,
-            backgroundColor: "rgba(13,19,33,0.98)",
-            borderWidth: 1,
-            borderColor: "rgba(148,163,184,0.22)",
-            overflow: "hidden",
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 12 },
-            shadowRadius: 28,
-            shadowOpacity: 0.5,
-            elevation: 20,
-          }}
+          style={{ width: 460, maxWidth: "92%", borderRadius: 22, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", shadowColor: "#000", shadowOffset: { width: 0, height: 20 }, shadowRadius: 44, shadowOpacity: 0.55, elevation: 24 }}
         >
-          <ScrollView bounces={false} contentContainerStyle={{ paddingVertical: 6 }}>
-            {items.map((it) => {
-              const sel = it.value === current;
-              return (
-                <Pressable
-                  key={it.value}
-                  onPress={() => onPick(it.value)}
-                  style={({ pressed }) => ({
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 12,
-                    paddingVertical: 12,
-                    paddingHorizontal: 16,
-                    backgroundColor: sel ? hexA(accent, 0.16) : pressed ? "rgba(255,255,255,0.07)" : "transparent",
-                  })}
-                >
-                  {/* leading check slot — keeps the check beside the item and all labels aligned */}
-                  <View style={{ width: 20, alignItems: "center", justifyContent: "center" }}>{sel && <Check size={18} color={accent} />}</View>
-                  <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 16, fontWeight: sel ? "600" : "400", color: sel ? accent : "#f1f5f9" }}>
-                    {it.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          <BlurView intensity={60} tint="dark" style={{ backgroundColor: "rgba(15,21,35,0.72)", paddingBottom: 6 }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: "rgba(255,255,255,0.62)", paddingTop: 26, paddingHorizontal: 30, paddingBottom: 12 }}>{title}</Text>
+            <ScrollView ref={scrollRef} style={{ maxHeight: height * 0.56 }} contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 6 }} showsVerticalScrollIndicator={false}>
+              {items.length === 0 && <Text style={{ color: "#94a3b8", fontSize: 17, paddingVertical: 22, textAlign: "center" }}>None available</Text>}
+              {items.map((it, i) => {
+                const isSel = it.value === current;
+                const isFocus = i === sel;
+                return (
+                  <Pressable
+                    key={it.value}
+                    onPress={() => onPick(it.value)}
+                    style={{ borderRadius: 14, marginVertical: 3, paddingVertical: 15, paddingHorizontal: 18, backgroundColor: isFocus ? accent : isSel ? hexA(accent, 0.16) : "transparent" }}
+                  >
+                    {/* explicit row (don't rely on Pressable's own flex): leading check slot + label */}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                      <View style={{ width: 24, alignItems: "center", justifyContent: "center" }}>{isSel && <Check size={20} color={isFocus ? "#04060c" : accent} />}</View>
+                      <Text numberOfLines={1} style={{ flex: 1, fontSize: 18, fontWeight: isFocus || isSel ? "700" : "500", color: isFocus ? "#04060c" : isSel ? accent : "#f1f5f9" }}>
+                        {it.label}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", paddingTop: 10, paddingHorizontal: 30, paddingBottom: 8 }}>OK to select · Back to cancel</Text>
+          </BlurView>
         </View>
       </Pressable>
     </Modal>
