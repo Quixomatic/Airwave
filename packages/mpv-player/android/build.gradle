@@ -1,0 +1,83 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.channelguide.mpvplayer'
+version = '0.0.0'
+
+// ---------------------------------------------------------------------------
+// libmpv-android — the prebuilt AAR from edde746's fork. It ships the native
+// libmpv/ffmpeg .so's (arm64-v8a, armeabi-v7a, x86_64 — x86_64 covers the
+// emulator) AND the `dev.jdtech.mpv.MpvPlayer` Kotlin coroutine wrapper we bind
+// against. Downloaded at build time (not vendored), exactly like the .refs/plezy
+// Plex client does. minSdk 26 is the AAR's floor.
+// ---------------------------------------------------------------------------
+def mpvVersion = 'v1.0.7'
+def mpvDir = layout.buildDirectory.dir('libmpv').get().asFile
+def mpvAar = 'libmpv-release.aar'
+
+def downloadLibmpv = tasks.register('downloadLibmpv') {
+  def stamp = new File(mpvDir, '.version')
+  outputs.upToDateWhen { stamp.exists() && stamp.text.trim() == mpvVersion }
+  doLast {
+    mpvDir.mkdirs()
+    def url = "https://github.com/edde746/libmpv-android/releases/download/${mpvVersion}/${mpvAar}"
+    exec { commandLine 'curl', '-sfL', url, '-o', new File(mpvDir, mpvAar).absolutePath }
+    stamp.text = mpvVersion
+  }
+}
+
+// Extract libmpv's libc++_shared.so so the app source set can package it with top
+// merge priority — libmpv is built against a newer libc++ than other native
+// consumers (RN, Reanimated), and its runtime must win (std::from_chars<float>).
+def extractMpvLibcxx = tasks.register('extractMpvLibcxx') {
+  dependsOn downloadLibmpv
+  def aar = new File(mpvDir, mpvAar)
+  def outDir = new File(mpvDir, 'libcxx')
+  inputs.file aar
+  outputs.dir outDir
+  doLast {
+    outDir.deleteDir() // drop stale ABIs from a previous AAR version
+    outDir.mkdirs()
+    exec { commandLine 'unzip', '-q', '-o', aar.absolutePath, 'jni/*/libc++_shared.so', '-d', outDir.absolutePath }
+  }
+}
+
+android {
+  namespace 'expo.modules.mpvplayer'
+
+  defaultConfig {
+    minSdkVersion 26
+  }
+
+  packagingOptions {
+    // Suppress the duplicate-libc++ merge error; the jniLibs.srcDir below makes
+    // libmpv's newer runtime win over other native consumers.
+    pickFirst 'lib/*/libc++_shared.so'
+  }
+
+  sourceSets {
+    main {
+      // Project-scope jniLibs merge ahead of AAR/subprojects, so dependency order
+      // can't accidentally select the older libc++ copy.
+      jniLibs.srcDir(new File(mpvDir, 'libcxx/jni'))
+    }
+  }
+}
+
+tasks.matching { it.name.startsWith('pre') && it.name.endsWith('Build') }.configureEach {
+  dependsOn downloadLibmpv, extractMpvLibcxx
+}
+// Gradle snapshots jniLibs source dirs before task execution; keep the extracted
+// libc++ dir present during input discovery.
+tasks.matching { it.name.startsWith('merge') && it.name.endsWith('JniLibFolders') }.configureEach {
+  dependsOn extractMpvLibcxx
+}
+
+dependencies {
+  implementation files(new File(mpvDir, mpvAar))
+  // The AAR is a raw file (no POM), so its coroutines dependency isn't resolved
+  // transitively — add it ourselves or MpvPlayer NoClassDefFoundErrors at runtime.
+  implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'
+}

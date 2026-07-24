@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.4] - 2026-07-24
+
+### Added
+
+- **Android mpv engine (`packages/mpv-player/android`) — first implementation (pending first-build validation).** The Kotlin twin of the iOS mpv module. `MpvCore` binds the `dev.jdtech.mpv.MpvPlayer` **coroutine** API from the prebuilt `edde746/libmpv-android` AAR (v1.0.7, downloaded at build time via a gradle task; ships arm64-v8a/armeabi-v7a/**x86_64** so the emulator's covered), rendering into a `SurfaceView` via the Android `gpu` VO with MediaCodec hw decode — options/`loadfile … -1 start=`/seek/keep-open-EOF all mirrored from the Swift core. `MpvPlayerView` (ExpoView + SurfaceView, load coalescing, surface lifecycle) and `MpvPlayerModule` expose the **identical** props/events/functions as the Apple module, so the platform-agnostic JS (`requireNativeView("MpvPlayer")` + `use-tv-player`) drives it unchanged. Registered via the `android` platform in `expo-module.config.json`; includes the `libc++_shared` dedupe. Not yet compiled — gets validated on the first Android EAS build.
+
 ## [0.8.3] - 2026-07-24
 
 ### Fixed
