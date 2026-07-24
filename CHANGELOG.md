@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.29] - 2026-07-24
+
+### Changed
+
+- **Full-player chrome now slides in like tv-web.** The chip and feature panel were popping in with no animation. Wrapped them in Reanimated entrances (250ms, matching tv-web's Framer transitions): the top-right channel **chip slides down** from `y:-30` (`FadeInDown`), and the bottom **feature panel slides up** from `y:48` (`FadeInUp`), with matching exits. The panel's `LinearGradient` now fills the animated wrapper. (The bottom gradient scrim was already present; tv-web has no top gradient scrim — just the chip — so none was added.)
+
 ## [0.7.28] - 2026-07-24
 
 ### Changed

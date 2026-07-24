@@ -216,7 +216,7 @@ export function FeaturePanel({
   const ctlFocused = (i: number) => focus.row === 1 && focus.col === i && !picker && !infoMode;
 
   return (
-    <LinearGradient colors={["transparent", "rgba(6,10,20,0.4)", "rgba(6,10,20,0.92)"]} locations={[0, 0.35, 0.75]} style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingTop: 96, paddingHorizontal: 56, paddingBottom: 40 }}>
+    <LinearGradient colors={["transparent", "rgba(6,10,20,0.4)", "rgba(6,10,20,0.92)"]} locations={[0, 0.35, 0.75]} style={{ paddingTop: 96, paddingHorizontal: 56, paddingBottom: 40 }}>
       <View style={{ marginBottom: 14 }}>
         <Text style={{ fontSize: 40, fontWeight: "800", letterSpacing: -0.5, color: "#f1f5f9" }}>{title}</Text>
         {subTitle && <Text style={{ marginTop: 2, fontSize: 20, color: "#c3c9d4" }}>{subTitle}</Text>}
