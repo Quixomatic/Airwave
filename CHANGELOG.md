@@ -2,6 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.0] - 2026-07-24
+
+Opens the **v0.8.x multi-platform native arc** — extending `apps/tv-native` from iPad-only to Android / Android TV / Fire TV / Apple TV. Full plan + blueprint in the tv-native plan §9.
+
+### Changed
+
+- **tv-native switched to the `react-native-tvos` fork** (`react-native` → `npm:react-native-tvos@0.83.6-0`). This is the load-bearing foundation for every TV target: Meta's stock React Native **cannot build tvOS at all**, and the fork is a drop-in **superset** that produces the identical iPad/Android app when `EXPO_TV` is off, and adds the TV focus + leanback support when it's on. The input dispatcher already **feature-detects** `useTVEventHandler` (`dispatcher.ts:78`), so nothing changes for the existing iPad build — the fork only *adds* TV capability, it doesn't remove iPad. Verified: `react-native` resolves to `react-native-tvos@0.83.6-0`, the whole dep graph re-pegged to it, typecheck clean. Takes effect on the next native dev-client rebuild (gate: confirm the iPad still direct-plays before any TV/Android work lands on top).
+
 ## [0.7.41] - 2026-07-24
 
 ### Changed

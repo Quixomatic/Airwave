@@ -1,6 +1,6 @@
 {
   "name": "tv-native",
-  "version": "0.7.41",
+  "version": "0.8.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -35,7 +35,7 @@
     "nativewind": "^4.2.6",
     "phosphor-react-native": "^3.0.6",
     "react": "19.2.0",
-    "react-native": "0.83.6",
+    "react-native": "npm:react-native-tvos@0.83.6-0",
     "react-native-css-interop": "0.2.6",
     "react-native-gesture-handler": "~2.30.1",
     "react-native-qrcode-svg": "^6.3.21",
