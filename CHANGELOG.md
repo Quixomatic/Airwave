@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.11] - 2026-07-24
+
+### Fixed
+
+- **Android build died at Gradle configuration — `'android.defaultConfig.versionName' is not defined`.** Gradle 9 / newer AGP requires `versionName`/`versionCode` in a library module's `defaultConfig` (the stock Expo modules set them). Our `mpv-player` android `build.gradle` set only `minSdkVersion` there (redundant — the `expo-module-gradle-plugin` already applies `minSdk 26` from the app's `expo-build-properties`), and `key-input` set none. Added `versionCode 1` + `versionName "0.0.0"` to both and dropped the redundant `minSdkVersion` from mpv-player. Configuration-only fix — the failing build died *before* any Kotlin compiled, so the next Android build is still the real first validation of the mpv engine + key-input Kotlin. (Separately: the **tvOS `development-tvos-sim` compile-check build SUCCEEDED** — the whole tvOS toolchain compiles.)
+
 ## [0.8.10] - 2026-07-24
 
 ### Added

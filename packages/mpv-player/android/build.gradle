@@ -47,8 +47,11 @@ def extractMpvLibcxx = tasks.register('extractMpvLibcxx') {
 android {
   namespace 'expo.modules.mpvplayer'
 
+  // minSdk 26 comes from the app's expo-build-properties (ExpoRootProject minSdk); Gradle 9 / AGP
+  // requires versionName/versionCode in a library's defaultConfig (matches the stock Expo modules).
   defaultConfig {
-    minSdkVersion 26
+    versionCode 1
+    versionName '0.0.0'
   }
 
   packagingOptions {

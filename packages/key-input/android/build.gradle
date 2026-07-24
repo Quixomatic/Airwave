@@ -8,4 +8,10 @@ version = '0.0.0'
 
 android {
   namespace 'expo.modules.keyinput'
+
+  // Gradle 9 / AGP requires versionName/versionCode in a library's defaultConfig (matches stock Expo modules).
+  defaultConfig {
+    versionCode 1
+    versionName '0.0.0'
+  }
 }
