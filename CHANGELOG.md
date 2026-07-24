@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.23] - 2026-07-24
+
+### Fixed
+
+- **tv-native collapsed sidebars respond to a direct tap.** Both the guide sidebar and the settings rail wrapped their collapsed sliver in a single tap-to-expand target, so the circular buttons did nothing until you expanded first. Now each collapsed circle is individually pressable: guide **Guide/Settings/Account** fire their action directly and the **filter** circle expands the sliver (there's no single lens to apply from collapsed); every settings **category** circle navigates directly.
+
 ## [0.7.22] - 2026-07-24
 
 Fixes tv-native bumper playback + brings the between-programs interstitial to tv-web parity.

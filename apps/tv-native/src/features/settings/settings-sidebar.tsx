@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
 import { GlassCircleButton } from "@/features/guide/glass-button";
@@ -50,7 +50,7 @@ export function SettingsSidebar({
             expanded={expanded}
             focused={expanded && focused && sel === i}
             active={it.key === activeKey}
-            onPress={expanded ? () => onActivate(i) : undefined}
+            onPress={() => onActivate(i)}
           />
           {/* separate "Back to Guide" from the categories (matches the guide sidebar) */}
           {i === 0 && <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginTop: 8 }} />}
@@ -66,13 +66,9 @@ export function SettingsSidebar({
         outerStyle,
       ]}
     >
-      {expanded ? (
-        <View style={{ flex: 1, overflow: "hidden", backgroundColor: C.sidebarBg, borderRightWidth: 1, borderRightColor: C.border }}>{content}</View>
-      ) : (
-        <Pressable onPress={onExpand} style={{ flex: 1 }}>
-          <View style={{ flex: 1, overflow: "hidden", backgroundColor: C.sidebarBg, borderRightWidth: 1, borderRightColor: C.border }}>{content}</View>
-        </Pressable>
-      )}
+      {/* Collapsed: each circle activates its category directly (onPress in `content`). No tap-to-expand
+          wrapper — matches the guide sidebar's collapsed behavior. */}
+      <View style={{ flex: 1, overflow: "hidden", backgroundColor: C.sidebarBg, borderRightWidth: 1, borderRightColor: C.border }}>{content}</View>
     </Animated.View>
   );
 }

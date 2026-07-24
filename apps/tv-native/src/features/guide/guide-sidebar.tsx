@@ -2,7 +2,7 @@ import * as LucideIcons from "lucide-react-native";
 import { History, LayoutGrid, ListFilter, Menu, Settings as SettingsIcon, Star, User } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
 import type { Package } from "@/lib/api";
@@ -130,14 +130,15 @@ export function GuideSidebar({
       </ScrollView>
     </View>
   ) : (
-    // Collapsed: the whole sliver is one tap target that expands. Circles are visual only.
-    <Pressable onPress={onExpand} style={{ flex: 1, gap: 14, paddingVertical: 24, paddingHorizontal: 18 }}>
-      {actions.map((it) => (
-        <GlassCircleButton key={it.key} icon={it.icon} expanded={false} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} />
+    // Collapsed: each ACTION circle fires its action directly (Guide/Settings/Account); the FILTER
+    // circle expands the sliver to reveal the lenses (there's no single lens to apply from collapsed).
+    <View style={{ flex: 1, gap: 14, paddingVertical: 24, paddingHorizontal: 18 }}>
+      {actions.map((it, i) => (
+        <GlassCircleButton key={it.key} icon={it.icon} expanded={false} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(i)} />
       ))}
       <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: 4 }} />
-      <GlassCircleButton icon={<ListFilter size={24} color="#f1f5f9" />} expanded={false} active={!!activeFilter} accent={activeFilter?.accent} />
-    </Pressable>
+      <GlassCircleButton icon={<ListFilter size={24} color="#f1f5f9" />} expanded={false} active={!!activeFilter} accent={activeFilter?.accent} onPress={onExpand} />
+    </View>
   );
 
   // Outer: casts the drop shadow (NO overflow — iOS clips a view's own shadow when overflow:hidden).
