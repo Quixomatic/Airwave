@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.25] - 2026-07-24
+
+### Changed
+
+- **tv-native full-player Info view: the Playback readout now matches tv-web.** The delivery/streaming info was a single plain-text line (`MODE · container/codec/codec · connection`); it's now the same **chip row** as tv-web — an accent-tinted mode chip (Direct Play / HLS Transcode / Progressive Transcode), gray container + video/audio codec chips each carrying Plex's copy-vs-transcode call (orange on transcode), and a connection chip (Local / Remote / Relay). Ported `DeliveryReadout` faithfully.
+
 ## [0.7.24] - 2026-07-24
 
 ### Fixed

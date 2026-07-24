@@ -5,9 +5,10 @@ import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 import type { GuideChannel } from "@/lib/api";
+import { hexA } from "@/features/guide/layout";
 import { LAYER, useKeyLayer } from "@/lib/input";
 
-import type { useTvPlayer } from "./use-tv-player";
+import type { Delivery, useTvPlayer } from "./use-tv-player";
 
 /**
  * The full-screen player's feature panel, ported from tv-web — the DVR scrubber (multi-segment,
@@ -201,12 +202,7 @@ export function FeaturePanel({
             {g?.directors?.length ? <DetailCol label="Director" value={g.directors.join(", ")} /> : null}
             {g?.studio ? <DetailCol label="Studio" value={g.studio} /> : null}
           </View>
-          {delivery && (
-            <Text style={{ marginTop: 20, fontSize: 14, color: "#64748b" }}>
-              {delivery.mode.toUpperCase()} · {[delivery.container, delivery.videoCodec, delivery.audioCodec].filter(Boolean).join("/")}
-              {delivery.connection ? ` · ${delivery.connection}` : ""}
-            </Text>
-          )}
+          {delivery && <DeliveryReadout delivery={delivery} accent={accent} />}
           <Text style={{ marginTop: 20, fontSize: 15, color: "#64748b" }}>Press Back to return</Text>
         </ScrollView>
       ) : (
@@ -306,6 +302,50 @@ function DetailCol({ label, value }: { label: string; value: string }) {
     <View style={{ maxWidth: 360 }}>
       <Text style={{ fontSize: 13, letterSpacing: 1, textTransform: "uppercase", color: "#64748b", marginBottom: 4 }}>{label}</Text>
       <Text style={{ fontSize: 17, color: "#dfe4ec" }}>{value}</Text>
+    </View>
+  );
+}
+
+const MODE_LABEL: Record<Delivery["mode"], string> = {
+  direct: "Direct Play",
+  http: "Progressive Transcode",
+  hls: "HLS Transcode",
+};
+const CONN_LABEL: Record<NonNullable<Delivery["connection"]>, string> = {
+  local: "Local",
+  remote: "Remote",
+  relay: "Relay",
+};
+
+/** A gray codec/container chip: MAIN in caps + an optional sub (Plex's copy/transcode call, orange on transcode). */
+function DeliveryChip({ main, sub }: { main: string; sub?: string | null }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6, paddingVertical: 5, paddingHorizontal: 12, borderRadius: 6, backgroundColor: "rgba(148,163,184,0.14)" }}>
+      <Text style={{ fontSize: 15, color: "#dfe4ec" }}>{main.toUpperCase()}</Text>
+      {sub && <Text style={{ fontSize: 12, color: sub === "transcode" ? "#f0a92a" : "#64748b" }}>{sub}</Text>}
+    </View>
+  );
+}
+
+/** "Playback" readout — HOW the current program is delivered, as chips (mode / container / video+audio
+ *  codec with Plex's copy-vs-transcode call / connection). Mechanical port of tv-web's DeliveryReadout. */
+function DeliveryReadout({ delivery, accent }: { delivery: Delivery; accent: string }) {
+  return (
+    <View style={{ marginTop: 28 }}>
+      <Text style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: 1, color: "#64748b", marginBottom: 8 }}>Playback</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+        <View style={{ paddingVertical: 5, paddingHorizontal: 12, borderRadius: 6, backgroundColor: hexA(accent, 0.13) }}>
+          <Text style={{ fontSize: 15, fontWeight: "700", color: accent }}>{MODE_LABEL[delivery.mode]}</Text>
+        </View>
+        {delivery.container && <DeliveryChip main={delivery.container} />}
+        {delivery.videoCodec && <DeliveryChip main={delivery.videoCodec} sub={delivery.videoDecision} />}
+        {delivery.audioCodec && <DeliveryChip main={delivery.audioCodec} sub={delivery.audioDecision} />}
+        {delivery.connection && (
+          <View style={{ paddingVertical: 5, paddingHorizontal: 12, borderRadius: 6, backgroundColor: delivery.connection === "local" ? "rgba(148,163,184,0.14)" : hexA(accent, 0.13) }}>
+            <Text style={{ fontSize: 15, fontWeight: "700", color: delivery.connection === "local" ? "#dfe4ec" : accent }}>{CONN_LABEL[delivery.connection].toUpperCase()}</Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
