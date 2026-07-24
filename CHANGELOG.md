@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.36] - 2026-07-24
+
+### Fixed
+
+- **Mini-player dock is now a true 16:9 box, bottom-aligned to the progress bar.** The featured-panel mini slot used a fixed width + `alignSelf: stretch`, so its aspect depended on the info-column height and the video ended up letterboxed inside it (floating, not filling to the bottom). Now the dock is an outer full-height container that **bottom-aligns** a **16:9 inner box** (fixed width → `aspectRatio: 16/9` derives the height, no circular layout). The measured slot is exactly 16:9, so the video fills it cleanly and its bottom lines up with the progress bar beside it.
+
 ## [0.7.35] - 2026-07-24
 
 ### Changed

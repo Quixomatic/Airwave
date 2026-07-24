@@ -548,9 +548,16 @@ function FeaturedPanel({ channel, program, now, accent, vw, onTune }: { channel:
         </View>
       </View>
 
-      {/* The mini-feed dock: a transparent placeholder that reserves the space + reports its rect;
-          the persistent player renders the live video on top of it. Only while a mini feed plays. */}
-      {miniActive && <View ref={slotRef} onLayout={measureSlot} style={{ width: fv(970), alignSelf: "stretch", borderRadius: 14, marginLeft: fv(40) }} />}
+      {/* The mini-feed dock. Outer stretches to the featured panel's full height and BOTTOM-aligns its
+          child, so the video's bottom lines up with the progress bar on the left. Inner is a TRUE 16:9
+          box (fixed width → `aspectRatio` derives the height with no circular layout), so the measured
+          slot is exactly 16:9 and the video fills it regardless of how mpv's contentFit behaves. Only
+          while a mini feed plays. */}
+      {miniActive && (
+        <View style={{ alignSelf: "stretch", justifyContent: "flex-end", marginLeft: fv(40) }}>
+          <View ref={slotRef} onLayout={measureSlot} style={{ width: fv(970), aspectRatio: 16 / 9, borderRadius: 14 }} />
+        </View>
+      )}
     </Pressable>
   );
 }
