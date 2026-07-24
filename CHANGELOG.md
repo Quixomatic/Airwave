@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.39] - 2026-07-24
+
+### Fixed
+
+- **Intermittent "stuck at the end of a program" (no bumper).** mpv's `keep-open` holds the last frame at EOF and stalls the position clock, so the tick's rollover check (`effective >= slotEnd − 0.25s`) sometimes missed the boundary and left playback frozen at the program's end instead of rolling into the bumper — intermittently, depending on how close the stall landed to the threshold (some episodes rolled fine, some stuck). Fixed two ways: `onEnd` now rolls to the next slot on the mpv EOF event with a 2s tolerance (tv-web's `ended` handler) for when mpv *does* emit it; and a **stall backstop** in the tick — near the slot end, if the position clock stops advancing while playing (not paused/buffering) for ~1.5s, the media has hit EOF, so roll into the bumper. Between the two the boundary can't slip through. (`goTo`'s in-flight guard dedupes them.)
+
 ## [0.7.38] - 2026-07-24
 
 ### Fixed

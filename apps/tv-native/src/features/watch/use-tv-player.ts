@@ -91,6 +91,8 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   const loadStartRef = useRef(0); // Date.now() at setSource, for the [vlc] event timeline in Metro
   const currentUrlRef = useRef<string | null>(null); // last loaded URL — a same-URL goTo = DVR seek within the current direct file
   const firstProgressRef = useRef(false); // did the first onProgress arrive for the current load?
+  const stallTicksRef = useRef(0); // consecutive ticks mpv's clock hasn't advanced (near-end EOF detect)
+  const lastPosSampleRef = useRef(0); // last positionSecRef the tick sampled, for the stall check
   const baselineArmedRef = useRef(false); // onLoad barrier: only anchor the baseline once the NEW source
   // has loaded, so a stale onProgress from the outgoing stream can't anchor the new program's baseline.
   const bufferingRef = useRef(false); // latest onBuffering state — for the watchdog's stuck-diagnosis
@@ -282,9 +284,21 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
     },
     [recordLog],
   );
-  const onEnd = useCallback((e: { nativeEvent: { reason: string } }) => {
-    console.log(`[mpv] END ${e.nativeEvent.reason}`);
-  }, []);
+  const onEnd = useCallback(
+    (e: { nativeEvent: { reason: string } }) => {
+      const reason = e.nativeEvent.reason;
+      console.log(`[mpv] END ${reason}`);
+      if (reason !== "eof") return;
+      // mpv reached the media end. `keep-open` holds the last frame and STALLS the position clock, so the
+      // tick's effective time can freeze just shy of the slot end and never cross its 0.25s rollover
+      // threshold — leaving playback stuck at the end of the program with no bumper (intermittent, since
+      // it depends on how close the stall is to the boundary). Roll to the next slot on EOF if we're
+      // within 2s of it (tv-web's `ended` handler). goTo's transitioning guard dedupes with the tick.
+      const cur = currentRef.current;
+      if (cur?.kind === "PROGRAM" && currentEffective() >= cur.endS - 2) void goTo(cur.endS);
+    },
+    [goTo, currentEffective],
+  );
 
   // Multi-segment scrubber view — the PROGRAM you're in is the expanded middle, flanked by fixed
   // left/right peeks (prev tail + bumper, upcoming bumper + next head). Ported from tv-web.
@@ -349,6 +363,23 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
         if (effective >= cur.endS - 0.25) {
           void goTo(cur.endS);
           return;
+        }
+        // Backstop for mpv's keep-open EOF (it pauses on the last frame WITHOUT an END_FILE event, so the
+        // clock stalls just shy of the boundary and the check above never fires — the intermittent
+        // "stuck at the end, no bumper" bug). Near the slot end, if the position clock has STALLED while
+        // playing (not paused/buffering) for ~1.5s, the media hit EOF → roll into the bumper.
+        if (effective >= cur.endS - 10 && !pausedRef.current && !bufferingRef.current) {
+          if (Math.abs(positionSecRef.current - lastPosSampleRef.current) < 0.05) stallTicksRef.current += 1;
+          else stallTicksRef.current = 0;
+          lastPosSampleRef.current = positionSecRef.current;
+          if (stallTicksRef.current >= 3) {
+            stallTicksRef.current = 0;
+            void goTo(cur.endS);
+            return;
+          }
+        } else {
+          stallTicksRef.current = 0;
+          lastPosSampleRef.current = positionSecRef.current;
         }
       } else {
         if (!pausedRef.current) bumperEffRef.current += wallDt;
