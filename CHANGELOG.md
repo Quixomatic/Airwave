@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.21] - 2026-07-23
+
+**The tv-native D-pad + channel-number entry are now drivable on iPad — via a hardware keyboard.** The input dispatcher and zone machine were ported from tv-web but had no key source on iPad (`useTVEventHandler` is TV-only; iOS doesn't deliver keyboard events to apps without GameController). Confirmed working on-device: the full guide navigates by arrow keys and channel numbers tune.
+
+### Added
+
+- **`@ChannelGuide/key-input`** — a small Expo native module that reads Apple's **GameController `GCKeyboard`** app-wide (no first-responder juggling, doesn't interfere with text fields) and maps physical keys to our semantic vocabulary: arrows → D-pad, Enter/Space → OK, Esc/Delete → Back, `[`/`-` → channel-down, `]`/`=` → channel-up, number row + keypad → digit. Emits `onKey`; wired as `useHardwareKeyInput()` alongside `useTVInput()`, and `dispatchKey` now carries the digit. This makes the D-pad zone machine + number entry work from any attached Bluetooth/Magic keyboard or keyboard-equipped remote. Stock system framework only — no SPM/linking. Android/Fire TV get the same JS contract via `onKeyDown` next.
+
+### Changed
+
+- **Channel-number entry now matches tv-web exactly.** Replaced the iPad-only stopgap (a persistent bottom-right keypad FAB + modal) with a faithful port: typing a digit slides a **top-center glass card down** (Reanimated + expo-blur), **OK** commits (tunes, or flashes red if the channel doesn't exist), **Back** cancels, an arrow passes through to navigation, inactivity dismisses without tuning, and **CH▲/▼** step the lineup.
+
 ## [0.7.20] - 2026-07-23
 
 **mpv now direct-plays the Plex library on iPad, at the live offset.** The `@ChannelGuide/mpv-player` engine (v0.7.19) built after a long EAS link fight, but no direct-play channel would start. This release lands the fixes that make it actually work end to end — confirmed on-device tuning real channels (4K HEVC/TrueHD/DTS-MA direct-play, opening at the live offset).
