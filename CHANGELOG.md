@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.9] - 2026-07-24
+
+### Added
+
+- **tvOS compile-validation profile.** `development-tvos-sim` EAS profile (`EXPO_TV=1` + the fork env + `ios.simulator: true`) — an unsigned tvOS **Simulator** build used purely to **validate that the tvOS target compiles** before Apple TV hardware is on hand. Shakes out any tvOS-specific build snags early (config-tv retargeting to tvOS, MPVKit's tvOS product link via the app-target SPM plugin, tvOS-only compile errors) so the eventual `development-tvos` **device** build is green when a physical Apple TV arrives. Note: it won't *run* on an Intel Mac (the arch dead-end from v0.8.8) — it's a "does it build" check, not a runtime test.
+
 ## [0.8.8] - 2026-07-24
 
 ### Added

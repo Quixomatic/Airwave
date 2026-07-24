@@ -31,6 +31,16 @@
         "RCT_HERMES_V1_ENABLED": "1"
       }
     },
+    "development-tvos-sim": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": { "simulator": true },
+      "env": {
+        "EXPO_TV": "1",
+        "REACT_NATIVE_NODE_MODULES_DIR": "/Users/expo/workingdir/build/apps/tv-native/node_modules",
+        "RCT_HERMES_V1_ENABLED": "1"
+      }
+    },
     "preview": {
       "distribution": "internal"
     },
