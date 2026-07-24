@@ -196,7 +196,10 @@ function PlayerHost({
           pins it to the container's exact bounds (the container size comes from a Reanimated style,
           which doesn't drive flex layout). */}
       {tv.source != null && (
-        <MpvPlayerView ref={tv.viewRef} source={tv.source} startTime={tv.startTime} {...tv.videoEvents} style={StyleSheet.absoluteFill} contentFit={full ? "contain" : "cover"} />
+        // Subtitles OFF by default: mpv otherwise auto-selects the embedded/forced sub track (sid=auto).
+        // In this app subs are delivered by SERVER burn-in (selecting them re-resolves to a transcode
+        // that hardcodes them into the video), so mpv must never render a text sub track itself.
+        <MpvPlayerView ref={tv.viewRef} source={tv.source} startTime={tv.startTime} options={{ sid: "no", "sub-auto": "no" }} {...tv.videoEvents} style={StyleSheet.absoluteFill} contentFit={full ? "contain" : "cover"} />
       )}
 
       {/* bumper interstitial — full (blurred art + big title + donut) or compact (mini feed) */}

@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.38] - 2026-07-24
+
+### Fixed
+
+- **Subtitles no longer show unless selected.** mpv auto-selects a media's embedded/forced subtitle track by default (`sid=auto`), so subs appeared even though none were chosen. In tv-native subtitles are delivered by server-side burn-in (selecting them re-resolves to a transcode that hardcodes them into the video), so mpv must never render a text sub track itself — now defaulted to `sid=no` / `sub-auto=no` via the player's mpv options. (Selecting subtitles still burns them in as before.)
+
 ## [0.7.37] - 2026-07-24
 
 ### Fixed
