@@ -2,6 +2,13 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.37] - 2026-07-24
+
+### Fixed
+
+- **Mini player now docks bottom-aligned without needing a focus.** The slot's screen rect was measured on a single `requestAnimationFrame` that could fire before the guide's ancestors finished positioning — so it captured a top-ish rect, and only a focus re-render re-measured it into place. Now it re-measures across a couple of frames + a short settle delay and on the outer container's `onLayout`, so it lands correctly on dock.
+- **Green "to focus" banner is hidden on iPad.** The green-button hint under the mini feed is an LG-remote affordance; it's now gated on `Platform.isTV`, so on iPad/touch (where you just tap the mini to focus) the bottom banner no longer shows. It still appears on actual TV builds.
+
 ## [0.7.36] - 2026-07-24
 
 ### Fixed

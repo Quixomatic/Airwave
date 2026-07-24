@@ -1,7 +1,7 @@
 import { MpvPlayerView } from "@ChannelGuide/mpv-player";
 import { Maximize2, X } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { setStatusBarHidden } from "expo-status-bar";
 
 import { useGuide } from "@/hooks/queries";
@@ -225,10 +225,11 @@ function PlayerHost({
         />
       )}
 
-      {/* mini: tap to focus; green hint while unfocused; two buttons when focused. */}
+      {/* mini: tap to focus; two buttons when focused. The green "to focus" banner is a TV-remote
+          affordance (the LG green button) — hidden on iPad/touch, where you just tap to focus. */}
       {layout === "mini" && !miniFocused && (
         <Pressable style={{ position: "absolute", inset: 0 }} onPress={onFocusMini}>
-          <GreenHint />
+          {Platform.isTV && <GreenHint />}
         </Pressable>
       )}
       {layout === "mini" && miniFocused && (

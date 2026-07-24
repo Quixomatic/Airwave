@@ -481,9 +481,16 @@ function FeaturedPanel({ channel, program, now, accent, vw, onTune }: { channel:
       player.setMiniSlot(null);
       return;
     }
-    const raf = requestAnimationFrame(measureSlot);
+    // Measure once the layout SETTLES. A single rAF can fire before the guide's ancestors finish
+    // positioning → a stale (top-ish) rect that only corrected when a focus re-render re-measured. Take
+    // it across a couple of frames + a short delay so the bottom-aligned slot lands right on dock.
+    const r1 = requestAnimationFrame(measureSlot);
+    const r2 = requestAnimationFrame(() => requestAnimationFrame(measureSlot));
+    const t = setTimeout(measureSlot, 300);
     return () => {
-      cancelAnimationFrame(raf);
+      cancelAnimationFrame(r1);
+      cancelAnimationFrame(r2);
+      clearTimeout(t);
       player.setMiniSlot(null);
     };
   }, [miniActive, measureSlot, player]);
@@ -554,7 +561,7 @@ function FeaturedPanel({ channel, program, now, accent, vw, onTune }: { channel:
           slot is exactly 16:9 and the video fills it regardless of how mpv's contentFit behaves. Only
           while a mini feed plays. */}
       {miniActive && (
-        <View style={{ alignSelf: "stretch", justifyContent: "flex-end", marginLeft: fv(40) }}>
+        <View onLayout={measureSlot} style={{ alignSelf: "stretch", justifyContent: "flex-end", marginLeft: fv(40) }}>
           <View ref={slotRef} onLayout={measureSlot} style={{ width: fv(970), aspectRatio: 16 / 9, borderRadius: 14 }} />
         </View>
       )}
