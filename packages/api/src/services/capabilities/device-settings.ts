@@ -1,6 +1,6 @@
 import { Prisma, type PrismaClient } from "@ChannelGuide/db";
 
-import { UNDECODABLE_AUDIO, UNRELIABLE_VIDEO } from "./codecs";
+import { audioQuirks, videoQuirks } from "./codecs";
 import { getMeasuredCaps, readOverrides } from "./native-caps";
 
 /**
@@ -41,12 +41,6 @@ const CANDIDATES: Record<CapKind, { token: string; label: string }[]> = {
   ],
 };
 
-const QUIRK: Record<CapKind, Record<string, string>> = {
-  video: UNRELIABLE_VIDEO,
-  audio: UNDECODABLE_AUDIO,
-  container: {},
-};
-
 export type TokenState = {
   token: string;
   label: string;
@@ -63,6 +57,15 @@ export async function getDeviceCapabilityView(prisma: PrismaClient, deviceId: st
     where: { deviceId },
     select: { model: true, osVersion: true, platform: true, screenWidth: true, screenHeight: true, hdr: true },
   });
+
+  // Quirks are platform-scoped (e.g. AV1 is a known-issue only on the Apple mpv clients), so the
+  // Device page shows the same defaults playback actually applies for THIS device's platform.
+  const platform = device?.platform ?? null;
+  const QUIRK: Record<CapKind, Record<string, string>> = {
+    video: videoQuirks(platform),
+    audio: audioQuirks(platform),
+    container: {},
+  };
 
   const setFor = (k: CapKind) => (k === "video" ? measured?.video : k === "audio" ? measured?.audio : measured?.containers);
 

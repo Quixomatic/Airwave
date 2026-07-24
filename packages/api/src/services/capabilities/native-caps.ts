@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@ChannelGuide/db";
 
 import type { ClientCaps } from "../plex/quality";
-import { UNDECODABLE_AUDIO, UNRELIABLE_VIDEO } from "./codecs";
+import { audioQuirks, videoQuirks } from "./codecs";
 import { CAP_MATRIX } from "./matrix";
 
 /**
@@ -135,9 +135,12 @@ export async function getDeviceNativeCaps(prisma: PrismaClient, deviceId: string
   const measured = await getMeasuredCaps(prisma, deviceId);
   if (!measured) return null;
   const ov = await readOverrides(prisma, deviceId);
+  // The platform gates which quirks apply (e.g. AV1 crashes only on the Apple mpv clients).
+  const device = await prisma.tvDevice.findUnique({ where: { deviceId }, select: { platform: true } });
+  const platform = device?.platform ?? null;
   return {
-    videoCodecs: applyEffective(measured.video, UNRELIABLE_VIDEO, ov.video),
-    audioCodecs: applyEffective(measured.audio, UNDECODABLE_AUDIO, ov.audio),
+    videoCodecs: applyEffective(measured.video, videoQuirks(platform), ov.video),
+    audioCodecs: applyEffective(measured.audio, audioQuirks(platform), ov.audio),
     directContainers: applyEffective(measured.containers, {}, ov.container, CONTAINER_ALIAS),
   };
 }

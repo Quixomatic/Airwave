@@ -33,40 +33,57 @@ export function canonicalContainer(raw: string): string {
 }
 
 /**
- * Audio codecs a panel is known NOT to decode even though the onboarding diagnostic
- * "passed" them — because that diagnostic verifies VIDEO decode only (`videoWidth×videoHeight`)
- * and never checks audio. A codec listed here is never credited as directly playable, so its
- * content takes the transcode path where the VIDEO still copies (no re-encode) and only the
- * AUDIO transcodes to a decodable codec. Keyed by canonical codec → the reason.
+ * Codec quirks — codecs a device is known NOT to play well even though the onboarding diagnostic
+ * "passed" them (audio: the diagnostic verifies VIDEO decode only; video: a codec decodes in
+ * ISOLATION but fails our real playback paths). A quirked codec is dropped from the credited native
+ * set, so `getPlaybackInfo` won't direct-play it and the HLS profile won't advertise it as a copy
+ * target → Plex transcodes it (audio-only re-encode where video still copies; a real video transcode
+ * for video quirks). The pattern every mature player ships; a manual per-device override on the
+ * Device settings page can force any of these back on.
  *
- * This is a device-quirk table (the pattern every mature player ships), a stopgap until the
- * diagnostic verifies audio directly — at which point an over-credited codec fails audio
- * verification naturally and its entry here can be dropped.
- *
- * NOTE: applied to every device today because all our targets are LG webOS TVs; scope it to a
- * platform once we support panels that DO decode these.
+ * A quirk with no `platforms` applies to EVERY device (our original LG-webOS-only assumption). One
+ * with `platforms` applies only to those `TvDevice.platform` values ("webos" | "browser" | "ios" |
+ * "android"), so a codec that's broken on one client isn't needlessly transcoded on another.
  */
-export const UNDECODABLE_AUDIO: Record<string, string> = {
+type Quirk = { reason: string; platforms?: string[] };
+
+const AUDIO_QUIRKS: Record<string, Quirk> = {
   // LG webOS (incl. the C2 / OLED77C2AUA) has NO DTS/DCA audio decoder (licensing): a DTS clip
   // decodes its video but no audio ever comes out. Confirmed 2026-07-15 on the C2 (Anastasia,
-  // mkv/h264/dca — video played, audio silent then dead).
-  dts: "LG webOS has no DTS/DCA audio decoder (licensing) — audio silent.",
+  // mkv/h264/dca — video played, audio silent then dead). Global (all current targets lack it).
+  dts: { reason: "LG webOS has no DTS/DCA audio decoder (licensing) — audio silent." },
 };
 
-/**
- * Video codecs that decode in ISOLATION (the diagnostic passed a clip) but do NOT play through our
- * actual paths on the panel — so they must force a real VIDEO transcode to a working codec, same
- * idea as {@link UNDECODABLE_AUDIO}. A codec listed here is dropped from the credited native video
- * set, so `getPlaybackInfo` won't direct-play it AND the HLS profile won't advertise it as a copy
- * target → Plex re-encodes it (e.g. → H.264). Keyed by canonical codec → the reason.
- *
- * (Stopgap until a manual capability-settings page lets the user toggle codecs per device — the
- * proper long-term home, which writes back to `DeviceCapability`.)
- */
-export const UNRELIABLE_VIDEO: Record<string, string> = {
+const VIDEO_QUIRKS: Record<string, Quirk> = {
   // LG C2: VP9 decodes in isolation (it's what YouTube uses) but FAILS every path we have — raw-file
   // `<video>` direct-play of mkv/vp9 errors (code 4, SRC_NOT_SUPPORTED), and VP9 *copied* into
   // fMP4/MSE sticks at readyState 1 (never plays). Confirmed 2026-07-17 on the C2 (Ms. Rachel,
   // mkv/vp9/aac — direct 0x0/err4, HLS stuck buffering). Force a transcode to H.264.
-  vp9: "LG webOS C2: VP9 fails raw-file direct-play (err 4) and VP9-in-MSE stalls — transcode video.",
+  vp9: { reason: "LG webOS C2: VP9 fails raw-file direct-play (err 4) and VP9-in-MSE stalls — transcode video." },
+  // Apple mpv clients (tv-native, MPVKit): mpv software-decodes AV1 via dav1d — there's no reliable
+  // hardware AV1 path through MPVKit — and that dav1d path NULL-CRASHES the decode thread on the
+  // iPad / Apple TV. Confirmed 2026-07-24 on an M1 iPad ("Howl's Moving Castle", mkv/av1/opus →
+  // EXC_BAD_ACCESS in ff_libdav1d_decoder after the first frame). AV1 software decode is CPU-murder
+  // on mobile regardless, so force a transcode to H.264. Scoped to platform "ios" (iPad + Apple TV);
+  // the C2 has hardware AV1 and Android mpv may hardware-decode via MediaCodec, so leave them alone.
+  av1: { reason: "mpv/MPVKit software-decodes AV1 (dav1d) — crashes on Apple clients; transcode to H.264.", platforms: ["ios"] },
 };
+
+/** Flatten a quirk table to `token → reason` for the codecs that apply to this device's platform. */
+function resolveQuirks(table: Record<string, Quirk>, platform: string | null | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [token, q] of Object.entries(table)) {
+    if (!q.platforms || (platform != null && q.platforms.includes(platform))) out[token] = q.reason;
+  }
+  return out;
+}
+
+/** Video codecs off by default (→ transcode) for this device's platform. */
+export function videoQuirks(platform: string | null | undefined): Record<string, string> {
+  return resolveQuirks(VIDEO_QUIRKS, platform);
+}
+
+/** Audio codecs off by default (→ audio transcode) for this device's platform. */
+export function audioQuirks(platform: string | null | undefined): Record<string, string> {
+  return resolveQuirks(AUDIO_QUIRKS, platform);
+}

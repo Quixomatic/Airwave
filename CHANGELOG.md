@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.5] - 2026-07-24
+
+### Fixed
+
+- **AV1 now auto-transcodes on the native mpv clients (device quirk) — fixes an iPad playback crash.** tv-native's mpv (MPVKit) has no reliable hardware AV1 path; it software-decodes AV1 via dav1d, which **null-crashes the decode thread** on iPad/Apple TV (confirmed: "Howl's Moving Castle", mkv/av1/opus → `EXC_BAD_ACCESS` in `ff_libdav1d_decoder` right after the first frame). AV1 is now in the video quirk table **scoped to platform `ios`**, so `getDeviceNativeCaps` drops it from the credited native set and the server transcodes AV1 → H.264 (no direct-play, no crash). The quirk tables are now **platform-scoped** off `TvDevice.platform`: a quirk with no `platforms` applies everywhere (VP9/DTS unchanged — still global), one with `platforms` only to those clients — so the C2 (hardware AV1) and Android (MediaCodec) aren't needlessly transcoded. Server-side only; no app rebuild.
+
+### Required restart
+
+- The dev server (`bun --hot`) may need a manual restart to pick up the `packages/api` change; then re-tune an AV1 channel — it now resolves to an HLS transcode instead of crashing.
+
 ## [0.8.4] - 2026-07-24
 
 ### Added
