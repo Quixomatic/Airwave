@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
 import { GlassCircleButton } from "@/features/guide/glass-button";
@@ -66,9 +66,15 @@ export function SettingsSidebar({
         outerStyle,
       ]}
     >
-      {/* Collapsed: each circle activates its category directly (onPress in `content`). No tap-to-expand
-          wrapper — matches the guide sidebar's collapsed behavior. */}
-      <View style={{ flex: 1, overflow: "hidden", backgroundColor: C.sidebarBg, borderRightWidth: 1, borderRightColor: C.border }}>{content}</View>
+      {/* Expanded: plain surface. Collapsed: the sliver background is a tap-to-expand target, while each
+          category circle still activates directly (its nested Pressable captures its own tap). */}
+      {expanded ? (
+        <View style={{ flex: 1, overflow: "hidden", backgroundColor: C.sidebarBg, borderRightWidth: 1, borderRightColor: C.border }}>{content}</View>
+      ) : (
+        <Pressable onPress={onExpand} style={{ flex: 1 }}>
+          <View style={{ flex: 1, overflow: "hidden", backgroundColor: C.sidebarBg, borderRightWidth: 1, borderRightColor: C.border }}>{content}</View>
+        </Pressable>
+      )}
     </Animated.View>
   );
 }

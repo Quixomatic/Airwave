@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.24] - 2026-07-24
+
+### Fixed
+
+- **Collapsed sidebars expand on a background tap again.** v0.7.23 made the collapsed circles individually pressable but dropped the sliver's tap-to-expand target, so tapping the sidebar background no longer expanded it. Restored: the collapsed sliver is an outer tap-to-expand `Pressable`, with each circle a nested `Pressable` that captures its own tap (so a direct button press activates and a tap on the gaps/background expands). Applies to both the guide sidebar and the settings rail.
+
 ## [0.7.23] - 2026-07-24
 
 ### Fixed
