@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.31] - 2026-07-24
+
+### Fixed
+
+- **Channel-number entry slide direction.** Same reversed-Reanimated-naming fix as the full chrome: the top-center number card was using `FadeInDown` (which rises from below); switched to `FadeInUp` so it drops **down from the top** and exits upward, matching tv-web and the channel chip.
+
 ## [0.7.30] - 2026-07-24
 
 ### Fixed

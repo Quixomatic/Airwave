@@ -2,7 +2,7 @@ import { BlurView } from "expo-blur";
 import { usePathname } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
-import Animated, { FadeInDown, FadeOutUp } from "react-native-reanimated";
+import Animated, { FadeInUp, FadeOutUp } from "react-native-reanimated";
 
 import { useGuide } from "@/hooks/queries";
 import { LAYER, useKeyLayer } from "@/lib/input";
@@ -133,7 +133,7 @@ export function ChannelNumberEntry() {
   return (
     <View pointerEvents="none" style={{ position: "absolute", top: 28, left: 0, right: 0, alignItems: "center", zIndex: 70 }}>
       <Animated.View
-        entering={FadeInDown.duration(250)}
+        entering={FadeInUp.duration(250)}
         exiting={FadeOutUp.duration(250)}
         style={{ minWidth: 220, borderRadius: 18, overflow: "hidden", borderWidth: 1, borderColor: flash ? "rgba(239,68,68,0.6)" : "rgba(255,255,255,0.12)" }}
       >
