@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.30] - 2026-07-24
+
+### Fixed
+
+- **Full-chrome open animation direction.** The feature panel was entering from *above* (settling down) instead of sliding up from the bottom. In this Reanimated build `FadeInUp` starts above and moves down (the reverse of the name), so the enter/exit were mismatched. Corrected: the panel uses `FadeInDown`/`FadeOutDown` (slides up in, down out) and the chip uses `FadeInUp`/`FadeOutUp` (down from the top in, up out).
+
 ## [0.7.29] - 2026-07-24
 
 ### Changed

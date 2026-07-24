@@ -85,9 +85,11 @@ export function FullChrome({
 
       {panelOpen && (
         <>
-          {/* Glass channel chip, top-right — slides DOWN from the top (tv-web parity: y:-30 → 0). */}
+          {/* Glass channel chip, top-right — slides DOWN from the top (tv-web parity: y:-30 → 0).
+              NOTE: in this Reanimated build FadeInUp starts ABOVE and moves down; FadeInDown starts
+              below and moves up. So "from the top" = FadeInUp, and the exit up = FadeOutUp. */}
           <Animated.View
-            entering={FadeInDown.duration(250)}
+            entering={FadeInUp.duration(250)}
             exiting={FadeOutUp.duration(250)}
             style={{ position: "absolute", top: 28, right: 40, flexDirection: "row", alignItems: "center", gap: 12, height: 56, paddingLeft: 12, paddingRight: 22, borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", backgroundColor: "rgba(18,24,38,0.55)" }}
           >
@@ -98,13 +100,14 @@ export function FullChrome({
             <Text style={{ fontSize: 22, fontWeight: "600", color: "#e6eaf1" }}>{channel?.name}</Text>
           </Animated.View>
           {/* touch back-to-guide affordance (D-pad uses Back) — slides down with the chip */}
-          <Animated.View entering={FadeInDown.duration(250)} exiting={FadeOutUp.duration(250)} style={{ position: "absolute", top: 28, left: 24, zIndex: 2 }}>
+          <Animated.View entering={FadeInUp.duration(250)} exiting={FadeOutUp.duration(250)} style={{ position: "absolute", top: 28, left: 24, zIndex: 2 }}>
             <Pressable onPress={onBack} style={{ borderRadius: 999, backgroundColor: "rgba(18,24,38,0.6)", padding: 10 }}>
               <ArrowLeft size={24} color="#f1f5f9" />
             </Pressable>
           </Animated.View>
-          {/* Feature panel — slides UP from the bottom (tv-web parity: y:48 → 0). */}
-          <Animated.View entering={FadeInUp.duration(250)} exiting={FadeOutDown.duration(250)} style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
+          {/* Feature panel — slides UP from the bottom (tv-web parity: y:48 → 0). FadeInDown = starts
+              below, moves up in this Reanimated build; exit down = FadeOutDown. */}
+          <Animated.View entering={FadeInDown.duration(250)} exiting={FadeOutDown.duration(250)} style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
             <FeaturePanel
               channel={channel}
               player={player}
