@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.33] - 2026-07-24
+
+### Fixed
+
+- **Scrubber jumped to the program start when switching to a transcode (HLS) quality.** The effectiveTime baseline was anchored in `onLoad` (before playback actually started) using whatever position was seeded, and mpv can timestamp a server-positioned HLS stream either from 0 or from the offset — so the anchor was wrong and the DVR clock computed the program start (playback itself was fine). Now matches tv-web's model: **direct-play** anchors deterministically at the offset (we pass `loadfile start=offset`), while **HLS/http** anchor to the *first real `onProgress` position* — wherever the stream actually opens, mode-agnostic. Supersedes the v0.7.32 seed for the transcode case.
+
 ## [0.7.32] - 2026-07-24
 
 ### Fixed

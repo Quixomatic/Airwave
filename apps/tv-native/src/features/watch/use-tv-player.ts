@@ -223,19 +223,33 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   // mpv view events — returned as `videoEvents`, spread onto <MpvPlayerView>. currentTime is in SECONDS
   // (mpv `time-pos` — absolute media time, exactly like an HTML <video>, so the tv-web clock maps 1:1).
   const onProgress = useCallback((e: { nativeEvent: { currentTime: number } }) => {
-    positionSecRef.current = e.nativeEvent.currentTime;
+    const t = e.nativeEvent.currentTime;
+    positionSecRef.current = t;
+    // HLS/http baseline: anchor to the FIRST real reported position (whatever mpv timestamps the
+    // server-positioned stream as — 0-based OR offset-based; we don't need to know which). Matches
+    // tv-web's baseline-on-"playing". Direct is anchored deterministically in applyBaseline (we passed
+    // loadfile start=offset), so this only fires for the modes we can't predict. Guarded so a
+    // resume-from-pause never re-anchors.
+    const loaded = currentRef.current;
+    if (loaded && loaded.kind === "PROGRAM" && !loaded.baselineReady) {
+      loaded.playStartCurrentTime = t;
+      loaded.baselineReady = true;
+    }
     if (!firstProgressRef.current) {
       firstProgressRef.current = true;
-      console.log(`[mpv] +${Date.now() - loadStartRef.current}ms FIRST-PROGRESS t=${e.nativeEvent.currentTime.toFixed(1)}s`);
+      console.log(`[mpv] +${Date.now() - loadStartRef.current}ms FIRST-PROGRESS t=${t.toFixed(1)}s`);
     }
   }, []);
-  // Baseline once per loaded program: direct-play opened AT the offset (loadfile start=), HLS/http starts
-  // at ~0. Anchor the clock to where playback begins. Guarded so resume-from-pause never re-anchors.
+  // Direct-play opens deterministically AT the offset (loadfile start=offset) — anchor the clock there
+  // as soon as it loads. HLS/http open at a server-positioned spot whose REPORTED time we can't predict,
+  // so those defer to onProgress (above) to anchor to the first real position. Guarded against re-anchor.
   const applyBaseline = useCallback(() => {
     const loaded = currentRef.current;
     if (!loaded || loaded.kind !== "PROGRAM" || loaded.baselineReady) return;
-    loaded.playStartCurrentTime = loaded.mode === "direct" && loaded.offset > 0 ? loaded.offset : positionSecRef.current;
-    loaded.baselineReady = true;
+    if (loaded.mode === "direct" && loaded.offset > 0) {
+      loaded.playStartCurrentTime = loaded.offset;
+      loaded.baselineReady = true;
+    }
   }, []);
   // onLoad = mpv `file-loaded` (parsed dims/duration): PlaybackLog + baseline + "playing".
   const onLoad = useCallback(
