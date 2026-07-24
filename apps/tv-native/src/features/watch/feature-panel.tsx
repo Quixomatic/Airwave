@@ -1,7 +1,7 @@
-import { AudioLines, Captions, Clapperboard, Info, Pause, Play, Radio, RotateCcw, SlidersHorizontal, Star, Tv } from "lucide-react-native";
+import { AudioLines, Captions, Check, Clapperboard, Info, Pause, Play, Radio, RotateCcw, SlidersHorizontal, Star, Tv } from "lucide-react-native";
 import type { ComponentType } from "react";
 import { useEffect, useRef, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 import type { GuideChannel } from "@/lib/api";
@@ -245,27 +245,30 @@ export function FeaturePanel({
         </>
       )}
 
-      {/* pickers */}
-      <PickerModal
-        open={picker !== null}
-        title={picker === "audio" ? "Audio" : picker === "subtitle" ? "Subtitles" : "Quality"}
-        items={
-          picker === "audio"
-            ? [{ value: "", label: "Default" }, ...tracks.audio.map((t) => ({ value: t.id, label: t.label }))]
-            : picker === "subtitle"
-              ? [{ value: "off", label: "Off" }, ...tracks.subtitle.map((t) => ({ value: t.id, label: t.label }))]
-              : qualities.map((q) => ({ value: q.id, label: q.label }))
-        }
-        current={picker === "audio" ? audioStreamId ?? "" : picker === "subtitle" ? subtitleStreamId ?? "off" : quality}
-        onPick={(v) => {
-          if (picker === "audio") onSelectAudio(v || undefined);
-          else if (picker === "subtitle") onSelectSub(v);
-          else onSelectQuality(v);
-          setPicker(null);
-        }}
-        onClose={() => setPicker(null)}
-        accent={accent}
-      />
+      {/* picker — an anchored glass dropdown that opens UPWARD from its selector button (tv-web's
+          side="top" align="end"). No native <Modal>, so no stacking; right-offset aligns it to the
+          Audio / Subtitles / Quality circle it belongs to. */}
+      {picker !== null && (
+        <PickerDropdown
+          rightOffset={picker === "audio" ? 188 : picker === "subtitle" ? 122 : 56}
+          items={
+            picker === "audio"
+              ? [{ value: "", label: "Default" }, ...tracks.audio.map((t) => ({ value: t.id, label: t.label }))]
+              : picker === "subtitle"
+                ? [{ value: "off", label: "Off" }, ...tracks.subtitle.map((t) => ({ value: t.id, label: t.label }))]
+                : qualities.map((q) => ({ value: q.id, label: q.label }))
+          }
+          current={picker === "audio" ? audioStreamId ?? "" : picker === "subtitle" ? subtitleStreamId ?? "off" : quality}
+          onPick={(v) => {
+            if (picker === "audio") onSelectAudio(v || undefined);
+            else if (picker === "subtitle") onSelectSub(v);
+            else onSelectQuality(v);
+            setPicker(null);
+          }}
+          onClose={() => setPicker(null)}
+          accent={accent}
+        />
+      )}
     </LinearGradient>
   );
 }
@@ -350,21 +353,45 @@ function DeliveryReadout({ delivery, accent }: { delivery: Delivery; accent: str
   );
 }
 
-function PickerModal({ open, title, items, current, onPick, onClose, accent }: { open: boolean; title: string; items: { value: string; label: string }[]; current: string; onPick: (v: string) => void; onClose: () => void; accent: string }) {
+/** An anchored glass dropdown that opens upward from a selector circle (Aurora-styled, matches the
+ *  sidebar glass + Info chips). No native Modal — an in-panel backdrop catches an outside tap to close,
+ *  the selected row is accent-tinted with a check. `rightOffset` aligns it under its own button. */
+function PickerDropdown({ rightOffset, items, current, onPick, onClose, accent }: { rightOffset: number; items: { value: string; label: string }[]; current: string; onPick: (v: string) => void; onClose: () => void; accent: string }) {
   return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" }}>
-        <View style={{ minWidth: 320, maxHeight: "70%", borderRadius: 16, backgroundColor: "#0b1120", borderWidth: 1, borderColor: "rgba(148,163,184,0.2)", overflow: "hidden" }}>
-          <Text style={{ fontSize: 15, fontWeight: "700", color: "#94a3b8", padding: 16 }}>{title}</Text>
-          <ScrollView>
-            {items.map((it) => (
-              <Pressable key={it.value} onPress={() => onPick(it.value)} style={{ paddingVertical: 14, paddingHorizontal: 18, backgroundColor: it.value === current ? "rgba(74,159,224,0.14)" : "transparent" }}>
-                <Text style={{ fontSize: 18, color: it.value === current ? accent : "#f1f5f9" }}>{it.label}</Text>
+    <>
+      {/* backdrop: an outside tap (anywhere in the panel) closes the dropdown */}
+      <Pressable onPress={onClose} style={{ position: "absolute", inset: 0 }} />
+      <View
+        style={{
+          position: "absolute",
+          bottom: 102,
+          right: rightOffset,
+          minWidth: 240,
+          maxHeight: 320,
+          borderRadius: 14,
+          backgroundColor: "rgba(13,19,33,0.96)",
+          borderWidth: 1,
+          borderColor: "rgba(148,163,184,0.22)",
+          overflow: "hidden",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 12 },
+          shadowRadius: 28,
+          shadowOpacity: 0.5,
+          elevation: 20,
+        }}
+      >
+        <ScrollView bounces={false}>
+          {items.map((it) => {
+            const sel = it.value === current;
+            return (
+              <Pressable key={it.value} onPress={() => onPick(it.value)} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 18, paddingVertical: 13, paddingHorizontal: 16, backgroundColor: sel ? hexA(accent, 0.14) : pressed ? "rgba(255,255,255,0.06)" : "transparent" })}>
+                <Text style={{ fontSize: 17, fontWeight: sel ? "600" : "400", color: sel ? accent : "#f1f5f9" }}>{it.label}</Text>
+                {sel && <Check size={18} color={accent} />}
               </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-      </Pressable>
-    </Modal>
+            );
+          })}
+        </ScrollView>
+      </View>
+    </>
   );
 }

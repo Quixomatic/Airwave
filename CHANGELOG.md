@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.26] - 2026-07-24
+
+### Fixed
+
+- **Full-player Audio/Subtitles/Quality menus no longer stack, and look native.** They used a full-screen RN `<Modal>` (a centered dark box) which, on iOS, could re-present before the previous one finished dismissing — leaving menus stacked behind each other on close. Replaced with an **anchored glass dropdown** that opens upward from its own selector circle (tv-web's `side="top" align="end"` — right-offset so Audio/Subtitles/Quality each align under their button), Aurora-styled to match the sidebar glass + Info chips, with the current option accent-tinted and check-marked. No native Modal → no stacking; an outside tap or Back closes it.
+
 ## [0.7.25] - 2026-07-24
 
 ### Changed
