@@ -7,6 +7,7 @@ import { useGuide } from "@/hooks/queries";
 import { api } from "@/lib/api";
 import { C } from "@/lib/theme";
 
+import { BumperCard } from "./bumper-card";
 import { ChannelNumberEntry } from "./channel-number-entry";
 import { Ctx, type Layout, type PlayerCtx } from "./player-ctx";
 import { useTvPlayer } from "./use-tv-player";
@@ -191,15 +192,9 @@ function PlayerHost({
         <MpvPlayerView ref={tv.viewRef} source={tv.source} startTime={tv.startTime} {...tv.videoEvents} style={StyleSheet.absoluteFill} contentFit={full ? "contain" : "cover"} />
       )}
 
-      {/* bumper interstitial */}
-      {status.state === "bumper" && status.guide && (
-        <View style={{ position: "absolute", inset: 0, alignItems: "center", justifyContent: "center", backgroundColor: C.bg, gap: 8 }}>
-          <Text style={{ color: C.mutedFg, fontSize: full ? 18 : 12 }}>Up next</Text>
-          <Text numberOfLines={2} style={{ color: C.fg, fontSize: full ? 30 : 15, fontWeight: "800", textAlign: "center", paddingHorizontal: 12 }}>
-            {status.guide.showTitle ?? status.guide.title}
-          </Text>
-          {status.bumperRemaining != null && <Text style={{ color: C.mutedFg, fontSize: full ? 15 : 11 }}>in {status.bumperRemaining}s</Text>}
-        </View>
+      {/* bumper interstitial — full (blurred art + big title + donut) or compact (mini feed) */}
+      {status.state === "bumper" && status.guide && channelId && (
+        <BumperCard channelId={channelId} guide={status.guide} remaining={status.bumperRemaining} accent={accent} compact={!full} />
       )}
 
       {status.loading && status.state !== "bumper" && (

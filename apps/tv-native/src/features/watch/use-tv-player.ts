@@ -191,6 +191,9 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
           loaded.baselineReady = true;
           positionSecRef.current = offset;
           void viewRef.current?.seek(offset);
+          // mpv `pause` is a PERSISTENT property (survives loadfile/seek). A bumper paused it; a
+          // same-media DVR seek back into this program won't fire onLoad, so resume here explicitly.
+          void viewRef.current?.play();
         } else {
           decodedDimsRef.current = { w: 0, h: 0 };
           positionSecRef.current = 0;
@@ -238,6 +241,10 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
       decodedDimsRef.current = { w: width, h: height };
       playingRef.current = true;
       applyBaseline();
+      // A fresh program load: resume unless the user paused. mpv's `pause` persists across loadfile,
+      // so after a bumper (which paused) the next program would paint its first frame but stay paused —
+      // exactly tv-web's `tryPlay(video)` on every load.
+      if (!pausedRef.current) void viewRef.current?.play();
       recordLog(width > 0 && height > 0 ? "playing" : "not_decoding");
       setStatus((s) => (s.buffering ? { ...s, buffering: false } : s));
     },
