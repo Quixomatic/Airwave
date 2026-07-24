@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.27] - 2026-07-24
+
+### Fixed
+
+- **Audio/Subtitles/Quality dropdown polish + close behavior.** The v0.7.26 dropdown had a disconnected trailing check, cramped rows, and only closed on select/button-tap. Reworked: each row has a **leading check slot** (check beside the label, labels aligned), generous padding, intrinsic width, and a scrolling max-height. It now renders in a transparent, conditionally-mounted full-screen Modal so a **tap anywhere outside closes it** (the menu claims its own touches), and **Back closes it** via the panel's key layer (GCKeyboard is app-wide, so it fires under the Modal). Conditional mount avoids the visible-toggle stacking the original Modal had.
+
 ## [0.7.26] - 2026-07-24
 
 ### Fixed

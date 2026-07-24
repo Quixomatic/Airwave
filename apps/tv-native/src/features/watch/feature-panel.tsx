@@ -1,7 +1,7 @@
 import { AudioLines, Captions, Check, Clapperboard, Info, Pause, Play, Radio, RotateCcw, SlidersHorizontal, Star, Tv } from "lucide-react-native";
 import type { ComponentType } from "react";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 import type { GuideChannel } from "@/lib/api";
@@ -353,45 +353,64 @@ function DeliveryReadout({ delivery, accent }: { delivery: Delivery; accent: str
   );
 }
 
-/** An anchored glass dropdown that opens upward from a selector circle (Aurora-styled, matches the
- *  sidebar glass + Info chips). No native Modal — an in-panel backdrop catches an outside tap to close,
- *  the selected row is accent-tinted with a check. `rightOffset` aligns it under its own button. */
+/** An anchored glass dropdown (Aurora-styled — matches the sidebar glass + Info chips) opening upward
+ *  from its selector circle. Rendered in a transparent, CONDITIONALLY-MOUNTED Modal so a tap ANYWHERE
+ *  closes it (its own full-screen window catches the touch) and there's no visible-toggle stacking. The
+ *  menu itself claims its touches so a tap inside doesn't close it; Back closes it via the panel's key
+ *  layer. `rightOffset` aligns the menu's right edge with its own button. */
 function PickerDropdown({ rightOffset, items, current, onPick, onClose, accent }: { rightOffset: number; items: { value: string; label: string }[]; current: string; onPick: (v: string) => void; onClose: () => void; accent: string }) {
   return (
-    <>
-      {/* backdrop: an outside tap (anywhere in the panel) closes the dropdown */}
-      <Pressable onPress={onClose} style={{ position: "absolute", inset: 0 }} />
-      <View
-        style={{
-          position: "absolute",
-          bottom: 102,
-          right: rightOffset,
-          minWidth: 240,
-          maxHeight: 320,
-          borderRadius: 14,
-          backgroundColor: "rgba(13,19,33,0.96)",
-          borderWidth: 1,
-          borderColor: "rgba(148,163,184,0.22)",
-          overflow: "hidden",
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 12 },
-          shadowRadius: 28,
-          shadowOpacity: 0.5,
-          elevation: 20,
-        }}
-      >
-        <ScrollView bounces={false}>
-          {items.map((it) => {
-            const sel = it.value === current;
-            return (
-              <Pressable key={it.value} onPress={() => onPick(it.value)} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 18, paddingVertical: 13, paddingHorizontal: 16, backgroundColor: sel ? hexA(accent, 0.14) : pressed ? "rgba(255,255,255,0.06)" : "transparent" })}>
-                <Text style={{ fontSize: 17, fontWeight: sel ? "600" : "400", color: sel ? accent : "#f1f5f9" }}>{it.label}</Text>
-                {sel && <Check size={18} color={accent} />}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-    </>
+    <Modal transparent visible animationType="fade" onRequestClose={onClose}>
+      {/* full-screen backdrop — a tap anywhere outside the menu closes it (faint dim to focus it) */}
+      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.18)" }}>
+        <View
+          onStartShouldSetResponder={() => true}
+          style={{
+            position: "absolute",
+            bottom: 102,
+            right: rightOffset,
+            minWidth: 210,
+            maxWidth: 360,
+            maxHeight: 336,
+            borderRadius: 14,
+            backgroundColor: "rgba(13,19,33,0.98)",
+            borderWidth: 1,
+            borderColor: "rgba(148,163,184,0.22)",
+            overflow: "hidden",
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 12 },
+            shadowRadius: 28,
+            shadowOpacity: 0.5,
+            elevation: 20,
+          }}
+        >
+          <ScrollView bounces={false} contentContainerStyle={{ paddingVertical: 6 }}>
+            {items.map((it) => {
+              const sel = it.value === current;
+              return (
+                <Pressable
+                  key={it.value}
+                  onPress={() => onPick(it.value)}
+                  style={({ pressed }) => ({
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    backgroundColor: sel ? hexA(accent, 0.16) : pressed ? "rgba(255,255,255,0.07)" : "transparent",
+                  })}
+                >
+                  {/* leading check slot — keeps the check beside the item and all labels aligned */}
+                  <View style={{ width: 20, alignItems: "center", justifyContent: "center" }}>{sel && <Check size={18} color={accent} />}</View>
+                  <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 16, fontWeight: sel ? "600" : "400", color: sel ? accent : "#f1f5f9" }}>
+                    {it.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </Pressable>
+    </Modal>
   );
 }
