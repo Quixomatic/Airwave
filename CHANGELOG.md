@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.32] - 2026-07-24
+
+### Fixed
+
+- **Scrubber snapped to the program start after a quality change.** Switching quality (e.g. 720p → Original) re-resolves the program at the current spot — playback stayed correct, but the DVR scrubber jumped to the beginning of the program. Cause: the direct-play reload seeded `positionSecRef = 0`, so in the window between `onLoad` (which anchors the baseline at `offset`) and mpv's first `onProgress` (which reports `offset`), `currentEffective` computed `startS + offset + (0 − offset) = startS`. Now the direct reload seeds the position at the offset (matching where playback opens), so the clock is consistent immediately. Also removes the same transient on tune-in.
+
 ## [0.7.31] - 2026-07-24
 
 ### Fixed

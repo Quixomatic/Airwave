@@ -196,7 +196,11 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
           void viewRef.current?.play();
         } else {
           decodedDimsRef.current = { w: 0, h: 0 };
-          positionSecRef.current = 0;
+          // Direct opens AT the offset (loadfile start=), so seed the position there — otherwise, in the
+          // window between onLoad (baseline anchors playStartCurrentTime=offset) and mpv's first onProgress
+          // (reports ~offset), currentEffective = startS+offset+(0−offset) = startS and the scrubber snaps
+          // to the program START. HLS/http start at ~0. (The same-media seek path already seeds this.)
+          positionSecRef.current = info.mode === "direct" ? offset : 0;
           firstProgressRef.current = false;
           bufferingRef.current = false;
           loggedRef.current = false;
