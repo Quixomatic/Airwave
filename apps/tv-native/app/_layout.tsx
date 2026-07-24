@@ -11,8 +11,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { PlayerProvider } from "@/features/watch/player-context";
 import { loadSession } from "@/lib/auth";
 import { loadDevice } from "@/lib/device";
-import { useHardwareKeyInput, useTVInput } from "@/lib/input";
-import { notifyInputActivity } from "@/lib/input/dispatcher";
+import { notifyInputActivity, useHardwareKeyInput, useTVInput } from "@/lib/input";
 import { C } from "@/lib/theme";
 
 const queryClient = new QueryClient({

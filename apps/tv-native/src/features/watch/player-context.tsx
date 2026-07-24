@@ -6,7 +6,7 @@ import { setStatusBarHidden } from "expo-status-bar";
 
 import { useGuide } from "@/hooks/queries";
 import { api } from "@/lib/api";
-import { onInputActivity } from "@/lib/input/dispatcher";
+import { onInputActivity } from "@/lib/input";
 import { C } from "@/lib/theme";
 
 import { BumperCard } from "./bumper-card";

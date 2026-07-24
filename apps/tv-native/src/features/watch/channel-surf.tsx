@@ -5,7 +5,7 @@ import { Image, Pressable, Text, useWindowDimensions, View } from "react-native"
 
 import { channelIcon, liveProgramIndex } from "@/features/guide/layout";
 import { imageUrl, type GuideGridChannel } from "@/lib/api";
-import { LAYER, useKeyLayer } from "@/lib/input";
+import { LAYER, onInputActivity, useKeyLayer } from "@/lib/input";
 import { channelVivid } from "@/lib/tint";
 
 /**
@@ -29,17 +29,22 @@ export function ChannelSurf({ channels, currentChannelId, onTune, onClose }: { c
 
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const resetHide = useCallback(() => {
-    if (hideTimer.current) clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => onCloseRef.current(), AUTO_HIDE_MS);
-  }, []);
+  // Auto-hide after inactivity (tv-web parity) — reset on ANY input (key OR touch) via the shared
+  // input-activity notifier, the same signal the mini-idle timer and feature panel ride. Back is
+  // handled by the key layer below, independent of this timer.
   useEffect(() => {
-    resetHide();
-    return () => {
-      if (hideTimer.current) clearTimeout(hideTimer.current);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const reset = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => onCloseRef.current(), AUTO_HIDE_MS);
     };
-  }, [resetHide]);
+    reset();
+    const unsub = onInputActivity(reset);
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsub();
+    };
+  }, []);
 
   const move = useCallback(
     (dir: 1 | -1) => {
@@ -67,11 +72,9 @@ export function ChannelSurf({ channels, currentChannelId, onTune, onClose }: { c
     onKey(e) {
       switch (e.key) {
         case "left":
-          resetHide();
           move(-1);
           break;
         case "right":
-          resetHide();
           move(1);
           break;
         case "ok": {
@@ -84,7 +87,7 @@ export function ChannelSurf({ channels, currentChannelId, onTune, onClose }: { c
           onCloseRef.current();
           break;
         default:
-          resetHide();
+          break;
       }
       return true; // swallow everything
     },

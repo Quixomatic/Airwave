@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.41] - 2026-07-24
+
+### Changed
+
+- **Feature-panel and channel-surf auto-hide now ride the shared input-activity notifier.** Both auto-hide timers previously reset only on key events via their own local handlers, so on iPad a touch (tapping controls) wouldn't reset them and the chrome could vanish out from under you mid-interaction. Both now subscribe to the same `onInputActivity` signal the mini-idle timer uses, so ANY input — a hardware key, the TV remote, or a touch — resets them. Back behavior is unchanged, still handled independently by each component's key layer (info → picker → close for the panel; close for surf), so the timer unification can't affect it.
+
 ## [0.7.40] - 2026-07-24
 
 ### Added

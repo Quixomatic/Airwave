@@ -7,7 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import type { GuideChannel } from "@/lib/api";
 import { hexA } from "@/features/guide/layout";
-import { LAYER, useKeyLayer } from "@/lib/input";
+import { LAYER, onInputActivity, useKeyLayer } from "@/lib/input";
 
 import type { Delivery, useTvPlayer } from "./use-tv-player";
 
@@ -97,17 +97,21 @@ export function FeaturePanel({
   const title = isEpisode ? g?.showTitle : g?.title;
   const subTitle = isEpisode ? `S${g?.season}, E${g?.episode}${g?.title ? ` · ${g.title}` : ""}` : undefined;
 
-  // Auto-hide the panel after inactivity (tv-web parity).
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const armHide = () => {
-    if (hideTimer.current) clearTimeout(hideTimer.current);
-    if (picker) return;
-    hideTimer.current = setTimeout(onClose, 8000);
-  };
+  // Auto-hide the panel after inactivity (tv-web parity) — reset on ANY input (key OR touch) via the
+  // shared input-activity notifier, same signal the mini-player idle timer rides. NOT while a picker is
+  // open (it owns the interaction). Back is handled by the key layer below, independent of this timer.
   useEffect(() => {
-    armHide();
+    if (picker) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const reset = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(onClose, 8000);
+    };
+    reset();
+    const unsub = onInputActivity(reset);
     return () => {
-      if (hideTimer.current) clearTimeout(hideTimer.current);
+      if (timer) clearTimeout(timer);
+      unsub();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [picker]);
@@ -152,7 +156,6 @@ export function FeaturePanel({
         else onClose();
         return true;
       }
-      armHide();
       // Picker open — D-pad/keyboard navigates the list (Back, handled above, closes it).
       if (picker) {
         if (e.key === "up") {
