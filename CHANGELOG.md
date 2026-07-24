@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.6] - 2026-07-24
+
+### Added
+
+- **Device capability overrides ported to tv-native (Settings → Device) — a faithful port of the tv-web page.** Per-codec toggles (video / audio / container) that override the server's measured caps + platform quirks. Each row shows the effective on/off `Toggle` + a `Pill` (Override / Forced) + a status line (Measured / Known-issue / Overriding); tapping flips it instantly (optimistic cache update) and collapses back to *clearing* the override when the choice matches the diagnostic default; a **Reset to diagnostic** row appears when any override is set; recent playback issues are listed for context. Same 2-column column-major grid + toggle logic as tv-web, wired to the existing `GET/POST /api/v1/device/caps` + `/reset` endpoints via new `api.ts` functions + types. So the v0.8.5 AV1 auto-transcode is now **visible and overridable** here, and any codec that misbehaves per-platform (Android / Fire TV / tvOS) is one toggle away. JS-only — hot-reloads, no rebuild.
+
 ## [0.8.5] - 2026-07-24
 
 ### Fixed

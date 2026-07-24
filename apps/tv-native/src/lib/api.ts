@@ -183,6 +183,36 @@ export type MediaInfo = {
   decision?: { videoDecision?: string; audioDecision?: string; videoCodec?: string; audioCodec?: string; container?: string };
 };
 
+// --- Device capability overrides (Settings → Device) — ported from tv-web -------
+export type CapKind = "video" | "audio" | "container";
+export type CapTokenState = {
+  token: string;
+  label: string;
+  measured: boolean; // the diagnostic credited native decode
+  quirk: string | null; // a known-issue reason it's off by default
+  override: boolean | null; // manual override (null = none)
+  effective: boolean; // what playback actually uses
+};
+export type CapGroup = { kind: CapKind; tokens: CapTokenState[] };
+export type PlaybackError = {
+  channelName: string | null;
+  title: string | null;
+  mode: string | null;
+  sourceContainer: string | null;
+  sourceVideoCodec: string | null;
+  sourceAudioCodec: string | null;
+  error: string | null;
+  outcome: string | null;
+  createdAt: string;
+};
+export type DeviceCapView = {
+  onboarded: boolean;
+  hasOverrides: boolean;
+  device: { model: string | null; osVersion: string | null; platform: string | null; screenWidth: number | null; screenHeight: number | null; hdr: boolean | null } | null;
+  groups: CapGroup[];
+  recentErrors: PlaybackError[];
+};
+
 export const api = {
   packages: () => request<{ packages: Package[] }>("/api/v1/packages"),
 
@@ -233,4 +263,13 @@ export const api = {
     }),
   recents: () => request<{ channelIds: string[] }>("/api/v1/recents"),
   guide: (forwardMinutes = 180) => request<GuideGrid>(`/api/v1/guide?forwardMinutes=${forwardMinutes}`),
+
+  /** The Device settings breakdown: measured / quirk / override / effective per codec + recent errors. */
+  deviceCaps: (deviceId: string) => request<DeviceCapView>(`/api/v1/device/caps?deviceId=${encodeURIComponent(deviceId)}`),
+  /** Set (or clear, when value=null) one codec's override for this device. */
+  setDeviceCap: (deviceId: string, kind: CapKind, token: string, value: boolean | null) =>
+    request<{ overrides: unknown }>("/api/v1/device/caps", { method: "POST", body: JSON.stringify({ deviceId, kind, token, value }) }),
+  /** Clear all overrides — revert to exactly what the diagnostic found. */
+  resetDeviceCaps: (deviceId: string) =>
+    request<{ ok: true }>("/api/v1/device/caps/reset", { method: "POST", body: JSON.stringify({ deviceId }) }),
 };
