@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.35] - 2026-07-24
+
+### Changed
+
+- **tv-native hides the iPad status bar during full-screen playback.** The time/battery/status bar now fades away while a channel is full-screen (for a clean 10-foot frame) and restores in the mini player or when closed — `setStatusBarHidden` keyed on the player layout, so it doesn't fight the app's light status-bar style elsewhere.
+
 ## [0.7.34] - 2026-07-24
 
 ### Fixed

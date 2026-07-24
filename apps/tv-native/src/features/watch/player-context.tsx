@@ -2,6 +2,7 @@ import { MpvPlayerView } from "@ChannelGuide/mpv-player";
 import { Maximize2, X } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { setStatusBarHidden } from "expo-status-bar";
 
 import { useGuide } from "@/hooks/queries";
 import { api } from "@/lib/api";
@@ -163,6 +164,12 @@ function PlayerHost({
   }, [status.state, status.loading, onPlaying]);
 
   const full = layout === "full";
+
+  // Hide the iPad status bar (time/battery/etc.) during full-screen playback for a clean 10-foot frame;
+  // restore it in mini/off. Imperative so it doesn't fight the root <StatusBar style="light" />.
+  useEffect(() => {
+    setStatusBarHidden(full, "fade");
+  }, [full]);
   // full → fill the screen; mini + docked → the featured slot; mini with no slot (e.g. on Settings,
   // where the guide's dock is unmounted) → hidden (audio keeps playing), matching tv-web.
   const hiddenMini = { x: vw - vw * 0.42, y: 80, width: vw * 0.42, height: (vw * 0.42 * 9) / 16 };
