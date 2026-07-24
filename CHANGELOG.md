@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.12] - 2026-07-24
+
+### Fixed
+
+- **Android build failed at the libmpv AAR download — `Could not find method exec()`.** Gradle 9.0 removed the `exec {}` closure from task actions (`doLast { exec {...} }`), which the mpv-player android `downloadLibmpv`/`extractMpvLibcxx` tasks used (ported from plezy's older-Gradle script). Rewrote both as the **`Exec` task type** (`tasks.register('…', Exec) { commandLine … }`) — the Gradle-9-native way to run `curl`/`unzip`. These tasks run in the pre-build phase (before compilation), so the Kotlin *still* hasn't compiled — the next Android build remains the first real validation of the mpv engine + key-input.
+
 ## [0.8.11] - 2026-07-24
 
 ### Fixed

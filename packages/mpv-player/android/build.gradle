@@ -17,31 +17,31 @@ def mpvVersion = 'v1.0.7'
 def mpvDir = layout.buildDirectory.dir('libmpv').get().asFile
 def mpvAar = 'libmpv-release.aar'
 
-def downloadLibmpv = tasks.register('downloadLibmpv') {
+// Gradle 9 removed the `exec {}` closure inside task actions — use the `Exec` task type instead.
+def downloadLibmpv = tasks.register('downloadLibmpv', Exec) {
   def stamp = new File(mpvDir, '.version')
   outputs.upToDateWhen { stamp.exists() && stamp.text.trim() == mpvVersion }
-  doLast {
-    mpvDir.mkdirs()
-    def url = "https://github.com/edde746/libmpv-android/releases/download/${mpvVersion}/${mpvAar}"
-    exec { commandLine 'curl', '-sfL', url, '-o', new File(mpvDir, mpvAar).absolutePath }
-    stamp.text = mpvVersion
-  }
+  commandLine 'curl', '-sfL',
+    "https://github.com/edde746/libmpv-android/releases/download/${mpvVersion}/${mpvAar}",
+    '-o', new File(mpvDir, mpvAar).absolutePath
+  doFirst { mpvDir.mkdirs() }
+  doLast { stamp.text = mpvVersion }
 }
 
 // Extract libmpv's libc++_shared.so so the app source set can package it with top
 // merge priority — libmpv is built against a newer libc++ than other native
 // consumers (RN, Reanimated), and its runtime must win (std::from_chars<float>).
-def extractMpvLibcxx = tasks.register('extractMpvLibcxx') {
+def extractMpvLibcxx = tasks.register('extractMpvLibcxx', Exec) {
   dependsOn downloadLibmpv
   def aar = new File(mpvDir, mpvAar)
   def outDir = new File(mpvDir, 'libcxx')
   inputs.file aar
   outputs.dir outDir
-  doLast {
+  doFirst {
     outDir.deleteDir() // drop stale ABIs from a previous AAR version
     outDir.mkdirs()
-    exec { commandLine 'unzip', '-q', '-o', aar.absolutePath, 'jni/*/libc++_shared.so', '-d', outDir.absolutePath }
   }
+  commandLine 'unzip', '-q', '-o', aar.absolutePath, 'jni/*/libc++_shared.so', '-d', outDir.absolutePath
 }
 
 android {
