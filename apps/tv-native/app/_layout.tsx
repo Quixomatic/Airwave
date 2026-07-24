@@ -12,6 +12,7 @@ import { PlayerProvider } from "@/features/watch/player-context";
 import { loadSession } from "@/lib/auth";
 import { loadDevice } from "@/lib/device";
 import { useHardwareKeyInput, useTVInput } from "@/lib/input";
+import { notifyInputActivity } from "@/lib/input/dispatcher";
 import { C } from "@/lib/theme";
 
 const queryClient = new QueryClient({
@@ -40,7 +41,7 @@ export default function RootLayout() {
   if (!ready) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: C.bg }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: C.bg }} onTouchStart={() => notifyInputActivity()}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <StatusBar style="light" />

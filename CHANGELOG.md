@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.40] - 2026-07-24
+
+### Added
+
+- **Mini-player idle → auto-expand to full (tv-web parity).** When a channel is docked in the mini feed and there's no input for 60s, it auto-expands to full-screen (on a TV the screensaver would otherwise blank everything but the tiny video). The `MINI_IDLE_FULLSCREEN_MS` constant existed but was never wired; now it is, via a shared **input-activity notifier** in the dispatcher — the timer resets on ANY input: a dispatched key (`dispatchKey` → `notifyInputActivity`) or a touch (a root `onTouchStart` → `notifyInputActivity`). (The feature-panel auto-hide still uses its own local key-reset for now — unifying both onto the shared notifier is a follow-up.)
+
 ## [0.7.39] - 2026-07-24
 
 ### Fixed

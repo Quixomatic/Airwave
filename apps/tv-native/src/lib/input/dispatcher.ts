@@ -24,10 +24,26 @@ function sortLayers() {
   layers.sort((a, b) => b.priority - a.priority || b.seq - a.seq);
 }
 
+// Input-activity observers (e.g. the mini-player idle→fullscreen timer): fired on any dispatched key.
+// Touch call sites (a root onTouchStart) notify via `notifyInputActivity` since touch bypasses the keys.
+let activityListeners: Array<() => void> = [];
+/** Notify all activity observers that the user did something (a key OR a touch). */
+export function notifyInputActivity(): void {
+  for (const l of [...activityListeners]) l();
+}
+/** Subscribe to any input activity; returns an unsubscribe. */
+export function onInputActivity(cb: () => void): () => void {
+  activityListeners.push(cb);
+  return () => {
+    activityListeners = activityListeners.filter((l) => l !== cb);
+  };
+}
+
 /** Run a key through the stack top→bottom until a layer claims it (returns true). `digit` carries 0–9
  *  for a `digit` key (from the hardware-keyboard source / a future number-remote). */
 export function dispatchKey(key: SemanticKey, digit?: number): boolean {
   if (key === "unknown") return false;
+  notifyInputActivity();
   const e: KeyEvent = { key, digit };
   for (const layer of [...layers]) {
     if (layer.onKey?.(e) === true) return true;

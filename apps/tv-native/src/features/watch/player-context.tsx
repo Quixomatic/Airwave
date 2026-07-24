@@ -6,6 +6,7 @@ import { setStatusBarHidden } from "expo-status-bar";
 
 import { useGuide } from "@/hooks/queries";
 import { api } from "@/lib/api";
+import { onInputActivity } from "@/lib/input/dispatcher";
 import { C } from "@/lib/theme";
 
 import { BumperCard } from "./bumper-card";
@@ -92,6 +93,25 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     },
     [tune],
   );
+
+  // Mini-player idle → auto-expand to full after a stretch of no input (tv-web parity: on a TV the
+  // screensaver would otherwise blank everything but the tiny video). Reset on ANY input — a dispatched
+  // key OR a touch: both flow through `onInputActivity` (keys via `dispatchKey`, touch via the root
+  // `onTouchStart` in `app/_layout`). Only armed while docked in the mini feed.
+  useEffect(() => {
+    if (layout !== "mini") return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const reset = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(goFull, MINI_IDLE_FULLSCREEN_MS);
+    };
+    reset();
+    const unsub = onInputActivity(reset);
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsub();
+    };
+  }, [layout, goFull]);
 
   const value = useMemo<PlayerCtx>(
     () => ({ activeChannelId, playingChannelId, layout, miniFocused, miniSel, tune, goFull, goMini, stop, focusMini, blurMini, miniMove, miniActivate, channelStep, setMiniSlot }),
