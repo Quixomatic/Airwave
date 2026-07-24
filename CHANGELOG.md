@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.2] - 2026-07-24
+
+### Fixed
+
+- **EAS iOS build failed compiling `react-native-worklets` against the react-native-tvos prebuilt Hermes** (the next snag after the v0.8.1 pod-install fix; MPVKit itself compiled + linked fine). `WorkletHermesRuntime.h` includes the legacy Hermes chrome-inspector header (`hermes/inspector-modern/chrome/Registration.h`) in Debug when `HERMES_V1_ENABLED` is undefined — but the react-native-tvos prebuilt Hermes xcframework doesn't ship those legacy debugger headers (stock RN's does), so the include (and the `chrome::enableDebugging/disableDebugging` calls right after) can't resolve. Fixed by setting `RCT_HERMES_V1_ENABLED=1` in the EAS `development` env — `RNWorklets.podspec` translates it to a target-scoped `-DHERMES_V1_ENABLED`, short-circuiting the legacy-debugger guard. Verified against the worklets 0.7.4 source that *every* `HERMES_V1_ENABLED` reference is a negative guard (`!defined`), so the flag only skips the legacy debugger path and activates no V1-only code — safe on RN 0.83's (V0) Hermes. Debug-only; the same env carries to the future tvOS profile.
+
 ## [0.8.1] - 2026-07-24
 
 ### Fixed
