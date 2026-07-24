@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.7.22] - 2026-07-24
+
+Fixes tv-native bumper playback + brings the between-programs interstitial to tv-web parity.
+
+### Fixed
+
+- **Playback resumes after a bumper.** mpv's `pause` is a persistent property that survives `loadfile`/`seek`; the bumper paused the video and nothing resumed it, so every program after a bumper — the bumper→next rollover, a seek that rolls back into the current program, a seek to a previous program — painted its first frame but stayed paused. Now `viewRef.play()` is called on program entry (in `onLoad` for fresh loads and after the same-media DVR seek), mirroring tv-web's `tryPlay(video)` on every load.
+
+### Changed
+
+- **Bumper card now matches tv-web.** Replaced tv-native's plain text-on-solid-background interstitial with a faithful port of `bumper-card.tsx`: a `react-native-svg` **CountdownDonut** (accent ring draining from full to empty, seconds centered, smooth local clock), a blurred cover-art background (`Image blurRadius`) + gradient scrim, and "Coming up next" + title + episode line. Adds the **compact variant** (small donut + "Up next", no art) for the mini feed — previously the mini just shrank the plain block.
+
 ## [0.7.21] - 2026-07-23
 
 **The tv-native D-pad + channel-number entry are now drivable on iPad — via a hardware keyboard.** The input dispatcher and zone machine were ported from tv-web but had no key source on iPad (`useTVEventHandler` is TV-only; iOS doesn't deliver keyboard events to apps without GameController). Confirmed working on-device: the full guide navigates by arrow keys and channel numbers tune.
