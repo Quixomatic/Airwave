@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.8] - 2026-07-24
+
+### Added
+
+- **tvOS (Apple TV) device build profile.** `development-tvos` EAS profile — `EXPO_TV=1` + the fork's `REACT_NATIVE_NODE_MODULES_DIR`/`RCT_HERMES_V1_ENABLED` env (`buildReactNativeFromSource` carries from app.json). It's a **device** dev-client build (no `ios.simulator`) for a physical Apple TV, whenever the new model lands.
+
+### Decision — Intel-iMac tvOS Simulator is deliberately skipped
+
+- Not a viable path for this app: (1) EAS builds on Apple-Silicon workers and a Debug simulator build defaults to **arm64-only**, which won't launch on an Intel Mac's sim without forcing a universal build via a Podfile config plugin — and even then **Hermes-for-tvOS** must ship an x86_64 simulator slice (unverified; would only surface *after* a ~40-min from-source build); (2) mpv's Metal/GL rendering in the tvOS Simulator is unreliable regardless of arch, so it likely can't exercise playback anyway. MPVKit itself *does* ship x86_64 tvOS-sim slices (verified). **tvOS testing = the physical Apple TV** (arm64 device build — no arch fight, mpv works).
+
 ## [0.8.7] - 2026-07-24
 
 ### Added
