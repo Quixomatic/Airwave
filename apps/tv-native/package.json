@@ -1,6 +1,6 @@
 {
   "name": "tv-native",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -23,6 +23,7 @@
     "better-auth": "catalog:",
     "expo": "^55.0.28",
     "expo-blur": "~55.0.16",
+    "expo-build-properties": "~55.0.16",
     "expo-constants": "~55.0.17",
     "expo-dev-client": "~55.0.37",
     "expo-linear-gradient": "~55.0.16",

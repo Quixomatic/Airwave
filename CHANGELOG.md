@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.3] - 2026-07-24
+
+### Fixed
+
+- **iPad dev build crashed immediately at launch — a dyld symbol mismatch in react-native-tvos's Hermes.** The app built clean but died on open with `Symbol not found: facebook::hermes::inspector_modern::RuntimeAdapter::~RuntimeAdapter()`, referenced by the prebuilt `React.framework`, expected in `hermesvm.framework`. Cause: Expo SDK 55 ships a **precompiled React Native core** (built for stock Hermes's legacy chrome inspector), but react-native-tvos ships its own **Hermes V1** (`useHermesV1` defaults on in SDK 55), which dropped the legacy `inspector_modern` symbols — so the precompiled React references a symbol its Hermes doesn't export. Fixed with `expo-build-properties` `ios.buildReactNativeFromSource: true`, which builds React core from source against the *actual* Hermes V1 (the dead inspector reference is guarded out and never emitted). `RCT_HERMES_V1_ENABLED=1` (v0.8.2) stays — still required for the worklets podspec. Hermes itself is NOT rebuilt (the prebuilt `hermesvm` stays used), so the build-time hit is bounded (~1.5–2×). This is the react-native-tvos + Expo-precompiled-RN incompatibility (issue #697 family); the fork ships no Expo-compatible precompiled `React.xcframework`, so RN core must build from source.
+
 ## [0.8.2] - 2026-07-24
 
 ### Fixed
