@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.13] - 2026-07-24
+
+### Fixed
+
+- **Android app crashed at startup — `Failed resolution of … AnyTypeCache` in `DomWebViewModule`.** A transitive `@expo/dom-webview` resolved to **57.0.1** (SDK 57) — a wildcard `*` peer + pnpm's auto-install-peers grabbed `latest`, overriding expo@55's `^55.0.6` — while the app runs `expo-modules-core@55`. The 57.x DOM-webview Android module references `expo.modules.kotlin.types.AnyTypeCache` (added in core 56), which core 55 doesn't have → `ClassNotFound` at module registration, killing app launch. (iOS didn't hit it — the reference is Android-Kotlin-specific.) Pinned `@expo/dom-webview` to **55.0.6** (the SDK-55 line) as a **direct dependency of tv-native** — a pnpm root `overrides` entry alone wasn't enough (auto-installed peers ignore overrides), but a direct dep forces the app's tree to 55.0.6. We don't use Expo DOM Components; this just version-matches the transitive module to core 55.
+
 ## [0.8.12] - 2026-07-24
 
 ### Fixed

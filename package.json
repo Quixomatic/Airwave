@@ -30,5 +30,10 @@
     "turbo": "^2.10.2",
     "typescript": "catalog:"
   },
-  "packageManager": "pnpm@10.11.0"
+  "packageManager": "pnpm@10.11.0",
+  "pnpm": {
+    "overrides": {
+      "@expo/dom-webview": "55.0.6"
+    }
+  }
 }

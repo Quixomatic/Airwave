@@ -1,6 +1,6 @@
 {
   "name": "tv-native",
-  "version": "0.8.12",
+  "version": "0.8.13",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -15,6 +15,7 @@
     "@ChannelGuide/key-input": "workspace:*",
     "@ChannelGuide/mpv-player": "workspace:*",
     "@better-auth/expo": "^1.6.23",
+    "@expo/dom-webview": "55.0.6",
     "@expo/metro-runtime": "~55.0.12",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@shopify/flash-list": "2.0.2",
