@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.14] - 2026-07-24
+
+### Fixed
+
+- **Android crashed loading `libmpv.so` — `cannot locate symbol …__from_chars_floating_point<float>`.** The app now runs end to end (server URL + Plex device-link login + the capability diagnostic starting) — the *only* failure left was `System.loadLibrary("mpv")`. libmpv.so is built against a newer `libc++_shared.so` that has `std::from_chars<float>`, but an older `libc++_shared.so` (bundled by RN/Reanimated) was winning the jniLibs merge and lacks that symbol → `dlopen` fails. The libc++ source-dir set in the mpv-player **module** build.gradle can't win — Gradle merges **project-scope (app)** jniLibs *ahead* of libraries/AARs. Added a config-plugin `withMpvAndroidLibcxx` that appends the app's `build.gradle` with an app-scope `jniLibs.srcDir` pointing at the module's extracted libmpv `libc++_shared.so` (+ `pickFirst` + the `extractMpvLibcxx` merge dependency), so libmpv's newer libc++ wins. Mirrors `.refs/plezy`'s app-module setup, adapted to Expo's generated `app/build.gradle`.
+
 ## [0.8.13] - 2026-07-24
 
 ### Fixed

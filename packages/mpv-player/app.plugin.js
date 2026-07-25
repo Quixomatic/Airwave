@@ -1,8 +1,11 @@
 const {
   withInfoPlist,
   withXcodeProject,
+  withAppBuildGradle,
   createRunOncePlugin,
 } = require("@expo/config-plugins");
+
+const MPV_GRADLE_PROJECT = ":ChannelGuide-mpv-player";
 
 const MPVKIT_URL = "https://github.com/edde746/MPVKit";
 const MPVKIT_VERSION = "1.0.12";
@@ -140,9 +143,51 @@ function withMpvkitAppTargetSPM(config) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// 3. Android — package libmpv's newer `libc++_shared.so` at APP-PROJECT scope.
+//
+//    libmpv.so is built against a newer libc++ that has `std::from_chars<float>`
+//    (`__from_chars_floating_point`). Other native libs (RN / Reanimated) bundle
+//    OLDER `libc++_shared.so` copies, and with a plain `pickFirst` merge one of
+//    those wins → `dlopen` of libmpv.so fails to locate the symbol at runtime.
+//    Setting the jniLibs source inside the mpv MODULE isn't enough — Gradle merges
+//    project-scope (the app) jniLibs AHEAD of subprojects/AARs, so the newer libc++
+//    must be declared on the APP. The mpv module's `extractMpvLibcxx` task already
+//    unzips the AAR's `libc++_shared.so` per-ABI to its build dir; here we point the
+//    app's source set at it (+ the merge-task dependency). Mirrors `.refs/plezy`'s
+//    app-module setup, adapted to Expo's generated `app/build.gradle`.
+// ---------------------------------------------------------------------------
+function withMpvAndroidLibcxx(config) {
+  return withAppBuildGradle(config, (config) => {
+    if (config.modResults.language !== "groovy") return config;
+    if (config.modResults.contents.includes("mpv-player: app-scope libc++")) return config;
+    config.modResults.contents += `
+
+// mpv-player: app-scope libc++ — see @ChannelGuide/mpv-player app.plugin.js. libmpv.so needs the
+// newer libc++_shared.so (std::from_chars<float>); declaring it at project scope makes it win the
+// jniLibs merge over the older copies RN/Reanimated bundle.
+android {
+    packagingOptions {
+        pickFirst 'lib/*/libc++_shared.so'
+    }
+    sourceSets {
+        main {
+            jniLibs.srcDir(project('${MPV_GRADLE_PROJECT}').layout.buildDirectory.dir('libmpv/libcxx/jni').get().asFile)
+        }
+    }
+}
+tasks.matching { it.name.startsWith('merge') && it.name.endsWith('JniLibFolders') }.configureEach {
+    dependsOn '${MPV_GRADLE_PROJECT}:extractMpvLibcxx'
+}
+`;
+    return config;
+  });
+}
+
 function withMpvPlayer(config) {
   config = withLocalNetwork(config);
   config = withMpvkitAppTargetSPM(config);
+  config = withMpvAndroidLibcxx(config);
   return config;
 }
 
