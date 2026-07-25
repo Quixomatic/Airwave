@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.15] - 2026-07-24
+
+### Fixed
+
+- **Android mpv loaded (libc++ fixed) but every diagnostic clip timed out "no frame" — a load-before-create race.** Android's `dev.jdtech.mpv.MpvPlayer.create` is a **suspend** (async) function, unlike iOS's synchronous `mpv_create` + `mpv_initialize`. `MpvCore.setup()` launched create and returned immediately, then `load()` ran before `player` existed and bailed at `val p = player ?: return@launch` — so `loadfile` **never executed**, mpv never opened the file, no frame ever came, and the capability diagnostic timed out on every clip. Fixed: `load()` now records the pending url/offset and `setup()`'s create-completion runs it, so the file always loads once mpv is up. Also forwarded mpv's own log stream to logcat (`adb logcat -s MpvCore`) for diagnosing any remaining decode/VO issues on device.
+
 ## [0.8.14] - 2026-07-24
 
 ### Fixed

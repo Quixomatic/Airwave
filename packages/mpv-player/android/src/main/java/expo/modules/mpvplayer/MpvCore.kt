@@ -43,6 +43,11 @@ class MpvCore(private val appContext: Context) {
   private var loadedEmitted = false
   private var firstFrameEmitted = false
 
+  // `MpvPlayer.create` is a SUSPEND function (async), so a load() call can arrive before the player
+  // exists. Remember the last requested load and run it as soon as create() finishes.
+  private var pendingLoadUrl: String? = null
+  private var pendingLoadStart: Double = 0.0
+
   // MARK: setup
 
   /** Create + initialize mpv, then observe the state we surface to JS. `options` override the defaults. */
@@ -80,6 +85,12 @@ class MpvCore(private val appContext: Context) {
       p.observeFlag("paused-for-cache").onEach { delegate?.mpvBuffering(it) }.launchIn(scope)
 
       p.eventFlow.onEach { handleEvent(it) }.launchIn(scope)
+      // Forward mpv's own logs to logcat (`adb logcat -s MpvCore`) — invaluable for diagnosing
+      // no-frame / decode / VO issues on device.
+      p.logFlow.onEach { android.util.Log.i("MpvCore", "[${it.level}] ${it.prefix}: ${it.text}") }.launchIn(scope)
+
+      // A load() may have been requested before create() finished (create is suspend) — run it now.
+      pendingLoadUrl?.let { doLoad(p, it, pendingLoadStart) }
     }
   }
 
@@ -93,13 +104,18 @@ class MpvCore(private val appContext: Context) {
   fun load(url: String, startTime: Double) {
     loadedEmitted = false
     firstFrameEmitted = false
-    scope.launch {
-      val p = player ?: return@launch
-      if (startTime > 0) {
-        p.command("loadfile", url, "replace", "-1", "start=${startTime.toInt()}")
-      } else {
-        p.command("loadfile", url, "replace", "-1")
-      }
+    pendingLoadUrl = url
+    pendingLoadStart = startTime
+    // If the player is already up, load immediately; otherwise setup()'s create() runs it on completion.
+    val p = player ?: return
+    scope.launch { doLoad(p, url, startTime) }
+  }
+
+  private suspend fun doLoad(p: MpvPlayer, url: String, startTime: Double) {
+    if (startTime > 0) {
+      p.command("loadfile", url, "replace", "-1", "start=${startTime.toInt()}")
+    } else {
+      p.command("loadfile", url, "replace", "-1")
     }
   }
 
