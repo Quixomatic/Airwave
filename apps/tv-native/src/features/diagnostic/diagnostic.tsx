@@ -1,6 +1,6 @@
 import { MpvPlayerView } from "@ChannelGuide/mpv-player";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
 
 import { api, type CapTest } from "@/lib/api";
 import { getServerUrl } from "@/lib/auth";
@@ -29,6 +29,16 @@ type TestCtx = {
   onLoad: (mi: { width: number; height: number }) => void;
   onError: (msg: string) => void;
 };
+
+// Codecs whose SOFTWARE decode is known to crash mpv on Apple platforms — dav1d AV1 null-deref
+// (the same EXC_BAD_ACCESS the iPad hit; the Apple TV 4K's A15 also has NO hardware AV1, so tvOS
+// software-decodes AV1 too and crashes identically ~immediately after the first frame). These are
+// ALREADY quirked to transcode server-side (codecs.ts: av1 → platform "ios", which react-native-tvos
+// reports for tvOS as well), so actually decoding them in the diagnostic changes nothing about the
+// outcome — the quirk force-transcodes regardless — it only risks crashing the whole run mid-way.
+// Skip the decode and record them unsupported, which matches what the server does anyway.
+const CRASHY_VIDEO_ON_APPLE = new Set(["av1"]);
+const skipDecode = (t: { video?: string | null }) => Platform.OS === "ios" && !!t.video && CRASHY_VIDEO_ON_APPLE.has(t.video);
 
 export function Diagnostic({ onExit }: { onExit: () => void }) {
   const { width } = useWindowDimensions();
@@ -121,14 +131,22 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
         setIdx(i);
         const test = tests[i]!;
         console.log(`[caps] ▶ ${i + 1}/${tests.length} ${test.id} — ${test.container}/${test.video}/${test.audio} — ${getServerUrl()}${test.url}`);
-        const auto = await runOne(test);
-        console.log(`[caps] ✓ ${test.id} → ${auto.decoded ? `decoded ${auto.decodedWidth}x${auto.decodedHeight}${auto.audioTrackPresent ? " +audio" : ""}` : `FAIL: ${auto.error ?? "?"}`}`);
-        // Release this clip before the next (source=null → mpv stop) so cycling ~49 clips doesn't
-        // accumulate decoders. The pause lets teardown complete before the next loadfile.
-        setSource(null);
-        // Let the just-unmounted instance's async mpv_terminate_destroy fully release
-        // (VideoToolbox sessions + surfaces) before the next clip's instance is created.
-        await new Promise((r) => setTimeout(r, 400));
+        let auto: Auto;
+        if (skipDecode(test)) {
+          // DON'T play it — the decoder crashes the whole app on this platform (see CRASHY_VIDEO_ON_APPLE).
+          // Record it unsupported, which is the honest result: the server quirk transcodes it anyway.
+          auto = { decoded: false, decodedWidth: 0, decodedHeight: 0, hasTrackApi: true, audioTrackPresent: false, error: `${test.video} software-decode unsafe on Apple — transcoded (not measured)` };
+          console.log(`[caps] ⤼ ${test.id} → SKIPPED (${test.video} would crash the decoder; recorded unsupported)`);
+        } else {
+          auto = await runOne(test);
+          console.log(`[caps] ✓ ${test.id} → ${auto.decoded ? `decoded ${auto.decodedWidth}x${auto.decodedHeight}${auto.audioTrackPresent ? " +audio" : ""}` : `FAIL: ${auto.error ?? "?"}`}`);
+          // Release this clip before the next (source=null → mpv stop) so cycling ~49 clips doesn't
+          // accumulate decoders. The pause lets teardown complete before the next loadfile.
+          setSource(null);
+          // Let the just-unmounted instance's async mpv_terminate_destroy fully release
+          // (VideoToolbox sessions + surfaces) before the next clip's instance is created.
+          await new Promise((r) => setTimeout(r, 400));
+        }
         if (cancelled) return;
         results[test.id] = auto;
         setRows((r) => ({ ...r, [test.id]: auto }));

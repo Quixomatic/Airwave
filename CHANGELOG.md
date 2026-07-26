@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.18] - 2026-07-26
+
+### Fixed
+
+- **The capability diagnostic hard-crashed the app on Apple TV (and would on iPad) at the AV1 clip.** The diagnostic plays every matrix clip raw to measure real decode — including AV1, which mpv software-decodes via dav1d and which **null-crashes** on Apple platforms (`EXC_BAD_ACCESS` in `ff_libdav1d_decoder`; the Apple TV 4K's A15 has no hardware AV1, same as the iPad M1). It died deterministically right after logging clip 13 (`vid_av1_mkv`) — onLoad resolves on the first frame while the instance keeps decoding AV1 during teardown, and dav1d crashes. The diagnostic now **skips playing** any AV1 clip when `Platform.OS === "ios"` (react-native-tvos reports that for tvOS too) and records it **unsupported** — which is the honest, correct result: `codecs.ts` already quirks `av1 → ios` so the server force-transcodes AV1 regardless, making the native measurement both pointless and dangerous. First full diagnostic run to complete on real Apple TV hardware. JS-only; no rebuild.
+
 ## [0.8.17] - 2026-07-26
 
 Opens the path to running tv-native on a **physical Apple TV** — which EAS's ad-hoc flow can't reach.
