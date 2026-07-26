@@ -143,17 +143,24 @@ final class MpvPlayerView: ExpoView, MpvCoreDelegate {
     private enum DynamicRange: String { case sdr = "SDR", hdr10 = "HDR10", hlg = "HLG" }
 
     private func applyDisplayCriteria(gamma: String?, primaries: String?, colorMatrix: String?, fps: Double, sigPeak: Double) {
+      guard #available(tvOS 17.0, *) else { return }
       guard let window = self.window else { return }
       criteriaWindow = window
       let dm = window.avDisplayManager
       // Respects the Apple TV's "Match Content → Match Dynamic Range" toggle.
       guard dm.isDisplayCriteriaMatchingEnabled else { return }
-      guard #available(tvOS 17.0, *) else { return }
 
       let source = Self.resolveDynamicRange(gamma: gamma, primaries: primaries, colorMatrix: colorMatrix, sigPeak: sigPeak)
       let display = Self.supported(source)
-      let refreshRate = Float(fps > 0 ? fps : 0)
+      // Only DRIVE the HDMI link for HDR content. SDR — which is EVERY capability-diagnostic clip and most
+      // SDR playback — just releases any HDR mode we set; we never set an "SDR criteria", which would
+      // needlessly renegotiate the display on every clip (and hammer it during the 49-clip diagnostic).
+      guard display != .sdr else {
+        clearDisplayCriteria()
+        return
+      }
 
+      let refreshRate = Float(fps > 0 ? fps : 0)
       guard let fmt = Self.makeFormatDescription(display, width: Int32(lastWidth > 0 ? lastWidth : 3840), height: Int32(lastHeight > 0 ? lastHeight : 2160)) else {
         clearDisplayCriteria()
         return

@@ -2,6 +2,13 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.21] - 2026-07-26
+
+### Fixed
+
+- **v0.8.20 crash-looped on Apple TV the moment playback started (`doesNotRecognizeSelector` → abort).** The HDR path calls `window.avDisplayManager`, which is a category **AVKit** adds to `UIWindow`. `import AVKit` compiles against the SDK headers, but the `mpv-player` podspec never **linked** AVKit — so at runtime the selector was absent and `-[UIWindow avDisplayManager]` aborted (SIGABRT) on the first clip's first frame, before the diagnostic could complete (hence the relaunch loop). Fixed by declaring `s.frameworks = 'AVFoundation', 'AVKit', 'CoreMedia'` in `MpvPlayer.podspec`. (plezy links these app-wide via Flutter, so its Swift never declared them — an Expo module must.) Needs a native rebuild.
+- **The diagnostic no longer renegotiates the HDMI display on every clip.** `applyDisplayCriteria` now only drives the display for actual HDR content; SDR (every diagnostic clip + most SDR playback) just releases any HDR mode instead of setting an "SDR criteria," so the 49-clip capability scan doesn't hammer the link.
+
 ## [0.8.20] - 2026-07-26
 
 Real HDR on the Apple TV — HDR content now switches the HDMI output into HDR10/HLG (LG's HDR badge lights) instead of playing tone-mapped to SDR.

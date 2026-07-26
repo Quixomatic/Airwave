@@ -10,6 +10,15 @@ Pod::Spec.new do |s|
 
   s.dependency 'ExpoModulesCore'
 
+  # System frameworks the Swift sources use. AVKit is REQUIRED for the tvOS HDR path:
+  # `UIWindow.avDisplayManager` (+ `AVDisplayManager`) is a category AVKit adds to UIWindow —
+  # `import AVKit` COMPILES against the SDK headers, but without LINKING AVKit the selector is
+  # absent at runtime → `-[UIWindow avDisplayManager]` doesNotRecognizeSelector → abort() (SIGABRT).
+  # AVFoundation = AVSampleBufferDisplayLayer / AVDisplayCriteria / AVPlayer.availableHDRModes;
+  # CoreMedia = CMVideoFormatDescription. (plezy links these app-wide via Flutter; an Expo module
+  # must declare them itself.)
+  s.frameworks = 'AVFoundation', 'AVKit', 'CoreMedia'
+
   # ── MPVKit is NOT linked here. ────────────────────────────────────────────
   # Earlier this pod linked the MPVKit Swift Package via React Native's
   # `spm_dependency` macro. That makes CocoaPods MERGE MPVKit's static libs into
