@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.19] - 2026-07-26
+
+Fixes the Apple TV Siri-remote experience — the input layer worked for the webOS d-pad model but never accounted for tvOS's quirks.
+
+### Fixed
+
+- **The Menu/Back button exited the app instead of navigating back.** On tvOS the Menu button backgrounds the app to Home by default; react-native-tvos only delivers a `menu` event (→ our `back`) if you call `TVEventControl.enableTVMenuKey()`. We now do, at the app root — so Back closes Info / panels / navigates in-app. (At the guide root it no longer exits to Home; use the TV/Home button. Root-exit refinement noted for later.)
+- **Siri-remote swipes did nothing.** The clickpad sends `swipeUp/Down/Left/Right` for touch swipes and `up/down/left/right` only for edge-clicks; we mapped only the clicks. Swipes now map to the same discrete directional steps — the tvOS analogue of tv-web treating each LG wheel notch as one d-pad press.
+- **The guide list fought the remote (smooth-scroll vs. snap).** The `FlashList` was being scrolled *natively* by tvOS (and its `Pressable` rows were grabbing the native focus engine), competing with our zone machine — so up/down sometimes snapped, sometimes slow-scrolled. On TV we now disable the list's native scroll, drive `scrollToIndex` from the zone machine so the list follows the selection, and take the row `Pressable`s out of the native focus engine (`focusable={false}`). iPad touch-scroll + tap-to-focus are untouched (all changes are `Platform.isTV`-gated).
+
 ## [0.8.18] - 2026-07-26
 
 ### Fixed

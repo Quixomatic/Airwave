@@ -2,7 +2,7 @@ import { FlashList } from "@shopify/flash-list";
 import { LinearGradient } from "expo-linear-gradient";
 import { Heart, Star } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, Text, useWindowDimensions, View } from "react-native";
+import { Platform, Pressable, Text, useWindowDimensions, View } from "react-native";
 
 import { usePlayer } from "@/features/watch/player-ctx";
 import type { GuideGridChannel, GuideGridProgram, GuideMeta } from "@/lib/api";
@@ -199,6 +199,22 @@ export function AuroraGrid({
     },
   });
 
+  const listRef = useRef<FlashList<(typeof channels)[number]>>(null);
+  // Keep the focused channel in view on TV — WE own the scroll (the list's native scroll is disabled on
+  // TV), so the remote drives the zone machine and the list follows, instead of tvOS smooth-scrolling it
+  // natively and fighting the discrete snap. This is the tvOS analogue of tv-web converting each LG wheel
+  // notch into one d-pad step: a swipe now surfaces as a discrete swipeUp/Down event (no longer eaten by
+  // the list's native scroll) → one step → this recenters. iPad keeps native touch-scroll (no-op here).
+  useEffect(() => {
+    if (!Platform.isTV || !channels.length) return;
+    if (zone !== "grid" && zone !== "rail") return;
+    try {
+      listRef.current?.scrollToIndex({ index: fc, animated: true, viewPosition: 0.4 });
+    } catch {
+      // index not measured yet / out of range — the next fc change re-tries.
+    }
+  }, [fc, zone, channels.length]);
+
   return (
     <View style={{ flex: 1, flexDirection: "row", backgroundColor: C.bg }}>
       {/* The guide column — the layout reserves only the sliver width; the sidebar overlays it. */}
@@ -224,9 +240,14 @@ export function AuroraGrid({
             />
           ) : (
             <FlashList
+              ref={listRef}
               data={channels}
               keyExtractor={(c) => c.id}
               extraData={{ fc, fp, zone }}
+              // TV: kill the list's own scroll so the remote's swipe surfaces as a discrete swipeUp/Down
+              // event (→ one zone step) instead of the OS smooth-scrolling the list underneath us. iPad
+              // keeps native touch-scroll.
+              scrollEnabled={!Platform.isTV}
               renderItem={({ item, index }) => (
                 <Row
                   channel={item}
@@ -349,7 +370,7 @@ function Row({
     <View style={{ height: rowPx, flexDirection: "row", borderTopWidth: 1, borderTopColor: C.rowBorder }}>
       {/* Rail — tap to focus; tap again (rail-focused) toggles favorite. The circle mirrors tv-web:
           when rail-focused it becomes the favorite heart (filled red if favorited, else outline). */}
-      <Pressable onPress={onPressRow} style={{ width: railPx, paddingVertical: vw(18), paddingHorizontal: vw(20), justifyContent: "space-between", backgroundColor: focused ? hexA(accent, 0.12) : "transparent" }}>
+      <Pressable onPress={onPressRow} focusable={!Platform.isTV} style={{ width: railPx, paddingVertical: vw(18), paddingHorizontal: vw(20), justifyContent: "space-between", backgroundColor: focused ? hexA(accent, 0.12) : "transparent" }}>
         {focused && <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: vw(4), backgroundColor: accent }} />}
         <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
           <View style={{ width: circle, height: circle, borderRadius: circle / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, 0.2), borderWidth: railFocused ? 2 : 1, borderColor: railFocused ? C.ring : hexA(accent, 0.35) }}>
@@ -391,6 +412,7 @@ function Row({
             <Pressable
               key={p.id}
               onPress={() => onPressProgram(pi)}
+              focusable={!Platform.isTV}
               style={{
                 position: "absolute",
                 top: vw(6),

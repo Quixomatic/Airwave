@@ -75,7 +75,21 @@ export function useKeyLayer(opts: { id: string; priority: number; active?: boole
  * build (never toggles at runtime), so the conditional hook call is safe.
  */
 export function useTVInput() {
-  const useTVEventHandler = (RN as unknown as { useTVEventHandler?: (cb: (e: { eventType: string }) => void) => void }).useTVEventHandler;
+  const RNTV = RN as unknown as {
+    useTVEventHandler?: (cb: (e: { eventType: string }) => void) => void;
+    TVEventControl?: { enableTVMenuKey?: () => void; disableTVMenuKey?: () => void };
+  };
+  const useTVEventHandler = RNTV.useTVEventHandler;
+  // Enable the tvOS Menu button so it delivers a `menu` event to our dispatcher (→ `back`) instead of
+  // the OS immediately backgrounding the app to Home. WITHOUT this, every Back press exits the app and
+  // our in-app back navigation (close Info, close panels, guide) never runs. No-op on the iPad build.
+  // ⚠️ While enabled, Menu never exits to Home — at the guide root Apple's HIG wants that. Refine later:
+  // toggle disableTVMenuKey() when there's nothing in-app left to go back to (like tv-web's platformBack).
+  useEffect(() => {
+    const ctl = RNTV.TVEventControl;
+    ctl?.enableTVMenuKey?.();
+    return () => ctl?.disableTVMenuKey?.();
+  }, [RNTV.TVEventControl]);
   if (useTVEventHandler) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useTVEventHandler((e) => {
