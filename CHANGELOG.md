@@ -2,6 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.20] - 2026-07-26
+
+Real HDR on the Apple TV — HDR content now switches the HDMI output into HDR10/HLG (LG's HDR badge lights) instead of playing tone-mapped to SDR.
+
+### Added
+
+- **tvOS HDR10 / HLG display-mode switching (`packages/mpv-player` native).** mpv renders its own frames via the `avfoundation` VO, so — unlike AVPlayer — tvOS never auto-switched the HDMI output to HDR, and `target-colorspace-hint` is inert in that VO while EDR is iOS-only. So HDR content direct-played but tone-mapped to SDR (no LG HDR badge). Now `MpvCore` reads the decoded stream's colorimetry (`video-params/gamma`/`primaries`/`sig-peak`) on first frame and `MpvPlayerView` drives the window's `AVDisplayManager.preferredDisplayCriteria` with an `AVDisplayCriteria(refreshRate:formatDescription:)` (tvOS 17+, public) tagged BT.2020/PQ (HDR10) or BT.2020/HLG — so the Apple TV switches into HDR, mpv's already-`target-colorspace-hint: auto` output passes through, and the display lights its HDR badge. Clamps to the display's advertised modes, dedupes across channel changes to avoid black-flash storms, and resets to SDR on leaving playback. Ported from `.refs/plezy`'s proven implementation. Respects the Apple TV's "Match Content → Match Dynamic Range" setting. **Dolby Vision Profile 8.1 content lights up as HDR10 here** (mpv decodes its PQ base layer); the true Dolby-Vision display mode (plezy's synthetic `dvh1` path + the DV profile from Plex metadata) is a later phase. All `#if os(tvOS)`-guarded; the iPad/iOS build is unchanged. Needs a native rebuild.
+
 ## [0.8.19] - 2026-07-26
 
 Fixes the Apple TV Siri-remote experience — the input layer worked for the webOS d-pad model but never accounted for tvOS's quirks.

@@ -1,4 +1,7 @@
 import AVFoundation
+#if os(tvOS)
+  import AVKit
+#endif
 import ExpoModulesCore
 import UIKit
 
@@ -14,6 +17,14 @@ final class MpvPlayerView: ExpoView, MpvCoreDelegate {
   private var pendingStartTime: Double = 0
   private var lastLoadedSource: String?
   private var applyScheduled = false
+  private var lastWidth: Int = 0
+  private var lastHeight: Int = 0
+  #if os(tvOS)
+    // Cross-instance so a channel change (old view torn down, new one built) doesn't redundantly clear +
+    // re-apply the same mode and black-flash the HDMI link between clips.
+    private static var activeDisplayCriteriaKey: String?
+    private weak var criteriaWindow: UIWindow?
+  #endif
 
   var options: [String: String] = [:]
 
@@ -91,6 +102,10 @@ final class MpvPlayerView: ExpoView, MpvCoreDelegate {
     lastLoadedSource = pendingSource
     guard let src = pendingSource, !src.isEmpty else {
       core.stop()
+      // Leaving playback (back to the guide) — drop the HDMI back to SDR for the UI.
+      #if os(tvOS)
+        clearDisplayCriteria()
+      #endif
       return
     }
     core.load(url: src, startTime: pendingStartTime)
@@ -99,6 +114,8 @@ final class MpvPlayerView: ExpoView, MpvCoreDelegate {
   // MARK: MpvCoreDelegate → JS events
 
   func mpvDidLoad(duration: Double, width: Int, height: Int) {
+    lastWidth = width
+    lastHeight = height
     onLoad(["duration": duration, "width": width, "height": height])
   }
   func mpvFirstFrame() { onFirstFrame([:]) }
@@ -106,6 +123,113 @@ final class MpvPlayerView: ExpoView, MpvCoreDelegate {
   func mpvBuffering(_ buffering: Bool) { onBuffering(["buffering": buffering]) }
   func mpvError(_ message: String) { onError(["message": message]) }
   func mpvEnd(reason: String) { onEnd(["reason": reason]) }
+
+  func mpvColorInfo(gamma: String?, primaries: String?, colorMatrix: String?, fps: Double, sigPeak: Double) {
+    #if os(tvOS)
+      applyDisplayCriteria(gamma: gamma, primaries: primaries, colorMatrix: colorMatrix, fps: fps, sigPeak: sigPeak)
+    #endif
+  }
+
+  // MARK: tvOS HDR — HDMI display-mode switching
+  //
+  // mpv renders its own frames (avfoundation VO), so unlike AVPlayer tvOS never auto-switches the HDMI
+  // output to HDR — and `target-colorspace-hint` is inert in that VO while EDR is iOS-only. The ONLY path
+  // to real HDR on the Apple TV is driving the window's `AVDisplayManager` with an `AVDisplayCriteria`
+  // built from a `CMFormatDescription` tagged with the content's colorimetry. Ported from
+  // `.refs/plezy` (ios/Runner/MpvPlayer/MpvPlayerCore.swift). Phase 1 = HDR10 + HLG (Dolby Vision Profile
+  // 8.1 rips light up as HDR10 here, since mpv decodes their PQ base layer); true DV mode is a later phase.
+
+  #if os(tvOS)
+    private enum DynamicRange: String { case sdr = "SDR", hdr10 = "HDR10", hlg = "HLG" }
+
+    private func applyDisplayCriteria(gamma: String?, primaries: String?, colorMatrix: String?, fps: Double, sigPeak: Double) {
+      guard let window = self.window else { return }
+      criteriaWindow = window
+      let dm = window.avDisplayManager
+      // Respects the Apple TV's "Match Content → Match Dynamic Range" toggle.
+      guard dm.isDisplayCriteriaMatchingEnabled else { return }
+      guard #available(tvOS 17.0, *) else { return }
+
+      let source = Self.resolveDynamicRange(gamma: gamma, primaries: primaries, colorMatrix: colorMatrix, sigPeak: sigPeak)
+      let display = Self.supported(source)
+      let refreshRate = Float(fps > 0 ? fps : 0)
+
+      guard let fmt = Self.makeFormatDescription(display, width: Int32(lastWidth > 0 ? lastWidth : 3840), height: Int32(lastHeight > 0 ? lastHeight : 2160)) else {
+        clearDisplayCriteria()
+        return
+      }
+      let key = "\(display.rawValue)|\(refreshRate)"
+      if Self.activeDisplayCriteriaKey == key, dm.preferredDisplayCriteria != nil { return }
+      dm.preferredDisplayCriteria = AVDisplayCriteria(refreshRate: refreshRate, formatDescription: fmt)
+      Self.activeDisplayCriteriaKey = key
+      NSLog("[MpvPlayerView] preferredDisplayCriteria → %@ @ %.3f fps (source %@)", display.rawValue, refreshRate, source.rawValue)
+    }
+
+    private func clearDisplayCriteria() {
+      guard let window = criteriaWindow ?? self.window else { return }
+      let dm = window.avDisplayManager
+      if Self.activeDisplayCriteriaKey != nil || dm.preferredDisplayCriteria != nil {
+        dm.preferredDisplayCriteria = nil
+        Self.activeDisplayCriteriaKey = nil
+        NSLog("[MpvPlayerView] preferredDisplayCriteria cleared")
+      }
+    }
+
+    private static func normalizeTag(_ v: String?) -> String {
+      (v?.lowercased() ?? "").filter { $0.isLetter || $0.isNumber }
+    }
+
+    private static func resolveDynamicRange(gamma: String?, primaries: String?, colorMatrix: String?, sigPeak: Double) -> DynamicRange {
+      let g = normalizeTag(gamma), p = normalizeTag(primaries), m = normalizeTag(colorMatrix)
+      if g.contains("hlg") || g.contains("arib") { return .hlg }
+      if g.contains("pq") || g.contains("smpte2084") || g.contains("st2084") || sigPeak > 1.0
+        || p.contains("bt2020") || m.contains("bt2020") { return .hdr10 }
+      return .sdr
+    }
+
+    /// Clamp the requested range to what the connected display actually advertises (avoids requesting an
+    /// HDR mode a non-HDR TV can't do → the switch would fail/flicker).
+    private static func supported(_ range: DynamicRange) -> DynamicRange {
+      let modes = AVPlayer.availableHDRModes
+      switch range {
+      case .hdr10: return modes.contains(.hdr10) ? .hdr10 : .sdr
+      case .hlg: return modes.contains(.hlg) ? .hlg : .sdr
+      case .sdr: return .sdr
+      }
+    }
+
+    private static func makeFormatDescription(_ range: DynamicRange, width: Int32, height: Int32) -> CMVideoFormatDescription? {
+      let ext: [CFString: Any]
+      switch range {
+      case .hdr10:
+        ext = [
+          kCMFormatDescriptionExtension_ColorPrimaries: kCMFormatDescriptionColorPrimaries_ITU_R_2020,
+          kCMFormatDescriptionExtension_TransferFunction: kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ,
+          kCMFormatDescriptionExtension_YCbCrMatrix: kCMFormatDescriptionYCbCrMatrix_ITU_R_2020,
+        ]
+      case .hlg:
+        ext = [
+          kCMFormatDescriptionExtension_ColorPrimaries: kCMFormatDescriptionColorPrimaries_ITU_R_2020,
+          kCMFormatDescriptionExtension_TransferFunction: kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG,
+          kCMFormatDescriptionExtension_YCbCrMatrix: kCMFormatDescriptionYCbCrMatrix_ITU_R_2020,
+        ]
+      case .sdr:
+        ext = [
+          kCMFormatDescriptionExtension_ColorPrimaries: kCMFormatDescriptionColorPrimaries_ITU_R_709_2,
+          kCMFormatDescriptionExtension_TransferFunction: kCMFormatDescriptionTransferFunction_ITU_R_709_2,
+          kCMFormatDescriptionExtension_YCbCrMatrix: kCMFormatDescriptionYCbCrMatrix_ITU_R_709_2,
+        ]
+      }
+      var fd: CMVideoFormatDescription?
+      let status = CMVideoFormatDescriptionCreate(
+        allocator: kCFAllocatorDefault,
+        codecType: kCMVideoCodecType_HEVC,
+        width: width, height: height,
+        extensions: ext as CFDictionary,
+        formatDescriptionOut: &fd)
+      return status == noErr ? fd : nil
+    }
+  #endif
 
   deinit { core.dispose() }
 }

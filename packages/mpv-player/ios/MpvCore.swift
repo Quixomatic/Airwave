@@ -10,6 +10,10 @@ protocol MpvCoreDelegate: AnyObject {
   func mpvBuffering(_ buffering: Bool)
   func mpvError(_ message: String)
   func mpvEnd(reason: String)
+  /// The decoded stream's colorimetry (from mpv's `video-params/*`), surfaced once a frame is decoded so
+  /// the view can switch the tvOS HDMI output into HDR10/HLG. On tvOS this is the ONLY path to real HDR —
+  /// `target-colorspace-hint` is inert in the avfoundation VO and EDR is iOS-only (per .refs/plezy).
+  func mpvColorInfo(gamma: String?, primaries: String?, colorMatrix: String?, fps: Double, sigPeak: Double)
 }
 
 /// A focused libmpv wrapper (ported/trimmed from plezy's `MpvPlayerCoreBase`): create → options →
@@ -165,6 +169,9 @@ final class MpvCore {
       if !firstFrameEmitted {
         firstFrameEmitted = true
         DispatchQueue.main.async { self.delegate?.mpvFirstFrame() }
+        // A frame is decoded → the video-params colorimetry is now valid; surface it so the view can
+        // switch the tvOS display into HDR for this clip.
+        emitColorInfo()
       }
     case MPV_EVENT_END_FILE:
       var reason = "unknown"
@@ -224,6 +231,33 @@ final class MpvCore {
     DispatchQueue.main.async {
       self.delegate?.mpvDidLoad(duration: dur, width: Int(w), height: Int(h))
     }
+  }
+
+  /// Read the decoded stream's colorimetry and hand it to the delegate (→ the view's tvOS HDR switch).
+  /// Runs on the mpv queue (called from the event handler), so the `mpv_get_property*` calls are safe.
+  private func emitColorInfo() {
+    let gamma = getString("video-params/gamma")
+    let primaries = getString("video-params/primaries")
+    let colorMatrix = getString("video-params/colormatrix")
+    let fps = getDouble("container-fps")
+    let sigPeak = getDouble("video-params/sig-peak")
+    DispatchQueue.main.async {
+      self.delegate?.mpvColorInfo(gamma: gamma, primaries: primaries, colorMatrix: colorMatrix, fps: fps, sigPeak: sigPeak)
+    }
+  }
+
+  private func getString(_ name: String) -> String? {
+    guard let mpv, let cstr = mpv_get_property_string(mpv, name) else { return nil }
+    defer { mpv_free(cstr) }
+    let s = String(cString: cstr)
+    return s.isEmpty ? nil : s
+  }
+
+  private func getDouble(_ name: String) -> Double {
+    guard let mpv else { return 0 }
+    var d = 0.0
+    mpv_get_property(mpv, name, MPV_FORMAT_DOUBLE, &d)
+    return d
   }
 
   private func checkError(_ status: CInt) {
