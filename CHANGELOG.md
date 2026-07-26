@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.16] - 2026-07-26
+
+### Changed
+
+- **`UI_SCALE` is now iPad/tablet-only — TVs render at 1.0.** The `1.3` global scale-up compensates for the iPad's taller-than-16:9 aspect (pure width-scaling under-sizes it and leaves vertical slack); a TV IS 16:9 (the layout's native design aspect), so applying 1.3 there oversizes everything by ~30% (huge fonts/rows, less content on screen). Now `UI_SCALE = Platform.isTV ? 1 : 1.3` — tvOS / Android TV / Fire TV get the design's intended proportions (matching tv-web's proven C2 sizing), while the iPad keeps 1.3. JS-only, hot-reloads. The iPad value is still "dial to taste."
+
 ## [0.8.15] - 2026-07-24
 
 ### Fixed

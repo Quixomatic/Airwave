@@ -1,5 +1,6 @@
 import * as LucideIcons from "lucide-react-native";
 import type { ComponentType } from "react";
+import { Platform } from "react-native";
 
 import type { GuideGridProgram } from "@/lib/api";
 
@@ -15,9 +16,13 @@ export const DESIGN_W = 2560;
  * A global scale-up knob. tv-web's `vw` sizes everything off WIDTH assuming a 16:9 TV; the iPad is
  * taller than 16:9 (~3:2 / 4:3), so pure width-scaling leaves the UI small with slack vertical space
  * (and the content-sized featured panel under-fills). `UI_SCALE` multiplies the whole layout —
- * fonts, row/rail/featured sizing — so it fills the taller screen. One knob; dial to taste.
+ * fonts, row/rail/featured sizing — so it fills the taller screen.
+ *
+ * This is an iPad/tablet-only compensation: a TV IS 16:9 (the design's native aspect), so it needs
+ * no bump — 1.3 there would oversize everything. TVs (tvOS / Android TV / Fire TV) run at 1.0,
+ * matching tv-web's proven sizing on the C2. Dial the iPad value to taste.
  */
-export const UI_SCALE = 1.3;
+export const UI_SCALE = Platform.isTV ? 1 : 1.3;
 
 /** spec px (at 2560 wide) → dp at the given screen width, scaled up for the device's taller aspect. */
 export const vwOf = (width: number, px: number) => (px / DESIGN_W) * width * UI_SCALE;
