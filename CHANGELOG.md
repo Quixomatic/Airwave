@@ -2,6 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.17] - 2026-07-26
+
+Opens the path to running tv-native on a **physical Apple TV** — which EAS's ad-hoc flow can't reach.
+
+### Added
+
+- **`testflight-tvos` EAS build + submit profile for physical Apple TV validation.** EAS's ad-hoc device management is **iOS-only by design** (`eas device:create` and the automated UDID registration never register or list a tvOS device — confirmed against Expo's own TV guide + eas-cli #2074), so a `distribution: internal` tvOS build can never target a real Apple TV: the ad-hoc device picker only ever shows iOS devices. The escape is **TestFlight** — App Store / TestFlight provisioning profiles carry **no device list**, sidestepping tvOS device registration entirely. New `testflight-tvos` profile clones `development-tvos` (keeps `developmentClient: true` so the installed app still hot-reloads from Metro over LAN, plus `EXPO_TV=1` + the react-native-tvos build env) but sets `distribution: "store"`; a matching `submit` profile lets `eas submit` push the build to TestFlight. Flow: `eas build --platform ios --profile testflight-tvos` → `eas submit --platform ios --profile testflight-tvos --latest` → install the TestFlight app on the Apple TV → download ChannelGuide → connect to `expo start --dev-client`. `development-tvos` (the ad-hoc device profile) is left untouched. Config-only.
+
 ## [0.8.16] - 2026-07-26
 
 ### Changed
