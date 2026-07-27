@@ -2,6 +2,33 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.33] - 2026-07-27
+
+Completes the Android-TV chrome scaling — the **full-size player chrome, channel surf, number entry,
+bumper card, and the diagnostic page** now scale via `scaled()` / `cs()`. iPad + Apple TV untouched.
+
+### Fixed
+
+- **Oversized full-size channel chrome + diagnostic + remaining watch UI on Android TV (tv-native).**
+  Applied `scaled()` / `cs()` (Android-TV-gated) to every remaining raw-dp screen:
+  - **Feature panel** — the title, the multi-segment DVR scrubber (thumb/halo/labels), the control row +
+    circle selectors, the Info view (metadata, delivery readout), and the audio/subs/quality picker modal.
+  - **Full chrome** (`watch`) — the top-right channel chip + the back affordance.
+  - **Channel surf** — tiles + carousel (scaling `TILE_W`/`GAP` at the source cascades to the art height
+    and centering math), the "Watching" flag, progress, and labels.
+  - **Channel-number entry**, the **mini-player** Full/Close buttons + focus hint (`player-context`), and
+    the **bumper** "Coming up next" card (countdown donut sized via `cs()` + text).
+  - **Diagnostic** — frame radius, test chips, progress bar + counts, and the inspect card (the
+    screen-proportional `frameW`/`frameH` are left alone; only the literal siblings scale).
+  - The guide empty-state (`guide-ghost`) already used `vw()` and needed nothing.
+  All JS; hot-reloads. iPad + Apple TV render identically (`cs`/`scaled` are ×1 there).
+
+### Not scaled (by design)
+
+- **Onboarding / login / setup** use **NativeWind** (Tailwind `className`), a separate styling system from
+  the `vw`/`cs` pipeline — and they're first-run, native-focus, touch-first screens. Scaling those is a
+  distinct conversion, deferred unless needed.
+
 ## [0.8.32] - 2026-07-27
 
 Extends the Android-TV chrome scaling to the **settings** screens via a new `scaled()` style-object helper.

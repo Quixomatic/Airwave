@@ -5,6 +5,7 @@ import { ActivityIndicator, Platform, StyleSheet, Text, useWindowDimensions, Vie
 import { setStatusBarHidden } from "expo-status-bar";
 
 import { TvPressable as Pressable } from "@/components/tv-pressable";
+import { cs, scaled } from "@/features/guide/layout";
 import { useGuide } from "@/hooks/queries";
 import { api } from "@/lib/api";
 import { onInputActivity } from "@/lib/input";
@@ -259,9 +260,9 @@ function PlayerHost({
         </Pressable>
       )}
       {layout === "mini" && miniFocused && (
-        <View style={{ position: "absolute", inset: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 18, backgroundColor: "rgba(6,10,20,0.55)" }}>
-          <MiniButton label="Full screen" icon={<Maximize2 size={26} color={miniSel === 0 ? "#06121f" : "#dfe4ec"} />} selected={miniSel === 0} accent={accent} onPress={onGoFull} />
-          <MiniButton label="Close" icon={<X size={26} color={miniSel === 1 ? "#06121f" : "#dfe4ec"} />} selected={miniSel === 1} accent={accent} onPress={onClose} />
+        <View style={scaled({ position: "absolute", inset: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 18, backgroundColor: "rgba(6,10,20,0.55)" })}>
+          <MiniButton label="Full screen" icon={<Maximize2 size={cs(26)} color={miniSel === 0 ? "#06121f" : "#dfe4ec"} />} selected={miniSel === 0} accent={accent} onPress={onGoFull} />
+          <MiniButton label="Close" icon={<X size={cs(26)} color={miniSel === 1 ? "#06121f" : "#dfe4ec"} />} selected={miniSel === 1} accent={accent} onPress={onClose} />
         </View>
       )}
     </View>
@@ -271,17 +272,17 @@ function PlayerHost({
 /** "press ▭ to focus" — the LG green button drawn as its physical shape (a wide thin rounded bar). */
 function GreenHint() {
   return (
-    <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, paddingTop: 7, paddingBottom: 8, backgroundColor: "rgba(6,10,20,0.5)" }}>
-      <Text style={{ fontSize: 12, fontWeight: "600", color: "#e6eaf1" }}>Hold OK, or ▲ from the top, to focus</Text>
+    <View style={scaled({ position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, paddingTop: 7, paddingBottom: 8, backgroundColor: "rgba(6,10,20,0.5)" })}>
+      <Text style={scaled({ fontSize: 12, fontWeight: "600", color: "#e6eaf1" })}>Hold OK, or ▲ from the top, to focus</Text>
     </View>
   );
 }
 
 function MiniButton({ label, icon, selected, accent, onPress }: { label: string; icon: React.ReactNode; selected: boolean; accent: string; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} focusable={!Platform.isTV} style={{ alignItems: "center", gap: 8 }}>
-      <View style={{ width: 60, height: 60, borderRadius: 30, alignItems: "center", justifyContent: "center", backgroundColor: selected ? accent : "rgba(30,41,59,0.85)" }}>{icon}</View>
-      <Text style={{ fontSize: 14, fontWeight: "600", color: selected ? "#f1f5f9" : "#94a3b8" }}>{label}</Text>
+    <Pressable onPress={onPress} focusable={!Platform.isTV} style={scaled({ alignItems: "center", gap: 8 })}>
+      <View style={scaled({ width: 60, height: 60, borderRadius: 30, alignItems: "center", justifyContent: "center", backgroundColor: selected ? accent : "rgba(30,41,59,0.85)" })}>{icon}</View>
+      <Text style={scaled({ fontSize: 14, fontWeight: "600", color: selected ? "#f1f5f9" : "#94a3b8" })}>{label}</Text>
     </Pressable>
   );
 }

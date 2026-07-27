@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import Animated, { FadeInUp, FadeOutUp } from "react-native-reanimated";
 
+import { scaled } from "@/features/guide/layout";
 import { useGuide } from "@/hooks/queries";
 import { LAYER, useKeyLayer } from "@/lib/input";
 
@@ -131,22 +132,22 @@ export function ChannelNumberEntry() {
   // Top-CENTER, dropped 28px from the top edge (consistent with the full-chrome channel pill). The card
   // slides down on enter / up on exit (Reanimated), mirroring tv-web's framer-motion y:-30 → 0.
   return (
-    <View pointerEvents="none" style={{ position: "absolute", top: 28, left: 0, right: 0, alignItems: "center", zIndex: 70 }}>
+    <View pointerEvents="none" style={scaled({ position: "absolute", top: 28, left: 0, right: 0, alignItems: "center", zIndex: 70 })}>
       <Animated.View
         entering={FadeInUp.duration(250)}
         exiting={FadeOutUp.duration(250)}
-        style={{ minWidth: 220, borderRadius: 18, overflow: "hidden", borderWidth: 1, borderColor: flash ? "rgba(239,68,68,0.6)" : "rgba(255,255,255,0.12)" }}
+        style={scaled({ minWidth: 220, borderRadius: 18, overflow: "hidden", borderWidth: 1, borderColor: flash ? "rgba(239,68,68,0.6)" : "rgba(255,255,255,0.12)" })}
       >
         {/* Same glass treatment as the full-chrome channel pill (small element → real blur is cheap). */}
-        <BlurView intensity={50} tint="dark" style={{ paddingVertical: 16, paddingHorizontal: 34, alignItems: "center", backgroundColor: "rgba(18,24,38,0.45)" }}>
-          <Text style={{ fontSize: 13, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: flash ? "#fca5a5" : "rgba(255,255,255,0.85)" }}>
+        <BlurView intensity={50} tint="dark" style={scaled({ paddingVertical: 16, paddingHorizontal: 34, alignItems: "center", backgroundColor: "rgba(18,24,38,0.45)" })}>
+          <Text style={scaled({ fontSize: 13, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: flash ? "#fca5a5" : "rgba(255,255,255,0.85)" })}>
             Channel
           </Text>
-          <Text style={{ fontSize: 68, fontWeight: "800", lineHeight: 72, color: flash ? "#ef4444" : "#fff", fontVariant: ["tabular-nums"] }}>
+          <Text style={scaled({ fontSize: 68, fontWeight: "800", lineHeight: 72, color: flash ? "#ef4444" : "#fff", fontVariant: ["tabular-nums"] })}>
             {buffer}
             <Text style={{ color: "rgba(255,255,255,0.3)" }}>{pad}</Text>
           </Text>
-          <Text style={{ fontSize: 15, fontWeight: "500", color: flash ? "#fca5a5" : "rgba(255,255,255,0.8)", marginTop: 2 }}>
+          <Text style={scaled({ fontSize: 15, fontWeight: "500", color: flash ? "#fca5a5" : "rgba(255,255,255,0.8)", marginTop: 2 })}>
             {flash ? `No channel ${buffer}` : "OK to watch · Back to cancel"}
           </Text>
         </BlurView>

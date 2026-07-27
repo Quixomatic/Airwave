@@ -5,7 +5,7 @@ import { Image, Text, useWindowDimensions, View } from "react-native";
 
 import { TvPressable as Pressable } from "@/components/tv-pressable";
 
-import { channelIcon, liveProgramIndex } from "@/features/guide/layout";
+import { channelIcon, cs, liveProgramIndex, scaled } from "@/features/guide/layout";
 import { imageUrl, type GuideGridChannel } from "@/lib/api";
 import { LAYER, onInputActivity, useKeyLayer } from "@/lib/input";
 import { channelVivid } from "@/lib/tint";
@@ -16,8 +16,8 @@ import { channelVivid } from "@/lib/tint";
  * The top MODAL layer (owns every key while up); touch taps a tile to tune. Opens centered on the
  * channel you're watching (a "Watching" flag).
  */
-const TILE_W = 220;
-const GAP = 18;
+const TILE_W = cs(220); // chrome-scaled tile width (drives the art height + carousel centering)
+const GAP = cs(18);
 const ART_H = Math.round((TILE_W * 9) / 16);
 const AUTO_HIDE_MS = 12_000;
 
@@ -98,8 +98,8 @@ export function ChannelSurf({ channels, currentChannelId, onTune, onClose }: { c
   const nowMs = Date.now();
 
   return (
-    <LinearGradient colors={["transparent", "rgba(4,6,12,0.96)"]} locations={[0, 0.4]} style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 420, paddingTop: 22, zIndex: 56 }}>
-      <Text style={{ fontSize: 14, fontWeight: "700", letterSpacing: 3, textTransform: "uppercase", color: "rgba(255,255,255,0.7)", textAlign: "center", marginBottom: 14 }}>Channel Surf</Text>
+    <LinearGradient colors={["transparent", "rgba(4,6,12,0.96)"]} locations={[0, 0.4]} style={scaled({ position: "absolute", left: 0, right: 0, bottom: 0, height: 420, paddingTop: 22, zIndex: 56 })}>
+      <Text style={scaled({ fontSize: 14, fontWeight: "700", letterSpacing: 3, textTransform: "uppercase", color: "rgba(255,255,255,0.7)", textAlign: "center", marginBottom: 14 })}>Channel Surf</Text>
       <FlashList
         ref={listRef}
         horizontal
@@ -131,29 +131,29 @@ function SurfTile({ channel, isFocused, isCurrent, nowMs, onPress }: { channel: 
 
   return (
     <Pressable onPress={onPress} style={{ width: TILE_W, marginHorizontal: GAP / 2, opacity: isFocused ? 1 : 0.5, transform: [{ scale: isFocused ? 1.06 : 1 }] }}>
-      <View style={{ height: 22, alignItems: "center", justifyContent: "flex-end", marginBottom: 6 }}>
+      <View style={scaled({ height: 22, alignItems: "center", justifyContent: "flex-end", marginBottom: 6 })}>
         {isCurrent && (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 3, paddingHorizontal: 10, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.13)" }}>
-            <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: accent }} />
-            <Text style={{ fontSize: 10, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(255,255,255,0.9)" }}>Watching</Text>
+          <View style={scaled({ flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 3, paddingHorizontal: 10, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.13)" })}>
+            <View style={scaled({ width: 7, height: 7, borderRadius: 4, backgroundColor: accent })} />
+            <Text style={scaled({ fontSize: 10, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(255,255,255,0.9)" })}>Watching</Text>
           </View>
         )}
       </View>
-      <View style={{ width: TILE_W, height: ART_H, borderRadius: 12, overflow: "hidden", backgroundColor: `${accent}22`, borderWidth: 2, borderColor: isFocused ? accent : "transparent", alignItems: "center", justifyContent: "center" }}>
-        {art ? <Image source={{ uri: art }} style={{ width: "100%", height: "100%" }} /> : <Icon size={44} color={accent} />}
+      <View style={{ width: TILE_W, height: ART_H, borderRadius: cs(12), overflow: "hidden", backgroundColor: `${accent}22`, borderWidth: 2, borderColor: isFocused ? accent : "transparent", alignItems: "center", justifyContent: "center" }}>
+        {art ? <Image source={{ uri: art }} style={{ width: "100%", height: "100%" }} /> : <Icon size={cs(44)} color={accent} />}
       </View>
-      <View style={{ height: 4, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.18)", marginTop: 8, overflow: "hidden" }}>
+      <View style={scaled({ height: 4, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.18)", marginTop: 8, overflow: "hidden" })}>
         <View style={{ height: "100%", width: `${pct * 100}%`, backgroundColor: accent }} />
       </View>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 }}>
-        <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: `${accent}33`, alignItems: "center", justifyContent: "center" }}>
-          <Icon size={15} color={accent} />
+      <View style={scaled({ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 })}>
+        <View style={scaled({ width: 26, height: 26, borderRadius: 13, backgroundColor: `${accent}33`, alignItems: "center", justifyContent: "center" })}>
+          <Icon size={cs(15)} color={accent} />
         </View>
-        <Text style={{ fontSize: 17, fontWeight: "800", color: accent }}>{channel.number}</Text>
-        <Text numberOfLines={1} style={{ fontSize: 16, fontWeight: "600", color: "#e6eaf1", flexShrink: 1 }}>{channel.name}</Text>
+        <Text style={scaled({ fontSize: 17, fontWeight: "800", color: accent })}>{channel.number}</Text>
+        <Text numberOfLines={1} style={scaled({ fontSize: 16, fontWeight: "600", color: "#e6eaf1", flexShrink: 1 })}>{channel.name}</Text>
       </View>
-      <Text numberOfLines={1} style={{ fontSize: 15, color: "#f1f5f9", marginTop: 4 }}>{title}</Text>
-      {sub && <Text numberOfLines={1} style={{ fontSize: 13, color: "#94a3b8" }}>{sub}</Text>}
+      <Text numberOfLines={1} style={scaled({ fontSize: 15, color: "#f1f5f9", marginTop: 4 })}>{title}</Text>
+      {sub && <Text numberOfLines={1} style={scaled({ fontSize: 13, color: "#94a3b8" })}>{sub}</Text>}
     </Pressable>
   );
 }

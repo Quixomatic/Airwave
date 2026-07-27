@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Image, Text, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 
+import { cs, scaled } from "@/features/guide/layout";
 import { imageUrl, type GuideMeta } from "@/lib/api";
 
 /**
@@ -63,12 +64,12 @@ export function BumperCard({ channelId, guide, remaining, accent, compact = fals
 
   if (compact) {
     return (
-      <LinearGradient colors={["rgba(4,6,12,0.88)", "rgba(4,6,12,0.96)"]} style={{ position: "absolute", inset: 0, overflow: "hidden", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 16, padding: 18 }}>
-        <CountdownDonut sec={sec} fraction={frac} accent={accent} size={54} stroke={5} fontSize={22} />
+      <LinearGradient colors={["rgba(4,6,12,0.88)", "rgba(4,6,12,0.96)"]} style={scaled({ position: "absolute", inset: 0, overflow: "hidden", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 16, padding: 18 })}>
+        <CountdownDonut sec={sec} fraction={frac} accent={accent} size={cs(54)} stroke={cs(5)} fontSize={cs(22)} />
         <View style={{ flexShrink: 1, minWidth: 0 }}>
-          <Text style={{ fontSize: 12, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: accent }}>Up next</Text>
+          <Text style={scaled({ fontSize: 12, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: accent })}>Up next</Text>
           {heading && (
-            <Text numberOfLines={1} style={{ fontSize: 18, fontWeight: "700", lineHeight: 21, color: "#f1f5f9" }}>
+            <Text numberOfLines={1} style={scaled({ fontSize: 18, fontWeight: "700", lineHeight: 21, color: "#f1f5f9" })}>
               {heading}
             </Text>
           )}
@@ -83,16 +84,16 @@ export function BumperCard({ channelId, guide, remaining, accent, compact = fals
       {bg && <Image source={{ uri: bg }} blurRadius={40} resizeMode="cover" style={{ position: "absolute", top: -60, left: -60, right: -60, bottom: -60, opacity: 0.62, transform: [{ scale: 1.12 }] }} />}
       <LinearGradient colors={["rgba(4,6,12,0.58)", "rgba(4,6,12,0.86)"]} style={{ position: "absolute", inset: 0 }} />
 
-      <View style={{ position: "absolute", inset: 0, alignItems: "center", justifyContent: "center", gap: 22, padding: 60 }}>
-        <Text style={{ fontSize: 22, fontWeight: "700", letterSpacing: 4, textTransform: "uppercase", color: accent }}>Coming up next</Text>
+      <View style={scaled({ position: "absolute", inset: 0, alignItems: "center", justifyContent: "center", gap: 22, padding: 60 })}>
+        <Text style={scaled({ fontSize: 22, fontWeight: "700", letterSpacing: 4, textTransform: "uppercase", color: accent })}>Coming up next</Text>
         {heading && (
-          <Text style={{ fontSize: 64, fontWeight: "800", textAlign: "center", lineHeight: 67, color: "#f1f5f9", maxWidth: 1400 }}>
+          <Text style={scaled({ fontSize: 64, fontWeight: "800", textAlign: "center", lineHeight: 67, color: "#f1f5f9", maxWidth: 1400 })}>
             {heading}
           </Text>
         )}
-        {episodeLine && <Text style={{ fontSize: 28, color: "#c3c9d4", textAlign: "center" }}>{episodeLine}</Text>}
-        <View style={{ marginTop: 24 }}>
-          <CountdownDonut sec={sec} fraction={frac} accent={accent} size={190} stroke={9} fontSize={92} />
+        {episodeLine && <Text style={scaled({ fontSize: 28, color: "#c3c9d4", textAlign: "center" })}>{episodeLine}</Text>}
+        <View style={scaled({ marginTop: 24 })}>
+          <CountdownDonut sec={sec} fraction={frac} accent={accent} size={cs(190)} stroke={cs(9)} fontSize={cs(92)} />
         </View>
       </View>
     </View>

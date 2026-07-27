@@ -5,6 +5,7 @@ import { ActivityIndicator, Text, View } from "react-native";
 import { AuroraGrid } from "@/features/guide/aurora-grid";
 import { usePlayer } from "@/features/watch/player-context";
 import { useFavorites, useGuide, useSetFavorite } from "@/hooks/queries";
+import { scaled } from "@/features/guide/layout";
 import { capsDoneForCurrentServer } from "@/lib/device";
 import { C } from "@/lib/theme";
 
@@ -36,8 +37,8 @@ export default function GuideRoute() {
   }
   if (error) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: C.bg, padding: 40 }}>
-        <Text style={{ color: C.mutedFg, fontSize: 18 }}>Couldn't load the guide.</Text>
+      <View style={scaled({ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: C.bg, padding: 40 })}>
+        <Text style={scaled({ color: C.mutedFg, fontSize: 18 })}>Couldn't load the guide.</Text>
       </View>
     );
   }

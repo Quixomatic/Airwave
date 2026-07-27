@@ -4,6 +4,7 @@ import { ActivityIndicator, Platform, ScrollView, Text, useWindowDimensions, Vie
 
 import { TvPressable as Pressable } from "@/components/tv-pressable";
 
+import { cs, scaled } from "@/features/guide/layout";
 import { api, type CapTest } from "@/lib/api";
 import { getServerUrl } from "@/lib/auth";
 import { deviceId, gatherDeviceReport, markCapsDone } from "@/lib/device";
@@ -216,20 +217,20 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
 
   if (error) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#060a14", alignItems: "center", justifyContent: "center", gap: 20, padding: 40 }}>
-        <Text style={{ color: "#f87171", fontSize: 20, textAlign: "center", maxWidth: 560 }}>{error}</Text>
-        <Pressable onPress={finish} style={{ borderRadius: 12, borderWidth: 1, borderColor: "rgba(148,163,184,0.25)", paddingHorizontal: 28, paddingVertical: 12 }}>
-          <Text style={{ color: "#e6eaf1", fontSize: 17 }}>Skip</Text>
+      <View style={scaled({ flex: 1, backgroundColor: "#060a14", alignItems: "center", justifyContent: "center", gap: 20, padding: 40 })}>
+        <Text style={scaled({ color: "#f87171", fontSize: 20, textAlign: "center", maxWidth: 560 })}>{error}</Text>
+        <Pressable onPress={finish} style={scaled({ borderRadius: 12, borderWidth: 1, borderColor: "rgba(148,163,184,0.25)", paddingHorizontal: 28, paddingVertical: 12 })}>
+          <Text style={scaled({ color: "#e6eaf1", fontSize: 17 })}>Skip</Text>
         </Pressable>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#060a14", alignItems: "center", justifyContent: "center", padding: 24 }}>
-      <Text style={{ color: "#f1f5f9", fontSize: 26, fontWeight: "800", marginBottom: 18 }}>Checking playback support</Text>
+    <View style={scaled({ flex: 1, backgroundColor: "#060a14", alignItems: "center", justifyContent: "center", padding: 24 })}>
+      <Text style={scaled({ color: "#f1f5f9", fontSize: 26, fontWeight: "800", marginBottom: 18 })}>Checking playback support</Text>
 
-      <View style={{ width: frameW, height: frameH, borderRadius: 16, overflow: "hidden", backgroundColor: "#000", borderWidth: 1, borderColor: "rgba(148,163,184,0.2)" }}>
+      <View style={{ width: frameW, height: frameH, borderRadius: cs(16), overflow: "hidden", backgroundColor: "#000", borderWidth: 1, borderColor: "rgba(148,163,184,0.2)" }}>
         {/* Mount the player ONLY while a clip is under test. Nulling `source` between clips (below)
             unmounts it → `deinit` → `mpv_terminate_destroy`, so each clip runs in a FRESH instance
             that is fully destroyed afterward. Cycling one reused instance across 49 clips of mixed
@@ -245,47 +246,47 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
           />
         )}
         {!done && (
-          <View style={{ position: "absolute", right: 12, bottom: 12 }}>
+          <View style={scaled({ position: "absolute", right: 12, bottom: 12 })}>
             <ActivityIndicator color={C.accent} />
           </View>
         )}
       </View>
 
       {/* current test chips */}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 16, maxWidth: frameW, justifyContent: "center" }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: cs(8), marginTop: cs(16), maxWidth: frameW, justifyContent: "center" }}>
         {chips.map((chip, i) => (
-          <View key={i} style={{ backgroundColor: "rgba(148,163,184,0.12)", borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10 }}>
-            <Text style={{ color: "#c3c9d4", fontSize: 13, fontWeight: "600" }}>{chip}</Text>
+          <View key={i} style={scaled({ backgroundColor: "rgba(148,163,184,0.12)", borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10 })}>
+            <Text style={scaled({ color: "#c3c9d4", fontSize: 13, fontWeight: "600" })}>{chip}</Text>
           </View>
         ))}
       </View>
 
       {/* progress */}
-      <View style={{ width: frameW, marginTop: 16 }}>
-        <View style={{ height: 8, borderRadius: 999, backgroundColor: "rgba(148,163,184,0.18)", overflow: "hidden" }}>
-          <View style={{ height: "100%", width: `${pct}%`, backgroundColor: C.accent, borderRadius: 999 }} />
+      <View style={{ width: frameW, marginTop: cs(16) }}>
+        <View style={scaled({ height: 8, borderRadius: 999, backgroundColor: "rgba(148,163,184,0.18)", overflow: "hidden" })}>
+          <View style={{ height: "100%", width: `${pct}%`, backgroundColor: C.accent, borderRadius: cs(999) }} />
         </View>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 10 }}>
-          <Text style={{ fontSize: 14, color: "#94a3b8" }}>{tests ? `${done ? total : idx + 1} of ${total}` : "Preparing…"}</Text>
-          <Text style={{ fontSize: 14, color: "#94a3b8" }}>{pass} native · {fail} transcode</Text>
+        <View style={scaled({ flexDirection: "row", justifyContent: "space-between", marginTop: 10 })}>
+          <Text style={scaled({ fontSize: 14, color: "#94a3b8" })}>{tests ? `${done ? total : idx + 1} of ${total}` : "Preparing…"}</Text>
+          <Text style={scaled({ fontSize: 14, color: "#94a3b8" })}>{pass} native · {fail} transcode</Text>
         </View>
       </View>
 
       {/* DEBUG (temporary) — the current clip URL + which tests passed, so we can see whether the
           mp4/mov clips play (reachability) vs the mkv/avi/webm ones failing (correct on iPadOS). */}
-      {cur && <Text style={{ marginTop: 12, fontSize: 11, color: "#475569", maxWidth: frameW }} numberOfLines={1}>{getServerUrl()}{cur.url}</Text>}
+      {cur && <Text style={{ marginTop: cs(12), fontSize: cs(11), color: "#475569", maxWidth: frameW }} numberOfLines={1}>{getServerUrl()}{cur.url}</Text>}
       {(() => {
         const last = tests?.slice(0, idx + 1).reverse().find((t) => rows[t.id]);
         const err = last ? rows[last.id]?.error : undefined;
-        return err ? <Text style={{ fontSize: 11, color: "#f0a92a", maxWidth: frameW, marginTop: 2 }} numberOfLines={1}>last error: {err}</Text> : null;
+        return err ? <Text style={{ fontSize: cs(11), color: "#f0a92a", maxWidth: frameW, marginTop: cs(2) }} numberOfLines={1}>last error: {err}</Text> : null;
       })()}
-      <View style={{ width: frameW, marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+      <View style={{ width: frameW, marginTop: cs(8), flexDirection: "row", flexWrap: "wrap", gap: cs(4) }}>
         {tests?.map((t) => {
           const r = rows[t.id];
           const color = !r ? "#334155" : r.decoded ? "#3fa66a" : "#7c2d2d";
           return (
-            <Pressable key={t.id} onPress={() => setInspect(t.id)} style={{ backgroundColor: color, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 3, borderWidth: inspect === t.id ? 1 : 0, borderColor: "#fff" }}>
-              <Text style={{ fontSize: 9, color: "#e6eaf1" }}>{t.container}/{t.video}</Text>
+            <Pressable key={t.id} onPress={() => setInspect(t.id)} style={scaled({ backgroundColor: color, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 3, borderWidth: inspect === t.id ? 1 : 0, borderColor: "#fff" })}>
+              <Text style={scaled({ fontSize: 9, color: "#e6eaf1" })}>{t.container}/{t.video}</Text>
             </Pressable>
           );
         })}
@@ -297,18 +298,18 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
         const r = t ? rows[t.id] : undefined;
         if (!t) return null;
         return (
-          <View style={{ width: frameW, marginTop: 10, padding: 12, borderRadius: 10, backgroundColor: "rgba(148,163,184,0.08)" }}>
-            <Text style={{ color: "#e6eaf1", fontSize: 13, fontWeight: "700" }}>{t.id}</Text>
-            <Text style={{ color: "#94a3b8", fontSize: 12, marginTop: 2 }}>container {t.container} · video {t.video} · audio {t.audio}{t.feature ? ` · ${t.feature}` : ""}</Text>
-            <Text style={{ color: r?.decoded ? "#5cc98a" : "#f0a92a", fontSize: 12, marginTop: 4 }}>{r ? (r.decoded ? `DECODED ${r.decodedWidth}×${r.decodedHeight}${r.audioOk === false ? " · no audio" : r.audioTrackPresent ? " · audio" : ""}` : `FAILED — ${r.error ?? "unknown"}`) : "not tested yet"}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}><Text style={{ color: "#475569", fontSize: 10, marginTop: 4 }}>{getServerUrl()}{t.url}</Text></ScrollView>
+          <View style={{ width: frameW, marginTop: cs(10), padding: cs(12), borderRadius: cs(10), backgroundColor: "rgba(148,163,184,0.08)" }}>
+            <Text style={scaled({ color: "#e6eaf1", fontSize: 13, fontWeight: "700" })}>{t.id}</Text>
+            <Text style={scaled({ color: "#94a3b8", fontSize: 12, marginTop: 2 })}>container {t.container} · video {t.video} · audio {t.audio}{t.feature ? ` · ${t.feature}` : ""}</Text>
+            <Text style={scaled({ color: r?.decoded ? "#5cc98a" : "#f0a92a", fontSize: 12, marginTop: 4 })}>{r ? (r.decoded ? `DECODED ${r.decodedWidth}×${r.decodedHeight}${r.audioOk === false ? " · no audio" : r.audioTrackPresent ? " · audio" : ""}` : `FAILED — ${r.error ?? "unknown"}`) : "not tested yet"}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}><Text style={scaled({ color: "#475569", fontSize: 10, marginTop: 4 })}>{getServerUrl()}{t.url}</Text></ScrollView>
           </View>
         );
       })()}
 
       {done && (
-        <Pressable onPress={finish} style={{ marginTop: 30, borderRadius: 14, backgroundColor: C.accent, paddingHorizontal: 44, paddingVertical: 14 }}>
-          <Text style={{ color: "#04060c", fontSize: 18, fontWeight: "700" }}>Continue</Text>
+        <Pressable onPress={finish} style={scaled({ marginTop: 30, borderRadius: 14, backgroundColor: C.accent, paddingHorizontal: 44, paddingVertical: 14 })}>
+          <Text style={scaled({ color: "#04060c", fontSize: 18, fontWeight: "700" })}>Continue</Text>
         </Pressable>
       )}
     </View>

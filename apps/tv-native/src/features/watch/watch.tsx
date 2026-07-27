@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { TvPressable as Pressable } from "@/components/tv-pressable";
 import Animated, { FadeInDown, FadeInUp, FadeOutDown, FadeOutUp } from "react-native-reanimated";
 
+import { cs, scaled } from "@/features/guide/layout";
 import { useGuide } from "@/hooks/queries";
 import type { GuideChannel } from "@/lib/api";
 import { LAYER, useKeyLayer } from "@/lib/input";
@@ -93,18 +94,18 @@ export function FullChrome({
           <Animated.View
             entering={FadeInUp.duration(250)}
             exiting={FadeOutUp.duration(250)}
-            style={{ position: "absolute", top: 28, right: 40, flexDirection: "row", alignItems: "center", gap: 12, height: 56, paddingLeft: 12, paddingRight: 22, borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", backgroundColor: "rgba(18,24,38,0.55)" }}
+            style={scaled({ position: "absolute", top: 28, right: 40, flexDirection: "row", alignItems: "center", gap: 12, height: 56, paddingLeft: 12, paddingRight: 22, borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", backgroundColor: "rgba(18,24,38,0.55)" })}
           >
-            <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: `${accent}33` }}>
-              <Tv size={20} color={accent} />
+            <View style={scaled({ width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: `${accent}33` })}>
+              <Tv size={cs(20)} color={accent} />
             </View>
-            <Text style={{ fontSize: 22, fontWeight: "700", color: accent }}>{channel?.number}</Text>
-            <Text style={{ fontSize: 22, fontWeight: "600", color: "#e6eaf1" }}>{channel?.name}</Text>
+            <Text style={scaled({ fontSize: 22, fontWeight: "700", color: accent })}>{channel?.number}</Text>
+            <Text style={scaled({ fontSize: 22, fontWeight: "600", color: "#e6eaf1" })}>{channel?.name}</Text>
           </Animated.View>
           {/* touch back-to-guide affordance (D-pad uses Back) — slides down with the chip */}
-          <Animated.View entering={FadeInUp.duration(250)} exiting={FadeOutUp.duration(250)} style={{ position: "absolute", top: 28, left: 24, zIndex: 2 }}>
-            <Pressable onPress={onBack} style={{ borderRadius: 999, backgroundColor: "rgba(18,24,38,0.6)", padding: 10 }}>
-              <ArrowLeft size={24} color="#f1f5f9" />
+          <Animated.View entering={FadeInUp.duration(250)} exiting={FadeOutUp.duration(250)} style={scaled({ position: "absolute", top: 28, left: 24, zIndex: 2 })}>
+            <Pressable onPress={onBack} style={scaled({ borderRadius: 999, backgroundColor: "rgba(18,24,38,0.6)", padding: 10 })}>
+              <ArrowLeft size={cs(24)} color="#f1f5f9" />
             </Pressable>
           </Animated.View>
           {/* Feature panel — slides UP from the bottom (tv-web parity: y:48 → 0). FadeInDown = starts
