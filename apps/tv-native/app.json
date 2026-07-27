@@ -2,7 +2,7 @@
   "expo": {
     "name": "ChannelGuide",
     "slug": "channelguide",
-    "version": "0.8.39",
+    "version": "0.8.40",
     "scheme": "channelguide",
     "orientation": "landscape",
     "userInterfaceStyle": "dark",
@@ -15,7 +15,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.channelguide.tv",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       }
     },
     "android": {
@@ -41,7 +44,8 @@
             "buildReactNativeFromSource": true
           },
           "android": {
-            "minSdkVersion": 26
+            "minSdkVersion": 26,
+            "usesCleartextTraffic": true
           }
         }
       ]

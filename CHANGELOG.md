@@ -2,6 +2,22 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.40] - 2026-07-27
+
+### Fixed
+
+- **Release/production builds couldn't reach a plain-HTTP server (tv-native).** Android **release** builds
+  block cleartext HTTP by default (dev/debug builds allow it), so a `preview`/production APK couldn't connect
+  to a self-hosted server on a plain `http://` LAN address — even though the dev client, iPad, and Apple TV
+  (all dev builds) connect fine. Confirmed via the release APK's manifest (no `usesCleartextTraffic`, no
+  network-security config). Enabled cleartext via `expo-build-properties` `android.usesCleartextTraffic:true`,
+  plus the iOS equivalent (`NSAppTransportSecurity.NSAllowsArbitraryLoads`) so an iOS release isn't blocked by
+  ATS. Load-bearing for self-host (plain-HTTP LAN) on any non-dev build. Native — takes effect on the next build.
+- **The guide-load-failure screen was a dead-end (tv-native).** When the guide couldn't load (server
+  unreachable / down), the user was stranded on a static "Couldn't load the guide" with no escape — unlike
+  tv-web, which shows the ghost guide + sidebar. Now it's recoverable: a focusable **Open Settings** (OK on
+  the remote, or tap) → change servers or sign out. A one-item zone machine so the D-pad isn't stuck.
+
 ## [0.8.39] - 2026-07-27
 
 DV arc, stage 2 — plumb the captured Dolby Vision metadata through to the client. (Then paused: the native
