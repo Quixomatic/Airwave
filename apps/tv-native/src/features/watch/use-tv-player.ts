@@ -61,6 +61,11 @@ const PEEK_L = 0.14;
 const PEEK_R = 0.14;
 const LOOKBACK_S = 6 * 60;
 const LOOKAHEAD_S = 6 * 60;
+// Resume-stall watchdog: after unpausing, if mpv produces NO progress for this long, the stream is dead
+// (a paused Plex session got reaped) → re-establish at the same spot. Bounded by MAX_RETRIES consecutive
+// reloads (reset on any real progress) so a permanently-dead stream can't loop.
+const RESUME_STALL_MS = 5000;
+const RESUME_MAX_RETRIES = 2;
 
 const titleOf = (g?: GuideMeta | null) => (!g ? "" : g.showTitle ? `${g.showTitle} — ${g.title}` : g.title);
 
@@ -97,6 +102,12 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   // has loaded, so a stale onProgress from the outgoing stream can't anchor the new program's baseline.
   const bufferingRef = useRef(false); // latest onBuffering state — for the watchdog's stuck-diagnosis
   const loggedRef = useRef(false); // already logged this load (onLoad/onError)? the watchdog skips if so
+  // Resume-stall watchdog state (see RESUME_STALL_MS): armed on unpause; the tick reloads if mpv's clock
+  // hasn't produced a progress event within the window; capped by resumeAttemptsRef (reset on progress).
+  const lastProgressAtRef = useRef(0); // Date.now() of the last onProgress — the liveness signal
+  const resumeWatchRef = useRef(false);
+  const resumeDeadlineRef = useRef(0);
+  const resumeAttemptsRef = useRef(0);
 
   const [tracks, setTracks] = useState<{ audio: Track[]; subtitle: Track[] }>({ audio: [], subtitle: [] });
   const [status, setStatus] = useState<PlayerStatus>({ loading: true, buffering: false, state: "idle", guide: null, paused: false, bumperRemaining: null, canRestart: false, error: null, scrubber: null, delivery: null });
@@ -229,6 +240,7 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   const onProgress = useCallback((e: { nativeEvent: { currentTime: number } }) => {
     const t = e.nativeEvent.currentTime;
     positionSecRef.current = t;
+    lastProgressAtRef.current = Date.now(); // liveness for the resume-stall watchdog
     // Baseline (tv-web's model, mode-agnostic): the clock is `startS + offset + (currentTime −
     // playStartCurrentTime)`, so anchor playStartCurrentTime to the FIRST real position of the NEW
     // stream — wherever it actually opens (direct → the offset; HLS → 0-based or offset-based, doesn't
@@ -357,6 +369,32 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
       lastTick.current = Date.now();
       const cur = currentRef.current;
       if (!cur) return;
+
+      // Resume-stall watchdog — after unpausing, if no progress event arrived within the window the stream
+      // is dead (reaped Plex session); re-establish at the same spot. Bounded: at most RESUME_MAX_RETRIES
+      // consecutive reloads, reset by any real progress; then give up in a retryable paused state (never a
+      // reload loop). A progress event within the window OR a re-pause = healthy → disarm.
+      if (resumeWatchRef.current && Date.now() >= resumeDeadlineRef.current) {
+        const stalledMs = Date.now() - lastProgressAtRef.current;
+        if (pausedRef.current || stalledMs < RESUME_STALL_MS) {
+          resumeWatchRef.current = false;
+          resumeAttemptsRef.current = 0;
+        } else if (resumeAttemptsRef.current < RESUME_MAX_RETRIES) {
+          resumeAttemptsRef.current += 1;
+          resumeDeadlineRef.current = Date.now() + RESUME_STALL_MS; // re-arm for the reload
+          console.log(`[mpv] resume stalled — reload ${resumeAttemptsRef.current}/${RESUME_MAX_RETRIES}`);
+          void goTo(currentEffective());
+          return;
+        } else {
+          // Give up, but leave it retryable: model as paused so Play re-arms the watchdog with a fresh budget.
+          resumeWatchRef.current = false;
+          pausedRef.current = true;
+          void viewRef.current?.pause();
+          setStatus((s) => ({ ...s, loading: false, buffering: false, paused: true, error: "Playback stopped. Press Play to retry." }));
+          return;
+        }
+      }
+
       let effective: number;
       if (cur.kind === "PROGRAM") {
         effective = currentEffective();
@@ -429,6 +467,7 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
     currentUrlRef.current = null;
     positionSecRef.current = 0;
     transitioning.current = false;
+    resumeWatchRef.current = false; // disarm the resume-stall watchdog across channel change / Close
     if (!channelId) {
       // Close: pause + release. The view is conditionally rendered on `source`, so nulling it unmounts
       // the MpvPlayerView (deinit → mpv_terminate_destroy); pause() first halts audio so nothing leaks.
@@ -468,14 +507,21 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
           if (pausedRef.current) {
             void viewRef.current?.play();
             pausedRef.current = false;
+            // Arm the resume-stall watchdog with a FRESH retry budget — a manual Play is always a new try
+            // (this is also the recovery path from a "Playback stopped" give-up).
+            resumeWatchRef.current = true;
+            resumeDeadlineRef.current = Date.now() + RESUME_STALL_MS;
+            resumeAttemptsRef.current = 0;
           } else {
             void viewRef.current?.pause();
             pausedRef.current = true;
+            resumeWatchRef.current = false; // disarm while paused
           }
         } else {
           pausedRef.current = !pausedRef.current;
         }
-        setStatus((s) => ({ ...s, paused: pausedRef.current }));
+        // On resume, clear a prior "Playback stopped" so pressing Play dismisses it immediately.
+        setStatus((s) => ({ ...s, paused: pausedRef.current, error: pausedRef.current ? s.error : null }));
       },
       jumpToLive: () => void goTo(now()),
       seekBy: (seconds: number) => void goTo(currentEffective() + seconds),

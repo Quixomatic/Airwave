@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.25] - 2026-07-26
+
+### Added
+
+- **Resume-stall watchdog — recover from a dead Plex session on unpause (tv-native).** After a long pause Plex can reap the transcode session, so unpausing a dead stream just froze forever. On resume, if mpv produces **no progress within ~5s** (its clock is frozen), the player re-establishes at the same spot (`goTo(currentEffective())` → fresh session). **Bounded so it can't loop:** at most 2 *consecutive* reloads, and the counter resets on any real progress — so only a stream that's dead *and stays dead* hits the cap; after that it gives up in a **retryable** paused state ("Playback stopped. Press Play to retry.") rather than reloading forever. Manual Play/seek/re-tune always starts fresh. (The *proactive* fix — keeping the Plex session alive during pause via a Plex timeline heartbeat with `isPaused`, plezy's mechanism — is a separate, bigger arc shared with tv-web; this is the recovery safety net.)
+
 ## [0.8.24] - 2026-07-26
 
 ### Fixed
