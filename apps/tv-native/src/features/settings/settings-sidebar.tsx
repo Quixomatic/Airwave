@@ -6,7 +6,7 @@ import { TvPressable as Pressable } from "@/components/tv-pressable";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
 import { GlassCircleButton } from "@/features/guide/glass-button";
-import { SIDEBAR_EXPANDED_W, SIDEBAR_SLIVER_W } from "@/features/guide/layout";
+import { cs, SIDEBAR_EXPANDED_W, SIDEBAR_SLIVER_W } from "@/features/guide/layout";
 import { C } from "@/lib/theme";
 
 /**
@@ -33,17 +33,22 @@ export function SettingsSidebar({
   onActivate: (index: number) => void;
   onExpand: () => void;
 }) {
-  const w = useSharedValue(expanded ? SIDEBAR_EXPANDED_W : SIDEBAR_SLIVER_W);
+  // Chrome widths + inner spacing scaled for Android TV's 960dp space (identity on iPad/Apple TV) —
+  // same treatment as the guide sidebar.
+  const SLIVER = cs(SIDEBAR_SLIVER_W);
+  const EXPANDED = cs(SIDEBAR_EXPANDED_W);
+
+  const w = useSharedValue(expanded ? EXPANDED : SLIVER);
   useEffect(() => {
-    w.value = withSpring(expanded ? SIDEBAR_EXPANDED_W : SIDEBAR_SLIVER_W, { mass: 1, stiffness: 320, damping: 34, overshootClamping: true });
-  }, [expanded, w]);
+    w.value = withSpring(expanded ? EXPANDED : SLIVER, { mass: 1, stiffness: 320, damping: 34, overshootClamping: true });
+  }, [expanded, w, EXPANDED, SLIVER]);
   const outerStyle = useAnimatedStyle(() => {
-    const t = (w.value - SIDEBAR_SLIVER_W) / (SIDEBAR_EXPANDED_W - SIDEBAR_SLIVER_W);
+    const t = (w.value - SLIVER) / (EXPANDED - SLIVER);
     return { width: w.value, shadowOpacity: 0.5 * t };
   });
 
   const content = (
-    <View style={{ flex: 1, gap: 14, paddingVertical: 24, paddingHorizontal: 18 }}>
+    <View style={{ flex: 1, gap: cs(14), paddingVertical: cs(24), paddingHorizontal: cs(18) }}>
       {items.map((it, i) => (
         <View key={it.key}>
           <GlassCircleButton
@@ -55,7 +60,7 @@ export function SettingsSidebar({
             onPress={() => onActivate(i)}
           />
           {/* separate "Back to Guide" from the categories (matches the guide sidebar) */}
-          {i === 0 && <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginTop: 8 }} />}
+          {i === 0 && <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginTop: cs(8) }} />}
         </View>
       ))}
     </View>

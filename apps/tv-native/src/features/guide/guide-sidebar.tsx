@@ -11,7 +11,7 @@ import { C } from "@/lib/theme";
 import { accentVivid } from "@/lib/accent-palette";
 
 import { GlassCircleButton } from "./glass-button";
-import { SIDEBAR_EXPANDED_W, SIDEBAR_SLIVER_W } from "./layout";
+import { cs, SIDEBAR_EXPANDED_W, SIDEBAR_SLIVER_W } from "./layout";
 
 /**
  * The guide's left sidebar, ported from tv-web — a collapsed sliver of glass circles that expands to
@@ -37,11 +37,12 @@ export type SidebarItem = {
 };
 
 const LU = LucideIcons as unknown as Record<string, React.ComponentType<{ size?: number; color?: string }>>;
+// cs() keeps the icons proportional to the (chrome-scaled) circles on Android TV; identity on iPad/Apple TV.
 function pkgIcon(id: string | null): ReactNode {
   const Comp = id && id.startsWith("lucide:") ? LU[id.slice(7)] ?? LucideIcons.Folder : LucideIcons.Folder;
-  return <Comp size={24} color="#f1f5f9" />;
+  return <Comp size={cs(24)} color="#f1f5f9" />;
 }
-const ic = (Cmp: React.ComponentType<{ size?: number; color?: string }>) => <Cmp size={24} color="#f1f5f9" />;
+const ic = (Cmp: React.ComponentType<{ size?: number; color?: string }>) => <Cmp size={cs(24)} color="#f1f5f9" />;
 
 export function buildSidebarItems(packages: Package[], lens: Lens): SidebarItem[] {
   const filtered = lens.type !== "all";
@@ -98,32 +99,39 @@ export function GuideSidebar({
   const filters = items.filter((i) => i.group === "filter");
   const activeFilter = filters.find((f) => f.lens && lensEquals(f.lens, lens));
 
-  const w = useSharedValue(expanded ? SIDEBAR_EXPANDED_W : SIDEBAR_SLIVER_W);
+  // Chrome widths + inner spacing scaled for Android TV's 960dp space (identity on iPad/Apple TV).
+  const SLIVER = cs(SIDEBAR_SLIVER_W);
+  const EXPANDED = cs(SIDEBAR_EXPANDED_W);
+  const padV = cs(24);
+  const padH = cs(18);
+  const gap = cs(14);
+
+  const w = useSharedValue(expanded ? EXPANDED : SLIVER);
   useEffect(() => {
     // Match tv-web's Framer spring (stiffness 320 / damping 34) but clamp the overshoot — Reanimated's
     // spring solver bounces harder than Framer's at these params; overshootClamping gives the clean
     // decelerating slide tv-web has.
-    w.value = withSpring(expanded ? SIDEBAR_EXPANDED_W : SIDEBAR_SLIVER_W, {
+    w.value = withSpring(expanded ? EXPANDED : SLIVER, {
       mass: 1,
       stiffness: 320,
       damping: 34,
       overshootClamping: true,
     });
-  }, [expanded, w]);
+  }, [expanded, w, EXPANDED, SLIVER]);
   // Width + the drop shadow fade in together (tv-web animates boxShadow 0→0.5 alpha with the width).
   const outerStyle = useAnimatedStyle(() => {
-    const t = (w.value - SIDEBAR_SLIVER_W) / (SIDEBAR_EXPANDED_W - SIDEBAR_SLIVER_W);
+    const t = (w.value - SLIVER) / (EXPANDED - SLIVER);
     return { width: w.value, shadowOpacity: 0.5 * t };
   });
 
   const content = expanded ? (
     // Interactive circles + labels; the lens list scrolls (packages exceed the screen).
-    <View style={{ flex: 1, gap: 14, paddingVertical: 24, paddingHorizontal: 18 }}>
+    <View style={{ flex: 1, gap, paddingVertical: padV, paddingHorizontal: padH }}>
       {actions.map((it, i) => (
         <GlassCircleButton key={it.key} icon={it.icon} label={it.label} expanded focused={focused && sel === i} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(i)} />
       ))}
-      <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: 4 }} />
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 14 }} showsVerticalScrollIndicator={false}>
+      <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: cs(4) }} />
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap }} showsVerticalScrollIndicator={false}>
         {filters.map((it, i) => {
           const idx = actions.length + i;
           return <GlassCircleButton key={it.key} icon={it.icon} label={it.label} sublabel={it.sublabel} expanded focused={focused && sel === idx} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(idx)} />;
@@ -134,12 +142,12 @@ export function GuideSidebar({
     // Collapsed: the sliver background is a tap-to-expand target (outer Pressable), while each ACTION
     // circle fires its action directly (a nested Pressable captures its own tap so the parent doesn't
     // fire). The FILTER circle expands to reveal the lenses (no single lens to apply from collapsed).
-    <Pressable onPress={onExpand} style={{ flex: 1, gap: 14, paddingVertical: 24, paddingHorizontal: 18 }}>
+    <Pressable onPress={onExpand} style={{ flex: 1, gap, paddingVertical: padV, paddingHorizontal: padH }}>
       {actions.map((it, i) => (
         <GlassCircleButton key={it.key} icon={it.icon} expanded={false} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(i)} />
       ))}
-      <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: 4 }} />
-      <GlassCircleButton icon={<ListFilter size={24} color="#f1f5f9" />} expanded={false} active={!!activeFilter} accent={activeFilter?.accent} onPress={onExpand} />
+      <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: cs(4) }} />
+      <GlassCircleButton icon={<ListFilter size={cs(24)} color="#f1f5f9" />} expanded={false} active={!!activeFilter} accent={activeFilter?.accent} onPress={onExpand} />
     </Pressable>
   );
 

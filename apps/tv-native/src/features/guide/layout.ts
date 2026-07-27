@@ -1,6 +1,6 @@
 import * as LucideIcons from "lucide-react-native";
 import type { ComponentType } from "react";
-import { Platform } from "react-native";
+import { Dimensions, Platform } from "react-native";
 
 import type { GuideGridProgram } from "@/lib/api";
 
@@ -26,6 +26,22 @@ export const UI_SCALE = Platform.isTV ? 1 : 1.3;
 
 /** spec px (at 2560 wide) → dp at the given screen width, scaled up for the device's taller aspect. */
 export const vwOf = (width: number, px: number) => (px / DESIGN_W) * width * UI_SCALE;
+
+/**
+ * Fixed-dp CHROME scale (sidebar widths, glass-circle sizes, border radii). The guide grid scales with
+ * screen width via `vwOf`, but the chrome was authored in raw dp that looks right on the wide iPad
+ * (1366dp) + Apple TV (~1920dp) screens. **Android TV normalizes every panel — 1080p or 4K — to a 960dp
+ * layout space** (confirmed on the Google TV Streamer + both emulators: `w=960` regardless of `scale`),
+ * i.e. ~HALF the tvOS dp width for the same content, so raw chrome renders ~2× oversized against the
+ * `vwOf`-scaled guide (huge collapsed sidebar, over-rounded cards). `cs()` scales it back in proportion to
+ * width — but ONLY on Android TV. iPad + Apple TV (`Platform.OS === "ios"`) and Android tablets (`isTV`
+ * false, which use `UI_SCALE` 1.3 like the iPad) stay at exactly 1, so their proven look is untouched.
+ */
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+export const CHROME_SCALE =
+  Platform.OS === "android" && Platform.isTV ? clamp(Dimensions.get("window").width / 1920, 0.5, 1) : 1;
+/** Scale a raw-dp chrome value. Identity everywhere except Android TV (≈0.5 at 960dp). */
+export const cs = (px: number) => px * CHROME_SCALE;
 
 export const ACCENTS = ["#2f9e8f", "#4a9fe0", "#3b82f6", "#8b5cf6", "#3fa66a", "#d08b2f", "#d0587e", "#7c8aa3"];
 

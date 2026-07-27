@@ -20,6 +20,7 @@ import {
   audioBadge,
   channelIcon,
   CH_FRAC,
+  cs,
   FEATURE_SCALE,
   fmtDay,
   fmtTime,
@@ -298,8 +299,9 @@ export function AuroraGrid({
 
   return (
     <View style={{ flex: 1, flexDirection: "row", backgroundColor: C.bg }}>
-      {/* The guide column — the layout reserves only the sliver width; the sidebar overlays it. */}
-      <View style={{ width: SIDEBAR_SLIVER_W, flexShrink: 0 }} />
+      {/* The guide column — the layout reserves only the sliver width; the sidebar overlays it. Must use
+          the SAME chrome-scaled width as the sidebar (cs), or the content sits offset by the old width. */}
+      <View style={{ width: cs(SIDEBAR_SLIVER_W), flexShrink: 0 }} />
       <View style={{ flex: 1, position: "relative", overflow: "hidden" }}>
         {channels.length > 0 && focusedChannel && focusedProgram ? (
           <FeaturedPanel channel={focusedChannel} program={focusedProgram} now={now} accent={channelTint(focusedChannel) ?? accentOf(fc)} vw={vw} onTune={() => onTune(focusedChannel.id)} />
@@ -493,8 +495,11 @@ function Row({
           const startMs = new Date(p.startsAt).getTime();
           const live = now.getTime() >= startMs && now.getTime() < startMs + p.durationSeconds * 1000;
           const rawLeft = laneX(p.startsAt);
-          const rawRight = rawLeft + Math.max(laneW * 0.02, (p.durationSeconds / 60) * ppm) - 6;
-          const left = rawLeft < 0 ? 6 : rawLeft;
+          // `gap` = the raw-dp space between adjacent cells; chrome-scale it so it stays proportional to
+          // the (width-scaled) cells on Android TV's 960dp space — else it reads as too-wide gaps there.
+          const gap = cs(6);
+          const rawRight = rawLeft + Math.max(laneW * 0.02, (p.durationSeconds / 60) * ppm) - gap;
+          const left = rawLeft < 0 ? gap : rawLeft;
           const cw = rawRight - left;
           if (cw < 8) return null;
           const fillPct = Math.max(0, Math.min(1, (laneX(now) - left) / cw));
@@ -510,7 +515,7 @@ function Row({
                 left,
                 width: cw,
                 height: rowPx - vw(12),
-                borderRadius: 8,
+                borderRadius: cs(8),
                 overflow: "hidden",
                 borderWidth: selected ? 2 : 1,
                 borderColor: selected ? C.ring : C.cellBorder,
@@ -552,7 +557,7 @@ const BADGE_GRAD = {
 
 function Badge({ label, colors, textColor, fv }: { label: string; colors: readonly [string, string]; textColor: string; fv: (px: number) => number }) {
   return (
-    <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 8, paddingVertical: fv(6), paddingHorizontal: fv(16) }}>
+    <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: cs(8), paddingVertical: fv(6), paddingHorizontal: fv(16) }}>
       <Text style={{ fontSize: fv(30), fontWeight: "700", color: textColor }}>{label}</Text>
     </LinearGradient>
   );
@@ -675,7 +680,7 @@ function FeaturedPanel({ channel, program, now, accent, vw, onTune }: { channel:
           while a mini feed plays. */}
       {miniActive && (
         <View onLayout={measureSlot} style={{ alignSelf: "stretch", justifyContent: "flex-end", marginLeft: fv(40) }}>
-          <View ref={slotRef} onLayout={measureSlot} style={{ width: fv(970), aspectRatio: 16 / 9, borderRadius: 14 }} />
+          <View ref={slotRef} onLayout={measureSlot} style={{ width: fv(970), aspectRatio: 16 / 9, borderRadius: cs(14) }} />
         </View>
       )}
     </Pressable>

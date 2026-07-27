@@ -20,9 +20,11 @@ import { C } from "@/lib/theme";
 // Android TV build is sorted.)
 {
   const d = Dimensions.get("window");
+  const s = Dimensions.get("screen");
   console.log(
     `[platform] OS=${Platform.OS} v=${String(Platform.Version)} isTV=${Platform.isTV} ` +
-      `w=${Math.round(d.width)} h=${Math.round(d.height)} scale=${d.scale} fontScale=${d.fontScale}`,
+      `win=${Math.round(d.width)}x${Math.round(d.height)} screen=${Math.round(s.width)}x${Math.round(s.height)} ` +
+      `scale=${d.scale} fontScale=${d.fontScale}`,
   );
 }
 

@@ -2,6 +2,35 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.31] - 2026-07-27
+
+Android TV chrome scaling — the fixed-dp chrome (sidebars, cards, gaps) now scales to Android TV's 960dp
+layout space, so it matches the guide instead of rendering oversized. iPad + Apple TV are mathematically
+untouched.
+
+### Fixed
+
+- **Oversized chrome on Android TV (tv-native).** Android TV normalizes every panel — 1080p or 4K — to a
+  **960dp** layout space, ~half the dp width tvOS reports for the same screen (confirmed: the Google TV
+  Streamer + both emulators all report `w=960` regardless of `scale`). The guide grid scales with width via
+  `vwOf` and looked right, but the sidebar widths, glass circles, icons, border radii, inter-program gap,
+  and the sidebar's layout spacer were authored in **raw dp**, so they rendered ~2× oversized against the
+  guide: a huge collapsed sidebar, over-rounded program cards, too-wide gaps between programs, and the
+  rails/featured panel pushed right by the old sidebar width. Added `CHROME_SCALE` / `cs()` (≈0.5 at 960dp)
+  and applied it to the guide sidebar + its spacer, the shared glass-circle button (size/ring/gap/labels),
+  the program-card / badge / mini-feed radii, the inter-program gap, and the **settings** sidebar + shell.
+  **Gated to Android TV only** (`Platform.OS === "android" && Platform.isTV`) — iPad + Apple TV
+  (`Platform.OS === "ios"`) and Android tablets (`isTV` false, which use `UI_SCALE` 1.3 like the iPad) stay
+  at exactly ×1, so `cs(x) === x` there and their proven sizing is unchanged. JS; hot-reloads.
+
+### Changed
+
+- **Startup `[platform]` diagnostic now logs window + screen dp size** (`win=`/`screen=`) alongside `isTV`,
+  to diagnose chrome-vs-guide scaling and rule out system-bar insets (confirmed the guide fills the full
+  960×540 — the emulator's bottom strip is its own nav bar, not a layout gap). Temporary; removed once
+  Android is dialed. Known follow-up: the settings **content** pages (cards) are still raw-dp and may read a
+  touch large on Android TV — a separate `cs()` pass if needed.
+
 ## [0.8.30] - 2026-07-27
 
 Starts the **Android TV arc**: makes the D-pad actually drive the app. On the Google TV emulator `isTV`

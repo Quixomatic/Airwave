@@ -8,7 +8,7 @@ import { TvPressable as Pressable } from "@/components/tv-pressable";
 
 import { SettingsSidebar } from "@/features/settings/settings-sidebar";
 import { SettingsCtx } from "@/features/settings/settings-ui";
-import { SIDEBAR_SLIVER_W } from "@/features/guide/layout";
+import { cs, SIDEBAR_SLIVER_W } from "@/features/guide/layout";
 import { LAYER, useKeyLayer } from "@/lib/input";
 import { C } from "@/lib/theme";
 
@@ -18,7 +18,7 @@ import { C } from "@/lib/theme";
  * RAIL ▲/▼ move between categories, OK opens one (Guide returns to the guide), ► enters content,
  * Back returns to the guide; in CONTENT each page self-manages option focus (`useSettingsPage`).
  */
-const ic = (Cmp: React.ComponentType<{ size?: number; color?: string }>) => <Cmp size={24} color="#f1f5f9" />;
+const ic = (Cmp: React.ComponentType<{ size?: number; color?: string }>) => <Cmp size={cs(24)} color="#f1f5f9" />;
 const NAV = [
   { key: "guide", label: "Back to Guide", icon: ic(ArrowLeft), to: "/" as const },
   { key: "general", label: "General", icon: ic(SlidersHorizontal), to: "/settings" as const },
@@ -90,7 +90,7 @@ export default function SettingsShell() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={{ flex: 1, flexDirection: "row" }}>
-        <View style={{ width: SIDEBAR_SLIVER_W, flexShrink: 0 }} />
+        <View style={{ width: cs(SIDEBAR_SLIVER_W), flexShrink: 0 }} />
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ maxWidth: 1024, width: "100%", alignSelf: "center", paddingVertical: 40, paddingHorizontal: 48 }}>
           <SettingsCtx.Provider value={{ active: zone === "content", returnToRail }}>
             <Slot />
