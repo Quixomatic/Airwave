@@ -2,6 +2,22 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.36] - 2026-07-27
+
+Brings the **Airwave** logo + wordmark to **tv-web** (login, QR card, About), mirroring tv-native.
+
+### Added
+
+- **Airwave brand mark + reusable `<Logo>` component in tv-web** (`src/lib/logo.tsx`): renders `/logo.png`
+  from `public/` at a px `markWidth` (keeps the native 715×517 aspect), with an optional white "Airwave"
+  wordmark laid out `row` (beside) or `column` (below). Used on **login** (mark + wordmark lockup, replacing
+  the old inline `<Logo>` stub + the "ChannelGuide" text title), the **QR sign-in card** (mark), and
+  **Settings → About** (lockup replacing the big name text). Added `apps/tv-web/public/logo.png`.
+  (`APP_NAME` was already "Airwave" in tv-web.)
+- **Staggered logo entrance on the login screen** (framer-motion, `animate` prop on `<Logo>`): the mark
+  fades + scales in, then the "Airwave" letters cascade in one by one. Off by default (About/QR render
+  static); enabled only on login.
+
 ## [0.8.35] - 2026-07-27
 
 Brings the **Airwave** brand into tv-native — logo + wordmark on login, the QR screen, and About — and

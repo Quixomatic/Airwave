@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { APP_NAME, APP_VERSION } from "../../../lib/app-info";
+import { Logo } from "../../../lib/logo";
 import { PageHeader, useSettingsPage } from "../../../features/settings/settings-ui";
 
 /**
@@ -20,7 +21,7 @@ function About() {
       <PageHeader title="About" />
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "36px 34px", borderRadius: 18, background: "rgba(148,163,184,0.06)", maxWidth: 640 }}>
-        <div style={{ fontSize: 52, fontWeight: 900, letterSpacing: "-1px", color: "#f1f5f9" }}>{APP_NAME}</div>
+        <Logo markWidth={72} wordmark />
         <div style={{ fontSize: 19, color: "#94a3b8" }}>Your media server, as live TV.</div>
         <div
           style={{

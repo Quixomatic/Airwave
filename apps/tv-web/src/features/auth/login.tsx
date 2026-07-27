@@ -4,6 +4,7 @@ import { ApiError, plexLink } from "../../lib/api";
 import { authClient } from "../../lib/auth-client";
 import { SERVER_URL, setToken } from "../../lib/auth-client";
 import { useDpadList } from "../../lib/input";
+import { Logo } from "../../lib/logo";
 import { Qr } from "../../lib/qr";
 
 const ACCENT = "#4a9fe0";
@@ -127,15 +128,14 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
 
   return (
     <div className="mx-auto flex min-h-full max-w-3xl flex-col items-center justify-center gap-8 p-10 text-center">
-      <Logo />
-
-      <div>
-        <h1 className="text-4xl font-semibold tracking-tight">ChannelGuide</h1>
-        <p className="mt-2 text-zinc-400">Sign in to start watching.</p>
+      <div className="flex flex-col items-center gap-2">
+        <Logo markWidth={130} wordmark animate />
+        <p className="text-zinc-400">Sign in to start watching.</p>
       </div>
 
       {pending ? (
         <div className="flex flex-col items-center gap-5 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-8">
+          <Logo markWidth={84} />
           <p className="text-lg font-medium">{pending.heading}</p>
           <p className="max-w-sm text-zinc-400">{pending.instruction}</p>
           <Qr value={pending.qrValue} />
@@ -170,23 +170,5 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
       {error && <p className="text-red-400">{error}</p>}
       <p className="text-xs text-zinc-600">Server: {SERVER_URL}</p>
     </div>
-  );
-}
-
-/**
- * The brand mark above the sign-in choices. Drop a `logo.png` (or `.svg`) into `apps/tv-web/public/`
- * and it appears here automatically; until then this renders nothing rather than a broken image, so
- * the layout is identical either way.
- */
-function Logo() {
-  const [ok, setOk] = useState(true);
-  if (!ok) return null;
-  return (
-    <img
-      src="/logo.png"
-      alt=""
-      onError={() => setOk(false)}
-      style={{ maxWidth: "min(38vw, 420px)", maxHeight: "22vh", objectFit: "contain" }}
-    />
   );
 }
