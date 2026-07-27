@@ -2,6 +2,22 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.38] - 2026-07-27
+
+Starts the **Dolby Vision** arc — captures the DV metadata from Plex (the foundation for switching the
+Apple TV into DV mode).
+
+### Added
+
+- **Capture Dolby Vision profile / level / BL-compat-id from Plex (server).** The Plex client now reads
+  `DOVIProfile` / `DOVILevel` / `DOVIBLCompatID` off the video stream (we previously grabbed only the
+  `DOVIPresent` flag) and stores `dovi: { profile, level, blCompatId }` on `GuideMeta` → `MediaItem.guide`
+  (a JSON column, so **no migration**). `blCompatId` classifies the base layer — 1/6 → HDR10, 4 → HLG,
+  2 → SDR, 0 → none (Profile 5). This is what the native tvOS player needs to build the `dvh1` display
+  criteria (mpv can't report it — it only decodes the base layer). **Re-run the metadata sync to backfill
+  existing items** (their stored `guide` JSON predates the field); the data is inert until the API + native
+  stages land.
+
 ## [0.8.37] - 2026-07-27
 
 ### Changed

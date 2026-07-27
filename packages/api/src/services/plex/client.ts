@@ -268,6 +268,9 @@ export type GuideMeta = {
   resolution?: string; // "4k" | "1080" | "720" | "sd"
   audioChannels?: number; // 6 → 5.1, 8 → 7.1
   hdr?: string; // "HDR10" | "Dolby Vision" | "HLG" when the video is HDR, else undefined (SDR)
+  // Dolby Vision metadata (fed to the native player so tvOS can switch into DV mode). `blCompatId`
+  // classifies the base layer: 1/6 → HDR10, 4 → HLG, 2 → SDR, 0 → none (Profile 5, no HDR-compat base).
+  dovi?: { profile: number; level?: number; blCompatId?: number };
   dynamicAudio?: string; // "Atmos" | "DTS:X" object/next-gen audio, else undefined
   videoCodec?: string; // "hevc" | "h264" | "av1" — for badges / diagnostics
   // episode context
@@ -328,6 +331,9 @@ type PlexStreamLite = {
   channels?: number;
   colorTrc?: string;
   DOVIPresent?: boolean | number;
+  DOVIProfile?: number | string; // Dolby Vision profile (5, 7, 8…)
+  DOVILevel?: number | string;
+  DOVIBLCompatID?: number | string; // base-layer compat: 1/6=HDR10, 4=HLG, 2=SDR, 0=none (Profile 5)
   title?: string;
   displayTitle?: string;
   extendedDisplayTitle?: string;
@@ -344,6 +350,20 @@ function detectHdr(media: PlexMedia | undefined): string | undefined {
   if (trc === "smpte2084") return "HDR10"; // PQ
   if (trc === "arib-std-b67") return "HLG";
   return undefined;
+}
+
+/** Dolby Vision profile / level / BL-compat-id from the video stream (only with includeElements=Stream).
+ *  Fed to the native player so tvOS can switch into DV mode. `blCompatId` classifies the base layer:
+ *  1/6 → HDR10, 4 → HLG, 2 → SDR, 0 → none (Profile 5, no HDR-compatible base). Undefined when not DV. */
+function detectDovi(media: PlexMedia | undefined): { profile: number; level?: number; blCompatId?: number } | undefined {
+  const vs = media?.Part?.[0]?.Stream?.find((s) => s.streamType === 1);
+  if (!vs) return undefined;
+  const profile = Number(vs.DOVIProfile ?? 0);
+  const present = vs.DOVIPresent === 1 || vs.DOVIPresent === true || profile > 0;
+  if (!present || !profile) return undefined;
+  const level = vs.DOVILevel != null ? Number(vs.DOVILevel) : undefined;
+  const blCompatId = vs.DOVIBLCompatID != null ? Number(vs.DOVIBLCompatID) : undefined;
+  return { profile, level, blCompatId };
 }
 
 /** Object-based / next-gen audio (Dolby Atmos, DTS:X) if any audio stream carries it — Plex
@@ -387,6 +407,7 @@ function toGuideMeta(m: PlexMetadata): GuideMeta {
     resolution: media?.videoResolution,
     audioChannels: media?.audioChannels,
     hdr: detectHdr(media),
+    dovi: detectDovi(media),
     dynamicAudio: detectDynamicAudio(media),
     videoCodec: media?.videoCodec,
     showTitle: m.grandparentTitle,
