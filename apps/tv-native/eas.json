@@ -53,6 +53,13 @@
     "preview": {
       "distribution": "internal"
     },
+    "preview-androidtv": {
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_TV": "1"
+      }
+    },
     "production": {
       "autoIncrement": true
     }

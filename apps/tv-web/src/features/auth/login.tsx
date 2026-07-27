@@ -135,7 +135,6 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
 
       {pending ? (
         <div className="flex flex-col items-center gap-5 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-8">
-          <Logo markWidth={84} />
           <p className="text-lg font-medium">{pending.heading}</p>
           <p className="max-w-sm text-zinc-400">{pending.instruction}</p>
           <Qr value={pending.qrValue} />

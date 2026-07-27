@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.37] - 2026-07-27
+
+### Changed
+
+- **Dropped the redundant logo from the QR sign-in card (tv-native + tv-web).** The logo + wordmark lockup
+  already sits above the card, so the second mark inside it was duplicative.
+
+### Added
+
+- **`preview-androidtv` EAS profile.** A **release** Android TV build (no `developmentClient` → JS is bundled,
+  no Metro / dev-server) as an installable APK (`EXPO_TV=1`). For measuring real on-device performance on the
+  Streamer without the dev-client overhead — to confirm whether the UI slowness is the dev server.
+
 ## [0.8.36] - 2026-07-27
 
 Brings the **Airwave** logo + wordmark to **tv-web** (login, QR card, About), mirroring tv-native.

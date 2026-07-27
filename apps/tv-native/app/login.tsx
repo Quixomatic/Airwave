@@ -139,7 +139,6 @@ export default function Login() {
         // separator, then the QR + code on the right.
         <View className="flex-row items-center border border-white/10 bg-card/60" style={scaled({ padding: 32, borderRadius: 16 })}>
           <View className="max-w-sm" style={scaled({ gap: 16, paddingRight: 32 })}>
-            <Logo width={84} />
             <Text className="font-semibold text-fg" style={scaled({ fontSize: 24 })}>{pending.heading}</Text>
             <Text className="text-muted" style={scaled({ fontSize: 17, lineHeight: 25 })}>{pending.instruction}</Text>
             <Pressable
