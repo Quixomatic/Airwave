@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.42] - 2026-07-27
+
+### Fixed
+
+- **Android TV overscan — content cut off at the screen edges (tv-native).** Real TVs crop ~5% of the
+  edges over HDMI ("overscan"), so the full-bleed guide lost its sidebar's left edge and the bottom
+  row / sidebar bottom on the physical Streamer (the emulator, a virtual display, doesn't overscan, so
+  it looked fine — hence the mismatch). Added **Android-TV-only** overscan-safe insets (`OVERSCAN_H` 48 /
+  `OVERSCAN_V` 27 — ~5% of the 960×540 dp space; **0 on iPad/Apple TV**, which have no overscan and where
+  tvOS manages its own safe area). The guide (`AuroraGrid`) subtracts the horizontal inset from its layout
+  width so the grid still fits the safe area, and pads its root; the settings shell pads its `SafeAreaView`
+  (which is the parent of its absolute sidebar). Kept full-bleed on iPad/Apple TV.
+
 ## [0.8.41] - 2026-07-27
 
 ### Changed

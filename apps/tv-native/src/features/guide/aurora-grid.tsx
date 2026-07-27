@@ -28,6 +28,8 @@ import {
   LEAD_MIN,
   liveProgramIndex,
   MIN,
+  OVERSCAN_H,
+  OVERSCAN_V,
   PROGRESS_FILL_ELAPSED_STRONGER,
   ROW_FRAC,
   SIDEBAR_SLIVER_W,
@@ -60,7 +62,10 @@ export function AuroraGrid({
   onSettings: () => void;
   onAccount: () => void;
 }) {
-  const { width } = useWindowDimensions();
+  // Subtract the Android-TV overscan inset from the layout width so the grid fits inside the safe area
+  // (0 on iPad/Apple TV). The root View below pads by the same amount.
+  const { width: winW } = useWindowDimensions();
+  const width = winW - OVERSCAN_H * 2;
   const vw = useCallback((px: number) => vwOf(width, px), [width]);
 
   const now = useMemo(() => new Date(serverTime), [serverTime]);
@@ -298,7 +303,7 @@ export function AuroraGrid({
   }, [fc, zone, channels.length, rowPx]);
 
   return (
-    <View style={{ flex: 1, flexDirection: "row", backgroundColor: C.bg }}>
+    <View style={{ flex: 1, flexDirection: "row", backgroundColor: C.bg, paddingLeft: OVERSCAN_H, paddingRight: OVERSCAN_H, paddingTop: OVERSCAN_V, paddingBottom: OVERSCAN_V }}>
       {/* The guide column — the layout reserves only the sliver width; the sidebar overlays it. Must use
           the SAME chrome-scaled width as the sidebar (cs), or the content sits offset by the old width. */}
       <View style={{ width: cs(SIDEBAR_SLIVER_W), flexShrink: 0 }} />
