@@ -3,9 +3,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 
+import { Logo } from "@/components/logo";
+
 import { ApiError, plexLink } from "@/lib/api";
 import { getServerUrl, setToken } from "@/lib/auth";
 import { authClient } from "@/lib/auth-client";
+import { cs, scaled } from "@/features/guide/layout";
 import { LAYER, useKeyLayer } from "@/lib/input";
 import { C } from "@/lib/theme";
 
@@ -125,27 +128,37 @@ export default function Login() {
   });
 
   return (
-    <View className="flex-1 items-center justify-center gap-8 bg-bg p-10">
+    <View className="flex-1 items-center justify-center bg-bg" style={scaled({ gap: 32, padding: 40 })}>
       <View className="items-center">
-        <Text className="text-4xl font-bold tracking-tight text-fg">ChannelGuide</Text>
-        <Text className="mt-2 text-muted">Sign in to start watching.</Text>
+        <Logo width={100} wordmark />
+        <Text className="text-muted" style={scaled({ marginTop: 8 })}>Sign in to start watching.</Text>
       </View>
 
       {pending ? (
-        <View className="items-center gap-5 rounded-2xl border border-white/10 bg-card/60 p-8">
-          <Text className="text-lg font-semibold text-fg">{pending.heading}</Text>
-          <Text className="max-w-sm text-center text-muted">{pending.instruction}</Text>
-          <View className="rounded-xl bg-white p-3">
-            <QRCode value={pending.qrValue} size={168} />
+        // Two columns (16:9 has width to spare, height is tight): text + Back on the left, a vertical
+        // separator, then the QR + code on the right.
+        <View className="flex-row items-center border border-white/10 bg-card/60" style={scaled({ padding: 32, borderRadius: 16 })}>
+          <View className="max-w-sm" style={scaled({ gap: 16, paddingRight: 32 })}>
+            <Logo width={84} />
+            <Text className="font-semibold text-fg" style={scaled({ fontSize: 24 })}>{pending.heading}</Text>
+            <Text className="text-muted" style={scaled({ fontSize: 17, lineHeight: 25 })}>{pending.instruction}</Text>
+            <Pressable
+              onPress={() => reset(null)}
+              className="self-start rounded-lg px-4 py-2 active:opacity-60"
+              style={{ borderWidth: 2, borderColor: sel === 0 ? "#fff" : "transparent" }}
+            >
+              <Text className="text-muted" style={scaled({ fontSize: 15 })}>← Back</Text>
+            </Pressable>
           </View>
-          <Text className="font-mono text-5xl font-bold tracking-[8px] text-fg">{pending.code}</Text>
-          <Pressable
-            onPress={() => reset(null)}
-            className="rounded-lg px-4 py-2 active:opacity-60"
-            style={{ borderWidth: 2, borderColor: sel === 0 ? "#fff" : "transparent" }}
-          >
-            <Text className="text-sm text-muted">← Back</Text>
-          </Pressable>
+
+          <View className="self-stretch bg-white/10" style={{ width: 1 }} />
+
+          <View className="items-center" style={scaled({ gap: 16, paddingLeft: 32 })}>
+            <View className="bg-white" style={scaled({ padding: 12, borderRadius: 12 })}>
+              <QRCode value={pending.qrValue} size={cs(190)} />
+            </View>
+            <Text className="font-mono font-bold text-fg" style={scaled({ fontSize: 40, letterSpacing: 6 })}>{pending.code}</Text>
+          </View>
         </View>
       ) : (
         <View className="w-full max-w-md gap-4">

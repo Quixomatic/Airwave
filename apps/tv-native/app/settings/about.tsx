@@ -1,5 +1,6 @@
 import { Text, View } from "react-native";
 
+import { Logo } from "@/components/logo";
 import { scaled } from "@/features/guide/layout";
 import { PageHeader, useSettingsPage } from "@/features/settings/settings-ui";
 import { APP_NAME, APP_VERSION } from "@/lib/app-info";
@@ -13,7 +14,7 @@ export default function About() {
       <PageHeader title="About" />
 
       <View style={scaled({ gap: 10, padding: 34, borderRadius: 18, backgroundColor: "rgba(148,163,184,0.06)", maxWidth: 640 })}>
-        <Text style={scaled({ fontSize: 52, fontWeight: "900", letterSpacing: -1, color: "#f1f5f9" })}>{APP_NAME}</Text>
+        <Logo width={72} wordmark />
         <Text style={scaled({ fontSize: 19, color: "#94a3b8" })}>Your media server, as live TV.</Text>
         <View style={scaled({ marginTop: 12, alignSelf: "flex-start", backgroundColor: "rgba(74,159,224,0.16)", borderRadius: 999, paddingVertical: 6, paddingHorizontal: 14 })}>
           <Text style={scaled({ fontSize: 14, fontWeight: "700", letterSpacing: 0.5, color: "#4a9fe0" })}>Version {APP_VERSION}</Text>

@@ -2,6 +2,29 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.35] - 2026-07-27
+
+Brings the **Airwave** brand into tv-native — logo + wordmark on login, the QR screen, and About — and
+reworks the QR sign-in screen into two columns.
+
+### Added
+
+- **Airwave brand mark + a reusable `<Logo>` component (tv-native).** Converted the mark (cloud + wave,
+  transparent) to `apps/tv-native/assets/logo.png` and added `src/components/logo.tsx`: renders the mark at a
+  chrome-scaled `width` (keeps the native 715×517 aspect), with an optional `wordmark` ("Airwave" in white)
+  laid out `row` (beside) or `column` (below). Used on **login** (mark + wordmark lockup replacing the old
+  text title), the **QR sign-in card** (mark, top-left), and **Settings → About** (lockup replacing the big
+  name text). (Native `Image` can't reliably decode webp on iOS/tvOS, so the source `.webp` → PNG.)
+- **App display name is now "Airwave"** (`APP_NAME`) — updates the About page + copy. (The launcher name /
+  bundle IDs in `app.json` are unchanged; that's a deeper rename for later.)
+
+### Changed
+
+- **The Plex / device-code QR screen is now a two-column layout (tv-native).** Logo + heading + instruction +
+  Back on the left, a vertical separator, then the QR + code on the right — which fits a 16:9 screen (wide,
+  short) far better than the tall vertical stack that was overflowing on Android TV. Sized via `scaled()` /
+  `cs()`.
+
 ## [0.8.34] - 2026-07-27
 
 Fixes D-pad navigation on the login + setup screens — they were unreachable on Android TV.
