@@ -43,19 +43,19 @@ export function GuideScreen({
     if (error instanceof ApiError && error.status === 401) onSignOut();
   }, [error, onSignOut]);
 
-  if (error && !(error instanceof ApiError && error.status === 401)) {
-    return <Centered>Couldn't load the guide.</Centered>;
-  }
-  if (!data) return <Centered>Loading…</Centered>;
+  // Only a genuine first-load (no data AND no error yet) shows the spinner.
+  if (!data && !error) return <Centered>Loading…</Centered>;
 
-  // NOTE: no early return for an empty channel list. AuroraGrid renders the full interface
+  // NO early return for an error OR an empty channel list. AuroraGrid renders the full interface
   // (sidebar + featured chrome + its own context-aware GuideGhost empty state) even with zero
-  // channels, so a fresh install still gets the sidebar to reach Settings/scan — a plain
-  // "No channels yet." card here would strand the user with no navigation.
+  // channels, so a fresh install — OR a server that's unreachable/down — still gets the sidebar to
+  // reach Settings/scan (change server / sign out). A plain "Couldn't load the guide." card here would
+  // strand the user with no navigation. `serverTime` falls back to the client clock when the fetch
+  // failed. (A 401 is handled in the effect above → forced sign-out.)
   return (
     <AuroraGrid
-      channels={data.channels}
-      serverTime={data.serverTime}
+      channels={data?.channels ?? []}
+      serverTime={data?.serverTime ?? new Date().toISOString()}
       onTune={onTune}
       onSettings={onSettings}
       onAccount={onAccount}

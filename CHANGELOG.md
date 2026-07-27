@@ -2,6 +2,23 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.41] - 2026-07-27
+
+### Changed
+
+- **Guide-load failure now renders the full guide shell (sidebar + GuideGhost), not a dead-end — tv-native
+  + tv-web.** When the guide can't load (server unreachable / down) or has zero channels, both clients now
+  render the real `AuroraGrid` (sidebar + featured chrome + context-aware ghost) so the sidebar's
+  Settings/Account are **always reachable through the normal D-pad zone machine** — the user changes servers
+  or signs out instead of being stranded.
+  - **tv-native:** replaced the v0.8.40 bespoke error screen (a half-measure — it had its *own* throwaway
+    key layer, so you couldn't cross into the sidebar) with the real guide shell. It now runs entirely
+    through the **global input dispatcher** like everything else; the guide's zone machine already handles
+    zero channels (LEFT opens the sidebar), so escape works with no channels loaded.
+  - **tv-web:** extended its existing empty-channels shell to the **error** case too (it previously
+    dead-ended on a plain "Couldn't load the guide." message).
+  - `serverTime` falls back to the client clock when the fetch failed; a 401 still forces sign-out.
+
 ## [0.8.40] - 2026-07-27
 
 ### Fixed
