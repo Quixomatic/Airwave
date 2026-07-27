@@ -1,4 +1,4 @@
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 
 import { PageHeader, useSettingsPage } from "@/features/settings/settings-ui";
 import { APP_NAME, APP_VERSION } from "@/lib/app-info";
@@ -27,6 +27,12 @@ export default function About() {
       <Text style={{ marginTop: 20, fontSize: 15, color: "#64748b", maxWidth: 640 }}>
         Looking for the connected server, the Plex connection, or how to sign out? Those live under{" "}
         <Text style={{ color: "#94a3b8" }}>Server</Text> and <Text style={{ color: "#94a3b8" }}>User</Text>.
+      </Text>
+
+      {/* Platform diagnostic — `isTV` drives UI_SCALE + the focusable/native-focus gating, so it's the
+          first thing to check on a TV device (esp. Android, where it depends on the build/uiMode). */}
+      <Text style={{ marginTop: 28, fontSize: 13, color: "#475569", maxWidth: 640 }}>
+        Platform: {Platform.OS} {String(Platform.Version)} · isTV: {String(Platform.isTV)}
       </Text>
     </View>
   );

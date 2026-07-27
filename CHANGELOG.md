@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.28] - 2026-07-27
+
+### Added
+
+- **Platform diagnostic on Settings → About (tv-native).** A small line showing `Platform.OS`, the OS version, and **`isTV`**. `isTV` drives `UI_SCALE` and the whole focusable/native-focus gating, so being able to read it on-device is the first check for TV builds — especially on **Android**, where `isTV` depends on the build's `IS_TV`/the device uiMode rather than just `EXPO_TV=1`.
+
 ## [0.8.27] - 2026-07-27
 
 ### Changed
