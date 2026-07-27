@@ -424,6 +424,9 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
     prevChannelRef.current = channelId;
     genRef.current++; // invalidate any in-flight goTo resolve
     currentRef.current = null;
+    // Clear the last-loaded URL so a re-tune of the SAME channel after Close reloads (sets `source` →
+    // remounts the view) instead of taking the "same media → seek" path against the now-unmounted view.
+    currentUrlRef.current = null;
     positionSecRef.current = 0;
     transitioning.current = false;
     if (!channelId) {
@@ -459,12 +462,15 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
       togglePause: () => {
         const cur = currentRef.current;
         if (cur?.kind === "PROGRAM") {
-          if (playingRef.current) {
-            void viewRef.current?.pause();
-            pausedRef.current = true;
-          } else {
+          // Toggle off the ACTUAL pause state. Using `playingRef` here was the bug: it's set true on load
+          // and never cleared, so this always took the pause branch — pressing play/pause again just
+          // re-paused and never resumed (only a seek resumed, because goTo explicitly calls play()).
+          if (pausedRef.current) {
             void viewRef.current?.play();
             pausedRef.current = false;
+          } else {
+            void viewRef.current?.pause();
+            pausedRef.current = true;
           }
         } else {
           pausedRef.current = !pausedRef.current;

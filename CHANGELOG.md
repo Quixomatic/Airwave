@@ -2,6 +2,13 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.23] - 2026-07-26
+
+### Fixed
+
+- **Play/pause never resumed (tv-native).** `togglePause` decided pause-vs-play off `playingRef`, which is set `true` on load and never cleared — so it *always* took the pause branch: the first press paused, every press after just re-paused, and it never resumed. (A *seek* resumed only because `goTo` explicitly calls `play()`.) It now toggles the **actual** pause state (`pausedRef`), so play/pause and the scrubber's OK correctly resume.
+- **Re-tuning the same channel right after Close wouldn't play.** Close nulls `source` (unmounting the mpv view, so `viewRef` is null), but the last-loaded URL was retained. Re-tuning the *same* channel at the same live position produced the *same* URL, so `goTo` took the "same media → seek" path and called `seek()`/`play()` on the unmounted view (no-ops) and **never set `source`** → nothing remounted. A different channel reloaded fine (different URL). The last-loaded URL is now cleared on channel change / Close, so any re-tune reloads.
+
 ## [0.8.22] - 2026-07-26
 
 A large tvOS input / performance / layout polish pass, bringing the Siri-remote guide experience to tv-web parity.
