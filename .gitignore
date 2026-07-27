@@ -78,3 +78,6 @@ packages/api/src/**/*.d.ts
 
 # Workflow SDK generated handler bundles (bunx workflow build) — 20MB+, rebuilt on every build.
 .well-known/
+
+# Gradle build caches from the Android native modules (packages/*/android/.gradle) — build junk.
+.gradle/
