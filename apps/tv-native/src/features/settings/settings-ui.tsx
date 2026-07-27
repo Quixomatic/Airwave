@@ -3,6 +3,7 @@ import { Text, View } from "react-native";
 
 import { TvPressable as Pressable } from "@/components/tv-pressable";
 
+import { scaled } from "@/features/guide/layout";
 import { LAYER, useKeyLayer } from "@/lib/input";
 
 /**
@@ -57,9 +58,9 @@ export function useSettingsPage(count: number, onActivate: (i: number) => void) 
 
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <View style={{ marginBottom: 30 }}>
-      <Text style={{ fontSize: 34, fontWeight: "800", letterSpacing: -0.5, color: "#f1f5f9" }}>{title}</Text>
-      {subtitle && <Text style={{ fontSize: 17, color: "#94a3b8", marginTop: 6 }}>{subtitle}</Text>}
+    <View style={scaled({ marginBottom: 30 })}>
+      <Text style={scaled({ fontSize: 34, fontWeight: "800", letterSpacing: -0.5, color: "#f1f5f9" })}>{title}</Text>
+      {subtitle && <Text style={scaled({ fontSize: 17, color: "#94a3b8", marginTop: 6 })}>{subtitle}</Text>}
     </View>
   );
 }
@@ -80,7 +81,7 @@ export function SettingRow({
   return (
     <Pressable
       onPress={onPress}
-      style={{
+      style={scaled({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
@@ -92,11 +93,11 @@ export function SettingRow({
         borderWidth: 2,
         borderColor: focused ? SETTINGS_ACCENT : "transparent",
         backgroundColor: focused ? "rgba(74,159,224,0.10)" : "rgba(148,163,184,0.06)",
-      }}
+      })}
     >
       <View style={{ flexShrink: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 18, fontWeight: "600", color: "#f1f5f9" }}>{label}</Text>
-        {sublabel && <Text style={{ fontSize: 14, color: "#94a3b8", marginTop: 2 }}>{sublabel}</Text>}
+        <Text style={scaled({ fontSize: 18, fontWeight: "600", color: "#f1f5f9" })}>{label}</Text>
+        {sublabel && <Text style={scaled({ fontSize: 14, color: "#94a3b8", marginTop: 2 })}>{sublabel}</Text>}
       </View>
       {right}
     </Pressable>
@@ -106,7 +107,7 @@ export function SettingRow({
 export function SectionLabel({ children, small }: { children: ReactNode; small?: boolean }) {
   return (
     <Text
-      style={{
+      style={scaled({
         fontSize: small ? 13 : 15,
         fontWeight: "700",
         letterSpacing: 1,
@@ -114,7 +115,7 @@ export function SectionLabel({ children, small }: { children: ReactNode; small?:
         color: "#64748b",
         marginTop: small ? 20 : 34,
         marginBottom: small ? 10 : 14,
-      }}
+      })}
     >
       {children}
     </Text>
@@ -124,8 +125,8 @@ export function SectionLabel({ children, small }: { children: ReactNode; small?:
 export function Pill({ children, tone = "accent" }: { children: ReactNode; tone?: "accent" | "warn" | "muted" }) {
   const c = tone === "warn" ? { bg: "rgba(240,169,42,0.16)", fg: "#f0a92a" } : tone === "muted" ? { bg: "rgba(148,163,184,0.16)", fg: "#94a3b8" } : { bg: "rgba(74,159,224,0.16)", fg: SETTINGS_ACCENT };
   return (
-    <View style={{ alignSelf: "flex-start", backgroundColor: c.bg, borderRadius: 999, paddingVertical: 3, paddingHorizontal: 9 }}>
-      <Text style={{ fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", color: c.fg }}>{children}</Text>
+    <View style={scaled({ alignSelf: "flex-start", backgroundColor: c.bg, borderRadius: 999, paddingVertical: 3, paddingHorizontal: 9 })}>
+      <Text style={scaled({ fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", color: c.fg })}>{children}</Text>
     </View>
   );
 }
@@ -133,8 +134,8 @@ export function Pill({ children, tone = "accent" }: { children: ReactNode; tone?
 export function Toggle({ on, warn }: { on: boolean; warn?: boolean }) {
   const color = warn ? "#f0a92a" : SETTINGS_ACCENT;
   return (
-    <View style={{ width: 46, height: 26, borderRadius: 999, backgroundColor: on ? color : "rgba(148,163,184,0.3)", justifyContent: "center" }}>
-      <View style={{ position: "absolute", top: 3, left: on ? 23 : 3, width: 20, height: 20, borderRadius: 10, backgroundColor: "#fff" }} />
+    <View style={scaled({ width: 46, height: 26, borderRadius: 999, backgroundColor: on ? color : "rgba(148,163,184,0.3)", justifyContent: "center" })}>
+      <View style={scaled({ position: "absolute", top: 3, left: on ? 23 : 3, width: 20, height: 20, borderRadius: 10, backgroundColor: "#fff" })} />
     </View>
   );
 }

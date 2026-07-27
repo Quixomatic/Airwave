@@ -2,6 +2,35 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.32] - 2026-07-27
+
+Extends the Android-TV chrome scaling to the **settings** screens via a new `scaled()` style-object helper.
+iPad + Apple TV remain mathematically untouched.
+
+### Added
+
+- **`scaled()` — a style-object form of `cs()`** (`features/guide/layout`). Multiplies the size-like keys
+  of a style object by `CHROME_SCALE` and **returns the same object untouched when `CHROME_SCALE === 1`**
+  (iPad / Apple TV / Android tablets — no copy, no change). Allow-listed keys: width/height/min-max,
+  padding*/margin*, top/bottom/left/right, borderRadius*, fontSize/lineHeight, gap*. Deliberately skips
+  `borderWidth` (hairlines), opacity/flex*/zIndex/elevation/aspectRatio, and any non-number ("100%"
+  strings, percent offsets). One wrap per style block instead of wrapping each number.
+
+### Fixed
+
+- **Oversized settings UI on Android TV (tv-native).** The settings screens are authored in raw dp (never
+  `vwOf`), so on the 960dp space they rendered ~2× too big. Applied `scaled()` to the shared primitives
+  (`PageHeader` / `SettingRow` / `SectionLabel` / `Pill` / `Toggle` in `settings-ui`), the shell's content
+  padding + max-width, and each page's detail card + `Info` rows (`device` / `user` / `server` / `about`,
+  incl. the avatar + recent-errors card). Android-TV-gated; iPad + Apple TV unchanged. JS; hot-reloads.
+
+### Still to do
+
+- The **full-size channel chrome** (`feature-panel`) and the **diagnostic** page are still raw-dp — next
+  scaling pass. Separately, the **Android-TV input lag** (~seconds per D-pad press on the Streamer) is a
+  distinct perf investigation (dev-build overhead + video-decode contention are the leading suspects; the
+  guide render was ruled out — the clock isn't a tick, the `Row` memo holds, logs/blur are cold-path).
+
 ## [0.8.31] - 2026-07-27
 
 Android TV chrome scaling — the fixed-dp chrome (sidebars, cards, gaps) now scales to Android TV's 960dp

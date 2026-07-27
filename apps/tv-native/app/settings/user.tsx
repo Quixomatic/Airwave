@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, Text, View } from "react-native";
 
+import { scaled } from "@/features/guide/layout";
 import { PageHeader, Pill, SectionLabel, SettingRow, useSettingsPage } from "@/features/settings/settings-ui";
 import { setToken } from "@/lib/auth";
 import { authClient } from "@/lib/auth-client";
@@ -35,17 +36,17 @@ export default function UserSettings() {
     <View>
       <PageHeader title="User" subtitle="Your account on this TV." />
 
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 24, padding: 26, borderRadius: 18, backgroundColor: "rgba(148,163,184,0.06)", marginBottom: 8 }}>
+      <View style={scaled({ flexDirection: "row", alignItems: "center", gap: 24, padding: 26, borderRadius: 18, backgroundColor: "rgba(148,163,184,0.06)", marginBottom: 8 })}>
         <Avatar image={user?.image} initials={initialsOf(user?.name, user?.email)} />
         <View style={{ flexShrink: 1, minWidth: 0 }}>
-          <Text numberOfLines={1} style={{ fontSize: 30, fontWeight: "800", letterSpacing: -0.5, color: "#f1f5f9" }}>
+          <Text numberOfLines={1} style={scaled({ fontSize: 30, fontWeight: "800", letterSpacing: -0.5, color: "#f1f5f9" })}>
             {user?.name || (isPending ? "…" : "Signed in")}
           </Text>
-          <Text numberOfLines={1} style={{ fontSize: 17, color: "#94a3b8", marginTop: 4 }}>
+          <Text numberOfLines={1} style={scaled({ fontSize: 17, color: "#94a3b8", marginTop: 4 })}>
             {user?.email ?? (isPending ? "" : "—")}
           </Text>
           {user?.role && (
-            <View style={{ marginTop: 10 }}>
+            <View style={scaled({ marginTop: 10 })}>
               <Pill tone="muted">{user.role}</Pill>
             </View>
           )}
@@ -71,11 +72,11 @@ function Avatar({ image, initials }: { image?: string | null; initials: string }
   const [failed, setFailed] = useState(false);
   const size = 96;
   if (image && !failed) {
-    return <Image source={{ uri: image }} onError={() => setFailed(true)} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: "rgba(148,163,184,0.16)" }} />;
+    return <Image source={{ uri: image }} onError={() => setFailed(true)} style={scaled({ width: size, height: size, borderRadius: size / 2, backgroundColor: "rgba(148,163,184,0.16)" })} />;
   }
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(74,159,224,0.16)" }}>
-      <Text style={{ fontSize: 34, fontWeight: "800", letterSpacing: 1, color: "#4a9fe0" }}>{initials}</Text>
+    <View style={scaled({ width: size, height: size, borderRadius: size / 2, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(74,159,224,0.16)" })}>
+      <Text style={scaled({ fontSize: 34, fontWeight: "800", letterSpacing: 1, color: "#4a9fe0" })}>{initials}</Text>
     </View>
   );
 }

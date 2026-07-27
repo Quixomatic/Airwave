@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Platform, Text, View } from "react-native";
 
+import { scaled } from "@/features/guide/layout";
 import { PageHeader, Pill, SectionLabel, SettingRow, Toggle, useSettingsPage } from "@/features/settings/settings-ui";
 import { api, type CapKind, type CapTokenState, type DeviceCapView } from "@/lib/api";
 import { deviceId } from "@/lib/device";
@@ -90,7 +91,7 @@ export default function DeviceSettings() {
       <PageHeader title="Device" subtitle="This device's playback capabilities and tools." />
 
       {data?.device && (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 28, paddingVertical: 16, paddingHorizontal: 22, borderRadius: 14, backgroundColor: "rgba(148,163,184,0.06)", marginBottom: 8 }}>
+        <View style={scaled({ flexDirection: "row", flexWrap: "wrap", gap: 28, paddingVertical: 16, paddingHorizontal: 22, borderRadius: 14, backgroundColor: "rgba(148,163,184,0.06)", marginBottom: 8 })}>
           <Info label="Model" value={data.device.model ?? "—"} />
           <Info label="Platform" value={data.device.platform ?? "—"} />
           <Info label="Resolution" value={data.device.screenWidth ? `${data.device.screenWidth}×${data.device.screenHeight}` : "—"} />
@@ -107,7 +108,7 @@ export default function DeviceSettings() {
       ))}
 
       <SectionLabel>Playback capabilities</SectionLabel>
-      <Text style={{ fontSize: 14, color: "#64748b", marginTop: -6, marginBottom: 18, maxWidth: 640, lineHeight: 20 }}>
+      <Text style={scaled({ fontSize: 14, color: "#64748b", marginTop: -6, marginBottom: 18, maxWidth: 640, lineHeight: 20 })}>
         Force a codec on or off for this device. Overrides win over what the diagnostic measured — forcing on something this device can't
         actually decode may break playback.
       </Text>
@@ -121,7 +122,7 @@ export default function DeviceSettings() {
         return (
           <View key={g.kind}>
             <SectionLabel small>{GROUP_LABEL[g.kind]}</SectionLabel>
-            <View style={{ flexDirection: "row", gap: 20 }}>
+            <View style={scaled({ flexDirection: "row", gap: 20 })}>
               <View style={{ flex: 1, minWidth: 0 }}>
                 {colA.map((t, i) => (
                   <TokenRow key={t.token} t={t} focused={sel === base + i} onPress={() => void toggle(g.kind, t)} />
@@ -146,10 +147,10 @@ export default function DeviceSettings() {
       {data?.recentErrors?.length ? (
         <>
           <SectionLabel>Recent playback issues</SectionLabel>
-          <View style={{ borderRadius: 14, backgroundColor: "rgba(148,163,184,0.06)", paddingHorizontal: 22, paddingVertical: 6 }}>
+          <View style={scaled({ borderRadius: 14, backgroundColor: "rgba(148,163,184,0.06)", paddingHorizontal: 22, paddingVertical: 6 })}>
             {data.recentErrors.map((e, i) => (
-              <View key={i} style={{ paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: "rgba(148,163,184,0.1)" }}>
-                <Text style={{ fontSize: 15, color: "#e6eaf1" }}>
+              <View key={i} style={scaled({ paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: "rgba(148,163,184,0.1)" })}>
+                <Text style={scaled({ fontSize: 15, color: "#e6eaf1" })}>
                   {e.channelName ?? e.title ?? "—"}
                   <Text style={{ color: "#64748b" }}>
                     {" · "}
@@ -157,7 +158,7 @@ export default function DeviceSettings() {
                     {e.mode ? ` · ${e.mode}` : ""}
                   </Text>
                 </Text>
-                {e.error ? <Text style={{ fontSize: 13, color: "#f87171", marginTop: 2 }}>{e.error}</Text> : null}
+                {e.error ? <Text style={scaled({ fontSize: 13, color: "#f87171", marginTop: 2 })}>{e.error}</Text> : null}
               </View>
             ))}
           </View>
@@ -195,8 +196,8 @@ function TokenRow({ t, focused, onPress }: { t: CapTokenState; focused: boolean;
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <View>
-      <Text style={{ fontSize: 12, letterSpacing: 1, textTransform: "uppercase", color: "#64748b", marginBottom: 3 }}>{label}</Text>
-      <Text style={{ fontSize: 17, fontWeight: "600", color: "#f1f5f9" }}>{value}</Text>
+      <Text style={scaled({ fontSize: 12, letterSpacing: 1, textTransform: "uppercase", color: "#64748b", marginBottom: 3 })}>{label}</Text>
+      <Text style={scaled({ fontSize: 17, fontWeight: "600", color: "#f1f5f9" })}>{value}</Text>
     </View>
   );
 }

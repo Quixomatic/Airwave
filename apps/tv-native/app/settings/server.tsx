@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 
+import { scaled } from "@/features/guide/layout";
 import { PageHeader, Pill, SectionLabel, SettingRow, useSettingsPage } from "@/features/settings/settings-ui";
 import { clearServerUrl, getServerUrl, setToken } from "@/lib/auth";
 
@@ -31,7 +32,7 @@ export default function ServerSettings() {
     <View>
       <PageHeader title="Server" subtitle="The ChannelGuide server this TV is signed in to." />
 
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 28, padding: 22, borderRadius: 14, backgroundColor: "rgba(148,163,184,0.06)", marginBottom: 8 }}>
+      <View style={scaled({ flexDirection: "row", flexWrap: "wrap", gap: 28, padding: 22, borderRadius: 14, backgroundColor: "rgba(148,163,184,0.06)", marginBottom: 8 })}>
         <Info label="Address" value={getServerUrl() || "Not connected"} />
       </View>
 
@@ -53,8 +54,8 @@ export default function ServerSettings() {
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ minWidth: 0 }}>
-      <Text style={{ fontSize: 12, letterSpacing: 1, textTransform: "uppercase", color: "#64748b", marginBottom: 3 }}>{label}</Text>
-      <Text style={{ fontSize: 17, fontWeight: "600", color: "#f1f5f9" }}>{value}</Text>
+      <Text style={scaled({ fontSize: 12, letterSpacing: 1, textTransform: "uppercase", color: "#64748b", marginBottom: 3 })}>{label}</Text>
+      <Text style={scaled({ fontSize: 17, fontWeight: "600", color: "#f1f5f9" })}>{value}</Text>
     </View>
   );
 }

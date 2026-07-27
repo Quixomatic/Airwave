@@ -1,6 +1,7 @@
 import * as LucideIcons from "lucide-react-native";
 import type { ComponentType } from "react";
 import { Dimensions, Platform } from "react-native";
+import type { TextStyle } from "react-native";
 
 import type { GuideGridProgram } from "@/lib/api";
 
@@ -42,6 +43,34 @@ export const CHROME_SCALE =
   Platform.OS === "android" && Platform.isTV ? clamp(Dimensions.get("window").width / 1920, 0.5, 1) : 1;
 /** Scale a raw-dp chrome value. Identity everywhere except Android TV (≈0.5 at 960dp). */
 export const cs = (px: number) => px * CHROME_SCALE;
+
+/**
+ * Style-object chrome scaler — the ergonomic form of `cs()` for whole screens authored in raw dp (watch
+ * chrome, diagnostic, settings). Multiplies the size-like keys by `CHROME_SCALE` so they match the
+ * `vwOf`-scaled guide on Android TV. **Returns the SAME object untouched when `CHROME_SCALE === 1`**
+ * (iPad / Apple TV / Android tablets) — no copy, no change, provably identical there. On Android TV it
+ * shallow-copies and scales only the allow-listed numeric keys; it deliberately SKIPS `borderWidth`
+ * (hairlines), `opacity`/`flex*`/`zIndex`/`elevation`/`aspectRatio`, and any non-number (e.g. "100%"
+ * strings, percent offsets). NOTE: only pass style blocks whose sizes are raw literals — a block that
+ * mixes in an already-screen-derived value (e.g. a `vw()`/dimension-based width) must be scaled per-key
+ * with `cs()` instead, or that value gets double-scaled.
+ */
+const SCALE_KEYS = new Set<string>([
+  "width", "height", "minWidth", "maxWidth", "minHeight", "maxHeight",
+  "top", "bottom", "left", "right",
+  "margin", "marginTop", "marginBottom", "marginLeft", "marginRight", "marginHorizontal", "marginVertical",
+  "padding", "paddingTop", "paddingBottom", "paddingLeft", "paddingRight", "paddingHorizontal", "paddingVertical",
+  "borderRadius", "borderTopLeftRadius", "borderTopRightRadius", "borderBottomLeftRadius", "borderBottomRightRadius",
+  "fontSize", "lineHeight", "gap", "rowGap", "columnGap",
+]);
+export function scaled<T extends TextStyle>(style: T): T {
+  if (CHROME_SCALE === 1) return style;
+  const out = { ...style } as Record<string, unknown>;
+  for (const k in out) {
+    if (SCALE_KEYS.has(k) && typeof out[k] === "number") out[k] = (out[k] as number) * CHROME_SCALE;
+  }
+  return out as T;
+}
 
 export const ACCENTS = ["#2f9e8f", "#4a9fe0", "#3b82f6", "#8b5cf6", "#3fa66a", "#d08b2f", "#d0587e", "#7c8aa3"];
 

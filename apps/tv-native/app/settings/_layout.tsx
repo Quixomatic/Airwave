@@ -8,7 +8,7 @@ import { TvPressable as Pressable } from "@/components/tv-pressable";
 
 import { SettingsSidebar } from "@/features/settings/settings-sidebar";
 import { SettingsCtx } from "@/features/settings/settings-ui";
-import { cs, SIDEBAR_SLIVER_W } from "@/features/guide/layout";
+import { cs, scaled, SIDEBAR_SLIVER_W } from "@/features/guide/layout";
 import { LAYER, useKeyLayer } from "@/lib/input";
 import { C } from "@/lib/theme";
 
@@ -91,7 +91,7 @@ export default function SettingsShell() {
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={{ flex: 1, flexDirection: "row" }}>
         <View style={{ width: cs(SIDEBAR_SLIVER_W), flexShrink: 0 }} />
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ maxWidth: 1024, width: "100%", alignSelf: "center", paddingVertical: 40, paddingHorizontal: 48 }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={scaled({ maxWidth: 1024, width: "100%", alignSelf: "center", paddingVertical: 40, paddingHorizontal: 48 })}>
           <SettingsCtx.Provider value={{ active: zone === "content", returnToRail }}>
             <Slot />
           </SettingsCtx.Provider>
