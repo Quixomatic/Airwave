@@ -82,11 +82,22 @@ export async function resolveMedia(
     },
   );
   if (!info) throw notFound("No playable media part.");
+
+  // Dolby Vision metadata (captured at sync → MediaItem.guide.dovi). Passed through so the native
+  // player CAN switch the Apple TV into DV mode (dvh1 display criteria) — that consumer is a later,
+  // tvOS-only step; for now it's plumbed but unused. See .plans/tv-native.md §11 (DV arc).
+  const item = await prisma.mediaItem.findUnique({
+    where: { mediaSourceId_ratingKey: { mediaSourceId: source.id, ratingKey } },
+    select: { guide: true },
+  });
+  const dovi = (item?.guide as { dovi?: { profile: number; level?: number; blCompatId?: number } } | null)?.dovi;
+
   return {
     ...info,
     offsetSeconds,
     connection,
     capsSource: measured ? "measured" : opts.caps ? "reported" : "default",
+    ...(dovi ? { dovi } : {}),
   };
 }
 

@@ -181,6 +181,9 @@ export type MediaInfo = {
   audioTracks: Track[];
   subtitleTracks: Track[];
   decision?: { videoDecision?: string; audioDecision?: string; videoCodec?: string; audioCodec?: string; container?: string };
+  /** Dolby Vision metadata (captured from Plex). Plumbed to the client but NOT yet consumed — the
+   *  native DV-mode switch (dvh1 display criteria on tvOS) is a deferred step. See .plans/tv-native.md §11. */
+  dovi?: { profile: number; level?: number; blCompatId?: number };
 };
 
 // --- Device capability overrides (Settings → Device) — ported from tv-web -------

@@ -2,6 +2,27 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.39] - 2026-07-27
+
+DV arc, stage 2 — plumb the captured Dolby Vision metadata through to the client. (Then paused: the native
+DV-mode switch is confirmed cosmetic on the Apple TV — see below.)
+
+### Added
+
+- **`dovi` in the `/media` response (server → client).** `broker.resolveMedia` looks up the played item's
+  `MediaItem.guide.dovi` (captured in v0.8.38) and includes it on the playback response; the tv-native
+  `MediaInfo` type now carries `dovi: { profile, level, blCompatId }`. **Plumbed but not yet consumed** —
+  the native DV-mode switch is a deferred, tvOS-only step.
+
+### Why we stopped here (not building the native badge)
+
+Real Dolby Vision = an HDR base image + the **RPU** (dynamic per-scene tone-mapping). Our mpv `avfoundation`
+video output doesn't apply the RPU — and, confirmed against `.refs/plezy`, **neither does plezy on iOS/tvOS**
+(it uses `avfoundation` there too; only its *macOS* build uses `gpu-next`, which can). So on the Apple TV a
+DV "mode" switch is just the badge over the HDR10 base — cosmetic, no picture change. The 288 Profile-8.1/7
+titles already direct-play correctly as HDR10 today. Building the `dvh1` badge (Stage C) and Profile-5
+handling (Stage D) is documented as deferred in `.plans/tv-native.md` §10.2 C.
+
 ## [0.8.38] - 2026-07-27
 
 Starts the **Dolby Vision** arc — captures the DV metadata from Plex (the foundation for switching the
