@@ -2,9 +2,10 @@ import * as LucideIcons from "lucide-react-native";
 import { History, LayoutGrid, ListFilter, Menu, Settings as SettingsIcon, Star, User } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
+import { TvPressable as Pressable } from "@/components/tv-pressable";
 import type { Package } from "@/lib/api";
 import { C } from "@/lib/theme";
 import { accentVivid } from "@/lib/accent-palette";

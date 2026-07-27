@@ -4,7 +4,7 @@
  * so normalization is just a rename to our vocabulary. Everything downstream (the dispatcher, the
  * guide's zone machine) deals in `SemanticKey`, identical to tv-web.
  */
-export type SemanticKey = "up" | "down" | "left" | "right" | "ok" | "back" | "chUp" | "chDown" | "digit" | "unknown";
+export type SemanticKey = "up" | "down" | "left" | "right" | "ok" | "okLong" | "back" | "chUp" | "chDown" | "digit" | "unknown";
 
 /** `digit` carries 0–9 in `digit`. (Number/channel keys don't arrive via `useTVEventHandler` on the
  *  current RN-TV targets — the on-screen keypad / CH buttons drive that logic directly; these types
@@ -12,26 +12,28 @@ export type SemanticKey = "up" | "down" | "left" | "right" | "ok" | "back" | "ch
 export type KeyEvent = { key: SemanticKey; digit?: number };
 
 /** react-native-tvos `useTVEventHandler` eventType → SemanticKey.
- *  The Siri remote sends discrete `up/down/left/right` only when you CLICK the edges of the clickpad;
- *  a touch SWIPE sends `swipeUp/swipeDown/swipeLeft/swipeRight`. We treat one swipe as one directional
- *  move so the natural swipe gesture drives the guide/zone machine, same as an edge-click or a webOS
- *  d-pad press. (Continuous pan is intentionally NOT enabled — we want discrete steps.) */
+ *  We map ONLY the reliable inputs: the discrete clickpad-edge presses (`up/down/left/right`), select,
+ *  and menu. We deliberately DO NOT map the Siri remote's touch `swipeUp/swipeDown/swipeLeft/swipeRight`
+ *  — the touchpad is imprecise, so a stray thumb-brush fires a spurious direction, and since every
+ *  direction here is a real transition (open panel / channel-surf / mini / sidebar), that read as the
+ *  UI "randomly" jumping. The clickpad edges are the true d-pad (physical, reliable — unlike an LG
+ *  wheel's detents, a swipe has none). If we want swipe-to-scroll back, the correct way is
+ *  `TVEventControl.enableTVPanGesture()` + a pan-distance THRESHOLD (so micro/stray swipes are ignored),
+ *  not raw swipe events — a separate, deliberate follow-up. */
 export function tvEventToKey(eventType: string): SemanticKey {
   switch (eventType) {
     case "up":
-    case "swipeUp":
       return "up";
     case "down":
-    case "swipeDown":
       return "down";
     case "left":
-    case "swipeLeft":
       return "left";
     case "right":
-    case "swipeRight":
       return "right";
     case "select":
       return "ok";
+    case "longSelect":
+      return "okLong"; // hold OK — the Siri-remote stand-in for the LG green button (jump to the mini)
     case "menu":
       return "back";
     default:

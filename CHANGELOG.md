@@ -2,6 +2,24 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.22] - 2026-07-26
+
+A large tvOS input / performance / layout polish pass, bringing the Siri-remote guide experience to tv-web parity.
+
+### Fixed
+
+- **Guide navigation was very laggy.** Each row mapped the whole day's program back-buffer on every keypress. Programs are now culled to the visible window (+ rail-edge slivers dropped) at the **SOURCE** (the `channels` memo), matching tv-web (§7.1) — rows are cheap and `fp` navigates exactly what's rendered.
+- **The guide re-centered on every move** (never felt like scrolling). It now scrolls **only when the focused row would go off-screen** (fixed row height + tracked scroll offset), so you travel through the visible rows and it scrolls at the edges — like tv-web. Scroll-follow also snaps instantly (no animation).
+- **Unused strips above/below the guide.** The route wrapped `AuroraGrid` in a `SafeAreaView` that applied tvOS overscan top/bottom insets; the guide is now **full-bleed** (tv-web parity), sidebar + grid edge-to-edge.
+- **The native tvOS focus engine double-fired every control** — `select` ran a focused `Pressable`'s `onPress` on top of our zone machine (pause opened the audio picker, closing the mini also tuned channel 1, the sidebar opened on Back, etc.). Added **`TvPressable`** (`focusable={false}` on tvOS by default) and swapped it across all 11 zone-machine screens, so `select` runs **only** our dispatcher. Includes the featured-panel Pressable where the mini docks; the guide also now visually **deselects** channels while the mini is focused.
+- **Siri-remote swipes fired spurious navigation** (random sidebar/panel jumps). Dropped the raw swipe→direction mapping — the touchpad is imprecise; the clickpad edges are the reliable d-pad. **Menu/Back** now navigates in-app (`TVEventControl.enableTVMenuKey()`) instead of exiting.
+- **Scrubber focus was hard to see.** The focus style (zone-machine-driven — never lost by the focus changes) now draws a prominent accent **halo** around the thumb, matching tv-web's glow.
+
+### Added
+
+- **D-pad up into the docked mini player** (from the guide's top row) + the **mini-focus handled inside the guide's one handler** by the active-zone check (◄/► pick Full/Close, OK activates, Back stops, Down returns) — the tv-web model, not a separate key layer.
+- **Hold-OK to focus the mini** (`longSelect` → `okLong`) — the Siri-remote stand-in for the LG green button; the mini hint updated to match.
+
 ## [0.8.21] - 2026-07-26
 
 ### Fixed

@@ -1,8 +1,10 @@
 import { Slot, usePathname, useRouter } from "expo-router";
 import { ArrowLeft, Cpu, Info, Server as ServerIcon, SlidersHorizontal, UserRound } from "lucide-react-native";
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import { TvPressable as Pressable } from "@/components/tv-pressable";
 
 import { SettingsSidebar } from "@/features/settings/settings-sidebar";
 import { SettingsCtx } from "@/features/settings/settings-ui";

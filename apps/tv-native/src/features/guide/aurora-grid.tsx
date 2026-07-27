@@ -1,8 +1,10 @@
-import { FlashList } from "@shopify/flash-list";
+import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { LinearGradient } from "expo-linear-gradient";
 import { Heart, Star } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Platform, Pressable, Text, useWindowDimensions, View } from "react-native";
+import { Platform, Text, useWindowDimensions, View } from "react-native";
+
+import { TvPressable as Pressable } from "@/components/tv-pressable";
 
 import { usePlayer } from "@/features/watch/player-ctx";
 import type { GuideGridChannel, GuideGridProgram, GuideMeta } from "@/lib/api";
@@ -86,6 +88,7 @@ export function AuroraGrid({
   const [zone, setZone] = useState<"grid" | "rail" | "sidebar">("grid");
   const [sidebarSel, setSidebarSel] = useState(0);
   const sidebarExpanded = zone === "sidebar";
+  const player = usePlayer();
 
   // Recents/favorites lenses filter the channel list (favorites via the passed set).
   const channels = useMemo(() => {
@@ -97,8 +100,21 @@ export function AuroraGrid({
           : lens.type === "favorites"
             ? favoriteIds.has(c.id)
             : true; // recents handled server-side elsewhere; kept simple here
-    return rawChannels.filter(inLens);
-  }, [rawChannels, lens, favoriteIds]);
+    // Cull each channel's programs to what's actually on the visible grid — within the window AND wide
+    // enough to render (not a rail-edge sliver) — at the SOURCE, matching tv-web (§7.1). This is what
+    // makes the rows cheap: otherwise every row maps the whole day's back-buffer on EVERY keypress (the
+    // guide lag), and `fp` could land on a hidden program. Same math as the Row's inline positioning.
+    const visible = (p: GuideGridProgram): boolean => {
+      const start = minsFrom(p.startsAt);
+      const end = start + p.durationSeconds / 60;
+      if (!(end > 0 && start < WINDOW_MIN)) return false; // ended before the rail, or starts past the window
+      const rawLeft = laneX(p.startsAt);
+      const rawRight = rawLeft + Math.max(laneW * 0.02, (p.durationSeconds / 60) * ppm) - 6;
+      const left = rawLeft < 0 ? 6 : rawLeft;
+      return rawRight - left >= 8; // cull rail-edge slivers (matches the Row's `cw < 8`)
+    };
+    return rawChannels.filter(inLens).map((c): GuideGridChannel => ({ ...c, programs: c.programs.filter(visible) }));
+  }, [rawChannels, lens, favoriteIds, minsFrom, laneX, laneW, ppm]);
 
   const [fc, setFc] = useState(0);
   const [fp, setFp] = useState(0);
@@ -150,7 +166,16 @@ export function AuroraGrid({
   useKeyLayer({
     id: "guide",
     priority: LAYER.BASE,
+    // Off the stack while the full-screen player is up (player-chrome owns the keys then). Matches
+    // tv-web's `active: player.layout !== "full"`.
+    active: player.layout !== "full",
     onKey(e) {
+      // Hold-OK jumps straight to the docked mini from anywhere in the guide — the Siri-remote analogue
+      // of tv-web's GREEN shortcut (same destination as ▲ from the top row, minus the travel).
+      if (e.key === "okLong" && player.layout === "mini" && !player.miniFocused) {
+        player.focusMini();
+        return true;
+      }
       if (zone === "sidebar") {
         if (e.key === "back" || e.key === "right") setZone("grid");
         else if (e.key === "up") setSidebarSel((s) => Math.max(0, s - 1));
@@ -164,6 +189,23 @@ export function AuroraGrid({
         else if (e.key === "up") setFc((c) => Math.max(0, c - 1));
         else if (e.key === "down") setFc((c) => Math.min(channels.length - 1, c + 1));
         else if (e.key === "ok" && focusedChannel) onToggleFavorite(focusedChannel.id);
+        return true;
+      }
+      // Mini feed focused → its two buttons own the keys. Handled INSIDE this one guide handler by the
+      // active-zone check (tv-web's model), NOT a separate key layer. Back stops the feed; Down blurs
+      // back to the grid; ◄/► move between Full-screen/Close; OK activates.
+      if (player.miniFocused) {
+        if (e.key === "back") player.stop();
+        else if (e.key === "left") player.miniMove(-1);
+        else if (e.key === "right") player.miniMove(1);
+        else if (e.key === "ok") player.miniActivate();
+        else if (e.key === "down") player.blurMini();
+        return true;
+      }
+      // Back on the guide with a mini feed docked → stop it. (Guide root has no in-app exit on tvOS —
+      // the Home button leaves the app.)
+      if (e.key === "back") {
+        if (player.layout === "mini") player.stop();
         return true;
       }
       const n = channels.length;
@@ -186,6 +228,12 @@ export function AuroraGrid({
           return true;
         }
         case "up": {
+          // At the top row, Up docks into the mini feed if one's playing (tv-web parity — the featured
+          // slot / mini sits above the channel list).
+          if (fc === 0) {
+            if (player.layout === "mini") player.focusMini();
+            return true;
+          }
           const nc = Math.max(0, fc - 1);
           setFc(nc);
           setFp(liveProgramIndex(channels[nc]!.programs, now.getTime()));
@@ -199,21 +247,37 @@ export function AuroraGrid({
     },
   });
 
-  const listRef = useRef<FlashList<(typeof channels)[number]>>(null);
-  // Keep the focused channel in view on TV — WE own the scroll (the list's native scroll is disabled on
-  // TV), so the remote drives the zone machine and the list follows, instead of tvOS smooth-scrolling it
-  // natively and fighting the discrete snap. This is the tvOS analogue of tv-web converting each LG wheel
-  // notch into one d-pad step: a swipe now surfaces as a discrete swipeUp/Down event (no longer eaten by
-  // the list's native scroll) → one step → this recenters. iPad keeps native touch-scroll (no-op here).
+  const listRef = useRef<FlashListRef<GuideGridChannel>>(null);
+  const scrollYRef = useRef(0);
+  const listHRef = useRef(0);
+  // Scroll the list only when the focused channel would be OFF-SCREEN (tv-web parity) — otherwise leave
+  // it PUT, so moving up/down feels like you're travelling through the visible rows and the list only
+  // scrolls once you hit the top/bottom edge (not the old "always re-center", which never felt like
+  // scrolling). Rows are a fixed height (rowPx), so the visible band = [scrollY, scrollY + listHeight].
+  // We predict the new offset after a programmatic scroll so rapid presses stay consistent. TV only —
+  // iPad keeps native touch-scroll (this is a no-op there).
   useEffect(() => {
     if (!Platform.isTV || !channels.length) return;
     if (zone !== "grid" && zone !== "rail") return;
+    const h = listHRef.current;
+    const top = fc * rowPx;
+    const bottom = top + rowPx;
+    const off = scrollYRef.current;
     try {
-      listRef.current?.scrollToIndex({ index: fc, animated: true, viewPosition: 0.4 });
+      if (h <= 0) {
+        listRef.current?.scrollToIndex({ index: fc, animated: false, viewPosition: 0 }); // not measured yet
+      } else if (top < off) {
+        listRef.current?.scrollToIndex({ index: fc, animated: false, viewPosition: 0 }); // above → to top
+        scrollYRef.current = top;
+      } else if (bottom > off + h) {
+        listRef.current?.scrollToIndex({ index: fc, animated: false, viewPosition: 1 }); // below → to bottom
+        scrollYRef.current = Math.max(0, bottom - h);
+      }
+      // else: already fully visible → don't scroll.
     } catch {
       // index not measured yet / out of range — the next fc change re-tries.
     }
-  }, [fc, zone, channels.length]);
+  }, [fc, zone, channels.length, rowPx]);
 
   return (
     <View style={{ flex: 1, flexDirection: "row", backgroundColor: C.bg }}>
@@ -243,18 +307,21 @@ export function AuroraGrid({
               ref={listRef}
               data={channels}
               keyExtractor={(c) => c.id}
-              extraData={{ fc, fp, zone }}
+              extraData={{ fc, fp, zone, mf: player.miniFocused }}
               // TV: kill the list's own scroll so the remote's swipe surfaces as a discrete swipeUp/Down
               // event (→ one zone step) instead of the OS smooth-scrolling the list underneath us. iPad
               // keeps native touch-scroll.
               scrollEnabled={!Platform.isTV}
+              onScroll={(e) => (scrollYRef.current = e.nativeEvent.contentOffset.y)}
+              onLayout={(e) => (listHRef.current = e.nativeEvent.layout.height)}
+              scrollEventThrottle={16}
               renderItem={({ item, index }) => (
                 <Row
                   channel={item}
                   accent={channelTint(item) ?? accentOf(index)}
-                  focused={index === fc && zone !== "sidebar"}
-                  railFocused={zone === "rail" && index === fc}
-                  focusedProgramId={zone === "grid" && index === fc ? focusedProgram?.id : undefined}
+                  focused={index === fc && zone !== "sidebar" && !player.miniFocused}
+                  railFocused={zone === "rail" && index === fc && !player.miniFocused}
+                  focusedProgramId={zone === "grid" && index === fc && !player.miniFocused ? focusedProgram?.id : undefined}
                   favorited={favoriteIds.has(item.id)}
                   onPressRow={() => onRailTap(index)}
                   onPressProgram={(pi) => onProgramTap(index, pi)}
@@ -296,7 +363,7 @@ export function AuroraGrid({
 
       {/* Scrim behind the expanded sidebar — tap to collapse. */}
       {sidebarExpanded && (
-        <Pressable onPress={() => setZone("grid")} style={{ position: "absolute", inset: 0, backgroundColor: "rgba(6,10,20,0.55)", zIndex: 24 }} />
+        <Pressable onPress={() => setZone("grid")} focusable={!Platform.isTV} style={{ position: "absolute", inset: 0, backgroundColor: "rgba(6,10,20,0.55)", zIndex: 24 }} />
       )}
 
       <GuideSidebar
@@ -518,7 +585,7 @@ function FeaturedPanel({ channel, program, now, accent, vw, onTune }: { channel:
   }, [miniActive, measureSlot, player]);
 
   return (
-    <Pressable onPress={onTune} style={{ flexDirection: "row", alignItems: "flex-start", paddingTop: fv(40), paddingHorizontal: fv(64) }}>
+    <Pressable onPress={onTune} focusable={!Platform.isTV} style={{ flexDirection: "row", alignItems: "flex-start", paddingTop: fv(40), paddingHorizontal: fv(64) }}>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: fv(22) }}>
           <View style={{ width: tile, height: tile, borderRadius: tile / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, 0.2), borderWidth: 1, borderColor: hexA(accent, 0.35) }}>

@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
+
+import { TvPressable as Pressable } from "@/components/tv-pressable";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
 import { GlassCircleButton } from "@/features/guide/glass-button";

@@ -1,7 +1,6 @@
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AuroraGrid } from "@/features/guide/aurora-grid";
 import { usePlayer } from "@/features/watch/player-context";
@@ -44,7 +43,9 @@ export default function GuideRoute() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top", "bottom"]}>
+    // Full-bleed (no SafeAreaView) — tv-web fills the screen and the guide's own internal padding
+    // handles spacing; the tvOS overscan insets were leaving unused strips above/below the grid+sidebar.
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
       <AuroraGrid
         channels={data!.channels}
         serverTime={data!.serverTime}
@@ -54,6 +55,6 @@ export default function GuideRoute() {
         onSettings={() => router.push("/settings")}
         onAccount={() => router.push("/settings/user")}
       />
-    </SafeAreaView>
+    </View>
   );
 }

@@ -1,9 +1,10 @@
 import { MpvPlayerView } from "@ChannelGuide/mpv-player";
 import { Maximize2, X } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { setStatusBarHidden } from "expo-status-bar";
 
+import { TvPressable as Pressable } from "@/components/tv-pressable";
 import { useGuide } from "@/hooks/queries";
 import { api } from "@/lib/api";
 import { onInputActivity } from "@/lib/input";
@@ -251,7 +252,7 @@ function PlayerHost({
       {/* mini: tap to focus; two buttons when focused. The green "to focus" banner is a TV-remote
           affordance (the LG green button) — hidden on iPad/touch, where you just tap to focus. */}
       {layout === "mini" && !miniFocused && (
-        <Pressable style={{ position: "absolute", inset: 0 }} onPress={onFocusMini}>
+        <Pressable style={{ position: "absolute", inset: 0 }} focusable={!Platform.isTV} onPress={onFocusMini}>
           {Platform.isTV && <GreenHint />}
         </Pressable>
       )}
@@ -269,15 +270,14 @@ function PlayerHost({
 function GreenHint() {
   return (
     <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, paddingTop: 7, paddingBottom: 8, backgroundColor: "rgba(6,10,20,0.5)" }}>
-      <View style={{ width: 30, height: 11, borderRadius: 6, backgroundColor: "#22c55e" }} />
-      <Text style={{ fontSize: 12, fontWeight: "600", color: "#e6eaf1" }}>to focus</Text>
+      <Text style={{ fontSize: 12, fontWeight: "600", color: "#e6eaf1" }}>Hold OK, or ▲ from the top, to focus</Text>
     </View>
   );
 }
 
 function MiniButton({ label, icon, selected, accent, onPress }: { label: string; icon: React.ReactNode; selected: boolean; accent: string; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={{ alignItems: "center", gap: 8 }}>
+    <Pressable onPress={onPress} focusable={!Platform.isTV} style={{ alignItems: "center", gap: 8 }}>
       <View style={{ width: 60, height: 60, borderRadius: 30, alignItems: "center", justifyContent: "center", backgroundColor: selected ? accent : "rgba(30,41,59,0.85)" }}>{icon}</View>
       <Text style={{ fontSize: 14, fontWeight: "600", color: selected ? "#f1f5f9" : "#94a3b8" }}>{label}</Text>
     </Pressable>

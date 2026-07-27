@@ -1,5 +1,7 @@
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+
+import { TvPressable as Pressable } from "@/components/tv-pressable";
 
 import { LAYER, useKeyLayer } from "@/lib/input";
 

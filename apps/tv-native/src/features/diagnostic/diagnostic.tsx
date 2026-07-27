@@ -1,6 +1,8 @@
 import { MpvPlayerView } from "@ChannelGuide/mpv-player";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Platform, ScrollView, Text, useWindowDimensions, View } from "react-native";
+
+import { TvPressable as Pressable } from "@/components/tv-pressable";
 
 import { api, type CapTest } from "@/lib/api";
 import { getServerUrl } from "@/lib/auth";

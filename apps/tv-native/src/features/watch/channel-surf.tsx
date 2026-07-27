@@ -1,7 +1,9 @@
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Image, Pressable, Text, useWindowDimensions, View } from "react-native";
+import { Image, Text, useWindowDimensions, View } from "react-native";
+
+import { TvPressable as Pressable } from "@/components/tv-pressable";
 
 import { channelIcon, liveProgramIndex } from "@/features/guide/layout";
 import { imageUrl, type GuideGridChannel } from "@/lib/api";

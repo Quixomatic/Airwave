@@ -1,10 +1,11 @@
 import { AudioLines, Captions, Check, Clapperboard, Info, Pause, Play, Radio, RotateCcw, SlidersHorizontal, Star, Tv } from "lucide-react-native";
 import type { ComponentType } from "react";
 import { useEffect, useRef, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { Modal, Platform, ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 
+import { TvPressable as Pressable } from "@/components/tv-pressable";
 import type { GuideChannel } from "@/lib/api";
 import { hexA } from "@/features/guide/layout";
 import { LAYER, onInputActivity, useKeyLayer } from "@/lib/input";
@@ -255,7 +256,7 @@ export function FeaturePanel({
       ) : (
         <>
           {/* scrubber */}
-          <Pressable onPress={() => controls.togglePause()} style={{ paddingTop: 6, paddingBottom: 4 }}>
+          <Pressable onPress={() => controls.togglePause()} focusable={!Platform.isTV} style={{ paddingTop: 6, paddingBottom: 4 }}>
             <View style={{ position: "relative", height: 8, width: "100%" }}>
               {sc?.segments.map((seg, i) => (
                 <View key={i} style={{ position: "absolute", top: 0, height: 8, left: `${seg.leftPct}%`, width: `${Math.max(0, seg.widthPct)}%`, paddingHorizontal: 2 }}>
@@ -265,11 +266,16 @@ export function FeaturePanel({
                 </View>
               ))}
               {liveInWindow && <View style={{ position: "absolute", top: -4, left: `${livePct}%`, width: 2, height: 16, backgroundColor: "#ef4444" }} />}
-              <View style={{ position: "absolute", top: 4, left: `${posPct}%`, width: scrubFocused ? 24 : 16, height: scrubFocused ? 24 : 16, borderRadius: 12, marginLeft: scrubFocused ? -12 : -8, marginTop: scrubFocused ? -12 : -8, backgroundColor: "#fff", borderWidth: scrubFocused ? 4 : 0, borderColor: accent }} />
+              {/* focus HALO — a 5px accent ring OUTSIDE the thumb (RN analogue of tv-web's
+                  `boxShadow: 0 0 0 5px ${accent}66`), so it's obvious you're on the scrubber. */}
+              {scrubFocused && (
+                <View pointerEvents="none" style={{ position: "absolute", top: 4, left: `${posPct}%`, width: 34, height: 34, borderRadius: 17, marginLeft: -17, marginTop: -17, backgroundColor: hexA(accent, 0.4) }} />
+              )}
+              <View style={{ position: "absolute", top: 4, left: `${posPct}%`, width: scrubFocused ? 24 : 16, height: scrubFocused ? 24 : 16, borderRadius: 12, marginLeft: scrubFocused ? -12 : -8, marginTop: scrubFocused ? -12 : -8, backgroundColor: "#fff", borderWidth: scrubFocused ? 2 : 0, borderColor: accent }} />
             </View>
             <View style={{ position: "relative", height: 26, marginTop: 10, width: "100%" }}>
               <Text style={{ position: "absolute", left: `${posPct}%`, fontSize: 17, fontWeight: "600", color: scrubFocused ? "#f1f5f9" : "#c3c9d4" }}>{fmt(sc?.slotPositionS ?? 0)}</Text>
-              <Pressable onPress={() => controls.jumpToLive()} style={{ position: "absolute", right: 0, flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Pressable onPress={() => controls.jumpToLive()} focusable={!Platform.isTV} style={{ position: "absolute", right: 0, flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: atLive ? "#ef4444" : "#64748b" }} />
                 <Text style={{ fontSize: 15, fontWeight: "700", letterSpacing: 0.5, color: atLive ? "#ef4444" : "#94a3b8" }}>{atLive ? "LIVE" : `-${fmt(behind)}`}</Text>
               </Pressable>
@@ -315,6 +321,7 @@ function Ctl({ icon: Icon, label, focused, dim, onPress }: { icon: ComponentType
   return (
     <Pressable
       onPress={onPress}
+      focusable={!Platform.isTV}
       style={{
         flexDirection: "row",
         alignItems: "center",
@@ -403,7 +410,7 @@ function PickerModal({ title, items, current, sel, onPick, onClose, accent }: { 
   }, [sel]);
   return (
     <Modal transparent visible animationType="fade" onRequestClose={onClose}>
-      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(4,6,12,0.6)", alignItems: "center", justifyContent: "center", padding: 40 }}>
+      <Pressable onPress={onClose} focusable={!Platform.isTV} style={{ flex: 1, backgroundColor: "rgba(4,6,12,0.6)", alignItems: "center", justifyContent: "center", padding: 40 }}>
         <View
           onStartShouldSetResponder={() => true}
           style={{ width: 460, maxWidth: "92%", borderRadius: 22, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", shadowColor: "#000", shadowOffset: { width: 0, height: 20 }, shadowRadius: 44, shadowOpacity: 0.55, elevation: 24 }}
@@ -419,6 +426,7 @@ function PickerModal({ title, items, current, sel, onPick, onClose, accent }: { 
                   <Pressable
                     key={it.value}
                     onPress={() => onPick(it.value)}
+                    focusable={!Platform.isTV}
                     style={{ borderRadius: 14, marginVertical: 3, paddingVertical: 15, paddingHorizontal: 18, backgroundColor: isFocus ? accent : isSel ? hexA(accent, 0.16) : "transparent" }}
                   >
                     {/* explicit row (don't rely on Pressable's own flex): leading check slot + label */}

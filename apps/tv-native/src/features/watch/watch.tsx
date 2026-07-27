@@ -1,6 +1,8 @@
 import { ArrowLeft, Tv } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+
+import { TvPressable as Pressable } from "@/components/tv-pressable";
 import Animated, { FadeInDown, FadeInUp, FadeOutDown, FadeOutUp } from "react-native-reanimated";
 
 import { useGuide } from "@/hooks/queries";

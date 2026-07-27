@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
+import { TvPressable as Pressable } from "@/components/tv-pressable";
 import { DEFAULT_ACCENT } from "@/lib/tint";
 
 import { hexA } from "./layout";
