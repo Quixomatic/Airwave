@@ -88,8 +88,13 @@ export default function SettingsShell() {
   const expanded = zone === "rail";
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg, paddingLeft: OVERSCAN_H, paddingRight: OVERSCAN_H, paddingTop: OVERSCAN_V, paddingBottom: OVERSCAN_V }}>
-      <View style={{ flex: 1, flexDirection: "row" }}>
+    // SafeAreaView = the Apple TV overscan-safe area (its working layout, untouched — 0 extra padding).
+    // The inner View adds the ANDROID-only overscan inset (SafeAreaView reports NO insets on Android TV)
+    // around the whole shell incl. the absolute sidebar, so it never depends on how SafeAreaView merges
+    // style padding. iPad/Apple TV: OVERSCAN_* = 0 → the inner View is a no-op pass-through.
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <View style={{ flex: 1, paddingLeft: OVERSCAN_H, paddingRight: OVERSCAN_H, paddingTop: OVERSCAN_V, paddingBottom: OVERSCAN_V }}>
+        <View style={{ flex: 1, flexDirection: "row" }}>
         <View style={{ width: cs(SIDEBAR_SLIVER_W), flexShrink: 0 }} />
         <ScrollView style={{ flex: 1 }} contentContainerStyle={scaled({ maxWidth: 1024, width: "100%", alignSelf: "center", paddingVertical: 40, paddingHorizontal: 48 })}>
           <SettingsCtx.Provider value={{ active: zone === "content", returnToRail }}>
@@ -109,6 +114,7 @@ export default function SettingsShell() {
         onActivate={activate}
         onExpand={() => setZone("rail")}
       />
+      </View>
     </SafeAreaView>
   );
 }

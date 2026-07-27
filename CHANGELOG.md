@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.43] - 2026-07-27
+
+### Changed
+
+- **Settings overscan applied on a plain inner View, not the `SafeAreaView` (tv-native).** v0.8.42 hung the
+  Android overscan padding on the settings `SafeAreaView`, which relies on how `SafeAreaView` merges style
+  padding with its (Apple TV) safe-area insets — ambiguous. The two screens' Apple-TV layouts were always
+  *different by design* (guide = full-bleed `View` since v0.8.22; settings = `SafeAreaView`), so we keep each
+  one's working layout and add the **Android-only** `OVERSCAN` inset on top: the guide's plain root View
+  (already done), and — for settings — a **plain inner View** wrapping the whole shell (incl. the absolute
+  sidebar), leaving the `SafeAreaView` untouched. On iPad/Apple TV `OVERSCAN_* = 0`, so the inner View is a
+  no-op pass-through (byte-identical to the working layout); on Android TV it's the only inset.
+
 ## [0.8.42] - 2026-07-27
 
 ### Fixed
