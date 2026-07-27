@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.29] - 2026-07-27
+
+### Changed
+
+- **Moved the `isTV` diagnostic from About to the Device page's detail card (tv-native).** It now shows as an **"Is TV?" Yes/No** row alongside Model / Platform / Resolution / HDR — where device details belong — and is off the About page.
+
 ## [0.8.28] - 2026-07-27
 
 ### Added

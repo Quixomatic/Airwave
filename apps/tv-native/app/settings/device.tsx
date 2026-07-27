@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 
 import { PageHeader, Pill, SectionLabel, SettingRow, Toggle, useSettingsPage } from "@/features/settings/settings-ui";
 import { api, type CapKind, type CapTokenState, type DeviceCapView } from "@/lib/api";
@@ -95,6 +95,9 @@ export default function DeviceSettings() {
           <Info label="Platform" value={data.device.platform ?? "—"} />
           <Info label="Resolution" value={data.device.screenWidth ? `${data.device.screenWidth}×${data.device.screenHeight}` : "—"} />
           <Info label="HDR" value={data.device.hdr ? "Yes" : "No"} />
+          {/* isTV drives UI_SCALE + the focusable/native-focus gating — the first thing to check on a TV
+              build (esp. Android, where it depends on the build IS_TV / device uiMode, not just EXPO_TV). */}
+          <Info label="Is TV?" value={Platform.isTV ? "Yes" : "No"} />
         </View>
       )}
 
