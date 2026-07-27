@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.27] - 2026-07-27
+
+### Changed
+
+- **Skip the per-tick scrubber build unless full-screen (tv-native perf).** `buildScrubber` (loops the timeline slots + maps each segment) ran every 500ms in the player tick regardless of layout — but only the feature panel, which exists only in full-screen chrome, consumes the scrubber. It's now gated on `layout === "full"`, so that work is skipped while a mini feed is docked (i.e. while you're browsing the guide) or off — freeing JS-thread time on the perf-sensitive path (weak-GPU-friendly). Still pre-built when full, so the scrubber is ready the instant the chrome opens. No visual or behavior change.
+
 ## [0.8.26] - 2026-07-27
 
 ### Changed

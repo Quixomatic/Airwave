@@ -176,7 +176,9 @@ function PlayerHost({
   useEffect(() => {
     api.qualities().then((r) => setQualities(r.qualities)).catch(() => {});
   }, []);
-  const tv = useTvPlayer(channelId, { quality, audioStreamId, subtitleStreamId });
+  // Only build the scrubber when full-screen (the feature panel is the only consumer) — skip the per-tick
+  // work while a mini feed is docked / off.
+  const tv = useTvPlayer(channelId, { quality, audioStreamId, subtitleStreamId }, layout === "full");
   const { status } = tv;
 
   // Release the CH▲/▼ lock once this channel is actually showing content.

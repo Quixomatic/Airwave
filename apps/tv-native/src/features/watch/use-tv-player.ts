@@ -71,7 +71,7 @@ const titleOf = (g?: GuideMeta | null) => (!g ? "" : g.showTitle ? `${g.showTitl
 
 export type PlayerOptions = { quality?: string; audioStreamId?: string; subtitleStreamId?: string };
 
-export function useTvPlayer(channelId: string | null, options: PlayerOptions = {}) {
+export function useTvPlayer(channelId: string | null, options: PlayerOptions = {}, scrubberActive = true) {
   const viewRef = useRef<MpvPlayerViewRef>(null);
   const [source, setSource] = useState<string | null>(null);
   const [startTime, setStartTime] = useState(0); // mpv open-at position (seconds) — loadfile … start=<offset>
@@ -80,6 +80,11 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   const paramsKey = `${options.quality ?? ""}|${options.audioStreamId ?? ""}|${options.subtitleStreamId ?? ""}`;
   const optionsRef = useRef(options);
   optionsRef.current = options;
+  // Only the feature panel (full-screen chrome) shows the scrubber, so only build it when full — skip the
+  // per-tick `buildScrubber` while a mini player is docked (browsing the guide) or off. Ref so the tick
+  // reads the latest without re-creating the interval.
+  const scrubberActiveRef = useRef(scrubberActive);
+  scrubberActiveRef.current = scrubberActive;
 
   const timeline = useQuery({ queryKey: ["timeline", channelId], queryFn: () => api.timeline(channelId!, 360, 180), refetchInterval: 120_000, enabled: !!channelId });
 
@@ -435,7 +440,7 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
         paused: pausedRef.current,
         bumperRemaining: cur.kind === "BUMPER" ? Math.max(0, Math.ceil(cur.endS - effective)) : null,
         canRestart: cur.kind === "PROGRAM",
-        scrubber: buildScrubber(effective, t),
+        scrubber: scrubberActiveRef.current ? buildScrubber(effective, t) : null,
         delivery: cur.kind === "PROGRAM" ? cur.delivery ?? null : null,
       }));
     }, 500);
