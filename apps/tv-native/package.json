@@ -1,6 +1,6 @@
 {
   "name": "tv-native",
-  "version": "0.8.43",
+  "version": "0.8.44",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {

@@ -2,7 +2,6 @@ import { Slot, usePathname, useRouter } from "expo-router";
 import { ArrowLeft, Cpu, Info, Server as ServerIcon, SlidersHorizontal, UserRound } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import { ScrollView, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 import { TvPressable as Pressable } from "@/components/tv-pressable";
 
@@ -88,11 +87,11 @@ export default function SettingsShell() {
   const expanded = zone === "rail";
 
   return (
-    // SafeAreaView = the Apple TV overscan-safe area (its working layout, untouched — 0 extra padding).
-    // The inner View adds the ANDROID-only overscan inset (SafeAreaView reports NO insets on Android TV)
-    // around the whole shell incl. the absolute sidebar, so it never depends on how SafeAreaView merges
-    // style padding. iPad/Apple TV: OVERSCAN_* = 0 → the inner View is a no-op pass-through.
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+    // Full-bleed on Apple TV / iPad (a plain View — NOT SafeAreaView, which on tvOS applies the title-safe
+    // overscan margin on all four edges and pushed the whole shell + sidebar massively inward). Matches the
+    // guide (full-bleed since v0.8.22). The inner View adds the ANDROID-TV-only overscan inset around the
+    // whole shell incl. the absolute sidebar. iPad/Apple TV: OVERSCAN_* = 0 → the inner View is a no-op.
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={{ flex: 1, paddingLeft: OVERSCAN_H, paddingRight: OVERSCAN_H, paddingTop: OVERSCAN_V, paddingBottom: OVERSCAN_V }}>
         <View style={{ flex: 1, flexDirection: "row" }}>
         <View style={{ width: cs(SIDEBAR_SLIVER_W), flexShrink: 0 }} />
@@ -115,6 +114,6 @@ export default function SettingsShell() {
         onExpand={() => setZone("rail")}
       />
       </View>
-    </SafeAreaView>
+    </View>
   );
 }

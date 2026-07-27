@@ -2,6 +2,26 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.44] - 2026-07-27
+
+### Fixed
+
+- **Settings pages were massively inset on Apple TV — now full-bleed (tv-native).** The settings shell was
+  the last screen still wrapped in `SafeAreaView`, which on tvOS applies the title-safe overscan margin on
+  **all four edges** — pushing the whole shell *and* the category sidebar far in from the screen edges (the
+  guide dropped `SafeAreaView` for full-bleed back in v0.8.22; settings never did, so it looked increasingly
+  wrong next to the full-bleed guide). Replaced it with a plain full-bleed `View`, keeping the
+  **Android-TV-only** overscan inset on the inner View. iPad/Apple TV now hug the edges like the guide;
+  Android TV keeps its overscan-safe inset. (JS — hot-reloads into the Apple TV dev client.)
+
+### Added
+
+- **`preview-tvos` EAS profile.** A **release** Apple TV build (no `developmentClient` → JS is bundled, no
+  Metro / dev server), internal distribution, mirroring `preview-androidtv`. For measuring real on-device
+  tvOS performance without the dev-client overhead (the Android preview proved the dev client was the
+  perf drag). The v0.8.40 cleartext/ATS exemption (`NSAllowsArbitraryLoads`) already lets a release tvOS
+  build reach a plain-HTTP LAN server.
+
 ## [0.8.43] - 2026-07-27
 
 ### Changed
