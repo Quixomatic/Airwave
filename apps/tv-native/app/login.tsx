@@ -6,6 +6,8 @@ import QRCode from "react-native-qrcode-svg";
 import { ApiError, plexLink } from "@/lib/api";
 import { getServerUrl, setToken } from "@/lib/auth";
 import { authClient } from "@/lib/auth-client";
+import { LAYER, useKeyLayer } from "@/lib/input";
+import { C } from "@/lib/theme";
 
 /**
  * Login — the native port of tv-web's device-code login. The Plex device-link flow
@@ -18,6 +20,7 @@ export default function Login() {
   const router = useRouter();
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sel, setSel] = useState(0); // D-pad selection (zone machine — the native focus engine never sees the D-pad on Android TV)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = () => {
@@ -96,6 +99,31 @@ export default function Login() {
     }, (data.interval ?? 5) * 1000);
   }, [router]);
 
+  // D-pad zone machine. On Android TV our native key module consumes the D-pad and routes it here
+  // (the native focus engine never sees it), so — like every other screen — we drive selection
+  // ourselves: ▲/▼ move between the buttons, OK activates, Back exits the code view.
+  const count = pending ? 1 : 2; // pending view = just the Back button
+  useEffect(() => setSel(0), [pending]); // reset selection when the view switches
+  useKeyLayer({
+    id: "login",
+    priority: LAYER.BASE,
+    onKey(e) {
+      if (e.key === "up") return setSel((s) => Math.max(0, s - 1)), true;
+      if (e.key === "down") return setSel((s) => Math.min(count - 1, s + 1)), true;
+      if (e.key === "ok") {
+        if (pending) reset(null);
+        else if (sel === 0) void startPlex();
+        else void startDevice();
+        return true;
+      }
+      if (e.key === "back" && pending) {
+        reset(null);
+        return true;
+      }
+      return false;
+    },
+  });
+
   return (
     <View className="flex-1 items-center justify-center gap-8 bg-bg p-10">
       <View className="items-center">
@@ -111,7 +139,11 @@ export default function Login() {
             <QRCode value={pending.qrValue} size={168} />
           </View>
           <Text className="font-mono text-5xl font-bold tracking-[8px] text-fg">{pending.code}</Text>
-          <Pressable onPress={() => reset(null)} className="rounded-lg px-4 py-2 active:opacity-60">
+          <Pressable
+            onPress={() => reset(null)}
+            className="rounded-lg px-4 py-2 active:opacity-60"
+            style={{ borderWidth: 2, borderColor: sel === 0 ? "#fff" : "transparent" }}
+          >
             <Text className="text-sm text-muted">← Back</Text>
           </Pressable>
         </View>
@@ -120,12 +152,14 @@ export default function Login() {
           <Pressable
             onPress={startPlex}
             className="items-center rounded-xl bg-amber-500 px-6 py-5 active:opacity-80"
+            style={{ borderWidth: 3, borderColor: sel === 0 ? "#fff" : "transparent" }}
           >
             <Text className="text-xl font-semibold text-black">Log in with Plex</Text>
           </Pressable>
           <Pressable
             onPress={startDevice}
-            className="items-center rounded-xl border border-white/15 px-6 py-5 active:opacity-70"
+            className="items-center rounded-xl px-6 py-5 active:opacity-70"
+            style={{ borderWidth: 2, borderColor: sel === 1 ? C.accent : "rgba(255,255,255,0.15)" }}
           >
             <Text className="text-xl font-semibold text-fg">Log in with a code</Text>
           </Pressable>

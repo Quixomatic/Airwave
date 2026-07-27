@@ -2,6 +2,31 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.34] - 2026-07-27
+
+Fixes D-pad navigation on the login + setup screens — they were unreachable on Android TV.
+
+### Fixed
+
+- **Login + setup couldn't be navigated by the D-pad on Android TV (tv-native) — you couldn't select a
+  button to sign in.** These onboarding screens were built "touch-first," relying on the **native Android
+  focus engine** rather than the app's zone machine. But the v0.8.30 Android D-pad capture
+  (`KeyInputModule`) intercepts every D-pad event at the Activity's `dispatchKeyEvent` and forwards it to
+  our dispatcher — **consuming it before the native focus engine sees it**. So on any native-focus screen
+  the D-pad did nothing: no focus movement, no ring, no way to press a button. (It had been broken since the
+  first `development-androidtv` build; login just wasn't hit until now.) Converted **login** and **setup**
+  to the same `useKeyLayer` zone machine every other screen uses: ▲/▼ move a selection, **OK** activates
+  (OK on the address field opens the keyboard), with a visible `sel`-driven ring (inline white/accent
+  border). Note: NativeWind's `focus:` variant is inert on these screens — it keys off the native `onFocus`
+  event, which never fires once the D-pad is captured — so the ring is state-driven, not `focus:`-class.
+
+### Durable gotcha
+
+- **Any screen that used the native focus engine must use the zone machine now.** The global Android D-pad
+  capture (which makes the guide/watch/settings work) deliberately starves the native focus engine, so
+  `focusable` + native focus + `focus:` styling is dead on Android TV. Drive selection + OK via `useKeyLayer`
+  and style from the selection index, exactly like the rest of the app.
+
 ## [0.8.33] - 2026-07-27
 
 Completes the Android-TV chrome scaling — the **full-size player chrome, channel surf, number entry,

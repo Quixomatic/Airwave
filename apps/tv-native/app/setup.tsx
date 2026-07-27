@@ -1,9 +1,10 @@
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 
 import { checkHealth } from "@/lib/api";
 import { normalizeServerUrl, setServerUrl } from "@/lib/auth";
+import { LAYER, useKeyLayer } from "@/lib/input";
 import { scanForServers } from "@/lib/server-scan";
 import { C } from "@/lib/theme";
 
@@ -23,6 +24,8 @@ export default function Setup() {
   const [scanned, setScanned] = useState(false);
   const [progress, setProgress] = useState(0);
   const [found, setFound] = useState<string[]>([]);
+  const [sel, setSel] = useState(0); // D-pad selection (zone machine — native focus is starved by our key capture)
+  const inputRef = useRef<TextInput>(null);
 
   const save = async (target: string) => {
     await setServerUrl(target);
@@ -58,6 +61,41 @@ export default function Setup() {
     setScanned(true);
   };
 
+  // D-pad zone machine. The native focus engine never sees the D-pad on Android TV (our key module
+  // consumes it), so we drive selection: the address field, Connect, then whatever scan control is
+  // currently shown (Scan / found servers / Scan again). OK on the field opens the keyboard.
+  const items = useMemo(() => {
+    const list: { key: string; run: () => void }[] = [
+      { key: "input", run: () => inputRef.current?.focus() },
+      { key: "connect", run: () => void connect() },
+    ];
+    if (!scanning) {
+      if (scanned) {
+        for (const s of found) list.push({ key: `srv:${s}`, run: () => void save(s) });
+        list.push({ key: "scanagain", run: () => void runScan() });
+      } else {
+        list.push({ key: "scan", run: () => void runScan() });
+      }
+    }
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanning, scanned, found]);
+  const cur = items[sel]?.key;
+  useEffect(() => setSel((s) => Math.min(s, items.length - 1)), [items.length]);
+  useKeyLayer({
+    id: "setup",
+    priority: LAYER.BASE,
+    onKey(e) {
+      if (e.key === "up") return setSel((s) => Math.max(0, s - 1)), true;
+      if (e.key === "down") return setSel((s) => Math.min(items.length - 1, s + 1)), true;
+      if (e.key === "ok") {
+        items[sel]?.run();
+        return true;
+      }
+      return false;
+    },
+  });
+
   return (
     <View className="flex-1 items-center justify-center bg-bg p-10">
       <View className="w-full max-w-xl">
@@ -70,6 +108,7 @@ export default function Setup() {
         </View>
 
         <TextInput
+          ref={inputRef}
           value={url}
           onChangeText={setUrl}
           onSubmitEditing={() => void connect()}
@@ -80,15 +119,15 @@ export default function Setup() {
           spellCheck={false}
           editable={!checking}
           keyboardType="url"
-          className="rounded-2xl border bg-card px-5 py-4 text-center text-2xl text-fg"
-          style={{ borderColor: error ? "#f87171" : "rgba(148,163,184,0.25)" }}
+          className="rounded-2xl bg-card px-5 py-4 text-center text-2xl text-fg"
+          style={{ borderWidth: 2, borderColor: cur === "input" ? C.accent : error ? "#f87171" : "rgba(148,163,184,0.25)" }}
         />
 
         <Pressable
           onPress={() => void connect()}
           disabled={checking}
           className="mt-4 items-center rounded-2xl bg-accent px-6 py-4 active:opacity-80"
-          style={{ opacity: checking ? 0.6 : 1 }}
+          style={{ opacity: checking ? 0.6 : 1, borderWidth: 3, borderColor: cur === "connect" ? "#fff" : "transparent" }}
         >
           <Text className="text-xl font-bold text-[#04060c]">{checking ? "Connecting…" : "Connect"}</Text>
         </Pressable>
@@ -120,26 +159,27 @@ export default function Setup() {
                   <Pressable
                     key={s}
                     onPress={() => void save(s)}
-                    className="items-center rounded-xl border border-white/20 bg-card px-5 py-3.5 active:opacity-70"
+                    className="items-center rounded-xl bg-card px-5 py-3.5 active:opacity-70"
+                    style={{ borderWidth: 2, borderColor: cur === `srv:${s}` ? C.accent : "rgba(255,255,255,0.2)" }}
                   >
                     <Text className="font-mono text-lg text-fg">{s}</Text>
                   </Pressable>
                 ))}
-                <Pressable onPress={() => void runScan()} className="mt-1 items-center rounded-xl border border-white/20 px-6 py-3 active:opacity-70">
+                <Pressable onPress={() => void runScan()} className="mt-1 items-center rounded-xl px-6 py-3 active:opacity-70" style={{ borderWidth: 2, borderColor: cur === "scanagain" ? C.accent : "rgba(255,255,255,0.2)" }}>
                   <Text className="font-semibold text-fg">Scan again</Text>
                 </Pressable>
               </>
             ) : (
               <View className="items-center gap-3">
                 <Text className="text-center text-muted">No servers found automatically — enter the address above.</Text>
-                <Pressable onPress={() => void runScan()} className="items-center rounded-xl border border-white/20 px-6 py-3 active:opacity-70">
+                <Pressable onPress={() => void runScan()} className="items-center rounded-xl px-6 py-3 active:opacity-70" style={{ borderWidth: 2, borderColor: cur === "scanagain" ? C.accent : "rgba(255,255,255,0.2)" }}>
                   <Text className="font-semibold text-fg">Scan again</Text>
                 </Pressable>
               </View>
             )}
           </View>
         ) : (
-          <Pressable onPress={() => void runScan()} className="items-center rounded-xl border border-white/20 px-6 py-3.5 active:opacity-70">
+          <Pressable onPress={() => void runScan()} className="items-center rounded-xl px-6 py-3.5 active:opacity-70" style={{ borderWidth: 2, borderColor: cur === "scan" ? C.accent : "rgba(255,255,255,0.2)" }}>
             <Text className="font-semibold text-fg">Scan for servers on my network</Text>
           </Pressable>
         )}
