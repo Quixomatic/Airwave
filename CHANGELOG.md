@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.24] - 2026-07-26
+
+### Fixed
+
+- **HDR content left the Apple TV's HDMI link in HDR after you closed it** (the guide/UI stayed in an HDR container). The display-criteria reset only ran in `applySource` on `source → null`, but Close **unmounts** the mpv view (it's conditionally rendered on `source`), so that path never fired — only `deinit`. Now `deinit` clears the criteria synchronously (via the retained window), dropping the link back to SDR when an HDR program is stopped. Native — takes effect on the next tvOS rebuild.
+
 ## [0.8.23] - 2026-07-26
 
 ### Fixed

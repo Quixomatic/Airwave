@@ -238,5 +238,13 @@ final class MpvPlayerView: ExpoView, MpvCoreDelegate {
     }
   #endif
 
-  deinit { core.dispose() }
+  deinit {
+    // Close unmounts this view (source→null), so applySource's clear never runs — drop the HDMI link
+    // back to SDR here, synchronously while self is still alive (an async-to-main hop would drain after
+    // dealloc). Otherwise the TV stays in HDR after you stop an HDR program.
+    #if os(tvOS)
+      clearDisplayCriteria()
+    #endif
+    core.dispose()
+  }
 }
