@@ -1,7 +1,7 @@
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { LinearGradient } from "expo-linear-gradient";
 import { Heart, Star } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Text, useWindowDimensions, View } from "react-native";
 
 import { TvPressable as Pressable } from "@/components/tv-pressable";
@@ -140,27 +140,44 @@ export function AuroraGrid({
     }
   };
 
+  // Refs mirroring the live zone/selection + the callbacks, so onRailTap/onProgramTap can be STABLE
+  // (`useCallback([])`). That stability is what lets `memo(Row)` skip re-rendering the unchanged rows on
+  // every keypress — otherwise these close over fc/fp/zone/channels and change every navigation, defeating
+  // the memo. Reading the latest via refs is also correct for an async tap (no stale closure).
+  const zoneRef = useRef(zone);
+  zoneRef.current = zone;
+  const fcRef = useRef(fc);
+  fcRef.current = fc;
+  const fpRef = useRef(fp);
+  fpRef.current = fp;
+  const channelsRef = useRef(channels);
+  channelsRef.current = channels;
+  const onTuneRef = useRef(onTune);
+  onTuneRef.current = onTune;
+  const onToggleFavoriteRef = useRef(onToggleFavorite);
+  onToggleFavoriteRef.current = onToggleFavorite;
+
   // Touch: tap to focus, tap the already-focused thing to activate — the same intent D-pad expresses
-  // with move + OK, on the same zone/fc/fp state.
-  const onProgramTap = (index: number, pi: number) => {
-    if (zone === "grid" && index === fc && fp === pi) {
-      const ch = channels[index];
-      if (ch) onTune(ch.id);
+  // with move + OK, on the same zone/fc/fp state. Stable (refs above) so Row can be memoized.
+  const onProgramTap = useCallback((index: number, pi: number) => {
+    if (zoneRef.current === "grid" && index === fcRef.current && fpRef.current === pi) {
+      const ch = channelsRef.current[index];
+      if (ch) onTuneRef.current(ch.id);
       return;
     }
     setZone("grid");
     setFc(index);
     setFp(pi);
-  };
-  const onRailTap = (index: number) => {
-    if (zone === "rail" && index === fc) {
-      const ch = channels[index];
-      if (ch) onToggleFavorite(ch.id);
+  }, []);
+  const onRailTap = useCallback((index: number) => {
+    if (zoneRef.current === "rail" && index === fcRef.current) {
+      const ch = channelsRef.current[index];
+      if (ch) onToggleFavoriteRef.current(ch.id);
       return;
     }
     setZone("rail");
     setFc(index);
-  };
+  }, []);
 
   // D-pad — the aurora-grid zone machine, ported. Drives the exact same state as touch.
   useKeyLayer({
@@ -316,15 +333,16 @@ export function AuroraGrid({
               onLayout={(e) => (listHRef.current = e.nativeEvent.layout.height)}
               scrollEventThrottle={16}
               renderItem={({ item, index }) => (
-                <Row
+                <RowMemo
                   channel={item}
                   accent={channelTint(item) ?? accentOf(index)}
                   focused={index === fc && zone !== "sidebar" && !player.miniFocused}
                   railFocused={zone === "rail" && index === fc && !player.miniFocused}
                   focusedProgramId={zone === "grid" && index === fc && !player.miniFocused ? focusedProgram?.id : undefined}
                   favorited={favoriteIds.has(item.id)}
-                  onPressRow={() => onRailTap(index)}
-                  onPressProgram={(pi) => onProgramTap(index, pi)}
+                  index={index}
+                  onRailTap={onRailTap}
+                  onProgramTap={onProgramTap}
                   now={now}
                   rowPx={rowPx}
                   railPx={railPx}
@@ -395,6 +413,10 @@ function TimeHeader({ T0, railPx, laneX, vw }: { T0: Date; railPx: number; laneX
   );
 }
 
+// Memoized: with stable props (the `now`/laneX/vw memos + the ref-backed onRailTap/onProgramTap), only the
+// rows whose focus/favorited actually changed re-render on navigation — not every visible row.
+const RowMemo = memo(Row);
+
 function Row({
   channel,
   accent,
@@ -402,8 +424,9 @@ function Row({
   railFocused,
   focusedProgramId,
   favorited,
-  onPressRow,
-  onPressProgram,
+  index,
+  onRailTap,
+  onProgramTap,
   now,
   rowPx,
   railPx,
@@ -419,8 +442,9 @@ function Row({
   railFocused: boolean;
   focusedProgramId?: string;
   favorited: boolean;
-  onPressRow: () => void;
-  onPressProgram: (programIndex: number) => void;
+  index: number;
+  onRailTap: (index: number) => void;
+  onProgramTap: (index: number, programIndex: number) => void;
   now: Date;
   rowPx: number;
   railPx: number;
@@ -437,7 +461,7 @@ function Row({
     <View style={{ height: rowPx, flexDirection: "row", borderTopWidth: 1, borderTopColor: C.rowBorder }}>
       {/* Rail — tap to focus; tap again (rail-focused) toggles favorite. The circle mirrors tv-web:
           when rail-focused it becomes the favorite heart (filled red if favorited, else outline). */}
-      <Pressable onPress={onPressRow} focusable={!Platform.isTV} style={{ width: railPx, paddingVertical: vw(18), paddingHorizontal: vw(20), justifyContent: "space-between", backgroundColor: focused ? hexA(accent, 0.12) : "transparent" }}>
+      <Pressable onPress={() => onRailTap(index)} focusable={!Platform.isTV} style={{ width: railPx, paddingVertical: vw(18), paddingHorizontal: vw(20), justifyContent: "space-between", backgroundColor: focused ? hexA(accent, 0.12) : "transparent" }}>
         {focused && <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: vw(4), backgroundColor: accent }} />}
         <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
           <View style={{ width: circle, height: circle, borderRadius: circle / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, 0.2), borderWidth: railFocused ? 2 : 1, borderColor: railFocused ? C.ring : hexA(accent, 0.35) }}>
@@ -478,7 +502,7 @@ function Row({
           return (
             <Pressable
               key={p.id}
-              onPress={() => onPressProgram(pi)}
+              onPress={() => onProgramTap(index, pi)}
               focusable={!Platform.isTV}
               style={{
                 position: "absolute",

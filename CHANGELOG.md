@@ -2,6 +2,12 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.26] - 2026-07-27
+
+### Changed
+
+- **Guide `Row` is memoized — the big guide-perf win (tv-native).** The row was a plain component, so every up/down re-rendered **every visible row** (the FlashList `extraData` changes each render), each painting several gradient program cells. `Row` is now `React.memo`'d with stable props: the tap handlers are `useCallback`-stable via refs (they close over `fc`/`fp`/`zone`/`channels`, which change every keypress — refs keep the callbacks stable while reading the latest values), and `index` is passed in. Now navigation re-renders only the **~2 rows whose selection actually changed**, not all ~10. Purely internal — no visual or behavior change — and it helps every platform (iPad, Apple TV, and Android TV when we get there).
+
 ## [0.8.25] - 2026-07-26
 
 ### Added
