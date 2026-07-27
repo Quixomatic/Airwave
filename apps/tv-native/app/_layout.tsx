@@ -4,15 +4,27 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { View } from "react-native";
+import { Dimensions, Platform, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { PlayerProvider } from "@/features/watch/player-context";
 import { loadSession } from "@/lib/auth";
 import { loadDevice } from "@/lib/device";
-import { notifyInputActivity, useHardwareKeyInput, useTVInput } from "@/lib/input";
+import { notifyInputActivity, useAndroidBack, useHardwareKeyInput, useTVInput } from "@/lib/input";
 import { C } from "@/lib/theme";
+
+// Startup diagnostic — isTV drives UI_SCALE + the focusable/native-focus gating; the window dp size +
+// scale tell us why fixed-dp chrome (sidebar/border-radius) looks oversized vs the vwOf-scaled guide on a
+// given screen. Readable in Metro/logcat even when on-screen input is broken. (Temporary; remove once the
+// Android TV build is sorted.)
+{
+  const d = Dimensions.get("window");
+  console.log(
+    `[platform] OS=${Platform.OS} v=${String(Platform.Version)} isTV=${Platform.isTV} ` +
+      `w=${Math.round(d.width)} h=${Math.round(d.height)} scale=${d.scale} fontScale=${d.fontScale}`,
+  );
+}
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -32,6 +44,7 @@ export default function RootLayout() {
   // D-pad zone machine + channel-number entry drivable on the iPad. Touch drives the same state too.
   useTVInput();
   useHardwareKeyInput();
+  useAndroidBack();
 
   useEffect(() => {
     void Promise.all([loadSession(), loadDevice()]).finally(() => setReady(true));

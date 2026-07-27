@@ -114,3 +114,21 @@ export function useHardwareKeyInput() {
     return () => sub.remove();
   }, []);
 }
+
+/**
+ * The Android hardware-BACK source — call once at the app root. On Android the remote's Back button is
+ * NOT reliably delivered via `dispatchKeyEvent` (modern Android routes it through the predictive-back
+ * dispatcher), so unlike the D-pad it's caught here via RN's `BackHandler`. Because `dispatchKey`
+ * returns synchronously whether a layer claimed the key, we can honor Android's contract exactly:
+ * return `true` to consume Back as in-app navigation (close Info / panel / go back a screen), or `false`
+ * when nothing claims it (the guide root) so RN performs the default action and the app exits to the
+ * launcher — the real "regular Back button" behavior. Android-only: iOS has no hardware Back, and tvOS
+ * delivers Menu→`back` through `useTVEventHandler` already (registering here would double-fire it).
+ */
+export function useAndroidBack() {
+  useEffect(() => {
+    if (RN.Platform.OS !== "android") return;
+    const sub = RN.BackHandler.addEventListener("hardwareBackPress", () => dispatchKey("back"));
+    return () => sub.remove();
+  }, []);
+}

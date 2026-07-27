@@ -2,6 +2,44 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.30] - 2026-07-27
+
+Starts the **Android TV arc**: makes the D-pad actually drive the app. On the Google TV emulator `isTV`
+resolved **true** (so scaling isn't an `isTV` bug — see below), but **no remote input did anything** — the
+architectural difference from tvOS, now fixed.
+
+### Fixed
+
+- **Android TV D-pad input was completely dead (tv-native).** On tvOS `useTVEventHandler` is a global,
+  focus-independent handler, so our manual zone machine (ported from the browser, everything
+  `focusable={false}`) works. On **Android**, D-pad navigation *is* the native focus engine — the OS routes
+  `KEYCODE_DPAD_*` to move focus **between focusable Views** — so with nothing focusable, focus can't move
+  and `useTVEventHandler` never fires → no button did anything. Fixed by capturing the D-pad (up/down/left/
+  right + OK/center/enter) in the native key module at the Activity's **`dispatchKeyEvent`** — which is
+  global and focus-independent — and forwarding it to the same dispatcher (the model media apps use on
+  Android TV: intercept above the focus engine, don't fight it). Consuming the event also stops the focus
+  engine seeing it, so there's no double-dispatch. Directional keys re-emit on auto-repeat (hold-to-scroll);
+  OK fires once per press. Android-only (Kotlin); tvOS/iPad untouched. **Needs a `development-androidtv`
+  rebuild** (the APK on the Streamer/emulator is still the v0.8.15 native).
+
+### Added
+
+- **The remote's Back button now works in-app on Android, and exits at the root (tv-native).** Back was
+  exiting the app immediately (like the Apple TV Menu button did before `enableTVMenuKey`). Handled via RN's
+  **`BackHandler`** — the version-robust "special way" on modern Android, where Back is routed through the
+  predictive-back dispatcher rather than always `dispatchKeyEvent`. Because our `dispatchKey()` returns
+  synchronously whether a layer claimed the key, Back honors Android's contract exactly: it navigates in-app
+  when something can handle it (close Info / a panel / go back a screen) and **falls through to a real
+  app-exit at the guide root** — the genuine "regular Back button" behavior (a cleaner result than tvOS's
+  currently-deferred root-exit). Android-only (iOS has no hardware Back; tvOS routes Menu→back through
+  `useTVEventHandler`). JS — lands with the same rebuild.
+
+- **Window dp size added to the startup platform diagnostic (tv-native).** The `[platform] …` log now also
+  prints `w/h/scale/fontScale`, so we can see why fixed-dp chrome (the sidebar widths + program-cell border
+  radius are raw dp, not run through `vwOf`) looks oversized against the `vwOf`-scaled guide on a given
+  screen — the likely cause of the emulator's huge collapsed sidebar + over-rounded cards. Diagnostic only;
+  hot-reloads. (Temporary; removed once the Android scaling is dialed on real hardware.)
+
 ## [0.8.29] - 2026-07-27
 
 ### Changed
