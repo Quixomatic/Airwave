@@ -7,7 +7,7 @@ import { TvPressable as Pressable } from "@/components/tv-pressable";
 
 import { SettingsSidebar } from "@/features/settings/settings-sidebar";
 import { SettingsCtx } from "@/features/settings/settings-ui";
-import { cs, OVERSCAN_H, OVERSCAN_V, scaled, SIDEBAR_SLIVER_W } from "@/features/guide/layout";
+import { cs, scaled, SIDEBAR_SLIVER_W } from "@/features/guide/layout";
 import { LAYER, useKeyLayer } from "@/lib/input";
 import { C } from "@/lib/theme";
 
@@ -88,12 +88,11 @@ export default function SettingsShell() {
 
   return (
     // Full-bleed on Apple TV / iPad (a plain View — NOT SafeAreaView, which on tvOS applies the title-safe
-    // overscan margin on all four edges and pushed the whole shell + sidebar massively inward). Matches the
-    // guide (full-bleed since v0.8.22). The inner View adds the ANDROID-TV-only overscan inset around the
-    // whole shell incl. the absolute sidebar. iPad/Apple TV: OVERSCAN_* = 0 → the inner View is a no-op.
+    // overscan margin on all four edges and pushed the whole shell + sidebar massively inward). The
+    // Android-TV overscan inset is applied ONCE at the app root (app/_layout.tsx), so every screen uses this
+    // Apple TV layout unchanged — no per-screen overscan.
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <View style={{ flex: 1, paddingLeft: OVERSCAN_H, paddingRight: OVERSCAN_H, paddingTop: OVERSCAN_V, paddingBottom: OVERSCAN_V }}>
-        <View style={{ flex: 1, flexDirection: "row" }}>
+      <View style={{ flex: 1, flexDirection: "row" }}>
         <View style={{ width: cs(SIDEBAR_SLIVER_W), flexShrink: 0 }} />
         <ScrollView style={{ flex: 1 }} contentContainerStyle={scaled({ maxWidth: 1024, width: "100%", alignSelf: "center", paddingVertical: 40, paddingHorizontal: 48 })}>
           <SettingsCtx.Provider value={{ active: zone === "content", returnToRail }}>
@@ -113,7 +112,6 @@ export default function SettingsShell() {
         onActivate={activate}
         onExpand={() => setZone("rail")}
       />
-      </View>
     </View>
   );
 }

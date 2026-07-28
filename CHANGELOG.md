@@ -2,6 +2,20 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.45] - 2026-07-27
+
+### Fixed
+
+- **Android TV overscan reworked to a single global inset — fixes the guide + settings being massively inset
+  (tv-native).** The v0.8.42/43 per-screen overscan (subtracting the inset from the guide's layout width and
+  padding the guide root; an extra inset View in settings) pushed the guide grid far off the sidebar and
+  over-inset the settings shell. Reverted all of it: the guide and settings go back to their **normal Apple TV
+  / full-bleed layout, unchanged**, and the Android-TV overscan (~5% of the 960×540 dp space) is now applied
+  **exactly once** — `paddingHorizontal/Vertical` on a single View at the app root (`app/_layout.tsx`). So the
+  whole UI shifts in uniformly (sidebar + content together, no gaps, no double-inset), and it's a no-op on
+  iPad/Apple TV (`OVERSCAN_* = 0`). Trade-off: full-screen video is inset by the same thin margin on Android TV
+  rather than bleeding off the panel edges.
+
 ## [0.8.44] - 2026-07-27
 
 ### Fixed
