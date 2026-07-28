@@ -2,6 +2,26 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.60] - 2026-07-28
+
+### Fixed
+
+- **Export the from-source Hermes framework's public jsi + VM symbols (tv-native) — the second half of the
+  v0.8.59 link fix.** v0.8.59's `-all_load` correctly *included* jsi's objects in `hermesvm.framework`, but
+  the link still failed with the same undefined symbols — because the build log showed jsi is compiled with
+  **`-fvisibility=hidden`**: the symbols are present in the framework but **hidden, not exported**, so nothing
+  can link them. Hermes's root `CMakeLists.txt` does `append("-fvisibility=hidden" CMAKE_CXX_FLAGS
+  CMAKE_C_FLAGS)` ("Don't export symbols unless we explicitly say so"), and our from-source Hermes V1 on tvOS
+  isn't re-exporting jsi/`NopCrashManager` the way the prebuilt framework does. **Fix:** override the
+  per-config `CMAKE_CXX/C_FLAGS_MINSIZEREL` (+ `_RELEASE`) in `build-hermes-xcode.sh` to append
+  `-fvisibility=default`. Hermes appends its `-fvisibility=hidden` only to the *general* flags; the per-config
+  flags are applied **after** the general ones on every compile and Hermes doesn't touch them, so
+  `-fvisibility=default` is the last `-fvisibility` on the line and wins — forcing jsi (HostObject/Value/
+  typeinfo/vtables) and `hermes::vm::NopCrashManager` to export from the framework, matching the prebuilt one.
+  Pairs with the v0.8.59 `-all_load` (include the objects) → export the objects. Should also unify the jsi
+  type-info across the framework boundary — the original crash's root cause. Same react-native-tvos patch,
+  `preview-tvos` only. Rebuild to verify.
+
 ## [0.8.59] - 2026-07-28
 
 ### Fixed

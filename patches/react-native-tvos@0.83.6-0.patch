@@ -76,7 +76,7 @@ index 4c018e6..ed377ab 100644
  }
  
 diff --git a/sdks/hermes-engine/utils/build-hermes-xcode.sh b/sdks/hermes-engine/utils/build-hermes-xcode.sh
-index 60506d1..3669a36 100644
+index 60506d1..aa75880 100644
 --- a/sdks/hermes-engine/utils/build-hermes-xcode.sh
 +++ b/sdks/hermes-engine/utils/build-hermes-xcode.sh
 @@ -52,11 +52,21 @@ fi
@@ -103,3 +103,30 @@ index 60506d1..3669a36 100644
  fi
  
  boost_context_flag=""
+@@ -68,6 +78,15 @@ architectures=$( echo "$ARCHS" | tr  " " ";" )
+ 
+ echo "Configure Apple framework"
+ 
++# [ChannelGuide patch] The CMAKE_*_FLAGS_MINSIZEREL/_RELEASE overrides below add
++# -fvisibility=default so the from-source hermesvm.framework EXPORTS its public jsi + VM
++# symbols. Hermes's root CMakeLists appends "-fvisibility=hidden" to the GENERAL CMAKE_CXX/C
++# flags ("Don't export symbols unless we explicitly say so"), which hides jsi
++# (HostObject/Value/typeinfo/vtables) and hermes::vm::NopCrashManager; a from-source build
++# then can't link them (React-jsi excludes jsi.cpp expecting the framework to provide them).
++# The per-config flags are applied AFTER the general flags on every compile and Hermes does
++# NOT touch them, so -fvisibility=default here is the last -fvisibility and wins. Pairs with
++# LINKER:-all_load above, which force-includes jsi's objects so there is something to export.
+ "$CMAKE_BINARY" \
+   -S "${PODS_ROOT}/hermes-engine" \
+   -B "${PODS_ROOT}/hermes-engine/build/${PLATFORM_NAME}" \
+@@ -85,6 +104,10 @@ echo "Configure Apple framework"
+   -DHERMES_BUILD_SHARED_JSI:BOOLEAN=false \
+   -DCMAKE_CXX_FLAGS:STRING="-gdwarf" \
+   -DCMAKE_C_FLAGS:STRING="-gdwarf" \
++  -DCMAKE_CXX_FLAGS_MINSIZEREL:STRING="-Os -DNDEBUG -fvisibility=default" \
++  -DCMAKE_C_FLAGS_MINSIZEREL:STRING="-Os -DNDEBUG -fvisibility=default" \
++  -DCMAKE_CXX_FLAGS_RELEASE:STRING="-O3 -DNDEBUG -fvisibility=default" \
++  -DCMAKE_C_FLAGS_RELEASE:STRING="-O3 -DNDEBUG -fvisibility=default" \
+   -DIMPORT_HOST_COMPILERS:PATH="${hermesc_path}" \
+   -DJSI_DIR="$jsi_path" \
+   -DHERMES_RELEASE_VERSION="for RN $release_version" \
