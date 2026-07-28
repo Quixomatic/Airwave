@@ -11,9 +11,10 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { BootSplash } from "@/components/boot-splash";
 import { OVERSCAN_H, OVERSCAN_V } from "@/features/guide/layout";
 import { PlayerProvider } from "@/features/watch/player-context";
-import { loadSession } from "@/lib/auth";
+import { getToken, hasServerUrl, loadSession } from "@/lib/auth";
 import { loadDevice } from "@/lib/device";
 import { notifyInputActivity, useAndroidBack, useHardwareKeyInput, useTVInput } from "@/lib/input";
+import { hydrateNetwork, probeConnection } from "@/lib/plex-connection";
 import { C } from "@/lib/theme";
 
 // Startup diagnostic — isTV drives UI_SCALE + the focusable/native-focus gating; the window dp size +
@@ -69,7 +70,13 @@ export default function RootLayout() {
   useAndroidBack();
 
   useEffect(() => {
-    void Promise.all([loadSession(), loadDevice()]).finally(() => setReady(true));
+    void Promise.all([loadSession(), loadDevice(), hydrateNetwork()]).finally(() => {
+      setReady(true);
+      // Refresh which Plex connection this device can actually reach (local → remote → relay) so
+      // off-network playback streams from the right URL. Non-blocking; the first media request uses
+      // the hydrated last-known value until this resolves. Only when we have a session to probe with.
+      if (hasServerUrl() && getToken()) void probeConnection();
+    });
   }, []);
 
   // Hydrate session/device BEFORE mounting the app (route guards read the session synchronously). While

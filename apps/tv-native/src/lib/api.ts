@@ -1,4 +1,5 @@
 import { getServerUrl, getToken } from "./auth";
+import { getNetwork } from "./plex-connection";
 
 /**
  * Thin client for ChannelGuide's REST surface — the same `/api/v1` (bearer) + custom Plex
@@ -237,6 +238,10 @@ export const api = {
     if (opts.quality && opts.quality !== "original") p.set("quality", opts.quality);
     if (opts.audioStreamId) p.set("audioStreamId", opts.audioStreamId);
     if (opts.subtitleStreamId) p.set("subtitleStreamId", opts.subtitleStreamId);
+    // Stream from the connection this device probed at launch (only when off-network — local is the
+    // server default). The server maps this to the source's stored remote/relay URL.
+    const net = getNetwork();
+    if (net === "remote" || net === "relay") p.set("network", net);
     return request<MediaInfo>(`/api/v1/channels/${channelId}/media?${p.toString()}`);
   },
 

@@ -2,6 +2,24 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.65] - 2026-07-28
+
+### Added
+
+- **Off-network Plex connection probe in tv-native — the local→remote→relay pick that makes away-from-home
+  playback work (parity with tv-web).** The native app streams DIRECTLY from Plex, so away from home it needs
+  the server's remote/relay URL, not the LAN one. Ported tv-web's `lib/plex-connection.ts` faithfully:
+  `src/lib/plex-connection.ts` fetches `/api/v1/connections` and probes each base's `/identity` (4s timeout)
+  local→remote→relay, remembering the first reachable one; the api client stamps it onto `/media` as
+  `?network=` (only when remote/relay — local is the server default), and the server maps it to the source's
+  stored URL (`broker.ts`, refreshed hourly by `plex-connection-refresh`). RN specifics vs the web version:
+  AsyncStorage-backed with a `hydrateNetwork()` at launch (so `getNetwork()` stays synchronous for the api
+  client), and a plain `fetch` reachability probe (no `no-cors`; ATS already allows arbitrary loads). Wired at
+  launch in `_layout.tsx` (after session hydrate, guarded on an existing session) and after both login paths
+  (`login.tsx`). **Settings → Server** now shows Media connection (select to re-probe) + Force connection
+  (Auto → Remote → Relay, for testing the off-network path from the LAN) + the connection mode, matching
+  tv-web. This unblocks the road-trip use case (server reachable off-network via Cloudflare HTTPS).
+
 ## [0.8.64] - 2026-07-28
 
 ### Added

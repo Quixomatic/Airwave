@@ -7,6 +7,7 @@ import { Logo } from "@/components/logo";
 
 import { ApiError, plexLink } from "@/lib/api";
 import { getServerUrl, setToken } from "@/lib/auth";
+import { probeConnection } from "@/lib/plex-connection";
 import { authClient } from "@/lib/auth-client";
 import { cs, scaled } from "@/features/guide/layout";
 import { LAYER, useKeyLayer } from "@/lib/input";
@@ -54,6 +55,7 @@ export default function Login() {
           if (res.status === "ok") {
             stopPolling();
             await setToken(res.token);
+            void probeConnection(); // pick the reachable Plex connection for this network
             router.replace("/guide");
           } else if (res.status === "expired") {
             reset("That code expired — try again.");
@@ -93,6 +95,7 @@ export default function Login() {
       if (tok?.access_token) {
         stopPolling();
         await setToken(tok.access_token);
+        void probeConnection(); // pick the reachable Plex connection for this network
         router.replace("/guide");
         return;
       }
