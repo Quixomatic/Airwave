@@ -75,3 +75,31 @@ index 4c018e6..ed377ab 100644
    }
  }
  
+diff --git a/sdks/hermes-engine/utils/build-hermes-xcode.sh b/sdks/hermes-engine/utils/build-hermes-xcode.sh
+index 60506d1..3669a36 100644
+--- a/sdks/hermes-engine/utils/build-hermes-xcode.sh
++++ b/sdks/hermes-engine/utils/build-hermes-xcode.sh
+@@ -52,11 +52,21 @@ fi
+ 
+ deployment_target=$(get_deployment_target $PLATFORM_NAME)
+ 
+-xcode_15_flags=""
++# [ChannelGuide patch — from-source Hermes on tvOS/iOS] Force-include the static jsi + VM
++# object files into the `hermesvm` shared framework. Hermes links `jsi` PUBLIC but WITHOUT
++# whole-archive, and the framework's top-level target is an (empty) dummy.cpp, so any jsi
++# symbol (HostObject/Value/NativeState/MutableBuffer/...) and VM symbol (NopCrashManager)
++# that nothing inside the VM already references gets DROPPED at link and is never exported
++# from the framework. That breaks a from-source build — React-jsi deliberately excludes
++# jsi.cpp expecting hermes-engine to provide these — with "Undefined symbols ... facebook::jsi::".
++# -all_load force-loads every archive in this link so those symbols land in (and export from)
++# the framework, matching the prebuilt hermes.framework. HERMES_EXTRA_LINKER_FLAGS reaches the
++# hermesvm shared link (proven: the -ld_classic flag below is applied to it).
++xcode_15_flags="LINKER:-all_load"
+ xcode_major_version=$(xcodebuild -version | grep -oE '[0-9]*' | head -n 1)
+ if [[ $xcode_major_version -ge 15 ]]; then
+   echo "########### Using LINKER:-ld_classic ###########"
+-  xcode_15_flags="LINKER:-ld_classic"
++  xcode_15_flags="$xcode_15_flags;LINKER:-ld_classic"
+ fi
+ 
+ boost_context_flag=""

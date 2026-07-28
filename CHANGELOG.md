@@ -2,6 +2,28 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.59] - 2026-07-28
+
+### Fixed
+
+- **Force-include jsi + the Hermes VM symbols into the from-source `hermesvm.framework` (tv-native) — the fix
+  for the v0.8.58 final-link wall.** The v0.8.58 build compiled everything then failed at the app's final
+  link with ~60 `Undefined symbols`: the *entire* `facebook::jsi::` core (`HostObject`, `Value` ctors,
+  `Array::createWithElements`, `NativeState`, `MutableBuffer`, `JSINativeException`, `strictEquals`, …),
+  referenced from ~11 libraries (ExpoModulesJSI/Core, Worklets, Reanimated, Fabric, GestureHandler,
+  jsiexecutor, ReactCommon), plus `hermes::vm::NopCrashManager::~NopCrashManager()`. **Root cause (read from
+  the xcode build log + Hermes's CMake):** `React-jsi` deliberately excludes `jsi.cpp` when using Hermes
+  (`# JSI is a part of hermes-engine`), expecting the Hermes framework to provide those symbols — the
+  *prebuilt* `hermes.framework` does, but our *from-source* one does **not**. Hermes builds `jsi` as a static
+  lib and links it into the `hermesvm` **shared** framework `PUBLIC` **without whole-archive**, and that
+  framework's top-level target is an empty `dummy.cpp`, so every jsi/VM symbol nothing inside the VM already
+  references gets **dropped at link** and never exported. (This is a known, upstream-unresolved from-source
+  gap — facebook/react-native#46593.) **Fix:** patch `sdks/hermes-engine/utils/build-hermes-xcode.sh` to add
+  `-all_load` to `HERMES_EXTRA_LINKER_FLAGS`, force-loading every archive into the `hermesvm` framework so the
+  jsi + VM symbols land in it and export — matching the prebuilt framework. The flag is proven to reach that
+  exact link (the existing `-ld_classic` flag rides the same var). Added to the existing
+  `patches/react-native-tvos@0.83.6-0.patch`; `preview-tvos` only. Rebuild `preview-tvos` to verify.
+
 ## [0.8.58] - 2026-07-28
 
 ### Fixed
