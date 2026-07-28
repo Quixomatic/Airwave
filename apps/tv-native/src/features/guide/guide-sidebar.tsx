@@ -105,6 +105,13 @@ export function GuideSidebar({
   const padV = cs(24);
   const padH = cs(18);
   const gap = cs(14);
+  // The focus ring (glass-button.tsx) is drawn ~cs(4) OUTSIDE each circle. In the lens list that lives in a
+  // ScrollView, which clips its content to its frame — so the ring gets cut on the left (every circle) and the
+  // top (the first). Extend the scroll frame outward by RING_ROOM (negative margin) and pad the content back by
+  // the same amount, so the rings have room INSIDE the clip while every circle stays pixel-identical. cs(8)
+  // leaves a comfortable ~cs(4) margin beyond the ring. (The action circles above the divider aren't scrolled,
+  // so they already clear the sidebar's overflow:hidden and need nothing.)
+  const RING_ROOM = cs(8);
 
   const w = useSharedValue(expanded ? EXPANDED : SLIVER);
   useEffect(() => {
@@ -131,7 +138,11 @@ export function GuideSidebar({
         <GlassCircleButton key={it.key} icon={it.icon} label={it.label} expanded focused={focused && sel === i} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(i)} />
       ))}
       <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: cs(4) }} />
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={{ flex: 1, marginLeft: -RING_ROOM, marginTop: -RING_ROOM }}
+        contentContainerStyle={{ gap, paddingLeft: RING_ROOM, paddingTop: RING_ROOM, paddingBottom: RING_ROOM }}
+        showsVerticalScrollIndicator={false}
+      >
         {filters.map((it, i) => {
           const idx = actions.length + i;
           return <GlassCircleButton key={it.key} icon={it.icon} label={it.label} sublabel={it.sublabel} expanded focused={focused && sel === idx} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(idx)} />;

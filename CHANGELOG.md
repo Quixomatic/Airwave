@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.70] - 2026-07-28
+
+### Fixed
+
+- **Sidebar focus ring no longer clipped on the lens circles (tv-native).** The D-pad focus ring is drawn
+  ~4px outside each circle; the filter/lens circles live in a `ScrollView`, which clips its content to its
+  frame — so the ring was cut off on the left (every lens) and the top (the first, "All"). Fixed at the actual
+  clipper: the lens `ScrollView` now extends its frame outward (`marginLeft`/`marginTop: -RING_ROOM`) and pads
+  the content back by the same amount, giving the rings room inside the clip while every circle stays
+  pixel-identical. The ring itself (`glass-button.tsx`) is untouched — looks exactly as before, just no longer
+  cut. (The action circles above the divider aren't scrolled and already cleared, so they needed nothing.) This
+  removes a tv-web Chromium-108 port artifact that RN doesn't share. Pure JS — hot-reloads.
+
 ## [0.8.69] - 2026-07-28
 
 ### Fixed
