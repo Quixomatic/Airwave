@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.71] - 2026-07-28
+
+### Fixed
+
+- **Android now fills the whole screen — removed the overscan inset (tv-native).** The app root padded the
+  entire UI (background + video + content) by a legacy ~5% Android-TV "overscan margin" (48/27dp), which on the
+  Google TV Streamer + a modern TV (no overscan) was pure wasted border. Per Android's own TV layout guide,
+  modern TVs don't crop the picture and the background should NOT be clipped to a safe area; Expo SDK 55 already
+  draws edge-to-edge on Android (no system bars on Android TV). So the fix is simply to drop the inset: the
+  root is full-bleed on every platform. Apple TV / iPad had zero overscan padding already, so they're
+  unchanged. Removed the now-dead `OVERSCAN_H`/`OVERSCAN_V`. Pure JS — hot-reloads.
+
 ## [0.8.70] - 2026-07-28
 
 ### Fixed

@@ -45,17 +45,6 @@ export const CHROME_SCALE =
 export const cs = (px: number) => px * CHROME_SCALE;
 
 /**
- * Android-TV overscan-safe insets. A real TV crops ~5% of the edges over HDMI ("overscan"), so full-bleed
- * content gets its edges cut off (the sidebar's left edge, the bottom row). The iPad has no overscan and
- * tvOS/Apple TV manages its own safe area, and the emulator is a virtual display with none — so this is
- * **Android TV only** (`OS === "android" && isTV`), 0 everywhere else. ~5% of the 960×540 dp space. The
- * guide subtracts the horizontal inset from its layout width so the grid still fits the safe area.
- */
-const OVERSCAN_ON = Platform.OS === "android" && Platform.isTV;
-export const OVERSCAN_H = OVERSCAN_ON ? 48 : 0;
-export const OVERSCAN_V = OVERSCAN_ON ? 27 : 0;
-
-/**
  * Style-object chrome scaler — the ergonomic form of `cs()` for whole screens authored in raw dp (watch
  * chrome, diagnostic, settings). Multiplies the size-like keys by `CHROME_SCALE` so they match the
  * `vwOf`-scaled guide on Android TV. **Returns the SAME object untouched when `CHROME_SCALE === 1`**

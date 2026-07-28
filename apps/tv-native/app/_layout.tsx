@@ -9,7 +9,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { BootSplash } from "@/components/boot-splash";
-import { OVERSCAN_H, OVERSCAN_V } from "@/features/guide/layout";
 import { PlayerProvider } from "@/features/watch/player-context";
 import { getToken, hasServerUrl, loadSession } from "@/lib/auth";
 import { loadDevice } from "@/lib/device";
@@ -89,11 +88,11 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <StatusBar style="light" />
-          {/* ONE global Android-TV overscan inset for the whole app (real TVs crop ~5% of the edges over
-              HDMI). Every screen keeps its normal Apple-TV / full-bleed layout; this is the only place the
-              overscan is applied, so the sidebar + content always move in together (no gaps). 0 on iPad /
-              Apple TV (no overscan; tvOS manages its own safe area) → a no-op pass-through there. */}
-          <View style={{ flex: 1, paddingHorizontal: OVERSCAN_H, paddingVertical: OVERSCAN_V }}>
+          {/* Full-bleed on every platform. Android draws edge-to-edge by default (Expo SDK 55 / the modern
+              Android default — no system bars on Android TV), and iPad + Apple TV manage their own safe area,
+              so the app fills the whole screen with no overscan inset. Per Android's TV layout guide, modern
+              TVs don't crop the picture, and the background should NOT be clipped to a "safe area". */}
+          <View style={{ flex: 1 }}>
             <PlayerProvider>
               <Stack
                 screenOptions={{
