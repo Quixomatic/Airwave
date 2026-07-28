@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.64] - 2026-07-28
+
+### Added
+
+- **iPad/iOS release EAS profile (`preview`) with the from-source-Hermes stack (tv-native).** The v0.8.63
+  `preview-tvos` release build launches + plays on a physical Apple TV. Set up the plain `preview` profile
+  (release, no dev client) for **iPad/iOS** with the same from-source env as `preview-tvos` **minus `EXPO_TV`**
+  (`RCT_BUILD_HERMES_FROM_SOURCE=true`, `EXPO_USE_PRECOMPILED_MODULES=0`, `RCT_HERMES_V1_ENABLED=1`,
+  `REACT_NATIVE_NODE_MODULES_DIR`). Release iOS needs the from-source Hermes for the same reason tvOS did
+  (`buildReactNativeFromSource` + release → the jsi split); the v0.8.63 tvOS copy-path fix is tvOS-only but
+  harmless to iOS. Run `eas build --profile preview --platform ios` to get the first non-dev-client iPad build.
+
 ## [0.8.63] - 2026-07-28
 
 ### Fixed
