@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { CredStore } from "./cred-store";
+import { CredStore, hydrateSyncCreds } from "./cred-store";
 
 /**
  * Native equivalent of tv-web's `auth-client` + `server-url`, minus better-auth's React client:
@@ -31,6 +31,8 @@ export async function loadSession(): Promise<void> {
   const [storedUrl, storedToken] = await Promise.all([
     AsyncStorage.getItem(SERVER_KEY),
     CredStore.getItemAsync(TOKEN_KEY),
+    // Warm the Apple-TV sync credential cache (for better-auth's expoClient) before any auth screen renders.
+    hydrateSyncCreds(),
   ]);
   if (storedUrl) serverUrl = storedUrl.replace(/\/+$/, "");
   token = storedToken ?? null;

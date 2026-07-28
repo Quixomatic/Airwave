@@ -2,6 +2,20 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.48] - 2026-07-27
+
+### Fixed
+
+- **Extend the Apple TV keychain-free fix to better-auth (tv-native).** v0.8.47 moved the startup token off
+  expo-secure-store, but `@better-auth/expo`'s `expoClient` still used SecureStore — reached by the device-code
+  login (`login.tsx`) and `useSession()` in Settings → User, so **logging in or opening that screen on the
+  Apple TV could still hit the same RN #54859 keychain crash**. better-auth reads its storage
+  **synchronously**, so AsyncStorage can't back it directly; added a synchronous, keychain-free `SyncCredStore`
+  — an in-memory cache hydrated from AsyncStorage at startup (`hydrateSyncCreds()`, awaited in `loadSession`)
+  and write-through for persistence — used on the Apple TV, with real SecureStore on iPad + Android. The whole
+  Apple TV auth path is now keychain-free. Added `[cred-store]` console logs (Apple TV only, keys + hit/miss —
+  never token values) so the keychain-free path is visible in the Metro console while verifying.
+
 ## [0.8.47] - 2026-07-27
 
 ### Fixed

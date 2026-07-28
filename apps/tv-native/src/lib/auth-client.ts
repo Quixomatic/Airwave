@@ -1,9 +1,9 @@
 import { expoClient } from "@better-auth/expo/client";
 import { deviceAuthorizationClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
-import * as SecureStore from "expo-secure-store";
 
 import { getServerUrl } from "./auth";
+import { SyncCredStore } from "./cred-store";
 
 /**
  * The better-auth client — the native equivalent of tv-web's `auth-client.ts`, for the
@@ -20,7 +20,7 @@ function make(url: string) {
   return createAuthClient({
     baseURL: `${url}/api/auth`,
     plugins: [
-      expoClient({ scheme: "channelguide", storagePrefix: "cg", storage: SecureStore }),
+      expoClient({ scheme: "channelguide", storagePrefix: "cg", storage: SyncCredStore }),
       deviceAuthorizationClient(),
     ],
   });
