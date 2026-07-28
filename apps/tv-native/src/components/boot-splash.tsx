@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { Image, StyleSheet, View } from "react-native";
 import Animated, {
   Easing,
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -56,14 +55,19 @@ export function BootSplash({ onFinish }: { onFinish: () => void }) {
 
   useEffect(() => {
     markP.value = withTiming(1, { duration: MARK_MS, easing: EASE });
-    // Fade the whole splash out once the intro has played + held, then hand off to the app.
     const introEnd = LETTER_START + letters.length * LETTER_STEP + LETTER_MS;
-    const t = setTimeout(() => {
-      rootOpacity.value = withTiming(0, { duration: OUT_MS, easing: EASE }, (done) => {
-        if (done) runOnJS(onFinish)();
-      });
-    }, introEnd + HOLD_MS);
-    return () => clearTimeout(t);
+    const fadeAt = introEnd + HOLD_MS;
+    // Fade the whole splash out once the intro has played + held.
+    const fadeTimer = setTimeout(() => {
+      rootOpacity.value = withTiming(0, { duration: OUT_MS, easing: EASE });
+    }, fadeAt);
+    // Hand off to the app on a plain JS timer — NOT the Reanimated completion callback, which can silently
+    // not fire and leave the splash stuck over the app. This guarantees the splash always clears.
+    const doneTimer = setTimeout(onFinish, fadeAt + OUT_MS + 40);
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(doneTimer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -74,7 +78,7 @@ export function BootSplash({ onFinish }: { onFinish: () => void }) {
   const rootStyle = useAnimatedStyle(() => ({ opacity: rootOpacity.value }));
 
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: C.bg, alignItems: "center", justifyContent: "center" }, rootStyle]}>
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: C.bg, alignItems: "center", justifyContent: "center" }, rootStyle]}>
       <View style={[{ flexDirection: "row", alignItems: "center" }, scaled({ gap: 18 })]}>
         <Animated.View style={markStyle}>
           <Image

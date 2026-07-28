@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.54] - 2026-07-27
+
+### Fixed
+
+- **Boot splash could leave a black screen (tv-native).** The animated splash dismissed via a Reanimated
+  `withTiming` completion callback (`runOnJS(onFinish)`), which can silently not fire — leaving the splash
+  stuck over the app (a black screen after the intro). Drive the hand-off from a plain JS timer instead
+  (guaranteed to fire), and set `pointerEvents="none"` on the splash so it can never trap the app underneath
+  even if it ever lingers.
+
 ## [0.8.53] - 2026-07-27
 
 ### Changed
