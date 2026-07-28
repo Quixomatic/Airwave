@@ -2,6 +2,22 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.50] - 2026-07-27
+
+### Fixed
+
+- **Apple TV release crash, take 2 — patch the RIGHT boundary (`RCTCxxUtils`) + reveal the culprit
+  (tv-native).** v0.8.49's patch was verified compiled into the binary (grepped the shipped `.ipa` — the
+  `[RN#54859]` marker is present) yet the crash persisted with **no** `[RN#54859]` log — proving the throw does
+  NOT go through `performVoidMethodInvocation`. It exits at a different boundary: `RCTCxxUtils.mm`'s
+  `tryAndReturnError`, whose `catch (...)` blanked the exception to the useless generic "non-std C++ exception"
+  string, which the caller then `RCTFatal`s → abort. Extended the patch to that boundary: it now (1) prints the
+  ACTUAL C++ exception **type + message** via the C++ ABI (`abi::__cxa_current_exception_type` /
+  `__cxa_demangle`) so the culprit finally shows in the device log (`[RN#54859] … type=… detail=…`), and (2)
+  **swallows** it (returns no error) instead of letting the app abort — matching what the dev client does (the
+  v0.8.49 dev build loads fine), so the release build can boot. The void-method patch (v0.8.49) stays as a
+  second safety net. Both live in `patches/react-native-tvos@0.83.6-0.patch`.
+
 ## [0.8.49] - 2026-07-27
 
 ### Fixed

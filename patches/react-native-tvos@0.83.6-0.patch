@@ -26,3 +26,53 @@ index 35cfd7a..5482b64 100644
      } @finally {
        [retainedObjectsForInvocation removeAllObjects];
      }
+diff --git a/React/CxxModule/RCTCxxUtils.mm b/React/CxxModule/RCTCxxUtils.mm
+index 4c018e6..20df3ee 100644
+--- a/React/CxxModule/RCTCxxUtils.mm
++++ b/React/CxxModule/RCTCxxUtils.mm
+@@ -12,6 +12,9 @@
+ #import <cxxreact/CxxNativeModule.h>
+ #import <jsi/jsi.h>
+ 
++#include <cxxabi.h>
++#include <typeinfo>
++
+ #import "DispatchMessageQueueThread.h"
+ #import "RCTCxxModule.h"
+ #import "RCTNativeModule.h"
+@@ -85,9 +88,32 @@ NSError *tryAndReturnError(const std::function<void()> &func)
+   } catch (const std::exception &ex) {
+     return errorWithException(ex);
+   } catch (...) {
+-    // On a 64-bit platform, this would catch ObjC exceptions, too, but not on
+-    // 32-bit platforms, so we catch those with id exceptions above.
+-    return RCTErrorWithMessage(@"non-std C++ exception");
++    // [ChannelGuide patch — facebook/react-native#54859]
++    // The original `return RCTErrorWithMessage(@"non-std C++ exception")` blanked the exception to a useless
++    // generic string, and the caller then RCTFatal's it → the whole app ABORTS at startup on tvOS 26 +
++    // release + New Architecture (fine in debug). Two changes:
++    //  (1) reveal the ACTUAL C++ exception type + message via the C++ ABI, so the culprit shows in the log;
++    //  (2) SWALLOW it (return nil = "no error") instead of letting the caller abort, so a throwing
++    //      fire-and-forget native call at launch can't kill the whole app. Overridable once the source is fixed.
++    const char *mangled = "unknown";
++    if (const std::type_info *t = abi::__cxa_current_exception_type()) {
++      mangled = t->name();
++    }
++    int demangleStatus = 0;
++    char *demangled = abi::__cxa_demangle(mangled, nullptr, nullptr, &demangleStatus);
++    const char *typeName = (demangleStatus == 0 && demangled != nullptr) ? demangled : mangled;
++    std::string detail;
++    try {
++      throw;
++    } catch (const std::exception &e) {
++      detail = e.what();
++    } catch (...) {
++    }
++    NSLog(@"[RN#54859] SWALLOWED non-std C++ exception at native-call boundary — type=%s detail=%s", typeName, detail.c_str());
++    if (demangled != nullptr) {
++      free(demangled);
++    }
++    return nil;
+   }
+ }
+ 
