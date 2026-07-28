@@ -2,11 +2,12 @@
   "expo": {
     "name": "ChannelGuide",
     "slug": "channelguide",
-    "version": "0.8.65",
+    "version": "0.8.66",
     "scheme": "channelguide",
     "orientation": "landscape",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#060a14",
+    "icon": "./assets/icons/icon-ios.png",
     "splash": {
       "backgroundColor": "#060a14",
       "resizeMode": "contain"
@@ -33,7 +34,16 @@
       [
         "@react-native-tvos/config-tv",
         {
-          "showVerboseWarnings": false
+          "showVerboseWarnings": false,
+          "appleTVImages": {
+            "iconSmall": "./assets/icons/tv-icon-small.png",
+            "iconSmall2x": "./assets/icons/tv-icon-small-2x.png",
+            "icon": "./assets/icons/tv-icon.png",
+            "topShelf": "./assets/icons/tv-topshelf.png",
+            "topShelf2x": "./assets/icons/tv-topshelf-2x.png",
+            "topShelfWide": "./assets/icons/tv-topshelf-wide.png",
+            "topShelfWide2x": "./assets/icons/tv-topshelf-wide-2x.png"
+          }
         }
       ],
       "@ChannelGuide/mpv-player",

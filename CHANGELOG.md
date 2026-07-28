@@ -2,6 +2,20 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.66] - 2026-07-28
+
+### Added
+
+- **Real Airwave app icons — the logo mark on a dark radial gradient (tv-native).** Generated the app icons
+  from the Airwave cloud+wave mark centered on a dark blue-navy radial gradient (matches the app's `#060a14`
+  background), reproducibly via `apps/tv-native/scripts/gen-app-icons.py` (Pillow + numpy) into
+  `assets/icons/`: a 1024×1024 opaque square for **iPad/iOS** (`expo.icon`), and the full **Apple TV** brand
+  asset set at the exact sizes `@react-native-tvos/config-tv` requires (icon 400×240/800×480, App Store icon
+  **1280×768**, top shelf 1920×720/3840×1440, top shelf wide 2320×720/4640×1440) wired via the plugin's
+  `appleTVImages`. All opaque RGB (no alpha → App-Store-safe). **Native/config change → needs a rebuild** to
+  appear (icons bake at prebuild, not over Metro): rebuild `development` (iPad dev client), `preview` (iPad),
+  and `preview-tvos` (Apple TV). Android icons (adaptive + TV banner) not done yet — separate follow-up.
+
 ## [0.8.65] - 2026-07-28
 
 ### Added
