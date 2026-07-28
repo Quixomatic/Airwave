@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.53] - 2026-07-27
+
+### Changed
+
+- **Diagnostic — the Apple TV boundary patch now REVEALS the exception type in the crash reason (tv-native).**
+  v0.8.50's swallow got the app to *open* (the crash is fixed mechanically) but it then HUNG on a white screen
+  (`Creating hang event` in the device log) — so the swallowed exception is on a **critical init path**, not
+  fire-and-forget. To identify the real source, the `RCTCxxUtils` `catch (...)` patch now surfaces the ACTUAL
+  C++ exception type + message (`abi::__cxa_current_exception_type` / `__cxa_demangle`) directly in the returned
+  error, so the crash reason reads `non-std C++ exception [type: <culprit>] <detail>` instead of the opaque
+  generic string. Deliberately fatal again (not swallowed) for this one diagnostic build — once we know the
+  type, we fix the source and it boots cleanly.
+
 ## [0.8.52] - 2026-07-27
 
 ### Added
