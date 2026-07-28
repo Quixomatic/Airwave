@@ -2,6 +2,26 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.62] - 2026-07-28
+
+### Fixed
+
+- **Build jsi as a shared library so it actually lands in the from-source `hermesvm.framework`
+  (`HERMES_BUILD_SHARED_JSI=true`, tv-native).** v0.8.61 proved visibility is NOT the gate: the sed landed
+  (`append("-fvisibility=default" …)` confirmed in the log), `hermesvm.framework` was relinked, there's no
+  exported-symbols allowlist — and the undefined count stayed frozen at 61 across **four** builds (`-all_load`
+  → per-config visibility → global `-fvisibility=default`). Conclusion: jsi isn't *hidden* in the framework,
+  it's *absent*. Cause: RN's `build-hermes-xcode.sh` force-sets **`-DHERMES_BUILD_SHARED_JSI:BOOLEAN=false`**,
+  which builds jsi as a **static** lib that never gets bundled into `hermesvm.framework`'s exports — and
+  `React-jsi` excludes `jsi.cpp` expecting the framework to provide it, so nobody does. `HERMES_BUILD_SHARED_JSI`
+  is a real Hermes cache var ("Build JSI as a shared library", default ON for Apple platforms; RN overrides it
+  OFF). **Fix:** flip it back to `true` so jsi is built + exported as a shared library from the framework.
+  Kept the v0.8.61 `-fvisibility=default` sed (exports the VM's `NopCrashManager` too) and the v0.8.59
+  `-all_load`. Same react-native-tvos patch, `preview-tvos` only. Rebuild to verify. **If the count finally
+  moves, we're on the right mechanism; if a new "libjsi.dylib not found" / packaging error appears, that's
+  progress too (jsi is now a real shared object) and we handle the embed.** Backup plan if this stalls:
+  compile `jsi.cpp` directly in `React-jsi`.
+
 ## [0.8.61] - 2026-07-28
 
 ### Fixed

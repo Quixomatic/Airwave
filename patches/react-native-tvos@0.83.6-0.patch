@@ -76,7 +76,7 @@ index 4c018e6..ed377ab 100644
  }
  
 diff --git a/sdks/hermes-engine/utils/build-hermes-xcode.sh b/sdks/hermes-engine/utils/build-hermes-xcode.sh
-index 60506d1..8ff2ed0 100644
+index 60506d1..6cc5ce9 100644
 --- a/sdks/hermes-engine/utils/build-hermes-xcode.sh
 +++ b/sdks/hermes-engine/utils/build-hermes-xcode.sh
 @@ -52,11 +52,21 @@ fi
@@ -129,3 +129,12 @@ index 60506d1..8ff2ed0 100644
  echo "Configure Apple framework"
  
  "$CMAKE_BINARY" \
+@@ -82,7 +111,7 @@ echo "Configure Apple framework"
+   -DHERMES_ENABLE_TEST_SUITE:BOOLEAN=false \
+   -DHERMES_ENABLE_BITCODE:BOOLEAN=false \
+   -DHERMES_BUILD_APPLE_FRAMEWORK:BOOLEAN=true \
+-  -DHERMES_BUILD_SHARED_JSI:BOOLEAN=false \
++  -DHERMES_BUILD_SHARED_JSI:BOOLEAN=true \
+   -DCMAKE_CXX_FLAGS:STRING="-gdwarf" \
+   -DCMAKE_C_FLAGS:STRING="-gdwarf" \
+   -DIMPORT_HOST_COMPILERS:PATH="${hermesc_path}" \
