@@ -2,6 +2,20 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.46] - 2026-07-27
+
+### Fixed
+
+- **Candidate fix for the release / New-Architecture tvOS startup crash — skip GameController on tvOS
+  (tv-native).** `@ChannelGuide/key-input` reads `GCKeyboard` (GameController) for hardware-keyboard input,
+  which is only useful on the iPad (no TV remote). On tvOS the Siri Remote is delivered via react-native-tvos
+  `useTVEventHandler`, so the module is redundant there — but its `OnCreate` accessed `GCKeyboard.coalesced`
+  at startup, spinning up the shared GameController session that enumerates the Siri Remote, exactly where the
+  **release + bridgeless (New Architecture)** build aborts (`RCTFatalException: non-std C++ exception`, right
+  after "Connected devices changed -> Siri Remote"). Guarded all GameController use behind `#if !os(tvOS)`.
+  iPad + Android unaffected. **Native — effective on the next tvOS build (currently parked), and unverified
+  until then** (react-native-tvos could also touch GameController independently).
+
 ## [0.8.45] - 2026-07-27
 
 ### Fixed

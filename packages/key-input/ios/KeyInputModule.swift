@@ -15,6 +15,13 @@ public class KeyInputModule: Module {
     Events("onKey")
 
     OnCreate {
+      // GCKeyboard is ONLY useful where there's no TV remote — the iPad (a Magic/BT keyboard). On tvOS the
+      // Siri Remote is delivered via react-native-tvos `useTVEventHandler`, so this module is redundant
+      // there. Critically, merely accessing `GCKeyboard.coalesced` on tvOS spins up the shared
+      // GameController session that enumerates the Siri Remote — which crashes the release / New-Architecture
+      // build at startup ('RCTFatalException: non-std C++ exception', right after "Connected devices changed
+      // -> Siri Remote"). So we skip GameController entirely on tvOS; the remote works through useTVEventHandler.
+      #if !os(tvOS)
       // A keyboard already attached at launch, plus any that connect later.
       if let keyboard = GCKeyboard.coalesced { self.attach(keyboard) }
       self.connectObserver = NotificationCenter.default.addObserver(
@@ -22,14 +29,17 @@ public class KeyInputModule: Module {
       ) { [weak self] note in
         if let keyboard = note.object as? GCKeyboard { self?.attach(keyboard) }
       }
+      #endif
     }
 
     OnDestroy {
+      #if !os(tvOS)
       if let observer = self.connectObserver {
         NotificationCenter.default.removeObserver(observer)
         self.connectObserver = nil
       }
       GCKeyboard.coalesced?.keyboardInput?.keyChangedHandler = nil
+      #endif
     }
   }
 
