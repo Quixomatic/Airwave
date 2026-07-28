@@ -2,6 +2,25 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.61] - 2026-07-28
+
+### Fixed
+
+- **Flip Hermes's global `-fvisibility=hidden` to `default` at its source so the from-source
+  `hermesvm.framework` exports its jsi + VM symbols (tv-native).** v0.8.60 added `-fvisibility=default` via
+  the per-config `CMAKE_*_FLAGS_MINSIZEREL`, but the build still failed with the same 61 undefined symbols —
+  and tellingly, even the non-jsi `hermes::vm::NopCrashManager` stayed hidden, proving the per-config override
+  was **not winning**: Hermes emits a later `-fvisibility=hidden` the per-config flags can't get behind.
+  Confirmed via Hermes's `CMakeLists.txt`: `if (GCC_COMPATIBLE) append("-fvisibility=hidden" CMAKE_CXX_FLAGS
+  CMAKE_C_FLAGS)` ("Don't export symbols unless we explicitly say so"). That file is downloaded onto the EAS
+  worker (not in our patchable `node_modules`), but `build-hermes-xcode.sh` runs after the fetch and before
+  cmake configures — so it now `sed`s that line to `append("-fvisibility=default" …)` before configuring,
+  making every Hermes symbol default-visibility (exported), matching the prebuilt framework. Replaces the
+  ineffective per-config-flag approach; keeps the v0.8.59 `-all_load` (force-includes jsi's objects so there
+  is something to export). Added a `grep fvisibility` echo right after the sed so the next build log shows the
+  actual line (in case the fork's spacing differs and the sed no-ops). Same react-native-tvos patch,
+  `preview-tvos` only. Rebuild to verify.
+
 ## [0.8.60] - 2026-07-28
 
 ### Fixed
