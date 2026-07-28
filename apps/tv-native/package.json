@@ -1,9 +1,10 @@
 {
   "name": "tv-native",
-  "version": "0.8.56",
+  "version": "0.8.57",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
+    "eas-build-pre-install": "brew install cmake ninja",
     "dev": "expo start --dev-client",
     "dev:android": "expo start --dev-client --android",
     "dev:ios": "expo start --dev-client --ios",

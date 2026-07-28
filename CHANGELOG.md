@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.57] - 2026-07-28
+
+### Fixed
+
+- **Install cmake/ninja on the EAS build so Hermes can compile from source (tv-native).** v0.8.56's
+  `RCT_BUILD_HERMES_FROM_SOURCE=true` worked — the build log confirms it selected Hermes V1 from the pinned
+  `.hermesv1version` tag (`hermes-v250829098.0.4`) — but `pod install` then failed at `hermes-engine.podspec`
+  with `Unable to locate the executable cmake` (the EAS worker doesn't ship cmake, which compiling Hermes
+  requires). Added an `eas-build-pre-install` hook (`brew install cmake ninja`) so the from-source Hermes build
+  can run. (The `EXPO_USE_PRECOMPILED_MODULES` line in that log is a benign warning — a known consequence of
+  building RN from source, not the failure.)
+
 ## [0.8.56] - 2026-07-28
 
 ### Changed
