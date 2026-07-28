@@ -76,65 +76,34 @@ index 4c018e6..ed377ab 100644
  }
  
 diff --git a/sdks/hermes-engine/utils/build-hermes-xcode.sh b/sdks/hermes-engine/utils/build-hermes-xcode.sh
-index 60506d1..6cc5ce9 100644
+index 60506d1..fb6fb9e 100644
 --- a/sdks/hermes-engine/utils/build-hermes-xcode.sh
 +++ b/sdks/hermes-engine/utils/build-hermes-xcode.sh
-@@ -52,11 +52,21 @@ fi
+@@ -19,6 +19,14 @@ function get_platform_copy_destination {
+     elif [[ $1 == "xros" || $1 == "xrsimulator" ]]; then
+       echo "xros"
+       return
++    elif [[ $1 == "appletvos" || $1 == "appletvsimulator" ]]; then
++      # [ChannelGuide patch] Apple TV must copy the built framework to the "tvos" folder,
++      # because hermes-engine.podspec vendors tvOS from destroot/Library/Frameworks/tvos/.
++      # Upstream fell through to "ios" here, so the real from-source Apple TV framework landed
++      # in ios/ while the app linked an empty/missing framework at tvos/ -> every hermes + jsi
++      # symbol (makeHermesRuntime, HostObject, NopCrashManager, ...) came up undefined at link.
++      echo "tvos"
++      return
+     fi
  
- deployment_target=$(get_deployment_target $PLATFORM_NAME)
+     echo "ios"
+diff --git a/sdks/hermes-engine/utils/create-dummy-hermes-xcframework.sh b/sdks/hermes-engine/utils/create-dummy-hermes-xcframework.sh
+index 76bd3a4..81bf64f 100644
+--- a/sdks/hermes-engine/utils/create-dummy-hermes-xcframework.sh
++++ b/sdks/hermes-engine/utils/create-dummy-hermes-xcframework.sh
+@@ -19,7 +19,7 @@ pushd destroot/Library/Frameworks > /dev/null || exit 1
  
--xcode_15_flags=""
-+# [ChannelGuide patch — from-source Hermes on tvOS/iOS] Force-include the static jsi + VM
-+# object files into the `hermesvm` shared framework. Hermes links `jsi` PUBLIC but WITHOUT
-+# whole-archive, and the framework's top-level target is an (empty) dummy.cpp, so any jsi
-+# symbol (HostObject/Value/NativeState/MutableBuffer/...) and VM symbol (NopCrashManager)
-+# that nothing inside the VM already references gets DROPPED at link and is never exported
-+# from the framework. That breaks a from-source build — React-jsi deliberately excludes
-+# jsi.cpp expecting hermes-engine to provide these — with "Undefined symbols ... facebook::jsi::".
-+# -all_load force-loads every archive in this link so those symbols land in (and export from)
-+# the framework, matching the prebuilt hermes.framework. HERMES_EXTRA_LINKER_FLAGS reaches the
-+# hermesvm shared link (proven: the -ld_classic flag below is applied to it).
-+xcode_15_flags="LINKER:-all_load"
- xcode_major_version=$(xcodebuild -version | grep -oE '[0-9]*' | head -n 1)
- if [[ $xcode_major_version -ge 15 ]]; then
-   echo "########### Using LINKER:-ld_classic ###########"
--  xcode_15_flags="LINKER:-ld_classic"
-+  xcode_15_flags="$xcode_15_flags;LINKER:-ld_classic"
- fi
+ echo '' > dummy.c
  
- boost_context_flag=""
-@@ -66,6 +76,25 @@ fi
+-platforms=( "macosx" "ios" "xros" ) # Add other platforms here if needed
++platforms=( "macosx" "ios" "xros" "tvos" ) # [ChannelGuide patch] added "tvos": hermes-engine.podspec vendors tvOS from destroot/Library/Frameworks/tvos, so the dummy must exist there at pod-install time (build-hermes-xcode.sh then overwrites it with the real Apple TV framework).
  
- architectures=$( echo "$ARCHS" | tr  " " ";" )
- 
-+# [ChannelGuide patch] Make the from-source hermesvm.framework EXPORT its public jsi + VM
-+# symbols. Hermes's root CMakeLists.txt does `append("-fvisibility=hidden" CMAKE_CXX_FLAGS
-+# CMAKE_C_FLAGS)` ("Don't export symbols unless we explicitly say so"), which hides jsi
-+# (HostObject/Value/typeinfo/vtables) and hermes::vm::NopCrashManager — so a from-source build
-+# can't link them (React-jsi excludes jsi.cpp expecting the framework to provide them, and the
-+# prebuilt framework does export them). Overriding via CMAKE_*_FLAGS_MINSIZEREL did NOT win
-+# (v0.8.60: symbols stayed hidden), so flip the value at its source: rewrite Hermes's own
-+# append to use -fvisibility=default before we configure. That makes every Hermes symbol
-+# default-visibility (exported), matching the prebuilt framework. Idempotent; the `|| true`
-+# keeps the build alive if upstream ever changes the line (we'd just see the link fail again).
-+# Pairs with LINKER:-all_load above, which force-includes jsi's objects so there's something
-+# to export. macOS/BSD sed needs the empty `-i ''` argument.
-+HERMES_CMAKELISTS="${PODS_ROOT}/hermes-engine/CMakeLists.txt"
-+if [[ -f "$HERMES_CMAKELISTS" ]]; then
-+  echo "########### [ChannelGuide] Forcing -fvisibility=default in Hermes CMakeLists ###########"
-+  sed -i '' 's/append("-fvisibility=hidden" CMAKE_CXX_FLAGS CMAKE_C_FLAGS)/append("-fvisibility=default" CMAKE_CXX_FLAGS CMAKE_C_FLAGS)/' "$HERMES_CMAKELISTS" || true
-+  grep -n "fvisibility" "$HERMES_CMAKELISTS" || true
-+fi
-+
- echo "Configure Apple framework"
- 
- "$CMAKE_BINARY" \
-@@ -82,7 +111,7 @@ echo "Configure Apple framework"
-   -DHERMES_ENABLE_TEST_SUITE:BOOLEAN=false \
-   -DHERMES_ENABLE_BITCODE:BOOLEAN=false \
-   -DHERMES_BUILD_APPLE_FRAMEWORK:BOOLEAN=true \
--  -DHERMES_BUILD_SHARED_JSI:BOOLEAN=false \
-+  -DHERMES_BUILD_SHARED_JSI:BOOLEAN=true \
-   -DCMAKE_CXX_FLAGS:STRING="-gdwarf" \
-   -DCMAKE_C_FLAGS:STRING="-gdwarf" \
-   -DIMPORT_HOST_COMPILERS:PATH="${hermesc_path}" \
+ for platform in "${platforms[@]}"
+ do

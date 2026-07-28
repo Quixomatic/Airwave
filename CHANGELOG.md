@@ -2,6 +2,28 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.63] - 2026-07-28
+
+### Fixed
+
+- **THE real cause of the tvOS release link wall: the from-source Apple TV Hermes framework was copied to the
+  wrong folder, so the app linked an empty one (tv-native).** After six builds chasing symbol *export* (visibility,
+  `-all_load`, `SHARED_JSI`), the actual bug was a **path mismatch in the react-native-tvos fork**, found by
+  diffing the Xcode-inline builder (`build-hermes-xcode.sh`) against the CI builder (`build-apple-framework.sh`):
+  the flags are **identical** (same `--target hermesvm`, same `HERMES_BUILD_SHARED_JSI=false`), so the framework
+  content was never the problem. But `build-hermes-xcode.sh`'s `get_platform_copy_destination` has no case for
+  `appletvos` — it falls through to **`ios`**, copying the real Apple TV framework to
+  `destroot/Library/Frameworks/ios/`. Meanwhile `hermes-engine.podspec` vendors tvOS from
+  `destroot/Library/Frameworks/tvos/` — which only ever held the empty **dummy** (and `create-dummy-hermes-xcframework.sh`
+  didn't even create a `tvos` dummy). So on Apple TV the app linked an empty framework → **every** hermes + jsi
+  symbol undefined (`makeHermesRuntime`, `makeHermesRootAPI`, `HostObject`, `NopCrashManager`, …), frozen at 61
+  no matter what we did to visibility. **Fix (two one-line patches to the react-native-tvos patch):** (1)
+  `get_platform_copy_destination` returns `tvos` for `appletvos`/`appletvsimulator` so the real framework lands
+  where the podspec vendors it; (2) `create-dummy-hermes-xcframework.sh` adds `tvos` to its platforms so the
+  dummy exists at pod-install time. **Reverted** the v0.8.59–v0.8.62 framework-content hacks (`-all_load`,
+  `-fvisibility=default` sed, `SHARED_JSI=true`) — the CI flags produce a correct framework; only the copy path
+  was wrong. `preview-tvos` only. Rebuild to verify — this should finally move the symbol count.
+
 ## [0.8.62] - 2026-07-28
 
 ### Fixed
