@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.74] - 2026-07-28
+
+### Fixed
+
+- **Android app now displays as "Airwave" (tv-native).** The v0.8.67 rename set the display label for
+  iOS/tvOS (`CFBundleDisplayName`) and webOS (appinfo title) but missed Android, where the launcher label
+  resolves to `android:label="@string/app_name"` = `expo.name` ("ChannelGuide"). Added a small config plugin
+  (`plugins/with-android-app-name.js`, `withStringsXml`) that overrides the `app_name` string to "Airwave" —
+  keeping `expo.name` and every namespace (`android.package` = com.channelguide.tv) unchanged, mirroring the
+  iOS override. Native/config change → applies on the next Android build (the just-installed v0.8.72 APK still
+  shows "ChannelGuide").
+
 ## [0.8.73] - 2026-07-28
 
 ### Added

@@ -2,7 +2,7 @@
   "expo": {
     "name": "ChannelGuide",
     "slug": "channelguide",
-    "version": "0.8.73",
+    "version": "0.8.74",
     "scheme": "channelguide",
     "orientation": "landscape",
     "userInterfaceStyle": "dark",
@@ -34,6 +34,7 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      "./plugins/with-android-app-name.js",
       [
         "@react-native-tvos/config-tv",
         {
