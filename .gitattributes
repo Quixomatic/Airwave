@@ -1,3 +1,7 @@
 # Shell scripts must be LF — CRLF breaks the shebang inside the Linux container.
 *.sh text eol=lf
 docker/entrypoint.sh text eol=lf
+
+# pnpm patches must be LF and match the (LF) package sources they patch, or `pnpm install` fails to apply
+# them on the EAS (Linux) build.
+patches/*.patch text eol=lf

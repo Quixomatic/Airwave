@@ -2,6 +2,23 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.49] - 2026-07-27
+
+### Fixed
+
+- **THE Apple TV release-build startup crash — patch the React Native framework bug directly (tv-native).**
+  After removing two specific triggers (GameController v0.8.46, keychain v0.8.47–48) the release / New-Arch
+  tvOS build STILL aborted at launch with `RCTFatalException: non-std C++ exception` — a *third* throwing void
+  TurboModule, exactly as RN #54859 warns ("multiple modules"). Since the New Architecture / bridgeless
+  **cannot** be disabled in SDK 55 (RN 0.83 removed the legacy arch) and there's no upstream fix yet, we patch
+  the root cause ourselves: `ObjCTurboModule::performVoidMethodInvocation` re-threw a caught `NSException` on
+  the async dispatch queue, where nothing catches it → `std::terminate` → `abort()`. The non-void path was
+  fixed upstream (PR #50193); the void one never was. The patch (`patches/react-native-tvos@0.83.6-0.patch`,
+  via pnpm `patchedDependencies`, auto-applied by EAS's `pnpm install`) **logs** the offending module/method
+  (`[RN#54859]`) and **swallows** it instead of aborting — a fire-and-forget void method failing silently is
+  fine; crashing the whole app is not. This is what makes a release / App Store build viable at all, and it
+  surfaces the culprit's name so we can optionally address the specific module later.
+
 ## [0.8.48] - 2026-07-27
 
 ### Fixed

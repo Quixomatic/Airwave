@@ -34,6 +34,9 @@
   "pnpm": {
     "overrides": {
       "@expo/dom-webview": "55.0.6"
+    },
+    "patchedDependencies": {
+      "react-native-tvos@0.83.6-0": "patches/react-native-tvos@0.83.6-0.patch"
     }
   }
 }

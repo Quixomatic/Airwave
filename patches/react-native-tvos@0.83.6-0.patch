@@ -1,0 +1,28 @@
+diff --git a/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm b/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
+index 35cfd7a..5482b64 100644
+--- a/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
++++ b/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
+@@ -470,9 +470,20 @@ void ObjCTurboModule::performVoidMethodInvocation(
+     @try {
+       [inv invokeWithTarget:strongModule];
+     } @catch (NSException *exception) {
+-      // Void methods are always async, re-throw instead of converting to
+-      // JSError, same as the async branch in performMethodInvocation.
+-      @throw exception;
++      // [ChannelGuide patch — facebook/react-native#54859]
++      // A void TurboModule method is dispatched ASYNC (see below), so there is NO caller to receive a
++      // re-thrown NSException: the original `@throw exception;` propagated into C++ on the async queue with
++      // no handler → std::terminate → abort(), which crashes the whole app at startup with
++      // 'RCTFatalException: non-std C++ exception' (iOS/tvOS 26 + release + New Architecture, fine in debug).
++      // Upstream fixed the non-void path (PR #50193) but never the void one. Since a void method is
++      // fire-and-forget (no return value, nothing awaits it), we LOG the culprit and swallow it instead of
++      // aborting — so a throwing native call (tvOS keychain, TVEventControl, etc.) can't kill the process.
++      NSLog(
++          @"[RN#54859] void TurboModule %s.%s threw (swallowed, NOT aborting): %@: %@",
++          moduleName,
++          methodName,
++          exception.name,
++          exception.reason);
+     } @finally {
+       [retainedObjectsForInvocation removeAllObjects];
+     }
