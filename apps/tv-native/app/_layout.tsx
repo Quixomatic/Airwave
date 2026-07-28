@@ -3,7 +3,7 @@ import "../global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { Component, type ReactNode, useEffect, useState } from "react";
 import { Dimensions, Platform, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -35,6 +35,23 @@ const queryClient = new QueryClient({
 });
 
 /**
+ * Error boundary around the boot splash. A splash render failure must NEVER blank the app — if it throws,
+ * we just skip the animation and show the app underneath.
+ */
+class SplashBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(err: unknown) {
+    console.warn("[boot-splash] render failed, skipping:", err);
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+/**
  * Root layout — the native analogue of tv-web's `main.tsx` + `__root`. Hydrates the session
  * (server URL + token) from device storage BEFORE rendering, so `SERVER_URL`-equivalents are set
  * when the API client and the route guards first run. Wraps everything in the providers a native
@@ -55,6 +72,11 @@ export default function RootLayout() {
     void Promise.all([loadSession(), loadDevice()]).finally(() => setReady(true));
   }, []);
 
+  // Hydrate session/device BEFORE mounting the app (route guards read the session synchronously). While
+  // loading, a plain dark screen — it matches the splash background, so the hand-off is seamless. This is the
+  // original, known-good boot; the splash is a pure overlay ON TOP of the mounted app.
+  if (!ready) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
+
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: C.bg }} onTouchStart={() => notifyInputActivity()}>
       <SafeAreaProvider>
@@ -65,21 +87,23 @@ export default function RootLayout() {
               overscan is applied, so the sidebar + content always move in together (no gaps). 0 on iPad /
               Apple TV (no overscan; tvOS manages its own safe area) → a no-op pass-through there. */}
           <View style={{ flex: 1, paddingHorizontal: OVERSCAN_H, paddingVertical: OVERSCAN_V }}>
-            {ready && (
-              <PlayerProvider>
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    contentStyle: { backgroundColor: C.bg },
-                    animation: "fade",
-                  }}
-                />
-              </PlayerProvider>
-            )}
+            <PlayerProvider>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: C.bg },
+                  animation: "fade",
+                }}
+              />
+            </PlayerProvider>
           </View>
-          {/* Animated Airwave boot splash — overlays the whole app on launch, then fades into the guide once
-              the session is loaded and the intro has played. The app mounts underneath (ready) so it's warm. */}
-          {!bootDone && <BootSplash onFinish={() => setBootDone(true)} />}
+          {/* Animated Airwave boot splash — overlays the freshly-mounted app, then fades out. Wrapped in an
+              error boundary so a splash failure can NEVER blank the app (it just skips the animation). */}
+          {!bootDone && (
+            <SplashBoundary>
+              <BootSplash onFinish={() => setBootDone(true)} />
+            </SplashBoundary>
+          )}
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

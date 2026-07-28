@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.55] - 2026-07-27
+
+### Fixed
+
+- **Boot splash black-screened the app on the iPad dev client — restore the known-good boot + isolate the
+  splash (tv-native).** v0.8.52 restructured the root layout (mounting the providers before session load and
+  gating the `Stack` on `ready`) to slot the splash in; that left the iPad on a black screen after load.
+  Restored the exact original boot — early-return dark screen while session/device hydrate, then the full
+  provider + `Stack` tree mounts unconditionally — and made the splash a pure overlay ON TOP of the mounted
+  app, wrapped in an error boundary so a splash render failure can never blank the app (worst case it silently
+  skips the animation).
+
 ## [0.8.54] - 2026-07-27
 
 ### Fixed
