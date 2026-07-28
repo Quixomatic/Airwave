@@ -2,6 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.52] - 2026-07-27
+
+### Added
+
+- **Animated Airwave boot splash (tv-native).** On launch the whole screen is the Airwave lockup, centered
+  and large: the mark fades + scales in, then the "Airwave" letters cascade up one by one; it holds briefly,
+  then fades into the app — the native analogue of tv-web's framer-motion `<Logo animate>`. Built with
+  Reanimated shared values (`src/components/boot-splash.tsx`, imperative — sidesteps the fork's inverted
+  `FadeIn*` naming); the app mounts underneath during the intro so it's warm the instant the splash clears.
+  Overlaid in the root layout, gated on session/device load + intro completion.
+
 ## [0.8.51] - 2026-07-27
 
 ### Added

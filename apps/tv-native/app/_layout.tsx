@@ -8,6 +8,7 @@ import { Dimensions, Platform, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { BootSplash } from "@/components/boot-splash";
 import { OVERSCAN_H, OVERSCAN_V } from "@/features/guide/layout";
 import { PlayerProvider } from "@/features/watch/player-context";
 import { loadSession } from "@/lib/auth";
@@ -41,6 +42,7 @@ const queryClient = new QueryClient({
  */
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
+  const [bootDone, setBootDone] = useState(false);
 
   // Input sources → the one dispatcher (tv-web's model). `useTVInput` = the TV remote D-pad (TV builds
   // only). `useHardwareKeyInput` = a physical keyboard/remote via GCKeyboard — this is what makes the
@@ -53,8 +55,6 @@ export default function RootLayout() {
     void Promise.all([loadSession(), loadDevice()]).finally(() => setReady(true));
   }, []);
 
-  if (!ready) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
-
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: C.bg }} onTouchStart={() => notifyInputActivity()}>
       <SafeAreaProvider>
@@ -65,16 +65,21 @@ export default function RootLayout() {
               overscan is applied, so the sidebar + content always move in together (no gaps). 0 on iPad /
               Apple TV (no overscan; tvOS manages its own safe area) → a no-op pass-through there. */}
           <View style={{ flex: 1, paddingHorizontal: OVERSCAN_H, paddingVertical: OVERSCAN_V }}>
-            <PlayerProvider>
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: C.bg },
-                  animation: "fade",
-                }}
-              />
-            </PlayerProvider>
+            {ready && (
+              <PlayerProvider>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: C.bg },
+                    animation: "fade",
+                  }}
+                />
+              </PlayerProvider>
+            )}
           </View>
+          {/* Animated Airwave boot splash — overlays the whole app on launch, then fades into the guide once
+              the session is loaded and the intro has played. The app mounts underneath (ready) so it's warm. */}
+          {!bootDone && <BootSplash onFinish={() => setBootDone(true)} />}
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
