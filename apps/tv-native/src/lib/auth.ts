@@ -1,12 +1,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as SecureStore from "expo-secure-store";
+
+import { CredStore } from "./cred-store";
 
 /**
  * Native equivalent of tv-web's `auth-client` + `server-url`, minus better-auth's React client:
  * the native app is a bearer-token client that talks to the SAME REST surface, so all it needs is
  * (a) where the server is and (b) the token.
  *
- *  - The **bearer token** is a credential → `expo-secure-store` (Keychain / Keystore).
+ *  - The **bearer token** is a credential → `CredStore` (Keychain/Keystore via SecureStore, except on the
+ *    Apple TV where it falls back to AsyncStorage — see `cred-store.ts` for the tvOS release-crash reason).
  *  - The **server URL** and other prefs are not secret → `AsyncStorage`.
  *
  * These are read once at startup into module-level values (mirroring tv-web, where `SERVER_URL` is
@@ -28,7 +30,7 @@ let token: string | null = null;
 export async function loadSession(): Promise<void> {
   const [storedUrl, storedToken] = await Promise.all([
     AsyncStorage.getItem(SERVER_KEY),
-    SecureStore.getItemAsync(TOKEN_KEY),
+    CredStore.getItemAsync(TOKEN_KEY),
   ]);
   if (storedUrl) serverUrl = storedUrl.replace(/\/+$/, "");
   token = storedToken ?? null;
@@ -54,8 +56,8 @@ export function getToken(): string | null {
 }
 export async function setToken(next: string | null): Promise<void> {
   token = next;
-  if (next) await SecureStore.setItemAsync(TOKEN_KEY, next);
-  else await SecureStore.deleteItemAsync(TOKEN_KEY);
+  if (next) await CredStore.setItemAsync(TOKEN_KEY, next);
+  else await CredStore.deleteItemAsync(TOKEN_KEY);
 }
 
 /** Coerce user input into a base URL (add http:// if missing, drop a trailing slash) — tv-web parity. */

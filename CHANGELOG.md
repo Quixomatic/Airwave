@@ -2,6 +2,23 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.47] - 2026-07-27
+
+### Fixed
+
+- **THE Apple TV release-build startup crash — stop using expo-secure-store on tvOS (tv-native).** The
+  release / New-Architecture tvOS build aborted at launch with `RCTFatalException: non-std C++ exception`
+  (fine in the dev client / debug). Root cause is a React Native **framework** bug,
+  [facebook/react-native#54859](https://github.com/facebook/react-native/issues/54859): on **iOS/tvOS 26 +
+  release + bridgeless**, a throwing async **void** TurboModule method isn't caught in
+  `ObjCTurboModule::performVoidMethodInvocation`, so the re-thrown exception aborts the process.
+  `expo-secure-store` is a named trigger — and our `loadSession()` reads the bearer token from the Keychain
+  at startup, where tvOS's heavily-restricted keychain throws. Added `lib/cred-store.ts`: a SecureStore-shaped
+  credential store that falls back to **AsyncStorage on the Apple TV** (`Platform.OS === "ios" && isTV`),
+  keeping the real Keychain/Keystore on iPad + Android (tvOS keychain persistence is unreliable anyway).
+  Stacks with v0.8.46, which removed the other startup trigger (GameController). Effective on the next tvOS
+  build.
+
 ## [0.8.46] - 2026-07-27
 
 ### Fixed
