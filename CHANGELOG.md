@@ -2,6 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.51] - 2026-07-27
+
+### Added
+
+- **Airwave wordmark logo on the server-setup screen (tv-native).** The same `<Logo width={100} wordmark />`
+  lockup used on the login screen now sits above the "Connect to your server" heading, so the branding is
+  consistent across onboarding (setup → login).
+
 ## [0.8.50] - 2026-07-27
 
 ### Fixed

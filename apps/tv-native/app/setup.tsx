@@ -2,6 +2,8 @@ import { useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 
+import { Logo } from "@/components/logo";
+
 import { checkHealth } from "@/lib/api";
 import { normalizeServerUrl, setServerUrl } from "@/lib/auth";
 import { LAYER, useKeyLayer } from "@/lib/input";
@@ -100,7 +102,8 @@ export default function Setup() {
     <View className="flex-1 items-center justify-center bg-bg p-10">
       <View className="w-full max-w-xl">
         <View className="mb-8 items-center">
-          <Text className="text-3xl font-extrabold tracking-tight text-fg">Connect to your server</Text>
+          <Logo width={100} wordmark />
+          <Text className="mt-5 text-3xl font-extrabold tracking-tight text-fg">Connect to your server</Text>
           <Text className="mt-2 text-center text-base leading-6 text-muted">
             Scan your network, or enter the address of your ChannelGuide server — a local IP like{" "}
             <Text className="font-mono text-[#c3c9d4]">192.168.1.50:3000</Text>, or a domain.
