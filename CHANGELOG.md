@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.72] - 2026-07-28
+
+### Fixed
+
+- **Android EAS builds failed on the `brew install` pre-install hook — guard it to macOS (tv-native).** The
+  `eas-build-pre-install` hook (added v0.8.57 to install cmake/ninja for the iOS/tvOS from-source-Hermes
+  builds) ran `brew install cmake ninja` on *every* platform. The Android build worker is Linux and has no
+  `brew` → `brew: not found` → build fails (the last Android APK, v0.8.15, predated the hook, so it only
+  surfaced now). Guarded the hook with `if command -v brew …` so it runs only where brew exists (the macOS
+  iOS/tvOS workers, which need cmake for from-source Hermes) and no-ops on the Linux Android worker (Android
+  doesn't build Hermes from source). Unblocks `preview-androidtv`.
+
 ## [0.8.71] - 2026-07-28
 
 ### Fixed
