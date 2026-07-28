@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.58] - 2026-07-28
+
+### Fixed
+
+- **Build all Expo modules from source too (`EXPO_USE_PRECOMPILED_MODULES=0`) so they link against the
+  from-source Hermes (tv-native).** The v0.8.57 build reached the **final link** and then failed on one
+  undefined symbol — `hermes::vm::NopCrashManager::~NopCrashManager()` referenced by `libExpoModulesJSI.a`, a
+  **precompiled** Expo module (EAS auto-sets `EXPO_USE_PRECOMPILED_MODULES=1`) built against the *prebuilt*
+  Hermes, which our from-source Hermes exports differently. Per Expo's docs, a from-source build must set
+  `EXPO_USE_PRECOMPILED_MODULES=0` so every Expo module compiles from source against the same Hermes/toolchain.
+  Added it to `preview-tvos`. This is the final piece of "align the whole C++ stack from source" — it makes the
+  build slower still, but it's required.
+
 ## [0.8.57] - 2026-07-28
 
 ### Fixed
