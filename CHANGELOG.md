@@ -2,6 +2,22 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.67] - 2026-07-28
+
+### Changed
+
+- **The installed apps now display as "Airwave" (tv-native + tv-web).** The in-app branding was already
+  Airwave (`APP_NAME`), but the OS-level app label still read "ChannelGuide". Fixed the user-visible name
+  everywhere it shows, without touching any namespace (bundle id `com.channelguide.tv`, Expo `name`/`slug`,
+  webOS `id` all unchanged):
+  - **iPad + Apple TV** — `ios.infoPlist.CFBundleDisplayName: "Airwave"` (Expo's `ios` config covers tvOS),
+    so the home-screen label under the icon reads "Airwave". Kept `expo.name` as "ChannelGuide" so the Xcode
+    project/target name is stable (the mpv plugin finds the app target by product type, but no reason to churn
+    the project name). **Needs a rebuild** to apply.
+  - **webOS / Tizen (tv-web)** — `appinfo.json` `title` → "Airwave" (the launcher label used by
+    `ares-install`), and the web player's browser-tab `<title>` → "Airwave". `vendor` left as "ChannelGuide"
+    (publisher metadata, not the app label — change later if wanted). Applies on the next TV package / web build.
+
 ## [0.8.66] - 2026-07-28
 
 ### Added

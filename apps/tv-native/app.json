@@ -2,7 +2,7 @@
   "expo": {
     "name": "ChannelGuide",
     "slug": "channelguide",
-    "version": "0.8.66",
+    "version": "0.8.67",
     "scheme": "channelguide",
     "orientation": "landscape",
     "userInterfaceStyle": "dark",
@@ -16,6 +16,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.channelguide.tv",
       "infoPlist": {
+        "CFBundleDisplayName": "Airwave",
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
