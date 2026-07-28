@@ -2,6 +2,22 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.56] - 2026-07-28
+
+### Changed
+
+- **Build Hermes V1 from source on the tvOS release build — THE fix for the release startup crash (tv-native).**
+  `preview-tvos` now sets `RCT_BUILD_HERMES_FROM_SOURCE=true`. Root cause of the release-only
+  `RCTFatalException: non-std C++ exception [type: facebook::jsi::JSINativeException]`: RN core is built from
+  source (`buildReactNativeFromSource`, required because the fork's Hermes V1 dropped the `inspector_modern`
+  symbols Expo's precompiled RN core expects) but Hermes stayed **prebuilt** — so RN core and Hermes carried two
+  different `jsi::` type-infos, and a `jsi::JSINativeException` thrown by Hermes couldn't be caught by RN core's
+  `catch (const std::exception&)` → it escaped as fatal (debug handles it fine). Per RN's Bundled-Hermes docs the
+  two copies of JSI must be one; `RCT_BUILD_HERMES_FROM_SOURCE=true` builds Hermes V1 from the pinned
+  `.hermesv1version` tag with the same JSI as the from-source RN core, unifying the type-info so RN catches the
+  exception and boots. Trade-off: much longer build (Hermes compiles from source). If confirmed, roll to every
+  iOS/tvOS **release** profile — the crash is iOS-26-release-generic, so an App Store iPad build needs it too.
+
 ## [0.8.55] - 2026-07-27
 
 ### Fixed
