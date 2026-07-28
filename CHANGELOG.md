@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.68] - 2026-07-28
+
+### Added
+
+- **Real Airwave launcher icon ("logo card") for the webOS TV app (tv-web).** `public/icon.png` was a blank
+  211-byte placeholder; replaced it with the Airwave cloud+wave mark on the same dark blue-navy radial gradient
+  as the native icons (opaque), at the webOS launcher size **80×80**, plus a **130×130** `largeIcon` wired into
+  `appinfo.json`. Now the C2 launcher shows a proper Airwave card, matching the iPad/Apple TV icons. Packaged
+  a ready-to-install `.ipk` via `ares-package dist --no-minify` (`apps/tv-web/build-ipk/com.channelguide.tv_0.8.68_all.ipk`);
+  install with `ares-install --device tv <ipk>` once the C2's wifi is back on. (`.ipk`/`dist` are gitignored
+  build artifacts.)
+
 ## [0.8.67] - 2026-07-28
 
 ### Changed

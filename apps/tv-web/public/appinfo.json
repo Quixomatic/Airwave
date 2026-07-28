@@ -1,11 +1,12 @@
 {
   "id": "com.channelguide.tv",
-  "version": "0.8.67",
+  "version": "0.8.68",
   "vendor": "ChannelGuide",
   "type": "web",
   "main": "index.html",
   "title": "Airwave",
   "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
   "iconColor": "#6366f1",
   "bgColor": "#0a0a0f",
   "supportPortraitMode": false,

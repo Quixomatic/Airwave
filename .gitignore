@@ -81,3 +81,6 @@ packages/api/src/**/*.d.ts
 
 # Gradle build caches from the Android native modules (packages/*/android/.gradle) — build junk.
 .gradle/
+
+# webOS ares-package output (.ipk build artifacts)
+apps/tv-web/build-ipk/
