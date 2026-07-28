@@ -2,6 +2,21 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.69] - 2026-07-28
+
+### Fixed
+
+- **Apple TV: Back exits the app at the guide root (tvOS root-exit, the analogue of tv-web's platformBack).**
+  Before, the Menu/Back key was always captured for in-app back, so at the guide root (nothing playing) Back
+  did nothing instead of leaving the app. Now the guide reactively toggles the tvOS Menu key: it's disabled
+  (so the OS backgrounds the app to the Home screen on Back) only when the guide is the focused screen AND at
+  its resting root (`zone === "grid"` and `player.layout === "off"`); any in-app back state re-enables it —
+  the rail/sidebar zone, a docked or full-screen player, or a pushed Settings screen (guide blurs). So the full
+  flow is: full chrome → Back → mini → Back → close mini → Back → **exit to the Apple TV home screen**. New
+  `setBackExitsApp()` in the input dispatcher (`disableTVMenuKey`/`enableTVMenuKey`), driven by a focus-gated
+  effect in `aurora-grid.tsx`. No-op on iPad/Android (no tvOS Menu key). Pure JS — hot-reloads on the tvOS dev
+  client; needs a `preview-tvos` rebuild to land in the release build.
+
 ## [0.8.68] - 2026-07-28
 
 ### Added

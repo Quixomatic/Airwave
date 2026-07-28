@@ -80,11 +80,10 @@ export function useTVInput() {
     TVEventControl?: { enableTVMenuKey?: () => void; disableTVMenuKey?: () => void };
   };
   const useTVEventHandler = RNTV.useTVEventHandler;
-  // Enable the tvOS Menu button so it delivers a `menu` event to our dispatcher (→ `back`) instead of
-  // the OS immediately backgrounding the app to Home. WITHOUT this, every Back press exits the app and
-  // our in-app back navigation (close Info, close panels, guide) never runs. No-op on the iPad build.
-  // ⚠️ While enabled, Menu never exits to Home — at the guide root Apple's HIG wants that. Refine later:
-  // toggle disableTVMenuKey() when there's nothing in-app left to go back to (like tv-web's platformBack).
+  // Enable the tvOS Menu button so it delivers a `menu` event to our dispatcher (→ `back`) for in-app
+  // back navigation (close Info, close panels, dock/undock the player) instead of the OS immediately
+  // backgrounding the app to Home. No-op on the iPad build. At the true guide root the guide flips this
+  // back OFF via `setBackExitsApp(true)` so Back exits to Home per Apple's HIG (see below).
   useEffect(() => {
     const ctl = RNTV.TVEventControl;
     ctl?.enableTVMenuKey?.();
@@ -96,6 +95,25 @@ export function useTVInput() {
       dispatchKey(tvEventToKey(e.eventType));
     });
   }
+}
+
+// tvOS Menu-key control, cached at module load. Lets the guide flip the Menu/Back button between
+// "in-app back" (enabled — the default) and "exit to the Home screen" (disabled) as the app enters or
+// leaves its true root — the tvOS analogue of tv-web's `platformBack()`. On tvOS, the OS only exits the
+// app when the Menu key is NOT captured, so a one-press root exit requires disabling it *before* the
+// press, i.e. reactively as the app reaches root. No-op off tvOS (TVEventControl is undefined on
+// iPad/Android — there Back is a hardware key handled by `useAndroidBack`, and iPad has no Back at all).
+const TV_MENU_CTL = (RN as unknown as {
+  TVEventControl?: { enableTVMenuKey?: () => void; disableTVMenuKey?: () => void };
+}).TVEventControl;
+
+/** At the true root (nothing in-app left to go back to), disable the Menu key so tvOS backgrounds the
+ *  app to Home on Back; otherwise keep it enabled so Back navigates in-app. Call reactively from the
+ *  screen that owns the root (the guide). No-op off tvOS. */
+export function setBackExitsApp(atRoot: boolean): void {
+  if (!TV_MENU_CTL) return;
+  if (atRoot) TV_MENU_CTL.disableTVMenuKey?.();
+  else TV_MENU_CTL.enableTVMenuKey?.();
 }
 
 /**

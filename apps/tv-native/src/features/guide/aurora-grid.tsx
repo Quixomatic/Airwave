@@ -1,5 +1,6 @@
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { LinearGradient } from "expo-linear-gradient";
+import { useFocusEffect } from "expo-router";
 import { Heart, Star } from "lucide-react-native";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Text, useWindowDimensions, View } from "react-native";
@@ -8,7 +9,7 @@ import { TvPressable as Pressable } from "@/components/tv-pressable";
 
 import { usePlayer } from "@/features/watch/player-ctx";
 import type { GuideGridChannel, GuideGridProgram, GuideMeta } from "@/lib/api";
-import { LAYER, useKeyLayer } from "@/lib/input";
+import { LAYER, setBackExitsApp, useKeyLayer } from "@/lib/input";
 import { C } from "@/lib/theme";
 import { channelTint } from "@/lib/tint";
 import { usePackages } from "@/hooks/queries";
@@ -181,6 +182,22 @@ export function AuroraGrid({
   }, []);
 
   // D-pad — the aurora-grid zone machine, ported. Drives the exact same state as touch.
+  // tvOS root exit (Apple HIG), the analogue of tv-web's platformBack: when the guide is the FOCUSED
+  // screen and sitting at its resting root (grid zone, nothing playing/docked), disable the Menu key so
+  // Back leaves the app to the Home screen. Any in-app back state re-enables it so Back navigates
+  // in-app: a rail/sidebar zone, a docked (mini) or full-screen player (`layout !== "off"`), or a pushed
+  // Settings screen (the guide blurs → `screenFocused` false). No-op off tvOS (`setBackExitsApp`).
+  const [screenFocused, setScreenFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setScreenFocused(true);
+      return () => setScreenFocused(false);
+    }, []),
+  );
+  useEffect(() => {
+    setBackExitsApp(screenFocused && zone === "grid" && player.layout === "off");
+  }, [screenFocused, zone, player.layout]);
+
   useKeyLayer({
     id: "guide",
     priority: LAYER.BASE,
@@ -220,8 +237,9 @@ export function AuroraGrid({
         else if (e.key === "down") player.blurMini();
         return true;
       }
-      // Back on the guide with a mini feed docked → stop it. (Guide root has no in-app exit on tvOS —
-      // the Home button leaves the app.)
+      // Back at the grid zone → stop a docked mini feed. At the true root (nothing playing) the Menu key
+      // is disabled (see the root-exit effect above), so on tvOS Back exits to Home and never reaches
+      // here; on the iPad (no hardware Back) this is a harmless no-op.
       if (e.key === "back") {
         if (player.layout === "mini") player.stop();
         return true;
