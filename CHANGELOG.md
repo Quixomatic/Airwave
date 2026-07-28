@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.73] - 2026-07-28
+
+### Added
+
+- **Airwave app icons for Android + Android TV (tv-native).** Extended `scripts/gen-app-icons.py` to also emit
+  the Android assets from the same Airwave mark on the dark radial gradient: an **adaptive icon** (transparent
+  `android-adaptive-fg.png` logo kept inside the launcher's safe zone + `android-adaptive-bg.png` gradient
+  background, wired into `android.adaptiveIcon.foregroundImage`/`backgroundImage`), and the **Android TV
+  leanback** assets — `android-tv-banner.png` (320×180 home-screen banner) + `android-tv-icon.png` (512×512
+  launcher icon) via the config-tv plugin's `androidTVBanner`/`androidTVIcon`. Now Android/Android TV match the
+  iPad/Apple TV/webOS icons. Native/config change → applies on the next Android build (the just-installed
+  v0.8.72 APK predates it).
+
 ## [0.8.72] - 2026-07-28
 
 ### Fixed

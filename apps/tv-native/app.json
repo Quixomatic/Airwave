@@ -2,7 +2,7 @@
   "expo": {
     "name": "ChannelGuide",
     "slug": "channelguide",
-    "version": "0.8.72",
+    "version": "0.8.73",
     "scheme": "channelguide",
     "orientation": "landscape",
     "userInterfaceStyle": "dark",
@@ -26,6 +26,8 @@
     "android": {
       "package": "com.channelguide.tv",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/icons/android-adaptive-fg.png",
+        "backgroundImage": "./assets/icons/android-adaptive-bg.png",
         "backgroundColor": "#060a14"
       }
     },
@@ -36,6 +38,8 @@
         "@react-native-tvos/config-tv",
         {
           "showVerboseWarnings": false,
+          "androidTVBanner": "./assets/icons/android-tv-banner.png",
+          "androidTVIcon": "./assets/icons/android-tv-icon.png",
           "appleTVImages": {
             "iconSmall": "./assets/icons/tv-icon-small.png",
             "iconSmall2x": "./assets/icons/tv-icon-small-2x.png",

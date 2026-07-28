@@ -41,16 +41,35 @@ def radial_bg(w: int, h: int) -> Image.Image:
 logo = Image.open(LOGO).convert("RGBA")
 
 
-def make(name: str, w: int, h: int, frac: float) -> None:
-    bg = radial_bg(w, h)
-    # Contain the logo within frac*w x frac*h, preserving aspect, centered.
+def _fit(w: int, h: int, frac: float):
     lw, lh = logo.size
     scale = min((w * frac) / lw, (h * frac) / lh)
     nw, nh = max(1, round(lw * scale)), max(1, round(lh * scale))
-    resized = logo.resize((nw, nh), Image.LANCZOS)
+    return logo.resize((nw, nh), Image.LANCZOS), nw, nh
+
+
+def make(name: str, w: int, h: int, frac: float) -> None:
+    """Logo centered on the dark radial gradient (opaque)."""
+    bg = radial_bg(w, h)
+    resized, nw, nh = _fit(w, h, frac)
     bg.paste(resized, ((w - nw) // 2, (h - nh) // 2), resized)  # logo alpha as the mask
     bg.save(os.path.join(OUT, name))
-    print(f"  {name:26s} {w}x{h}")
+    print(f"  {name:30s} {w}x{h}")
+
+
+def make_bg(name: str, w: int, h: int) -> None:
+    """The radial gradient alone — the Android adaptive-icon background layer."""
+    radial_bg(w, h).save(os.path.join(OUT, name))
+    print(f"  {name:30s} {w}x{h}  (gradient only)")
+
+
+def make_fg(name: str, w: int, h: int, frac: float) -> None:
+    """Logo centered on TRANSPARENT — the Android adaptive-icon foreground (kept inside the safe zone)."""
+    canvas = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    resized, nw, nh = _fit(w, h, frac)
+    canvas.paste(resized, ((w - nw) // 2, (h - nh) // 2), resized)
+    canvas.save(os.path.join(OUT, name))
+    print(f"  {name:30s} {w}x{h}  (transparent fg)")
 
 
 print("iOS / iPad square:")
@@ -64,4 +83,13 @@ make("tv-topshelf.png", 1920, 720, 0.46)
 make("tv-topshelf-2x.png", 3840, 1440, 0.46)
 make("tv-topshelf-wide.png", 2320, 720, 0.42)
 make("tv-topshelf-wide-2x.png", 4640, 1440, 0.42)
+
+print("Android:")
+# Adaptive icon: separate foreground (logo, transparent, kept small enough for the launcher's safe-zone
+# mask) + background (the gradient). The launcher composites + masks them to a circle/squircle.
+make_fg("android-adaptive-fg.png", 1024, 1024, 0.52)
+make_bg("android-adaptive-bg.png", 1024, 1024)
+# Android TV leanback: the home-screen banner (320x180) + the launcher/mipmap icon.
+make("android-tv-banner.png", 320, 180, 0.52)
+make("android-tv-icon.png", 512, 512, 0.60)
 print("done")
