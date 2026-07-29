@@ -2,6 +2,11 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.0] - 2026-07-28
+
+Version-line bump to **0.9.x** — the tv-native clients (iPad, Apple TV, Android/Android TV) and webOS are all
+shipping and branded as Airwave. No functional change; patch bumps continue from here.
+
 ## [0.8.75] - 2026-07-28
 
 ### Fixed / Added
