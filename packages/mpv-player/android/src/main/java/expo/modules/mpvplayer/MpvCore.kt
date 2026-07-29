@@ -38,10 +38,16 @@ interface MpvCoreDelegate {
 class MpvCore(private val appContext: Context) {
   var delegate: MpvCoreDelegate? = null
 
-  // The video output. gpu-NEXT (not gpu) is what enables HDR on Android mpv — it auto-detects the display
-  // and, with target-colorspace-hint, switches an HDR panel into HDR + passes the metadata through (the
-  // Apple analogue is the AVDisplayManager display-mode switch). Both reference players use gpu-next.
-  private val vo = "gpu-next"
+  // The video output. PATH A EXPERIMENT (v0.9.1): mpv's OpenGL-ES VO (gpu-next) CANNOT do HDR passthrough on
+  // Android — it ALWAYS tone-maps HDR→SDR (findroid #645, mpv-android #874, libplacebo author confirmed),
+  // which is exactly why HDR played as low-frame-rate SDR (the per-frame tone-map is what tanked the frame
+  // rate on the Streamer's GPU). `mediacodec_embed` instead lets MediaCodec render decoded frames DIRECTLY to
+  // the SurfaceView (Google's official HDR-video path, the same one ExoPlayer uses) → real HDR10/HLG
+  // passthrough + NO GPU tone-map (frame rate recovers). Trade-off: mpv gives up its own renderer (no
+  // gpu-next scaling / OSD / subtitle rendering / panscan) — acceptable for us (subs are server-burned and we
+  // direct-play). REVERT = change this one line back to "gpu-next" (+ hwdec below). See `.plans/tv-native.md`
+  // §13 for the full analysis + the ExoPlayer alternative (Path C).
+  private val vo = "mediacodec_embed"
 
   // A single scope drives create + all Flow collectors. MpvPlayer's suspend calls submit through its own
   // internal single-threaded native dispatcher, so ordering (options → loadfile) is preserved for us.
@@ -65,12 +71,17 @@ class MpvCore(private val appContext: Context) {
         MpvPlayer.create(appContext) {
           // Android render path — the mpv-android / findroid recipe.
           setOption("vo", vo)
+          // gpu-context / opengl-es configure the gpu-next VO; inert under mediacodec_embed but left in place
+          // so reverting `vo` to "gpu-next" restores the working GL config in one line.
           setOption("gpu-context", "android")
           setOption("opengl-es", "yes")
-          setOption("hwdec", "mediacodec,mediacodec-copy")
+          // mediacodec_embed needs the DIRECT (zero-copy) MediaCodec decoder that renders straight to the
+          // surface — the "-copy" variant reads frames back to the CPU and can't feed the embed VO. (Was
+          // "mediacodec,mediacodec-copy" under the gpu-next VO.)
+          setOption("hwdec", "mediacodec")
           setOption("ao", "audiotrack")
-          // HDR (step 2): make gpu-next signal the target colorspace so an HDR display switches into HDR
-          // and the metadata passes through. gpu-next tone-maps to SDR when the display can't do HDR.
+          // gpu-next-only (inert under mediacodec_embed, which passes HDR through natively). Left in place so
+          // reverting `vo` to "gpu-next" restores the prior config in one line.
           setOption("target-colorspace-hint", "yes")
           // Keep the last frame at EOF so a seek-back after the program ends still works.
           setOption("keep-open", "yes")

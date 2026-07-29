@@ -2,6 +2,27 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.1] - 2026-07-28
+
+### Changed
+
+- **Android HDR (Path A experiment): switch the Android mpv VO to `mediacodec_embed` (tv-native).** v0.8.75's
+  HDR attempt (`vo=gpu-next` + `target-colorspace-hint`) played HDR as **low-frame-rate SDR** on the Google TV
+  Streamer — because mpv's OpenGL-ES Android VO (gpu-next) **fundamentally cannot do HDR passthrough; it always
+  tone-maps HDR→SDR** (confirmed by findroid #645, mpv-android #874, and libplacebo's author), and that
+  per-frame tone-map is what tanked the frame rate. So v0.8.75's "gpu-next is the whole HDR story" premise was
+  wrong. This swaps the Android VO to **`mediacodec_embed`**, which lets MediaCodec render decoded frames
+  **directly to the SurfaceView** — Google's official HDR-video path (the same one ExoPlayer uses) — so
+  HDR10/HLG pass through to the panel with no GPU tone-map (frame rate should recover). Also set
+  `hwdec=mediacodec` (the direct/zero-copy decoder `mediacodec_embed` requires; the `-copy` variant reads
+  frames back to the CPU and can't feed it). Trade-off: mpv gives up its own renderer on Android (no gpu-next
+  scaling / OSD / subtitle rendering / panscan) — acceptable here since subtitles are server-burned and we
+  direct-play. Android-only; the Apple/JS side is untouched, and it's a one-line revert back to `gpu-next`.
+  **Native → needs an EAS Android build to validate on the Streamer** (HDR lights + frame rate recovers + DVR /
+  surface-lifecycle / bumper-rollover still work); if it regresses SDR or doesn't light HDR, revert. The full
+  analysis + the ExoPlayer alternative (Path C: ExoPlayer for HDR-only on Android) are documented in the
+  tv-native plan (§13).
+
 ## [0.9.0] - 2026-07-28
 
 Version-line bump to **0.9.x** — the tv-native clients (iPad, Apple TV, Android/Android TV) and webOS are all
