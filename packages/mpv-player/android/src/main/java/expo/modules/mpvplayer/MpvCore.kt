@@ -12,6 +12,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /** Events surfaced from the mpv flows up to the Expo view (mirrors the iOS `MpvCoreDelegate`). */
 interface MpvCoreDelegate {
@@ -27,13 +28,20 @@ interface MpvCoreDelegate {
  * A focused libmpv wrapper — the Android twin of `ios/MpvCore.swift`. Binds the `dev.jdtech.mpv.MpvPlayer`
  * coroutine API (from the edde746/libmpv-android AAR): `create` + pre-init options, `loadfile … -1
  * start=<offset>` (the fast ffmpeg-estimated seek), and property/event Flow collection → delegate events.
- * Renders via the Android `gpu` VO into a caller-supplied Surface (a SurfaceView).
+ * Renders via the Android `gpu-next` VO into a caller-supplied Surface (a SurfaceView).
  *
  * Everything the JS contract exposes matches the iOS module 1:1, so tv-web/tv-native's effectiveTime/DVR
- * clock maps onto it unchanged.
+ * clock maps onto it unchanged. The Android *surface lifecycle* + *HDR* follow the two canonical mpv-Android
+ * references (`.refs/mpv-android/.../BaseMPVView.kt` + `.refs/findroid/.../mpv/MPVPlayer.kt`), NOT plezy
+ * (whose Android HDR lives on its ExoPlayer path, not mpv).
  */
 class MpvCore(private val appContext: Context) {
   var delegate: MpvCoreDelegate? = null
+
+  // The video output. gpu-NEXT (not gpu) is what enables HDR on Android mpv — it auto-detects the display
+  // and, with target-colorspace-hint, switches an HDR panel into HDR + passes the metadata through (the
+  // Apple analogue is the AVDisplayManager display-mode switch). Both reference players use gpu-next.
+  private val vo = "gpu-next"
 
   // A single scope drives create + all Flow collectors. MpvPlayer's suspend calls submit through its own
   // internal single-threaded native dispatcher, so ordering (options → loadfile) is preserved for us.
@@ -55,18 +63,24 @@ class MpvCore(private val appContext: Context) {
     scope.launch {
       val p = try {
         MpvPlayer.create(appContext) {
-          // Android render path (plezy's proven recipe): the GL VO with MediaCodec hw decode.
-          setOption("vo", "gpu")
+          // Android render path — the mpv-android / findroid recipe.
+          setOption("vo", vo)
           setOption("gpu-context", "android")
           setOption("opengl-es", "yes")
           setOption("hwdec", "mediacodec,mediacodec-copy")
           setOption("ao", "audiotrack")
+          // HDR (step 2): make gpu-next signal the target colorspace so an HDR display switches into HDR
+          // and the metadata passes through. gpu-next tone-maps to SDR when the display can't do HDR.
+          setOption("target-colorspace-hint", "yes")
           // Keep the last frame at EOF so a seek-back after the program ends still works.
           setOption("keep-open", "yes")
           // Big, forward-biased network cache for smooth LAN direct-play + resilient seeks.
           setOption("cache", "yes")
           setOption("demuxer-max-bytes", "150MiB")
           setOption("demuxer-max-back-bytes", "50MiB")
+          // Don't init the VO until a surface exists — mpv-android sets this to avoid a premature VO init
+          // before surfaceCreated(); attachSurface() flips it back to "yes".
+          setOption("force-window", "no")
           for ((k, v) in options) setOption(k, v)
         }
       } catch (e: Exception) {
@@ -75,8 +89,8 @@ class MpvCore(private val appContext: Context) {
       }
       player = p
 
-      // A surface may have arrived (surfaceCreated) before create finished.
-      pendingSurface?.let { p.attachSurface(it) }
+      // A surface may have arrived (surfaceCreated) before create finished — attach it the full way.
+      pendingSurface?.let { attachSurfaceInternal(p, it) }
 
       // Observe the running state. Dims/duration are read synchronously at the load event instead (see
       // maybeEmitLoad), matching the iOS core — a direct get returns the current value even when the new
@@ -86,7 +100,7 @@ class MpvCore(private val appContext: Context) {
 
       p.eventFlow.onEach { handleEvent(it) }.launchIn(scope)
       // Forward mpv's own logs to logcat (`adb logcat -s MpvCore`) — invaluable for diagnosing
-      // no-frame / decode / VO issues on device.
+      // no-frame / decode / VO / HDR issues on device.
       p.logFlow.onEach { android.util.Log.i("MpvCore", "[${it.level}] ${it.prefix}: ${it.text}") }.launchIn(scope)
 
       // A load() may have been requested before create() finished (create is suspend) — run it now.
@@ -144,15 +158,42 @@ class MpvCore(private val appContext: Context) {
   fun seek(seconds: Double) = launchOnPlayer { it.command("seek", seconds.toString(), "absolute") }
 
   // MARK: surface
+  //
+  // The surface lifecycle IS the Android playback-hardening fix. mpv's VO holds a raw pointer to the Android
+  // surface; if the surface is destroyed (view repositioned full↔mini, backgrounded, or reconfigured) while
+  // the VO is still active, the next render/reconfig hits a dangling pointer → "Missing surface pointer" →
+  // "no video". Because the DVR tune-in seeks to the live offset on load, that reconfig happened immediately
+  // → DVR never activated. The canonical fix (mpv-android BaseMPVView / findroid MPVPlayer): DISABLE the VO
+  // (`vo=null`) before detaching, and RE-ENABLE it after re-attaching.
+
+  private suspend fun attachSurfaceInternal(p: MpvPlayer, surface: Surface) {
+    p.attachSurface(surface)
+    // Force a window + bring the VO back (it is "null" after any prior detach). Order matters: surface
+    // first, then the VO is pointed at it.
+    p.setProperty("force-window", "yes")
+    p.setProperty("vo", vo)
+  }
 
   fun attachSurface(surface: Surface) {
     pendingSurface = surface
-    player?.attachSurface(surface)
+    val p = player ?: return // setup() attaches pendingSurface once create() finishes
+    scope.launch { attachSurfaceInternal(p, surface) }
   }
 
   fun detachSurface() {
     pendingSurface = null
-    player?.detachSurface()
+    val p = player ?: return
+    // Disable the VO + force-window BEFORE detaching so mpv stops rendering to the surface instead of
+    // holding a dangling pointer. runBlocking mirrors mpv-android's SYNCHRONOUS teardown: the surface is
+    // invalid the instant surfaceDestroyed() returns, so vo=null must land first (mpv-android notes even
+    // this can't fully guarantee VO deinit finished — it's the best-effort the reference settles on).
+    runBlocking {
+      runCatching {
+        p.setProperty("vo", "null")
+        p.setProperty("force-window", "no")
+      }
+    }
+    runCatching { p.detachSurface() }
   }
 
   fun setSurfaceSize(width: Int, height: Int) = launchOnPlayer {

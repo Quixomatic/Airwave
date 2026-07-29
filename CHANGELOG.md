@@ -2,6 +2,29 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.8.75] - 2026-07-28
+
+### Fixed / Added
+
+- **Android mpv: surface-lifecycle hardening (fixes DVR/no-video) + HDR via gpu-next (tv-native).** Two
+  Android-mpv-only changes in `packages/mpv-player/android/MpvCore.kt` — the Apple/Swift core + JS contract are
+  untouched. Grounded in the two canonical mpv-Android references (cloned to `.refs/mpv-android` +
+  `.refs/findroid`, which uses our exact `dev.jdtech.mpv` AAR); NOT plezy (its Android HDR is on ExoPlayer).
+  - **Step 1 — surface lifecycle (the real unblocker).** mpv's VO holds a raw pointer to the Android surface;
+    our old teardown just called `detachSurface()`, so when the surface was destroyed/reconfigured with the VO
+    still active, the next reconfig hit a dangling pointer → "Missing surface pointer" → no video. Because the
+    DVR tune-in seeks to the live offset on load, that reconfig fired immediately → **DVR never activated**.
+    Adopted mpv-android/findroid's exact order: **disable the VO (`vo=null`) + `force-window=no` BEFORE
+    `detachSurface`**, and re-attach + restore the VO on `surfaceCreated`. The detach runs synchronously
+    (`runBlocking`, on the main-thread `surfaceDestroyed`) because the surface is freed the instant that
+    callback returns — async would reintroduce the race.
+  - **Step 2 — HDR.** Switched the VO `gpu` → **`gpu-next`** (the entire Android-mpv HDR story per both
+    references) + `target-colorspace-hint=yes` to force the display into HDR + pass metadata through on an HDR
+    panel (the analogue of the Apple `AVDisplayManager` switch); tone-maps to SDR otherwise.
+  - **Native → needs an EAS Android build to compile + validate on the Streamer.** HDR passthrough on Android
+    mpv is a known-imperfect area (findroid #645), so step 2 may need on-device iteration; step 1 is the solid
+    fix that makes DVR + all content play.
+
 ## [0.8.74] - 2026-07-28
 
 ### Fixed
