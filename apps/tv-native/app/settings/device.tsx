@@ -1,9 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import { useContext, useEffect, useRef } from "react";
 import { Platform, Text, View } from "react-native";
 
+import { TvPressable as Pressable } from "@/components/tv-pressable";
 import { scaled } from "@/features/guide/layout";
-import { PageHeader, Pill, SectionLabel, SettingRow, Toggle, useSettingsPage } from "@/features/settings/settings-ui";
+import { PageHeader, Pill, SectionLabel, SettingRow, SettingsCtx, Toggle, useSettingsPage } from "@/features/settings/settings-ui";
 import { api, type CapKind, type CapTokenState, type DeviceCapView } from "@/lib/api";
 import { deviceId } from "@/lib/device";
 
@@ -67,15 +69,18 @@ export default function DeviceSettings() {
     }
   };
 
-  const count = tools.length + flatTokens.length + (hasOverrides ? 1 : 0);
+  const errors = data?.recentErrors ?? [];
+  const resetIndex = tools.length + flatTokens.length; // the "Reset to diagnostic" row (only when hasOverrides)
+  const errorsBase = resetIndex + (hasOverrides ? 1 : 0); // recent-issue focus stops follow it
+  const count = errorsBase + errors.length;
   const { sel } = useSettingsPage(count, (i) => {
     if (i < tools.length) return tools[i]!.onPress();
     const ti = i - tools.length;
     if (ti < flatTokens.length) return void toggle(flatTokens[ti]!.kind, flatTokens[ti]!.t);
-    void reset();
+    if (hasOverrides && i === resetIndex) return void reset();
+    // recent-issue focus stops (errorsBase..) are informational → OK does nothing.
   });
 
-  const resetIndex = tools.length + flatTokens.length;
   // Flat D-pad index of each group's first token (tokens are contiguous after the tools).
   const groupBases: number[] = [];
   {
@@ -144,22 +149,14 @@ export default function DeviceSettings() {
         </View>
       )}
 
-      {data?.recentErrors?.length ? (
+      {errors.length ? (
         <>
           <SectionLabel>Recent playback issues</SectionLabel>
-          <View style={scaled({ borderRadius: 14, backgroundColor: "rgba(148,163,184,0.06)", paddingHorizontal: 22, paddingVertical: 6 })}>
-            {data.recentErrors.map((e, i) => (
-              <View key={i} style={scaled({ paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: "rgba(148,163,184,0.1)" })}>
-                <Text style={scaled({ fontSize: 15, color: "#e6eaf1" })}>
-                  {e.channelName ?? e.title ?? "—"}
-                  <Text style={{ color: "#64748b" }}>
-                    {" · "}
-                    {[e.sourceContainer, e.sourceVideoCodec, e.sourceAudioCodec].filter(Boolean).join("/") || "—"}
-                    {e.mode ? ` · ${e.mode}` : ""}
-                  </Text>
-                </Text>
-                {e.error ? <Text style={scaled({ fontSize: 13, color: "#f87171", marginTop: 2 })}>{e.error}</Text> : null}
-              </View>
+          {/* Informational, but each is a D-pad focus stop so the list is reachable + scrolls into view on
+              a TV (there's nothing interactive here otherwise, so it was previously unreachable by remote). */}
+          <View style={scaled({ borderRadius: 14, backgroundColor: "rgba(148,163,184,0.06)", paddingHorizontal: 12, paddingVertical: 6 })}>
+            {errors.map((e, i) => (
+              <ErrorRow key={i} e={e} first={i === 0} focused={sel === errorsBase + i} />
             ))}
           </View>
         </>
@@ -190,6 +187,41 @@ function TokenRow({ t, focused, onPress }: { t: CapTokenState; focused: boolean;
         </View>
       }
     />
+  );
+}
+
+type RecentError = NonNullable<DeviceCapView["recentErrors"]>[number];
+
+/** A recent-playback-issue row — informational, but a D-pad focus stop so the list is reachable and
+ *  snap-scrolls into view on a TV (mirrors the SettingRow ensureVisible-on-focus). OK does nothing. */
+function ErrorRow({ e, first, focused }: { e: RecentError; first: boolean; focused: boolean }) {
+  const ref = useRef<View>(null);
+  const { ensureVisible } = useContext(SettingsCtx);
+  useEffect(() => {
+    if (focused) ensureVisible(ref.current);
+  }, [focused, ensureVisible]);
+  return (
+    <Pressable
+      ref={ref}
+      style={scaled({
+        paddingVertical: 12,
+        paddingHorizontal: 10,
+        borderRadius: 8,
+        borderTopWidth: first || focused ? 0 : 1,
+        borderTopColor: "rgba(148,163,184,0.1)",
+        backgroundColor: focused ? "rgba(74,159,224,0.12)" : "transparent",
+      })}
+    >
+      <Text style={scaled({ fontSize: 15, color: "#e6eaf1" })}>
+        {e.channelName ?? e.title ?? "—"}
+        <Text style={{ color: "#64748b" }}>
+          {" · "}
+          {[e.sourceContainer, e.sourceVideoCodec, e.sourceAudioCodec].filter(Boolean).join("/") || "—"}
+          {e.mode ? ` · ${e.mode}` : ""}
+        </Text>
+      </Text>
+      {e.error ? <Text style={scaled({ fontSize: 13, color: "#f87171", marginTop: 2 })}>{e.error}</Text> : null}
+    </Pressable>
   );
 }
 

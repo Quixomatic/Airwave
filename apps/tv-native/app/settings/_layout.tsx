@@ -1,6 +1,6 @@
 import { Slot, usePathname, useRouter } from "expo-router";
 import { ArrowLeft, Cpu, Info, Server as ServerIcon, SlidersHorizontal, UserRound } from "lucide-react-native";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 
 import { TvPressable as Pressable } from "@/components/tv-pressable";
@@ -86,6 +86,41 @@ export default function SettingsShell() {
 
   const expanded = zone === "rail";
 
+  // D-pad snap-scroll for the content pane. `SettingRow` calls `ensureVisible` when it gains focus; the
+  // shell measures the row's position within the scroll content and snaps it into view ONLY when it's
+  // off-screen (mirrors the guide grid + guide sidebar). measureLayout is used because rows are nested in
+  // sections/columns, so a plain onLayout Y wouldn't be content-relative.
+  const scrollRef = useRef<ScrollView>(null);
+  const contentRef = useRef<View>(null);
+  const viewHRef = useRef(0);
+  const scrollYRef = useRef(0);
+  const ensureVisible = useCallback((node: View | null) => {
+    const content = contentRef.current;
+    const sv = scrollRef.current;
+    const h = viewHRef.current;
+    if (!node || !content || !sv || h <= 0) return;
+    node.measureLayout(
+      content,
+      (_x, y, _w, hh) => {
+        const cushion = cs(20); // leave breathing room above/below the focused row
+        const off = scrollYRef.current;
+        const top = y - cushion;
+        const bottom = y + hh + cushion;
+        if (top < off) {
+          const ny = Math.max(0, top);
+          sv.scrollTo({ y: ny, animated: false });
+          scrollYRef.current = ny;
+        } else if (bottom > off + h) {
+          const ny = bottom - h;
+          sv.scrollTo({ y: ny, animated: false });
+          scrollYRef.current = ny;
+        }
+        // else: already fully visible → leave it put.
+      },
+      () => {},
+    );
+  }, []);
+
   return (
     // Full-bleed on Apple TV / iPad (a plain View — NOT SafeAreaView, which on tvOS applies the title-safe
     // overscan margin on all four edges and pushed the whole shell + sidebar massively inward). The
@@ -94,10 +129,22 @@ export default function SettingsShell() {
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={{ flex: 1, flexDirection: "row" }}>
         <View style={{ width: cs(SIDEBAR_SLIVER_W), flexShrink: 0 }} />
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={scaled({ maxWidth: 1024, width: "100%", alignSelf: "center", paddingVertical: 40, paddingHorizontal: 48 })}>
-          <SettingsCtx.Provider value={{ active: zone === "content", returnToRail }}>
-            <Slot />
-          </SettingsCtx.Provider>
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          onLayout={(e) => { viewHRef.current = e.nativeEvent.layout.height; }}
+          onScroll={(e) => { scrollYRef.current = e.nativeEvent.contentOffset.y; }}
+          scrollEventThrottle={16}
+        >
+          {/* Inner content view carries the max-width/centering/padding (moved off contentContainerStyle) so
+              it's a stable measurement root: a focused row's y measured against this view maps 1:1 to the
+              scroll offset. */}
+          <View ref={contentRef} style={scaled({ maxWidth: 1024, width: "100%", alignSelf: "center", paddingVertical: 40, paddingHorizontal: 48 })}>
+            <SettingsCtx.Provider value={{ active: zone === "content", returnToRail, ensureVisible }}>
+              <Slot />
+            </SettingsCtx.Provider>
+          </View>
         </ScrollView>
       </View>
 

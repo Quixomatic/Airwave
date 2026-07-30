@@ -14,8 +14,13 @@ import { LAYER, useKeyLayer } from "@/lib/input";
  */
 export const SETTINGS_ACCENT = "#4a9fe0";
 
-export type SettingsCtxValue = { active: boolean; returnToRail: () => void };
-export const SettingsCtx = createContext<SettingsCtxValue>({ active: false, returnToRail: () => {} });
+export type SettingsCtxValue = {
+  active: boolean;
+  returnToRail: () => void;
+  /** Ask the shell's ScrollView to snap a focused row into view (no-op if already visible). */
+  ensureVisible: (node: View | null) => void;
+};
+export const SettingsCtx = createContext<SettingsCtxValue>({ active: false, returnToRail: () => {}, ensureVisible: () => {} });
 
 export function useSettingsPage(count: number, onActivate: (i: number) => void) {
   const { active, returnToRail } = useContext(SettingsCtx);
@@ -78,8 +83,17 @@ export function SettingRow({
   onPress?: () => void;
   right?: ReactNode;
 }) {
+  // When the D-pad focuses this row, ask the shell to snap it into view (mirrors the guide grid's
+  // "scroll only when off-screen" — the shell no-ops if the row is already fully visible). onLayout Y is
+  // parent-relative in this nested layout, so the shell measures the row against the scroll content.
+  const rowRef = useRef<View>(null);
+  const { ensureVisible } = useContext(SettingsCtx);
+  useEffect(() => {
+    if (focused) ensureVisible(rowRef.current);
+  }, [focused, ensureVisible]);
   return (
     <Pressable
+      ref={rowRef}
       onPress={onPress}
       style={scaled({
         flexDirection: "row",

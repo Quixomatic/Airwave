@@ -2,6 +2,23 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.4] - 2026-07-28
+
+### Fixed
+
+- **Settings pages snap-scroll the D-pad selection into view, and the Device page's "Recent playback issues"
+  are now reachable by remote (tv-native).** Like the guide grid and the guide sidebar, the settings content
+  pane now keeps the focused row on screen: when a D-pad-focused `SettingRow` would fall outside the shell's
+  ScrollView it snaps into view (no animation, "only when off-screen"), measured via `measureLayout` against
+  the scroll content (rows are nested in sections/columns, so a plain `onLayout` Y isn't content-relative).
+  Wired through `SettingsCtx.ensureVisible`, so every settings page (Device / Server / User / General) gets it.
+  On the **Device** page the codec toggles could overflow the screen with no way to scroll, and the "Recent
+  playback issues" list had no focusable rows at all — so it was unreachable by remote. Each recent issue is
+  now an (informational) D-pad focus stop: you can scroll down to see them and they snap into view; OK does
+  nothing on them. Pure JS — hot-reloads. _(Known/deferred: the codec grid's column-major D-pad flow still
+  "zig-zags" from the bottom of column 1 to the top of column 2 — true 2D up/down/left/right nav is a separate
+  change for later.)_
+
 ## [0.9.3] - 2026-07-28
 
 ### Fixed
