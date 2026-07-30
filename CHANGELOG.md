@@ -2,6 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.14] - 2026-07-30
+
+### Added
+
+- **Airwave logo in the admin — About page + animated on login (web).** Ported tv-web's `<Logo>` (the
+  cloud+wave mark + optional "Airwave" wordmark) into `apps/web`, made theme-aware (the wordmark uses
+  `currentColor` instead of the TV app's hardcoded white). It shows as a static lockup in the About page's
+  Frame header (left-aligned with the title/description) and as an **animated** entrance above the login card
+  (the mark fades + scales in, then the wordmark letters cascade). Added `framer-motion` to the admin and the
+  `logo.png` asset to `apps/web/public`.
+
 ## [0.9.13] - 2026-07-30
 
 ### Changed

@@ -1,6 +1,6 @@
 {
   "name": "web",
-  "version": "0.9.13",
+  "version": "0.9.14",
   "private": true,
   "type": "module",
   "scripts": {
@@ -29,6 +29,7 @@
     "better-auth": "catalog:",
     "cronstrue": "3.14.0",
     "dotenv": "catalog:",
+    "framer-motion": "^12.42.2",
     "hls.js": "^1.6.16",
     "lucide-react": "catalog:",
     "next-themes": "catalog:",

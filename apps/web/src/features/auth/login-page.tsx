@@ -15,6 +15,7 @@ import { Input } from "@ChannelGuide/ui/components/input";
 
 import { GithubIcon } from "@/components/icons/github-icon";
 import { GoogleIcon } from "@/components/icons/google-icon";
+import { Logo } from "@/components/logo";
 import { signIn } from "@/lib/auth-client";
 
 type Mode = "password" | "magic";
@@ -122,7 +123,8 @@ export function LoginPage() {
 
   // ── Default: Plex / social + email sign-in ────────────────────────
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="text-foreground flex min-h-screen flex-col items-center justify-center gap-8 bg-background p-4">
+      <Logo markWidth={72} wordmark animate />
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl">Sign In</CardTitle>
