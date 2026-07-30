@@ -127,7 +127,7 @@ function SessionTile({ s }: { s: ActiveSession }) {
         {/* Device + connection */}
         <div className="bg-muted/40 space-y-1.5 p-4">
           <DetailRow icon={<Monitor className="size-3.5" />} label="Device">
-            {s.device ? (s.device.model ?? s.device.platform ?? s.device.id) : "—"}
+            {s.device ? (s.device.model ?? s.device.platform ?? s.device.id) : "Unknown"}
           </DetailRow>
           <DetailRow icon={<Radio className="size-3.5" />} label="Connection">
             <ConnectionBadge connection={s.connection} />
@@ -195,9 +195,19 @@ function DetailRow({ icon, label, children }: { icon?: React.ReactNode; label: s
   );
 }
 
+// Muted "Unknown" chip — used for every missing chip value so rows keep a consistent height across tiles.
+const MUTED_BADGE = "border-muted-foreground/20 bg-muted text-muted-foreground";
+function UnknownBadge() {
+  return (
+    <Badge variant="outline" className={MUTED_BADGE}>
+      Unknown
+    </Badge>
+  );
+}
+
 /** copy = Direct Play (emerald); transcode = Transcode (amber). */
 function StreamBadge({ decision, codec }: { decision: string | null; codec: string | null }) {
-  if (!decision && !codec) return <span className="text-muted-foreground">—</span>;
+  if (!decision && !codec) return <UnknownBadge />;
   const transcode = decision === "transcode";
   return (
     <Badge
@@ -215,7 +225,7 @@ function StreamBadge({ decision, codec }: { decision: string | null; codec: stri
 }
 
 function ConnectionBadge({ connection }: { connection: string | null }) {
-  if (!connection) return <span className="text-muted-foreground">—</span>;
+  if (!connection) return <UnknownBadge />;
   const cls =
     connection === "local"
       ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-600"

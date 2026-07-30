@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.11] - 2026-07-30
+
+### Fixed
+
+- **Sessions tiles were different heights — missing values now render "Unknown" consistently (web).** Empty
+  chip values (Connection / Video / Audio) rendered as a short `—` text span while populated tiles showed
+  full-height badges, so tiles varied in height. Missing chip values now render a muted **"Unknown" badge**
+  (same height as a real one) and the Device text falls back to "Unknown", so every row keeps a consistent
+  height across tiles. Frontend-only.
+
 ## [0.9.10] - 2026-07-30
 
 ### Changed
