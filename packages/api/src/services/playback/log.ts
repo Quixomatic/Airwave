@@ -25,6 +25,46 @@ export type PlaybackLogInput = {
   error?: string | null;
 };
 
+/** A flat view of the Plex delivery decision — declared so the tRPC output type stays shallow (the raw
+ *  Prisma JsonValue is deeply recursive and blows up client-side type inference — TS2589). */
+type StreamDecision = {
+  videoDecision?: string;
+  audioDecision?: string;
+  videoCodec?: string;
+  audioCodec?: string;
+  container?: string;
+} | null;
+
+/** Recent play logs across all users — the admin "Recent sessions & play logs" view. Each row is one
+ *  tune attempt with its full delivery diagnostics (mode/codecs/decision/connection/outcome). */
+export async function listRecentPlaybackLogs(prisma: PrismaClient, limit = 30) {
+  const rows = await prisma.playbackLog.findMany({
+    orderBy: { createdAt: "desc" },
+    take: Math.min(Math.max(limit, 1), 100),
+    include: { user: { select: { name: true, email: true } } },
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    user: r.user.name || r.user.email,
+    deviceId: r.deviceId,
+    channelId: r.channelId,
+    channelName: r.channelName,
+    ratingKey: r.ratingKey,
+    title: r.title,
+    mode: r.mode,
+    sourceContainer: r.sourceContainer,
+    sourceVideoCodec: r.sourceVideoCodec,
+    sourceAudioCodec: r.sourceAudioCodec,
+    decision: (r.decision ?? null) as unknown as StreamDecision,
+    connection: r.connection,
+    outcome: r.outcome,
+    decodedWidth: r.decodedWidth,
+    decodedHeight: r.decodedHeight,
+    error: r.error,
+    createdAt: r.createdAt,
+  }));
+}
+
 export async function logPlayback(prisma: PrismaClient, userId: string, i: PlaybackLogInput) {
   const row = await prisma.playbackLog.create({
     data: {

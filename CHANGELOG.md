@@ -2,6 +2,37 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.8] - 2026-07-30
+
+### Added
+
+- **New Settings → Sessions page — a Plex-style "Now Playing" for ChannelGuide (web).** A new `/settings/sessions`
+  tab with two sections, built on the Frame component pattern:
+  - **Active sessions** — a fixed-width tile per live viewer (wraps Plex-style, not full-width), sectioned:
+    cover art + title + SxEy/episode + **program progress bar** + Live/−behind + channel; the **device** +
+    **connection** (local/remote/relay); per-stream **Video** and **Audio** delivery (Direct Play vs Transcode
+    + codec); Subtitles; and who's watching. Auto-refreshes every 5s (same cadence as the guide's session chip).
+  - **Recent sessions & play logs** — the last 40 tunes across all devices with the delivery decision,
+    connection, decoded resolution, an **outcome** badge (Playing / No-frames / Error) + error text, viewer,
+    device, and relative time.
+  - Backend: enriched `playback.sessions` (joins the current schedule slot for progress + episode metadata,
+    the latest matching play-log for the delivery/transcode detail, and the device) and a new
+    `playback.recentLogs` query. Artwork shows at its **natural aspect ratio** via the `/img` proxy (a new
+    raw/no-resize mode on `channelImg` so posters aren't square-cropped). **No schema change.**
+
+### Fixed
+
+- **tv-native now reports how far behind live it is (`delaySeconds` + `positionAt`) in its heartbeat.** The
+  native heartbeat only sent channel / state / ratingKey / title, so the server defaulted `delaySeconds` to 0
+  — every iPad / Apple TV / Android session read as **"Live" at 0:00** in the Sessions view (and cross-device
+  resume had no position to seed). It now computes both from the effectiveTime clock, matching tv-web's
+  `use-channel-player`. So the Sessions tiles show real Live/−behind + program progress for native clients.
+  Pure JS — hot-reloads.
+
+### Note
+
+- The API server must restart to expose the new `playback.recentLogs` query (a `packages/api` change).
+
 ## [0.9.7] - 2026-07-30
 
 ### Changed

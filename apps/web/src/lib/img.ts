@@ -8,10 +8,12 @@ function serverBase(): string {
 
 /**
  * URL for the public artwork proxy of a SAVED channel's media source — the same `/img/:channelId` proxy
- * the TV app uses for cover art (streams Plex art through the source token, optional `w` resize). Returns
- * null when there's no art path.
+ * the TV app uses for cover art (streams Plex art through the source token). Returns null when there's no
+ * art path. `w` requests a Plex resize (a square-ish cover crop via the proxy's transcode); pass `null` to
+ * get the RAW image at its natural aspect ratio (e.g. a tall poster shown as-is, not cropped).
  */
-export function channelImg(channelId: string, path: string | undefined | null, w = 200): string | null {
+export function channelImg(channelId: string, path: string | undefined | null, w: number | null = 200): string | null {
   if (!path) return null;
-  return `${serverBase()}/img/${channelId}?path=${encodeURIComponent(path)}&w=${w}`;
+  const base = `${serverBase()}/img/${channelId}?path=${encodeURIComponent(path)}`;
+  return w == null ? base : `${base}&w=${w}`;
 }

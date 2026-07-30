@@ -9,6 +9,7 @@ import {
   resolveMedia,
   stopChannelTranscode,
 } from "../services/playback/broker";
+import { listRecentPlaybackLogs } from "../services/playback/log";
 import {
   endWatchSession,
   heartbeatSession,
@@ -103,4 +104,9 @@ export const playbackRouter = router({
 
   /** Active watch sessions — the admin "Now Watching" view. */
   sessions: adminProcedure.query(({ ctx }) => listActiveSessions(ctx.prisma)),
+
+  /** Recent play logs across all users — the admin "Recent sessions & play logs" view. */
+  recentLogs: adminProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(100).default(30) }).optional())
+    .query(({ ctx, input }) => listRecentPlaybackLogs(ctx.prisma, input?.limit ?? 30)),
 });

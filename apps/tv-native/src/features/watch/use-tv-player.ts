@@ -452,10 +452,24 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
     const id = setInterval(() => {
       const cur = currentRef.current;
       if (!channelId || !cur) return;
-      void api.heartbeat({ channelId, state: cur.kind === "BUMPER" ? "bumper" : "program", ratingKey: cur.ratingKey, title: titleOf(cur.guide), transcodeSession: cur.session ?? null }).catch(() => {});
+      // Report how far behind live + the exact timeline instant — parity with tv-web's use-channel-player.
+      // Without these the server defaulted delaySeconds to 0, so every native session read as "Live" at
+      // 0:00 in the admin Now-Watching / Sessions view (and cross-device resume had no position to seed).
+      const eff = currentEffective();
+      void api
+        .heartbeat({
+          channelId,
+          state: cur.kind === "BUMPER" ? "bumper" : "program",
+          ratingKey: cur.ratingKey,
+          title: titleOf(cur.guide),
+          delaySeconds: Math.max(0, Math.round(now() - eff)),
+          positionAt: new Date(eff * 1000).toISOString(),
+          transcodeSession: cur.session ?? null,
+        })
+        .catch(() => {});
     }, 10_000);
     return () => clearInterval(id);
-  }, [channelId]);
+  }, [channelId, now, currentEffective]);
   useEffect(() => () => void api.endSession().catch(() => {}), []);
 
   // Channel change (incl. → null on Close): release the current media + reset the clock. A non-null
