@@ -38,16 +38,15 @@ interface MpvCoreDelegate {
 class MpvCore(private val appContext: Context) {
   var delegate: MpvCoreDelegate? = null
 
-  // The video output. PATH A EXPERIMENT (v0.9.1): mpv's OpenGL-ES VO (gpu-next) CANNOT do HDR passthrough on
-  // Android — it ALWAYS tone-maps HDR→SDR (findroid #645, mpv-android #874, libplacebo author confirmed),
-  // which is exactly why HDR played as low-frame-rate SDR (the per-frame tone-map is what tanked the frame
-  // rate on the Streamer's GPU). `mediacodec_embed` instead lets MediaCodec render decoded frames DIRECTLY to
-  // the SurfaceView (Google's official HDR-video path, the same one ExoPlayer uses) → real HDR10/HLG
-  // passthrough + NO GPU tone-map (frame rate recovers). Trade-off: mpv gives up its own renderer (no
-  // gpu-next scaling / OSD / subtitle rendering / panscan) — acceptable for us (subs are server-burned and we
-  // direct-play). REVERT = change this one line back to "gpu-next" (+ hwdec below). See `.plans/tv-native.md`
-  // §13 for the full analysis + the ExoPlayer alternative (Path C).
-  private val vo = "mediacodec_embed"
+  // The video output. gpu-next is the SDR-safe default (mpv's own renderer). NOTE: on Android, gpu-next's
+  // OpenGL-ES path CANNOT do HDR passthrough — it ALWAYS tone-maps HDR→SDR (findroid #645, mpv-android #874,
+  // libplacebo author), so HDR currently plays as (acceptable-but-not-final) tone-mapped SDR. THE FIX — switch
+  // HDR programs to `vo=mediacodec_embed` (MediaCodec renders straight to the SurfaceView = real HDR
+  // passthrough), chosen DYNAMICALLY per program by reading `video-params/gamma` on load, exactly like the
+  // Apple side (`ios/MpvCore.swift`) reads gamma to drive the display switch — is the NEXT ARC, fully
+  // specified in `.plans/tv-native.md` §13.5. Deliberately deferred; do NOT global-force `mediacodec_embed`
+  // (tried in v0.9.1, reverted v0.9.2 — it regresses SDR, which must stay on the mpv renderer).
+  private val vo = "gpu-next"
 
   // A single scope drives create + all Flow collectors. MpvPlayer's suspend calls submit through its own
   // internal single-threaded native dispatcher, so ordering (options → loadfile) is preserved for us.
@@ -71,17 +70,13 @@ class MpvCore(private val appContext: Context) {
         MpvPlayer.create(appContext) {
           // Android render path — the mpv-android / findroid recipe.
           setOption("vo", vo)
-          // gpu-context / opengl-es configure the gpu-next VO; inert under mediacodec_embed but left in place
-          // so reverting `vo` to "gpu-next" restores the working GL config in one line.
           setOption("gpu-context", "android")
           setOption("opengl-es", "yes")
-          // mediacodec_embed needs the DIRECT (zero-copy) MediaCodec decoder that renders straight to the
-          // surface — the "-copy" variant reads frames back to the CPU and can't feed the embed VO. (Was
-          // "mediacodec,mediacodec-copy" under the gpu-next VO.)
-          setOption("hwdec", "mediacodec")
+          setOption("hwdec", "mediacodec,mediacodec-copy")
           setOption("ao", "audiotrack")
-          // gpu-next-only (inert under mediacodec_embed, which passes HDR through natively). Left in place so
-          // reverting `vo` to "gpu-next" restores the prior config in one line.
+          // Signals the target colorspace to gpu-next. On a Vulkan/HDR-capable path this passes HDR metadata
+          // through, but Android's OpenGL-ES gpu-next path tone-maps HDR→SDR regardless (see §13). Kept
+          // (harmless) — real HDR passthrough is the dynamic mediacodec_embed arc (§13.5), not this option.
           setOption("target-colorspace-hint", "yes")
           // Keep the last frame at EOF so a seek-back after the program ends still works.
           setOption("keep-open", "yes")

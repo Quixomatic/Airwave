@@ -2,6 +2,21 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.2] - 2026-07-28
+
+### Reverted
+
+- **Revert the global Android `mediacodec_embed` VO back to `gpu-next` (tv-native).** v0.9.1 swapped the
+  Android mpv VO to `mediacodec_embed` (for HDR passthrough) but did it **globally** — forcing every Android
+  program (SDR included) off mpv's own renderer. That's not what we want: mpv stays the god renderer for SDR,
+  and the HDR path should engage only for HDR content. Reverted to the known-good `gpu-next` default (HDR
+  tone-maps to SDR as before — acceptable-but-not-final). The correct approach — **dynamic, per-program** HDR
+  detection done entirely in the Android-native `MpvCore.kt` (read `video-params/gamma` on load → switch to
+  `mediacodec_embed` only for HDR programs, exactly like the Apple side reads gamma to switch the display),
+  with **zero shared-JS changes** so the proven iPad / Apple TV builds stay untouched — is fully specified as
+  the next arc in the tv-native plan (§13.5) and deliberately deferred. Android is parked in the known-good
+  state; no behavior change from the last Android build on the Streamer.
+
 ## [0.9.1] - 2026-07-28
 
 ### Changed
