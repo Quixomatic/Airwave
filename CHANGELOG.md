@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.7] - 2026-07-30
+
+### Changed
+
+- **Admin home is now the Guide — `/` redirects to `/guide` (web).** The placeholder Dashboard at `/` is
+  retired (unused for now); visiting the root — and the post-login landing — now go straight to the Guide.
+  `_auth/index` is a `beforeLoad` redirect to `/guide`, and both the post-login redirector and the
+  already-signed-in `/login` guard point at `/guide` directly (no double hop). The sidebar already had no
+  Dashboard link, so nothing else in the nav changes.
+
 ## [0.9.6] - 2026-07-28
 
 ### Fixed

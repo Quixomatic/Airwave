@@ -6,7 +6,7 @@ import { authClient } from "@/lib/auth-client";
  * Post-login redirector. Login callbackURLs point here so there's a single
  * place to decide where a freshly-authenticated user lands.
  *
- * For now: home ("/") when authed, else back to /login. This is the seam for
+ * For now: the guide ("/guide", the admin home) when authed, else back to /login. This is the seam for
  * future onboarding gates (e.g. "no linked Plex → /onboarding/plex").
  *
  * `disableCookieCache` so a just-written session cookie is read fresh rather
@@ -20,6 +20,6 @@ export const Route = createFileRoute("/post-login")({
     if (!session?.data?.user) {
       throw redirect({ to: "/login" });
     }
-    throw redirect({ to: "/" });
+    throw redirect({ to: "/guide" });
   },
 });

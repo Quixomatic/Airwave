@@ -1,26 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import { trpc } from "@/utils/trpc";
-
+/**
+ * The admin home is the Guide. "/" redirects to /guide so visiting the root lands straight on the guide.
+ * The old dashboard is retired (unused for now) — reintroduce a real landing page here if one is ever wanted.
+ */
 export const Route = createFileRoute("/_auth/")({
-  staticData: { breadcrumb: "Dashboard" },
-  component: RouteComponent,
+  beforeLoad: () => {
+    throw redirect({ to: "/guide" });
+  },
 });
-
-function RouteComponent() {
-  const { session } = Route.useRouteContext();
-  const privateData = useQuery(trpc.privateData.queryOptions());
-
-  return (
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-      <p className="text-muted-foreground mt-1 text-sm">
-        Welcome{session.data?.user.name ? `, ${session.data.user.name}` : ""}.
-      </p>
-      <p className="text-muted-foreground mt-3 text-xs">
-        API: {privateData.data?.message ?? "…"}
-      </p>
-    </div>
-  );
-}
