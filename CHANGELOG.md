@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.12] - 2026-07-30
+
+### Changed
+
+- **Sessions: pixel-perfect tile alignment (CSS subgrid) + scrollable play logs (web).** Active-session tiles
+  now use CSS **subgrid** — the tile grid defines shared rows and each tile spans them with
+  `grid-template-rows: subgrid`, so every tile's sections (media / progress / device / streams / viewer) snap
+  to the same row lines and line up across neighboring tiles regardless of content length (the tile
+  overrides the inherited subgrid row-gap to 0 so the muted stream-detail sections stay flush). The **Recent
+  sessions & play logs** list is capped (`max-h-[32rem]`) and scrolls instead of growing unbounded.
+  Frontend-only.
+
 ## [0.9.11] - 2026-07-30
 
 ### Fixed

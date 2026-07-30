@@ -1,6 +1,6 @@
 {
   "id": "com.channelguide.tv",
-  "version": "0.9.11",
+  "version": "0.9.12",
   "vendor": "ChannelGuide",
   "type": "web",
   "main": "index.html",

@@ -50,7 +50,9 @@ function SettingsSessions() {
             No one's watching right now.
           </FramePanel>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          // Fixed 20rem columns; each tile is a subgrid spanning the shared rows so its sections line up
+          // across neighboring tiles (media/progress/device/streams/viewer align row-for-row).
+          <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,20rem)]">
             {active.map((s) => (
               <SessionTile key={s.id} s={s} />
             ))}
@@ -66,7 +68,7 @@ function SettingsSessions() {
             the panel actually decoded frames.
           </FrameDescription>
         </FrameHeader>
-        <FramePanel className="divide-border divide-y p-0">
+        <FramePanel className="divide-border max-h-[32rem] divide-y overflow-y-auto p-0">
           {recent.length === 0 ? (
             <div className="text-muted-foreground flex items-center justify-center py-10 text-sm">
               No play logs yet.
@@ -84,9 +86,13 @@ function SettingsSessions() {
 function SessionTile({ s }: { s: ActiveSession }) {
   const art = s.channelId ? channelImg(s.channelId, s.thumbPath, null) : null;
   const onBreak = s.state === "bumper";
-  // Fixed ~1/3-ish tile that wraps (Plex-style cards), not a full-width stretch.
+  // Subgrid tile: its 5 sections (media, progress, device, streams, viewer) snap to the container's shared
+  // row lines, so those sections align pixel-for-pixel across neighboring tiles. row-span must match the
+  // section count below. gap-y-0: a subgrid inherits the parent grid's row-gap, which would insert gaps
+  // between the sections (exposing the panel bg) — override it to 0 so the sections touch; the parent keeps
+  // its gap between tiles.
   return (
-    <FramePanel className="divide-border w-full min-w-0 divide-y p-0 sm:w-80">
+    <FramePanel className="row-span-5 grid min-w-0 gap-y-0 [grid-template-rows:subgrid] divide-border divide-y p-0">
       {/* Media: portrait poster | title, SxEy · episode; channel below */}
       <div className="p-4">
         <div className="flex gap-3">
