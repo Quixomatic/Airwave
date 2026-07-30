@@ -37,6 +37,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Free up runner disk space
+        # The multi-arch build (amd64 + arm64/QEMU) + the baked capability media (~429 MB) + the gha
+        # build cache overflow the standard runner's ~14 GB free ("no space left on device"). Remove the
+        # preinstalled toolchains this build never touches to reclaim ~20+ GB before building.
+        run: |
+          echo "Disk before cleanup:"; df -h /
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost \
+            /usr/local/share/powershell \
+            /usr/local/graalvm \
+            /usr/share/swift || true
+          sudo docker image prune --all --force || true
+          echo "Disk after cleanup:"; df -h /
+
       - name: Fetch capability media (private media-v1 release)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
