@@ -2,6 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.9] - 2026-07-30
+
+### Changed
+
+- **Sessions page tile polish (web).** Tiles now show the **portrait poster** of the show (for episodes, via
+  the grandparent `showRatingKey`) or the movie — the same art the channel-edit preview uses — instead of the
+  landscape episode still (both the active tiles and the recent-log thumbnails; the poster key is resolved
+  server-side). The **program progress bar spans the full tile width** as its own band between the media
+  header and the device info, and the **channel line sits below** the media header rather than beside the art.
+  (API server restart needed — `packages/api` services changed.)
+
 ## [0.9.8] - 2026-07-30
 
 ### Added

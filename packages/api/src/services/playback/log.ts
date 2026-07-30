@@ -1,5 +1,7 @@
 import { Prisma, type PrismaClient } from "@ChannelGuide/db";
 
+import type { GuideMeta } from "../plex/client";
+
 /**
  * Records one tune attempt's full diagnostics to `PlaybackLog` — so test results
  * live in the DB (reviewable) instead of on the TV's debug overlay. The client
@@ -43,13 +45,31 @@ export async function listRecentPlaybackLogs(prisma: PrismaClient, limit = 30) {
     take: Math.min(Math.max(limit, 1), 100),
     include: { user: { select: { name: true, email: true } } },
   });
-  return rows.map((r) => ({
+  // Resolve each item's PORTRAIT poster key (the show's grandparentRatingKey for episodes, else the item's
+  // own) in one batch, so tiles show the show/movie poster — not a landscape episode still.
+  const ratingKeys = [...new Set(rows.map((r) => r.ratingKey).filter((k): k is string => !!k))];
+  const items = ratingKeys.length
+    ? await prisma.mediaItem.findMany({
+        where: { ratingKey: { in: ratingKeys } },
+        select: { ratingKey: true, guide: true },
+      })
+    : [];
+  const posterKeyByRating = new Map<string, string>();
+  for (const it of items) {
+    if (posterKeyByRating.has(it.ratingKey)) continue;
+    const g = it.guide as GuideMeta | null;
+    posterKeyByRating.set(it.ratingKey, g?.showRatingKey ?? it.ratingKey);
+  }
+  return rows.map((r) => {
+    const posterKey = r.ratingKey ? (posterKeyByRating.get(r.ratingKey) ?? r.ratingKey) : null;
+    return {
     id: r.id,
     user: r.user.name || r.user.email,
     deviceId: r.deviceId,
     channelId: r.channelId,
     channelName: r.channelName,
     ratingKey: r.ratingKey,
+    thumbPath: posterKey ? `/library/metadata/${posterKey}/thumb` : null,
     title: r.title,
     mode: r.mode,
     sourceContainer: r.sourceContainer,
@@ -62,7 +82,8 @@ export async function listRecentPlaybackLogs(prisma: PrismaClient, limit = 30) {
     decodedHeight: r.decodedHeight,
     error: r.error,
     createdAt: r.createdAt,
-  }));
+    };
+  });
 }
 
 export async function logPlayback(prisma: PrismaClient, userId: string, i: PlaybackLogInput) {

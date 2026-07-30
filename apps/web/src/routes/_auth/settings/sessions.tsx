@@ -87,42 +87,42 @@ function SessionTile({ s }: { s: ActiveSession }) {
   // Fixed ~1/3-ish tile that wraps (Plex-style cards), not a full-width stretch.
   return (
     <FramePanel className="divide-border w-full min-w-0 divide-y p-0 sm:w-80">
-      {/* Media: art (natural ratio, small) | title, SxEy · episode title, progress, channel */}
-      <div className="flex gap-3 p-4">
-        {art ? (
-          <img src={art} alt="" className="h-24 w-auto shrink-0 self-start rounded-md" />
-        ) : (
-          <div className="bg-muted text-muted-foreground flex h-24 w-16 shrink-0 items-center justify-center rounded-md">
-            <Tv className="size-6" />
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
+      {/* Media: portrait poster | title, SxEy · episode; channel below */}
+      <div className="p-4">
+        <div className="flex gap-3">
+          {art ? (
+            <img src={art} alt="" className="h-24 w-auto shrink-0 self-start rounded-md" />
+          ) : (
+            <div className="bg-muted text-muted-foreground flex h-24 w-16 shrink-0 items-center justify-center rounded-md">
+              <Tv className="size-6" />
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">
               {onBreak ? "On a break" : (s.showTitle ?? s.title ?? "—")}
             </p>
             {!onBreak && (s.showTitle || s.season != null || s.episode != null) && (
               <p className="text-muted-foreground mt-0.5 truncate text-xs">
                 {[
-                  s.season != null && s.episode != null
-                    ? `S${s.season} · E${s.episode}`
-                    : null,
+                  s.season != null && s.episode != null ? `S${s.season} · E${s.episode}` : null,
                   s.showTitle ? s.title : null,
                 ]
                   .filter(Boolean)
                   .join(" · ") || (s.year ? String(s.year) : "")}
               </p>
             )}
-            <div className="mt-2">
-              <Progress s={s} />
-            </div>
-            {s.channel && (
-              <p className="text-muted-foreground mt-2 text-xs">
-                Ch {s.channel.number} · {s.channel.name}
-                {s.channel.callsign ? ` (${s.channel.callsign})` : ""}
-              </p>
-            )}
           </div>
         </div>
+        {s.channel && (
+          <p className="text-muted-foreground mt-3 text-xs">
+            Ch {s.channel.number} · {s.channel.name}
+            {s.channel.callsign ? ` (${s.channel.callsign})` : ""}
+          </p>
+        )}
+      </div>
+
+      {/* Program progress — full-width band between the media header and the device info */}
+      <Progress s={s} />
 
         {/* Device + connection */}
         <div className="space-y-1.5 p-4">
@@ -163,13 +163,13 @@ function Progress({ s }: { s: ActiveSession }) {
   const p = s.progress;
   const pct = p && p.durationSeconds > 0 ? Math.min(100, (p.positionSeconds / p.durationSeconds) * 100) : 0;
   return (
-    <div className="space-y-1">
+    <div>
       {p && (
-        <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
-          <div className="bg-primary h-full rounded-full" style={{ width: `${pct}%` }} />
+        <div className="bg-muted h-1.5 w-full overflow-hidden">
+          <div className="bg-primary h-full" style={{ width: `${pct}%` }} />
         </div>
       )}
-      <div className="text-muted-foreground flex items-center justify-between text-[11px]">
+      <div className="text-muted-foreground flex items-center justify-between px-4 py-2 text-[11px]">
         <span>{p ? `${fmtDuration(p.positionSeconds)} / ${fmtDuration(p.durationSeconds)}` : ""}</span>
         <span>
           {live ? (
@@ -247,7 +247,7 @@ function OutcomeBadge({ outcome }: { outcome: string | null }) {
 /** One recent play-log row — a compact line with art, media, delivery badges, outcome, viewer, time. */
 function LogRow({ l }: { l: RecentLog }) {
   const decision = l.decision;
-  const art = l.channelId && l.ratingKey ? channelImg(l.channelId, `/library/metadata/${l.ratingKey}/thumb`, null) : null;
+  const art = l.channelId ? channelImg(l.channelId, l.thumbPath, null) : null;
   return (
     <div className="flex items-center gap-3 p-3">
       {art ? (

@@ -145,6 +145,9 @@ export async function listActiveSessions(prisma: PrismaClient) {
           })
         : null;
       const decision = (log?.decision as PlexDecision | null) ?? null;
+      // Portrait POSTER of the show (for episodes, via grandparentRatingKey) or the movie itself — never
+      // the landscape episode still. Same art the channel-edit preview uses.
+      const posterKey = guide?.showRatingKey ?? r.ratingKey;
 
       return {
         id: r.id,
@@ -160,8 +163,8 @@ export async function listActiveSessions(prisma: PrismaClient) {
         season: guide?.season ?? null,
         episode: guide?.episode ?? null,
         year: guide?.year ?? null,
-        // Relative Plex thumb path for the /img proxy (episode thumb, else derive from ratingKey).
-        thumbPath: guide?.thumb ?? (r.ratingKey ? `/library/metadata/${r.ratingKey}/thumb` : null),
+        // Relative Plex poster path for the /img proxy (show/movie poster — portrait).
+        thumbPath: posterKey ? `/library/metadata/${posterKey}/thumb` : null,
         ratingKey: r.ratingKey,
         delaySeconds: r.delaySeconds,
         progress,
