@@ -2,7 +2,7 @@ import { expoClient } from "@better-auth/expo/client";
 import { deviceAuthorizationClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
-import { getServerUrl } from "./auth";
+import { getServerUrl, getToken } from "./auth";
 import { SyncCredStore } from "./cred-store";
 
 /**
@@ -23,6 +23,13 @@ function make(url: string) {
       expoClient({ scheme: "channelguide", storagePrefix: "cg", storage: SyncCredStore }),
       deviceAuthorizationClient(),
     ],
+    // Send the bearer token (the better-auth session token minted by the Plex device-link login, stored in
+    // lib/auth) on every authClient call — exactly like tv-web. Without this, `useSession()` hit
+    // /api/auth/get-session with no credential, so Settings → User showed "?" / no details. The `/api/v1`
+    // REST client already sends this same token; this wires the better-auth client to it too.
+    fetchOptions: {
+      auth: { type: "Bearer", token: () => getToken() ?? "" },
+    },
   });
 }
 

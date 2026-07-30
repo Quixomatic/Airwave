@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.6] - 2026-07-28
+
+### Fixed
+
+- **Settings → User now shows the signed-in account on tv-native (name / email / role / avatar).** The page
+  read `authClient().useSession()`, but tv-native's better-auth client never sent a bearer token, so
+  `/api/auth/get-session` came back with no session and the page showed "?" / "Signed in" / "—". Wired the
+  native `authClient` to send the same bearer token the `/api/v1` REST client already uses (the better-auth
+  session token minted by the Plex device-link login, stored in `lib/auth`) via `fetchOptions.auth` —
+  mirroring tv-web's client config. Now `useSession()` resolves the account and the User page shows the real
+  details. Pure JS — hot-reloads. (Confirmed on device.)
+
 ## [0.9.5] - 2026-07-28
 
 ### Fixed
