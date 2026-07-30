@@ -2,6 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.13] - 2026-07-30
+
+### Changed
+
+- **Sessions: use the shared `EmptyState` component for both empty views (web).** The Active-sessions and
+  Recent-play-logs empty states now render the reusable `EmptyState` (tinted icon disc + title + description),
+  matching Channels / Packages / Sources / Users, instead of one-off centered text. Frontend-only.
+
 ## [0.9.12] - 2026-07-30
 
 ### Changed

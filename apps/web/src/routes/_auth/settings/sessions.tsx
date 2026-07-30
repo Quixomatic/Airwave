@@ -10,8 +10,9 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import type { inferRouterOutputs } from "@trpc/server";
-import { Monitor, Radio, Tv, User } from "lucide-react";
+import { History, Monitor, Radio, Tv, User } from "lucide-react";
 
+import { EmptyState } from "@/components/empty-state";
 import { channelImg } from "@/lib/img";
 import { trpc } from "@/utils/trpc";
 
@@ -46,8 +47,12 @@ function SettingsSessions() {
           </FrameDescription>
         </FrameHeader>
         {active.length === 0 ? (
-          <FramePanel className="text-muted-foreground flex items-center justify-center py-10 text-sm">
-            No one's watching right now.
+          <FramePanel className="p-0">
+            <EmptyState
+              icon={Tv}
+              title="No one's watching"
+              description="Active viewing sessions show up here in real time."
+            />
           </FramePanel>
         ) : (
           // Fixed 20rem columns; each tile is a subgrid spanning the shared rows so its sections line up
@@ -70,9 +75,11 @@ function SettingsSessions() {
         </FrameHeader>
         <FramePanel className="divide-border max-h-[32rem] divide-y overflow-y-auto p-0">
           {recent.length === 0 ? (
-            <div className="text-muted-foreground flex items-center justify-center py-10 text-sm">
-              No play logs yet.
-            </div>
+            <EmptyState
+              icon={History}
+              title="No play logs yet"
+              description="Playback attempts across devices will appear here."
+            />
           ) : (
             recent.map((l) => <LogRow key={l.id} l={l} />)
           )}
