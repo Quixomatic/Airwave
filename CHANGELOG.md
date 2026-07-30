@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.5] - 2026-07-28
+
+### Fixed
+
+- **Settings: reaching the first option scrolls the pane to the top so the header above it is visible
+  (tv-native).** After the v0.9.4 snap-scroll, D-padding all the way up landed on the top-most focusable
+  option (e.g. Device → "Run capability diagnostic") but left the non-focusable content above it (the page
+  title + the device-info card) scrolled off-screen, with no way to reveal it. Now selecting the first option
+  scrolls the content pane fully to the top. Wired via a new `SettingsCtx.scrollToTop`, fired from
+  `useSettingsPage` when the selection is at index 0 (it runs after the row's own snap-scroll, so it wins for
+  the top row). Pure JS — hot-reloads.
+
 ## [0.9.4] - 2026-07-28
 
 ### Fixed

@@ -120,6 +120,10 @@ export default function SettingsShell() {
       () => {},
     );
   }, []);
+  const scrollToTop = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+    scrollYRef.current = 0;
+  }, []);
 
   return (
     // Full-bleed on Apple TV / iPad (a plain View — NOT SafeAreaView, which on tvOS applies the title-safe
@@ -141,7 +145,7 @@ export default function SettingsShell() {
               it's a stable measurement root: a focused row's y measured against this view maps 1:1 to the
               scroll offset. */}
           <View ref={contentRef} style={scaled({ maxWidth: 1024, width: "100%", alignSelf: "center", paddingVertical: 40, paddingHorizontal: 48 })}>
-            <SettingsCtx.Provider value={{ active: zone === "content", returnToRail, ensureVisible }}>
+            <SettingsCtx.Provider value={{ active: zone === "content", returnToRail, ensureVisible, scrollToTop }}>
               <Slot />
             </SettingsCtx.Provider>
           </View>

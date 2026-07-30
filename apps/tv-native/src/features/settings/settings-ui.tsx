@@ -19,11 +19,13 @@ export type SettingsCtxValue = {
   returnToRail: () => void;
   /** Ask the shell's ScrollView to snap a focused row into view (no-op if already visible). */
   ensureVisible: (node: View | null) => void;
+  /** Scroll the content pane to the very top — used at the first option to reveal the header above it. */
+  scrollToTop: () => void;
 };
-export const SettingsCtx = createContext<SettingsCtxValue>({ active: false, returnToRail: () => {}, ensureVisible: () => {} });
+export const SettingsCtx = createContext<SettingsCtxValue>({ active: false, returnToRail: () => {}, ensureVisible: () => {}, scrollToTop: () => {} });
 
 export function useSettingsPage(count: number, onActivate: (i: number) => void) {
-  const { active, returnToRail } = useContext(SettingsCtx);
+  const { active, returnToRail, scrollToTop } = useContext(SettingsCtx);
   const [sel, setSel] = useState(0);
   const selRef = useRef(0);
   selRef.current = sel;
@@ -33,6 +35,14 @@ export function useSettingsPage(count: number, onActivate: (i: number) => void) 
   useEffect(() => {
     if (active) setSel((s) => Math.min(s, Math.max(0, count - 1)));
   }, [active, count]);
+
+  // At the top-most option, scroll the pane fully to the top so the non-focusable header above the first
+  // row (page title, the device-info card, etc.) is revealed — otherwise landing on row 0 left it stuck
+  // wherever the previous row's snap-scroll had put it. Runs AFTER the row's own ensureVisible (parent
+  // effect after child effect), so this wins for sel 0.
+  useEffect(() => {
+    if (active && sel === 0) scrollToTop();
+  }, [active, sel, scrollToTop]);
 
   useKeyLayer({
     id: "settings-page",
