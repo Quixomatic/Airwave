@@ -2,6 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.10] - 2026-07-30
+
+### Changed
+
+- **Sessions tiles: subtle background on the stream-detail sections (web).** The device/connection and
+  video/audio/subtitles sections now sit on a faint muted background, grouping them apart from the media
+  header and the viewer footer. Frontend-only.
+
 ## [0.9.9] - 2026-07-30
 
 ### Changed

@@ -125,7 +125,7 @@ function SessionTile({ s }: { s: ActiveSession }) {
       <Progress s={s} />
 
         {/* Device + connection */}
-        <div className="space-y-1.5 p-4">
+        <div className="bg-muted/40 space-y-1.5 p-4">
           <DetailRow icon={<Monitor className="size-3.5" />} label="Device">
             {s.device ? (s.device.model ?? s.device.platform ?? s.device.id) : "—"}
           </DetailRow>
@@ -135,7 +135,7 @@ function SessionTile({ s }: { s: ActiveSession }) {
         </div>
 
         {/* Streams: video / audio / subtitles */}
-        <div className="space-y-1.5 p-4">
+        <div className="bg-muted/40 space-y-1.5 p-4">
           <DetailRow label="Video">
             <StreamBadge decision={s.video?.decision ?? null} codec={s.video?.codec ?? null} />
           </DetailRow>
