@@ -2,7 +2,7 @@
   "expo": {
     "name": "ChannelGuide",
     "slug": "channelguide",
-    "version": "0.9.2",
+    "version": "0.9.3",
     "scheme": "channelguide",
     "orientation": "landscape",
     "userInterfaceStyle": "dark",

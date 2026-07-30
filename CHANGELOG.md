@@ -2,6 +2,21 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.3] - 2026-07-28
+
+### Fixed
+
+- **Guide sidebar: the lens/package list now snap-scrolls to keep the D-pad selection in view (tv-native).**
+  When a server has enough packages that the sidebar's filter circles overflow the screen, D-padding down
+  moved the focus ring onto circles below the fold but never scrolled the list — so the selected circle went
+  off-screen. The lens `ScrollView` now mirrors the guide grid's "scroll only when off-screen" behavior: when
+  the selected filter circle would fall outside the viewport it snaps into view (no animation) — to the top
+  edge if it's above, the bottom edge if below — and leaves the list put when the circle is already visible,
+  so moving down travels through the visible circles and only scrolls at the edges (exactly like moving up/down
+  through programs in the guide). Each circle's position is measured via a forwarded `onLayout` on
+  `GlassCircleButton` (the action circles above the divider aren't scrolled). Driven by selection + focus, so
+  it's a no-op on touch (native scroll handles it). Pure JS — hot-reloads.
+
 ## [0.9.2] - 2026-07-28
 
 ### Reverted

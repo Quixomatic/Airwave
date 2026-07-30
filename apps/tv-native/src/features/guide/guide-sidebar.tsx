@@ -1,7 +1,7 @@
 import * as LucideIcons from "lucide-react-native";
 import { History, LayoutGrid, ListFilter, Menu, Settings as SettingsIcon, Star, User } from "lucide-react-native";
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ScrollView, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
@@ -113,6 +113,40 @@ export function GuideSidebar({
   // so they already clear the sidebar's overflow:hidden and need nothing.)
   const RING_ROOM = cs(8);
 
+  // D-pad snap-scroll for the lens list — the sidebar analogue of the guide grid's "scroll only when the
+  // focused row is off-screen" (aurora-grid.tsx): when the selected FILTER circle would fall outside the
+  // ScrollView's viewport, snap it into view with NO animation — to the top edge if it's above, the bottom
+  // edge if below; leave it put when already visible (so moving down travels through the visible circles and
+  // only scrolls at the edges). The action circles above the divider aren't scrolled (sel < actions.length).
+  // Driven by `sel`/`focused`, so it runs only during D-pad navigation (no-op on touch, where `focused` is
+  // always false and the ScrollView scrolls natively).
+  const scrollRef = useRef<ScrollView>(null);
+  const viewHRef = useRef(0); // lens ScrollView viewport height
+  const scrollYRef = useRef(0); // current content offset (kept live via onScroll)
+  const offsetsRef = useRef<{ y: number; h: number }[]>([]); // each filter's [y, height] within the content
+  useEffect(() => {
+    if (!focused) return;
+    const fi = sel - actions.length; // local index into the (scrolled) filter list
+    if (fi < 0) return; // an action circle is selected — the lens list isn't scrolled for those
+    const item = offsetsRef.current[fi];
+    const h = viewHRef.current;
+    const sv = scrollRef.current;
+    if (!item || h <= 0 || !sv) return;
+    const off = scrollYRef.current;
+    const top = item.y - RING_ROOM; // leave room for the focus ring (drawn ~cs(4) outside the circle)
+    const bottom = item.y + item.h + RING_ROOM;
+    if (top < off) {
+      const y = Math.max(0, top);
+      sv.scrollTo({ y, animated: false }); // above the viewport → snap to the top edge
+      scrollYRef.current = y;
+    } else if (bottom > off + h) {
+      const y = bottom - h;
+      sv.scrollTo({ y, animated: false }); // below the viewport → snap to the bottom edge
+      scrollYRef.current = y;
+    }
+    // else: already fully visible → leave it put.
+  }, [sel, focused, actions.length, RING_ROOM]);
+
   const w = useSharedValue(expanded ? EXPANDED : SLIVER);
   useEffect(() => {
     // Match tv-web's Framer spring (stiffness 320 / damping 34) but clamp the overshoot — Reanimated's
@@ -139,13 +173,32 @@ export function GuideSidebar({
       ))}
       <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: cs(4) }} />
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1, marginLeft: -RING_ROOM, marginTop: -RING_ROOM }}
         contentContainerStyle={{ gap, paddingLeft: RING_ROOM, paddingTop: RING_ROOM, paddingBottom: RING_ROOM }}
         showsVerticalScrollIndicator={false}
+        onLayout={(e) => { viewHRef.current = e.nativeEvent.layout.height; }}
+        onScroll={(e) => { scrollYRef.current = e.nativeEvent.contentOffset.y; }}
+        scrollEventThrottle={16}
       >
         {filters.map((it, i) => {
           const idx = actions.length + i;
-          return <GlassCircleButton key={it.key} icon={it.icon} label={it.label} sublabel={it.sublabel} expanded focused={focused && sel === idx} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(idx)} />;
+          // Measure each circle's y/height within the content so the snap-scroll effect can tell when the
+          // selected one is off-screen (onLayout forwarded to the button's root — no wrapper needed).
+          return (
+            <GlassCircleButton
+              key={it.key}
+              onLayout={(e) => { offsetsRef.current[i] = { y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height }; }}
+              icon={it.icon}
+              label={it.label}
+              sublabel={it.sublabel}
+              expanded
+              focused={focused && sel === idx}
+              active={it.lens ? lensEquals(it.lens, lens) : false}
+              accent={it.accent}
+              onPress={() => onActivate(idx)}
+            />
+          );
         })}
       </ScrollView>
     </View>

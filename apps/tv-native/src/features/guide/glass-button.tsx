@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Text, View } from "react-native";
+import { type LayoutChangeEvent, Text, View } from "react-native";
 
 import { TvPressable as Pressable } from "@/components/tv-pressable";
 import { DEFAULT_ACCENT } from "@/lib/tint";
@@ -22,6 +22,7 @@ export function GlassCircleButton({
   accent = DEFAULT_ACCENT,
   size = 54,
   onPress,
+  onLayout,
 }: {
   icon: ReactNode;
   label?: string;
@@ -32,6 +33,8 @@ export function GlassCircleButton({
   accent?: string;
   size?: number;
   onPress?: () => void;
+  /** Forwarded to the root — lets the sidebar measure each circle's y for D-pad snap-scroll. */
+  onLayout?: (e: LayoutChangeEvent) => void;
 }) {
   const lit = focused || active;
   // Chrome-scaled for Android TV's 960dp space (identity on iPad/Apple TV) — the circle must shrink with
@@ -39,7 +42,7 @@ export function GlassCircleButton({
   const s = cs(size);
   const ring = cs(8);
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => ({ width: "100%", opacity: pressed ? 0.75 : 1 })}>
+    <Pressable onPress={onPress} onLayout={onLayout} style={({ pressed }) => ({ width: "100%", opacity: pressed ? 0.75 : 1 })}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: expanded ? cs(14) : 0, width: "100%" }}>
         {/* circle (with the D-pad focus ring) */}
         <View style={{ width: s, height: s, flexShrink: 0 }}>
