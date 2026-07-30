@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.15] - 2026-07-30
+
+### Added
+
+- **Airwave browser-tab favicons for the admin (web) and the web player (tv-web).** Generated `favicon.ico`
+  (16/32/48), `favicon-32x32.png`, and `apple-touch-icon.png` (180×180) — the Airwave mark on the same dark
+  radial gradient as the native app icons — via a new reproducible `scripts/gen-favicons.py` (mirrors
+  `apps/tv-native/scripts/gen-app-icons.py`). Wired into both apps' `index.html`. The admin browser tab title
+  is now **"Airwave"** (was "ChannelGuide").
+
 ## [0.9.14] - 2026-07-30
 
 ### Added
