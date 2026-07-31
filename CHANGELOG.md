@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.31] - 2026-07-31
+
+### Fixed
+
+- **Self-host: persist the bumper-music library across image updates (docker).** The bumper-music feature
+  (v0.9.28) writes uploads to a folder in the `server` container that had no volume, so tracks would be lost on
+  every recreate/update. Added a persistent **`channelguide_bumpermusic` volume** → `/data/bumper-music` in
+  `docker-compose.yml` (with a commented bind-mount option for dropping files in directly), the
+  **`BUMPER_MUSIC_DIR`** env, and an entrypoint step that creates the dir + `chown`s it to PUID/PGID so the app
+  user can write to it. Documented in `.env.example`. ⚠️ Applying this needs a **`docker compose up -d`** (a
+  Watchtower auto-recreate reuses the old spec and won't pick up the new volume/env).
+
 ## [0.9.30] - 2026-07-31
 
 ### Changed

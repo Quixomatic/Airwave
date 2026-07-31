@@ -61,10 +61,17 @@ services:
       WORKFLOW_TARGET_WORLD: ${WORKFLOW_TARGET_WORLD:-@workflow/world-postgres}
       WORKFLOW_LOCAL_BASE_URL: ${WORKFLOW_LOCAL_BASE_URL:-http://127.0.0.1:3152}
       WORKFLOW_POSTGRES_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Ambient bumper-music library — uploaded/dropped-in audio lives here (persisted via the volume below).
+      BUMPER_MUSIC_DIR: ${BUMPER_MUSIC_DIR:-/data/bumper-music}
       PUID: ${PUID:-1000}
       PGID: ${PGID:-1000}
       UMASK: ${UMASK:-022}
       TZ: ${TZ:-UTC}
+    volumes:
+      # Bumper-music audio persists here so uploads survive image updates. Bind-mount your OWN folder instead
+      # to drop files straight in (then "Scan folder" on the Bumpers page), e.g.:
+      #   - /mnt/tank/apps/channelguide/bumper-music:/data/bumper-music
+      - channelguide_bumpermusic:/data/bumper-music
     ports:
       - "${SERVER_PORT:-36020}:3000"
     healthcheck:
@@ -132,3 +139,4 @@ services:
 
 volumes:
   channelguide_pgdata:
+  channelguide_bumpermusic:

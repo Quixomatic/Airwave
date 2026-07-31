@@ -56,6 +56,12 @@ case "${CG_ROLE}" in
         || echo "[entrypoint] WARNING: workflow schema bootstrap failed — the AI lineup engine may not start." >&2
     fi
 
+    # Bumper-music library dir (§7.14) — user-uploaded/dropped-in audio persists here (mount a volume).
+    # Ensure it exists and is writable by the app user before the server writes uploads into it.
+    BMDIR="${BUMPER_MUSIC_DIR:-/app/apps/server/bumper-music}"
+    mkdir -p "$BMDIR" 2>/dev/null || true
+    chown -R "${PUID}:${PGID}" "$BMDIR" 2>/dev/null || true
+
     echo "[entrypoint] starting API server on :${PORT:-3000}…"
     # cwd = apps/server so Bun loads bunfig.toml (workflow preload) and resolves the
     # generated ./.well-known handlers relative to the bundle — same as `pnpm start`.
