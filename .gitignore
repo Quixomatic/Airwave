@@ -67,6 +67,9 @@ temp
 # Generated capability-probe test media (large, regeneratable)
 apps/server/capability-media/
 
+# Bumper ambient music (user-provided; dev default dir — self-host mounts a volume here)
+apps/server/bumper-music/
+
 # Capability media tarball staged for the Docker build (pulled from the media-v1 release,
 # baked into the image). Keep the dir (.gitkeep) so the Dockerfile COPY has a source.
 docker/cap-media/*.tar.gz

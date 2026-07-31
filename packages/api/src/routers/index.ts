@@ -1,5 +1,6 @@
 import { protectedProcedure, publicProcedure, router } from "../index";
 import { aiRouter } from "./ai";
+import { bumperMusicRouter } from "./bumper-music";
 import { bumpersRouter } from "./bumpers";
 import { channelsRouter } from "./channels";
 import { generatorRouter } from "./generator";
@@ -22,6 +23,7 @@ export const appRouter = router({
     };
   }),
   ai: aiRouter,
+  bumperMusic: bumperMusicRouter,
   bumpers: bumpersRouter,
   channels: channelsRouter,
   generator: generatorRouter,

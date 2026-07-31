@@ -22,6 +22,11 @@ export const bumpersRouter = router({
         shortEpisodeMinutes: z.number().int().min(1).max(240),
         interstitialStyle: z.string().min(1).optional(),
         interstitialMusicKey: z.string().nullish(),
+        // Ambient bumper music (§7.14) — global controls; the library is managed via `bumperMusic.*`.
+        musicEnabled: z.boolean().optional(),
+        musicVolume: z.number().int().min(0).max(100).optional(),
+        musicFadeInMs: z.number().int().min(0).max(10_000).optional(),
+        musicFadeOutMs: z.number().int().min(0).max(10_000).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -37,6 +42,10 @@ export const bumpersRouter = router({
           shortEpisodeMinutes: input.shortEpisodeMinutes,
           ...(input.interstitialStyle ? { interstitialStyle: input.interstitialStyle } : {}),
           interstitialMusicKey: input.interstitialMusicKey ?? null,
+          ...(input.musicEnabled !== undefined ? { musicEnabled: input.musicEnabled } : {}),
+          ...(input.musicVolume !== undefined ? { musicVolume: input.musicVolume } : {}),
+          ...(input.musicFadeInMs !== undefined ? { musicFadeInMs: input.musicFadeInMs } : {}),
+          ...(input.musicFadeOutMs !== undefined ? { musicFadeOutMs: input.musicFadeOutMs } : {}),
           // Any settings change advances the rev; channels built under an older rev
           // become stale and get rebuilt by the schedule-bumper-sync job.
           rev: { increment: 1 },

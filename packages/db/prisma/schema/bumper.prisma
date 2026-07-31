@@ -43,9 +43,18 @@ model BumperConfig {
 
   /// Reserved for future template/style variants; one auto-derived style for now.
   interstitialStyle   String  @default("up-next")
-  /// Optional soft "elevator music"/chime bed played under the interstitial
-  /// (a media key; rendering lands with the viewer). Null = silent.
+  /// DEPRECATED — the single-track "elevator music" hook, superseded by the BumperMusic library below.
+  /// Left nullable/unused; the ambient bed now comes from enabled `BumperMusic` rows, chosen at random.
   interstitialMusicKey String?
+
+  // ── Ambient bumper music (the BumperMusic library) ─────────────────────────
+  /// Play a soft random music bed under the interstitial. On by default.
+  musicEnabled   Boolean @default(true)
+  /// Bed level 0–100 (kept LOW by default so it's a bed, not the foreground).
+  musicVolume    Int     @default(30)
+  /// Fade the track in at the start of a bumper / out before it ends, in milliseconds.
+  musicFadeInMs  Int     @default(1000)
+  musicFadeOutMs Int     @default(1500)
 
   // ── Commercial media (future — clips shown inside the interstitial frame) ───
   source            BumperSource?
@@ -64,4 +73,29 @@ model BumperConfig {
   updatedAt DateTime @updatedAt
 
   @@map("bumper_config")
+}
+
+/// One ambient bumper-music track (§7.14). The audio file lives in BUMPER_MUSIC_DIR (a volume on self-host);
+/// this row indexes it plus its enabled state + metadata, so the folder stays the source of truth for bytes
+/// and the DB for "what's in the random pool". Two ingestion paths: uploaded through the admin UI, or dropped
+/// into the volume and picked up by the manual `bumper-music-scan` job. The TV apps stream these over the API.
+model BumperMusic {
+  id          String  @id @default(cuid())
+  /// File name relative to BUMPER_MUSIC_DIR — the on-disk identity.
+  filename    String  @unique
+  /// Display name (defaults to the filename without extension; editable).
+  title       String
+  /// In the random pool when true. The per-track on/off toggle in the admin UI.
+  enabled     Boolean @default(true)
+  contentType String? // "audio/mpeg" | "audio/mp4" | "audio/aac"
+  sizeBytes   Int?
+  /// How it got here: "upload" (admin UI) or "scan" (found in the volume by the scan job).
+  source      String  @default("upload")
+  /// True when the indexed file has gone missing (the scan flags it; the UI warns). Kept, not deleted.
+  missing     Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("bumper_music")
 }

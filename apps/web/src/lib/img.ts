@@ -1,7 +1,7 @@
 import { env } from "@ChannelGuide/env/web";
 
-/** Base URL of the API server (which hosts the public artwork proxy). */
-function serverBase(): string {
+/** Base URL of the API server (which hosts the public artwork proxy + static assets like bumper music). */
+export function serverBase(): string {
   const u = env.VITE_SERVER_URL;
   return u.startsWith("/") && typeof window !== "undefined" ? `${window.location.origin}${u}` : u;
 }

@@ -1,6 +1,8 @@
 import { createContext } from "@ChannelGuide/api/context";
 import { appRouter } from "@ChannelGuide/api/routers/index";
 import { runAgentChat } from "@ChannelGuide/api/services/agent/chat";
+import { createFromUpload } from "@ChannelGuide/api/services/bumper-music/library";
+import { contentTypeFor } from "@ChannelGuide/api/services/bumper-music/store";
 import { startJobs } from "@ChannelGuide/api/services/jobs/scheduler";
 import { resolveChannelSource } from "@ChannelGuide/api/services/playback/broker";
 import { buildAuthUrl, createPin } from "@ChannelGuide/api/services/plex/client";
@@ -52,6 +54,7 @@ const cookieCors = cors({
 app.use("/api/auth/*", cookieCors);
 app.use("/trpc/*", cookieCors);
 app.use("/api/ai/*", cookieCors);
+app.use("/api/admin/*", cookieCors);
 
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
@@ -66,6 +69,26 @@ app.post("/api/ai/chat", async (c) => {
   if (!body?.id || !Array.isArray(body.messages)) return c.json({ error: "id and messages required" }, 400);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return runAgentChat(prisma, user.id, { conversationId: body.id, messages: body.messages as any });
+});
+
+// Bumper-music upload (§7.14) — admin-only multipart. tRPC is JSON-only, so file uploads land here; the
+// library management (list/toggle/rename/delete/scan) is tRPC (`bumperMusic.*`). Cookie-authed admin surface.
+app.post("/api/admin/bumper-music", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  const user = session?.user as { id: string; role?: string | null } | undefined;
+  if (!user) return c.json({ error: "Unauthorized" }, 401);
+  if (user.role !== "admin") return c.json({ error: "Admin only" }, 403);
+  const body = await c.req.parseBody();
+  const file = body.file;
+  if (!(file instanceof File)) return c.json({ error: "file is required" }, 400);
+  if (file.size > 30 * 1024 * 1024) return c.json({ error: "File too large (max 30 MB)" }, 413);
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const row = await createFromUpload(prisma, file.name, bytes);
+    return c.json({ ok: true, track: { id: row.id, title: row.title, filename: row.filename } });
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : "Upload failed" }, 400);
+  }
 });
 
 // Plex login authorize-proxy. better-auth's genericOAuth "plex" provider points
@@ -128,6 +151,26 @@ app.use(
   serveStatic({
     root: CAP_MEDIA_DIR,
     rewriteRequestPath: (p) => p.replace(/^\/caps\/media/, ""),
+  }),
+);
+
+// Bumper-music audio (§7.14) — PUBLIC static files, range-served (the client streams via <audio src>, which
+// can't send a bearer, and wants range for seek/cache). Root = BUMPER_MUSIC_DIR (a mounted volume on
+// self-host; default ./bumper-music). The enabled-track LIST is behind viewer auth at /api/v1/bumper-music.
+const BUMPER_MUSIC_DIR = process.env.BUMPER_MUSIC_DIR ?? "./bumper-music";
+app.use("/bumper-music/*", async (c, next) => {
+  await next();
+  const mt = contentTypeFor(c.req.path);
+  if (mt && c.res) {
+    c.res = new Response(c.res.body, c.res);
+    c.res.headers.set("Content-Type", mt);
+  }
+});
+app.use(
+  "/bumper-music/*",
+  serveStatic({
+    root: BUMPER_MUSIC_DIR,
+    rewriteRequestPath: (p) => decodeURIComponent(p.replace(/^\/bumper-music/, "")),
   }),
 );
 

@@ -2,6 +2,23 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.28] - 2026-07-31
+
+### Added
+
+- **Bumper ambient music — Phase A: the admin/self-host backend (web/server).** Groundwork for a Pluto-style
+  soft music bed under the "Up Next" interstitial (§7.14). A **managed track library**: upload mp3 / m4a / aac
+  through the bumpers admin page (or drop files into a mounted volume and run the **Scan bumper music** job),
+  toggle each track on/off, delete, with per-track "found/uploaded" + "missing" indicators and inline preview.
+  Global controls on the bumpers page — **ambient music on/off, volume, fade in/out** (in `BumperConfig`). The
+  files live in **`BUMPER_MUSIC_DIR`** (env, defaults to `./bumper-music`; self-host mounts a volume there) and
+  are **streamed** to clients over `GET /bumper-music/<file>` (public, range-served) with the enabled-track
+  list behind viewer auth at `GET /api/v1/bumper-music` — nothing lives on the TV apps. Backend: `BumperMusic`
+  model (migration `add_bumper_music`); `services/bumper-music/` (store + library); multipart upload endpoint
+  `POST /api/admin/bumper-music` (admin-only); `bumperMusic` tRPC (list/setEnabled/rename/remove/scan). The
+  deprecated single-track `interstitialMusicKey` is superseded by the library. **Phase B (playing it in the TV
+  bumpers — fade in, loop, fade out) lands later, as its own arc.** Server restart needed.
+
 ## [0.9.27] - 2026-07-31
 
 ### Fixed

@@ -4,6 +4,7 @@ import type { SyncProgress } from "../media/media-item";
 import { getConnectionForRole } from "../agent/config";
 import { getLineupRunner } from "../agent/lineup-runner";
 import { clearAiGenerated } from "../agent/tools";
+import { scanMusicDir } from "../bumper-music/library";
 import { getGlobalBumperConfig } from "../bumpers/bumper-config";
 import { generateLineup } from "../generator/generate";
 import { syncMediaItems } from "../media/sync-media";
@@ -285,6 +286,19 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
         `[jobs] ai-lineup-build dispatched run ${runId}` +
           (limit > 0 ? ` (building ${limit} of the planned lineup)` : " (UNCAPPED — full lineup)"),
       );
+    },
+  },
+  {
+    id: "bumper-music-scan",
+    name: "Scan Bumper Music",
+    description:
+      "Scans the bumper-music folder for audio files added directly to the volume and indexes any new ones (so they join the random rotation), flags tracks whose file has gone missing, and clears the flag on any that reappeared. Manual; run it after dropping files into the music volume.",
+    interval: "fixed",
+    defaultCron: "0 0 0 1 1 *", // manual-only; never auto-fires
+    manual: true,
+    run: async () => {
+      const r = await scanMusicDir(prisma);
+      console.log(`[jobs] bumper-music-scan: +${r.added} added, ${r.missing} missing, ${r.total} total`);
     },
   },
   {
