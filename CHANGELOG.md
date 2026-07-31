@@ -2,6 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.32] - 2026-07-31
+
+### Changed
+
+- **Self-host: fix the bumper-music container path, make only the host side configurable (docker).** Refined
+  v0.9.31 — the container mount path `/data/bumper-music` is now **fixed** (`BUMPER_MUSIC_DIR` hardcoded in the
+  server env, not a knob), and the only thing you choose is the **host** side of the mount via a new
+  **`BUMPER_MUSIC_VOLUME`** var: `- ${BUMPER_MUSIC_VOLUME:-channelguide_bumpermusic}:/data/bumper-music`. Unset
+  → the named volume; set it to a bind path (your dataset) to drop files in directly. Documented in
+  `.env.example`. Removes the footgun of two coupled path knobs.
+
 ## [0.9.31] - 2026-07-31
 
 ### Fixed
