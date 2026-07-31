@@ -2,6 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.29] - 2026-07-31
+
+### Added
+
+- **Rename bumper-music tracks from the admin UI (web).** Each track in the music library now has an inline
+  edit (pencil) on its title — click to rename (Enter/blur saves, Esc cancels), so a hashy filename like
+  `234345634563456.mp3` can become "Track 1". Wires the existing `bumperMusic.rename` mutation into the list.
+
 ## [0.9.28] - 2026-07-31
 
 ### Added

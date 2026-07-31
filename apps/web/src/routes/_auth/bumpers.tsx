@@ -17,6 +17,7 @@ import {
   FolderSearch,
   Loader2,
   Music,
+  Pencil,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -216,6 +217,25 @@ function MusicLibrary() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+
+  const startEdit = (id: string, title: string) => {
+    setEditingId(id);
+    setDraft(title);
+  };
+  const saveEdit = async () => {
+    const id = editingId;
+    const title = draft.trim();
+    setEditingId(null);
+    if (!id || !title) return;
+    try {
+      await trpcClient.bumperMusic.rename.mutate({ id, title });
+      await tracks.refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Rename failed");
+    }
+  };
 
   const upload = async (file: File) => {
     setUploading(true);
@@ -318,7 +338,36 @@ function MusicLibrary() {
               <li key={t.id} className={`flex items-center gap-3 p-3 ${t.missing ? "opacity-60" : ""}`}>
                 <Switch checked={t.enabled} onCheckedChange={(v) => toggle(t.id, v === true)} aria-label={`Enable ${t.title}`} disabled={t.missing} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{t.title}</p>
+                  {editingId === t.id ? (
+                    <Input
+                      autoFocus
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onBlur={() => void saveEdit()}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void saveEdit();
+                        } else if (e.key === "Escape") {
+                          setEditingId(null);
+                        }
+                      }}
+                      className="h-7 text-sm"
+                      aria-label="Track name"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <p className="truncate text-sm font-medium">{t.title}</p>
+                      <button
+                        type="button"
+                        onClick={() => startEdit(t.id, t.title)}
+                        className="text-muted-foreground hover:text-foreground shrink-0"
+                        aria-label={`Rename ${t.title}`}
+                      >
+                        <Pencil className="size-3.5" />
+                      </button>
+                    </div>
+                  )}
                   <p className="text-muted-foreground truncate text-xs">
                     {t.source === "scan" ? "found in folder" : "uploaded"}
                     {t.sizeBytes ? ` · ${(t.sizeBytes / 1024 / 1024).toFixed(1)} MB` : ""}
