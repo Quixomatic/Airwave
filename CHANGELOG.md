@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.24] - 2026-07-31
+
+### Added
+
+- **User access control — Phase 3: polish (web).** The Users list now shows each restricted user's scope at a
+  glance — **"N of M channels"** (M = total enabled channels), or "All access" — and the access editor's header
+  reads **"N of M channels selected"** while you're picking. `users.list` resolves the accessible enabled count
+  per restricted user (admins + all-access users skip the query). Rounds out the access-control arc
+  (config → enforcement → polish).
+
 ## [0.9.23] - 2026-07-31
 
 ### Added

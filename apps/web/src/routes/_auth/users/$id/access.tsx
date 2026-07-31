@@ -149,7 +149,7 @@ function Editor({ id, data, onSaved }: { id: string; data: AccessData; onSaved: 
             <FrameDescription>
               {allAccess
                 ? "This user can see every package and channel, including ones added later."
-                : `Restricted — ${selectedCount} channel${selectedCount === 1 ? "" : "s"} selected.`}
+                : `Restricted — ${selectedCount} of ${allChannelIds.size} channels selected.`}
             </FrameDescription>
           </div>
           <div className="flex shrink-0 items-center gap-3">

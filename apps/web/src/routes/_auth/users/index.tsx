@@ -36,6 +36,8 @@ export const Route = createFileRoute("/_auth/users/")({
 
 function UsersPage() {
   const users = useQuery(trpc.users.list.queryOptions());
+  const list = users.data?.users;
+  const totalChannels = users.data?.totalChannels ?? 0;
   const [importing, setImporting] = useState(false);
 
   const importUsers = async () => {
@@ -71,7 +73,7 @@ function UsersPage() {
           </Button>
         </FrameHeader>
         <FramePanel className="p-0">
-          {users.data && users.data.length === 0 ? (
+          {list && list.length === 0 ? (
             <EmptyState
               icon={Users}
               title="No users yet"
@@ -89,7 +91,7 @@ function UsersPage() {
             />
           ) : (
             <ul className="divide-y">
-              {users.data?.map((u) => (
+              {list?.map((u) => (
                 <li key={u.id}>
                   <Link
                     to="/users/$id"
@@ -103,7 +105,9 @@ function UsersPage() {
                     <div className="flex shrink-0 items-center gap-2">
                       {u.role !== "admin" && (
                         <Badge variant="outline" className="text-muted-foreground">
-                          {u.allAccess ? "All access" : "Restricted"}
+                          {u.allAccess
+                            ? "All access"
+                            : `${u.accessCount ?? 0} of ${totalChannels} channels`}
                         </Badge>
                       )}
                       <RoleBadge role={u.role} />

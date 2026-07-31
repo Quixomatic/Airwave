@@ -1,22 +1,32 @@
 import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
-import { getUserAccess, setUserAccess } from "../services/access/access";
+import { accessibleChannels, getUserAccess, setUserAccess } from "../services/access/access";
 
 export const usersRouter = router({
   list: adminProcedure.query(async ({ ctx }) => {
-    return ctx.prisma.user.findMany({
-      orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        image: true,
-        allAccess: true,
-        createdAt: true,
-      },
-    });
+    const [users, totalChannels] = await Promise.all([
+      ctx.prisma.user.findMany({
+        orderBy: { createdAt: "asc" },
+        select: { id: true, email: true, name: true, role: true, image: true, allAccess: true, createdAt: true },
+      }),
+      ctx.prisma.channel.count({ where: { enabled: true } }),
+    ]);
+
+    // How many ENABLED channels each restricted user can actually see (`accessCount: null` = all). Admins +
+    // all-access users skip the resolve; only restricted users cost the extra query (fine at self-host scale).
+    const enriched = await Promise.all(
+      users.map(async (u) => {
+        if (u.role === "admin" || u.allAccess) return { ...u, accessCount: null as number | null };
+        const acc = await accessibleChannels(ctx.prisma, u.id);
+        if (acc === "all") return { ...u, accessCount: null };
+        const accessCount = acc.size
+          ? await ctx.prisma.channel.count({ where: { enabled: true, id: { in: [...acc] } } })
+          : 0;
+        return { ...u, accessCount };
+      }),
+    );
+    return { users: enriched, totalChannels };
   }),
 
   /** One user's profile (for the detail page). */
