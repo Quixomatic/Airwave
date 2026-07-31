@@ -7,6 +7,9 @@ import type { PrismaClient } from "@ChannelGuide/db";
  * channels). Ungrouped channels (no package) are per-channel grants only. Admins bypass.
  */
 
+/** A resolved access set: `"all"` (admins + all-access users — no filtering) or the exact channel ids. */
+export type AccessSet = "all" | Set<string>;
+
 export type PackageGrant = { packageId: string; mode: "FULL" | "PARTIAL" };
 
 /** A channel as the access grid renders it. */
@@ -102,15 +105,22 @@ export async function setUserAccess(
   return { ok: true };
 }
 
+/** Whether an access set permits a channel (`"all"` → always). */
+export function isChannelAllowed(access: AccessSet, channelId: string): boolean {
+  return access === "all" || access.has(channelId);
+}
+
+/** Keep only the channel ids an access set permits (`"all"` → unchanged). */
+export function filterAccessibleIds(ids: string[], access: AccessSet): string[] {
+  return access === "all" ? ids : ids.filter((id) => access.has(id));
+}
+
 /**
  * Resolve what a user can actually see/play — the central check Phase 2's REST enforcement wires in.
  * Returns `"all"` (short-circuit: no filtering) for admins and all-access users; otherwise the concrete
  * set of accessible channel ids (FULL packages' channels ∪ explicit channel grants).
  */
-export async function accessibleChannels(
-  prisma: PrismaClient,
-  userId: string,
-): Promise<"all" | Set<string>> {
+export async function accessibleChannels(prisma: PrismaClient, userId: string): Promise<AccessSet> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {

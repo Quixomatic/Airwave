@@ -2,6 +2,23 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.23] - 2026-07-31
+
+### Added
+
+- **User access control — Phase 2: enforcement (server).** The access config from Phase 1 now actually gates
+  what viewers see and play on the TV apps (tv-web / tv-native). Approach (§7.13): the viewer REST API
+  (`apps/server/src/rest.ts`) resolves each request's access set **once** in a middleware (`accessibleChannels`
+  → `"all"` for admins + all-access users, else the exact channel ids, stashed on the context); a **path-scoped
+  middleware** on `/channels/:id/*` 403s any per-channel route (timeline / now / **media** / stop) for a channel
+  the viewer can't access — so a deep-link or raw bearer call can't stream it; the collection reads
+  (`/channels`, `/packages`, `/guide`, `/favorites`, `/recents`) **filter at the data layer** (the access set is
+  threaded into `listGuideChannels` / `listActivePackages` / `getGuideGrid`, and favorites/recents are
+  intersected — hidden, not deleted); and the routes that carry a channel id in the request **body**
+  (`/sessions/heartbeat`, `POST /favorites`, `/playback/log`) guard inline. Admin tRPC is unchanged (admins
+  bypass). A restricted package the viewer can't see drops out of the sidebar entirely.
+  - **Server restart** needed to pick up the new middleware.
+
 ## [0.9.22] - 2026-07-31
 
 ### Fixed

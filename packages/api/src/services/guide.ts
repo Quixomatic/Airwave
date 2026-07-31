@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@ChannelGuide/db";
 
+import type { AccessSet } from "./access/access";
 import { guideMetaOf, mediaItemGuideInclude } from "./media/media-item";
 
 /**
@@ -17,13 +18,17 @@ const guideChannelSelect = {
   package: { select: { id: true, key: true, icon: true, tint: true, name: true } },
 } as const;
 
-/** Enabled channels in guide/lineup order — the TV client's channel list (surfing). */
-export async function listGuideChannels(prisma: PrismaClient) {
-  return prisma.channel.findMany({
+/**
+ * Enabled channels in guide/lineup order — the TV client's channel list (surfing). `accessible` scopes it
+ * to what the viewer may see (`"all"` → every enabled channel; a Set → only those ids); see access control §7.13.
+ */
+export async function listGuideChannels(prisma: PrismaClient, accessible: AccessSet = "all") {
+  const channels = await prisma.channel.findMany({
     where: { enabled: true },
     orderBy: { number: "asc" },
     select: guideChannelSelect,
   });
+  return accessible === "all" ? channels : channels.filter((c) => accessible.has(c.id));
 }
 
 /**
@@ -38,8 +43,9 @@ export async function getGuideGrid(
   prisma: PrismaClient,
   forwardMinutes: number,
   backMinutes = 60,
+  accessible: AccessSet = "all",
 ) {
-  const channels = await listGuideChannels(prisma);
+  const channels = await listGuideChannels(prisma, accessible);
   const now = new Date();
   // Query broadly (6h) so a long program that started well before the window but is
   // still airing is caught; the filter below trims to the visible past/future span.

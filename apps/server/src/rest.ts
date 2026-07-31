@@ -1,3 +1,9 @@
+import {
+  type AccessSet,
+  accessibleChannels,
+  filterAccessibleIds,
+  isChannelAllowed,
+} from "@ChannelGuide/api/services/access/access";
 import { ApiError } from "@ChannelGuide/api/services/errors";
 import { listFavoriteChannelIds, setFavorite } from "@ChannelGuide/api/services/favorites";
 import { getGuideGrid, listGuideChannels } from "@ChannelGuide/api/services/guide";
@@ -46,13 +52,33 @@ import { Hono } from "hono";
 
 type Session = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
 
-const api = new Hono<{ Variables: { session: Session } }>();
+const api = new Hono<{ Variables: { session: Session; access: AccessSet } }>();
 
-/** Require an authenticated session (cookie or bearer token). */
+/**
+ * Require an authenticated session (cookie or bearer token) AND resolve the viewer's access set once for
+ * the whole request (access control §7.13). Everything downstream reads `c.get("access")` — `"all"` for
+ * admins + all-access users (short-circuits every filter/guard), otherwise the exact accessible channel ids.
+ */
 api.use("*", async (c, next) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   if (!session) return c.json({ error: "Authentication required" }, 401);
   c.set("session", session);
+  c.set("access", await accessibleChannels(prisma, session.user.id));
+  await next();
+});
+
+/**
+ * Gate every per-channel route (`/channels/:id/timeline|now|media|stop`) in ONE place: 403 unless the
+ * viewer may access the `:id`. Runs after the `*` middleware, so `access` is already resolved. The
+ * must-have is `/media` — a direct bearer call or deep-link can't stream a channel the viewer can't see.
+ * (Routes that carry the channel id in the BODY — heartbeat, favorite — are guarded inline; a middleware
+ * can't read the body without consuming it.)
+ */
+api.use("/channels/:id/*", async (c, next) => {
+  const id = c.req.param("id");
+  if (id && !isChannelAllowed(c.get("access"), id)) {
+    return c.json({ error: "You don't have access to this channel" }, 403);
+  }
   await next();
 });
 
@@ -74,17 +100,22 @@ function intParam(raw: string | undefined, def: number, min: number, max: number
 
 // --- Guide / lineup -------------------------------------------------------
 
-/** Enabled channels in lineup order (the TV channel list / surfing). */
-api.get("/channels", async (c) => c.json({ channels: await listGuideChannels(prisma) }));
+/** Enabled channels in lineup order (the TV channel list / surfing) — scoped to the viewer's access. */
+api.get("/channels", async (c) => c.json({ channels: await listGuideChannels(prisma, c.get("access")) }));
 
-/** Channel packages that have active channels — the guide sidebar's filter list. */
-api.get("/packages", async (c) => c.json({ packages: await listActivePackages(prisma) }));
+/** Channel packages that have active channels the viewer can access — the guide sidebar's filter list. */
+api.get("/packages", async (c) => c.json({ packages: await listActivePackages(prisma, c.get("access")) }));
 
 // --- Favorites (per-user, synced across devices) --------------------------
 
-/** This user's favorited channel ids (the guide's heart state + "Favorites" lens). */
+/** This user's favorited channel ids (the guide's heart state + "Favorites" lens) — accessible ones only. */
 api.get("/favorites", async (c) =>
-  c.json({ channelIds: await listFavoriteChannelIds(prisma, c.get("session").user.id) }),
+  c.json({
+    channelIds: filterAccessibleIds(
+      await listFavoriteChannelIds(prisma, c.get("session").user.id),
+      c.get("access"),
+    ),
+  }),
 );
 
 /**
@@ -97,19 +128,27 @@ api.post("/favorites", async (c) => {
   if (!body?.channelId || typeof body.favorite !== "boolean") {
     return c.json({ error: "channelId and favorite are required" }, 400);
   }
+  if (!isChannelAllowed(c.get("access"), body.channelId)) {
+    return c.json({ error: "You don't have access to this channel" }, 403);
+  }
   return c.json(await setFavorite(prisma, c.get("session").user.id, body.channelId, body.favorite));
 });
 
-/** This user's recently-watched channels, deduped, most-recent-first (the "Recents" lens). */
+/** This user's recently-watched channels, deduped, most-recent-first (the "Recents" lens) — accessible only. */
 api.get("/recents", async (c) =>
-  c.json({ channelIds: await listRecentChannelIds(prisma, c.get("session").user.id) }),
+  c.json({
+    channelIds: filterAccessibleIds(
+      await listRecentChannelIds(prisma, c.get("session").user.id),
+      c.get("access"),
+    ),
+  }),
 );
 
-/** Cross-channel guide grid over a forward window. */
+/** Cross-channel guide grid over a forward window — scoped to the viewer's access. */
 api.get("/guide", async (c) => {
   const forwardMinutes = intParam(c.req.query("forwardMinutes"), 150, 30, 720);
   const backMinutes = intParam(c.req.query("backMinutes"), 60, 0, 360);
-  return c.json(await getGuideGrid(prisma, forwardMinutes, backMinutes));
+  return c.json(await getGuideGrid(prisma, forwardMinutes, backMinutes, c.get("access")));
 });
 
 /** The Plex-style quality ladder for the client's quality selector. */
@@ -187,6 +226,9 @@ api.get("/connections", async (c) => {
 api.post("/playback/log", async (c) => {
   const body = (await c.req.json().catch(() => null)) as Parameters<typeof logPlayback>[2] | null;
   if (!body) return c.json({ error: "body required" }, 400);
+  if (body.channelId && !isChannelAllowed(c.get("access"), body.channelId)) {
+    return c.json({ error: "You don't have access to this channel" }, 403);
+  }
   return c.json(await logPlayback(prisma, c.get("session").user.id, body));
 });
 
@@ -271,6 +313,9 @@ api.post("/sessions/heartbeat", async (c) => {
   } | null;
   if (!body?.channelId || !body.state) {
     return c.json({ error: "channelId and state are required" }, 400);
+  }
+  if (!isChannelAllowed(c.get("access"), body.channelId)) {
+    return c.json({ error: "You don't have access to this channel" }, 403);
   }
   return c.json(
     await heartbeatSession(prisma, c.get("session").user.id, {
