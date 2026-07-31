@@ -193,21 +193,22 @@ function BumpersPage() {
           </FramePanel>
         </Frame>
 
-        <Frame className={enabled ? "" : "opacity-60"}>
-          <FrameHeader>
-            <FrameTitle>Coming later</FrameTitle>
-          </FrameHeader>
-          <FramePanel>
-            <div className="border-border/60 text-muted-foreground rounded-md border border-dashed p-3 text-xs">
-              Commercial clips (from a Plex playlist/collection or a local folder) that play <em>inside</em> the
-              up-next frame, and a mid-program break cadence. The schema is already in place for both.
-            </div>
-          </FramePanel>
-        </Frame>
       </form>
 
       {/* The music library — its own actions (upload/toggle/delete/scan), so it lives OUTSIDE the config form. */}
       <MusicLibrary />
+
+      <Frame>
+        <FrameHeader>
+          <FrameTitle>Coming later</FrameTitle>
+        </FrameHeader>
+        <FramePanel>
+          <div className="border-border/60 text-muted-foreground rounded-md border border-dashed p-3 text-xs">
+            Commercial clips (from a Plex playlist/collection or a local folder) that play <em>inside</em> the
+            up-next frame, and a mid-program break cadence. The schema is already in place for both.
+          </div>
+        </FramePanel>
+      </Frame>
     </div>
   );
 }

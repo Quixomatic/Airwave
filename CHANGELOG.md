@@ -2,6 +2,13 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.30] - 2026-07-31
+
+### Changed
+
+- **Bumpers page: moved the "Coming later" note below the music library (web).** So the flow reads
+  Enable → Break lengths → Ambient music → Music library → Coming later.
+
 ## [0.9.29] - 2026-07-31
 
 ### Added
