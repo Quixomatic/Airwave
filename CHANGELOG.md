@@ -2,6 +2,25 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.21] - 2026-07-31
+
+### Added
+
+- **User access control — Phase 1: configuration (admin UI). No enforcement yet.** Groundwork for Plex-style
+  per-user sharing (§7.13). You can now open a user and configure what packages/channels they're allowed —
+  three levels: **all access** (default for new users; everything incl. future content), **full package
+  access** (all current + future channels in a package), and **partial** (specific channels). The admin
+  **Users** page is now a list → **`users/:id`** (overview with an access summary) → **`users/:id/access`**
+  (a grid editor reusing the import-preview tiles: a master "all access" switch, package + per-channel
+  toggles, sticky Save + "Reset to all access"). Mode is derived on save — a package with all its channels
+  selected becomes FULL (includes future channels), some → PARTIAL, none → no grant; ungrouped channels are
+  per-channel grants. Backend: `User.allAccess` + `UserPackageAccess` (FULL/PARTIAL) + `UserChannelAccess`
+  (migration `add_user_access`); `services/access/` (`getUserAccess` / `setUserAccess` / `accessibleChannels`);
+  `users.get` / `users.getAccess` / `users.setAccess`.
+  - **Not enforced yet:** this only stores the config — viewers still see everything until Phase 2 wires the
+    `accessibleChannels` resolver into the viewer REST surface (guide reads + the `/media` playback gate).
+  - **Requires a server restart** to pick up the regenerated Prisma client (`allAccess` and the new tables).
+
 ## [0.9.20] - 2026-07-31
 
 ### Fixed

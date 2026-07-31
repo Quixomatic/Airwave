@@ -38,7 +38,11 @@ export function BreadcrumbProvider({ children }: { children: ReactNode }) {
 export function useBreadcrumb(label: string | undefined): void {
   const ctx = useContext(BreadcrumbContext);
   const matches = useMatches();
-  const currentMatchId = matches[matches.length - 1]?.id;
+  // Target the DEEPEST match that declares a breadcrumb — so a LAYOUT route (e.g. `users/$id`) can own a
+  // dynamic label even when its active child is a tabbed sub-page (Overview/Access) with no breadcrumb of
+  // its own. For a leaf detail route that itself has the breadcrumb (channels/$channelId), this is still
+  // that same route, so existing callers are unaffected.
+  const currentMatchId = [...matches].reverse().find((m) => m.staticData?.breadcrumb !== undefined)?.id;
   // Depend on the stable setter, not the whole ctx object, to stay loop-proof.
   const setOverride = ctx?.setOverride;
 

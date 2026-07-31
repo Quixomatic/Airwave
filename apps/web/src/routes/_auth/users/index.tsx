@@ -8,8 +8,8 @@ import {
   FrameTitle,
 } from "@ChannelGuide/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { Loader2, ShieldCheck, User, UserPlus, Users } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ChevronRight, Loader2, ShieldCheck, User, UserPlus, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -30,8 +30,7 @@ function RoleBadge({ role }: { role?: string | null }) {
   );
 }
 
-export const Route = createFileRoute("/_auth/users")({
-  staticData: { breadcrumb: "Users", breadcrumbIcon: Users, breadcrumbTint: "emerald" },
+export const Route = createFileRoute("/_auth/users/")({
   component: UsersPage,
 });
 
@@ -91,12 +90,26 @@ function UsersPage() {
           ) : (
             <ul className="divide-y">
               {users.data?.map((u) => (
-                <li key={u.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{u.name || u.email}</p>
-                    <p className="text-muted-foreground truncate text-xs">{u.email}</p>
-                  </div>
-                  <RoleBadge role={u.role} />
+                <li key={u.id}>
+                  <Link
+                    to="/users/$id"
+                    params={{ id: u.id }}
+                    className="hover:bg-muted/50 flex items-center justify-between gap-3 px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{u.name || u.email}</p>
+                      <p className="text-muted-foreground truncate text-xs">{u.email}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {u.role !== "admin" && (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          {u.allAccess ? "All access" : "Restricted"}
+                        </Badge>
+                      )}
+                      <RoleBadge role={u.role} />
+                      <ChevronRight className="text-muted-foreground size-4" />
+                    </div>
+                  </Link>
                 </li>
               ))}
             </ul>

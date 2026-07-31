@@ -46,6 +46,7 @@ model ChannelPackage {
   aiGenerated Boolean @default(false)
 
   channels    Channel[]
+  userAccess  UserPackageAccess[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -111,6 +112,7 @@ model Channel {
   favorites     Favorite[]
   watchStates   ChannelWatchState[]
   watchSessions WatchSession[]
+  userAccess    UserChannelAccess[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

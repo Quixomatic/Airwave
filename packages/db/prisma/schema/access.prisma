@@ -1,0 +1,50 @@
+/// Per-user access control over packages + channels (§7.13) — Plex-style sharing.
+///
+/// Three levels of granularity:
+///   1. User.allAccess = true            → everything, including packages/channels added later.
+///   2. UserPackageAccess.mode = FULL    → every channel in that package, including future ones.
+///   3. UserPackageAccess.mode = PARTIAL → only the channels in UserChannelAccess for that package.
+///
+/// A user with allAccess=false and no rows sees NOTHING. Ungrouped channels (no package) can only be
+/// granted individually via UserChannelAccess, and only allAccess users auto-receive new ungrouped ones.
+/// Admins bypass all of this. Enforcement is entirely on the viewer REST surface (apps/server/src/rest.ts);
+/// the admin tRPC panel is admin-only and unaffected.
+
+enum PackageAccessMode {
+  FULL // every channel in the package, incl. future ones
+  PARTIAL // only the channels listed in UserChannelAccess for this package
+}
+
+/// A user's access to ONE package. A row exists only for packages the user has SOME access to;
+/// the absence of a row means no access to that package.
+model UserPackageAccess {
+  id        String            @id @default(cuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  packageId String
+  package   ChannelPackage    @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  mode      PackageAccessMode @default(FULL)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, packageId])
+  @@index([userId])
+  @@map("user_package_access")
+}
+
+/// An explicit per-channel grant. Used when the channel's package is PARTIAL, OR for ungrouped
+/// channels (no package) which have nothing to grant at the package level.
+model UserChannelAccess {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channelId String
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, channelId])
+  @@index([userId])
+  @@map("user_channel_access")
+}

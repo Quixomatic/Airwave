@@ -16,6 +16,10 @@ model User {
   banReason  String?
   banExpires DateTime?
 
+  // Access control (§7.13). true = sees every package/channel incl. future ones (default for new
+  // users); false = restricted to the grants in packageAccess/channelAccess. Admins bypass regardless.
+  allAccess Boolean @default(true)
+
   // domain back-relations
   mediaSources    MediaSource[]       @relation("MediaSourceOwner")
   channelsCreated Channel[]           @relation("ChannelCreatedBy")
@@ -25,6 +29,8 @@ model User {
   tvDevices       TvDevice[]
   playbackLogs    PlaybackLog[]
   aiConversations AiConversation[]
+  packageAccess   UserPackageAccess[]
+  channelAccess   UserChannelAccess[]
 
   @@unique([email])
   @@map("user")
