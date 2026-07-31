@@ -2,6 +2,15 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.35] - 2026-07-31
+
+### Changed
+
+- **Bumper music fades are now buttery (tv-web).** The fade in/out was driven off the player's 500ms tick, so
+  it stepped in ~2–3 jumps. Added a `requestAnimationFrame` loop that interpolates the bumper's elapsed time
+  between ticks and drives the volume at 60fps, so fades ramp smoothly. Position stays tick-driven (seeking
+  the audio every frame would stutter); only the volume is smoothed.
+
 ## [0.9.34] - 2026-07-31
 
 ### Fixed

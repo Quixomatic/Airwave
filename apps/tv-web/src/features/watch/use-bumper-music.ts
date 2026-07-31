@@ -57,6 +57,9 @@ export function useBumperMusic({
   const cfgRef = useRef<BumperMusic | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const durRef = useRef<number | null>(null);
+  // The last authoritative position from the player's 500ms tick, timestamped so the rAF loop can
+  // interpolate between ticks for a smooth 60fps fade.
+  const posRef = useRef<{ elapsed: number; total: number; ts: number } | null>(null);
 
   // Settings + track pool, fetched once for the session.
   useEffect(() => {
@@ -101,19 +104,40 @@ export function useBumperMusic({
     };
   }, [active, bumperKey]);
 
-  // Sync volume + position to the timeline every tick (and on scrub) — the whole point: it FOLLOWS `elapsed`.
+  // Reconcile on each player tick: record the authoritative position (for the rAF loop to interpolate from)
+  // and, on a real DVR scrub, snap the audio position to match `elapsed % trackDuration`.
   useEffect(() => {
-    const cfg = cfgRef.current;
+    if (!active || elapsed == null || total == null) {
+      posRef.current = null;
+      return;
+    }
+    posRef.current = { elapsed, total, ts: performance.now() };
     const audio = audioRef.current;
-    if (!audio || !cfg || !active || elapsed == null || total == null) return;
-
-    const target = Math.max(0, Math.min(1, cfg.volume / 100));
-    audio.volume = bumperVolume(elapsed, total, cfg.fadeInMs, cfg.fadeOutMs, target);
-
     const dur = durRef.current;
-    if (dur && dur > 0) {
+    if (audio && dur && dur > 0) {
       const desired = elapsed % dur;
       if (Math.abs(audio.currentTime - desired) > SEEK_THRESHOLD) audio.currentTime = desired;
     }
   }, [active, elapsed, total]);
+
+  // Smooth the fade at 60fps: interpolate `elapsed` forward from the last tick and set the volume from it, so
+  // the fade in/out is buttery rather than stepped on the 500ms tick. (Position stays tick-driven — seeking
+  // the audio every frame would stutter.)
+  useEffect(() => {
+    if (!active) return;
+    let raf = 0;
+    const loop = () => {
+      const audio = audioRef.current;
+      const cfg = cfgRef.current;
+      const pos = posRef.current;
+      if (audio && cfg && pos) {
+        const target = Math.max(0, Math.min(1, cfg.volume / 100));
+        const local = Math.max(0, Math.min(pos.total, pos.elapsed + (performance.now() - pos.ts) / 1000));
+        audio.volume = bumperVolume(local, pos.total, cfg.fadeInMs, cfg.fadeOutMs, target);
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [active]);
 }
