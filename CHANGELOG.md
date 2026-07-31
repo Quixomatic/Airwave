@@ -2,6 +2,20 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.20] - 2026-07-31
+
+### Fixed
+
+- **Workflows failed to start in production with `start-invalid-workflow-function` (server).** Prod runs the
+  compiled `dist/index.mjs` (via `bun run dist/index.mjs`), not `src` through Bun's bunfig preload — so the
+  Workflow SDK's **client transform** (which attaches each workflow's `workflowId`) never ran, and every
+  `start(workflow)` threw in prod. It worked in dev only because dev loads the source through the preload
+  (`workflow-plugin.ts`). Fixed by applying the same `@workflow/swc-plugin` client transform at **bundle
+  time** via a `tsdown.config.ts` plugin, so the compiled bundle carries the `workflowId` (verified: both
+  `aiLineupWorkflow` and `importLineupWorkflow` now get their ids baked in). This affected **both** the new
+  lineup import and the AI-lineup workflow in production — the import was just the first workflow actually
+  invoked on a self-hosted box.
+
 ## [0.9.19] - 2026-07-30
 
 ### Added
