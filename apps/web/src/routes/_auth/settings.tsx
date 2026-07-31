@@ -9,6 +9,7 @@ const TABS = [
   { label: "AI Assistant", to: "/settings/ai" },
   { label: "Jobs & Cache", to: "/settings/jobs" },
   { label: "Workflows", to: "/settings/workflows" },
+  { label: "Import / Export", to: "/settings/transfer" },
   { label: "About", to: "/settings/about" },
 ] as const;
 

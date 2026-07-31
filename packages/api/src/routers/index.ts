@@ -8,6 +8,7 @@ import { packagesRouter } from "./packages";
 import { playbackRouter } from "./playback";
 import { plexRouter } from "./plex";
 import { sourcesRouter } from "./sources";
+import { transferRouter } from "./transfer";
 import { usersRouter } from "./users";
 
 export const appRouter = router({
@@ -29,6 +30,7 @@ export const appRouter = router({
   playback: playbackRouter,
   plex: plexRouter,
   sources: sourcesRouter,
+  transfer: transferRouter,
   users: usersRouter,
 });
 export type AppRouter = typeof appRouter;

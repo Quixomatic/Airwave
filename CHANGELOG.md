@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.16] - 2026-07-30
+
+### Added
+
+- **Export lineup — first half of lineup transfer between instances (web).** A new **Settings → Import /
+  Export** tab with a working **Export**: downloads every package + channel (with their filters) as a single
+  portable JSON (`airwave-lineup-<date>.json`), omitting everything instance-specific (media-source binding,
+  schedules, cached metadata — all rebuilt on import). Channel→package links travel by the package `key`; a
+  definition's Plex library travels by its title. Backend: `transfer.export` query + `services/transfer/export.ts`.
+  Import (upload → staging pick-and-choose → durable WDK workflow) lands next. **Server restart needed** to
+  expose the new query.
+
 ## [0.9.15] - 2026-07-30
 
 ### Added
