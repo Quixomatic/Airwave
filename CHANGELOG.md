@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.26] - 2026-07-31
+
+### Added
+
+- **Admin panel is now admins-only — non-admins can't sign into the admin UI (web).** Following better-auth's
+  documented pattern (the admin plugin has no built-in sign-in block; the recommendation is a server-side
+  session role check + server-side authorization): the `_auth` guard now reads the **server-issued** `user.role`
+  (DB-backed, from a `getSession` round-trip — not client-forgeable) and bounces any non-admin to a new
+  **`/not-authorized`** page (branded, with a Sign out button). Login + post-login redirect admins to the guide
+  and everyone else to that notice. Regular users can still sign into the **TV apps** normally — this only gates
+  the admin panel. Defense-in-depth: every admin data call was already an `adminProcedure` (server-enforced 403),
+  so non-admins never had access to anything here; this just makes the door explicit instead of a broken shell.
+
 ## [0.9.25] - 2026-07-31
 
 ### Changed

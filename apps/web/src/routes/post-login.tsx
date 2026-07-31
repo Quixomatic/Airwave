@@ -20,6 +20,8 @@ export const Route = createFileRoute("/post-login")({
     if (!session?.data?.user) {
       throw redirect({ to: "/login" });
     }
-    throw redirect({ to: "/guide" });
+    // Admins land on the guide; a non-admin who authenticated here gets the admins-only notice.
+    const role = (session.data.user as { role?: string | null }).role ?? null;
+    throw redirect({ to: role === "admin" ? "/guide" : "/not-authorized" });
   },
 });
