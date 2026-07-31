@@ -3,6 +3,7 @@ import { Loader2, Maximize2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { BumperCard } from "./bumper-card";
+import { useBumperMusic } from "./use-bumper-music";
 import { ChannelNumberEntry } from "./channel-number-entry";
 import { Ctx, type Layout, type PlayerCtx } from "./player-ctx";
 import { accentForChannel, FullChrome } from "./watch";
@@ -237,6 +238,16 @@ function PlayerHost({
 
   const player = useTvPlayer(channelId, { quality, audioStreamId, subtitleStreamId });
 
+  // Ambient music bed under bumpers (§7.14 Phase B) — lives HERE on the persistent host, not in FullChrome,
+  // so it plays whether the channel is full-screen OR docked as the mini feed. Derived from the bumper's
+  // timeline position, so it seeks + fades with DVR scrubbing.
+  useBumperMusic({
+    active: player.status.state === "bumper",
+    elapsed: player.status.bumperElapsed,
+    total: player.status.bumperTotal,
+    bumperKey: player.status.bumperKey,
+  });
+
   // Release the CH▲/▼ in-flight lock once THIS channel is actually showing content (program or
   // bumper) — a CH press stays locked through the remount+load, then frees the next press. This
   // host is keyed on the channel id, so a fresh instance mounts per channel and reports its own load.
@@ -301,6 +312,7 @@ function PlayerHost({
           channelId={channelId}
           guide={player.status.guide}
           remaining={player.status.bumperRemaining}
+          total={player.status.bumperTotal}
           accent={accent}
           compact
         />

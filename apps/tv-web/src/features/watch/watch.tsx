@@ -3,7 +3,6 @@ import { Tv } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { BumperCard } from "./bumper-card";
-import { useBumperMusic } from "./use-bumper-music";
 import { ChannelSurf } from "./channel-surf";
 import { FeaturePanel } from "./feature-panel";
 import { usePlayer } from "./player-ctx";
@@ -94,20 +93,17 @@ export function FullChrome({
 
   const isBumper = status.state === "bumper";
 
-  // Ambient music bed under the bumper (§7.14 Phase B) — derived from the bumper's timeline position, so it
-  // seeks + fades with DVR scrubbing. Plays only while the full-screen player is mounted.
-  useBumperMusic({
-    active: isBumper,
-    elapsed: status.bumperElapsed,
-    total: status.bumperTotal,
-    bumperKey: status.bumperKey,
-  });
-
   return (
     <>
       {/* Bumper interstitial — status.guide is the upcoming program. */}
       {isBumper && status.guide && (
-        <BumperCard channelId={channelId} guide={status.guide} remaining={status.bumperRemaining} accent={accent} />
+        <BumperCard
+          channelId={channelId}
+          guide={status.guide}
+          remaining={status.bumperRemaining}
+          total={status.bumperTotal}
+          accent={accent}
+        />
       )}
 
       {status.error && !panelOpen && (

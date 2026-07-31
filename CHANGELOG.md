@@ -2,6 +2,22 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.34] - 2026-07-31
+
+### Fixed
+
+- **Bumper countdown donut now drains against the bumper's TRUE length (tv-web).** It used to infer the total
+  from the largest `remaining` it had seen, so joining or scrubbing into the middle of a bumper made the ring
+  treat a partial amount as "full" and drain too fast. It now uses the player's real `bumperTotal`, so at 10s
+  left in a 30s bumper the ring correctly shows ⅔ drained, however you got there.
+
+### Changed
+
+- **Bumper ambient music also plays in the docked mini feed (tv-web).** The `useBumperMusic` hook moved from
+  the full-screen chrome onto the persistent player host, so the bed plays during a bumper whether the channel
+  is full-screen or docked as the mini feed in the guide (one instance, no double-play). Same DVR-derived
+  behavior (deterministic track, seek + fade with the timeline).
+
 ## [0.9.33] - 2026-07-31
 
 ### Added
