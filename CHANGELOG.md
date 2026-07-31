@@ -2,6 +2,24 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.33] - 2026-07-31
+
+### Added
+
+- **Bumper ambient music — Phase B (tv-web): it plays, and it's DVR-correct (web).** During a bumper the web
+  player plays a soft music bed from the library — fades in as the "Up Next" card appears, loops if the track
+  is shorter than the break, and fades out to land as the next program starts (§7.14). Crucially it's **derived
+  from the bumper's position on the DVR timeline, not an independent timer**: the track is chosen
+  **deterministically** by hashing a stable bumper key (so the same bumper always gets the same track), and its
+  **playback position + volume are a function of the elapsed time within the bumper** — so if you **scrub back
+  into/through a bumper, the music seeks and re-fades right along with it**. A new `useBumperMusic` hook (its
+  own `<audio>`, independent of the video), scoped to the full-screen player (the docked mini-feed bumper stays
+  silent while you browse); the player now exposes `bumperElapsed` / `bumperTotal` / `bumperKey`. Backend:
+  `GET /api/v1/bumper-music` returns the music settings (enabled/volume/fades) + the enabled track pool in one
+  call, and `/bumper-music/<file>` gets a `Cache-Control` header so each track downloads once per device and
+  replays from disk (deterministic *selection* over stable per-track URLs — fully cacheable). **Server restart
+  needed.** tv-native playback lands next.
+
 ## [0.9.32] - 2026-07-31
 
 ### Changed

@@ -61,6 +61,14 @@ export type PlayerStatus = {
   guide: GuideMeta | null;
   paused: boolean;
   bumperRemaining: number | null;
+  /** Position within the current bumper on the timeline, in seconds (null outside a bumper). Updates on DVR
+   *  scrub, so an ambient bed can be DERIVED from it (seek + fade), not played on an independent timer. */
+  bumperElapsed: number | null;
+  /** The current bumper's full length in seconds (null outside a bumper). */
+  bumperTotal: number | null;
+  /** Stable key for the CURRENT bumper occurrence (its timeline start) — so a client can pick a deterministic
+   *  track for it that survives scrubbing. Null outside a bumper. */
+  bumperKey: string | null;
   canRestart: boolean;
   error: string | null;
   scrubber: ScrubberView | null;
@@ -200,6 +208,9 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
     guide: null,
     paused: false,
     bumperRemaining: null,
+    bumperElapsed: null,
+    bumperTotal: null,
+    bumperKey: null,
     canRestart: false,
     error: null,
     scrubber: null,
@@ -597,8 +608,13 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
         /* ignore */
       }
 
-      const state = cur.kind === "BUMPER" ? "bumper" : "program";
-      const bumperRemaining = cur.kind === "BUMPER" ? Math.max(0, Math.ceil(cur.endS - effective)) : null;
+      const isBumperSlot = cur.kind === "BUMPER";
+      const state = isBumperSlot ? "bumper" : "program";
+      const bumperRemaining = isBumperSlot ? Math.max(0, Math.ceil(cur.endS - effective)) : null;
+      // Timeline-derived bumper position, so an ambient bed can seek + fade with DVR scrubbing (not a timer).
+      const bumperElapsed = isBumperSlot ? Math.max(0, effective - cur.startS) : null;
+      const bumperTotal = isBumperSlot ? Math.max(0, cur.endS - cur.startS) : null;
+      const bumperKey = isBumperSlot ? String(Math.round(cur.startS)) : null;
       setStatus((s) => ({
         ...s,
         loading: false,
@@ -606,6 +622,9 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
         guide: cur.guide,
         paused: pausedRef.current,
         bumperRemaining,
+        bumperElapsed,
+        bumperTotal,
+        bumperKey,
         canRestart: cur.kind === "PROGRAM",
         scrubber: buildScrubber(effective, t),
         delivery: cur.kind === "PROGRAM" ? cur.delivery ?? null : null,

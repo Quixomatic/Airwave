@@ -164,6 +164,10 @@ app.use("/bumper-music/*", async (c, next) => {
   if (mt && c.res) {
     c.res = new Response(c.res.body, c.res);
     c.res.headers.set("Content-Type", mt);
+    // Cache the bytes on the device — each track's URL is stable per file, so a re-played track serves from
+    // the browser's disk cache with no network. serveStatic still sends Last-Modified/ETag, so a *changed*
+    // file revalidates (304) rather than serving stale.
+    c.res.headers.set("Cache-Control", "public, max-age=604800");
   }
 });
 app.use(

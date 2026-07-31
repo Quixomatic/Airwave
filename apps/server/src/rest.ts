@@ -4,7 +4,7 @@ import {
   filterAccessibleIds,
   isChannelAllowed,
 } from "@ChannelGuide/api/services/access/access";
-import { listEnabledMusic } from "@ChannelGuide/api/services/bumper-music/library";
+import { bumperMusicPayload } from "@ChannelGuide/api/services/bumper-music/library";
 import { ApiError } from "@ChannelGuide/api/services/errors";
 import { listFavoriteChannelIds, setFavorite } from "@ChannelGuide/api/services/favorites";
 import { getGuideGrid, listGuideChannels } from "@ChannelGuide/api/services/guide";
@@ -156,10 +156,11 @@ api.get("/guide", async (c) => {
 api.get("/qualities", (c) => c.json({ qualities: qualityList() }));
 
 /**
- * Enabled ambient bumper-music tracks (§7.14) — the client picks one at random to play under a bumper.
- * Bytes are streamed from the public `/bumper-music/<file>` static route (range-served). Empty list → silent.
+ * Ambient bumper-music (§7.14) — the global music settings + enabled track pool, so a client can play a
+ * random bed under a bumper (fade in → loop → fade out). Bytes stream from the public `/bumper-music/<file>`
+ * static route (range-served). `enabled: false` or no tracks → the client stays silent.
  */
-api.get("/bumper-music", async (c) => c.json({ tracks: await listEnabledMusic(prisma) }));
+api.get("/bumper-music", async (c) => c.json(await bumperMusicPayload(prisma)));
 
 // --- Per-channel playback -------------------------------------------------
 

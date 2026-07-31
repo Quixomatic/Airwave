@@ -2,6 +2,7 @@ import path from "node:path";
 
 import type { PrismaClient } from "@ChannelGuide/db";
 
+import { getGlobalBumperConfig } from "../bumpers/bumper-config";
 import {
   contentTypeFor,
   deleteFile,
@@ -31,6 +32,22 @@ export async function listEnabledMusic(prisma: PrismaClient) {
     select: { id: true, title: true, filename: true },
   });
   return rows.map((r) => ({ id: r.id, title: r.title, url: `/bumper-music/${encodeURIComponent(r.filename)}` }));
+}
+
+/**
+ * Everything a TV client needs to play the ambient bed during a bumper (§7.14 Phase B): the global music
+ * settings + the enabled track pool, in one call. `enabled` folds in the master music toggle — when false (or
+ * no tracks), the client stays silent.
+ */
+export async function bumperMusicPayload(prisma: PrismaClient) {
+  const [cfg, tracks] = await Promise.all([getGlobalBumperConfig(prisma), listEnabledMusic(prisma)]);
+  return {
+    enabled: cfg.musicEnabled && tracks.length > 0,
+    volume: cfg.musicVolume, // 0–100
+    fadeInMs: cfg.musicFadeInMs,
+    fadeOutMs: cfg.musicFadeOutMs,
+    tracks, // [{ id, title, url }] — url is the server-relative /bumper-music/<file>
+  };
 }
 
 /** Write an uploaded file to the dir + index it. Enabled by default (goes straight into the pool). */
