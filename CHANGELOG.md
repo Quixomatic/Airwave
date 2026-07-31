@@ -2,6 +2,20 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.17] - 2026-07-30
+
+### Added
+
+- **Import lineup — upload + staging pick-and-choose (web), the second stage of lineup transfer.** Settings →
+  Import / Export takes an uploaded lineup file → **`/settings/transfer/import-preview`**, a read-only staging
+  screen (writes nothing): each package is a tile in a grid with a **package-level toggle + per-channel
+  toggles**, so you choose exactly what to import. A ⚠ **hover-card** (coss `PreviewCard`) flags per-channel
+  caveats — collection/playlist/manual filters dropped, would-import-disabled, number-in-use → reassigned,
+  unmatched library → searches all. A **sticky** main-Frame header carries the summary + the "Import N
+  channels" action. Gated on a connected + synced source. Backend: `transfer.importPreview` (read-only) +
+  `services/transfer/import.ts`. The actual import execution (durable workflow) is the next stage — the button
+  is present but not yet wired. **Server restart needed** for the new query.
+
 ## [0.9.16] - 2026-07-30
 
 ### Added
