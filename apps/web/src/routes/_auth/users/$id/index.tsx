@@ -1,7 +1,7 @@
 import { Button } from "@ChannelGuide/ui/components/button";
 import { Frame, FrameHeader, FramePanel, FrameTitle } from "@ChannelGuide/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { KeyRound } from "lucide-react";
 
 import { trpc } from "@/utils/trpc";
@@ -12,6 +12,7 @@ export const Route = createFileRoute("/_auth/users/$id/")({
 
 function UserOverview() {
   const { id } = Route.useParams();
+  const navigate = useNavigate();
   const user = useQuery(trpc.users.get.queryOptions({ id }));
   const access = useQuery(trpc.users.getAccess.queryOptions({ id }));
   const u = user.data;
@@ -53,10 +54,12 @@ function UserOverview() {
             <p className="text-muted-foreground truncate text-sm">{summary}</p>
           </div>
           {u?.role !== "admin" && (
-            <Button size="sm" variant="outline" asChild>
-              <Link to="/users/$id/access" params={{ id }}>
-                <KeyRound className="mr-2 size-4" /> Manage access
-              </Link>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate({ to: "/users/$id/access", params: { id } })}
+            >
+              <KeyRound className="mr-2 size-4" /> Manage access
             </Button>
           )}
         </div>

@@ -2,6 +2,14 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.22] - 2026-07-31
+
+### Fixed
+
+- **User overview "Manage access" button rendered the icon above the text (web).** It used `<Button asChild>`
+  wrapping a `<Link>`, but the Base UI `Button` primitive doesn't support Slot/`asChild`, so the button's
+  `inline-flex` layout never reached the link. Switched to a native `Button` with `useNavigate`.
+
 ## [0.9.21] - 2026-07-31
 
 ### Added
