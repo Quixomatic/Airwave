@@ -28,15 +28,17 @@ function ImportPreviewPage() {
   const staged = getStagedImport();
   const preview = staged?.preview ?? null;
 
-  const allNums = useMemo(() => {
+  // Default selection = everything EXCEPT exact duplicates (already imported → skipped anyway), so a
+  // re-import of the same file is opt-in per channel rather than a wall of no-ops.
+  const defaultSelected = useMemo(() => {
     const s = new Set<number>();
     if (preview) {
-      for (const p of preview.packages) for (const c of p.channels) s.add(c.number);
-      for (const c of preview.ungrouped) s.add(c.number);
+      for (const p of preview.packages) for (const c of p.channels) if (!c.duplicate) s.add(c.number);
+      for (const c of preview.ungrouped) if (!c.duplicate) s.add(c.number);
     }
     return s;
   }, [preview]);
-  const [selected, setSelected] = useState<Set<number>>(() => new Set(allNums));
+  const [selected, setSelected] = useState<Set<number>>(() => new Set(defaultSelected));
 
   // Direct nav / hard refresh loses the staged file — send them back to upload.
   if (!staged || !preview) return <Navigate to="/settings/transfer" />;
@@ -48,12 +50,18 @@ function ImportPreviewPage() {
       else x.add(n);
       return x;
     });
-  const allSel = (chs: Ch[]) => chs.length > 0 && chs.every((c) => selected.has(c.number));
+  // Duplicates can't be selected (they're skipped on import regardless), so package-level select-all
+  // operates only on the selectable (non-duplicate) channels.
+  const allSel = (chs: Ch[]) => {
+    const sel = chs.filter((c) => !c.duplicate);
+    return sel.length > 0 && sel.every((c) => selected.has(c.number));
+  };
   const togglePkg = (chs: Ch[]) =>
     setSelected((prev) => {
       const x = new Set(prev);
-      if (allSel(chs)) for (const c of chs) x.delete(c.number);
-      else for (const c of chs) x.add(c.number);
+      const sel = chs.filter((c) => !c.duplicate);
+      if (allSel(chs)) for (const c of sel) x.delete(c.number);
+      else for (const c of sel) x.add(c.number);
       return x;
     });
 
@@ -81,6 +89,7 @@ function ImportPreviewPage() {
               <span className="text-foreground font-medium">{staged.fileName}</span> →{" "}
               <span className="text-foreground font-medium">{staged.targetName}</span> · {preview.totals.packages}{" "}
               packages · {preview.totals.channels} channels · {selectedCount} selected
+              {preview.totals.duplicates > 0 ? ` · ${preview.totals.duplicates} already imported` : ""}
             </FrameDescription>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -121,6 +130,7 @@ function ImportPreviewPage() {
               <Switch
                 checked={allSel(g.channels)}
                 onCheckedChange={() => togglePkg(g.channels)}
+                disabled={!g.channels.some((c) => !c.duplicate)}
                 aria-label={`Select all in ${g.name}`}
               />
             </div>
@@ -140,6 +150,8 @@ function ImportPreviewPage() {
 
 function ChannelRow({ c, checked, onToggle }: { c: Ch; checked: boolean; onToggle: () => void }) {
   const issues: string[] = [];
+  if (c.duplicate)
+    issues.push("An identical channel already exists here — it'll be skipped even if selected (idempotent re-import).");
   if (c.willBeDisabled) issues.push("No portable filter — it'll import disabled (nothing to schedule).");
   if (c.droppedKinds.length)
     issues.push(`Drops ${[...new Set(c.droppedKinds)].join(", ").toLowerCase()} from the filter (per-server, not portable).`);
@@ -149,14 +161,24 @@ function ChannelRow({ c, checked, onToggle }: { c: Ch; checked: boolean; onToggl
     issues.push("A filter targets a library this instance doesn't have — it'll search all libraries instead.");
 
   return (
-    <div className="flex items-center gap-3 p-3">
-      <Switch checked={checked} onCheckedChange={onToggle} aria-label={`Import ${c.name}`} />
+    <div className={`flex items-center gap-3 p-3${c.duplicate ? " opacity-60" : ""}`}>
+      <Switch
+        checked={checked}
+        onCheckedChange={onToggle}
+        disabled={c.duplicate}
+        aria-label={`Import ${c.name}`}
+      />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm">
           <span className="text-muted-foreground tabular-nums">{c.number}</span> {c.name}
           {c.callsign ? <span className="text-muted-foreground"> · {c.callsign}</span> : null}
         </p>
       </div>
+      {c.duplicate && (
+        <span className="bg-muted text-muted-foreground shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium">
+          Already imported
+        </span>
+      )}
       {issues.length > 0 && (
         <HoverCard>
           <HoverCardTrigger render={<button type="button" className="text-amber-500" aria-label="Import warnings" />}>

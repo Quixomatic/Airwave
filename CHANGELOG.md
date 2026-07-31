@@ -2,6 +2,25 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.18] - 2026-07-30
+
+### Added
+
+- **Import dedupe — re-importing an identical lineup is now a no-op (web).** The import brains and the
+  staging screen now recognize channels that already exist here by a **content signature** — name + package
+  + ordering/sort + the canonicalized filter, deliberately NOT the channel number (identical content is the
+  same channel even if the number differs). In the staging screen a duplicate channel is badged **"already
+  imported"**, its toggle is **disabled** (can't be selected — it'd be skipped anyway), it's excluded from
+  the default selection and from a package's select-all, and the header counts how many are already imported.
+  An edited channel (same name, tweaked filter) is NOT a duplicate — it imports as new.
+- **Import brains (the reusable, workflow-agnostic core) — `services/transfer/import.ts`.** `planImport`
+  builds the deterministic import plan (package reuse-by-key, channel dedupe, number preserve-or-probe-upward
+  reserving in-memory across the run, and library remap by title); `executePackagePlan` /
+  `executeChannelPlan` do the actual create — both **dry-run aware**: in dry-run they resolve each channel's
+  filter against Plex for a true pool size and write nothing (no package/channel/schedule created). A real
+  run creates the channel + its PREDICATE definitions and lays a windowed initial schedule so it's watchable
+  immediately. This is the shared logic the durable import workflow (next) orchestrates.
+
 ## [0.9.17] - 2026-07-30
 
 ### Added
