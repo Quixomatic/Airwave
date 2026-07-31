@@ -1,0 +1,55 @@
+/// One unit of work inside a lineup IMPORT run, recorded for the observability page (§7.12).
+///
+/// Mirrors `AiLineupTrace`'s purpose — the Workflow SDK stores each step's I/O as CBOR in its own
+/// schema, which the run page can't cheaply read — but the import has no AI, no token cost, and no
+/// hidden agent loop, so this is trimmed: it records per-package and per-channel outcomes (created /
+/// skipped / disabled / failed, the resolved pool size, the reassigned number) so the page can show a
+/// multi-tiered progress view of what got created. Carries `dryRun` so a validation run is unmistakable.
+///
+/// Keyed by the SDK's own ids (`workflowRunId` / `stepId` / `attempt`) so a row joins back to the step
+/// timeline. Recording is best-effort — a trace write must never fail an import step.
+model ImportTrace {
+  id     String  @id @default(cuid())
+  /// WDK's `workflowRunId` — joins these rows to `workflow.workflow_runs`.
+  runId  String
+  /// WDK's `stepId`; null for anything recorded outside a step.
+  stepId String?
+
+  /// Short step name, e.g. "planImport" / "buildChannel".
+  stepName String
+  /// 1 on the first try; a retry writes a SECOND row rather than overwriting.
+  attempt  Int    @default(1)
+  /// "plan" | "packages" | "channel" | "report"
+  phase    String
+  /// True when this run wrote nothing (validation-only) — the run page banners it.
+  dryRun   Boolean @default(false)
+
+  /// Which package/channel this row is about (null for whole-run steps).
+  packageKey    String?
+  channelName   String?
+  channelNumber Int?
+
+  /// "ok" | "created" | "skipped" | "disabled" | "failed"
+  status String
+  /// Why it was skipped/disabled, or the error summary.
+  reason String?
+
+  /// Resolved match count for the channel's filter (dry-run and real).
+  poolSize         Int?
+  /// Program slots laid in the windowed initial schedule (real runs only).
+  scheduleSlots    Int?
+  /// The channel's number collided and was bumped to the next free one.
+  numberReassigned Boolean @default(false)
+
+  /// The plan/inputs (summarized) and the outcome — opaque JSON the page renders.
+  input  Json?
+  output Json?
+
+  error      String?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([runId])
+  @@index([runId, phase])
+  @@map("import_trace")
+}

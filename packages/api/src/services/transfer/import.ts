@@ -563,6 +563,16 @@ export async function executeChannelPlan(
     };
   }
 
+  // Idempotent retry — same pattern as the AI builder's channel reservation. `planImport` assigns
+  // `assignedNumber` from the FREE set, so a channel already sitting at that number can only be one a
+  // PRIOR attempt of this step created (WDK re-dispatches an in-flight step, or retries a crashed one).
+  // Treat it as already-created rather than colliding on the unique number and failing the run.
+  const already = await prisma.channel.findUnique({
+    where: { number: plan.assignedNumber },
+    select: { id: true },
+  });
+  if (already) return { ...base, status: "created", channelId: already.id, poolSize };
+
   try {
     const c = await prisma.channel.create({
       data: {
@@ -611,6 +621,14 @@ export async function executeChannelPlan(
 
     return { ...base, status: "created", channelId: c.id, poolSize, scheduleSlots };
   } catch (err) {
+    // Retry-safety: WDK re-runs a step whose result wasn't checkpointed (a crash after the write, or two
+    // workers racing the same queued step in dev). The plan's assigned number is deterministic, so a
+    // unique-constraint hit on `number` means a PRIOR attempt already created this channel — treat it as
+    // created (idempotent) rather than failing the whole run.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      const existing = await prisma.channel.findUnique({ where: { number: plan.assignedNumber }, select: { id: true } });
+      if (existing) return { ...base, status: "created", channelId: existing.id, poolSize };
+    }
     return { ...base, status: "failed", reason: err instanceof Error ? err.message : String(err), poolSize };
   }
 }

@@ -2,6 +2,29 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.19] - 2026-07-30
+
+### Added
+
+- **Lineup import execution — the durable import workflow + observability (web/server).** The staging
+  **Import** button now actually runs: a WDK workflow (`importLineupWorkflow`) recreates the selected
+  packages + channels on this instance — plan (dedupe + number preserve/probe + library remap) → create
+  packages (reuse by key) → build each channel (create + PREDICATE defs + a windowed initial schedule so
+  it's watchable immediately) → report. Mirrors the AI-lineup workflow machinery minus the AI.
+  - **🔑 Dry-run mode** — a toggle beside the Import button. Runs end-to-end for real (validates, resolves
+    every channel's filter against Plex for true pool sizes, computes reassigned numbers, writes trace
+    rows for live progress) but **writes nothing** — no packages, channels, or schedules. The way to
+    validate a deployed build (e.g. on TrueNAS) and preview the real outcome before committing.
+  - **Observability** — a new **Workflows → Lineup Import** run page (`/settings/workflows/import/:runId`):
+    a multi-tier progress view (overall progress bar + packages tier over a per-channel tier) that
+    live-polls while the run is in flight, showing each channel's outcome (created / disabled / skipped /
+    failed), resolved pool size, schedule slots, and renumbering, plus a step timeline. Backed by a new
+    `ImportTrace` model (migration `add_import_trace`).
+  - **Idempotent + retry-safe** — re-importing the same lineup is a no-op (duplicates skipped by content
+    signature), and a retried channel build recognizes an already-created channel instead of colliding.
+  - **Requires a server restart** to load the new workflow engine registration + regenerated Prisma client
+    + rebuilt workflow bundle (`bun --hot` doesn't reload workflow bundles) — on dev and after each deploy.
+
 ## [0.9.18] - 2026-07-30
 
 ### Added

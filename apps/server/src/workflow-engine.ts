@@ -20,7 +20,9 @@
  * Revisit if the worker ever runs on another host, or the port is published in Docker.
  */
 import { setLineupRunner } from "@ChannelGuide/api/services/agent/lineup-runner";
+import { setImportRunner } from "@ChannelGuide/api/services/transfer/import-runner";
 
+import { importLineupWorkflow } from "../workflows/import";
 import { aiLineupWorkflow } from "../workflows/lineup";
 
 /**
@@ -78,6 +80,25 @@ export async function startWorkflowEngine(): Promise<void> {
       const status = await run.status;
       // Only read the return value once it's actually done; on a live run this would
       // block until the workflow finishes, which would hang a status poll.
+      const output = status === "completed" ? await run.returnValue : undefined;
+      return { runId, status, output };
+    },
+    async cancel(runId) {
+      const run = await getRun(runId);
+      await run?.cancel();
+    },
+  });
+
+  setImportRunner({
+    async start(args) {
+      const run = await start(importLineupWorkflow, [args]);
+      console.log(`[workflow] import run started: ${run.runId}${args.dryRun ? " (dry-run)" : ""}`);
+      return { runId: run.runId };
+    },
+    async status(runId) {
+      const run = await getRun(runId);
+      if (!run) return null;
+      const status = await run.status;
       const output = status === "completed" ? await run.returnValue : undefined;
       return { runId, status, output };
     },

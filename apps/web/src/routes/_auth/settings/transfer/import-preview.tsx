@@ -8,12 +8,14 @@ import {
 } from "@ChannelGuide/ui/components/frame";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@ChannelGuide/ui/components/preview-card";
 import { Switch } from "@ChannelGuide/ui/components/switch";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft, PackageCheck } from "lucide-react";
+import { AlertTriangle, Loader2, PackageCheck, X } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { getStagedImport, type ImportPreview } from "@/features/transfer/staging";
+import { trpc, trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/settings/transfer/import-preview")({
   staticData: { breadcrumb: "Import preview" },
@@ -72,9 +74,27 @@ function ImportPreviewPage() {
   const selectedCount = selected.size;
   const sourceReady = !!preview.source?.ready;
 
-  const handleImport = () => {
-    // Stage 2: dispatch the import workflow with the selected channel numbers + the staged raw data.
-    toast.info(`${selectedCount} channels selected — the import workflow is the next step.`);
+  const [dryRun, setDryRun] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const engine = useQuery(trpc.transfer.importAvailable.queryOptions());
+  const engineReady = engine.data?.available ?? false;
+
+  const handleImport = async () => {
+    setStarting(true);
+    try {
+      const { runId } = await trpcClient.transfer.import.mutate({
+        data: staged.data as never,
+        selectedNumbers: [...selected],
+        targetSourceId: staged.targetSourceId,
+        dryRun,
+      });
+      toast.success(dryRun ? "Dry run started — nothing will be imported." : "Import started.");
+      void navigate({ to: "/settings/workflows/import/$runId", params: { runId } });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't start the import.");
+    } finally {
+      setStarting(false);
+    }
   };
 
   return (
@@ -92,12 +112,21 @@ function ImportPreviewPage() {
               {preview.totals.duplicates > 0 ? ` · ${preview.totals.duplicates} already imported` : ""}
             </FrameDescription>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-3">
+            <label className="text-muted-foreground flex items-center gap-2 text-sm" title="Validate + resolve + preview for real, but write nothing.">
+              <Switch checked={dryRun} onCheckedChange={setDryRun} aria-label="Dry run" />
+              Dry run
+            </label>
             <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/settings/transfer" })}>
-              <ArrowLeft className="mr-2 size-4" /> Different file
+              <X className="mr-2 size-4" /> Cancel
             </Button>
-            <Button size="sm" onClick={handleImport} disabled={selectedCount === 0 || !sourceReady}>
-              <PackageCheck className="mr-2 size-4" /> Import {selectedCount} {selectedCount === 1 ? "channel" : "channels"}
+            <Button
+              size="sm"
+              onClick={handleImport}
+              disabled={selectedCount === 0 || !sourceReady || !engineReady || starting}
+            >
+              {starting ? <Loader2 className="mr-2 size-4 animate-spin" /> : <PackageCheck className="mr-2 size-4" />}
+              {dryRun ? "Dry run" : "Import"} {selectedCount} {selectedCount === 1 ? "channel" : "channels"}
             </Button>
           </div>
         </div>
@@ -113,6 +142,12 @@ function ImportPreviewPage() {
         <Banner>
           {staged.targetName} isn't ready yet — connect it to a media server and run a metadata sync before
           importing.
+        </Banner>
+      )}
+      {!engine.isLoading && !engineReady && (
+        <Banner>
+          The import workflow engine isn't running on this instance (WORKFLOW_ENABLED is off), so imports can't
+          be started here.
         </Banner>
       )}
 
