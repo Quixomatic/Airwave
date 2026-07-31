@@ -2,6 +2,15 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.25] - 2026-07-31
+
+### Changed
+
+- **User overview page redesign (web).** The `users/:id` overview now leads with a proper profile hero — a big
+  avatar (their image, or emerald-tinted initials) next to their name + email, with role and access-status
+  chips — over a tidy details grid (Role / Joined / User ID) and a restyled Access card (icon tile + summary +
+  Manage button). Same Frame, much nicer.
+
 ## [0.9.24] - 2026-07-31
 
 ### Added

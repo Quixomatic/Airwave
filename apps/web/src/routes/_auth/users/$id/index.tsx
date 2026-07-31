@@ -1,8 +1,9 @@
+import { Badge } from "@ChannelGuide/ui/components/badge";
 import { Button } from "@ChannelGuide/ui/components/button";
-import { Frame, FrameHeader, FramePanel, FrameTitle } from "@ChannelGuide/ui/components/frame";
+import { Frame, FramePanel } from "@ChannelGuide/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { KeyRound } from "lucide-react";
+import { KeyRound, ShieldCheck, User } from "lucide-react";
 
 import { trpc } from "@/utils/trpc";
 
@@ -17,12 +18,20 @@ function UserOverview() {
   const access = useQuery(trpc.users.getAccess.queryOptions({ id }));
   const u = user.data;
   const a = access.data;
+  const admin = u?.role === "admin";
+  const initials = (u?.name || u?.email || "?")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((s) => s[0])
+    .join("")
+    .toUpperCase();
 
   // Summarize what they can see.
   let summary = "—";
-  if (u?.role === "admin") summary = "Full access (admin)";
+  if (admin) summary = "Full access to everything";
   else if (a) {
-    if (a.allAccess) summary = "All packages & channels (incl. new ones)";
+    if (a.allAccess) summary = "All packages & channels (including ones added later)";
     else {
       const full = a.packages.filter((p) => p.mode === "FULL").length;
       const partial = a.packages.filter((p) => p.mode === "PARTIAL").length;
@@ -31,35 +40,74 @@ function UserOverview() {
       if (full) bits.push(`${full} full package${full === 1 ? "" : "s"}`);
       if (partial) bits.push(`${partial} partial`);
       if (chans) bits.push(`${chans} channel${chans === 1 ? "" : "s"}`);
-      summary = bits.length ? `Restricted — ${bits.join(", ")}` : "No access";
+      summary = bits.length ? `Restricted — ${bits.join(", ")}` : "No access to any channels";
     }
   }
 
   return (
     <Frame>
-      <FrameHeader className="flex-row items-center justify-between">
-        <FrameTitle>Overview</FrameTitle>
-      </FrameHeader>
-      <FramePanel className="space-y-4">
-        <dl className="grid gap-3 sm:grid-cols-2">
-          <Field label="Name" value={u?.name || "—"} />
-          <Field label="Email" value={u?.email || "—"} />
-          <Field label="Role" value={u?.role === "admin" ? "Admin" : "User"} />
+      <FramePanel className="space-y-6">
+        {/* Hero — big avatar + name. */}
+        <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
+          {u?.image ? (
+            <img
+              src={u.image}
+              alt=""
+              className="ring-border size-20 shrink-0 rounded-full object-cover ring-2"
+            />
+          ) : (
+            <div className="ring-border flex size-20 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-2xl font-semibold text-emerald-600 ring-2">
+              {initials}
+            </div>
+          )}
+          <div className="min-w-0">
+            <h2 className="truncate text-2xl font-semibold">{u?.name || u?.email || "…"}</h2>
+            {u?.name && u?.email && <p className="text-muted-foreground truncate">{u.email}</p>}
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+              <Badge
+                variant={admin ? "default" : "outline"}
+                className={admin ? "gap-1 border-amber-500/30 bg-amber-500/15 text-amber-600" : "gap-1"}
+              >
+                {admin ? <ShieldCheck className="size-3" /> : <User className="size-3" />}
+                {admin ? "Admin" : "User"}
+              </Badge>
+              {!admin && a && (
+                <Badge
+                  variant="outline"
+                  className={a.allAccess ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "text-muted-foreground"}
+                >
+                  {a.allAccess ? "All access" : "Restricted"}
+                </Badge>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Details. */}
+        <dl className="border-border grid gap-4 border-t pt-5 sm:grid-cols-3">
+          <Field label="Role" value={admin ? "Admin" : "User"} />
           <Field label="Joined" value={u?.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"} />
+          <Field label="User ID" value={id} mono />
         </dl>
 
-        <div className="border-border flex items-center justify-between gap-3 rounded-lg border p-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium">Access</p>
-            <p className="text-muted-foreground truncate text-sm">{summary}</p>
+        {/* Access card. */}
+        <div className="border-border bg-muted/40 flex items-center justify-between gap-3 rounded-xl border p-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="bg-background ring-border flex size-9 shrink-0 items-center justify-center rounded-lg ring-1">
+              <KeyRound className="text-muted-foreground size-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Access</p>
+              <p className="text-muted-foreground truncate text-sm">{summary}</p>
+            </div>
           </div>
-          {u?.role !== "admin" && (
+          {!admin && (
             <Button
               size="sm"
               variant="outline"
               onClick={() => navigate({ to: "/users/$id/access", params: { id } })}
             >
-              <KeyRound className="mr-2 size-4" /> Manage access
+              <KeyRound className="mr-2 size-4" /> Manage
             </Button>
           )}
         </div>
@@ -68,11 +116,11 @@ function UserOverview() {
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div>
+    <div className="min-w-0">
       <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className="truncate text-sm">{value}</dd>
+      <dd className={`truncate text-sm ${mono ? "font-mono text-xs" : ""}`}>{value}</dd>
     </div>
   );
 }
