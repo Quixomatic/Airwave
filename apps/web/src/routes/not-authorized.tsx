@@ -37,11 +37,9 @@ function NotAuthorized() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-6">
-      <div className="w-full max-w-md space-y-6 text-center">
-        <div className="flex justify-center">
-          <Logo wordmark markWidth={150} />
-        </div>
-        <div className="bg-muted ring-border mx-auto flex size-14 items-center justify-center rounded-2xl ring-1">
+      <div className="flex w-full max-w-md flex-col items-center gap-6 text-center">
+        <Logo wordmark markWidth={80} />
+        <div className="bg-muted ring-border flex size-14 items-center justify-center rounded-2xl ring-1">
           <ShieldAlert className="text-amber-500 size-7" />
         </div>
         <div className="space-y-2">

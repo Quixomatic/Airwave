@@ -2,6 +2,15 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.27] - 2026-07-31
+
+### Fixed
+
+- **Not-authorized page: the Airwave logo is now centered (web).** At `markWidth=150` the mark + "Airwave"
+  wordmark lockup (~570px) overflowed the `max-w-md` (448px) container, so it looked off-center. Sized the
+  logo to `80` (fits comfortably) and switched the container to a `flex flex-col items-center` column (matching
+  the login page) so everything centers cleanly.
+
 ## [0.9.26] - 2026-07-31
 
 ### Added
