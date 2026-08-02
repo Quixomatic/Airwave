@@ -1,8 +1,28 @@
 import ExpoModulesCore
 
 public class MpvPlayerModule: Module {
+  /// Headless audio-only core (§7.14 Phase B / radio channels). Created lazily on first `audioLoad`, held for
+  /// the module's lifetime, and independent of the video `View`. See `MpvAudioCore`.
+  private var audio: MpvAudioCore?
+
   public func definition() -> ModuleDefinition {
     Name("MpvPlayer")
+
+    // Module-level (view-less) AUDIO events — the bumper bed + future radio player subscribe to these.
+    Events("onAudioProgress", "onAudioEnded")
+
+    AsyncFunction("audioLoad") { (url: String) in self.ensureAudio().load(url) }
+    AsyncFunction("audioPlay") { self.audio?.play() }
+    AsyncFunction("audioPause") { self.audio?.pause() }
+    AsyncFunction("audioStop") { self.audio?.stop() }
+    AsyncFunction("audioSeek") { (seconds: Double) in self.audio?.seek(seconds) }
+    AsyncFunction("audioSetVolume") { (volume: Double) in self.audio?.setVolume(volume) }
+    AsyncFunction("audioSetLoop") { (loop: Bool) in self.audio?.setLoop(loop) }
+
+    OnDestroy {
+      self.audio?.dispose()
+      self.audio = nil
+    }
 
     View(MpvPlayerView.self) {
       Events("onLoad", "onFirstFrame", "onProgress", "onBuffering", "onTracks", "onError", "onEnd")
@@ -23,5 +43,17 @@ public class MpvPlayerModule: Module {
       AsyncFunction("pause") { (view: MpvPlayerView) in view.pause() }
       AsyncFunction("seek") { (view: MpvPlayerView, seconds: Double) in view.seek(seconds) }
     }
+  }
+
+  private func ensureAudio() -> MpvAudioCore {
+    if let audio { return audio }
+    let core = MpvAudioCore()
+    core.onProgress = { [weak self] time, duration in
+      self?.sendEvent("onAudioProgress", ["currentTime": time, "duration": duration])
+    }
+    core.onEnded = { [weak self] in self?.sendEvent("onAudioEnded", [:]) }
+    core.setup()
+    audio = core
+    return core
   }
 }

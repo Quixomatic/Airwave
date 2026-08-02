@@ -6,11 +6,31 @@ import expo.modules.kotlin.modules.ModuleDefinition
 /**
  * The Android twin of `ios/MpvPlayerModule.swift`. Registers the `MpvPlayer` view with the exact same
  * props/events/functions as the Apple module, so the platform-agnostic JS (`requireNativeView("MpvPlayer")`
- * + `use-tv-player`) drives it unchanged.
+ * + `use-tv-player`) drives it unchanged. Also exposes the module-level, view-less AUDIO API (§7.14 Phase B /
+ * radio channels) via a separate headless `MpvAudioCore`.
  */
 class MpvPlayerModule : Module() {
+  /** Headless audio-only core, created lazily on first `audioLoad`, independent of the video `View`. */
+  private var audio: MpvAudioCore? = null
+
   override fun definition() = ModuleDefinition {
     Name("MpvPlayer")
+
+    // Module-level (view-less) AUDIO events — the bumper bed + future radio player subscribe to these.
+    Events("onAudioProgress", "onAudioEnded")
+
+    AsyncFunction("audioLoad") { url: String -> ensureAudio().load(url) }
+    AsyncFunction("audioPlay") { audio?.play() }
+    AsyncFunction("audioPause") { audio?.pause() }
+    AsyncFunction("audioStop") { audio?.stop() }
+    AsyncFunction("audioSeek") { seconds: Double -> audio?.seek(seconds) }
+    AsyncFunction("audioSetVolume") { volume: Double -> audio?.setVolume(volume) }
+    AsyncFunction("audioSetLoop") { loop: Boolean -> audio?.setLoop(loop) }
+
+    OnDestroy {
+      audio?.dispose()
+      audio = null
+    }
 
     View(MpvPlayerView::class) {
       Events("onLoad", "onFirstFrame", "onProgress", "onBuffering", "onTracks", "onError", "onEnd")
@@ -31,5 +51,19 @@ class MpvPlayerModule : Module() {
       AsyncFunction("pause") { view: MpvPlayerView -> view.pause() }
       AsyncFunction("seek") { view: MpvPlayerView, seconds: Double -> view.seek(seconds) }
     }
+  }
+
+  private fun ensureAudio(): MpvAudioCore {
+    audio?.let { return it }
+    // Audio needs no Activity/UI — the application context is enough (mirrors plezy's audio plugin).
+    val ctx = appContext.reactContext?.applicationContext ?: appContext.reactContext!!
+    val core = MpvAudioCore(ctx)
+    core.onProgress = { time, duration ->
+      sendEvent("onAudioProgress", mapOf("currentTime" to time, "duration" to duration))
+    }
+    core.onEnded = { sendEvent("onAudioEnded", emptyMap<String, Any>()) }
+    core.setup()
+    audio = core
+    return core
   }
 }

@@ -2,6 +2,22 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.36] - 2026-08-02
+
+### Added
+
+- **mpv headless audio — Phase 1: the native capability (tv-native).** A surface-less, audio-only mpv path
+  added to `@ChannelGuide/mpv-player`, for the bumper music bed (§7.14 Phase B) and future audio-only "radio"
+  channels — **one media stack** (chosen over expo-audio / track-player / theoplayer after the refs showed
+  plezy runs exactly this and streamyfin's track-player is null on TV). It's a **separate, compartmentalized
+  piece**, independent of the video `<MpvPlayerView>`: a distinct headless core (`MpvAudioCore.swift` /
+  `MpvAudioCore.kt`, ported from plezy — `vid=no` / `audio-display=no` / `force-window=no`, no `wid`/surface)
+  driven by module-level, view-less functions. New JS API `mpvAudio` (`load` / `play` / `pause` / `stop` /
+  `seek` / `setVolume 0..1` / `setLoop` + `onProgress` / `onEnded`), backed by a second, independent libmpv
+  instance created lazily on first `load`. The video path is 100% untouched. **Needs a native tv-native build
+  to validate** (load / volume / seek / loop / stop on iPad, Apple TV, Android — Apple TV being the one to
+  prove). Phase 2 = port the bumper-music hook onto `mpvAudio`; radio channels reuse it later.
+
 ## [0.9.35] - 2026-07-31
 
 ### Changed
