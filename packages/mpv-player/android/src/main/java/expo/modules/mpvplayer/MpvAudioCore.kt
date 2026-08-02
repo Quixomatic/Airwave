@@ -6,11 +6,14 @@ import dev.jdtech.mpv.MpvEvent
 import dev.jdtech.mpv.MpvPlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 /**
  * A HEADLESS (no video surface) audio-only libmpv core — the Android twin of `ios/MpvAudioCore.swift`, for
@@ -29,6 +32,9 @@ class MpvAudioCore(private val appContext: Context) {
   private var player: MpvPlayer? = null
   // create() is suspend, so a load() can arrive before the player exists — run it on completion.
   private var pendingLoadUrl: String? = null
+  // Our last commanded volume (0..1), so a fade always starts from where the last one left off.
+  private var currentVolume = 1.0
+  private var fadeJob: Job? = null
 
   fun setup() {
     scope.launch {
@@ -72,8 +78,43 @@ class MpvAudioCore(private val appContext: Context) {
   fun pause() = onPlayer { it.setProperty("pause", true) }
   fun stop() = onPlayer { it.command("stop") }
   fun seek(seconds: Double) = onPlayer { it.command("seek", seconds.toString(), "absolute") }
-  /** `v` is 0..1 (like a web `<audio>` volume); mpv's `volume` is 0..100. */
-  fun setVolume(v: Double) = onPlayer { it.setProperty("volume", (v * 100.0).coerceIn(0.0, 100.0)) }
+  /** `v` is 0..1 (like a web `<audio>` volume); mpv's `volume` is 0..100. Cancels any in-flight fade. */
+  fun setVolume(v: Double) {
+    fadeJob?.cancel()
+    val clamped = v.coerceIn(0.0, 1.0)
+    currentVolume = clamped
+    onPlayer { it.setProperty("volume", clamped * 100.0) }
+  }
+
+  /**
+   * Smoothly ramp the volume to `target` (0..1) over `durationMs` — a native 60fps ramp of mpv's `volume`,
+   * so it's buttery with a SINGLE bridge call. The primitive for bumper fade in/out and future radio
+   * crossfades. Starts from the current commanded volume; cancels any prior fade.
+   */
+  fun fadeVolume(target: Double, durationMs: Double) {
+    fadeJob?.cancel()
+    val end = target.coerceIn(0.0, 1.0)
+    val start = currentVolume
+    val p = player
+    if (p == null || durationMs <= 0 || abs(end - start) < 0.001) {
+      currentVolume = end
+      p?.let { onPlayer { it.setProperty("volume", end * 100.0) } }
+      return
+    }
+    fadeJob = scope.launch {
+      val startNs = System.nanoTime()
+      while (true) {
+        val elapsedMs = (System.nanoTime() - startNs) / 1_000_000.0
+        val t = (elapsedMs / durationMs).coerceAtMost(1.0)
+        val v = start + (end - start) * t
+        currentVolume = v
+        p.setProperty("volume", v * 100.0)
+        if (t >= 1.0) break
+        delay(16)
+      }
+    }
+  }
+
   fun setLoop(loop: Boolean) = onPlayer { it.setProperty("loop-file", if (loop) "inf" else "no") }
 
   fun dispose() {

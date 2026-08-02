@@ -2,6 +2,18 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.38] - 2026-08-02
+
+### Added
+
+- **Native volume fade in the mpv audio core — buttery ramps + a crossfade primitive (tv-native).** Added
+  `mpvAudio.fadeVolume(target, durationMs)` — a **native 60fps ramp** of mpv's `volume` (a cancellable
+  `DispatchSource` timer on iOS / coroutine loop on Android), so a fade is smooth with a **single bridge
+  call** instead of per-frame chatter. The bumper-music hook now drives this instead of a JS interval: each
+  ~500ms player tick hands the native side one `fadeVolume` (only when the target changes), and it interpolates
+  at 60fps — steady full-volume middle sends nothing, a fade is ~2 calls/sec, a scrub snaps in 250ms. Same
+  primitive will power radio-channel crossfades later. Needs a native tv-native build.
+
 ## [0.9.37] - 2026-08-02
 
 ### Added

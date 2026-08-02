@@ -17,6 +17,7 @@ public class MpvPlayerModule: Module {
     AsyncFunction("audioStop") { self.audio?.stop() }
     AsyncFunction("audioSeek") { (seconds: Double) in self.audio?.seek(seconds) }
     AsyncFunction("audioSetVolume") { (volume: Double) in self.audio?.setVolume(volume) }
+    AsyncFunction("audioFadeVolume") { (volume: Double, durationMs: Double) in self.audio?.fadeVolume(to: volume, durationMs: durationMs) }
     AsyncFunction("audioSetLoop") { (loop: Bool) in self.audio?.setLoop(loop) }
 
     OnDestroy {

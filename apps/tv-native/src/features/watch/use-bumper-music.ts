@@ -12,10 +12,10 @@ import { getServerUrl } from "../../lib/auth";
  * bumper always gets the same track, surviving scrubs), and its **position + volume are functions of the
  * bumper's `elapsed`** — so scrubbing back into/through a bumper seeks + re-fades the music with it.
  *
- * Native difference: `mpvAudio.setVolume` is an async bridge call, so we DON'T ramp at 60fps (too chatty).
- * A ~60ms interval interpolates `elapsed` and sends volume only when it meaningfully changes (constant in the
- * full-volume middle → no calls); position re-seeks only on a real scrub. Reuses the single audio core, so it
- * lives on the persistent player host (plays full-screen AND docked, like tv-web).
+ * Native difference: the fade is done NATIVELY — each ~500ms player tick sends one `fadeVolume(target, ms)`
+ * (only when the target changes), and the native core does the buttery 60fps ramp off-bridge. So the
+ * steady full-volume middle sends nothing, a fade is ~2 bridge calls/sec, and a scrub snaps quickly. Reuses
+ * the single audio core, so it lives on the persistent player host (plays full-screen AND docked, like tv-web).
  */
 
 function hashString(s: string): number {
@@ -38,7 +38,10 @@ function bumperVolume(elapsed: number, total: number, fadeInMs: number, fadeOutM
 }
 
 const SEEK_THRESHOLD = 1.5;
-const VOLUME_STEP_MS = 60;
+// Native fade a touch longer than the player tick (~500ms) so ramps stay continuous between ticks; a scrub
+// snaps faster.
+const TICK_FADE_MS = 600;
+const SEEK_FADE_MS = 250;
 
 export function useBumperMusic({
   active,
@@ -52,10 +55,10 @@ export function useBumperMusic({
   bumperKey: string | null;
 }) {
   const cfgRef = useRef<BumperMusic | null>(null);
-  const posRef = useRef<{ elapsed: number; total: number; ts: number } | null>(null);
   const audioTimeRef = useRef(0); // latest mpv audio position (from onProgress)
   const audioDurRef = useRef(0); // latest mpv audio duration (from onProgress)
   const lastVolRef = useRef(-1);
+  const lastElapsedRef = useRef<number | null>(null);
 
   // Settings + track pool, fetched once for the session.
   useEffect(() => {
@@ -81,6 +84,7 @@ export function useBumperMusic({
     audioTimeRef.current = 0;
     audioDurRef.current = 0;
     lastVolRef.current = -1;
+    lastElapsedRef.current = null;
 
     const sub = mpvAudio.onProgress((e: MpvAudioProgress) => {
       audioTimeRef.current = e.currentTime;
@@ -90,7 +94,7 @@ export function useBumperMusic({
     void (async () => {
       await mpvAudio.load(`${getServerUrl()}${track.url}`);
       await mpvAudio.setLoop(true);
-      await mpvAudio.setVolume(0);
+      await mpvAudio.setVolume(0); // start silent; the reconcile below fades it in
       await mpvAudio.play();
     })();
 
@@ -100,36 +104,28 @@ export function useBumperMusic({
     };
   }, [active, bumperKey]);
 
-  // Reconcile on each player tick: record the authoritative position + snap the audio position on a real scrub.
+  // Reconcile on each player tick (and on scrub): drive volume + position from the bumper's timeline
+  // position. Volume is the elapsed-derived target (fade in at start, full middle, fade out at end); each
+  // change is handed to the NATIVE fade so the ramp is buttery off-bridge. Position snaps on a real scrub.
   useEffect(() => {
-    if (!active || elapsed == null || total == null) {
-      posRef.current = null;
-      return;
+    if (!active || elapsed == null || total == null) return;
+    const cfg = cfgRef.current;
+    if (!cfg) return;
+
+    const targetMax = Math.max(0, Math.min(1, cfg.volume / 100));
+    const v = bumperVolume(elapsed, total, cfg.fadeInMs, cfg.fadeOutMs, targetMax);
+    const jumped = lastElapsedRef.current == null || Math.abs(elapsed - lastElapsedRef.current) > SEEK_THRESHOLD;
+    lastElapsedRef.current = elapsed;
+
+    if (jumped || Math.abs(v - lastVolRef.current) >= 0.01) {
+      lastVolRef.current = v;
+      void mpvAudio.fadeVolume(v, jumped ? SEEK_FADE_MS : TICK_FADE_MS);
     }
-    posRef.current = { elapsed, total, ts: Date.now() };
+
     const dur = audioDurRef.current;
     if (dur > 0) {
       const desired = elapsed % dur;
       if (Math.abs(audioTimeRef.current - desired) > SEEK_THRESHOLD) void mpvAudio.seek(desired);
     }
   }, [active, elapsed, total]);
-
-  // Smooth-ish fade: interpolate elapsed on a light interval and push volume only when it changes (the
-  // full-volume middle sends nothing; a fade sends ~16/s for ~1s — easy on the bridge).
-  useEffect(() => {
-    if (!active) return;
-    const id = setInterval(() => {
-      const cfg = cfgRef.current;
-      const pos = posRef.current;
-      if (!cfg || !pos) return;
-      const targetMax = Math.max(0, Math.min(1, cfg.volume / 100));
-      const local = Math.max(0, Math.min(pos.total, pos.elapsed + (Date.now() - pos.ts) / 1000));
-      const v = bumperVolume(local, pos.total, cfg.fadeInMs, cfg.fadeOutMs, targetMax);
-      if (Math.abs(v - lastVolRef.current) >= 0.02 || (v === 0 && lastVolRef.current !== 0)) {
-        lastVolRef.current = v;
-        void mpvAudio.setVolume(v);
-      }
-    }, VOLUME_STEP_MS);
-    return () => clearInterval(id);
-  }, [active]);
 }

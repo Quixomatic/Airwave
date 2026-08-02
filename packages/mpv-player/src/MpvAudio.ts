@@ -25,6 +25,7 @@ interface MpvAudioNative {
   audioStop(): Promise<void>;
   audioSeek(seconds: number): Promise<void>;
   audioSetVolume(volume: number): Promise<void>;
+  audioFadeVolume(volume: number, durationMs: number): Promise<void>;
   audioSetLoop(loop: boolean): Promise<void>;
   addListener(event: "onAudioProgress", listener: (e: MpvAudioProgress) => void): MpvAudioSubscription;
   addListener(event: "onAudioEnded", listener: () => void): MpvAudioSubscription;
@@ -42,8 +43,11 @@ export const mpvAudio = {
   stop: (): Promise<void> => Native.audioStop(),
   /** Absolute seek, in seconds. */
   seek: (seconds: number): Promise<void> => Native.audioSeek(seconds),
-  /** Volume 0..1 (0 = silent, 1 = full). */
+  /** Volume 0..1 (0 = silent, 1 = full) — set immediately. */
   setVolume: (volume: number): Promise<void> => Native.audioSetVolume(volume),
+  /** Smoothly ramp the volume to 0..1 over `durationMs` — a native 60fps fade (one bridge call). Use for
+   *  fade in/out and crossfades; cancels any in-flight fade and starts from the current level. */
+  fadeVolume: (volume: number, durationMs: number): Promise<void> => Native.audioFadeVolume(volume, durationMs),
   /** Loop the track when it reaches the end (mpv `loop-file`). */
   setLoop: (loop: boolean): Promise<void> => Native.audioSetLoop(loop),
   /** Position ticks (mpv `time-pos`) + the track's duration. */

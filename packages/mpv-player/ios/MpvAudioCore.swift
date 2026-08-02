@@ -20,6 +20,9 @@ final class MpvAudioCore {
   private let queue = DispatchQueue(label: "mpv-player.audio", qos: .userInitiated)
   private var wakeupContext: UnsafeMutableRawPointer?
   private var isDisposing = false
+  // Our last commanded volume (0..1), so a fade always starts from where the last one left off.
+  private var currentVolume: Double = 1.0
+  private var fadeTimer: DispatchSourceTimer?
 
   @discardableResult
   func setup() -> Bool {
@@ -66,12 +69,53 @@ final class MpvAudioCore {
   func pause() { setProperty("pause", "yes") }
   func stop() { command(["stop"]) }
   func seek(_ seconds: Double) { command(["seek", String(seconds), "absolute"]) }
-  /// `v` is 0..1 (like an `<audio>` element's volume); mpv's `volume` is 0..100.
-  func setVolume(_ v: Double) { setProperty("volume", String(max(0, min(100, v * 100)))) }
+  /// `v` is 0..1 (like an `<audio>` element's volume); mpv's `volume` is 0..100. Cancels any in-flight fade.
+  func setVolume(_ v: Double) {
+    cancelFade()
+    let clamped = max(0, min(1, v))
+    currentVolume = clamped
+    setProperty("volume", String(clamped * 100))
+  }
+
+  /// Smoothly ramp the volume to `target` (0..1) over `durationMs` — a native 60fps ramp of mpv's `volume`,
+  /// so it's buttery with a SINGLE bridge call (no per-frame chatter). The primitive for bumper fade in/out
+  /// and future radio crossfades. Starts from the current commanded volume; cancels any prior fade.
+  func fadeVolume(to target: Double, durationMs: Double) {
+    cancelFade()
+    let end = max(0, min(1, target))
+    let start = currentVolume
+    if durationMs <= 0 || abs(end - start) < 0.001 {
+      currentVolume = end
+      setProperty("volume", String(end * 100))
+      return
+    }
+    let dur = durationMs / 1000.0
+    let startTime = DispatchTime.now()
+    let timer = DispatchSource.makeTimerSource(queue: queue)
+    timer.schedule(deadline: .now(), repeating: .milliseconds(16))
+    timer.setEventHandler { [weak self] in
+      guard let self else { return }
+      let elapsed = Double(DispatchTime.now().uptimeNanoseconds - startTime.uptimeNanoseconds) / 1_000_000_000
+      let t = min(1, elapsed / dur)
+      let v = start + (end - start) * t
+      self.currentVolume = v
+      self.setProperty("volume", String(v * 100))
+      if t >= 1 { self.cancelFade() }
+    }
+    fadeTimer = timer
+    timer.resume()
+  }
+
+  private func cancelFade() {
+    fadeTimer?.cancel()
+    fadeTimer = nil
+  }
+
   func setLoop(_ loop: Bool) { setProperty("loop-file", loop ? "inf" : "no") }
 
   func dispose() {
     isDisposing = true
+    cancelFade()
     let handle = mpv
     let ctx = wakeupContext
     mpv = nil
