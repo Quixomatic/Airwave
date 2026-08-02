@@ -217,8 +217,20 @@ export type DeviceCapView = {
   recentErrors: PlaybackError[];
 };
 
+/** Ambient bumper music (§7.14) — global settings + the enabled track pool (urls are server-relative). */
+export type BumperMusic = {
+  enabled: boolean;
+  volume: number; // 0–100
+  fadeInMs: number;
+  fadeOutMs: number;
+  tracks: { id: string; title: string; url: string }[];
+};
+
 export const api = {
   packages: () => request<{ packages: Package[] }>("/api/v1/packages"),
+
+  /** Global bumper-music settings + enabled tracks — the client plays a random bed under each bumper. */
+  bumperMusic: () => request<BumperMusic>("/api/v1/bumper-music"),
 
   timeline: (channelId: string, backMinutes = 360, forwardMinutes = 180) =>
     request<Timeline>(`/api/v1/channels/${channelId}/timeline?backMinutes=${backMinutes}&forwardMinutes=${forwardMinutes}`),

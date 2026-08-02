@@ -33,23 +33,25 @@ function CountdownDonut({ sec, fraction, accent, size, stroke, fontSize }: { sec
   );
 }
 
-export function BumperCard({ channelId, guide, remaining, accent, compact = false }: { channelId: string; guide: GuideMeta | null; remaining: number | null; accent: string; compact?: boolean }) {
+export function BumperCard({ channelId, guide, remaining, total, accent, compact = false }: { channelId: string; guide: GuideMeta | null; remaining: number | null; total?: number | null; accent: string; compact?: boolean }) {
   const isEpisode = !!guide?.showTitle && guide?.season != null && guide?.episode != null;
   const heading = isEpisode ? guide?.showTitle : guide?.title;
   const episodeLine = isEpisode ? `S${guide?.season} · E${guide?.episode}${guide?.title ? ` — ${guide.title}` : ""}` : undefined;
 
-  // Local smooth countdown; reconcile the captured end-time only on real drift (>1s). `totalRef`
-  // captures the bumper's full length (the largest remaining seen) so the donut drains from full.
+  // Local smooth countdown; reconcile the captured end-time only on real drift (>1s). The donut drains
+  // against the bumper's TRUE length (`total` from the timeline) so joining/scrubbing mid-bumper shows the
+  // correct fraction — falls back to the largest remaining seen only when `total` isn't provided.
   const endRef = useRef(Date.now() + (remaining ?? 0) * 1000);
-  const totalRef = useRef(Math.max(1, remaining ?? 0));
+  const totalRef = useRef(Math.max(1, total ?? remaining ?? 0));
   const [sec, setSec] = useState(remaining ?? 0);
   const [frac, setFrac] = useState(1);
   useEffect(() => {
     if (remaining == null) return;
     const localRemaining = Math.max(0, Math.round((endRef.current - Date.now()) / 1000));
     if (Math.abs(localRemaining - remaining) > 1) endRef.current = Date.now() + remaining * 1000;
-    if (remaining > totalRef.current) totalRef.current = remaining;
-  }, [remaining]);
+    if (total != null && total > 0) totalRef.current = total;
+    else if (remaining > totalRef.current) totalRef.current = remaining;
+  }, [remaining, total]);
   useEffect(() => {
     const tick = () => {
       const remS = Math.max(0, (endRef.current - Date.now()) / 1000);

@@ -12,6 +12,7 @@ import { onInputActivity } from "@/lib/input";
 import { C } from "@/lib/theme";
 
 import { BumperCard } from "./bumper-card";
+import { useBumperMusic } from "./use-bumper-music";
 import { ChannelNumberEntry } from "./channel-number-entry";
 import { Ctx, type Layout, type PlayerCtx } from "./player-ctx";
 import { useTvPlayer } from "./use-tv-player";
@@ -182,6 +183,16 @@ function PlayerHost({
   const tv = useTvPlayer(channelId, { quality, audioStreamId, subtitleStreamId }, layout === "full");
   const { status } = tv;
 
+  // Ambient music bed under bumpers (§7.14 Phase B) — on the persistent host, so it plays full-screen AND
+  // docked. Its own headless mpv audio core (`mpvAudio`), derived from the bumper's timeline position (seeks
+  // + fades with DVR scrubbing). Independent of the video player.
+  useBumperMusic({
+    active: status.state === "bumper",
+    elapsed: status.bumperElapsed,
+    total: status.bumperTotal,
+    bumperKey: status.bumperKey,
+  });
+
   // Release the CH▲/▼ lock once this channel is actually showing content.
   useEffect(() => {
     if (!status.loading && (status.state === "program" || status.state === "bumper")) onPlaying();
@@ -228,7 +239,7 @@ function PlayerHost({
 
       {/* bumper interstitial — full (blurred art + big title + donut) or compact (mini feed) */}
       {status.state === "bumper" && status.guide && channelId && (
-        <BumperCard channelId={channelId} guide={status.guide} remaining={status.bumperRemaining} accent={accent} compact={!full} />
+        <BumperCard channelId={channelId} guide={status.guide} remaining={status.bumperRemaining} total={status.bumperTotal} accent={accent} compact={!full} />
       )}
 
       {status.loading && status.state !== "bumper" && (

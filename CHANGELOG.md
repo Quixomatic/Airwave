@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.37] - 2026-08-02
+
+### Added
+
+- **Bumper ambient music — Phase 2 (tv-native): wired to `mpvAudio` (tv-native).** The bumper bed now plays on
+  the native apps via the headless `mpvAudio` core (§7.14 Phase B) — same DVR-derived model as tv-web
+  (deterministic track by hashed bumper key; position + volume from the bumper's `elapsed`, so it seeks + fades
+  with scrubbing). The player exposes `bumperElapsed`/`bumperTotal`/`bumperKey` (additive — video path
+  untouched), a `use-bumper-music` hook drives `mpvAudio` from the persistent host (plays full-screen AND
+  docked), and the countdown donut now drains against the real `bumperTotal` (join/scrub fix, matching tv-web).
+  Native-specific: volume is pushed on a ~60ms interval with change-detection (not 60fps) to spare the RN
+  bridge. **Needs a native tv-native build** (which compiles the v0.9.36 audio core) to run.
+
 ## [0.9.36] - 2026-08-02
 
 ### Added

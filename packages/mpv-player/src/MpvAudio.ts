@@ -1,5 +1,10 @@
 import { requireNativeModule } from "expo";
-import type { EventSubscription } from "expo-modules-core";
+
+/** An event subscription — `remove()` to unsubscribe. (Structurally matches Expo's `EventSubscription`;
+ *  declared locally so this file doesn't depend on `expo-modules-core`'s types resolving from every consumer.) */
+export interface MpvAudioSubscription {
+  remove: () => void;
+}
 
 /**
  * Headless audio-only mpv player (§7.14 Phase B / radio channels) — a compartmentalized piece of the
@@ -21,8 +26,8 @@ interface MpvAudioNative {
   audioSeek(seconds: number): Promise<void>;
   audioSetVolume(volume: number): Promise<void>;
   audioSetLoop(loop: boolean): Promise<void>;
-  addListener(event: "onAudioProgress", listener: (e: MpvAudioProgress) => void): EventSubscription;
-  addListener(event: "onAudioEnded", listener: () => void): EventSubscription;
+  addListener(event: "onAudioProgress", listener: (e: MpvAudioProgress) => void): MpvAudioSubscription;
+  addListener(event: "onAudioEnded", listener: () => void): MpvAudioSubscription;
 }
 
 // Same native module as the video view ("MpvPlayer") — the audio API is module-level, view-less.
@@ -42,8 +47,8 @@ export const mpvAudio = {
   /** Loop the track when it reaches the end (mpv `loop-file`). */
   setLoop: (loop: boolean): Promise<void> => Native.audioSetLoop(loop),
   /** Position ticks (mpv `time-pos`) + the track's duration. */
-  onProgress: (listener: (e: MpvAudioProgress) => void): EventSubscription =>
+  onProgress: (listener: (e: MpvAudioProgress) => void): MpvAudioSubscription =>
     Native.addListener("onAudioProgress", listener),
   /** Natural end of the track (EOF). */
-  onEnded: (listener: () => void): EventSubscription => Native.addListener("onAudioEnded", listener),
+  onEnded: (listener: () => void): MpvAudioSubscription => Native.addListener("onAudioEnded", listener),
 };

@@ -50,6 +50,14 @@ export type PlayerStatus = {
   guide: GuideMeta | null;
   paused: boolean;
   bumperRemaining: number | null;
+  /** Position within the current bumper on the timeline, in seconds (null outside a bumper). Updates on DVR
+   *  scrub, so the ambient music bed can be DERIVED from it (seek + fade). Mirrors tv-web. */
+  bumperElapsed: number | null;
+  /** The current bumper's full length in seconds (null outside a bumper). */
+  bumperTotal: number | null;
+  /** Stable key for the CURRENT bumper occurrence (its timeline start) — for a deterministic track pick that
+   *  survives scrubbing. Null outside a bumper. */
+  bumperKey: string | null;
   canRestart: boolean;
   error: string | null;
   scrubber: ScrubberView | null;
@@ -115,7 +123,7 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   const resumeAttemptsRef = useRef(0);
 
   const [tracks, setTracks] = useState<{ audio: Track[]; subtitle: Track[] }>({ audio: [], subtitle: [] });
-  const [status, setStatus] = useState<PlayerStatus>({ loading: true, buffering: false, state: "idle", guide: null, paused: false, bumperRemaining: null, canRestart: false, error: null, scrubber: null, delivery: null });
+  const [status, setStatus] = useState<PlayerStatus>({ loading: true, buffering: false, state: "idle", guide: null, paused: false, bumperRemaining: null, bumperElapsed: null, bumperTotal: null, bumperKey: null, canRestart: false, error: null, scrubber: null, delivery: null });
 
   const now = useCallback(() => (Date.now() + clockOffset.current) / 1000, []);
 
@@ -432,13 +440,18 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
           return;
         }
       }
+      const isBumperSlot = cur.kind === "BUMPER";
       setStatus((s) => ({
         ...s,
         loading: false,
-        state: cur.kind === "BUMPER" ? "bumper" : "program",
+        state: isBumperSlot ? "bumper" : "program",
         guide: cur.guide,
         paused: pausedRef.current,
-        bumperRemaining: cur.kind === "BUMPER" ? Math.max(0, Math.ceil(cur.endS - effective)) : null,
+        bumperRemaining: isBumperSlot ? Math.max(0, Math.ceil(cur.endS - effective)) : null,
+        // Timeline-derived bumper position, so the ambient bed seeks + fades with DVR scrubbing (mirrors tv-web).
+        bumperElapsed: isBumperSlot ? Math.max(0, effective - cur.startS) : null,
+        bumperTotal: isBumperSlot ? Math.max(0, cur.endS - cur.startS) : null,
+        bumperKey: isBumperSlot ? String(Math.round(cur.startS)) : null,
         canRestart: cur.kind === "PROGRAM",
         scrubber: scrubberActiveRef.current ? buildScrubber(effective, t) : null,
         delivery: cur.kind === "PROGRAM" ? cur.delivery ?? null : null,
