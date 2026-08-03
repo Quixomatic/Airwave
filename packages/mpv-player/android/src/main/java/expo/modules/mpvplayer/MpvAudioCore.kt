@@ -52,6 +52,9 @@ class MpvAudioCore(private val appContext: Context) {
           setOption("vo", "null")
           setOption("ao", "audiotrack")
           setOption("gapless-audio", "weak")
+          // Open the next queued playlist entry BEFORE the current one ends — makes an `append`ed network
+          // track truly gapless (no "opening the next file" pause at the boundary).
+          setOption("prefetch-playlist", "yes")
           setOption("keep-open", "yes")
           setOption("cache", "yes")
         }
@@ -94,6 +97,17 @@ class MpvAudioCore(private val appContext: Context) {
   private suspend fun doLoad(p: MpvPlayer, url: String, startTime: Double) {
     if (startTime > 0) p.command("loadfile", url, "replace", "-1", "start=${startTime.toInt()}")
     else p.command("loadfile", url, "replace", "-1")
+  }
+
+  /**
+   * Queue `url` AFTER the current track (mpv playlist `append`) for GAPLESS radio playback — mpv auto-advances
+   * the playlist and, with `prefetch-playlist`, opens the next entry before the current ends → no gap. Call
+   * after a `load` (the first track plays now; appended ones follow). Optional `startTime` tunes the appended
+   * entry mid-track (radio DVR).
+   */
+  fun append(url: String, startTime: Double = 0.0) = onPlayer {
+    if (startTime > 0) it.command("loadfile", url, "append", "-1", "start=${startTime.toInt()}")
+    else it.command("loadfile", url, "append", "-1")
   }
 
   fun play() = onPlayer { it.setProperty("pause", false) }

@@ -28,6 +28,7 @@ export interface MpvAudioBuffering {
 
 interface MpvAudioNative {
   audioLoad(url: string, startTime: number): Promise<void>;
+  audioAppend(url: string, startTime: number): Promise<void>;
   audioPlay(): Promise<void>;
   audioPause(): Promise<void>;
   audioStop(): Promise<void>;
@@ -50,6 +51,10 @@ export const mpvAudio = {
   /** Load (and buffer) a track URL, opening AT `startTime` seconds (a fast range-seek, not play-from-0).
    *  Replaces any current track. */
   load: (url: string, startTime = 0): Promise<void> => Native.audioLoad(url, startTime),
+  /** Queue a track AFTER the current one for GAPLESS handoff (mpv playlist `append` + `prefetch-playlist`) —
+   *  the next entry opens before this one ends, so there's no gap. Call after `load`; optional `startTime`
+   *  tunes the appended entry mid-track. The queue primitive for radio channels. */
+  append: (url: string, startTime = 0): Promise<void> => Native.audioAppend(url, startTime),
   play: (): Promise<void> => Native.audioPlay(),
   pause: (): Promise<void> => Native.audioPause(),
   /** Stop + unload the current track. */

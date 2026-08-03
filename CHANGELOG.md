@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.41] - 2026-08-03
+
+### Added
+
+- **mpv audio: gapless `append` for track-to-track handoff (tv-native).** Added `mpvAudio.append(url, startTime?)`
+  — queues a track after the current one via mpv's playlist (`loadfile … append`), which auto-advances with no
+  gap. Paired with a new `prefetch-playlist=yes` option (mpv opens the next queued entry *before* the current
+  ends, so the handoff is truly gapless even over the network) on top of the existing `gapless-audio=weak`.
+  This is the track-to-track primitive for future radio channels — the decision (James) is **gapless append,
+  not a true crossfade**: a radio orchestrator will `load` the current track at its DVR offset and `append` the
+  next as playback nears the boundary, all on the single audio core (no second instance). Native on both
+  platforms + JS API + types. **Needs a native tv-native build** to run.
+
 ## [0.9.40] - 2026-08-03
 
 ### Added

@@ -12,6 +12,7 @@ public class MpvPlayerModule: Module {
     Events("onAudioProgress", "onAudioEnded", "onAudioError", "onAudioBuffering")
 
     AsyncFunction("audioLoad") { (url: String, startTime: Double) in self.ensureAudio().load(url, startTime: startTime) }
+    AsyncFunction("audioAppend") { (url: String, startTime: Double) in self.ensureAudio().append(url, startTime: startTime) }
     AsyncFunction("audioPlay") { self.audio?.play() }
     AsyncFunction("audioPause") { self.audio?.pause() }
     AsyncFunction("audioStop") { self.audio?.stop() }

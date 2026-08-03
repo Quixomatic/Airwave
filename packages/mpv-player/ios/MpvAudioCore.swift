@@ -44,6 +44,9 @@ final class MpvAudioCore {
       "force-window": "no",
       "vo": "null",
       "gapless-audio": "weak",
+      // Open the next queued playlist entry BEFORE the current one ends — the trick that makes an
+      // `append`ed network track truly gapless (no "opening the next file" pause at the boundary).
+      "prefetch-playlist": "yes",
       "keep-open": "yes",
       "cache": "yes",
     ]
@@ -73,6 +76,16 @@ final class MpvAudioCore {
   /// mid-track is fast even on a long/un-indexed file, NOT a play-from-0-then-seek. Matches the video core.
   func load(_ url: String, startTime: Double = 0) {
     var args = ["loadfile", url, "replace", "-1"]
+    if startTime > 0 { args.append("start=\(Int(startTime))") }
+    command(args)
+  }
+
+  /// Queue `url` AFTER the current track (mpv playlist `append`) for GAPLESS radio playback — mpv auto-advances
+  /// the playlist and, with `prefetch-playlist`, opens the next entry before the current ends → no gap. Call
+  /// after a `load` (the first track plays now; appended ones follow). Optional `startTime` tunes the appended
+  /// entry mid-track (radio DVR).
+  func append(_ url: String, startTime: Double = 0) {
+    var args = ["loadfile", url, "append", "-1"]
     if startTime > 0 { args.append("start=\(Int(startTime))") }
     command(args)
   }
