@@ -2,6 +2,16 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.39] - 2026-08-02
+
+### Added
+
+- **mpv audio: `load(url, startTime)` — open a track AT an offset (tv-native).** The headless audio core's
+  `load` now takes an optional `startTime` and issues `loadfile … start=<t>`, so mpv opens the file at that
+  position via a fast byte-range seek (not play-from-0-then-seek) — the foundation for DVR tune-in *mid-track*
+  on future radio channels. Native on both platforms + threaded through the module + `mpvAudio.load(url, t?)`.
+  The bumper bed passes no offset (unchanged). Needs a native tv-native build.
+
 ## [0.9.38] - 2026-08-02
 
 ### Added

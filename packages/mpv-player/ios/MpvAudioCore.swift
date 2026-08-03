@@ -64,7 +64,13 @@ final class MpvAudioCore {
 
   // MARK: control
 
-  func load(_ url: String) { command(["loadfile", url, "replace", "-1"]) }
+  /// Load `url`, opening AT `startTime` seconds — mpv estimates the byte position (a range seek), so tune-in
+  /// mid-track is fast even on a long/un-indexed file, NOT a play-from-0-then-seek. Matches the video core.
+  func load(_ url: String, startTime: Double = 0) {
+    var args = ["loadfile", url, "replace", "-1"]
+    if startTime > 0 { args.append("start=\(Int(startTime))") }
+    command(args)
+  }
   func play() { setProperty("pause", "no") }
   func pause() { setProperty("pause", "yes") }
   func stop() { command(["stop"]) }

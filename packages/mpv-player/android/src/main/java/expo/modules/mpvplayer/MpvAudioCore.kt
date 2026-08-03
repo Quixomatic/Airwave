@@ -32,6 +32,7 @@ class MpvAudioCore(private val appContext: Context) {
   private var player: MpvPlayer? = null
   // create() is suspend, so a load() can arrive before the player exists — run it on completion.
   private var pendingLoadUrl: String? = null
+  private var pendingLoadStart: Double = 0.0
   // Our last commanded volume (0..1), so a fade always starts from where the last one left off.
   private var currentVolume = 1.0
   private var fadeJob: Job? = null
@@ -64,14 +65,24 @@ class MpvAudioCore(private val appContext: Context) {
         if (ev is MpvEvent.EndFile && ev.reason == EndFileReason.Eof) onEnded?.invoke()
       }.launchIn(scope)
 
-      pendingLoadUrl?.let { p.command("loadfile", it, "replace", "-1") }
+      pendingLoadUrl?.let { doLoad(p, it, pendingLoadStart) }
     }
   }
 
-  fun load(url: String) {
+  /**
+   * Load `url`, opening AT `startTime` seconds — mpv estimates the byte position (range seek), so tune-in
+   * mid-track is fast even on a long/un-indexed file, NOT play-from-0-then-seek. Matches the video core.
+   */
+  fun load(url: String, startTime: Double = 0.0) {
     pendingLoadUrl = url
+    pendingLoadStart = startTime
     val p = player ?: return // setup()'s create() runs it on completion
-    scope.launch { p.command("loadfile", url, "replace", "-1") }
+    scope.launch { doLoad(p, url, startTime) }
+  }
+
+  private suspend fun doLoad(p: MpvPlayer, url: String, startTime: Double) {
+    if (startTime > 0) p.command("loadfile", url, "replace", "-1", "start=${startTime.toInt()}")
+    else p.command("loadfile", url, "replace", "-1")
   }
 
   fun play() = onPlayer { it.setProperty("pause", false) }

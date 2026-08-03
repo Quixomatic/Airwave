@@ -19,7 +19,7 @@ export interface MpvAudioProgress {
 }
 
 interface MpvAudioNative {
-  audioLoad(url: string): Promise<void>;
+  audioLoad(url: string, startTime: number): Promise<void>;
   audioPlay(): Promise<void>;
   audioPause(): Promise<void>;
   audioStop(): Promise<void>;
@@ -35,8 +35,9 @@ interface MpvAudioNative {
 const Native = requireNativeModule<MpvAudioNative>("MpvPlayer");
 
 export const mpvAudio = {
-  /** Load (and buffer) a track URL. Replaces any current track. */
-  load: (url: string): Promise<void> => Native.audioLoad(url),
+  /** Load (and buffer) a track URL, opening AT `startTime` seconds (a fast range-seek, not play-from-0).
+   *  Replaces any current track. */
+  load: (url: string, startTime = 0): Promise<void> => Native.audioLoad(url, startTime),
   play: (): Promise<void> => Native.audioPlay(),
   pause: (): Promise<void> => Native.audioPause(),
   /** Stop + unload the current track. */

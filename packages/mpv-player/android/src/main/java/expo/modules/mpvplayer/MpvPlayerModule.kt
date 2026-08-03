@@ -19,7 +19,7 @@ class MpvPlayerModule : Module() {
     // Module-level (view-less) AUDIO events — the bumper bed + future radio player subscribe to these.
     Events("onAudioProgress", "onAudioEnded")
 
-    AsyncFunction("audioLoad") { url: String -> ensureAudio().load(url) }
+    AsyncFunction("audioLoad") { url: String, startTime: Double -> ensureAudio().load(url, startTime) }
     AsyncFunction("audioPlay") { audio?.play() }
     AsyncFunction("audioPause") { audio?.pause() }
     AsyncFunction("audioStop") { audio?.stop() }
