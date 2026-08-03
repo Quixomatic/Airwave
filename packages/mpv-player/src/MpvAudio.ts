@@ -18,6 +18,14 @@ export interface MpvAudioProgress {
   duration: number;
 }
 
+export interface MpvAudioError {
+  message: string;
+}
+
+export interface MpvAudioBuffering {
+  buffering: boolean;
+}
+
 interface MpvAudioNative {
   audioLoad(url: string, startTime: number): Promise<void>;
   audioPlay(): Promise<void>;
@@ -26,9 +34,13 @@ interface MpvAudioNative {
   audioSeek(seconds: number): Promise<void>;
   audioSetVolume(volume: number): Promise<void>;
   audioFadeVolume(volume: number, durationMs: number): Promise<void>;
+  audioSetMuted(muted: boolean): Promise<void>;
+  audioSetRate(rate: number): Promise<void>;
   audioSetLoop(loop: boolean): Promise<void>;
   addListener(event: "onAudioProgress", listener: (e: MpvAudioProgress) => void): MpvAudioSubscription;
   addListener(event: "onAudioEnded", listener: () => void): MpvAudioSubscription;
+  addListener(event: "onAudioError", listener: (e: MpvAudioError) => void): MpvAudioSubscription;
+  addListener(event: "onAudioBuffering", listener: (e: MpvAudioBuffering) => void): MpvAudioSubscription;
 }
 
 // Same native module as the video view ("MpvPlayer") — the audio API is module-level, view-less.
@@ -49,6 +61,10 @@ export const mpvAudio = {
   /** Smoothly ramp the volume to 0..1 over `durationMs` — a native 60fps fade (one bridge call). Use for
    *  fade in/out and crossfades; cancels any in-flight fade and starts from the current level. */
   fadeVolume: (volume: number, durationMs: number): Promise<void> => Native.audioFadeVolume(volume, durationMs),
+  /** Mute/unmute without disturbing the volume level (mpv `mute`). */
+  setMuted: (muted: boolean): Promise<void> => Native.audioSetMuted(muted),
+  /** Playback speed (1.0 = normal — mpv `speed`). */
+  setRate: (rate: number): Promise<void> => Native.audioSetRate(rate),
   /** Loop the track when it reaches the end (mpv `loop-file`). */
   setLoop: (loop: boolean): Promise<void> => Native.audioSetLoop(loop),
   /** Position ticks (mpv `time-pos`) + the track's duration. */
@@ -56,4 +72,10 @@ export const mpvAudio = {
     Native.addListener("onAudioProgress", listener),
   /** Natural end of the track (EOF). */
   onEnded: (listener: () => void): MpvAudioSubscription => Native.addListener("onAudioEnded", listener),
+  /** A load/decode/network error (mpv end-file reason = error). */
+  onError: (listener: (e: MpvAudioError) => void): MpvAudioSubscription =>
+    Native.addListener("onAudioError", listener),
+  /** Stalled waiting on the network buffer (mpv `paused-for-cache`) — true on stall, false on resume. */
+  onBuffering: (listener: (e: MpvAudioBuffering) => void): MpvAudioSubscription =>
+    Native.addListener("onAudioBuffering", listener),
 };

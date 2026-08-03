@@ -17,7 +17,7 @@ class MpvPlayerModule : Module() {
     Name("MpvPlayer")
 
     // Module-level (view-less) AUDIO events — the bumper bed + future radio player subscribe to these.
-    Events("onAudioProgress", "onAudioEnded")
+    Events("onAudioProgress", "onAudioEnded", "onAudioError", "onAudioBuffering")
 
     AsyncFunction("audioLoad") { url: String, startTime: Double -> ensureAudio().load(url, startTime) }
     AsyncFunction("audioPlay") { audio?.play() }
@@ -26,6 +26,8 @@ class MpvPlayerModule : Module() {
     AsyncFunction("audioSeek") { seconds: Double -> audio?.seek(seconds) }
     AsyncFunction("audioSetVolume") { volume: Double -> audio?.setVolume(volume) }
     AsyncFunction("audioFadeVolume") { volume: Double, durationMs: Double -> audio?.fadeVolume(volume, durationMs) }
+    AsyncFunction("audioSetMuted") { muted: Boolean -> audio?.setMuted(muted) }
+    AsyncFunction("audioSetRate") { rate: Double -> audio?.setRate(rate) }
     AsyncFunction("audioSetLoop") { loop: Boolean -> audio?.setLoop(loop) }
 
     OnDestroy {
@@ -63,6 +65,8 @@ class MpvPlayerModule : Module() {
       sendEvent("onAudioProgress", mapOf("currentTime" to time, "duration" to duration))
     }
     core.onEnded = { sendEvent("onAudioEnded", emptyMap<String, Any>()) }
+    core.onError = { message -> sendEvent("onAudioError", mapOf("message" to message)) }
+    core.onBuffering = { buffering -> sendEvent("onAudioBuffering", mapOf("buffering" to buffering)) }
     core.setup()
     audio = core
     return core

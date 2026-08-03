@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.40] - 2026-08-03
+
+### Added
+
+- **mpv audio: error + buffering events and mute/rate control (tv-native).** The headless audio core now
+  surfaces what a "complete" player should — instead of failing silently. Added `mpvAudio.onError` (mpv
+  end-file reason = error → `{ message }`), `mpvAudio.onBuffering` (observes `paused-for-cache` → `{ buffering }`,
+  true on a network stall / false on resume), plus `mpvAudio.setMuted(bool)` (mpv `mute`) and
+  `mpvAudio.setRate(n)` (mpv `speed`). Wired natively on both platforms (iOS `MpvAudioCore`/`MpvPlayerModule`,
+  Android `MpvAudioCore`/`MpvPlayerModule`) and through the JS API + types. These are radio-facing (a network
+  stream wants a stall spinner + bad-stream errors); the bumper bed needs no change. **Needs a native
+  tv-native build** to run — validated with the rest of the audio arc on device.
+
 ## [0.9.39] - 2026-08-02
 
 ### Added

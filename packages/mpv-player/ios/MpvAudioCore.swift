@@ -15,6 +15,10 @@ final class MpvAudioCore {
   var onProgress: ((Double, Double) -> Void)?
   /// Natural end of the track (mpv EOF) — NOT our own stop/replace.
   var onEnded: (() -> Void)?
+  /// A load/decode/network error (mpv end-file reason = error) — the message.
+  var onError: ((String) -> Void)?
+  /// Stalled waiting on the network buffer (mpv `paused-for-cache`).
+  var onBuffering: ((Bool) -> Void)?
 
   private var mpv: OpaquePointer?
   private let queue = DispatchQueue(label: "mpv-player.audio", qos: .userInitiated)
@@ -52,6 +56,7 @@ final class MpvAudioCore {
     }
 
     mpv_observe_property(mpv, 0, "time-pos", MPV_FORMAT_DOUBLE)
+    mpv_observe_property(mpv, 0, "paused-for-cache", MPV_FORMAT_FLAG)
 
     let ctx = Unmanaged.passRetained(self).toOpaque()
     wakeupContext = ctx
@@ -75,6 +80,10 @@ final class MpvAudioCore {
   func pause() { setProperty("pause", "yes") }
   func stop() { command(["stop"]) }
   func seek(_ seconds: Double) { command(["seek", String(seconds), "absolute"]) }
+  func setMuted(_ muted: Bool) { setProperty("mute", muted ? "yes" : "no") }
+  /// Playback speed (1.0 = normal). mpv `speed`.
+  func setRate(_ rate: Double) { setProperty("speed", String(rate)) }
+
   /// `v` is 0..1 (like an `<audio>` element's volume); mpv's `volume` is 0..100. Cancels any in-flight fade.
   func setVolume(_ v: Double) {
     cancelFade()
@@ -176,18 +185,32 @@ final class MpvAudioCore {
     switch event.event_id {
     case MPV_EVENT_END_FILE:
       var eof = false
+      var errMsg: String?
       if let p = event.data?.assumingMemoryBound(to: mpv_event_end_file.self) {
-        eof = p.pointee.reason == MPV_END_FILE_REASON_EOF
+        switch p.pointee.reason {
+        case MPV_END_FILE_REASON_EOF: eof = true
+        case MPV_END_FILE_REASON_ERROR: errMsg = String(cString: mpv_error_string(p.pointee.error))
+        default: break
+        }
       }
-      if eof { DispatchQueue.main.async { self.onEnded?() } }
+      let m = errMsg
+      DispatchQueue.main.async {
+        if let m { self.onError?(m) }
+        if eof { self.onEnded?() }
+      }
     case MPV_EVENT_PROPERTY_CHANGE:
       guard let data = event.data else { break }
       let prop = data.assumingMemoryBound(to: mpv_event_property.self).pointee
-      if String(cString: prop.name) == "time-pos",
+      let name = String(cString: prop.name)
+      if name == "time-pos",
          prop.format == MPV_FORMAT_DOUBLE,
          let d = prop.data?.assumingMemoryBound(to: Double.self).pointee {
         let dur = getDouble("duration")
         DispatchQueue.main.async { self.onProgress?(d, dur) }
+      } else if name == "paused-for-cache",
+                prop.format == MPV_FORMAT_FLAG,
+                let f = prop.data?.assumingMemoryBound(to: Int32.self).pointee {
+        DispatchQueue.main.async { self.onBuffering?(f != 0) }
       }
     default:
       break

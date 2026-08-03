@@ -9,7 +9,7 @@ public class MpvPlayerModule: Module {
     Name("MpvPlayer")
 
     // Module-level (view-less) AUDIO events — the bumper bed + future radio player subscribe to these.
-    Events("onAudioProgress", "onAudioEnded")
+    Events("onAudioProgress", "onAudioEnded", "onAudioError", "onAudioBuffering")
 
     AsyncFunction("audioLoad") { (url: String, startTime: Double) in self.ensureAudio().load(url, startTime: startTime) }
     AsyncFunction("audioPlay") { self.audio?.play() }
@@ -18,6 +18,8 @@ public class MpvPlayerModule: Module {
     AsyncFunction("audioSeek") { (seconds: Double) in self.audio?.seek(seconds) }
     AsyncFunction("audioSetVolume") { (volume: Double) in self.audio?.setVolume(volume) }
     AsyncFunction("audioFadeVolume") { (volume: Double, durationMs: Double) in self.audio?.fadeVolume(to: volume, durationMs: durationMs) }
+    AsyncFunction("audioSetMuted") { (muted: Bool) in self.audio?.setMuted(muted) }
+    AsyncFunction("audioSetRate") { (rate: Double) in self.audio?.setRate(rate) }
     AsyncFunction("audioSetLoop") { (loop: Bool) in self.audio?.setLoop(loop) }
 
     OnDestroy {
@@ -53,6 +55,8 @@ public class MpvPlayerModule: Module {
       self?.sendEvent("onAudioProgress", ["currentTime": time, "duration": duration])
     }
     core.onEnded = { [weak self] in self?.sendEvent("onAudioEnded", [:]) }
+    core.onError = { [weak self] message in self?.sendEvent("onAudioError", ["message": message]) }
+    core.onBuffering = { [weak self] buffering in self?.sendEvent("onAudioBuffering", ["buffering": buffering]) }
     core.setup()
     audio = core
     return core

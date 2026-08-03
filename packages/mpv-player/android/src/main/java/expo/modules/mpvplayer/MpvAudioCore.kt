@@ -27,6 +27,10 @@ class MpvAudioCore(private val appContext: Context) {
   var onProgress: ((Double, Double) -> Unit)? = null
   /** Natural end of the track (mpv EOF) — NOT our own stop/replace. */
   var onEnded: (() -> Unit)? = null
+  /** A load/decode/network error (mpv end-file reason = error) — the message. */
+  var onError: ((String) -> Unit)? = null
+  /** Stalled waiting on the network buffer (mpv `paused-for-cache`). */
+  var onBuffering: ((Boolean) -> Unit)? = null
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
   private var player: MpvPlayer? = null
@@ -60,9 +64,16 @@ class MpvAudioCore(private val appContext: Context) {
         val dur = p.getDouble("duration") ?: 0.0
         onProgress?.invoke(t, dur)
       }.launchIn(scope)
+      p.observeFlag("paused-for-cache").onEach { onBuffering?.invoke(it) }.launchIn(scope)
 
       p.eventFlow.onEach { ev ->
-        if (ev is MpvEvent.EndFile && ev.reason == EndFileReason.Eof) onEnded?.invoke()
+        if (ev is MpvEvent.EndFile) {
+          when (ev.reason) {
+            EndFileReason.Eof -> onEnded?.invoke()
+            EndFileReason.Error -> onError?.invoke("mpv end-file error")
+            else -> {}
+          }
+        }
       }.launchIn(scope)
 
       pendingLoadUrl?.let { doLoad(p, it, pendingLoadStart) }
@@ -89,6 +100,9 @@ class MpvAudioCore(private val appContext: Context) {
   fun pause() = onPlayer { it.setProperty("pause", true) }
   fun stop() = onPlayer { it.command("stop") }
   fun seek(seconds: Double) = onPlayer { it.command("seek", seconds.toString(), "absolute") }
+  fun setMuted(muted: Boolean) = onPlayer { it.setProperty("mute", muted) }
+  /** Playback speed (1.0 = normal). mpv `speed`. */
+  fun setRate(rate: Double) = onPlayer { it.setProperty("speed", rate) }
   /** `v` is 0..1 (like a web `<audio>` volume); mpv's `volume` is 0..100. Cancels any in-flight fade. */
   fun setVolume(v: Double) {
     fadeJob?.cancel()
