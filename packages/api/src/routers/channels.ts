@@ -49,6 +49,37 @@ const nodeSchema: z.ZodType<FilterNodeInput> = z.lazy(() =>
   ]),
 );
 
+// OPTIONAL bolt-on grouping/rotation strategy (§7.6 Arc 3). Mirrors `ChannelStrategy` in
+// services/schedule/timeline.ts. `null` clears it (→ base ordering only).
+const runSpecSchema = z.union([
+  z.number(),
+  z.tuple([z.number(), z.number()]),
+  z.literal("all"),
+  z.object({ minutes: z.tuple([z.number(), z.number()]) }),
+]);
+const strategySchema = z
+  .object({
+    rotation: z.enum(["clustered", "round_robin"]),
+    rotationOrder: z.enum(["shuffle", "cycle"]).optional(),
+    grouping: z
+      .array(
+        z.object({
+          scope: z.enum(["show", "movie", "collection"]),
+          run: runSpecSchema.optional(),
+          filter: nodeSchema.optional(),
+        }),
+      )
+      .min(1),
+    constraints: z
+      .object({
+        noRepeatWithin: z
+          .object({ minutes: z.number().optional(), count: z.number().optional() })
+          .optional(),
+      })
+      .optional(),
+  })
+  .nullable();
+
 export const channelsRouter = router({
   // Server-side search / filter / sort (the UI drives it via URL params). Input is optional so
   // no-arg callers (e.g. the watch page) still get the full list, number-ascending.
@@ -148,6 +179,7 @@ export const channelsRouter = router({
       packageTint: channel.package?.tint ?? null,
       mediaTypes: filter.mediaTypes ?? ["movie", "show"],
       filter: filter.filter ?? null,
+      strategy: (channel.strategy as unknown) ?? null,
     };
   }),
 
@@ -213,6 +245,7 @@ export const channelsRouter = router({
         mediaTypes: z.array(mediaTypeEnum).min(1),
         filter: nodeSchema.optional(),
         ordering: orderingEnum.default("SHUFFLE"),
+        strategy: strategySchema.optional(),
         sortField: z.string().optional(),
         sortDir: z.enum(["asc", "desc"]).optional(),
         packageId: z.string().nullish(),
@@ -263,6 +296,9 @@ export const channelsRouter = router({
           number,
           mediaSourceId: input.mediaSourceId,
           ordering: input.ordering,
+          strategy: input.strategy
+            ? (JSON.parse(JSON.stringify(input.strategy)) as Prisma.InputJsonValue)
+            : Prisma.DbNull,
           sortField: input.sortField ?? "title",
           sortDir: input.sortDir ?? "asc",
           packageId: input.packageId ?? null,
@@ -308,6 +344,7 @@ export const channelsRouter = router({
         mediaTypes: z.array(mediaTypeEnum).min(1),
         filter: nodeSchema.optional(),
         ordering: orderingEnum,
+        strategy: strategySchema.optional(),
         sortField: z.string().optional(),
         sortDir: z.enum(["asc", "desc"]).optional(),
         packageId: z.string().nullish(),
@@ -332,6 +369,14 @@ export const channelsRouter = router({
           callsign: input.callsign ? normalizeCallsign(input.callsign) : null,
           number: input.number,
           ordering: input.ordering,
+          // `undefined` = field omitted from the payload (leave as-is); `null` = explicitly clear it.
+          ...(input.strategy === undefined
+            ? {}
+            : {
+                strategy: input.strategy
+                  ? (JSON.parse(JSON.stringify(input.strategy)) as Prisma.InputJsonValue)
+                  : Prisma.DbNull,
+              }),
           sortField: input.sortField ?? "title",
           sortDir: input.sortDir ?? "asc",
           packageId: input.packageId ?? null,

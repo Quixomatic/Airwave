@@ -2,6 +2,17 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.46] - 2026-08-04
+
+### Added
+
+- **Channel Strategies — Phase 4b (API): `strategy` is now settable through the channels router.** `channels.create`
+  and `channels.update` accept an optional `strategy` (validated by a Zod mirror of `ChannelStrategy` — rotation,
+  rotationOrder, grouping rules with scope/run/filter, and `noRepeatWithin`); `channels.get` returns it. Update
+  treats `undefined` as "leave as-is" and `null` as "clear" (`Prisma.DbNull`). This makes strategies fully
+  settable/persistable end-to-end (API, and via import/export) ahead of the visual editor. Bolt-on: omitted =
+  unchanged, and a channel with no strategy is byte-for-byte today's behavior.
+
 ## [0.9.45] - 2026-08-04
 
 ### Changed
