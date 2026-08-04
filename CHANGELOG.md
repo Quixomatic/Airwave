@@ -2,6 +2,22 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.47] - 2026-08-04
+
+### Added
+
+- **Channel Strategies — Phase 4b: the admin visual editor (feature-complete).** A new **"Advanced — grouping &
+  rotation"** collapsible section on the channel **new + edit** pages (`features/channels/strategy-editor.tsx`),
+  collapsed by default so a basic channel stays simple. A master on/off switch (off = today's behavior); when
+  on: **Rotation** (Marathon each group / Rotate between groups) + **Order** (Varied / Fixed cycle); an
+  add/remove **grouping-rule list** — each rule picks a **scope** (Each show / Movies / Filtered set) and a
+  **run** (one at a time / block of N–M / ~N–M minutes / whole run), with an optional per-rule **filter** that
+  reuses the existing channel `FilterBuilder` (evaluated locally); a **"don't repeat a show"** control (off /
+  within N minutes / within N shows); and a plain-English preview per rule. Threaded through `ChannelFormValues`
+  and both routes (`channels.create`/`update`). Purely additive — nothing else on the form changes, and a
+  channel with the strategy off schedules exactly as before. Strategy changes apply on the next schedule build
+  (Generate). **This completes the Channel Strategies core arc** (§7.6 Arc 3); AI/preset wiring stays deferred.
+
 ## [0.9.46] - 2026-08-04
 
 ### Added

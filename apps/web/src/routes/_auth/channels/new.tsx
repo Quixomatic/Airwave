@@ -43,6 +43,7 @@ function NewChannel() {
                   mediaTypes: v.mediaTypes,
                   filter: v.filter,
                   ordering: v.ordering,
+                  strategy: v.strategy,
                   sortField: v.sortField,
                   sortDir: v.sortDir,
                   packageId: v.packageId,

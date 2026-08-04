@@ -19,7 +19,7 @@ import { Switch } from "@ChannelGuide/ui/components/switch";
 import { Textarea } from "@ChannelGuide/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ChevronDown, Info, ListFilter, SlidersHorizontal, Tv, type LucideIcon } from "lucide-react";
+import { ChevronDown, Info, Layers, ListFilter, SlidersHorizontal, Tv, type LucideIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -28,6 +28,7 @@ import { IconTintField } from "@/features/icons/icon-tint-field";
 import { trpc } from "@/utils/trpc";
 
 import { FilterBuilder, type FilterGroup, normalizeFilter } from "./filter-builder";
+import { StrategyEditor, type ChannelStrategy } from "./strategy-editor";
 
 export type Ordering = "SHUFFLE" | "IN_ORDER" | "BY_AIR_DATE";
 export type MediaType = "movie" | "show";
@@ -40,6 +41,7 @@ export type ChannelFormValues = {
   mediaTypes: MediaType[];
   filter: FilterGroup;
   ordering: Ordering;
+  strategy: ChannelStrategy | null;
   sortField: string;
   sortDir: "asc" | "desc";
   packageId: string | null;
@@ -129,6 +131,7 @@ export function ChannelForm({
   const [movies, setMovies] = useState(initialTypes.includes("movie"));
   const [tv, setTv] = useState(initialTypes.includes("show"));
   const [ordering, setOrdering] = useState<Ordering>(initial?.ordering ?? "SHUFFLE");
+  const [strategy, setStrategy] = useState<ChannelStrategy | null>(initial?.strategy ?? null);
   const [sortField, setSortField] = useState(initial?.sortField ?? "title");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(initial?.sortDir ?? "asc");
   const [packageId, setPackageId] = useState<string>(initial?.packageId ?? "");
@@ -184,6 +187,7 @@ export function ChannelForm({
       mediaTypes,
       filter,
       ordering,
+      strategy,
       sortField,
       sortDir,
       packageId: packageId || null,
@@ -405,6 +409,17 @@ export function ChannelForm({
         <FilterBuilder
           value={filter}
           onChange={setFilter}
+          mediaSourceId={sourceId}
+          mediaTypes={mediaTypes}
+        />
+      </Section>
+
+      {/* Advanced grouping/rotation strategy — collapsed by default so a basic channel stays simple.
+          Optional; off = plays in the order set above (byte-for-byte today's behavior). */}
+      <Section title="Advanced — grouping & rotation" icon={Layers} defaultOpen={false}>
+        <StrategyEditor
+          value={strategy}
+          onChange={setStrategy}
           mediaSourceId={sourceId}
           mediaTypes={mediaTypes}
         />

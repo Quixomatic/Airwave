@@ -25,6 +25,7 @@ import {
 } from "@/features/channels/channel-form";
 import { ChannelPreviewTiles } from "@/features/channels/channel-preview";
 import type { FilterGroup } from "@/features/channels/filter-builder";
+import type { ChannelStrategy } from "@/features/channels/strategy-editor";
 import { trpc, trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/channels/$channelId")({
@@ -161,6 +162,7 @@ function ChannelDetail() {
               mediaTypes: channel.data.mediaTypes as MediaType[],
               filter: (channel.data.filter as FilterGroup | null) ?? undefined,
               ordering: channel.data.ordering as Ordering,
+              strategy: (channel.data.strategy as ChannelStrategy | null) ?? null,
               sortField: channel.data.sortField,
               sortDir: channel.data.sortDir as "asc" | "desc",
               packageId: channel.data.packageId,
@@ -181,6 +183,7 @@ function ChannelDetail() {
                   mediaTypes: v.mediaTypes,
                   filter: v.filter,
                   ordering: v.ordering,
+                  strategy: v.strategy,
                   sortField: v.sortField,
                   sortDir: v.sortDir,
                   packageId: v.packageId,
