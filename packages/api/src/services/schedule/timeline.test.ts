@@ -149,6 +149,70 @@ describe("channel strategies", () => {
     expect(keys.slice(swIdx[0]!, swIdx[0]! + 3)).toEqual(["sw-1", "sw-2", "sw-3"]);
   });
 
+  test("noRepeatWithin (count) spaces same-show blocks apart", () => {
+    const pool = [...show("A", 6), ...show("B", 6), ...show("C", 6), ...show("D", 6)];
+    const strat: ChannelStrategy = {
+      rotation: "round_robin",
+      grouping: [{ scope: "show", run: [1, 1] }],
+      constraints: { noRepeatWithin: { count: 3 } },
+    };
+    const keys = passKeys(pool, "IN_ORDER", strat);
+    expect([...keys].sort()).toEqual([...pool.map((p) => p.ratingKey)].sort());
+    const lastSeen: Record<string, number> = {};
+    keys.forEach((k, i) => {
+      const s = k.split("-")[0]!;
+      if (lastSeen[s] !== undefined) expect(i - lastSeen[s]!).toBeGreaterThanOrEqual(3);
+      lastSeen[s] = i;
+    });
+  });
+
+  test("noRepeatWithin relaxes on a tiny pool (never stalls or drops items)", () => {
+    const pool = [...show("A", 4), ...show("B", 4)]; // only 2 groups
+    const strat: ChannelStrategy = {
+      rotation: "round_robin",
+      grouping: [{ scope: "show", run: [1, 1] }],
+      constraints: { noRepeatWithin: { count: 10 } }, // impossible to honor with 2 groups
+    };
+    const keys = passKeys(pool, "IN_ORDER", strat);
+    expect(keys).toHaveLength(8);
+    expect([...keys].sort()).toEqual([...pool.map((p) => p.ratingKey)].sort()); // every item once
+  });
+
+  test("constrained build resumes across a PASS boundary (recent cursor threading)", () => {
+    const pool = [...show("A", 2), ...show("B", 2), ...show("C", 2)]; // 6 items, one pass = ~3h
+    const strat: ChannelStrategy = {
+      rotation: "round_robin",
+      grouping: [{ scope: "show", run: [1, 1] }],
+      constraints: { noRepeatWithin: { count: 2 } },
+    };
+    const seed = 999;
+    const start0 = new Date("2026-01-01T00:00:00Z");
+    // Uncapped ~2 passes (one pass = 6 × 30min = 10800s).
+    const fullBuild = buildSchedule(pool, "IN_ORDER", seed, start0, 20000, null, { strategy: strat });
+    const full = fullBuild.entries.filter((e) => e.kind === "PROGRAM").map((e) => e.ratingKey!);
+    expect(full.length).toBeGreaterThan(6); // actually crosses the pass boundary
+
+    // Rebuild in ~2-item windows, resuming from the cursor (which now carries `recent`).
+    const window = 2 * 30 * 60;
+    let start = start0;
+    let cursor: ReturnType<typeof buildSchedule>["cursor"] | null = null;
+    const chunks: string[] = [];
+    for (let i = 0; i < 200 && chunks.length < full.length; i++) {
+      const b = buildSchedule(pool, "IN_ORDER", seed, start, 1, null, {
+        maxDurationSeconds: window,
+        resumeFrom: cursor,
+        strategy: strat,
+      });
+      const keys = b.entries.filter((e) => e.kind === "PROGRAM").map((e) => e.ratingKey!);
+      if (keys.length === 0) break;
+      chunks.push(...keys);
+      cursor = b.cursor;
+      const last = b.entries[b.entries.length - 1]!;
+      start = new Date(last.startsAt.getTime() + last.durationSeconds * 1000);
+    }
+    expect(chunks.slice(0, full.length)).toEqual(full); // identical across the pass seam
+  });
+
   test("movies rule keeps movies as a rotating group alongside shows", () => {
     const pool = [...show("A", 4), ...Array.from({ length: 4 }, (_, i) => movie(`${i + 1}`))];
     const strat: ChannelStrategy = {

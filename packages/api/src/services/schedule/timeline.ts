@@ -37,7 +37,15 @@ export type ScheduleCursor = {
   passIndex: number;
   /** Next item offset within that pass's order. 0 = start of a fresh pass. */
   pos: number;
+  /** Tier-2 cross-pass history: the trailing emitted items feeding the CURRENT pass's `noRepeatWithin`
+   *  constraint (pinned per pass, like `passSeed`; recomputed from the prior pass's tail at rollover). Absent
+   *  for channels with no constraint — the pure per-pass strategies don't need it. */
+  recent?: RecentItem[];
 };
+
+/** One trailing emitted item (its group key + duration) — the memory a `noRepeatWithin` constraint walks
+ *  backward over to decide whether a group is still "too recent" to air again. */
+export type RecentItem = { key: string; sec: number };
 
 export type BuildResult = {
   entries: TimelineEntry[];
@@ -261,11 +269,18 @@ function shuffleIndices(idx: number[], seed: number): number[] {
   return arr;
 }
 
-type StrategyGroup = { items: PlexItem[]; run: RunSpec | undefined; firstIdx: number };
+type StrategyGroup = { key: string; items: PlexItem[]; run: RunSpec | undefined; firstIdx: number };
+
+/** The group key for an item (matching the bucketing in `strategyPassOrder`). */
+function keyOf(item: PlexItem, rules: GroupingRule[]): string {
+  const g = groupFor(item, rules);
+  return g ? g.key : `solo:${item.ratingKey}`;
+}
 
 /**
  * One pass under a strategy: a full permutation of the pool. Buckets the base-ordered pool
- * into groups, then assembles by rotation. Pure in (pool, ordering, strategy, baseSeed, passIndex).
+ * into groups, then assembles by rotation. Pure in (pool, ordering, strategy, baseSeed, passIndex)
+ * — plus `incoming` (the cross-pass history) ONLY when a `noRepeatWithin` constraint is active.
  */
 function strategyPassOrder(
   pool: PlexItem[],
@@ -273,6 +288,7 @@ function strategyPassOrder(
   strategy: ChannelStrategy,
   baseSeed: number,
   passIndex: number,
+  incoming: RecentItem[] = [],
 ): PlexItem[] {
   const based = passOrder(pool, ordering, baseSeed, passIndex);
   const map = new Map<string, StrategyGroup>();
@@ -282,10 +298,16 @@ function strategyPassOrder(
     const run = g ? g.run : 1;
     const existing = map.get(key);
     if (existing) existing.items.push(item);
-    else map.set(key, { items: [item], run, firstIdx: idx });
+    else map.set(key, { key, items: [item], run, firstIdx: idx });
   });
   // Group order follows the base ordering (position of each group's first item).
   const groups = [...map.values()].sort((a, b) => a.firstIdx - b.firstIdx);
+
+  // Tier-2: a cross-pass "no repeat within N minutes/items" constraint → starvation-based assembly.
+  const nr = strategy.constraints?.noRepeatWithin;
+  if (nr && (nr.minutes != null || nr.count != null)) {
+    return constrainedPassOrder(groups, nr, baseSeed, passIndex, incoming);
+  }
 
   // Marathon: each group's whole run, in group order.
   if (strategy.rotation === "clustered") return groups.flatMap((g) => g.items);
@@ -322,6 +344,104 @@ function strategyPassOrder(
     if (out.length === before) break; // safety: never spin without progress
   }
   return out;
+}
+
+/**
+ * Tier-2 assembly: honor a `noRepeatWithin` window (minutes and/or item count). A **starvation scheduler** —
+ * each turn picks, among groups not currently inside their no-repeat window (and never the immediately-previous
+ * group), the one aired longest ago; seeded tiebreak. If EVERY remaining group is still inside its window
+ * (tiny pool), it **relaxes** to the least-recently-aired one rather than stalling — so every item is still laid
+ * exactly once. `incoming` seeds the per-group "last aired" from the previous pass's tail, so the constraint
+ * holds across a build seam. Deterministic in (groups, nr, baseSeed, passIndex, incoming).
+ */
+function constrainedPassOrder(
+  groups: StrategyGroup[],
+  nr: { minutes?: number; count?: number },
+  baseSeed: number,
+  passIndex: number,
+  incoming: RecentItem[],
+): PlexItem[] {
+  const wSec = nr.minutes != null ? nr.minutes * 60 : 0;
+  const wCount = nr.count != null ? nr.count : 0;
+  const consumed = groups.map(() => 0);
+  const hasMore = (i: number) => consumed[i]! < groups[i]!.items.length;
+
+  // Seed each group's most-recent end position (sec + item index) from the incoming tail. Entries end at
+  // pass start (position 0), so pre-pass ends are negative (how long ago, backward from 0).
+  const lastSec = new Map<string, number>();
+  const lastIdx = new Map<string, number>();
+  {
+    let accSec = 0;
+    let accIdx = 0;
+    for (let i = incoming.length - 1; i >= 0; i--) {
+      const e = incoming[i]!;
+      if (!lastSec.has(e.key)) {
+        lastSec.set(e.key, -accSec);
+        lastIdx.set(e.key, -accIdx);
+      }
+      accSec += e.sec;
+      accIdx += 1;
+    }
+  }
+
+  const out: PlexItem[] = [];
+  const total = groups.reduce((s, g) => s + g.items.length, 0);
+  let posSec = 0;
+  let posIdx = 0;
+  let lastGroup = -1;
+  let turn = 0;
+  while (out.length < total) {
+    const before = out.length;
+    const remaining = groups.map((_, i) => i).filter(hasMore);
+    if (remaining.length === 0) break;
+    // Avoid the immediately-previous group unless it's the only one left.
+    const notLast = remaining.filter((i) => i !== lastGroup);
+    const pool = notLast.length ? notLast : remaining;
+    const gapSec = (i: number) => posSec - (lastSec.get(groups[i]!.key) ?? -Infinity);
+    const gapIdx = (i: number) => posIdx - (lastIdx.get(groups[i]!.key) ?? -Infinity);
+    const eligible = pool.filter((i) => gapSec(i) >= wSec && gapIdx(i) >= wCount);
+    const candidates = eligible.length ? eligible : pool; // relax if none clears the window
+    // Most-starved first (aired longest ago); seeded tiebreak so ties are deterministic + varied.
+    const tb = (i: number) => mulberry32(mix(mix(baseSeed >>> 0, passIndex), turn * 131 + i))();
+    const pick = candidates.sort((a, b) => gapSec(b) - gapSec(a) || tb(a) - tb(b))[0]!;
+
+    const g = groups[pick]!;
+    const take = runCount(g.items, consumed[pick]!, g.run, mix(mix(baseSeed >>> 0, passIndex), turn));
+    for (let k = 0; k < take && hasMore(pick); k++) {
+      const it = g.items[consumed[pick]!++]!;
+      out.push(it);
+      posSec += itemSeconds(it);
+      posIdx += 1;
+    }
+    lastSec.set(g.key, posSec);
+    lastIdx.set(g.key, posIdx);
+    lastGroup = pick;
+    turn++;
+    if (out.length === before) break; // safety
+  }
+  return out;
+}
+
+/** The trailing emitted items of a pass, enough to cover the largest `noRepeatWithin` window — persisted as the
+ *  next pass's `incoming` so the constraint holds across the pass boundary. Bounded to avoid unbounded JSON. */
+function tailRecent(
+  order: PlexItem[],
+  rules: GroupingRule[],
+  nr: { minutes?: number; count?: number },
+): RecentItem[] {
+  const wSec = nr.minutes != null ? nr.minutes * 60 : 0;
+  const wCount = nr.count != null ? nr.count : 0;
+  const res: RecentItem[] = [];
+  let sec = 0;
+  let cnt = 0;
+  for (let i = order.length - 1; i >= 0 && cnt < 1000; i--) {
+    const it = order[i]!;
+    res.unshift({ key: keyOf(it, rules), sec: itemSeconds(it) });
+    sec += itemSeconds(it);
+    cnt += 1;
+    if (sec >= wSec && cnt >= wCount) break; // both windows covered
+  }
+  return res;
 }
 
 /**
@@ -404,9 +524,13 @@ export function buildSchedule(
   let stopped = false;
 
   const strategy = opts.strategy ?? null;
+  const constraint = strategy?.constraints?.noRepeatWithin ?? null;
+  // Tier-2 incoming cross-pass history for the CURRENT pass — pinned per pass (like passSeed), recomputed from
+  // the prior pass's tail at rollover, so a `noRepeatWithin` constraint holds across a windowed build seam.
+  let recent: RecentItem[] = constraint && resume?.recent ? resume.recent : [];
   while (!stopped && coveredSeconds < target && entries.length < MAX_ENTRIES) {
     const order = strategy
-      ? strategyPassOrder(usable, ordering, strategy, baseSeed, passIndex)
+      ? strategyPassOrder(usable, ordering, strategy, baseSeed, passIndex, recent)
       : passOrder(usable, ordering, baseSeed, passIndex);
     let i = pos;
     while (i < order.length) {
@@ -461,6 +585,8 @@ export function buildSchedule(
     } else {
       // Ran the pass to completion: roll over to a brand-new pass from 0 (SHUFFLE
       // reshuffles on the new passIndex), which is also how an uncapped build loops.
+      // Carry the tail forward so a constraint spans the pass boundary.
+      if (constraint) recent = tailRecent(order, strategy!.grouping, constraint);
       passIndex++;
       pos = 0;
       passes++;
@@ -473,6 +599,6 @@ export function buildSchedule(
     poolSeconds,
     coveredSeconds,
     bumperCount,
-    cursor: { passSeed: baseSeed, passIndex, pos },
+    cursor: { passSeed: baseSeed, passIndex, pos, ...(constraint ? { recent } : {}) },
   };
 }

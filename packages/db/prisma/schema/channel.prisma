@@ -97,6 +97,9 @@ model Channel {
   schedulePassSeed  Int @default(0)
   schedulePassIndex Int @default(0)
   schedulePassPos   Int @default(0)
+  // Tier-2 cross-pass history for a `strategy.constraints.noRepeatWithin` — the trailing emitted items feeding
+  // the in-progress pass's constraint, so it holds across a windowed build seam. null unless a constraint is set.
+  scheduleRecent    Json?
 
   // Thin per-channel bumper override; the global BumperConfig owns the content.
   bumperMode BumperMode @default(INHERIT)

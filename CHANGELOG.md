@@ -2,6 +2,22 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.44] - 2026-08-04
+
+### Added
+
+- **Channel Strategies — Phase 3: Tier-2 `noRepeatWithin` constraints.** A strategy can now declare
+  `constraints: { noRepeatWithin: { minutes?, count? } }` — never air the same show (group) again within that
+  window. Implemented as a **starvation scheduler** (`constrainedPassOrder`): each turn picks the group aired
+  longest ago among those clear of the window, never the immediately-previous group; if a tiny pool makes the
+  window impossible it **relaxes deterministically** rather than stalling or dropping items, so every item is
+  still laid exactly once. To hold the constraint across a **windowed build seam / pass boundary**, the
+  `ScheduleCursor` gained a `recent` history field (new `Channel.scheduleRecent` JSON column, migration
+  `add_schedule_recent`) — the trailing emitted items are carried forward as the next pass's seed and threaded
+  through `buildSchedule` + `cursorData`/`cursorOf`. Fully deterministic; the non-constrained path is untouched
+  (history is null unless a constraint is set). 3 new tests incl. **resume across a pass boundary === one
+  uncapped build** (10 `bun:test` cases total).
+
 ## [0.9.43] - 2026-08-04
 
 ### Added

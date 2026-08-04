@@ -115,6 +115,8 @@ function cursorData(cursor: ScheduleCursor) {
     schedulePassSeed: cursor.passSeed | 0,
     schedulePassIndex: cursor.passIndex,
     schedulePassPos: cursor.pos,
+    // Tier-2 constraint history (null unless the channel's strategy has a `noRepeatWithin`).
+    scheduleRecent: cursor.recent ?? undefined,
   };
 }
 
@@ -123,6 +125,7 @@ function cursorOf(channel: {
   schedulePassSeed: number;
   schedulePassIndex: number;
   schedulePassPos: number;
+  scheduleRecent?: unknown;
 }): ScheduleCursor | null {
   // pos 0 with no pass history = nothing partial to resume; let the builder seed fresh.
   if (channel.schedulePassPos === 0 && channel.schedulePassIndex === 0) return null;
@@ -130,6 +133,9 @@ function cursorOf(channel: {
     passSeed: channel.schedulePassSeed >>> 0,
     passIndex: channel.schedulePassIndex,
     pos: channel.schedulePassPos,
+    recent: Array.isArray(channel.scheduleRecent)
+      ? (channel.scheduleRecent as ScheduleCursor["recent"])
+      : undefined,
   };
 }
 
