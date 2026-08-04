@@ -68,6 +68,12 @@ model Channel {
   sortIndex   Int              @default(0)
   ordering    OrderingStrategy @default(SHUFFLE)
   shuffleSeed Int? // stable seed for deterministic shuffle
+  // OPTIONAL bolt-on grouping/rotation strategy (§7.6 Arc 3) layered OVER `ordering`. null = base ordering
+  // only (byte-for-byte today's behavior). Shape (see services/schedule/timeline.ts `ChannelStrategy`):
+  // { rotation: "clustered"|"round_robin", rotationOrder?: "shuffle"|"cycle",
+  //   grouping: [{ scope: "show"|"movie"|"collection", run: n|[min,max]|"all"|{minutes:[min,max]}, filter? }],
+  //   constraints?: { noRepeatWithin?: {...} } }. Base order still governs within-group order + group sort.
+  strategy    Json?
   // When ordering != SHUFFLE, Plex sorts the pool by this field/direction and the
   // scheduler preserves that order. `sortField` is a SORT_FIELDS key.
   sortField   String           @default("title")

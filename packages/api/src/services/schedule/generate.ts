@@ -14,6 +14,7 @@ import {
   type OrderingStrategy,
   type ScheduleCursor,
   buildSchedule,
+  parseStrategy,
 } from "./timeline";
 
 const DAY_SECONDS = 86400;
@@ -165,6 +166,7 @@ export async function generateChannelSchedule(
   // A full rebuild always starts a brand-new pass sequence — no resume.
   const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, from, min, plan, {
     maxDurationSeconds: opts.windowSeconds,
+    strategy: parseStrategy(channel.strategy),
   });
 
   await prisma.$transaction([
@@ -240,6 +242,7 @@ export async function extendChannelSchedule(
   const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, tailEnd, min, plan, {
     maxDurationSeconds: opts.windowSeconds,
     resumeFrom: cursorOf(channel),
+    strategy: parseStrategy(channel.strategy),
   });
 
   const pruneBefore = new Date(now.getTime() - HISTORY_KEEP_SECONDS * 1000);
@@ -328,6 +331,7 @@ export async function repairChannelSchedule(
   // so it re-seeds the cursor rather than continuing the old one.
   const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, from, min, plan, {
     maxDurationSeconds: opts.windowSeconds,
+    strategy: parseStrategy(channel.strategy),
   });
 
   await prisma.$transaction([

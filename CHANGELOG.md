@@ -2,6 +2,27 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.42] - 2026-08-04
+
+### Added
+
+- **Channel Strategies (§7.6 Arc 3) — Phase 1: the engine core.** An OPTIONAL, bolt-on grouping/rotation layer
+  over a channel's base `ordering`. A new nullable `Channel.strategy` JSON column (migration
+  `add_channel_strategy`); `null` = today's behavior byte-for-byte. `services/schedule/timeline.ts` gains
+  `parseStrategy` (defensive — bad config safely falls back to base ordering) + `strategyPassOrder`, which
+  buckets the base-ordered pool into groups and assembles a pass by either **`clustered`** (marathon each group
+  in turn) or **`round_robin`** (rotate a run of items per group). The base ordering still governs order *within*
+  each group and how groups are sorted — so `in_order` **continues a show across its blocks** instead of
+  restarting. Each grouping rule is `{ scope, run, filter? }`: **scope** `show` (by grandparent) or `movie`
+  self-scope by metadata (no filter needed); **run** is a fixed count, a seeded count range `[2,3]`, `"all"`, or
+  a **length-aware duration range `{ minutes: [25,55] }`** (sums real item durations, so 7-min Bluey → more
+  episodes per block than a 45-min drama — no per-show classification). `round_robin` **never repeats a show
+  back-to-back** across a lap seam (`rotationOrder: shuffle` swaps deterministically, `cycle` rotates). Wired
+  through `buildSchedule` (opts) + `generate`/`extend`/`repair`. Fully deterministic and **resumes on the
+  existing `{passSeed, passIndex, pos}` cursor with no new fields** (the seam rule is enforced within a pass).
+  6 `bun:test` cases incl. **windowed-build + resume === one uncapped build**. `collection` scope, the optional
+  per-rule `filter`, cross-pass Tier-2 constraints, and the admin UI land in later phases.
+
 ## [0.9.41] - 2026-08-03
 
 ### Added

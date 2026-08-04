@@ -114,6 +114,175 @@ function passOrder(
   return pool;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Channel strategies (§7.6 Arc 3) — OPTIONAL bolt-on grouping/rotation over the base
+// `ordering`. A strategy is a smarter per-pass ordering: bucket the base-ordered pool
+// into groups (by show/movie/collection), then either MARATHON each group in turn
+// (`clustered`) or ROTATE a run of items per group (`round_robin`). The base ordering
+// still governs the order WITHIN each group and how groups are sorted — so IN_ORDER
+// continues a show across its blocks, SHUFFLE randomises within, etc.
+//
+// Every pass is still a full permutation of the pool (each item exactly once), so a
+// strategy is a pure function of (pool, baseSeed, passIndex) and resumes on the existing
+// {passSeed, passIndex, pos} cursor with NO new fields — the round-robin no-same-group-
+// back-to-back rule is enforced WITHIN a pass (between laps), which is self-contained.
+// (True cross-pass constraints — "no repeat within 6h" — are a later Tier-2 addition that
+// carries history through the cursor; not here.)
+
+/** What a grouping rule targets. Phase 1 implements `show`; `movie`/`collection` land next. */
+export type GroupScope = "show" | "movie" | "collection";
+/** How much of a group plays per turn: a fixed count, a seeded count range, a seeded
+ *  duration range (length-aware — short shows self-adjust), or the whole group. */
+export type RunSpec = number | [number, number] | "all" | { minutes: [number, number] };
+export type GroupingRule = { scope: GroupScope; run?: RunSpec; filter?: unknown };
+export type ChannelStrategy = {
+  rotation: "clustered" | "round_robin";
+  /** round_robin only: reshuffle the group order each lap (`shuffle`) vs rotate the pattern (`cycle`). */
+  rotationOrder?: "shuffle" | "cycle";
+  grouping: GroupingRule[];
+  constraints?: { noRepeatWithin?: { minutes?: number; count?: number } };
+};
+
+/** Validate an untyped `Channel.strategy` JSON into a usable strategy, or null (→ base ordering).
+ *  Defensive: a malformed/empty strategy safely falls back so a channel is never broken by bad config. */
+export function parseStrategy(raw: unknown): ChannelStrategy | null {
+  if (!raw || typeof raw !== "object") return null;
+  const s = raw as Record<string, unknown>;
+  const rotation = s.rotation;
+  if (rotation !== "clustered" && rotation !== "round_robin") return null;
+  if (!Array.isArray(s.grouping) || s.grouping.length === 0) return null;
+  const grouping: GroupingRule[] = [];
+  for (const g of s.grouping) {
+    if (!g || typeof g !== "object") continue;
+    const scope = (g as Record<string, unknown>).scope;
+    if (scope !== "show" && scope !== "movie" && scope !== "collection") continue;
+    grouping.push({ scope, run: (g as Record<string, unknown>).run as RunSpec | undefined,
+      filter: (g as Record<string, unknown>).filter });
+  }
+  if (grouping.length === 0) return null;
+  const rotationOrder = s.rotationOrder === "cycle" ? "cycle" : "shuffle";
+  return { rotation, rotationOrder, grouping, constraints: s.constraints as ChannelStrategy["constraints"] };
+}
+
+/** The group key + run for an item under these rules, or null → the item is its own singleton (run 1).
+ *  First matching rule wins. Phase 1: `show` (episodes by grandparent) + `movie` (all movies one group). */
+function groupFor(item: PlexItem, rules: GroupingRule[]): { key: string; run: RunSpec } | null {
+  for (const rule of rules) {
+    if (rule.scope === "show" && item.guide.showRatingKey) {
+      return { key: `show:${item.guide.showRatingKey}`, run: rule.run ?? 1 };
+    }
+    if (rule.scope === "movie" && item.guide.type === "movie") {
+      return { key: "movie", run: rule.run ?? 1 };
+    }
+    // `collection` + per-rule `filter` land in a later phase.
+  }
+  return null;
+}
+
+/** How many items to take from a group this turn, seeded (deterministic). Always ≥1. Duration mode
+ *  sums real item lengths so short-episode shows self-adjust (no per-show length classification). */
+function runCount(items: PlexItem[], consumed: number, run: RunSpec | undefined, seed: number): number {
+  const remaining = items.length - consumed;
+  if (remaining <= 0) return 0;
+  if (run === "all") return remaining;
+  if (typeof run === "number") return Math.max(1, Math.min(remaining, Math.floor(run)));
+  const rng = mulberry32(seed);
+  if (Array.isArray(run)) {
+    const [lo, hi] = run;
+    const n = Math.floor(lo + rng() * (Math.max(lo, hi) - lo + 1));
+    return Math.max(1, Math.min(remaining, n));
+  }
+  if (run && typeof run === "object" && Array.isArray(run.minutes)) {
+    const [lo, hi] = run.minutes;
+    const targetSec = (lo + rng() * Math.max(0, hi - lo)) * 60;
+    let acc = 0;
+    let count = 0;
+    for (let i = consumed; i < items.length; i++) {
+      acc += itemSeconds(items[i]!);
+      count++;
+      if (acc >= targetSec) break;
+    }
+    return Math.max(1, count);
+  }
+  return 1;
+}
+
+/** Seeded Fisher–Yates over a copy of an index array. */
+function shuffleIndices(idx: number[], seed: number): number[] {
+  const arr = [...idx];
+  const rng = mulberry32(seed);
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const t = arr[i]!;
+    arr[i] = arr[j]!;
+    arr[j] = t;
+  }
+  return arr;
+}
+
+type StrategyGroup = { items: PlexItem[]; run: RunSpec | undefined; firstIdx: number };
+
+/**
+ * One pass under a strategy: a full permutation of the pool. Buckets the base-ordered pool
+ * into groups, then assembles by rotation. Pure in (pool, ordering, strategy, baseSeed, passIndex).
+ */
+function strategyPassOrder(
+  pool: PlexItem[],
+  ordering: OrderingStrategy,
+  strategy: ChannelStrategy,
+  baseSeed: number,
+  passIndex: number,
+): PlexItem[] {
+  const based = passOrder(pool, ordering, baseSeed, passIndex);
+  const map = new Map<string, StrategyGroup>();
+  based.forEach((item, idx) => {
+    const g = groupFor(item, strategy.grouping);
+    const key = g ? g.key : `solo:${item.ratingKey}`;
+    const run = g ? g.run : 1;
+    const existing = map.get(key);
+    if (existing) existing.items.push(item);
+    else map.set(key, { items: [item], run, firstIdx: idx });
+  });
+  // Group order follows the base ordering (position of each group's first item).
+  const groups = [...map.values()].sort((a, b) => a.firstIdx - b.firstIdx);
+
+  // Marathon: each group's whole run, in group order.
+  if (strategy.rotation === "clustered") return groups.flatMap((g) => g.items);
+
+  // Rotate: a seeded run per group per lap, never the same group back-to-back across a lap seam.
+  const out: PlexItem[] = [];
+  const consumed = groups.map(() => 0);
+  const hasMore = (i: number) => consumed[i]! < groups[i]!.items.length;
+  let lap = 0;
+  let lastGroup = -1;
+  while (groups.some((_, i) => hasMore(i))) {
+    const before = out.length;
+    const active = groups.map((_, i) => i).filter(hasMore);
+    const lapSeed = mix(mix(baseSeed >>> 0, passIndex), lap);
+    let lapOrder =
+      strategy.rotationOrder === "cycle"
+        ? // rotate the active list left by `lap`
+          active.slice(lap % active.length).concat(active.slice(0, lap % active.length))
+        : shuffleIndices(active, lapSeed);
+    // No same group back-to-back at the lap seam (unless it's the only one left).
+    if (lapOrder.length > 1 && lapOrder[0] === lastGroup) {
+      const t = lapOrder[0]!;
+      lapOrder[0] = lapOrder[1]!;
+      lapOrder[1] = t;
+    }
+    for (const gi of lapOrder) {
+      if (!hasMore(gi)) continue;
+      const g = groups[gi]!;
+      const take = runCount(g.items, consumed[gi]!, g.run, mix(lapSeed, gi));
+      for (let k = 0; k < take && hasMore(gi); k++) out.push(g.items[consumed[gi]!++]!);
+      lastGroup = gi;
+    }
+    lap++;
+    if (out.length === before) break; // safety: never spin without progress
+  }
+  return out;
+}
+
 /**
  * Lay out a channel's lineup back-to-back from `startAt`.
  *
@@ -144,7 +313,12 @@ export function buildSchedule(
   startAt: Date,
   minDurationSeconds: number,
   bumper: TimelineBumperPlan | null = null,
-  opts: { maxDurationSeconds?: number; resumeFrom?: ScheduleCursor | null } = {},
+  opts: {
+    maxDurationSeconds?: number;
+    resumeFrom?: ScheduleCursor | null;
+    /** OPTIONAL bolt-on grouping/rotation (§7.6 Arc 3). null/undefined = base ordering only. */
+    strategy?: ChannelStrategy | null;
+  } = {},
 ): BuildResult {
   const usable = pool.filter((i) => i.durationMs > 0);
   const resume = opts.resumeFrom ?? null;
@@ -188,8 +362,11 @@ export function buildSchedule(
   let prevItem: PlexItem | null = null;
   let stopped = false;
 
+  const strategy = opts.strategy ?? null;
   while (!stopped && coveredSeconds < target && entries.length < MAX_ENTRIES) {
-    const order = passOrder(usable, ordering, baseSeed, passIndex);
+    const order = strategy
+      ? strategyPassOrder(usable, ordering, strategy, baseSeed, passIndex)
+      : passOrder(usable, ordering, baseSeed, passIndex);
     let i = pos;
     while (i < order.length) {
       // Windowed builds stop the moment the window is covered — mid-pass is the point.
