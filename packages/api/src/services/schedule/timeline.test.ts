@@ -135,7 +135,12 @@ describe("channel strategies", () => {
     const strat: ChannelStrategy = {
       rotation: "round_robin",
       grouping: [
-        { scope: "collection", run: "all", filter: { titleContains: "Star Wars" } }, // claims sw-* first
+        {
+          scope: "collection",
+          run: "all",
+          // reuse the channel filter grammar, evaluated locally
+          filter: { type: "condition", field: "title", op: "contains", value: "Star Wars" },
+        }, // claims sw-* first
         { scope: "show", run: [1, 1] },
         { scope: "movie", run: [1, 1] }, // the OTHER movies (x1/x2), not the SW films
       ],

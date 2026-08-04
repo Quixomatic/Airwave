@@ -2,6 +2,21 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.45] - 2026-08-04
+
+### Changed
+
+- **Channel Strategies — Phase 4a: grouping filters now use the real channel filter grammar, evaluated
+  locally.** A grouping rule's optional `filter` is now the same recursive `FilterNode` tree (`group` with
+  and/or + `{ field, op, value }` conditions) the channel-content builder produces — so the admin can reuse that
+  builder per grouping. Unlike the content filter (resolved against Plex to BUILD the pool), a grouping filter
+  narrows the ALREADY-resolved pool, so it's evaluated **locally** against cached metadata with no network
+  (`services/schedule/local-filter.ts` → `matchesLocalFilter`). Supports the subset of fields our `GuideMeta`
+  holds (title/genre/director/actor/studio/contentRating/resolution/year/decade/ratings/duration/hdr/dovi/
+  releaseDate); a field we don't cache doesn't claim the item (`LOCAL_FILTER_FIELDS` — the builder will restrict
+  to these). Replaces the interim lightweight `StrategyFilter`. +5 tests. Deterministic (time-relative fields
+  intentionally unsupported).
+
 ## [0.9.44] - 2026-08-04
 
 ### Added

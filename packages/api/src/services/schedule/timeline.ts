@@ -1,5 +1,7 @@
 import { type BumperPlan, breakSeconds } from "../bumpers/bumper-config";
 import type { PlexItem } from "../plex/client";
+import type { FilterNode } from "../plex/filter-fields";
+import { matchesLocalFilter } from "./local-filter";
 
 export type OrderingStrategy = "SHUFFLE" | "IN_ORDER" | "BY_AIR_DATE";
 
@@ -143,19 +145,10 @@ export type GroupScope = "show" | "movie" | "collection";
 /** How much of a group plays per turn: a fixed count, a seeded count range, a seeded
  *  duration range (length-aware — short shows self-adjust), or the whole group. */
 export type RunSpec = number | [number, number] | "all" | { minutes: [number, number] };
-/** OPTIONAL predicate narrowing which pool items a rule claims — matched against LOCAL metadata (no Plex
- *  query). All provided fields must match (AND). Used for carve-outs like "the Star Wars films". */
-export type StrategyFilter = {
-  titleContains?: string; // substring of the item title OR its show title (case-insensitive)
-  type?: "movie" | "episode" | "show";
-  genre?: string; // one of guide.genres (case-insensitive)
-  studio?: string; // guide.studio (case-insensitive)
-  yearMin?: number;
-  yearMax?: number;
-  showTitle?: string; // exact-ish (case-insensitive equals)
-  showRatingKey?: string;
-};
-export type GroupingRule = { scope: GroupScope; run?: RunSpec; filter?: StrategyFilter };
+/** OPTIONAL predicate narrowing which pool items a rule claims — the SAME `FilterNode` tree as the channel
+ *  content filter (the admin reuses that builder), but evaluated LOCALLY against cached pool metadata (no Plex
+ *  query). Used for carve-outs like "the Star Wars films". See {@link matchesLocalFilter}. */
+export type GroupingRule = { scope: GroupScope; run?: RunSpec; filter?: FilterNode };
 export type ChannelStrategy = {
   rotation: "clustered" | "round_robin";
   /** round_robin only: reshuffle the group order each lap (`shuffle`) vs rotate the pattern (`cycle`). */
@@ -180,31 +173,12 @@ export function parseStrategy(raw: unknown): ChannelStrategy | null {
     grouping.push({
       scope,
       run: (g as Record<string, unknown>).run as RunSpec | undefined,
-      filter: (g as Record<string, unknown>).filter as StrategyFilter | undefined,
+      filter: (g as Record<string, unknown>).filter as FilterNode | undefined,
     });
   }
   if (grouping.length === 0) return null;
   const rotationOrder = s.rotationOrder === "cycle" ? "cycle" : "shuffle";
   return { rotation, rotationOrder, grouping, constraints: s.constraints as ChannelStrategy["constraints"] };
-}
-
-/** Does `item` satisfy every provided field of `filter` (AND)? Local metadata only. */
-function matchesFilter(item: PlexItem, filter: StrategyFilter): boolean {
-  const g = item.guide;
-  if (filter.titleContains) {
-    const needle = filter.titleContains.toLowerCase();
-    const hay = `${item.title} ${g.showTitle ?? ""}`.toLowerCase();
-    if (!hay.includes(needle)) return false;
-  }
-  if (filter.type && g.type !== filter.type) return false;
-  if (filter.genre && !(g.genres ?? []).some((x) => x.toLowerCase() === filter.genre!.toLowerCase()))
-    return false;
-  if (filter.studio && (g.studio ?? "").toLowerCase() !== filter.studio.toLowerCase()) return false;
-  if (filter.yearMin != null && (item.year ?? g.year ?? 0) < filter.yearMin) return false;
-  if (filter.yearMax != null && (item.year ?? g.year ?? Infinity) > filter.yearMax) return false;
-  if (filter.showTitle && (g.showTitle ?? "").toLowerCase() !== filter.showTitle.toLowerCase()) return false;
-  if (filter.showRatingKey && g.showRatingKey !== filter.showRatingKey) return false;
-  return true;
 }
 
 /** The group key + run for an item under these rules, or null → the item is its own singleton (run 1).
@@ -214,7 +188,7 @@ function matchesFilter(item: PlexItem, filter: StrategyFilter): boolean {
 function groupFor(item: PlexItem, rules: GroupingRule[]): { key: string; run: RunSpec } | null {
   for (let ri = 0; ri < rules.length; ri++) {
     const rule = rules[ri]!;
-    if (rule.filter && !matchesFilter(item, rule.filter)) continue;
+    if (rule.filter && !matchesLocalFilter(item, rule.filter)) continue;
     if (rule.scope === "collection") return { key: `collection:${ri}`, run: rule.run ?? "all" };
     if (rule.scope === "show") {
       if (item.guide.showRatingKey) return { key: `show:${item.guide.showRatingKey}`, run: rule.run ?? 1 };
