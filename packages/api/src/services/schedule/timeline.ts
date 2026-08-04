@@ -129,12 +129,25 @@ function passOrder(
 // (True cross-pass constraints — "no repeat within 6h" — are a later Tier-2 addition that
 // carries history through the cursor; not here.)
 
-/** What a grouping rule targets. Phase 1 implements `show`; `movie`/`collection` land next. */
+/** What a grouping rule targets. `show` = one group per series; `movie` = all movies one group;
+ *  `collection` = the whole filter-matched set as ONE group (a marathon carve-out — e.g. "Star Wars"). */
 export type GroupScope = "show" | "movie" | "collection";
 /** How much of a group plays per turn: a fixed count, a seeded count range, a seeded
  *  duration range (length-aware — short shows self-adjust), or the whole group. */
 export type RunSpec = number | [number, number] | "all" | { minutes: [number, number] };
-export type GroupingRule = { scope: GroupScope; run?: RunSpec; filter?: unknown };
+/** OPTIONAL predicate narrowing which pool items a rule claims — matched against LOCAL metadata (no Plex
+ *  query). All provided fields must match (AND). Used for carve-outs like "the Star Wars films". */
+export type StrategyFilter = {
+  titleContains?: string; // substring of the item title OR its show title (case-insensitive)
+  type?: "movie" | "episode" | "show";
+  genre?: string; // one of guide.genres (case-insensitive)
+  studio?: string; // guide.studio (case-insensitive)
+  yearMin?: number;
+  yearMax?: number;
+  showTitle?: string; // exact-ish (case-insensitive equals)
+  showRatingKey?: string;
+};
+export type GroupingRule = { scope: GroupScope; run?: RunSpec; filter?: StrategyFilter };
 export type ChannelStrategy = {
   rotation: "clustered" | "round_robin";
   /** round_robin only: reshuffle the group order each lap (`shuffle`) vs rotate the pattern (`cycle`). */
@@ -156,25 +169,53 @@ export function parseStrategy(raw: unknown): ChannelStrategy | null {
     if (!g || typeof g !== "object") continue;
     const scope = (g as Record<string, unknown>).scope;
     if (scope !== "show" && scope !== "movie" && scope !== "collection") continue;
-    grouping.push({ scope, run: (g as Record<string, unknown>).run as RunSpec | undefined,
-      filter: (g as Record<string, unknown>).filter });
+    grouping.push({
+      scope,
+      run: (g as Record<string, unknown>).run as RunSpec | undefined,
+      filter: (g as Record<string, unknown>).filter as StrategyFilter | undefined,
+    });
   }
   if (grouping.length === 0) return null;
   const rotationOrder = s.rotationOrder === "cycle" ? "cycle" : "shuffle";
   return { rotation, rotationOrder, grouping, constraints: s.constraints as ChannelStrategy["constraints"] };
 }
 
+/** Does `item` satisfy every provided field of `filter` (AND)? Local metadata only. */
+function matchesFilter(item: PlexItem, filter: StrategyFilter): boolean {
+  const g = item.guide;
+  if (filter.titleContains) {
+    const needle = filter.titleContains.toLowerCase();
+    const hay = `${item.title} ${g.showTitle ?? ""}`.toLowerCase();
+    if (!hay.includes(needle)) return false;
+  }
+  if (filter.type && g.type !== filter.type) return false;
+  if (filter.genre && !(g.genres ?? []).some((x) => x.toLowerCase() === filter.genre!.toLowerCase()))
+    return false;
+  if (filter.studio && (g.studio ?? "").toLowerCase() !== filter.studio.toLowerCase()) return false;
+  if (filter.yearMin != null && (item.year ?? g.year ?? 0) < filter.yearMin) return false;
+  if (filter.yearMax != null && (item.year ?? g.year ?? Infinity) > filter.yearMax) return false;
+  if (filter.showTitle && (g.showTitle ?? "").toLowerCase() !== filter.showTitle.toLowerCase()) return false;
+  if (filter.showRatingKey && g.showRatingKey !== filter.showRatingKey) return false;
+  return true;
+}
+
 /** The group key + run for an item under these rules, or null → the item is its own singleton (run 1).
- *  First matching rule wins. Phase 1: `show` (episodes by grandparent) + `movie` (all movies one group). */
+ *  FIRST matching rule wins (so a filtered carve-out listed first claims its items). A rule with a `filter`
+ *  only claims items the filter matches. `collection` = the whole matched set as one group (marathon carve-out);
+ *  `show` = per-series; `movie` = all movies in one group. */
 function groupFor(item: PlexItem, rules: GroupingRule[]): { key: string; run: RunSpec } | null {
-  for (const rule of rules) {
-    if (rule.scope === "show" && item.guide.showRatingKey) {
-      return { key: `show:${item.guide.showRatingKey}`, run: rule.run ?? 1 };
+  for (let ri = 0; ri < rules.length; ri++) {
+    const rule = rules[ri]!;
+    if (rule.filter && !matchesFilter(item, rule.filter)) continue;
+    if (rule.scope === "collection") return { key: `collection:${ri}`, run: rule.run ?? "all" };
+    if (rule.scope === "show") {
+      if (item.guide.showRatingKey) return { key: `show:${item.guide.showRatingKey}`, run: rule.run ?? 1 };
+      continue; // a show rule can't claim a movie — let a later rule try
     }
-    if (rule.scope === "movie" && item.guide.type === "movie") {
-      return { key: "movie", run: rule.run ?? 1 };
+    if (rule.scope === "movie") {
+      if (item.guide.type === "movie") return { key: "movie", run: rule.run ?? 1 };
+      continue;
     }
-    // `collection` + per-rule `filter` land in a later phase.
   }
   return null;
 }

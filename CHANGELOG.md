@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.43] - 2026-08-04
+
+### Added
+
+- **Channel Strategies — Phase 2: `collection` scope + per-rule `filter`.** A grouping rule can now carry an
+  optional `filter` (`titleContains` / `type` / `genre` / `studio` / `yearMin`–`yearMax` / `showTitle` /
+  `showRatingKey`) matched against LOCAL item metadata (no Plex query, AND over provided fields), so a rule only
+  claims the items it matches — first-matching-rule-wins, so a filtered carve-out listed first takes precedence.
+  New **`scope: collection`** groups the whole filter-matched set as ONE group — the "Star Wars films in release
+  order as a single marathon" case: `{ scope: "collection", run: "all", filter: { titleContains: "Star Wars" } }`.
+  (A collection is defined *by* its filter here, not by Plex collection-membership metadata, which the pool
+  doesn't carry.) +1 test covering the carve-out (contiguous, in base order, precedence over a later movie rule).
+
 ## [0.9.42] - 2026-08-04
 
 ### Added

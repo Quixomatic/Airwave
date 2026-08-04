@@ -16,6 +16,9 @@ function ep(show: string, n: number, mins = 30): PlexItem {
 function movie(id: string, mins = 100): PlexItem {
   return { ratingKey: `m-${id}`, title: id, durationMs: mins * 60_000, guide: { title: id, type: "movie" } };
 }
+function titledMovie(rk: string, title: string, year: number, mins = 120): PlexItem {
+  return { ratingKey: rk, title, durationMs: mins * 60_000, year, guide: { title, type: "movie", year } };
+}
 function show(name: string, count: number, mins = 30): PlexItem[] {
   return Array.from({ length: count }, (_, i) => ep(name, i + 1, mins));
 }
@@ -120,6 +123,30 @@ describe("channel strategies", () => {
       start = new Date(last.startsAt.getTime() + last.durationSeconds * 1000);
     }
     expect(chunks.slice(0, full.length)).toEqual(full);
+  });
+
+  test("collection filter groups a carve-out as one contiguous marathon block (first-match precedence)", () => {
+    const sw = [
+      titledMovie("sw-1", "Star Wars: A New Hope", 1977),
+      titledMovie("sw-2", "Star Wars: The Empire Strikes Back", 1980),
+      titledMovie("sw-3", "Star Wars: Return of the Jedi", 1983),
+    ];
+    const pool = [...show("A", 4), ...sw, movie("x1"), movie("x2")];
+    const strat: ChannelStrategy = {
+      rotation: "round_robin",
+      grouping: [
+        { scope: "collection", run: "all", filter: { titleContains: "Star Wars" } }, // claims sw-* first
+        { scope: "show", run: [1, 1] },
+        { scope: "movie", run: [1, 1] }, // the OTHER movies (x1/x2), not the SW films
+      ],
+    };
+    const keys = passKeys(pool, "IN_ORDER", strat);
+    expect([...keys].sort()).toEqual([...pool.map((p) => p.ratingKey)].sort());
+    // the three SW films are contiguous (one marathon) and in base (release) order
+    const swIdx = keys.map((k, i) => (k.startsWith("sw-") ? i : -1)).filter((i) => i >= 0);
+    expect(swIdx).toHaveLength(3);
+    expect(swIdx[2]! - swIdx[0]!).toBe(2); // contiguous
+    expect(keys.slice(swIdx[0]!, swIdx[0]! + 3)).toEqual(["sw-1", "sw-2", "sw-3"]);
   });
 
   test("movies rule keeps movies as a rotating group alongside shows", () => {
