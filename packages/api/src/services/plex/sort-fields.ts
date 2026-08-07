@@ -10,7 +10,9 @@ export type SortFieldMeta = { field: string; label: string; plex: string };
 export const SORT_FIELDS: SortFieldMeta[] = [
   { field: "title", label: "Title", plex: "titleSort" },
   { field: "year", label: "Year", plex: "year" },
-  { field: "releaseDate", label: "Release date", plex: "originallyAvailableAt" },
+  // Plex `originallyAvailableAt` — for a movie this is its release date; for an EPISODE it's that episode's
+  // original air date (TV resolves at the episode level, type=4). Labeled to cover both (matches the filter field).
+  { field: "releaseDate", label: "Release / air date", plex: "originallyAvailableAt" },
   { field: "criticRating", label: "Critic rating", plex: "rating" },
   { field: "audienceRating", label: "Audience rating", plex: "audienceRating" },
   { field: "userRating", label: "Personal rating", plex: "userRating" },

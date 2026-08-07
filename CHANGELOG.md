@@ -2,6 +2,15 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.50] - 2026-08-07
+
+### Changed
+
+- **Channel ordering: the "Release date" sort is relabeled "Release / air date."** No behavior change — it maps
+  to Plex `originallyAvailableAt`, which for a movie is its release date and for an episode is that episode's
+  original air date (TV channels resolve and sort at the episode level). The old label read movie-centric; this
+  matches how the filter builder already names the field, so a TV channel "sorted by air date" is clearly this one.
+
 ## [0.9.49] - 2026-08-07
 
 ### Changed
