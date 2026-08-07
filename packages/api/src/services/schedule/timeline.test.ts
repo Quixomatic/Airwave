@@ -145,6 +145,25 @@ describe("channel strategies", () => {
     }
   });
 
+  test("round_robin recycles an exhausted group so rotation stays even to the pass end", () => {
+    // F (4 eps) empties in 4 turns; S (12 eps) takes 12 — same run of 1/turn. Without recycling the last
+    // ~8 turns would be S-only; with recycling, F loops and keeps alternating to the end.
+    const pool = [...show("F", 4), ...show("S", 12)];
+    const strat: ChannelStrategy = { rotation: "round_robin", grouping: [{ scope: "show", run: [1, 1] }] };
+    const keys = passKeys(pool, "IN_ORDER", strat);
+    // Every distinct item aired at least once (no starvation): 4 F + 12 S.
+    expect(new Set(keys).size).toBe(16);
+    // The slow show cycles exactly once; the fast show LOOPS (airs more than its 4 episodes)…
+    expect(keys.filter((k) => k.startsWith("S-")).length).toBe(12);
+    expect(keys.filter((k) => k.startsWith("F-")).length).toBeGreaterThan(4);
+    // …and is still present in the final quarter of the pass (didn't drop out at the tail).
+    const tail = keys.slice(Math.floor(keys.length * 0.75));
+    expect(tail.some((k) => k.startsWith("F-"))).toBe(true);
+    // recycling replays F's episodes IN ORDER (F-e1 after F-e4)
+    const fOrder = keys.filter((k) => k.startsWith("F-")).slice(0, 5);
+    expect(fOrder).toEqual(["F-e1", "F-e2", "F-e3", "F-e4", "F-e1"]);
+  });
+
   test("windowed build + resume === one uncapped build (cursor resume under strategy)", () => {
     const pool = [...show("A", 8), ...show("B", 8), ...show("C", 8)];
     const strat: ChannelStrategy = { rotation: "round_robin", grouping: [{ scope: "show", run: [2, 3] }] };
@@ -193,7 +212,10 @@ describe("channel strategies", () => {
       ],
     };
     const keys = passKeys(pool, "IN_ORDER", strat);
-    expect([...keys].sort()).toEqual([...pool.map((p) => p.ratingKey)].sort());
+    // Every pool item airs (distinct set === pool); recycling may repeat the shorter regular groups, but the
+    // Star Wars marathon (run: "all") plays exactly ONCE — it's exempt from recycling.
+    expect([...new Set(keys)].sort()).toEqual([...pool.map((p) => p.ratingKey)].sort());
+    expect(keys.filter((k) => k.startsWith("sw-"))).toEqual(["sw-1", "sw-2", "sw-3"]); // once, in order
     // the three SW films are contiguous (one marathon) and in base (release) order
     const swIdx = keys.map((k, i) => (k.startsWith("sw-") ? i : -1)).filter((i) => i >= 0);
     expect(swIdx).toHaveLength(3);

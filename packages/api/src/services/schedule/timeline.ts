@@ -294,14 +294,27 @@ function strategyPassOrder(
   if (strategy.rotation === "clustered") return groups.flatMap((g) => g.items);
 
   // Rotate: a seeded run per group per lap, never the same group back-to-back across a lap seam.
+  //
+  // RECYCLING: a group that runs out of episodes mid-pass RESETS its cursor and runs back through its own
+  // items again, so it keeps its slot in the rotation instead of dropping out and letting the longest-lasting
+  // group dominate the pass tail. (Duration blocks make this real even for near-equal catalogs: the show that
+  // plays more-per-turn empties first.) The pass runs until EVERY group has aired its full list at least once
+  // (`cycles[i] >= 1`); faster/shorter groups loop as needed to fill the gap. Still a pure, finite, deterministic
+  // sequence in (groups, baseSeed, passIndex) — so the cursor resumes it unchanged; MAX_ENTRIES is the backstop.
   const out: PlexItem[] = [];
-  const consumed = groups.map(() => 0);
-  const hasMore = (i: number) => consumed[i]! < groups[i]!.items.length;
+  const cursor = groups.map(() => 0); // position within each group's items (0..len)
+  const cycles = groups.map(() => 0); // full times through its list
+  // A `run: "all"` group is a MARATHON — it plays its whole run ONCE and then drops out (never recycles).
+  const marathonDone = (i: number) => groups[i]!.run === "all" && cycles[i]! >= 1;
+  // Pass ends once every group has aired its list at least once (empty groups count as done — defensive,
+  // groups are only created with items, but this guarantees termination).
+  const allAiredOnce = () => groups.every((g, i) => g.items.length === 0 || cycles[i]! >= 1);
   let lap = 0;
   let lastGroup = -1;
-  while (groups.some((_, i) => hasMore(i))) {
+  while (!allAiredOnce() && out.length < MAX_ENTRIES) {
     const before = out.length;
-    const active = groups.map((_, i) => i).filter(hasMore);
+    const active = groups.map((_, i) => i).filter((i) => groups[i]!.items.length > 0 && !marathonDone(i));
+    if (active.length === 0) break;
     const lapSeed = mix(mix(baseSeed >>> 0, passIndex), lap);
     let lapOrder =
       strategy.rotationOrder === "cycle"
@@ -315,11 +328,19 @@ function strategyPassOrder(
       lapOrder[1] = t;
     }
     for (const gi of lapOrder) {
-      if (!hasMore(gi)) continue;
       const g = groups[gi]!;
-      const take = runCount(g.items, consumed[gi]!, g.run, mix(lapSeed, gi));
-      for (let k = 0; k < take && hasMore(gi); k++) out.push(g.items[consumed[gi]!++]!);
+      const len = g.items.length;
+      if (len === 0) continue;
+      const take = runCount(g.items, cursor[gi]!, g.run, mix(lapSeed, gi));
+      const end = Math.min(cursor[gi]! + take, len); // don't wrap within a block; cap at the cycle end
+      for (let j = cursor[gi]!; j < end; j++) out.push(g.items[j]!);
+      cursor[gi] = end;
       lastGroup = gi;
+      if (cursor[gi]! >= len) {
+        cycles[gi]!++;
+        // Marathon groups stay exhausted (play once); everything else loops back to keep its rotation slot.
+        cursor[gi] = g.run === "all" ? len : 0;
+      }
     }
     lap++;
     if (out.length === before) break; // safety: never spin without progress
@@ -488,12 +509,11 @@ export function buildSchedule(
 
   let passIndex = resume ? resume.passIndex : 0;
   let pos = resume ? resume.pos : 0;
-  // A stale cursor (the pool shrank since it was written, e.g. the filter was edited)
-  // can point past the end — roll to a clean fresh pass rather than laying nothing.
-  if (pos < 0 || pos >= usable.length) {
-    passIndex++;
-    pos = 0;
-  }
+  // A negative cursor is nonsense — start clean. (A cursor pointing PAST the pass end — e.g. the pool shrank
+  // after a filter edit, OR a recycled strategy pass came out shorter — is handled inside the loop against the
+  // actual `order.length`, NOT `usable.length`: with recycling a pass can be LONGER than the pool, so a valid
+  // mid-pass resume position legitimately exceeds `usable.length`.)
+  if (pos < 0) pos = 0;
 
   const entries: TimelineEntry[] = [];
   let cursorSec = Math.floor(startAt.getTime() / 1000);
@@ -513,6 +533,12 @@ export function buildSchedule(
     const order = strategy
       ? strategyPassOrder(usable, ordering, strategy, baseSeed, passIndex, recent)
       : passOrder(usable, ordering, baseSeed, passIndex);
+    // Stale/over-end cursor (pool shrank, or this pass came out shorter) — roll to a fresh pass.
+    if (pos >= order.length) {
+      passIndex++;
+      pos = 0;
+      continue;
+    }
     let i = pos;
     while (i < order.length) {
       // Windowed builds stop the moment the window is covered — mid-pass is the point.

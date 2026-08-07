@@ -2,6 +2,21 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.49] - 2026-08-07
+
+### Changed
+
+- **Channel strategies — round-robin now recycles an exhausted group so rotation stays even to the end of a
+  pass.** Previously, once a show used up its episodes within a pass it dropped out and the longest-lasting show
+  dominated the tail (pronounced with duration blocks, where the show that plays *more per turn* empties first —
+  e.g. Bluey at 4/turn runs out before Blue's Clues at 1/turn even with more episodes). Now a group that runs
+  out **resets its cursor and loops its own list** to keep its rotation slot; the pass ends cleanly once **every**
+  group has aired its full list at least once (tracked per group), so it terminates on the slowest group with no
+  risk of an endless build. **Marathons (`run: "all"`) are exempt** — they play once and drop out. Deterministic
+  and cursor-resumable (fixed a resume-staleness guard that assumed a pass equals the pool size — a recycled pass
+  is longer). 2 new tests (recycling keeps a fast show present to the tail + replays it in order; marathon plays
+  once); 18 engine tests total.
+
 ## [0.9.48] - 2026-08-07
 
 ### Fixed
