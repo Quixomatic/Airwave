@@ -95,7 +95,54 @@ describe("channel strategies", () => {
     const firstShort = blocks.find((b) => b.show === "Sh")!;
     const firstLong = blocks.find((b) => b.show === "Lo")!;
     expect(firstShort.size).toBeGreaterThanOrEqual(3); // ~25–55 min of 7-min eps
-    expect(firstLong.size).toBeLessThanOrEqual(2); // one 45-min ep already fills the block
+    expect(firstLong.size).toBe(1); // one 45-min ep fills the block; a 2nd (90m) blows past 55
+  });
+
+  test("a duration TURN never overshoots the ceiling (the 24–30 / 22-min-show bug)", () => {
+    // Balanced catalogs (both exhaust in 2 laps) so shows alternate cleanly — isolates the per-turn
+    // ceiling from tail-domination. Bluey (7m ×8 → 4/turn), Blue's Clues (22m ×2 → 1/turn).
+    const pool = [...show("Bluey", 8, 7), ...show("Blues", 2, 22)];
+    const strat: ChannelStrategy = {
+      rotation: "round_robin",
+      grouping: [{ scope: "show", run: { minutes: [24, 30] } }],
+    };
+    const keys = passKeys(pool, "IN_ORDER", strat);
+    const dur: Record<string, number> = { Bluey: 7, Blues: 22 };
+    // Every consecutive same-show run (a turn, since shows alternate here) fits under the 30-min ceiling,
+    // except a lone item longer than the window. A 2nd Blue's Clues (44m) must NEVER appear in a run.
+    let curShow = "";
+    let curCount = 0;
+    const check = () => {
+      if (curShow && curCount > 1) expect(curCount * dur[curShow]!).toBeLessThanOrEqual(30);
+    };
+    for (const k of keys) {
+      const s = k.split("-")[0]!;
+      if (s === curShow) curCount++;
+      else {
+        check();
+        curShow = s;
+        curCount = 1;
+      }
+    }
+    check();
+  });
+
+  test("an item longer than the window still airs once (ceiling never blocks the FIRST item)", () => {
+    // Balanced turns: Long (45m ×4 → 1/turn) + Short (7m ×12 → ~3/turn in a 15–30 window) both take 4 turns.
+    const pool = [...show("Long", 4, 45), ...show("Short", 12, 7)];
+    const strat: ChannelStrategy = {
+      rotation: "round_robin",
+      grouping: [{ scope: "show", run: { minutes: [15, 30] } }],
+    };
+    const keys = passKeys(pool, "IN_ORDER", strat);
+    // Every 45-min episode airs (none dropped because it exceeds the 30 ceiling)…
+    expect(keys.filter((k) => k.startsWith("Long-")).sort()).toEqual(["Long-e1", "Long-e2", "Long-e3", "Long-e4"]);
+    // …and it's always alone (a 2nd would be 90 > 30).
+    let run = 0;
+    for (const k of keys) {
+      run = k.startsWith("Long-") ? run + 1 : 0;
+      expect(run).toBeLessThanOrEqual(1);
+    }
   });
 
   test("windowed build + resume === one uncapped build (cursor resume under strategy)", () => {

@@ -216,14 +216,21 @@ function runCount(items: PlexItem[], consumed: number, run: RunSpec | undefined,
     return Math.max(1, Math.min(remaining, n));
   }
   if (run && typeof run === "object" && Array.isArray(run.minutes)) {
+    // Fill a block toward the [lo, hi]-minute window WITHOUT overshooting the ceiling: add items while
+    // each still fits under `hi`, and stop as soon as we're within the window. So a 22-min show in a
+    // 24–30 window is ONE item (a 2nd would be 44 > 30), while 7-min episodes pack in until they reach it.
+    // Always ≥1 (a single item longer than the window still airs once).
     const [lo, hi] = run.minutes;
-    const targetSec = (lo + rng() * Math.max(0, hi - lo)) * 60;
+    const loSec = Math.min(lo, hi) * 60;
+    const hiSec = Math.max(lo, hi) * 60;
     let acc = 0;
     let count = 0;
     for (let i = consumed; i < items.length; i++) {
-      acc += itemSeconds(items[i]!);
+      const s = itemSeconds(items[i]!);
+      if (count > 0 && acc + s > hiSec) break; // adding this would blow past the ceiling
+      acc += s;
       count++;
-      if (acc >= targetSec) break;
+      if (acc >= loSec) break; // reached the window — good enough
     }
     return Math.max(1, count);
   }

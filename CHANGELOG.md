@@ -2,6 +2,22 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.48] - 2026-08-07
+
+### Fixed
+
+- **Channel strategies — duration blocks no longer overshoot the window ceiling.** A `run: { minutes: [lo, hi] }`
+  block was filling *until it reached* the floor, so a 22-min show in a 24–30 window grabbed a 2nd episode
+  (44 min, over the ceiling). Now it adds items only while they still fit under `hi`, stopping once inside the
+  window — so a 22-min show is one item, 7-min episodes pack to ~4. The **first** item always airs even if it's
+  longer than the window (a 45-min episode in a 15–30 window still plays once). Covered by two new engine tests.
+
+### Changed
+
+- **The channel "Advanced — grouping & rotation" section auto-expands when the channel already has a strategy**
+  (instead of always starting collapsed), so an existing strategy isn't hidden. New/basic channels still start
+  collapsed.
+
 ## [0.9.47] - 2026-08-04
 
 ### Added

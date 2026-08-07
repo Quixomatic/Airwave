@@ -414,9 +414,10 @@ export function ChannelForm({
         />
       </Section>
 
-      {/* Advanced grouping/rotation strategy — collapsed by default so a basic channel stays simple.
-          Optional; off = plays in the order set above (byte-for-byte today's behavior). */}
-      <Section title="Advanced — grouping & rotation" icon={Layers} defaultOpen={false}>
+      {/* Advanced grouping/rotation strategy — collapsed by default so a basic channel stays simple, but
+          auto-expanded when this channel ALREADY has a strategy (so it's not hidden). Optional; off = plays in
+          the order set above (byte-for-byte today's behavior). */}
+      <Section title="Advanced — grouping & rotation" icon={Layers} defaultOpen={strategy != null}>
         <StrategyEditor
           value={strategy}
           onChange={setStrategy}
