@@ -2,6 +2,19 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.53] - 2026-08-08
+
+### Fixed
+
+- **tv-native diagnostic per-test animation now matches tv-web exactly.** v0.9.52 used Reanimated's
+  `SlideInRight`/`SlideOutLeft`, which slide the block the *entire screen width* with no fade — way too much
+  motion. Replaced with a custom transition mirroring tv-web's framer-motion: a subtle **56px** horizontal
+  slide **plus an opacity fade** (enter from x:+56 faded → x:0; exit to x:−56 faded), 260ms ease-out on both
+  in and out (matching framer-motion applying the same `transition` to exit). The block is absolutely positioned
+  in its row so the outgoing and incoming tests **crossfade** cleanly instead of shoving the layout. (One
+  intentional difference: tv-web's `AnimatePresence mode="wait"` sequences out-then-in; this crossfades, since
+  Reanimated has no clean wait-mode — the overlap avoids an empty gap and reads the same.)
+
 ## [0.9.52] - 2026-08-08
 
 ### Changed

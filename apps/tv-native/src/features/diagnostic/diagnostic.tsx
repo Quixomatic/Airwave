@@ -2,7 +2,7 @@ import { MpvPlayerView } from "@ChannelGuide/mpv-player";
 import { Check } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Platform, Text, useWindowDimensions, View } from "react-native";
-import Animated, { FadeIn, SlideInRight, SlideOutLeft, ZoomIn } from "react-native-reanimated";
+import Animated, { Easing, FadeIn, withTiming, ZoomIn } from "react-native-reanimated";
 
 import { TvPressable as Pressable } from "@/components/tv-pressable";
 
@@ -216,6 +216,30 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
   const cur = tests?.[idx];
   const chips = cur ? [cur.container, cur.video, cur.audio, cur.feature, cur.subtitle].filter((x): x is string => !!x && x !== "none") : [];
 
+  // Match tv-web's per-test transition EXACTLY: a subtle 56px horizontal slide + opacity fade (not a
+  // full-width slide). Enter from the right (x:+OFFSET, faded), exit to the left (x:-OFFSET, faded), easeOut.
+  const OFFSET = cs(56);
+  const enterTest = () => {
+    "worklet";
+    return {
+      initialValues: { opacity: 0, transform: [{ translateX: OFFSET }] },
+      animations: {
+        opacity: withTiming(1, { duration: 260, easing: Easing.out(Easing.ease) }),
+        transform: [{ translateX: withTiming(0, { duration: 260, easing: Easing.out(Easing.ease) }) }],
+      },
+    };
+  };
+  const exitTest = () => {
+    "worklet";
+    return {
+      initialValues: { opacity: 1, transform: [{ translateX: 0 }] },
+      animations: {
+        opacity: withTiming(0, { duration: 260, easing: Easing.out(Easing.ease) }),
+        transform: [{ translateX: withTiming(-OFFSET, { duration: 260, easing: Easing.out(Easing.ease) }) }],
+      },
+    };
+  };
+
   if (error) {
     return (
       <View style={scaled({ flex: 1, backgroundColor: "#060a14", alignItems: "center", justifyContent: "center", gap: 20, padding: 40 })}>
@@ -270,14 +294,16 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
         </Text>
       </View>
 
-      {/* The thing being tested — slides in from the right, slides away to the left, per test. */}
-      <View style={{ height: cs(74), marginTop: cs(22), width: frameW, alignItems: "center", justifyContent: "center" }}>
+      {/* The thing being tested — a subtle slide-in from the right / slide-away to the left + fade, per test
+          (matches tv-web). Absolutely positioned inside the fixed-height row so the outgoing + incoming
+          blocks overlap and crossfade cleanly instead of shoving the layout. */}
+      <View style={{ height: cs(74), marginTop: cs(22), width: frameW }}>
         {!done && cur && (
           <Animated.View
             key={cur.id}
-            entering={SlideInRight.duration(260)}
-            exiting={SlideOutLeft.duration(200)}
-            style={{ alignItems: "center", gap: cs(10) }}
+            entering={enterTest}
+            exiting={exitTest}
+            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", gap: cs(10) }}
           >
             <Text style={scaled({ color: "#f1f5f9", fontSize: 22, fontWeight: "700", textAlign: "center" })}>{cur.diagnostic}</Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: cs(8), justifyContent: "center" }}>
