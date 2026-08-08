@@ -2,6 +2,22 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.52] - 2026-08-08
+
+### Changed
+
+- **tv-native diagnostic: presentation brought back in line with tv-web (no functionality change).** The
+  capability-check screen had accumulated debug visuals during the iPad/Apple TV bring-up — the clip URL, a
+  "last error" line, a grid of every test as green/red chips, and a tap-to-inspect panel. Those are removed, and
+  the screen now mirrors tv-web: a single **per-test block that slides in from the right / out to the left**
+  (Reanimated `SlideInRight`/`SlideOutLeft`, keyed on the test) showing the human-readable diagnostic sentence
+  **plus** its capability chips (now pills), a title that switches **"Setting up your TV" → "Setup complete"**
+  with a subtitle, a spring ✓ on the frame when done, and a **Continue** button with the white focus halo
+  (mirroring tv-web's outline; the key-layer already routes OK/select to it). The little corner activity spinner
+  is kept (tv-native mounts the player fresh per clip, so it needs the working cue that tv-web's continuous
+  video provides). The actual capability run — clip playback, decode measurement, audio verdict, per-device
+  results — is untouched. tv-native ships in the next device build.
+
 ## [0.9.51] - 2026-08-07
 
 ### Fixed

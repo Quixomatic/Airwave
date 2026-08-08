@@ -1,6 +1,8 @@
 import { MpvPlayerView } from "@ChannelGuide/mpv-player";
+import { Check } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Platform, ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Platform, Text, useWindowDimensions, View } from "react-native";
+import Animated, { FadeIn, SlideInRight, SlideOutLeft, ZoomIn } from "react-native-reanimated";
 
 import { TvPressable as Pressable } from "@/components/tv-pressable";
 
@@ -54,7 +56,6 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
   const [rows, setRows] = useState<Record<string, Auto>>({});
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [inspect, setInspect] = useState<string | null>(null); // tapped test id (debug)
 
   // Report this device + fetch the matrix.
   useEffect(() => {
@@ -228,10 +229,10 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
 
   return (
     <View style={scaled({ flex: 1, backgroundColor: "#060a14", alignItems: "center", justifyContent: "center", padding: 24 })}>
-      <Text style={scaled({ color: "#f1f5f9", fontSize: 26, fontWeight: "800", marginBottom: 18 })}>Checking playback support</Text>
-
-      <View style={{ width: frameW, height: frameH, borderRadius: cs(16), overflow: "hidden", backgroundColor: "#000", borderWidth: 1, borderColor: "rgba(148,163,184,0.2)" }}>
-        {/* Mount the player ONLY while a clip is under test. Nulling `source` between clips (below)
+      {/* The clip actually being decoded — a centered framed "screen". Its size doesn't affect the
+          measurement, just how it looks. */}
+      <View style={{ width: frameW, height: frameH, borderRadius: cs(20), overflow: "hidden", backgroundColor: "#000", borderWidth: 1, borderColor: "rgba(148,163,184,0.16)" }}>
+        {/* Mount the player ONLY while a clip is under test. Nulling `source` between clips (above)
             unmounts it → `deinit` → `mpv_terminate_destroy`, so each clip runs in a FRESH instance
             that is fully destroyed afterward. Cycling one reused instance across 49 clips of mixed
             4K codecs stacks VideoToolbox decoder sessions + surfaces → OOM/freeze (~clip 8). */}
@@ -245,24 +246,53 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
             onError={(e) => ctxRef.current?.onError(e.nativeEvent.message)}
           />
         )}
+        {/* Little "working" spinner in the corner — tv-native mounts the player fresh per clip (black
+            gaps between clips), so unlike tv-web's continuously-playing video it needs an activity cue. */}
         {!done && (
           <View style={scaled({ position: "absolute", right: 12, bottom: 12 })}>
             <ActivityIndicator color={C.accent} />
           </View>
         )}
+        {done && (
+          <Animated.View entering={ZoomIn.springify().damping(18)} style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
+            <View style={{ width: cs(92), height: cs(92), borderRadius: cs(46), backgroundColor: C.accent, alignItems: "center", justifyContent: "center" }}>
+              <Check size={cs(50)} color="#04060c" strokeWidth={3} />
+            </View>
+          </Animated.View>
+        )}
       </View>
 
-      {/* current test chips */}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: cs(8), marginTop: cs(16), maxWidth: frameW, justifyContent: "center" }}>
-        {chips.map((chip, i) => (
-          <View key={i} style={scaled({ backgroundColor: "rgba(148,163,184,0.12)", borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10 })}>
-            <Text style={scaled({ color: "#c3c9d4", fontSize: 13, fontWeight: "600" })}>{chip}</Text>
-          </View>
-        ))}
+      {/* Title */}
+      <View style={{ marginTop: cs(36), alignItems: "center" }}>
+        <Text style={scaled({ color: "#f1f5f9", fontSize: 34, fontWeight: "800" })}>{done ? "Setup complete" : "Setting up your TV"}</Text>
+        <Text style={scaled({ color: "#94a3b8", fontSize: 18, marginTop: 6, textAlign: "center" })}>
+          {done ? "We've measured exactly what your TV plays natively." : "Checking exactly what your TV can play — just a moment."}
+        </Text>
       </View>
 
-      {/* progress */}
-      <View style={{ width: frameW, marginTop: cs(16) }}>
+      {/* The thing being tested — slides in from the right, slides away to the left, per test. */}
+      <View style={{ height: cs(74), marginTop: cs(22), width: frameW, alignItems: "center", justifyContent: "center" }}>
+        {!done && cur && (
+          <Animated.View
+            key={cur.id}
+            entering={SlideInRight.duration(260)}
+            exiting={SlideOutLeft.duration(200)}
+            style={{ alignItems: "center", gap: cs(10) }}
+          >
+            <Text style={scaled({ color: "#f1f5f9", fontSize: 22, fontWeight: "700", textAlign: "center" })}>{cur.diagnostic}</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: cs(8), justifyContent: "center" }}>
+              {chips.map((chip, i) => (
+                <View key={i} style={scaled({ backgroundColor: "rgba(148,163,184,0.14)", borderRadius: 999, paddingVertical: 3, paddingHorizontal: 11 })}>
+                  <Text style={scaled({ color: "#cbd5e1", fontSize: 13, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" })}>{chip}</Text>
+                </View>
+              ))}
+            </View>
+          </Animated.View>
+        )}
+      </View>
+
+      {/* Progress */}
+      <View style={{ width: frameW, marginTop: cs(10) }}>
         <View style={scaled({ height: 8, borderRadius: 999, backgroundColor: "rgba(148,163,184,0.18)", overflow: "hidden" })}>
           <View style={{ height: "100%", width: `${pct}%`, backgroundColor: C.accent, borderRadius: cs(999) }} />
         </View>
@@ -272,45 +302,16 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
         </View>
       </View>
 
-      {/* DEBUG (temporary) — the current clip URL + which tests passed, so we can see whether the
-          mp4/mov clips play (reachability) vs the mkv/avi/webm ones failing (correct on iPadOS). */}
-      {cur && <Text style={{ marginTop: cs(12), fontSize: cs(11), color: "#475569", maxWidth: frameW }} numberOfLines={1}>{getServerUrl()}{cur.url}</Text>}
-      {(() => {
-        const last = tests?.slice(0, idx + 1).reverse().find((t) => rows[t.id]);
-        const err = last ? rows[last.id]?.error : undefined;
-        return err ? <Text style={{ fontSize: cs(11), color: "#f0a92a", maxWidth: frameW, marginTop: cs(2) }} numberOfLines={1}>last error: {err}</Text> : null;
-      })()}
-      <View style={{ width: frameW, marginTop: cs(8), flexDirection: "row", flexWrap: "wrap", gap: cs(4) }}>
-        {tests?.map((t) => {
-          const r = rows[t.id];
-          const color = !r ? "#334155" : r.decoded ? "#3fa66a" : "#7c2d2d";
-          return (
-            <Pressable key={t.id} onPress={() => setInspect(t.id)} style={scaled({ backgroundColor: color, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 3, borderWidth: inspect === t.id ? 1 : 0, borderColor: "#fff" })}>
-              <Text style={scaled({ fontSize: 9, color: "#e6eaf1" })}>{t.container}/{t.video}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {/* tapped-chip detail (debug) */}
-      {inspect && (() => {
-        const t = tests?.find((x) => x.id === inspect);
-        const r = t ? rows[t.id] : undefined;
-        if (!t) return null;
-        return (
-          <View style={{ width: frameW, marginTop: cs(10), padding: cs(12), borderRadius: cs(10), backgroundColor: "rgba(148,163,184,0.08)" }}>
-            <Text style={scaled({ color: "#e6eaf1", fontSize: 13, fontWeight: "700" })}>{t.id}</Text>
-            <Text style={scaled({ color: "#94a3b8", fontSize: 12, marginTop: 2 })}>container {t.container} · video {t.video} · audio {t.audio}{t.feature ? ` · ${t.feature}` : ""}</Text>
-            <Text style={scaled({ color: r?.decoded ? "#5cc98a" : "#f0a92a", fontSize: 12, marginTop: 4 })}>{r ? (r.decoded ? `DECODED ${r.decodedWidth}×${r.decodedHeight}${r.audioOk === false ? " · no audio" : r.audioTrackPresent ? " · audio" : ""}` : `FAILED — ${r.error ?? "unknown"}`) : "not tested yet"}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}><Text style={scaled({ color: "#475569", fontSize: 10, marginTop: 4 })}>{getServerUrl()}{t.url}</Text></ScrollView>
-          </View>
-        );
-      })()}
-
       {done && (
-        <Pressable onPress={finish} style={scaled({ marginTop: 30, borderRadius: 14, backgroundColor: C.accent, paddingHorizontal: 44, paddingVertical: 14 })}>
-          <Text style={scaled({ color: "#04060c", fontSize: 18, fontWeight: "700" })}>Continue</Text>
-        </Pressable>
+        // The sole action once the run finishes — a static white halo marks it focused (the key-layer
+        // routes OK/select here via `finish`), mirroring tv-web's always-on focus outline.
+        <Animated.View entering={FadeIn.delay(150)} style={{ marginTop: cs(34) }}>
+          <View style={{ borderRadius: cs(18), borderWidth: cs(3), borderColor: "rgba(255,255,255,0.85)", padding: cs(4) }}>
+            <Pressable onPress={finish} style={scaled({ borderRadius: 14, backgroundColor: C.accent, paddingHorizontal: 44, paddingVertical: 14 })}>
+              <Text style={scaled({ color: "#04060c", fontSize: 18, fontWeight: "700" })}>Continue</Text>
+            </Pressable>
+          </View>
+        </Animated.View>
       )}
     </View>
   );
