@@ -103,6 +103,7 @@ export function FullChrome({
           remaining={status.bumperRemaining}
           total={status.bumperTotal}
           accent={accent}
+          paused={status.paused}
         />
       )}
 

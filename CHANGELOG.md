@@ -2,6 +2,20 @@
 
 All notable changes to ChannelGuide are documented here.
 
+## [0.9.51] - 2026-08-07
+
+### Fixed
+
+- **Bumper: pausing the channel now pauses the ambient music and the countdown donut (tv-web + tv-native).**
+  When a bumper was on screen and you paused, the countdown ring kept draining and the music kept playing (the
+  channel itself paused fine, and resuming re-synced correctly). The player *does* freeze the bumper clock on
+  pause, but two consumers ran their own clocks and weren't told: the donut (`bumper-card`) runs a smooth local
+  wall-clock whose reconcile only fires when `remaining` changes — frozen while paused, so it kept ticking — and
+  `use-bumper-music` took no paused state, so the `<audio>` / `mpvAudio` bed only stopped on teardown. Both now
+  receive `status.paused`: the bed pauses/resumes with the channel (and the fade freezes), and the donut pins its
+  local clock while paused. Covers the full-screen and mini/docked bumper on both apps. (tv-native ships in the
+  next device build.)
+
 ## [0.9.50] - 2026-08-07
 
 ### Changed

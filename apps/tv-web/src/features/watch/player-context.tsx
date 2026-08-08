@@ -246,6 +246,7 @@ function PlayerHost({
     elapsed: player.status.bumperElapsed,
     total: player.status.bumperTotal,
     bumperKey: player.status.bumperKey,
+    paused: player.status.paused,
   });
 
   // Release the CH▲/▼ in-flight lock once THIS channel is actually showing content (program or
@@ -315,6 +316,7 @@ function PlayerHost({
           total={player.status.bumperTotal}
           accent={accent}
           compact
+          paused={player.status.paused}
         />
       )}
 

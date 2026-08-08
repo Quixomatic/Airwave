@@ -48,17 +48,22 @@ export function useBumperMusic({
   elapsed,
   total,
   bumperKey,
+  paused = false,
 }: {
   active: boolean;
   elapsed: number | null;
   total: number | null;
   bumperKey: string | null;
+  /** When the channel is paused, the bed pauses with it. */
+  paused?: boolean;
 }) {
   const cfgRef = useRef<BumperMusic | null>(null);
   const audioTimeRef = useRef(0); // latest mpv audio position (from onProgress)
   const audioDurRef = useRef(0); // latest mpv audio duration (from onProgress)
   const lastVolRef = useRef(-1);
   const lastElapsedRef = useRef<number | null>(null);
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
 
   // Settings + track pool, fetched once for the session.
   useEffect(() => {
@@ -95,7 +100,8 @@ export function useBumperMusic({
       await mpvAudio.load(`${getServerUrl()}${track.url}`);
       await mpvAudio.setLoop(true);
       await mpvAudio.setVolume(0); // start silent; the reconcile below fades it in
-      await mpvAudio.play();
+      // If the channel is paused when the bumper starts, stay paused.
+      if (!pausedRef.current) await mpvAudio.play();
     })();
 
     return () => {
@@ -103,6 +109,13 @@ export function useBumperMusic({
       void mpvAudio.stop();
     };
   }, [active, bumperKey]);
+
+  // Pause/resume the bed with the channel.
+  useEffect(() => {
+    if (!active || !bumperKey) return;
+    if (paused) void mpvAudio.pause();
+    else void mpvAudio.play();
+  }, [paused, active, bumperKey]);
 
   // Reconcile on each player tick (and on scrub): drive volume + position from the bumper's timeline
   // position. Volume is the elapsed-derived target (fade in at start, full middle, fade out at end); each

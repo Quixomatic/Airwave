@@ -191,6 +191,7 @@ function PlayerHost({
     elapsed: status.bumperElapsed,
     total: status.bumperTotal,
     bumperKey: status.bumperKey,
+    paused: status.paused,
   });
 
   // Release the CH▲/▼ lock once this channel is actually showing content.
@@ -239,7 +240,7 @@ function PlayerHost({
 
       {/* bumper interstitial — full (blurred art + big title + donut) or compact (mini feed) */}
       {status.state === "bumper" && status.guide && channelId && (
-        <BumperCard channelId={channelId} guide={status.guide} remaining={status.bumperRemaining} total={status.bumperTotal} accent={accent} compact={!full} />
+        <BumperCard channelId={channelId} guide={status.guide} remaining={status.bumperRemaining} total={status.bumperTotal} accent={accent} compact={!full} paused={status.paused} />
       )}
 
       {status.loading && status.state !== "bumper" && (

@@ -75,6 +75,7 @@ export function BumperCard({
   total,
   accent,
   compact = false,
+  paused = false,
 }: {
   channelId: string;
   guide: GuideMeta | null;
@@ -85,6 +86,9 @@ export function BumperCard({
   total?: number | null;
   accent: string;
   compact?: boolean;
+  /** When the channel is paused, freeze the countdown (the player freezes bumperRemaining; the donut's local
+   *  clock must hold too, or it keeps draining off wall-clock). */
+  paused?: boolean;
 }) {
   const isEpisode = !!guide?.showTitle && guide?.season != null && guide?.episode != null;
   const heading = isEpisode ? guide?.showTitle : guide?.title;
@@ -97,6 +101,10 @@ export function BumperCard({
   // correct fraction — falls back to the largest remaining seen only when `total` isn't provided.
   const endRef = useRef(Date.now() + (remaining ?? 0) * 1000);
   const totalRef = useRef(Math.max(1, total ?? remaining ?? 0));
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  // Remaining-ms captured at the moment of pause, so the local clock holds there instead of draining.
+  const heldRef = useRef(0);
   const [sec, setSec] = useState(remaining ?? 0);
   const [frac, setFrac] = useState(1);
   useEffect(() => {
@@ -107,8 +115,14 @@ export function BumperCard({
     if (total != null && total > 0) totalRef.current = total;
     else if (remaining > totalRef.current) totalRef.current = remaining;
   }, [remaining, total]);
+  // Capture where the countdown is when a pause begins.
+  useEffect(() => {
+    if (paused) heldRef.current = Math.max(0, endRef.current - Date.now());
+  }, [paused]);
   useEffect(() => {
     const tick = () => {
+      // Paused: keep the end-time pinned `heldRef` ahead of now, so remaining/fraction hold steady.
+      if (pausedRef.current) endRef.current = Date.now() + heldRef.current;
       const remS = Math.max(0, (endRef.current - Date.now()) / 1000);
       setSec(Math.ceil(remS));
       setFrac(totalRef.current > 0 ? remS / totalRef.current : 0);

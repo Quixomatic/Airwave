@@ -48,15 +48,20 @@ export function useBumperMusic({
   elapsed,
   total,
   bumperKey,
+  paused = false,
 }: {
   active: boolean;
   elapsed: number | null;
   total: number | null;
   bumperKey: string | null;
+  /** When the channel is paused, the bed pauses with it (and the fade freezes). */
+  paused?: boolean;
 }) {
   const cfgRef = useRef<BumperMusic | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const durRef = useRef<number | null>(null);
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
   // The last authoritative position from the player's 500ms tick, timestamped so the rAF loop can
   // interpolate between ticks for a smooth 60fps fade.
   const posRef = useRef<{ elapsed: number; total: number; ts: number } | null>(null);
@@ -92,8 +97,8 @@ export function useBumperMusic({
     };
     audio.addEventListener("loadedmetadata", onMeta);
     // Autoplay is allowed — the user tuned in (a keypress) and the page is already producing audio; a rare
-    // block is caught and simply stays silent.
-    void audio.play().catch(() => {});
+    // block is caught and simply stays silent. If the channel is paused when the bumper starts, stay paused.
+    if (!pausedRef.current) void audio.play().catch(() => {});
 
     return () => {
       audio.removeEventListener("loadedmetadata", onMeta);
@@ -103,6 +108,15 @@ export function useBumperMusic({
       durRef.current = null;
     };
   }, [active, bumperKey]);
+
+  // Pause/resume the bed with the channel. (The audio element is created in the effect above; this just
+  // toggles its playback so a paused channel doesn't keep the music going.)
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (paused) audio.pause();
+    else void audio.play().catch(() => {});
+  }, [paused, active, bumperKey]);
 
   // Reconcile on each player tick: record the authoritative position (for the rAF loop to interpolate from)
   // and, on a real DVR scrub, snap the audio position to match `elapsed % trackDuration`.
@@ -130,7 +144,8 @@ export function useBumperMusic({
       const audio = audioRef.current;
       const cfg = cfgRef.current;
       const pos = posRef.current;
-      if (audio && cfg && pos) {
+      // While paused, freeze the fade — don't interpolate volume off wall-clock (the audio is paused anyway).
+      if (audio && cfg && pos && !pausedRef.current) {
         const target = Math.max(0, Math.min(1, cfg.volume / 100));
         const local = Math.max(0, Math.min(pos.total, pos.elapsed + (performance.now() - pos.ts) / 1000));
         audio.volume = bumperVolume(local, pos.total, cfg.fadeInMs, cfg.fadeOutMs, target);
