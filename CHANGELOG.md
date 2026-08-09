@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.55] - 2026-08-09
+
+### Fixed
+
+- **Build fix: sync the lockfile to the rebranded react-native-tvos patch.** The v0.9.54 rebrand also renamed the
+  comment labels inside `patches/react-native-tvos@0.83.6-0.patch` (`[ChannelGuide patch]` → `[Airwave patch]`),
+  which changes the patch content-hash — but that edit happened AFTER the `pnpm install`, so the committed
+  lockfile kept the old `patch_hash`, and `pnpm install --frozen-lockfile` failed on both EAS and the Docker
+  build (`ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`). Regenerated the lockfile so its `patch_hash` for
+  `react-native-tvos@0.83.6-0` matches the (kept, rebranded) patch; `--frozen-lockfile` now passes. Patch-hash
+  propagation only — no dependency versions changed, no functional change.
+
 ## [0.9.54] - 2026-08-09
 
 ### Changed — rebrand ChannelGuide → Airwave
