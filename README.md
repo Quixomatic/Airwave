@@ -239,10 +239,18 @@ On the roadmap / in progress:
 
 ## AI features (optional)
 
-Airwave includes an **optional** AI assistant that can draft channel lineups from a prompt. It is **disabled by
-default** (`WORKFLOW_ENABLED` off), requires **your own** provider API key, and is completely separable — none of
-the core product (channels, scheduling, playback, apps) depends on it, and with it off nothing is sent anywhere.
-It's a convenience for authoring, not a dependency.
+Airwave has an **optional** AI assistant for authoring channels — and it's genuinely optional: none of the core
+product (channels, scheduling, playback, apps) depends on it, and **nothing is sent to any AI provider unless you
+set one up**.
+
+- **The assistant/chat** activates only when an admin adds an **AI connection** in the admin — *your* provider
+  and *your* API key (Anthropic, OpenAI, Google, or any OpenAI-compatible endpoint). No connection → no
+  assistant, and no external calls.
+- The heavier **durable workflows** — the multi-agent AI *lineup generator* and the *lineup import/export*
+  engine — additionally require `WORKFLOW_ENABLED=1` (off by default). This flag gates the workflow engine
+  itself, not the chat.
+
+Bring-your-own-key, opt-in, and fully separable — a convenience for authoring, not a dependency.
 
 ---
 
