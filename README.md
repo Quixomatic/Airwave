@@ -8,8 +8,9 @@ favorite show — and streams them to a proper 10-foot TV app with a channel gui
 tune-in. Think Pluto TV or an old cable box, but every channel is **yours**, running on **your** hardware, from
 **your** library.
 
-It's free, self-hosted, and there's nothing to sign up for — you run the server, you point it at your media
-server, you make channels.
+The whole system is free and open to self-host — run the server, point it at your media server, make channels.
+It's yours to change and tinker with. The only paid thing is the *optional* convenience of the prebuilt
+Apple TV / iPad apps on the App Store — and you're welcome to build and sideload those yourself, too.
 
 > **Status:** actively developed, pre-1.0, and used daily on real hardware (LG webOS TV, Apple TV 4K, TrueNAS).
 > See [Project status](#project-status) for what's solid vs. in progress.
@@ -22,6 +23,20 @@ SCREENSHOTS — add real ones before/at launch (drop them in docs/screenshots/ a
 -->
 
 ---
+
+## Why I built this
+
+I built Airwave for myself — to bring back the feeling of flipping on live cable TV as a kid, and to set up
+channels of good content for my own kid to grow up with. I self-host it, I use it every day, and I plan to keep
+maintaining it for many years.
+
+It's yours to run and tinker with. The server, admin UI, and web/browser TV app are free and open — **change
+whatever you want, that's encouraged.** You're welcome to modify the native TV apps and build/sideload your own
+copies too, and **contributions and PRs are very welcome** — I'm happy to take improvements.
+
+The one thing I ask — and the one thing the license draws a line around — is: **please don't repost my apps to the
+app stores as your own.** The prebuilt, published Apple TV / iPad apps are a small paid download to hedge the time
+and effort I've put in, for folks who just want to grab it and go. Everything else is free. (See [License](#license).)
 
 ## What it does
 
@@ -256,7 +271,20 @@ Bring-your-own-key, opt-in, and fully separable — a convenience for authoring,
 
 ## License
 
-Not yet chosen — a license will be added before the repository is made public. Until then, all rights reserved.
+Airwave is **source-available** under the [PolyForm Perimeter License 1.0.1](./LICENSE). In plain terms: use it,
+self-host it, change it, and build your own copies freely — for **any purpose except providing a product that
+competes with Airwave** (which includes republishing/reselling the apps or offering a competing hosted service).
+
+| ✅ You can | ❌ You can't |
+|---|---|
+| Self-host the whole thing (server, admin, web/browser TV) — free | Repost/republish the apps to an app store (Apple / Google / LG) |
+| Read, modify, and change **any** part — encouraged | Sell it, or offer it as a paid product/download |
+| Build & sideload your own apps, with your own tweaks | Offer a hosted service that substitutes for Airwave |
+| Use it for any purpose — personal, family, or business self-host | Remove the copyright / required-notice line |
+| Open pull requests — contributions are welcome | — |
+
+As the copyright holder, I publish the official prebuilt apps myself (a small paid convenience on the App Store).
+This isn't legal advice — the [LICENSE](./LICENSE) is the authoritative text.
 
 ---
 
