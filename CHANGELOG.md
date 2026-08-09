@@ -2,7 +2,7 @@
 
 All notable changes to Airwave are documented here.
 
-## [0.10.0] - 2026-08-09
+## [0.9.54] - 2026-08-09
 
 ### Changed — rebrand ChannelGuide → Airwave
 
