@@ -1,11 +1,11 @@
 ---
 name: version-bump
-description: Cut a new ChannelGuide release — bump every shippable app package.json in lockstep, write a CHANGELOG.md entry, commit with the changelog entry as the commit body, and push.
+description: Cut a new Airwave release — bump every shippable app package.json in lockstep, write a CHANGELOG.md entry, commit with the changelog entry as the commit body, and push.
 ---
 
 # Version Bump
 
-Cuts a new release of ChannelGuide: bumps every shippable `apps/*` `package.json` in
+Cuts a new release of Airwave: bumps every shippable `apps/*` `package.json` in
 lockstep, writes a `CHANGELOG.md` entry, commits with the changelog entry as the message
 body, and pushes. Ported from the BasicTimeTracker / OpenServe golden-standard flow.
 

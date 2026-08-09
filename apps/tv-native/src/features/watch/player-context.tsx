@@ -1,4 +1,4 @@
-import { MpvPlayerView } from "@ChannelGuide/mpv-player";
+import { MpvPlayerView } from "@airwave/mpv-player";
 import { Maximize2, X } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";

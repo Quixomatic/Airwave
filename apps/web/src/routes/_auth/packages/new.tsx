@@ -1,14 +1,14 @@
-import { Button } from "@ChannelGuide/ui/components/button";
+import { Button } from "@airwave/ui/components/button";
 import {
   Frame,
   FrameDescription,
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@ChannelGuide/ui/components/frame";
-import { Input } from "@ChannelGuide/ui/components/input";
-import { Label } from "@ChannelGuide/ui/components/label";
-import { Textarea } from "@ChannelGuide/ui/components/textarea";
+} from "@airwave/ui/components/frame";
+import { Input } from "@airwave/ui/components/input";
+import { Label } from "@airwave/ui/components/label";
+import { Textarea } from "@airwave/ui/components/textarea";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { LayoutGrid, Loader2 } from "lucide-react";
 import { useState } from "react";

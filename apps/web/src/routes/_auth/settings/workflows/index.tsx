@@ -11,7 +11,7 @@ import {
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@ChannelGuide/ui/components/frame";
+} from "@airwave/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronRight, DownloadCloud, Workflow } from "lucide-react";

@@ -1,5 +1,5 @@
 # ============================================================================
-#  ChannelGuide — self-host stack (Dockge / docker compose)
+#  Airwave — self-host stack (Dockge / docker compose)
 #
 #  One image, run three ways: Postgres, the API `server`, and the admin `web`
 #  (server + web are the SAME image, selected by CG_ROLE). Copy .env.example to
@@ -32,7 +32,7 @@ services:
       retries: 10
 
   server:
-    image: ${CG_IMAGE:-ghcr.io/quixomatic/channelguide:latest}
+    image: ${CG_IMAGE:-ghcr.io/quixomatic/airwave:latest}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -84,7 +84,7 @@ services:
       start_period: 60s
 
   web:
-    image: ${CG_IMAGE:-ghcr.io/quixomatic/channelguide:latest}
+    image: ${CG_IMAGE:-ghcr.io/quixomatic/airwave:latest}
     restart: unless-stopped
     depends_on:
       server:
@@ -112,7 +112,7 @@ services:
   # by adding `tvweb` to COMPOSE_PROFILES in .env, and set TV_WEB_PUBLIC_URL (that address is also
   # allow-listed on the server as TV_APP_ORIGIN for the TV login flow).
   tvweb:
-    image: ${CG_IMAGE:-ghcr.io/quixomatic/channelguide:latest}
+    image: ${CG_IMAGE:-ghcr.io/quixomatic/airwave:latest}
     restart: unless-stopped
     profiles: ["tvweb"]
     depends_on:

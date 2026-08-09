@@ -14,18 +14,18 @@
  * Durability: `"use workflow"` is the deterministic orchestrator (no I/O); `"use step"` is the actual
  * work (retried, checkpointed). After editing this file you MUST re-run `bunx workflow build`.
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 import { getStepMetadata, getWorkflowMetadata } from "workflow";
 
-import type { ChannelImportResult, ChannelPlan, ImportPlan } from "@ChannelGuide/api/services/transfer/import";
+import type { ChannelImportResult, ChannelPlan, ImportPlan } from "@airwave/api/services/transfer/import";
 import {
   executeChannelPlan,
   executePackagePlan,
   loadResolveSource,
   planImport,
-} from "@ChannelGuide/api/services/transfer/import";
-import type { ImportRunArgs } from "@ChannelGuide/api/services/transfer/import-runner";
-import { recordImportTrace } from "@ChannelGuide/api/services/transfer/import-trace";
+} from "@airwave/api/services/transfer/import";
+import type { ImportRunArgs } from "@airwave/api/services/transfer/import-runner";
+import { recordImportTrace } from "@airwave/api/services/transfer/import-trace";
 
 /** Schedule generation (~30s/channel) is the slow step, so keep the fan-out modest. */
 const BUILD_CONCURRENCY = 4;

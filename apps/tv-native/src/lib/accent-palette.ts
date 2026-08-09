@@ -1,5 +1,5 @@
 /**
- * The channel/package accent palette — ported verbatim from `@ChannelGuide/ui/lib/accent-palette`
+ * The channel/package accent palette — ported verbatim from `@airwave/ui/lib/accent-palette`
  * (pure data, no React, explicitly shared between the admin and TV apps). Copied here for now;
  * a later `client-core` package is the natural home to dedupe it with tv-web.
  *

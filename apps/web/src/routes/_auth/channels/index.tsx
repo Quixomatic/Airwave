@@ -1,5 +1,5 @@
-import { AccentIconTile } from "@ChannelGuide/ui/components/accent-icon-tile";
-import { Button } from "@ChannelGuide/ui/components/button";
+import { AccentIconTile } from "@airwave/ui/components/accent-icon-tile";
+import { Button } from "@airwave/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,17 +12,17 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@ChannelGuide/ui/components/dropdown-menu";
+} from "@airwave/ui/components/dropdown-menu";
 import {
   Frame,
   FrameDescription,
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@ChannelGuide/ui/components/frame";
-import { Input } from "@ChannelGuide/ui/components/input";
-import { Skeleton } from "@ChannelGuide/ui/components/skeleton";
-import { Switch } from "@ChannelGuide/ui/components/switch";
+} from "@airwave/ui/components/frame";
+import { Input } from "@airwave/ui/components/input";
+import { Skeleton } from "@airwave/ui/components/skeleton";
+import { Switch } from "@airwave/ui/components/switch";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";

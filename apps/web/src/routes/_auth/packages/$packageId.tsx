@@ -1,16 +1,16 @@
-import { AccentIconTile } from "@ChannelGuide/ui/components/accent-icon-tile";
-import { Button } from "@ChannelGuide/ui/components/button";
+import { AccentIconTile } from "@airwave/ui/components/accent-icon-tile";
+import { Button } from "@airwave/ui/components/button";
 import {
   Frame,
   FrameDescription,
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@ChannelGuide/ui/components/frame";
-import { Input } from "@ChannelGuide/ui/components/input";
-import { Label } from "@ChannelGuide/ui/components/label";
-import { Switch } from "@ChannelGuide/ui/components/switch";
-import { Textarea } from "@ChannelGuide/ui/components/textarea";
+} from "@airwave/ui/components/frame";
+import { Input } from "@airwave/ui/components/input";
+import { Label } from "@airwave/ui/components/label";
+import { Switch } from "@airwave/ui/components/switch";
+import { Textarea } from "@airwave/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { LayoutGrid, Loader2, Tv } from "lucide-react";

@@ -1,7 +1,7 @@
 /**
  * Which of the media server's Plex connections THIS device can reach.
  *
- * The ChannelGuide server always talks to Plex over its LAN `baseUrl`, but the TV app streams
+ * The Airwave server always talks to Plex over its LAN `baseUrl`, but the TV app streams
  * DIRECTLY from Plex — so a TV away from home needs the remote/relay URL instead of the LAN one.
  * At launch we fetch the candidates from `/api/v1/connections` and probe them local → remote →
  * relay, remembering the first reachable one on the device (like the server URL). The api client

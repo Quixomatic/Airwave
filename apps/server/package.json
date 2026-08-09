@@ -1,6 +1,6 @@
 {
   "name": "server",
-  "version": "0.9.53",
+  "version": "0.10.0",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
@@ -14,10 +14,10 @@
     "workflow:ui": "bun --env-file=.env run scripts/workflow-ui.ts"
   },
   "dependencies": {
-    "@ChannelGuide/api": "workspace:*",
-    "@ChannelGuide/auth": "workspace:*",
-    "@ChannelGuide/db": "workspace:*",
-    "@ChannelGuide/env": "workspace:*",
+    "@airwave/api": "workspace:*",
+    "@airwave/auth": "workspace:*",
+    "@airwave/db": "workspace:*",
+    "@airwave/env": "workspace:*",
     "@hono/trpc-server": "^0.4.2",
     "@trpc/server": "catalog:",
     "@workflow/world-postgres": "4.3.0",
@@ -28,7 +28,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@ChannelGuide/config": "workspace:*",
+    "@airwave/config": "workspace:*",
     "@swc/core": "1.15.3",
     "@types/bun": "catalog:",
     "@workflow/swc-plugin": "4.1.1",

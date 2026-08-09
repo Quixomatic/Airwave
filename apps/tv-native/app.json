@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "ChannelGuide",
-    "slug": "channelguide",
-    "version": "0.9.53",
-    "scheme": "channelguide",
+    "name": "Airwave",
+    "slug": "airwave",
+    "version": "0.10.0",
+    "scheme": "airwave",
     "orientation": "landscape",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#060a14",
@@ -14,9 +14,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.channelguide.tv",
+      "bundleIdentifier": "com.airwave.tv",
       "infoPlist": {
-        "CFBundleDisplayName": "Airwave",
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
@@ -24,7 +23,7 @@
       }
     },
     "android": {
-      "package": "com.channelguide.tv",
+      "package": "com.airwave.tv",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icons/android-adaptive-fg.png",
         "backgroundImage": "./assets/icons/android-adaptive-bg.png",
@@ -34,7 +33,6 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "./plugins/with-android-app-name.js",
       [
         "@react-native-tvos/config-tv",
         {
@@ -52,7 +50,7 @@
           }
         }
       ],
-      "@ChannelGuide/mpv-player",
+      "@airwave/mpv-player",
       [
         "expo-build-properties",
         {
@@ -69,7 +67,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "49e8c4ad-45d5-4dbc-a3c8-0b99297fbc00"
+        "projectId": "87ed2fd1-1001-4479-bb16-ca7315c82d90"
       }
     },
     "owner": "quixomatic"

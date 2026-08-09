@@ -1,4 +1,4 @@
-import { Prisma, type PrismaClient } from "@ChannelGuide/db";
+import { Prisma, type PrismaClient } from "@airwave/db";
 
 import { toAccentKey } from "../accents";
 import { normalizeCallsign } from "../generator/callsign";

@@ -19,7 +19,7 @@ const NETWORK_LABEL: Record<Network, string> = {
 };
 
 /**
- * /settings/server — the connected ChannelGuide server and how this TV reaches Plex.
+ * /settings/server — the connected Airwave server and how this TV reaches Plex.
  * (These used to live on About, which made no sense — About is app identity.)
  */
 export const Route = createFileRoute("/_auth/settings/server")({
@@ -80,7 +80,7 @@ function ServerSettings() {
 
   return (
     <div>
-      <PageHeader title="Server" subtitle="The ChannelGuide server this TV is signed in to." />
+      <PageHeader title="Server" subtitle="The Airwave server this TV is signed in to." />
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 28, padding: "16px 22px", borderRadius: 14, background: "rgba(148,163,184,0.06)", marginBottom: 8 }}>
         <Info label="Address" value={SERVER_URL || "Not connected"} />
@@ -116,7 +116,7 @@ function ServerSettings() {
               : "Press OK again to sign out and return to server setup"
             : baked
               ? "Sign this TV out — the server address is fixed by this deployment"
-              : "Sign out and pick a different ChannelGuide server"
+              : "Sign out and pick a different Airwave server"
         }
         focused={sel === 2}
         right={armChange ? <Pill tone="warn">Confirm</Pill> : undefined}

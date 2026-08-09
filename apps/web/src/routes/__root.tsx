@@ -1,4 +1,4 @@
-import { Toaster } from "@ChannelGuide/ui/components/sonner";
+import { Toaster } from "@airwave/ui/components/sonner";
 import type { QueryClient } from "@tanstack/react-query";
 import { HeadContent, Outlet, createRootRouteWithContext } from "@tanstack/react-router";
 
@@ -17,7 +17,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
   head: () => ({
     meta: [
       {
-        title: "ChannelGuide",
+        title: "Airwave",
       },
       {
         name: "description",

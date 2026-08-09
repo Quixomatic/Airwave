@@ -1,12 +1,12 @@
-import { pollPlexLink, startPlexLink } from "@ChannelGuide/api/services/auth/tv-plex-link";
-import prisma from "@ChannelGuide/db";
+import { pollPlexLink, startPlexLink } from "@airwave/api/services/auth/tv-plex-link";
+import prisma from "@airwave/db";
 import { Hono } from "hono";
 
 /**
  * TV device-code login endpoints (Plex `plex.tv/link` flow). Mounted at
  * `/api/tv/auth` — UNAUTHENTICATED, because these *establish* the session the
  * TV then carries as a bearer token to `/api/v1`. See
- * `@ChannelGuide/api/services/auth/tv-plex-link`.
+ * `@airwave/api/services/auth/tv-plex-link`.
  */
 const tvAuth = new Hono();
 

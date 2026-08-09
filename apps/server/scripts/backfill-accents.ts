@@ -13,9 +13,9 @@
  *  - MANUAL channels (generated=false): preserve intent — map an existing tint token → key; leave a
  *    null (package-inherited) channel null. We never impose the variance cycle on a hand-made channel.
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
-import { channelAccentAt, toAccentKey } from "@ChannelGuide/api/services/accents";
+import { channelAccentAt, toAccentKey } from "@airwave/api/services/accents";
 
 async function main() {
   const write = process.argv.includes("--write");

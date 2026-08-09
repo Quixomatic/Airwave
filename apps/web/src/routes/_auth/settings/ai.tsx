@@ -1,9 +1,9 @@
-import { Badge } from "@ChannelGuide/ui/components/badge";
-import { Button } from "@ChannelGuide/ui/components/button";
-import { Frame, FrameHeader, FramePanel, FrameTitle } from "@ChannelGuide/ui/components/frame";
-import { Input } from "@ChannelGuide/ui/components/input";
-import { Label } from "@ChannelGuide/ui/components/label";
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@ChannelGuide/ui/components/select";
+import { Badge } from "@airwave/ui/components/badge";
+import { Button } from "@airwave/ui/components/button";
+import { Frame, FrameHeader, FramePanel, FrameTitle } from "@airwave/ui/components/frame";
+import { Input } from "@airwave/ui/components/input";
+import { Label } from "@airwave/ui/components/label";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@airwave/ui/components/select";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { CheckCircle2, Loader2, Pencil, Plug, Trash2, XCircle } from "lucide-react";

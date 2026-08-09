@@ -1,5 +1,5 @@
 {
-  "name": "ChannelGuide",
+  "name": "Airwave",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -12,20 +12,20 @@
     "check-types": "turbo run check-types",
     "dev:web": "turbo run dev -F web",
     "dev:server": "turbo run dev -F server",
-    "db:push": "turbo run db:push -F @ChannelGuide/db",
-    "db:studio": "turbo run db:studio -F @ChannelGuide/db",
-    "db:generate": "turbo run db:generate -F @ChannelGuide/db",
-    "db:migrate": "turbo run db:migrate -F @ChannelGuide/db",
+    "db:push": "turbo run db:push -F @airwave/db",
+    "db:studio": "turbo run db:studio -F @airwave/db",
+    "db:generate": "turbo run db:generate -F @airwave/db",
+    "db:migrate": "turbo run db:migrate -F @airwave/db",
     "workflow:build": "turbo run workflow:build -F server",
     "workflow:ui": "turbo run workflow:ui -F server"
   },
   "dependencies": {
-    "@ChannelGuide/env": "workspace:*",
+    "@airwave/env": "workspace:*",
     "dotenv": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@ChannelGuide/config": "workspace:*",
+    "@airwave/config": "workspace:*",
     "@types/bun": "catalog:",
     "turbo": "^2.10.2",
     "typescript": "catalog:"

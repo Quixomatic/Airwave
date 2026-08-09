@@ -1,8 +1,8 @@
 /* The shared base-lyra design system (same as the admin) — tokens, Inter,
    shadcn component styles. `pnpm dlx shadcn add <c>` drops components into
-   @ChannelGuide/ui/components per components.json. Lightning CSS lowers its
+   @airwave/ui/components per components.json. Lightning CSS lowers its
    oklch/color-mix for the C2's Chromium 108 (see vite.config + [[feedback-tv-css-chromium108]]). */
-@import "@ChannelGuide/ui/globals.css";
+@import "@airwave/ui/globals.css";
 
 /* The TV app is always dark + 10-foot. The <html> carries `class="dark"` (index.html)
    so base-lyra's dark tokens apply. Canvas = the Aurora design (.docs/tv-design-spec.md). */

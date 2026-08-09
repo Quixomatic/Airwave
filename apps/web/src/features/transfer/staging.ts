@@ -1,4 +1,4 @@
-import type { AppRouter } from "@ChannelGuide/api/routers/index";
+import type { AppRouter } from "@airwave/api/routers/index";
 import type { inferRouterOutputs } from "@trpc/server";
 
 export type ImportPreview = inferRouterOutputs<AppRouter>["transfer"]["importPreview"];

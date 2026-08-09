@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 import { tool } from "ai";
 import { z } from "zod";
 

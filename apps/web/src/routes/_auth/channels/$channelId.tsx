@@ -1,18 +1,18 @@
-import { Button } from "@ChannelGuide/ui/components/button";
+import { Button } from "@airwave/ui/components/button";
 import {
   Frame,
   FrameDescription,
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@ChannelGuide/ui/components/frame";
+} from "@airwave/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Loader2, Tv } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { AccentIconTile } from "@ChannelGuide/ui/components/accent-icon-tile";
+import { AccentIconTile } from "@airwave/ui/components/accent-icon-tile";
 
 import { useBreadcrumb } from "@/context/breadcrumb-provider";
 import { HeaderLeft, HeaderRight, TopHeaderRight } from "@/context/header-provider";

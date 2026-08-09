@@ -5,10 +5,10 @@
  *
  *   bun --env-file=.env run scripts/sim-title.ts "Anastasia"
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
-import { getDeviceNativeCaps } from "@ChannelGuide/api/services/capabilities/native-caps";
-import { getPlaybackInfo } from "@ChannelGuide/api/services/plex/client";
+import { getDeviceNativeCaps } from "@airwave/api/services/capabilities/native-caps";
+import { getPlaybackInfo } from "@airwave/api/services/plex/client";
 
 async function probe(url: string) {
   const ctrl = new AbortController();

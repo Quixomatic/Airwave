@@ -5,7 +5,7 @@ const {
   createRunOncePlugin,
 } = require("@expo/config-plugins");
 
-const MPV_GRADLE_PROJECT = ":ChannelGuide-mpv-player";
+const MPV_GRADLE_PROJECT = ":Airwave-mpv-player";
 
 const MPVKIT_URL = "https://github.com/edde746/MPVKit";
 const MPVKIT_VERSION = "1.0.12";
@@ -47,7 +47,7 @@ function withMpvkitAppTargetSPM(config) {
     const app = proj.getTarget("com.apple.product-type.application");
     if (!app) {
       throw new Error(
-        "[@ChannelGuide/mpv-player] Could not find the application target to link MPVKit."
+        "[@airwave/mpv-player] Could not find the application target to link MPVKit."
       );
     }
     const nativeTarget = app.target;
@@ -163,7 +163,7 @@ function withMpvAndroidLibcxx(config) {
     if (config.modResults.contents.includes("mpv-player: app-scope libc++")) return config;
     config.modResults.contents += `
 
-// mpv-player: app-scope libc++ — see @ChannelGuide/mpv-player app.plugin.js. libmpv.so needs the
+// mpv-player: app-scope libc++ — see @airwave/mpv-player app.plugin.js. libmpv.so needs the
 // newer libc++_shared.so (std::from_chars<float>); declaring it at project scope makes it win the
 // jniLibs merge over the older copies RN/Reanimated bundle.
 android {

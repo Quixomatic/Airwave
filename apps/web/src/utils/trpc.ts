@@ -1,5 +1,5 @@
-import type { AppRouter } from "@ChannelGuide/api/routers/index";
-import { env } from "@ChannelGuide/env/web";
+import type { AppRouter } from "@airwave/api/routers/index";
+import { env } from "@airwave/env/web";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { createTRPCClient, httpBatchLink, httpLink, splitLink } from "@trpc/client";
 import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";

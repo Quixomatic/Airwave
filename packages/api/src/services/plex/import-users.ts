@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 import { getSharedUsers } from "./client";
 
@@ -9,7 +9,7 @@ type ConnectedSource = {
 };
 
 /**
- * Import the users the admin's Plex server is shared with as ChannelGuide
+ * Import the users the admin's Plex server is shared with as Airwave
  * Viewer accounts (matched by Plex email). Idempotent — existing emails are
  * skipped. Owner-created / env-seeded admins are untouched. This is the
  * explicit "Import Plex Users" action (Overseerr-style), not automatic.

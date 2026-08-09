@@ -1,11 +1,11 @@
 {
-  "extends": "@ChannelGuide/config/tsconfig.base.json",
+  "extends": "@airwave/config/tsconfig.base.json",
   "compilerOptions": {
     "jsx": "react-jsx",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "types": [],
     "paths": {
-      "@ChannelGuide/ui/*": ["./src/*"]
+      "@airwave/ui/*": ["./src/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],

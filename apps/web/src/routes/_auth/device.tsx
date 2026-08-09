@@ -1,6 +1,6 @@
-import { Button } from "@ChannelGuide/ui/components/button";
-import { Card } from "@ChannelGuide/ui/components/card";
-import { Input } from "@ChannelGuide/ui/components/input";
+import { Button } from "@airwave/ui/components/button";
+import { Card } from "@airwave/ui/components/card";
+import { Input } from "@airwave/ui/components/input";
 import { createFileRoute } from "@tanstack/react-router";
 import { Tv } from "lucide-react";
 import { useState } from "react";

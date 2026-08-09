@@ -11,7 +11,7 @@
     "rootDirs": ["."],
     "paths": {
       "@/*": ["./src/*"],
-      "@ChannelGuide/ui/*": ["../../packages/ui/src/*"]
+      "@airwave/ui/*": ["../../packages/ui/src/*"]
     }
   }
 }

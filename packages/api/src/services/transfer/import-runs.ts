@@ -3,7 +3,7 @@
  * `workflow` schema (which Prisma deliberately can't see), so this reads them via raw SQL over the same
  * connection, filtered to our import workflow by name. Mirrors `agent/lineup-runs.ts`.
  */
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 export type ImportRunSummary = {
   runId: string;

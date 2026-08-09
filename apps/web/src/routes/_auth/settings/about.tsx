@@ -4,7 +4,7 @@ import {
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@ChannelGuide/ui/components/frame";
+} from "@airwave/ui/components/frame";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { Logo } from "@/components/logo";
@@ -36,12 +36,12 @@ function SettingsAbout() {
             <dt className="text-muted-foreground">Source</dt>
             <dd>
               <a
-                href="https://github.com/Quixomatic/ChannelGuide"
+                href="https://github.com/Quixomatic/Airwave"
                 target="_blank"
                 rel="noreferrer"
                 className="hover:text-foreground underline"
               >
-                github.com/Quixomatic/ChannelGuide
+                github.com/Quixomatic/Airwave
               </a>
             </dd>
           </dl>

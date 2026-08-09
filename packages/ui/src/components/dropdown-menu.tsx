@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
 
-import { cn } from "@ChannelGuide/ui/lib/utils"
+import { cn } from "@airwave/ui/lib/utils"
 import { CaretRightIcon, CheckIcon } from "@phosphor-icons/react"
 
 function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {

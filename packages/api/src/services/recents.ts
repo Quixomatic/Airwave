@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 /**
  * The user's recently-watched channels — the guide's "Recents" lens.

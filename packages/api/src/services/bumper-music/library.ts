@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 import { getGlobalBumperConfig } from "../bumpers/bumper-config";
 import {

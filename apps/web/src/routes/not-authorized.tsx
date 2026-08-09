@@ -1,4 +1,4 @@
-import { Button } from "@ChannelGuide/ui/components/button";
+import { Button } from "@airwave/ui/components/button";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { LogOut, ShieldAlert } from "lucide-react";
 import { useState } from "react";

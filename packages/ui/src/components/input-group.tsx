@@ -1,9 +1,9 @@
 "use client";
 
-import { Button } from "@ChannelGuide/ui/components/button";
-import { Input } from "@ChannelGuide/ui/components/input";
-import { Textarea } from "@ChannelGuide/ui/components/textarea";
-import { cn } from "@ChannelGuide/ui/lib/utils";
+import { Button } from "@airwave/ui/components/button";
+import { Input } from "@airwave/ui/components/input";
+import { Textarea } from "@airwave/ui/components/textarea";
+import { cn } from "@airwave/ui/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 

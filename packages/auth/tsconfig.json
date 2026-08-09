@@ -1,5 +1,5 @@
 {
-  "extends": "@ChannelGuide/config/tsconfig.base.json",
+  "extends": "@airwave/config/tsconfig.base.json",
   "compilerOptions": {
     "declaration": true,
     "declarationMap": true,

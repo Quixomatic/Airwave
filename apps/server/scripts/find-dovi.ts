@@ -11,9 +11,9 @@
  *
  *   bun --env-file=.env run scripts/find-dovi.ts
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
-import { getLibraries } from "@ChannelGuide/api/services/plex/client";
+import { getLibraries } from "@airwave/api/services/plex/client";
 
 const H = (token: string) => ({ Accept: "application/json", "X-Plex-Token": token });
 

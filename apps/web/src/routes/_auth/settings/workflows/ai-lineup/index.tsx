@@ -9,15 +9,15 @@
  * moved to `/settings/workflows/ai-lineup/$runId`. This page stays a scannable index of
  * what ran, when, and how far it got.
  */
-import { Badge } from "@ChannelGuide/ui/components/badge";
-import { Button } from "@ChannelGuide/ui/components/button";
+import { Badge } from "@airwave/ui/components/badge";
+import { Button } from "@airwave/ui/components/button";
 import {
   Frame,
   FrameDescription,
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@ChannelGuide/ui/components/frame";
+} from "@airwave/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronRight, Loader2, RefreshCw } from "lucide-react";

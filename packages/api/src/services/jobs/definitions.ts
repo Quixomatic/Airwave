@@ -1,4 +1,4 @@
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
 import type { SyncProgress } from "../media/media-item";
 import { getConnectionForRole } from "../agent/config";

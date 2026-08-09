@@ -48,6 +48,6 @@ export default defineConfig({
   format: "esm",
   outDir: "./dist",
   clean: true,
-  noExternal: [/@ChannelGuide\/.*/],
+  noExternal: [/@airwave\/.*/],
   plugins: [workflowClientTransform],
 });

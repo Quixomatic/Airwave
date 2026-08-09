@@ -1,6 +1,6 @@
 import { Checkbox as CheckboxPrimitive } from "@base-ui/react/checkbox"
 
-import { cn } from "@ChannelGuide/ui/lib/utils"
+import { cn } from "@airwave/ui/lib/utils"
 import { CheckIcon } from "@phosphor-icons/react"
 
 function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {

@@ -66,7 +66,7 @@ async function isServer(url: string): Promise<boolean> {
 }
 
 /**
- * Sweep the local /24 for ChannelGuide servers. Reports progress (0..1) as it goes. Returns the base
+ * Sweep the local /24 for Airwave servers. Reports progress (0..1) as it goes. Returns the base
  * URLs found (e.g. "http://192.168.1.50:3000"). Empty if the subnet couldn't be determined or nothing
  * answered.
  */

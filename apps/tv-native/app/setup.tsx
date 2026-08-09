@@ -12,7 +12,7 @@ import { C } from "@/lib/theme";
 
 /**
  * First-launch onboarding — the native port of tv-web's `ServerSetup`. Point the app at a
- * self-hosted ChannelGuide server: scan the LAN or type the address, validate against `/api/health`,
+ * self-hosted Airwave server: scan the LAN or type the address, validate against `/api/health`,
  * store it, and continue to login. Touch-first for iPad; TV D-pad focus comes with the TV targets
  * (the native focus engine handles it — no hand-rolled dispatcher like webOS needed).
  */
@@ -105,7 +105,7 @@ export default function Setup() {
           <Logo width={100} wordmark />
           <Text className="mt-5 text-3xl font-extrabold tracking-tight text-fg">Connect to your server</Text>
           <Text className="mt-2 text-center text-base leading-6 text-muted">
-            Scan your network, or enter the address of your ChannelGuide server — a local IP like{" "}
+            Scan your network, or enter the address of your Airwave server — a local IP like{" "}
             <Text className="font-mono text-[#c3c9d4]">192.168.1.50:3000</Text>, or a domain.
           </Text>
         </View>

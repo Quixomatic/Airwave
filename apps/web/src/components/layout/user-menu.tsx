@@ -9,14 +9,14 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@ChannelGuide/ui/components/dropdown-menu";
+} from "@airwave/ui/components/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@ChannelGuide/ui/components/sidebar";
-import { tintClassesForSeed } from "@ChannelGuide/ui/lib/string-to-tint";
+} from "@airwave/ui/components/sidebar";
+import { tintClassesForSeed } from "@airwave/ui/lib/string-to-tint";
 import { useNavigate } from "@tanstack/react-router";
 import { ChevronsUpDown, LogOut, Monitor, Moon, Sun, User } from "lucide-react";
 

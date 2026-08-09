@@ -1,4 +1,4 @@
-import { Prisma, type PrismaClient } from "@ChannelGuide/db";
+import { Prisma, type PrismaClient } from "@airwave/db";
 
 import { audioQuirks, videoQuirks } from "./codecs";
 import { getMeasuredCaps, readOverrides } from "./native-caps";

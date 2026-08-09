@@ -21,7 +21,7 @@
  * A channel build is seconds-to-minutes, so the coarser granularity costs little, and it
  * avoids taking on `@ai-sdk/workflow` before we need it. Revisit if builds get long.
  */
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 import { generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 

@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 import { type PlexItem, getFilterValues, getSectionItemsRaw } from "./client";
 import { type FilterCondition, type FilterNode, buildParam } from "./filter-fields";

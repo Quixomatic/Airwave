@@ -1,13 +1,13 @@
-import { Button } from "@ChannelGuide/ui/components/button";
+import { Button } from "@airwave/ui/components/button";
 import {
   Frame,
   FrameDescription,
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@ChannelGuide/ui/components/frame";
-import { Switch } from "@ChannelGuide/ui/components/switch";
-import type { AppRouter } from "@ChannelGuide/api/routers/index";
+} from "@airwave/ui/components/frame";
+import { Switch } from "@airwave/ui/components/switch";
+import type { AppRouter } from "@airwave/api/routers/index";
 import type { inferRouterOutputs } from "@trpc/server";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";

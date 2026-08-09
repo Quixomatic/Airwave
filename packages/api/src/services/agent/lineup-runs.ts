@@ -10,7 +10,7 @@
  * counts) is stored as CBOR in `output_cbor`, so decoding it means going through the SDK —
  * the page fetches that per-run via `ai.lineupRun`, which calls `getRun().returnValue`.
  */
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 export type LineupRunSummary = {
   runId: string;

@@ -1,4 +1,4 @@
-import { Prisma, type PrismaClient } from "@ChannelGuide/db";
+import { Prisma, type PrismaClient } from "@airwave/db";
 
 /**
  * Device capability reporting — the data behind the webOS playback probe. A TV

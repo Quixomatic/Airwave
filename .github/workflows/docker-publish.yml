@@ -1,8 +1,8 @@
-# Build + publish the ChannelGuide Docker image to GHCR.
+# Build + publish the Airwave Docker image to GHCR.
 #
 # Triggers:
 #   • push a version tag  → git tag v0.6.30 && git push origin v0.6.30
-#       publishes ghcr.io/quixomatic/channelguide:{0.6.30, 0.6, latest}
+#       publishes ghcr.io/quixomatic/airwave:{0.6.30, 0.6, latest}
 #   • manual (workflow_dispatch) → publishes a :sha-<short> image for testing
 #
 # The image is ONE artifact that runs as either the API server or the admin web
@@ -10,7 +10,7 @@
 # into the build context first (GITHUB_TOKEN has access), then baked in.
 #
 # NOTE: the first publish creates a PRIVATE package. Flip it to public once at
-#   GitHub → Packages → channelguide → Package settings → Change visibility.
+#   GitHub → Packages → airwave → Package settings → Change visibility.
 # Repo visibility is independent — the repo can stay private.
 name: Publish Docker image
 
@@ -25,7 +25,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE: ghcr.io/quixomatic/channelguide
+  IMAGE: ghcr.io/quixomatic/airwave
 
 jobs:
   build-and-push:

@@ -1,5 +1,5 @@
-import { AccentIconTile } from "@ChannelGuide/ui/components/accent-icon-tile";
-import { ACCENT_PALETTE } from "@ChannelGuide/ui/lib/accent-palette";
+import { AccentIconTile } from "@airwave/ui/components/accent-icon-tile";
+import { ACCENT_PALETTE } from "@airwave/ui/lib/accent-palette";
 import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";

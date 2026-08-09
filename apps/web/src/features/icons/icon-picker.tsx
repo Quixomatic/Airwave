@@ -1,6 +1,6 @@
-import { Input } from "@ChannelGuide/ui/components/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@ChannelGuide/ui/components/popover";
-import { Skeleton } from "@ChannelGuide/ui/components/skeleton";
+import { Input } from "@airwave/ui/components/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@airwave/ui/components/popover";
+import { Skeleton } from "@airwave/ui/components/skeleton";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import * as React from "react";
 

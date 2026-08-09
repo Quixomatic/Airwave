@@ -14,11 +14,11 @@
  *   B) a renamed copy    → every channel "would create" with a real pool size + renumbered (its number
  *                          collides with the original it was cloned from) — proves the create/resolve/probe path.
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
-import { exportLineup } from "@ChannelGuide/api/services/transfer/export";
-import type { ImportedLineup } from "@ChannelGuide/api/services/transfer/import";
-import { requireImportRunner } from "@ChannelGuide/api/services/transfer/import-runner";
+import { exportLineup } from "@airwave/api/services/transfer/export";
+import type { ImportedLineup } from "@airwave/api/services/transfer/import";
+import { requireImportRunner } from "@airwave/api/services/transfer/import-runner";
 
 import { startWorkflowEngine } from "../src/workflow-engine";
 

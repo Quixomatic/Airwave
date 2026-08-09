@@ -5,7 +5,7 @@ import { normalizeServerUrl, setStoredServerUrl } from "../../lib/server-url";
 import { scanForServers } from "../../lib/server-scan";
 
 /**
- * First-launch onboarding — point the TV app at a self-hosted ChannelGuide server. The server lives
+ * First-launch onboarding — point the TV app at a self-hosted Airwave server. The server lives
  * at a different address per install (a LAN IP or an exposed domain), so we let the user scan the
  * local network or type the address, validate it against `/api/health`, store it on the device, and
  * reload so the whole app re-initialises against it. Styled to match the diagnostic/guide screens.
@@ -77,7 +77,7 @@ export function ServerSetup() {
       }
       if (!res.ok) throw new Error(`The server responded with ${res.status}.`);
       const body = (await res.json().catch(() => null)) as { ok?: boolean } | null;
-      if (!body?.ok) throw new Error("That address didn't look like a ChannelGuide server.");
+      if (!body?.ok) throw new Error("That address didn't look like a Airwave server.");
       saveAndReload(target);
     } catch (e) {
       setChecking(false);
@@ -187,7 +187,7 @@ export function ServerSetup() {
         <div style={{ textAlign: "center", marginBottom: 30 }}>
           <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: "-0.5px" }}>Connect to your server</div>
           <div style={{ fontSize: 18, color: "#94a3b8", marginTop: 8, lineHeight: 1.5 }}>
-            Scan your network, or enter the address of your ChannelGuide server — a local IP like{" "}
+            Scan your network, or enter the address of your Airwave server — a local IP like{" "}
             <span style={{ fontFamily: "monospace", color: "#c3c9d4" }}>192.168.1.50:3000</span>, or a domain.
           </div>
         </div>

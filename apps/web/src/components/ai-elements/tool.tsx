@@ -1,4 +1,4 @@
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@ChannelGuide/ui/components/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@airwave/ui/components/collapsible";
 import { CheckCircle2Icon, ChevronDownIcon, CircleIcon, Loader2Icon, ShieldQuestionIcon, WrenchIcon, XCircleIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 

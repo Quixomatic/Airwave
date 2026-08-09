@@ -1,13 +1,13 @@
-import { Button } from "@ChannelGuide/ui/components/button";
+import { Button } from "@airwave/ui/components/button";
 import {
   Frame,
   FrameDescription,
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@ChannelGuide/ui/components/frame";
-import { Input } from "@ChannelGuide/ui/components/input";
-import { Label } from "@ChannelGuide/ui/components/label";
+} from "@airwave/ui/components/frame";
+import { Input } from "@airwave/ui/components/input";
+import { Label } from "@airwave/ui/components/label";
 import { createFileRoute } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";

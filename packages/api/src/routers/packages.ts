@@ -1,4 +1,4 @@
-import { Prisma, type PrismaClient } from "@ChannelGuide/db";
+import { Prisma, type PrismaClient } from "@airwave/db";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 

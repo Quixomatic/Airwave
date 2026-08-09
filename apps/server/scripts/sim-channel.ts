@@ -10,11 +10,11 @@
  * Pass `hls` as the 2nd arg to force the HLS transcode path (forceHls) instead of the
  * native-first ladder — to compare what the transcode fallback resolves to.
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
-import { getDeviceNativeCaps } from "@ChannelGuide/api/services/capabilities/native-caps";
-import { resolveMedia } from "@ChannelGuide/api/services/playback/broker";
-import { getChannelTimeline } from "@ChannelGuide/api/services/schedule/generate";
+import { getDeviceNativeCaps } from "@airwave/api/services/capabilities/native-caps";
+import { resolveMedia } from "@airwave/api/services/playback/broker";
+import { getChannelTimeline } from "@airwave/api/services/schedule/generate";
 
 async function probe(url: string) {
   const ctrl = new AbortController();

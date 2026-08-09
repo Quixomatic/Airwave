@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# ChannelGuide — ONE image, TWO roles selected at runtime by CG_ROLE:
+# Airwave — ONE image, TWO roles selected at runtime by CG_ROLE:
 #   CG_ROLE=server → applies DB migrations, then runs the Bun API server.
 #   CG_ROLE=web    → builds the admin SPA with the deployment's VITE_SERVER_URL
 #                    (each self-host lives at a different address), then serves it.
@@ -75,7 +75,7 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 
 # Prisma client + the server bundle (dist/index.mjs) + the workflow-SDK handlers
 # (apps/server/.well-known) — all built ONCE, so the container never rebuilds at start.
-RUN pnpm --filter @ChannelGuide/db db:generate \
+RUN pnpm --filter @airwave/db db:generate \
  && pnpm --filter server build
 
 # --- Runtime user (remapped to PUID/PGID by the entrypoint) -------------------------

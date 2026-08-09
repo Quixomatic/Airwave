@@ -12,11 +12,11 @@
   },
   "iconLibrary": "lucide",
   "aliases": {
-    "components": "@ChannelGuide/ui/components",
-    "utils": "@ChannelGuide/ui/lib/utils",
-    "hooks": "@ChannelGuide/ui/hooks",
-    "lib": "@ChannelGuide/ui/lib",
-    "ui": "@ChannelGuide/ui/components"
+    "components": "@airwave/ui/components",
+    "utils": "@airwave/ui/lib/utils",
+    "hooks": "@airwave/ui/hooks",
+    "lib": "@airwave/ui/lib",
+    "ui": "@airwave/ui/components"
   },
   "menuColor": "default",
   "menuAccent": "subtle",

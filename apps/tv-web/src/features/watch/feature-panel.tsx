@@ -4,7 +4,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
-} from "@ChannelGuide/ui/components/dropdown-menu";
+} from "@airwave/ui/components/dropdown-menu";
 import { motion } from "framer-motion";
 import {
   AudioLines,

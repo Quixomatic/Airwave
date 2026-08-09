@@ -1,6 +1,6 @@
 import { Separator as SeparatorPrimitive } from "@base-ui/react/separator"
 
-import { cn } from "@ChannelGuide/ui/lib/utils"
+import { cn } from "@airwave/ui/lib/utils"
 
 function Separator({
   className,

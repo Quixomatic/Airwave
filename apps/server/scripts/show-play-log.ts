@@ -5,7 +5,7 @@
  *
  *   bun --env-file=.env run scripts/show-play-log.ts
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
 async function main() {
   const rows = await prisma.playbackLog.findMany({ orderBy: { createdAt: "desc" }, take: 30 });

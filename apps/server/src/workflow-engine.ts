@@ -19,8 +19,8 @@
  * and are never mounted on the public Hono app. Same posture as Postgres on :5433.
  * Revisit if the worker ever runs on another host, or the port is published in Docker.
  */
-import { setLineupRunner } from "@ChannelGuide/api/services/agent/lineup-runner";
-import { setImportRunner } from "@ChannelGuide/api/services/transfer/import-runner";
+import { setLineupRunner } from "@airwave/api/services/agent/lineup-runner";
+import { setImportRunner } from "@airwave/api/services/transfer/import-runner";
 
 import { importLineupWorkflow } from "../workflows/import";
 import { aiLineupWorkflow } from "../workflows/lineup";

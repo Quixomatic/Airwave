@@ -10,7 +10,7 @@ import { Qr } from "../../lib/qr";
 const ACCENT = "#4a9fe0";
 
 /* -------------------------------------------------------------------------- */
-/*  Login — two device-code flows: Plex (plex.tv/link) and ChannelGuide code   */
+/*  Login — two device-code flows: Plex (plex.tv/link) and Airwave code   */
 /*  UNCHANGED from the original App.tsx — this login flow works well; the only  */
 /*  edit is that it now lives on the /login route (onSignedIn → navigate("/")). */
 /* -------------------------------------------------------------------------- */
@@ -60,7 +60,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
           } else if (res.status === "expired") {
             reset("That code expired — try again.");
           } else if (res.status === "unregistered") {
-            reset(`No ChannelGuide account for ${res.email}. Ask an admin to import you.`);
+            reset(`No Airwave account for ${res.email}. Ask an admin to import you.`);
           }
         } catch {
           /* transient — keep polling */
@@ -71,7 +71,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
     }
   }, [onSignedIn]);
 
-  // --- ChannelGuide device code (better-auth deviceAuthorization) ---
+  // --- Airwave device code (better-auth deviceAuthorization) ---
   const startDevice = useCallback(async () => {
     setError(null);
     const { data, error: codeErr } = await authClient.device.code({

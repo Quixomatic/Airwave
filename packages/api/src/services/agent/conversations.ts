@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 /** Chat-history reads/writes for the assistant panel (scoped to the requesting user). */
 

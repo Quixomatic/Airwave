@@ -3,8 +3,8 @@ Pod::Spec.new do |s|
   s.version        = '0.0.0'
   s.summary        = 'Hardware-keyboard input source (GameController GCKeyboard) for tv-native.'
   s.description     = 'Emits semantic D-pad / number keys from a physical keyboard or remote so the input dispatcher + zone machine are drivable on iPad/tvOS. No first-responder juggling — reads GCKeyboard app-wide.'
-  s.author         = 'ChannelGuide'
-  s.homepage       = 'https://github.com/Quixomatic/ChannelGuide'
+  s.author         = 'Airwave'
+  s.homepage       = 'https://github.com/Quixomatic/Airwave'
   s.platforms      = { :ios => '15.1', :tvos => '15.1' }
   s.source         = { git: '' }
 

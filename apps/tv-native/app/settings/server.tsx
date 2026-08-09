@@ -64,7 +64,7 @@ export default function ServerSettings() {
 
   return (
     <View>
-      <PageHeader title="Server" subtitle="The ChannelGuide server this device is signed in to." />
+      <PageHeader title="Server" subtitle="The Airwave server this device is signed in to." />
 
       <View style={scaled({ flexDirection: "row", flexWrap: "wrap", gap: 28, padding: 22, borderRadius: 14, backgroundColor: "rgba(148,163,184,0.06)", marginBottom: 8 })}>
         <Info label="Address" value={getServerUrl() || "Not connected"} />
@@ -89,7 +89,7 @@ export default function ServerSettings() {
       <SectionLabel>Change server</SectionLabel>
       <SettingRow
         label="Change server"
-        sublabel={armChange ? "Press OK again to sign out and return to server setup" : "Sign out and pick a different ChannelGuide server"}
+        sublabel={armChange ? "Press OK again to sign out and return to server setup" : "Sign out and pick a different Airwave server"}
         focused={sel === 2}
         right={armChange ? <Pill tone="warn">Confirm</Pill> : undefined}
         onPress={() => {

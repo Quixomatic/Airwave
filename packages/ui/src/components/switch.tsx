@@ -2,7 +2,7 @@
 
 import { Switch as SwitchPrimitive } from "@base-ui/react/switch";
 import type React from "react";
-import { cn } from "@ChannelGuide/ui/lib/utils";
+import { cn } from "@airwave/ui/lib/utils";
 
 export function Switch({
   className,

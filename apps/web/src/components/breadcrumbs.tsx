@@ -4,7 +4,7 @@ import { Link, useMatches } from "@tanstack/react-router";
 import {
   TintedIconTile,
   type TintedIconTileTint,
-} from "@ChannelGuide/ui/components/tinted-icon-tile";
+} from "@airwave/ui/components/tinted-icon-tile";
 
 import { useBreadcrumbOverride } from "@/context/breadcrumb-provider";
 

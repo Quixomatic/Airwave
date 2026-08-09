@@ -1,5 +1,5 @@
 {
-  "name": "@ChannelGuide/api",
+  "name": "@airwave/api",
   "type": "module",
   "exports": {
     ".": {
@@ -11,9 +11,9 @@
   },
   "scripts": {},
   "dependencies": {
-    "@ChannelGuide/auth": "workspace:*",
-    "@ChannelGuide/db": "workspace:*",
-    "@ChannelGuide/env": "workspace:*",
+    "@airwave/auth": "workspace:*",
+    "@airwave/db": "workspace:*",
+    "@airwave/env": "workspace:*",
     "@ai-sdk/anthropic": "^4.0.16",
     "@ai-sdk/google": "^4.0.18",
     "@ai-sdk/openai": "^4.0.16",
@@ -26,7 +26,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@ChannelGuide/config": "workspace:*",
+    "@airwave/config": "workspace:*",
     "@types/node-schedule": "2.1.8",
     "hono": "catalog:",
     "typescript": "catalog:"

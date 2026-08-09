@@ -1,5 +1,5 @@
-import { createPrismaClient } from "@ChannelGuide/db";
-import { env } from "@ChannelGuide/env/server";
+import { createPrismaClient } from "@airwave/db";
+import { env } from "@airwave/env/server";
 
 import { auth } from "../index";
 

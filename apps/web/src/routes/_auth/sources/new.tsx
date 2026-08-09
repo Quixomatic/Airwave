@@ -1,15 +1,15 @@
-import { Button } from "@ChannelGuide/ui/components/button";
+import { Button } from "@airwave/ui/components/button";
 import {
   Frame,
   FrameDescription,
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@ChannelGuide/ui/components/frame";
-import { Input } from "@ChannelGuide/ui/components/input";
-import { Label } from "@ChannelGuide/ui/components/label";
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@ChannelGuide/ui/components/select";
-import { Switch } from "@ChannelGuide/ui/components/switch";
+} from "@airwave/ui/components/frame";
+import { Input } from "@airwave/ui/components/input";
+import { Label } from "@airwave/ui/components/label";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@airwave/ui/components/select";
+import { Switch } from "@airwave/ui/components/switch";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Loader2, Tv } from "lucide-react";
 import { useState } from "react";

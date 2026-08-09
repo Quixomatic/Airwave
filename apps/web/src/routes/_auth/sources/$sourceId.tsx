@@ -1,15 +1,15 @@
-import { Button } from "@ChannelGuide/ui/components/button";
-import { Card } from "@ChannelGuide/ui/components/card";
+import { Button } from "@airwave/ui/components/button";
+import { Card } from "@airwave/ui/components/card";
 import {
   Frame,
   FrameDescription,
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@ChannelGuide/ui/components/frame";
-import { Input } from "@ChannelGuide/ui/components/input";
-import { Label } from "@ChannelGuide/ui/components/label";
-import { Switch } from "@ChannelGuide/ui/components/switch";
+} from "@airwave/ui/components/frame";
+import { Input } from "@airwave/ui/components/input";
+import { Label } from "@airwave/ui/components/label";
+import { Switch } from "@airwave/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
@@ -134,7 +134,7 @@ function SourceDetail() {
         <FrameHeader className="flex-row items-center justify-between">
           <div>
             <FrameTitle>Libraries</FrameTitle>
-            <FrameDescription>Which libraries ChannelGuide builds channels from.</FrameDescription>
+            <FrameDescription>Which libraries Airwave builds channels from.</FrameDescription>
           </div>
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={syncMetadata} disabled={syncing}>

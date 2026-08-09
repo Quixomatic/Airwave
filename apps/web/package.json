@@ -1,6 +1,6 @@
 {
   "name": "web",
-  "version": "0.9.53",
+  "version": "0.10.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,9 +11,9 @@
     "check-types": "vite build && tsc --noEmit"
   },
   "dependencies": {
-    "@ChannelGuide/api": "workspace:*",
-    "@ChannelGuide/env": "workspace:*",
-    "@ChannelGuide/ui": "workspace:*",
+    "@airwave/api": "workspace:*",
+    "@airwave/env": "workspace:*",
+    "@airwave/ui": "workspace:*",
     "@ai-sdk/react": "^4.0.34",
     "@hookform/resolvers": "^5.4.0",
     "@phosphor-icons/react": "^2.1.10",
@@ -41,7 +41,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@ChannelGuide/config": "workspace:*",
+    "@airwave/config": "workspace:*",
     "@tanstack/react-query-devtools": "^5.101.2",
     "@tanstack/react-router-devtools": "^1.167.0",
     "@tanstack/router-plugin": "^1.168.19",

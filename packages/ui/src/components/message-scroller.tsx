@@ -1,7 +1,7 @@
 "use client";
 
-import { Button } from "@ChannelGuide/ui/components/button";
-import { cn } from "@ChannelGuide/ui/lib/utils";
+import { Button } from "@airwave/ui/components/button";
+import { cn } from "@airwave/ui/lib/utils";
 import {
   MessageScroller as MessageScrollerPrimitive,
   useMessageScroller,

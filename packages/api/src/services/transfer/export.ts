@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 /**
  * Export the full lineup — every package + channel + their definitions — as a portable JSON blob that can

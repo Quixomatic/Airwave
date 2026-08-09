@@ -1,12 +1,12 @@
-import type { AppRouter } from "@ChannelGuide/api/routers/index";
-import { Badge } from "@ChannelGuide/ui/components/badge";
+import type { AppRouter } from "@airwave/api/routers/index";
+import { Badge } from "@airwave/ui/components/badge";
 import {
   Frame,
   FrameDescription,
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@ChannelGuide/ui/components/frame";
+} from "@airwave/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import type { inferRouterOutputs } from "@trpc/server";

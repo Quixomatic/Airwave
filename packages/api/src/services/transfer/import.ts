@@ -1,4 +1,4 @@
-import { Prisma, type PrismaClient } from "@ChannelGuide/db";
+import { Prisma, type PrismaClient } from "@airwave/db";
 
 import { normalizeCallsign } from "../generator/callsign";
 import type { FilterNode } from "../plex/filter-fields";

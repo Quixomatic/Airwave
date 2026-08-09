@@ -1,6 +1,6 @@
 {
   "name": "tv-native",
-  "version": "0.9.53",
+  "version": "0.10.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -13,8 +13,8 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@ChannelGuide/key-input": "workspace:*",
-    "@ChannelGuide/mpv-player": "workspace:*",
+    "@airwave/key-input": "workspace:*",
+    "@airwave/mpv-player": "workspace:*",
     "@better-auth/expo": "^1.6.23",
     "@expo/dom-webview": "55.0.6",
     "@expo/metro-runtime": "~55.0.12",

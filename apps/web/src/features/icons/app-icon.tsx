@@ -1,4 +1,4 @@
-import { type AccentKey, isAccentKey } from "@ChannelGuide/ui/lib/accent-palette";
+import { type AccentKey, isAccentKey } from "@airwave/ui/lib/accent-palette";
 
 import { type IconComponent, resolveIcon } from "./icon-set";
 

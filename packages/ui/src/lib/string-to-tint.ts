@@ -1,4 +1,4 @@
-import type { TintedIconTileTint } from "@ChannelGuide/ui/components/tinted-icon-tile";
+import type { TintedIconTileTint } from "@airwave/ui/components/tinted-icon-tile";
 
 /**
  * Deterministic string → tint mapping, ported from Twenty's

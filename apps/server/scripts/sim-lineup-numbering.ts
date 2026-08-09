@@ -9,12 +9,12 @@
  *
  * Run: bun --env-file=.env scripts/sim-lineup-numbering.ts
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
 import {
   assignChannelNumbers,
   type LineupPlanDraft,
-} from "@ChannelGuide/api/services/agent/lineup-plan";
+} from "@airwave/api/services/agent/lineup-plan";
 
 /** Minimal stand-in for a planned channel — numbering ignores everything but identity. */
 const channel = (key: string) =>

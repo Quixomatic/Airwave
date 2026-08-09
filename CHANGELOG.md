@@ -1,6 +1,36 @@
 # Changelog
 
-All notable changes to ChannelGuide are documented here.
+All notable changes to Airwave are documented here.
+
+## [0.10.0] - 2026-08-09
+
+### Changed — rebrand ChannelGuide → Airwave
+
+- **Package scope** `@ChannelGuide/*` → `@airwave/*` across the monorepo (467 refs / 205 files: imports, every
+  workspace `package.json` name, tsconfig path aliases, components.json, CSS source globs, Dockerfile,
+  entrypoint) + `pnpm install` relink. Also fixed the server bundler's `tsdown` `noExternal` regex (it was
+  `/@ChannelGuide\//` — an escaped-slash the sweep missed — which would have externalized the workspace packages
+  and broken the prod `dist/index.mjs`).
+- **App identity (tv-native):** `expo.name` → "Airwave", `slug` → `airwave` (new EAS project), `scheme` →
+  `airwave` (+ matching `authClient` scheme), iOS `bundleIdentifier` + Android `package` → **`com.airwave.tv`**,
+  and the new EAS `projectId`. Removed the now-redundant `with-android-app-name` config plugin and the iOS
+  `CFBundleDisplayName` override (both existed only to force "Airwave" over the old name — `expo.name` now does
+  it). webOS `appinfo.json` `id` → `com.airwave.tv`, `vendor` → Airwave.
+- **GHCR image** `ghcr.io/quixomatic/channelguide` → `ghcr.io/quixomatic/airwave` (workflow, compose defaults,
+  `.env.example`).
+- **User-facing strings + docs** (login/settings/setup copy, README, compose/Dockerfile headers) → Airwave.
+- **Deliberately left unchanged** (identity/data — renaming would break the running deployment): the Postgres
+  DB/user/volumes/compose project name (`channelguide*`), the Plex client identifier (`channelguide-server`), the
+  better-auth device `client_id` (`channelguide-tv`), and the native module Gradle groups
+  (`com.channelguide.{keyinput,mpvplayer}` — internal Maven coords).
+
+### Deploy / build notes
+
+- **Self-host:** the next tag publishes to `ghcr.io/quixomatic/airwave` — the new GHCR package is **private on
+  first push; flip it public once** (Packages → airwave → visibility). Update `CG_IMAGE` to the airwave image.
+  DB/volume names are unchanged, so existing data is preserved.
+- **Apps:** `com.airwave.tv` + the new EAS project is a **new app identity** — the next build re-provisions
+  (Apple App ID + profiles, EAS credentials, webOS reinstall); existing dev/TestFlight installs won't update.
 
 ## [0.9.53] - 2026-08-08
 

@@ -15,7 +15,7 @@
  */
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 
-import { CAP_MATRIX } from "@ChannelGuide/api/services/capabilities/matrix";
+import { CAP_MATRIX } from "@airwave/api/services/capabilities/matrix";
 
 const MASTER = process.argv[2];
 const OUT = process.argv[3];

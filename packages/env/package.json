@@ -1,5 +1,5 @@
 {
-  "name": "@ChannelGuide/env",
+  "name": "@airwave/env",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@ChannelGuide/config": "workspace:*",
+    "@airwave/config": "workspace:*",
     "@types/bun": "catalog:",
     "typescript": "catalog:"
   }

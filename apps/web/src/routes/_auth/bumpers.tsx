@@ -1,14 +1,14 @@
-import { Badge } from "@ChannelGuide/ui/components/badge";
-import { Button } from "@ChannelGuide/ui/components/button";
+import { Badge } from "@airwave/ui/components/badge";
+import { Button } from "@airwave/ui/components/button";
 import {
   Frame,
   FrameDescription,
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@ChannelGuide/ui/components/frame";
-import { Input } from "@ChannelGuide/ui/components/input";
-import { Switch } from "@ChannelGuide/ui/components/switch";
+} from "@airwave/ui/components/frame";
+import { Input } from "@airwave/ui/components/input";
+import { Switch } from "@airwave/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {

@@ -1,4 +1,4 @@
-# ChannelGuide
+# Airwave
 
 This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines React, TanStack Router, Hono, TRPC, and more.
 
@@ -18,7 +18,7 @@ This project was created with [Better-T-Stack](https://github.com/AmanVarshney01
 
 ## Self-Hosting (Docker)
 
-ChannelGuide self-hosts as a **single Docker image** that runs two ways — the API
+Airwave self-hosts as a **single Docker image** that runs two ways — the API
 **server** and the admin **web** (selected by `CG_ROLE`) — plus a Postgres database,
 wired together by [`docker-compose.yml`](./docker-compose.yml).
 
@@ -49,7 +49,7 @@ wired together by [`docker-compose.yml`](./docker-compose.yml).
 
 ### Image
 
-Published to GHCR (multi-arch, amd64 + arm64): `ghcr.io/quixomatic/channelguide`.
+Published to GHCR (multi-arch, amd64 + arm64): `ghcr.io/quixomatic/airwave`.
 Update with `docker compose pull && docker compose up -d` — migrations apply automatically on start.
 
 ### Building the image yourself
@@ -57,9 +57,9 @@ Update with `docker compose pull && docker compose up -d` — migrations apply a
 ```bash
 # stage the capability-probe media (baked in for the TV diagnostic), then build:
 gh release download media-v1 -p capability-media.tar.gz -D docker/cap-media
-docker build -t channelguide:local .
+docker build -t airwave:local .
 ```
-Set `CG_IMAGE=channelguide:local` in your `.env` to run the local build.
+Set `CG_IMAGE=airwave:local` in your `.env` to run the local build.
 
 ## Getting Started
 
@@ -114,7 +114,7 @@ npx shadcn@latest add accordion dialog popover sheet table -c packages/ui
 Import shared components like this:
 
 ```tsx
-import { Button } from "@ChannelGuide/ui/components/button";
+import { Button } from "@airwave/ui/components/button";
 ```
 
 ### Add app-specific blocks
@@ -124,7 +124,7 @@ If you want to add app-specific blocks instead of shared primitives, run the sha
 ## Project Structure
 
 ```
-ChannelGuide/
+Airwave/
 ├── apps/
 │   ├── web/         # Frontend application (React + TanStack Router)
 │   └── server/      # Backend API (Hono, TRPC)

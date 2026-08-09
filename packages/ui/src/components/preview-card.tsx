@@ -2,7 +2,7 @@
 
 import { PreviewCard as PreviewCardPrimitive } from "@base-ui/react/preview-card";
 import type React from "react";
-import { cn } from "@ChannelGuide/ui/lib/utils";
+import { cn } from "@airwave/ui/lib/utils";
 
 export const PreviewCard: typeof PreviewCardPrimitive.Root =
   PreviewCardPrimitive.Root;

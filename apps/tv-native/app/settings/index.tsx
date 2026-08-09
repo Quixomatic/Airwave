@@ -16,7 +16,7 @@ export default function General() {
         <SettingRow key={r.label} label={r.label} sublabel={r.sublabel} focused={sel === i} onPress={r.onPress} />
       ))}
       <Text style={{ marginTop: 20, fontSize: 15, color: "#64748b" }}>
-        ChannelGuide — your media server as live TV channels. More general preferences will live here.
+        Airwave — your media server as live TV channels. More general preferences will live here.
       </Text>
     </View>
   );

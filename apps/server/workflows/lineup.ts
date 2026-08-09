@@ -21,36 +21,36 @@
  * After editing this file you MUST re-run `bunx workflow build` — `bun --hot` does not
  * pick up workflow changes (the directives are a build-time transform).
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 import { getStepMetadata, getWorkflowMetadata } from "workflow";
 
-import type { ChannelBuildResult } from "@ChannelGuide/api/services/agent/channel-builder";
-import { buildPlannedChannel } from "@ChannelGuide/api/services/agent/channel-builder";
-import type { LibraryProfile } from "@ChannelGuide/api/services/agent/library-profile";
+import type { ChannelBuildResult } from "@airwave/api/services/agent/channel-builder";
+import { buildPlannedChannel } from "@airwave/api/services/agent/channel-builder";
+import type { LibraryProfile } from "@airwave/api/services/agent/library-profile";
 import {
   buildFilterVocabulary,
   buildLibraryProfile,
   formatFieldCatalog,
   formatFilterVocabulary,
   formatLibraryProfile,
-} from "@ChannelGuide/api/services/agent/library-profile";
+} from "@airwave/api/services/agent/library-profile";
 import type {
   ExistingPackage,
   LineupPlan,
   LineupPlanDraft,
   PlannedChannel,
-} from "@ChannelGuide/api/services/agent/lineup-plan";
+} from "@airwave/api/services/agent/lineup-plan";
 import {
   assignChannelNumbers,
   formatLineupPlan,
   planLineup as planLineupService,
-} from "@ChannelGuide/api/services/agent/lineup-plan";
-import type { LineupRunArgs } from "@ChannelGuide/api/services/agent/lineup-runner";
-import { clearAiGenerated, createPackage, discoverFieldValues } from "@ChannelGuide/api/services/agent/tools";
+} from "@airwave/api/services/agent/lineup-plan";
+import type { LineupRunArgs } from "@airwave/api/services/agent/lineup-runner";
+import { clearAiGenerated, createPackage, discoverFieldValues } from "@airwave/api/services/agent/tools";
 import {
   INITIAL_WINDOW_SECONDS,
   generateChannelSchedule,
-} from "@ChannelGuide/api/services/schedule/generate";
+} from "@airwave/api/services/schedule/generate";
 
 export type { LibraryProfile, LineupPlan, PlannedChannel, ChannelBuildResult };
 

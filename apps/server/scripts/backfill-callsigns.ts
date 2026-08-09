@@ -5,13 +5,13 @@
  *
  * Run:  bun --env-file=.env run scripts/backfill-callsigns.ts
  */
-import prisma from "@ChannelGuide/db";
-import { PRESET_PACKAGES } from "@ChannelGuide/api/services/generator/presets";
+import prisma from "@airwave/db";
+import { PRESET_PACKAGES } from "@airwave/api/services/generator/presets";
 import {
   deriveCallsign,
   normalizeCallsign,
   uniqueCallsign,
-} from "@ChannelGuide/api/services/generator/callsign";
+} from "@airwave/api/services/generator/callsign";
 
 const presetCallsign = new Map<string, string>();
 for (const pkg of PRESET_PACKAGES) {

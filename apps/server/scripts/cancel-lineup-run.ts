@@ -8,7 +8,7 @@
  * Run: bun --env-file=.env scripts/cancel-lineup-run.ts [runId]
  * With no argument it cancels every run that isn't already in a terminal state.
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
 async function main() {
   const { getRun } = await import("workflow/api");

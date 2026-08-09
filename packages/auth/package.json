@@ -1,5 +1,5 @@
 {
-  "name": "@ChannelGuide/auth",
+  "name": "@airwave/auth",
   "type": "module",
   "exports": {
     ".": {
@@ -11,14 +11,14 @@
   },
   "scripts": {},
   "dependencies": {
-    "@ChannelGuide/db": "workspace:*",
-    "@ChannelGuide/env": "workspace:*",
+    "@airwave/db": "workspace:*",
+    "@airwave/env": "workspace:*",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@ChannelGuide/config": "workspace:*",
+    "@airwave/config": "workspace:*",
     "typescript": "catalog:"
   }
 }

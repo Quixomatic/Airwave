@@ -3,7 +3,7 @@ import {
   SidebarContent,
   SidebarHeader,
   SidebarRail,
-} from "@ChannelGuide/ui/components/sidebar";
+} from "@airwave/ui/components/sidebar";
 
 import { NavGroup } from "./nav-group";
 import { sidebarData } from "./sidebar-data";

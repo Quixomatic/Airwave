@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 /**
  * Per-user favorite channels — powers the guide's heart toggle and the "Favorites" lens. Stored

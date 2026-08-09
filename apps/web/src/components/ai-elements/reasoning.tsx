@@ -1,4 +1,4 @@
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@ChannelGuide/ui/components/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@airwave/ui/components/collapsible";
 import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import { createContext, useContext, useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 

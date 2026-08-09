@@ -6,7 +6,7 @@
  *
  * Recording is best-effort: a trace write that throws must never fail a completed import step.
  */
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 export type ImportTracePhase = "plan" | "packages" | "channel" | "report";
 

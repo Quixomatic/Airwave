@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 import { channelAccentAt } from "../accents";
 import type { SyncProgress } from "../media/media-item";

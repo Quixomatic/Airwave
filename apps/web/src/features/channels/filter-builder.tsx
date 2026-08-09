@@ -1,6 +1,6 @@
-import { Button } from "@ChannelGuide/ui/components/button";
-import { Input } from "@ChannelGuide/ui/components/input";
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@ChannelGuide/ui/components/select";
+import { Button } from "@airwave/ui/components/button";
+import { Input } from "@airwave/ui/components/input";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@airwave/ui/components/select";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, X } from "lucide-react";
 

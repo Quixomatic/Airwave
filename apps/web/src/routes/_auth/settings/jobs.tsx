@@ -1,13 +1,13 @@
-import { Badge } from "@ChannelGuide/ui/components/badge";
-import { Button } from "@ChannelGuide/ui/components/button";
-import { Card } from "@ChannelGuide/ui/components/card";
+import { Badge } from "@airwave/ui/components/badge";
+import { Button } from "@airwave/ui/components/button";
+import { Card } from "@airwave/ui/components/card";
 import {
   Frame,
   FrameDescription,
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@ChannelGuide/ui/components/frame";
+} from "@airwave/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import cronstrue from "cronstrue";
@@ -73,7 +73,7 @@ function SettingsJobs() {
         <FrameHeader>
           <FrameTitle>Jobs &amp; cache</FrameTitle>
           <FrameDescription>
-            ChannelGuide runs maintenance tasks on a schedule — metadata sync, library scans, and
+            Airwave runs maintenance tasks on a schedule — metadata sync, library scans, and
             topping up channel schedules. Trigger any of them now or change how often they run.
             Running a job manually doesn't change its schedule.
           </FrameDescription>

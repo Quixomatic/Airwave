@@ -1,16 +1,16 @@
-import { createContext } from "@ChannelGuide/api/context";
-import { appRouter } from "@ChannelGuide/api/routers/index";
-import { runAgentChat } from "@ChannelGuide/api/services/agent/chat";
-import { createFromUpload } from "@ChannelGuide/api/services/bumper-music/library";
-import { contentTypeFor } from "@ChannelGuide/api/services/bumper-music/store";
-import { startJobs } from "@ChannelGuide/api/services/jobs/scheduler";
-import { resolveChannelSource } from "@ChannelGuide/api/services/playback/broker";
-import { buildAuthUrl, createPin } from "@ChannelGuide/api/services/plex/client";
-import prisma from "@ChannelGuide/db";
-import { auth } from "@ChannelGuide/auth";
-import { PLEX_CLIENT_ID } from "@ChannelGuide/auth/lib/plex-login";
-import { seedAdmin } from "@ChannelGuide/auth/lib/seed-admin";
-import { env } from "@ChannelGuide/env/server";
+import { createContext } from "@airwave/api/context";
+import { appRouter } from "@airwave/api/routers/index";
+import { runAgentChat } from "@airwave/api/services/agent/chat";
+import { createFromUpload } from "@airwave/api/services/bumper-music/library";
+import { contentTypeFor } from "@airwave/api/services/bumper-music/store";
+import { startJobs } from "@airwave/api/services/jobs/scheduler";
+import { resolveChannelSource } from "@airwave/api/services/playback/broker";
+import { buildAuthUrl, createPin } from "@airwave/api/services/plex/client";
+import prisma from "@airwave/db";
+import { auth } from "@airwave/auth";
+import { PLEX_CLIENT_ID } from "@airwave/auth/lib/plex-login";
+import { seedAdmin } from "@airwave/auth/lib/seed-admin";
+import { env } from "@airwave/env/server";
 import { trpcServer } from "@hono/trpc-server";
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
@@ -224,7 +224,7 @@ if (WEB_DIR) {
   app.use("*", serveStatic({ root: WEB_DIR }));
   app.get("*", serveStatic({ path: "index.html", root: WEB_DIR }));
 } else {
-  app.get("/", (c) => c.text("ChannelGuide server — the admin web runs separately in dev."));
+  app.get("/", (c) => c.text("Airwave server — the admin web runs separately in dev."));
 }
 
 // Bootstrap the first admin from env (idempotent; no-op if ADMIN_* unset).

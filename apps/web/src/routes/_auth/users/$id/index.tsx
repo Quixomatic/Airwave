@@ -1,6 +1,6 @@
-import { Badge } from "@ChannelGuide/ui/components/badge";
-import { Button } from "@ChannelGuide/ui/components/button";
-import { Frame, FramePanel } from "@ChannelGuide/ui/components/frame";
+import { Badge } from "@airwave/ui/components/badge";
+import { Button } from "@airwave/ui/components/button";
+import { Frame, FramePanel } from "@airwave/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { KeyRound, ShieldCheck, User } from "lucide-react";

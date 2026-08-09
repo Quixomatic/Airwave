@@ -2,7 +2,7 @@
 
 import { Field as FieldPrimitive } from "@base-ui/react/field";
 import type React from "react";
-import { cn } from "@ChannelGuide/ui/lib/utils";
+import { cn } from "@airwave/ui/lib/utils";
 
 export function Field({
   className,

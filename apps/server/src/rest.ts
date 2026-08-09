@@ -3,39 +3,39 @@ import {
   accessibleChannels,
   filterAccessibleIds,
   isChannelAllowed,
-} from "@ChannelGuide/api/services/access/access";
-import { bumperMusicPayload } from "@ChannelGuide/api/services/bumper-music/library";
-import { ApiError } from "@ChannelGuide/api/services/errors";
-import { listFavoriteChannelIds, setFavorite } from "@ChannelGuide/api/services/favorites";
-import { getGuideGrid, listGuideChannels } from "@ChannelGuide/api/services/guide";
-import { listActivePackages } from "@ChannelGuide/api/services/packages";
-import { listRecentChannelIds } from "@ChannelGuide/api/services/recents";
+} from "@airwave/api/services/access/access";
+import { bumperMusicPayload } from "@airwave/api/services/bumper-music/library";
+import { ApiError } from "@airwave/api/services/errors";
+import { listFavoriteChannelIds, setFavorite } from "@airwave/api/services/favorites";
+import { getGuideGrid, listGuideChannels } from "@airwave/api/services/guide";
+import { listActivePackages } from "@airwave/api/services/packages";
+import { listRecentChannelIds } from "@airwave/api/services/recents";
 import {
   getTimelineWindow,
   qualityList,
   resolveMedia,
   stopChannelTranscode,
-} from "@ChannelGuide/api/services/playback/broker";
+} from "@airwave/api/services/playback/broker";
 import {
   endWatchSession,
   heartbeatSession,
   listActiveSessions,
-} from "@ChannelGuide/api/services/playback/sessions";
+} from "@airwave/api/services/playback/sessions";
 import {
   getCapabilityManifest,
   saveCapabilityResult,
-} from "@ChannelGuide/api/services/capabilities/service";
+} from "@airwave/api/services/capabilities/service";
 import {
   getDeviceCapabilityView,
   resetDeviceCapabilityOverrides,
   setDeviceCapabilityOverride,
   type CapKind,
-} from "@ChannelGuide/api/services/capabilities/device-settings";
-import { reportDevice } from "@ChannelGuide/api/services/devices/report";
-import { logPlayback } from "@ChannelGuide/api/services/playback/log";
-import { getNowNext } from "@ChannelGuide/api/services/schedule/generate";
-import prisma from "@ChannelGuide/db";
-import { auth } from "@ChannelGuide/auth";
+} from "@airwave/api/services/capabilities/device-settings";
+import { reportDevice } from "@airwave/api/services/devices/report";
+import { logPlayback } from "@airwave/api/services/playback/log";
+import { getNowNext } from "@airwave/api/services/schedule/generate";
+import prisma from "@airwave/db";
+import { auth } from "@airwave/auth";
 import { Hono } from "hono";
 
 /**

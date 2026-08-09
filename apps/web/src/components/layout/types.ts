@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
-import type { TintedIconTileTint } from "@ChannelGuide/ui/components/tinted-icon-tile";
+import type { TintedIconTileTint } from "@airwave/ui/components/tinted-icon-tile";
 
 type BaseNavItem = {
   title: string;

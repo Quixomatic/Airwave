@@ -1,13 +1,13 @@
-import { Button } from "@ChannelGuide/ui/components/button";
+import { Button } from "@airwave/ui/components/button";
 import {
   Frame,
   FrameDescription,
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@ChannelGuide/ui/components/frame";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@ChannelGuide/ui/components/preview-card";
-import { Switch } from "@ChannelGuide/ui/components/switch";
+} from "@airwave/ui/components/frame";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@airwave/ui/components/preview-card";
+import { Switch } from "@airwave/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, Loader2, PackageCheck, X } from "lucide-react";

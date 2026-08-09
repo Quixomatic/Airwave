@@ -2,7 +2,7 @@ import { getServerUrl, getToken } from "./auth";
 import { getNetwork } from "./plex-connection";
 
 /**
- * Thin client for ChannelGuide's REST surface — the same `/api/v1` (bearer) + custom Plex
+ * Thin client for Airwave's REST surface — the same `/api/v1` (bearer) + custom Plex
  * device-link flow (`/api/tv/auth/plex/*`) that tv-web talks to. Ported from tv-web's `lib/api.ts`;
  * `fetch` is a global in React Native, so the request shape is identical — only the base URL + token
  * come from the native session store instead of localStorage.

@@ -1,4 +1,4 @@
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
 const conv = await prisma.aiConversation.findFirst({ orderBy: { updatedAt: "desc" } });
 if (!conv) {

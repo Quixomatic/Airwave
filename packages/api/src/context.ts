@@ -1,5 +1,5 @@
-import { auth } from "@ChannelGuide/auth";
-import prisma from "@ChannelGuide/db";
+import { auth } from "@airwave/auth";
+import prisma from "@airwave/db";
 import type { Context as HonoContext } from "hono";
 
 export type CreateContextOptions = {

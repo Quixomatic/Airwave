@@ -1,8 +1,8 @@
-import { Button } from "@ChannelGuide/ui/components/button";
-import { Input } from "@ChannelGuide/ui/components/input";
-import { Label } from "@ChannelGuide/ui/components/label";
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@ChannelGuide/ui/components/select";
-import { Switch } from "@ChannelGuide/ui/components/switch";
+import { Button } from "@airwave/ui/components/button";
+import { Input } from "@airwave/ui/components/input";
+import { Label } from "@airwave/ui/components/label";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@airwave/ui/components/select";
+import { Switch } from "@airwave/ui/components/switch";
 import { Filter, Plus, X } from "lucide-react";
 import { useState } from "react";
 

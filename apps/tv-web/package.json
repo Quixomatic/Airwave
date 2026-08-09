@@ -1,6 +1,6 @@
 {
   "name": "tv-web",
-  "version": "0.9.53",
+  "version": "0.10.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,7 @@
     "check-types": "vite build && tsc --noEmit"
   },
   "dependencies": {
-    "@ChannelGuide/ui": "workspace:*",
+    "@airwave/ui": "workspace:*",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.17",
     "@tanstack/react-virtual": "^3.14.5",
@@ -24,7 +24,7 @@
     "react-dom": "catalog:"
   },
   "devDependencies": {
-    "@ChannelGuide/config": "workspace:*",
+    "@airwave/config": "workspace:*",
     "@tailwindcss/vite": "^4.3.2",
     "@tanstack/router-plugin": "^1.168.19",
     "@types/node": "^22.13.14",

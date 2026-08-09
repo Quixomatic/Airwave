@@ -1,4 +1,4 @@
-import { mpvAudio, type MpvAudioProgress } from "@ChannelGuide/mpv-player";
+import { mpvAudio, type MpvAudioProgress } from "@airwave/mpv-player";
 import { useEffect, useRef } from "react";
 
 import { api, type BumperMusic } from "../../lib/api";

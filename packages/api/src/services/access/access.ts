@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 /**
  * Per-user access control (§7.13) — the config read/write brains, plus the resolver that Phase 2's REST

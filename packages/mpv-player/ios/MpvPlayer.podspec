@@ -3,8 +3,8 @@ Pod::Spec.new do |s|
   s.version        = '0.0.0'
   s.summary        = 'Expo native video player powered by mpv (libmpv/MPVKit).'
   s.description    = 'A full replacement for AVPlayer and libVLC — direct-plays every codec/container and does fast ffmpeg-estimated HTTP seeks. iOS · iPadOS · tvOS.'
-  s.author         = 'ChannelGuide'
-  s.homepage       = 'https://github.com/Quixomatic/ChannelGuide'
+  s.author         = 'Airwave'
+  s.homepage       = 'https://github.com/Quixomatic/Airwave'
   s.platforms      = { :ios => '15.1', :tvos => '15.1' }
   s.source         = { git: '' }
 

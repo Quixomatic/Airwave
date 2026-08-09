@@ -4,9 +4,9 @@
  *
  *   bun --env-file=.env run scripts/create-hdr-dts-collection.ts
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
-import { getLibraries } from "@ChannelGuide/api/services/plex/client";
+import { getLibraries } from "@airwave/api/services/plex/client";
 
 const COLLECTION = "HDR DTS Test";
 const H = (token: string) => ({ Accept: "application/json", "X-Plex-Token": token });

@@ -8,7 +8,7 @@ export interface MpvAudioSubscription {
 
 /**
  * Headless audio-only mpv player (§7.14 Phase B / radio channels) — a compartmentalized piece of the
- * `@ChannelGuide/mpv-player` module, completely independent of the video `<MpvPlayerView>`. Drive it
+ * `@airwave/mpv-player` module, completely independent of the video `<MpvPlayerView>`. Drive it
  * imperatively: `load` a URL, then `play`/`pause`/`seek`/`setVolume`/`setLoop`/`stop`, and subscribe to
  * `onProgress`/`onEnded`. Backed by a second, surface-less libmpv instance (see the native `MpvAudioCore`).
  */

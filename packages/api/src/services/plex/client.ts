@@ -10,7 +10,7 @@ import { BROWSER_CLIENT_PROFILE, type ClientCaps, clientProfileExtra, qualityPar
 import { canonicalAudioCodec, canonicalContainer, canonicalVideoCodec } from "../capabilities/codecs";
 
 const PLEX_TV = "https://plex.tv/api/v2";
-const PRODUCT = "ChannelGuide";
+const PRODUCT = "Airwave";
 const VERSION = "0.0.10";
 
 export function plexHeaders(clientId: string, token?: string): Record<string, string> {
@@ -19,7 +19,7 @@ export function plexHeaders(clientId: string, token?: string): Record<string, st
     "X-Plex-Product": PRODUCT,
     "X-Plex-Version": VERSION,
     "X-Plex-Client-Identifier": clientId,
-    "X-Plex-Device": "ChannelGuide Server",
+    "X-Plex-Device": "Airwave Server",
     "X-Plex-Platform": "Web",
   };
   if (token) headers["X-Plex-Token"] = token;
@@ -64,7 +64,7 @@ export type PlexUser = {
   thumb?: string;
 };
 
-/** The Plex account behind a token (email is what we match ChannelGuide accounts by). */
+/** The Plex account behind a token (email is what we match Airwave accounts by). */
 export async function getPlexUser(clientId: string, token: string): Promise<PlexUser> {
   const res = await fetch(`${PLEX_TV}/user`, { headers: plexHeaders(clientId, token) });
   if (!res.ok) throw new Error(`Plex getUser failed (${res.status})`);
@@ -116,7 +116,7 @@ export type ConnectionUrls = {
 };
 
 /**
- * The OFF-network Plex connection URIs. The ChannelGuide server always runs alongside Plex, so
+ * The OFF-network Plex connection URIs. The Airwave server always runs alongside Plex, so
  * the stored `baseUrl` already IS the local URL and the server uses it for everything — only a
  * TV app that's away from home needs these, to fall back to when it can't reach `baseUrl` on the
  * LAN: remoteUrl (WAN) then relayUrl (last resort). With `includeHttps=1` each `uri` is the HTTPS

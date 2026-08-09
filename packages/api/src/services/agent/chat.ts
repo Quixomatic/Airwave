@@ -1,4 +1,4 @@
-import { Prisma, type PrismaClient } from "@ChannelGuide/db";
+import { Prisma, type PrismaClient } from "@airwave/db";
 import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from "ai";
 
 import { buildAgentTools } from "./agent-tools";

@@ -15,7 +15,7 @@
  * Recording must never be able to fail a run: a trace write that throws would turn a
  * successful, expensive channel build into a retry. Every write here is best-effort.
  */
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 export type TracePhase =
   | "analyze"

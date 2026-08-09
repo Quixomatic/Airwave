@@ -1,4 +1,4 @@
-import { cn } from "@ChannelGuide/ui/lib/utils";
+import { cn } from "@airwave/ui/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 
 function Empty({ className, ...props }: React.ComponentProps<"div">) {

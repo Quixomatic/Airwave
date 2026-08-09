@@ -1,4 +1,4 @@
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 import schedule, { rescheduleJob } from "node-schedule";
 
 import { JOB_DEFINITIONS, type JobDefinition, jobDefinition } from "./definitions";

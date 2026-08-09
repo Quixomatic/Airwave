@@ -19,7 +19,7 @@
  * `@unique` and Phase 4 fans out ~5-10 concurrent creates, so letting each agent pick
  * would race. Assigning at plan time also makes a resumed run idempotent.
  */
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 import { generateObject } from "ai";
 import { z } from "zod";
 

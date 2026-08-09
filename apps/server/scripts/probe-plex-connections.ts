@@ -4,8 +4,8 @@
  *
  *   bun --env-file=.env run scripts/probe-plex-connections.ts
  */
-import { getServers, pickConnectionUrls } from "@ChannelGuide/api/services/plex/client";
-import prisma from "@ChannelGuide/db";
+import { getServers, pickConnectionUrls } from "@airwave/api/services/plex/client";
+import prisma from "@airwave/db";
 
 const sources = await prisma.mediaSource.findMany({ where: { type: "PLEX" } });
 if (!sources.length) console.log("no PLEX sources");

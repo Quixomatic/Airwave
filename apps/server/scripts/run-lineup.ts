@@ -26,9 +26,9 @@
  * Also: if you pipe THIS script through `grep`/`head`, the output buffers and you see
  * nothing until it exits. Run it unpiped, or background it and tail the log.
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
-import { requireLineupRunner } from "@ChannelGuide/api/services/agent/lineup-runner";
+import { requireLineupRunner } from "@airwave/api/services/agent/lineup-runner";
 
 import { startWorkflowEngine } from "../src/workflow-engine";
 

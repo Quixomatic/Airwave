@@ -15,7 +15,7 @@
 import {
   type ScheduleCursor,
   buildSchedule,
-} from "@ChannelGuide/api/services/schedule/timeline";
+} from "@airwave/api/services/schedule/timeline";
 
 const H = 3600;
 const START = new Date("2026-07-19T12:00:00Z");

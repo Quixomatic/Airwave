@@ -1,7 +1,7 @@
 import { useChat } from "@ai-sdk/react";
-import { env } from "@ChannelGuide/env/web";
-import { Button } from "@ChannelGuide/ui/components/button";
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@ChannelGuide/ui/components/select";
+import { env } from "@airwave/env/web";
+import { Button } from "@airwave/ui/components/button";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@airwave/ui/components/select";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses, type UIMessage } from "ai";

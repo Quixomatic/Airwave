@@ -1,4 +1,4 @@
-import { env } from "@ChannelGuide/env/web";
+import { env } from "@airwave/env/web";
 import {
   adminClient,
   deviceAuthorizationClient,

@@ -20,7 +20,7 @@
  * episodes would both miss the metadata and let one 500-episode show drown out everything
  * else. Episode counts are surfaced separately via `topShows`.
  */
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 import { FILTER_FIELDS, OPS_FOR_KIND } from "../plex/filter-fields";
 

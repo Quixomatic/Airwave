@@ -5,9 +5,9 @@
  * All of it comes from `ImportTrace` (a row per package summary + per channel outcome) plus the SDK's
  * own step timeline. No AI, no token cost — this is purely "did each thing land, and how big is its pool".
  */
-import { Badge } from "@ChannelGuide/ui/components/badge";
-import { Button } from "@ChannelGuide/ui/components/button";
-import { Frame, FrameHeader, FramePanel, FrameTitle } from "@ChannelGuide/ui/components/frame";
+import { Badge } from "@airwave/ui/components/badge";
+import { Button } from "@airwave/ui/components/button";
+import { Frame, FrameHeader, FramePanel, FrameTitle } from "@airwave/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Loader2, RefreshCw } from "lucide-react";

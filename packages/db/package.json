@@ -1,5 +1,5 @@
 {
-  "name": "@ChannelGuide/db",
+  "name": "@airwave/db",
   "type": "module",
   "exports": {
     ".": {
@@ -18,7 +18,7 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
-    "@ChannelGuide/env": "workspace:*",
+    "@airwave/env": "workspace:*",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "dotenv": "catalog:",
@@ -26,7 +26,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@ChannelGuide/config": "workspace:*",
+    "@airwave/config": "workspace:*",
     "@types/pg": "^8.20.0",
     "prisma": "^7.8.0",
     "typescript": "catalog:"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# ChannelGuide container entrypoint. Runs as root: sets timezone, remaps the
+# Airwave container entrypoint. Runs as root: sets timezone, remaps the
 # unprivileged `app` user to PUID/PGID (so writes land as your TrueNAS dataset
 # owner), then drops privileges with gosu to run the selected role.
 #
@@ -43,7 +43,7 @@ cd /app
 case "${CG_ROLE}" in
   server)
     echo "[entrypoint] applying database migrations (prisma migrate deploy)…"
-    gosu app env HOME=/home/app pnpm --filter @ChannelGuide/db db:migrate:deploy
+    gosu app env HOME=/home/app pnpm --filter @airwave/db db:migrate:deploy
 
     # Durable workflow engine (AI lineup builder) keeps its state in its OWN Postgres
     # schema (drizzle-managed `workflow` + graphile-worker). Bootstrap it when enabled —

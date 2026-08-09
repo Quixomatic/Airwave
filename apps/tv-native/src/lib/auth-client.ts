@@ -20,7 +20,7 @@ function make(url: string) {
   return createAuthClient({
     baseURL: `${url}/api/auth`,
     plugins: [
-      expoClient({ scheme: "channelguide", storagePrefix: "cg", storage: SyncCredStore }),
+      expoClient({ scheme: "airwave", storagePrefix: "cg", storage: SyncCredStore }),
       deviceAuthorizationClient(),
     ],
     // Send the bearer token (the better-auth session token minted by the Plex device-link login, stored in

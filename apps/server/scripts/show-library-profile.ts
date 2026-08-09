@@ -8,12 +8,12 @@
  *
  * With no sourceId it uses the first enabled media source.
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
 import {
   buildLibraryProfile,
   formatLibraryProfile,
-} from "@ChannelGuide/api/services/agent/library-profile";
+} from "@airwave/api/services/agent/library-profile";
 
 const sourceId =
   process.argv[2] ??

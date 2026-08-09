@@ -1,5 +1,5 @@
-import { Button } from "@ChannelGuide/ui/components/button";
-import { Textarea } from "@ChannelGuide/ui/components/textarea";
+import { Button } from "@airwave/ui/components/button";
+import { Textarea } from "@airwave/ui/components/textarea";
 import { Loader2Icon, SendIcon, SquareIcon } from "lucide-react";
 import type { ComponentProps, FormEvent } from "react";
 

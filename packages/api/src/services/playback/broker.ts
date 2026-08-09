@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 import { getDeviceNativeCaps } from "../capabilities/native-caps";
 import { notFound, preconditionFailed } from "../errors";

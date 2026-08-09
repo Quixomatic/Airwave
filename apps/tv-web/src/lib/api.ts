@@ -2,7 +2,7 @@ import { SERVER_URL, getToken } from "./auth-client";
 import { getNetwork } from "./plex-connection";
 
 /**
- * Thin client for ChannelGuide's CUSTOM endpoints — the REST guide/playback API
+ * Thin client for Airwave's CUSTOM endpoints — the REST guide/playback API
  * (`/api/v1`, bearer-auth) and the custom Plex device-link flow
  * (`/api/tv/auth/plex/*`, which isn't a better-auth plugin). The better-auth
  * device-code login goes through `authClient` instead (see auth-client.ts).

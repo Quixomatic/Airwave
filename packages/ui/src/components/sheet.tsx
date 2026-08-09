@@ -1,8 +1,8 @@
 import * as React from "react"
 import { Dialog as SheetPrimitive } from "@base-ui/react/dialog"
 
-import { cn } from "@ChannelGuide/ui/lib/utils"
-import { Button } from "@ChannelGuide/ui/components/button"
+import { cn } from "@airwave/ui/lib/utils"
+import { Button } from "@airwave/ui/components/button"
 import { XIcon } from "@phosphor-icons/react"
 
 function Sheet({ ...props }: SheetPrimitive.Root.Props) {

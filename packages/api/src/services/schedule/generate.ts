@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 import type { GuideMeta } from "../plex/client";
 import { getGlobalBumperConfig, resolveBumperPlan } from "../bumpers/bumper-config";

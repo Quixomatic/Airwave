@@ -5,9 +5,9 @@
  *
  *   bun --env-file=.env run scripts/show-audio-caps.ts
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
-import { getDeviceNativeCaps } from "@ChannelGuide/api/services/capabilities/native-caps";
+import { getDeviceNativeCaps } from "@airwave/api/services/capabilities/native-caps";
 
 async function main() {
   const cap = await prisma.deviceCapability.findFirst({ where: { decoded: true } });

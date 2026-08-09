@@ -5,9 +5,9 @@
  *
  *   bun --env-file=.env run scripts/probe-title-streams.ts "Avatar"
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
-import { getLibraries } from "@ChannelGuide/api/services/plex/client";
+import { getLibraries } from "@airwave/api/services/plex/client";
 
 const H = (t: string) => ({ Accept: "application/json", "X-Plex-Token": t });
 

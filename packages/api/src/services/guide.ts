@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 import type { AccessSet } from "./access/access";
 import { guideMetaOf, mediaItemGuideInclude } from "./media/media-item";

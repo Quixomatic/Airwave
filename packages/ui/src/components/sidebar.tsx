@@ -5,24 +5,24 @@ import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
 import { cva, type VariantProps } from "class-variance-authority"
 
-import { useIsMobile } from "@ChannelGuide/ui/hooks/use-mobile"
-import { cn } from "@ChannelGuide/ui/lib/utils"
-import { Button } from "@ChannelGuide/ui/components/button"
-import { Input } from "@ChannelGuide/ui/components/input"
-import { Separator } from "@ChannelGuide/ui/components/separator"
+import { useIsMobile } from "@airwave/ui/hooks/use-mobile"
+import { cn } from "@airwave/ui/lib/utils"
+import { Button } from "@airwave/ui/components/button"
+import { Input } from "@airwave/ui/components/input"
+import { Separator } from "@airwave/ui/components/separator"
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "@ChannelGuide/ui/components/sheet"
-import { Skeleton } from "@ChannelGuide/ui/components/skeleton"
+} from "@airwave/ui/components/sheet"
+import { Skeleton } from "@airwave/ui/components/skeleton"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@ChannelGuide/ui/components/tooltip"
+} from "@airwave/ui/components/tooltip"
 import { SidebarIcon } from "@phosphor-icons/react"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"

@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 import { type PlexItem, getMetadata, getRecentlyAdded } from "../plex/client";
 import type { SyncProgress } from "./media-item";

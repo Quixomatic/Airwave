@@ -23,7 +23,7 @@ export function setToken(token: string | null) {
  * configured for **bearer** auth instead of cookies: we capture the
  * `set-auth-token` header on every successful call and send it back as
  * `Authorization: Bearer`. `deviceAuthorizationClient()` gives us the
- * ChannelGuide device-code login (`authClient.device.*`) for non-Plex users.
+ * Airwave device-code login (`authClient.device.*`) for non-Plex users.
  */
 export const authClient = createAuthClient({
   // SERVER_URL is "" until the device is onboarded — the app renders the setup screen in that case

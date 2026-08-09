@@ -1,7 +1,7 @@
 {
-  "id": "com.channelguide.tv",
-  "version": "0.9.53",
-  "vendor": "ChannelGuide",
+  "id": "com.airwave.tv",
+  "version": "0.10.0",
+  "vendor": "Airwave",
   "type": "web",
   "main": "index.html",
   "title": "Airwave",

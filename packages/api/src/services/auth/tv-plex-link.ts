@@ -1,13 +1,13 @@
-import { auth } from "@ChannelGuide/auth";
-import { createLinkPin, getPinToken, getPlexAccount } from "@ChannelGuide/auth/lib/plex-login";
-import type { PrismaClient } from "@ChannelGuide/db";
+import { auth } from "@airwave/auth";
+import { createLinkPin, getPinToken, getPlexAccount } from "@airwave/auth/lib/plex-login";
+import type { PrismaClient } from "@airwave/db";
 
 /**
  * TV device-code login via Plex's own PIN flow (`plex.tv/link`).
  *
  * Reuses the EXACT identity path of the web "Sign in with Plex" (genericOAuth):
  * a Plex pin → the user's Plex token → their Plex account email → match an
- * EXISTING ChannelGuide account (login-only; provisioning is via Import Plex
+ * EXISTING Airwave account (login-only; provisioning is via Import Plex
  * Users). The only difference from the web flow is acquisition: instead of a
  * browser redirect to `app.plex.tv/auth`, the TV shows a short code the user
  * enters at `plex.tv/link`, and the TV polls for the token.
@@ -37,7 +37,7 @@ export type PollResult =
 /**
  * Poll a pending link. `pending` until the user approves at plex.tv/link;
  * `expired` if the pin lapsed; `unregistered` if the Plex email has no
- * ChannelGuide account (login-only); `ok` with a session bearer token otherwise.
+ * Airwave account (login-only); `ok` with a session bearer token otherwise.
  */
 export async function pollPlexLink(prisma: PrismaClient, pinId: number): Promise<PollResult> {
   let token: string | null;

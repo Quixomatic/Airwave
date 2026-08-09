@@ -1,7 +1,7 @@
-import { accentTint, accentVivid } from "@ChannelGuide/ui/lib/accent-palette";
+import { accentTint, accentVivid } from "@airwave/ui/lib/accent-palette";
 
 /**
- * TV-app accent helpers over the shared palette (`@ChannelGuide/ui/lib/accent-palette`). The DB
+ * TV-app accent helpers over the shared palette (`@airwave/ui/lib/accent-palette`). The DB
  * stores a swatch KEY; the guide presents its MUTED tint on large surfaces (rail/cell fill, icon)
  * and the sidebar shows the VIVID value on its small package circles — "store vivid, present muted".
  */

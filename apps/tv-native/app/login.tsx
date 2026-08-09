@@ -16,7 +16,7 @@ import { C } from "@/lib/theme";
 /**
  * Login — the native port of tv-web's device-code login. The Plex device-link flow
  * (`/api/tv/auth/plex/*`) is pure REST and identical to tv-web's, so it ports 1:1. The
- * ChannelGuide code flow (better-auth device authorization) lands in a follow-up.
+ * Airwave code flow (better-auth device authorization) lands in a follow-up.
  */
 type Pending = { heading: string; instruction: string; code: string; qrValue: string };
 
@@ -60,7 +60,7 @@ export default function Login() {
           } else if (res.status === "expired") {
             reset("That code expired — try again.");
           } else if (res.status === "unregistered") {
-            reset(`No ChannelGuide account for ${res.email}. Ask an admin to import you.`);
+            reset(`No Airwave account for ${res.email}. Ask an admin to import you.`);
           }
         } catch {
           /* transient — keep polling */
@@ -71,7 +71,7 @@ export default function Login() {
     }
   }, [router]);
 
-  // ChannelGuide device code (better-auth deviceAuthorization) — mirrors tv-web's startDevice.
+  // Airwave device code (better-auth deviceAuthorization) — mirrors tv-web's startDevice.
   const startDevice = useCallback(async () => {
     setError(null);
     const { data, error: codeErr } = await authClient().device.code({ client_id: "channelguide-tv" });

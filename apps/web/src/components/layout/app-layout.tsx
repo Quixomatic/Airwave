@@ -1,6 +1,6 @@
 // SidebarTrigger temporarily hidden from the TopHeader — re-add the import to restore it.
-import { Button } from "@ChannelGuide/ui/components/button";
-import { SidebarProvider } from "@ChannelGuide/ui/components/sidebar";
+import { Button } from "@airwave/ui/components/button";
+import { SidebarProvider } from "@airwave/ui/components/sidebar";
 import { Outlet, useMatches } from "@tanstack/react-router";
 import { Sparkles } from "lucide-react";
 

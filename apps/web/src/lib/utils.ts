@@ -1,1 +1,1 @@
-export { cn } from "@ChannelGuide/ui/lib/utils";
+export { cn } from "@airwave/ui/lib/utils";

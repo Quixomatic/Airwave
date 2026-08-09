@@ -1,5 +1,5 @@
 /**
- * The TV app talks to a self-hosted ChannelGuide server that lives at a different address for every
+ * The TV app talks to a self-hosted Airwave server that lives at a different address for every
  * user — so, unlike the admin web (served same-origin by that server), the TV app can't bake the URL
  * in. It's chosen once during onboarding (`features/setup/server-setup.tsx`), validated against
  * `/api/health`, and stored on the device. A build-time `VITE_SERVER_URL` is only a dev convenience.

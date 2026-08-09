@@ -3,15 +3,15 @@ import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
-import { Button } from "@ChannelGuide/ui/components/button";
+import { Button } from "@airwave/ui/components/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@ChannelGuide/ui/components/card";
-import { Input } from "@ChannelGuide/ui/components/input";
+} from "@airwave/ui/components/card";
+import { Input } from "@airwave/ui/components/input";
 
 import { GithubIcon } from "@/components/icons/github-icon";
 import { GoogleIcon } from "@/components/icons/google-icon";

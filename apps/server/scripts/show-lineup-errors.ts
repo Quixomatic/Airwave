@@ -7,7 +7,7 @@
  *
  * Run: bun --env-file=.env scripts/show-lineup-errors.ts
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
 async function main() {
   const rows = await prisma.$queryRawUnsafe<

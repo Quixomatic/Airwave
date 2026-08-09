@@ -1,4 +1,4 @@
-import { env } from "@ChannelGuide/env/web";
+import { env } from "@airwave/env/web";
 
 /** Base URL of the API server (which hosts the public artwork proxy + static assets like bumper music). */
 export function serverBase(): string {

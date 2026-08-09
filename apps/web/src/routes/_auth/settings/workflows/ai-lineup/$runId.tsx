@@ -10,9 +10,9 @@
  * call. The list page's figure is build-steps-only at worker rates, which once reported $0.16
  * for a run whose planner alone ran twice on Opus.
  */
-import { Badge } from "@ChannelGuide/ui/components/badge";
-import { Button } from "@ChannelGuide/ui/components/button";
-import { Frame, FrameHeader, FramePanel, FrameTitle } from "@ChannelGuide/ui/components/frame";
+import { Badge } from "@airwave/ui/components/badge";
+import { Button } from "@airwave/ui/components/button";
+import { Frame, FrameHeader, FramePanel, FrameTitle } from "@airwave/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ChevronDown, ChevronRight, Loader2, RefreshCw } from "lucide-react";

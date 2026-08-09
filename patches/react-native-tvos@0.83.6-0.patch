@@ -9,7 +9,7 @@ index 35cfd7a..5482b64 100644
 -      // Void methods are always async, re-throw instead of converting to
 -      // JSError, same as the async branch in performMethodInvocation.
 -      @throw exception;
-+      // [ChannelGuide patch — facebook/react-native#54859]
++      // [Airwave patch — facebook/react-native#54859]
 +      // A void TurboModule method is dispatched ASYNC (see below), so there is NO caller to receive a
 +      // re-thrown NSException: the original `@throw exception;` propagated into C++ on the async queue with
 +      // no handler → std::terminate → abort(), which crashes the whole app at startup with
@@ -47,7 +47,7 @@ index 4c018e6..ed377ab 100644
 -    // On a 64-bit platform, this would catch ObjC exceptions, too, but not on
 -    // 32-bit platforms, so we catch those with id exceptions above.
 -    return RCTErrorWithMessage(@"non-std C++ exception");
-+    // [ChannelGuide patch — facebook/react-native#54859]
++    // [Airwave patch — facebook/react-native#54859]
 +    // Reveal the ACTUAL non-std C++ exception type + message (via the C++ ABI) so the crash REASON names the
 +    // culprit instead of the useless generic string. Kept FATAL (return the error): swallowing it here
 +    // (return nil) let the app open but then HANG on a white screen, proving this exception is on a critical
@@ -84,7 +84,7 @@ index 60506d1..fb6fb9e 100644
        echo "xros"
        return
 +    elif [[ $1 == "appletvos" || $1 == "appletvsimulator" ]]; then
-+      # [ChannelGuide patch] Apple TV must copy the built framework to the "tvos" folder,
++      # [Airwave patch] Apple TV must copy the built framework to the "tvos" folder,
 +      # because hermes-engine.podspec vendors tvOS from destroot/Library/Frameworks/tvos/.
 +      # Upstream fell through to "ios" here, so the real from-source Apple TV framework landed
 +      # in ios/ while the app linked an empty/missing framework at tvos/ -> every hermes + jsi
@@ -103,7 +103,7 @@ index 76bd3a4..81bf64f 100644
  echo '' > dummy.c
  
 -platforms=( "macosx" "ios" "xros" ) # Add other platforms here if needed
-+platforms=( "macosx" "ios" "xros" "tvos" ) # [ChannelGuide patch] added "tvos": hermes-engine.podspec vendors tvOS from destroot/Library/Frameworks/tvos, so the dummy must exist there at pod-install time (build-hermes-xcode.sh then overwrites it with the real Apple TV framework).
++platforms=( "macosx" "ios" "xros" "tvos" ) # [Airwave patch] added "tvos": hermes-engine.podspec vendors tvOS from destroot/Library/Frameworks/tvos, so the dummy must exist there at pod-install time (build-hermes-xcode.sh then overwrites it with the real Apple TV framework).
  
  for platform in "${platforms[@]}"
  do

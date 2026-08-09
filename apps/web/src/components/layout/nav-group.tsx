@@ -2,15 +2,15 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@ChannelGuide/ui/components/collapsible";
+} from "@airwave/ui/components/collapsible";
 import {
   SidebarGroup,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@ChannelGuide/ui/components/sidebar";
-import { TintedIconTile } from "@ChannelGuide/ui/components/tinted-icon-tile";
+} from "@airwave/ui/components/sidebar";
+import { TintedIconTile } from "@airwave/ui/components/tinted-icon-tile";
 import { Link, useLocation } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
 import { useState } from "react";

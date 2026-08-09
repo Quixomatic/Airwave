@@ -13,8 +13,8 @@
   "iconLibrary": "lucide",
   "aliases": {
     "components": "@/components",
-    "utils": "@ChannelGuide/ui/lib/utils",
-    "ui": "@ChannelGuide/ui/components",
+    "utils": "@airwave/ui/lib/utils",
+    "ui": "@airwave/ui/components",
     "lib": "@/lib",
     "hooks": "@/hooks"
   },

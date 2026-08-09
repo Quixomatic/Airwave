@@ -7,11 +7,11 @@
  *
  *   bun --env-file=.env run scripts/sim-playback.ts [channelNumber]
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
-import { getDeviceNativeCaps } from "@ChannelGuide/api/services/capabilities/native-caps";
-import { resolveMedia } from "@ChannelGuide/api/services/playback/broker";
-import { getNowNext } from "@ChannelGuide/api/services/schedule/generate";
+import { getDeviceNativeCaps } from "@airwave/api/services/capabilities/native-caps";
+import { resolveMedia } from "@airwave/api/services/playback/broker";
+import { getNowNext } from "@airwave/api/services/schedule/generate";
 
 // Read up to ~64KB off a stream (or a playlist) to see if Plex actually serves it.
 async function probe(url: string, opts: { range?: string } = {}) {

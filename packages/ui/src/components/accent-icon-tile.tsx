@@ -1,7 +1,7 @@
 import * as React from "react";
 
-import { accentTint, accentVivid } from "@ChannelGuide/ui/lib/accent-palette";
-import { cn } from "@ChannelGuide/ui/lib/utils";
+import { accentTint, accentVivid } from "@airwave/ui/lib/accent-palette";
+import { cn } from "@airwave/ui/lib/utils";
 
 /**
  * A rounded icon tile tinted from the shared **accent palette** (by swatch key), for CHANNEL and

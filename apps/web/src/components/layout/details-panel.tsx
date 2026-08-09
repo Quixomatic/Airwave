@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useDetailsPanel, useResolvedPanel } from "@/context/details-panel-provider";
 import { PanelFooterSlot, PanelHeaderMetaSlot, PanelHeaderTitleSlot } from "@/context/panel-header-provider";
 import { cn } from "@/lib/utils";
-import { SidePanelBody, SidePanelClose, SidePanelHeader } from "@ChannelGuide/ui/components/side-panel";
+import { SidePanelBody, SidePanelClose, SidePanelHeader } from "@airwave/ui/components/side-panel";
 
 /**
  * Slide-in side panel — an `<aside>` sibling to the inset `<main>` card. The sliding chrome lives on

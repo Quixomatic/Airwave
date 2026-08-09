@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 import type { ClientCaps } from "../plex/quality";
 import { audioQuirks, videoQuirks } from "./codecs";

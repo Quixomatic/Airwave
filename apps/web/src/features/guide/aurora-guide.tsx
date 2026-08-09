@@ -1,5 +1,5 @@
-import { Skeleton } from "@ChannelGuide/ui/components/skeleton";
-import { accentTint } from "@ChannelGuide/ui/lib/accent-palette";
+import { Skeleton } from "@airwave/ui/components/skeleton";
+import { accentTint } from "@airwave/ui/lib/accent-palette";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Star, Tv } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { MpvPlayerViewRef } from "@ChannelGuide/mpv-player";
+import type { MpvPlayerViewRef } from "@airwave/mpv-player";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { api, type GuideMeta, type MediaInfo, type Track, type TimelineSlot } from "@/lib/api";
@@ -7,7 +7,7 @@ import { deviceId } from "@/lib/device";
 
 /**
  * The tv-native channel player — the effectiveTime clock + DVR ported from tv-web's `use-tv-player`,
- * driving an **mpv** view (`@ChannelGuide/mpv-player`, source-prop + event-driven, seconds — a real seekable media element). Derives the current slot + offset from real
+ * driving an **mpv** view (`@airwave/mpv-player`, source-prop + event-driven, seconds — a real seekable media element). Derives the current slot + offset from real
  * playback position, rolls at boundaries, and — the DVR — `goTo(anyTime)` rewinds OUT of the current
  * program through the bumper into the previous one. Emits a multi-segment scrubber view.
  *

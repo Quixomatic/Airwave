@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@ChannelGuide/db";
+import type { PrismaClient } from "@airwave/db";
 
 /**
  * The break plan the schedule engine weaves in (null = no bumpers on this channel).

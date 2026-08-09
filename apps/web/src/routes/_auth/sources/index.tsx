@@ -1,12 +1,12 @@
-import { Badge } from "@ChannelGuide/ui/components/badge";
-import { Button } from "@ChannelGuide/ui/components/button";
+import { Badge } from "@airwave/ui/components/badge";
+import { Button } from "@airwave/ui/components/button";
 import {
   Frame,
   FrameDescription,
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@ChannelGuide/ui/components/frame";
+} from "@airwave/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Plus, Server as ServerIcon } from "lucide-react";
@@ -38,7 +38,7 @@ function SourcesList() {
         <FrameHeader>
           <FrameTitle>Sources</FrameTitle>
           <FrameDescription>
-            Media servers ChannelGuide builds channels from and serves content to.
+            Media servers Airwave builds channels from and serves content to.
           </FrameDescription>
         </FrameHeader>
         <FramePanel className="p-0">

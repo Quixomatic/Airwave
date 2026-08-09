@@ -1,5 +1,5 @@
 {
-  "name": "@ChannelGuide/mpv-player",
+  "name": "@airwave/mpv-player",
   "version": "0.0.0",
   "description": "Expo native video player powered by mpv — a full replacement for AVPlayer and libVLC. Apple (MPVKit) + Android/Android TV/Fire TV (libmpv-android). Direct-plays every codec/container and does fast ffmpeg-estimated HTTP seeks.",
   "main": "src/index.ts",

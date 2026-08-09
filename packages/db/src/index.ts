@@ -1,4 +1,4 @@
-import { env } from "@ChannelGuide/env/server";
+import { env } from "@airwave/env/server";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import { Prisma, PrismaClient } from "../prisma/generated/client";

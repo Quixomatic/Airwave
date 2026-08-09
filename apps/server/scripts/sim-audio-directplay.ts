@@ -14,10 +14,10 @@
  *
  *   bun --env-file=.env run scripts/sim-audio-directplay.ts "Avatar"
  */
-import prisma from "@ChannelGuide/db";
+import prisma from "@airwave/db";
 
-import { canonicalAudioCodec } from "@ChannelGuide/api/services/capabilities/codecs";
-import { getDeviceNativeCaps } from "@ChannelGuide/api/services/capabilities/native-caps";
+import { canonicalAudioCodec } from "@airwave/api/services/capabilities/codecs";
+import { getDeviceNativeCaps } from "@airwave/api/services/capabilities/native-caps";
 
 const H = (t: string) => ({ Accept: "application/json", "X-Plex-Token": t });
 
@@ -86,7 +86,7 @@ async function decide(
     "X-Plex-Session-Identifier": session,
     "X-Plex-Client-Identifier": clientId,
     "X-Plex-Token": token,
-    "X-Plex-Product": "ChannelGuide",
+    "X-Plex-Product": "Airwave",
     "X-Plex-Platform": "Generic",
     "X-Plex-Client-Profile-Extra": profile,
   });

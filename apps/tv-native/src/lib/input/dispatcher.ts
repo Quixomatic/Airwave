@@ -1,4 +1,4 @@
-import { addHardwareKeyListener } from "@ChannelGuide/key-input";
+import { addHardwareKeyListener } from "@airwave/key-input";
 import { useEffect, useRef } from "react";
 import * as RN from "react-native";
 
@@ -117,7 +117,7 @@ export function setBackExitsApp(atRoot: boolean): void {
 }
 
 /**
- * The HARDWARE-KEYBOARD event source (`@ChannelGuide/key-input`) — call once at the app root alongside
+ * The HARDWARE-KEYBOARD event source (`@airwave/key-input`) — call once at the app root alongside
  * `useTVInput`. On iPad/tvOS it reads GCKeyboard (a Magic Keyboard, any BT keyboard, a keyboard-equipped
  * remote) and feeds the SAME dispatcher, so the D-pad zone machine + channel-number entry are finally
  * drivable on a device with no TV remote. The native layer already maps to our vocabulary

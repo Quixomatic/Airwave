@@ -1,7 +1,7 @@
 import * as React from "react";
 import { X } from "lucide-react";
-import { cn } from "@ChannelGuide/ui/lib/utils";
-import { Button } from "@ChannelGuide/ui/components/button";
+import { cn } from "@airwave/ui/lib/utils";
+import { Button } from "@airwave/ui/components/button";
 
 /**
  * Reusable side-panel primitives — composable header / body / footer for any slide-in surface.
