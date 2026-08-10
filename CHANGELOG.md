@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.60] - 2026-08-10
+
+### Fixed
+
+- **tv-web login now uses the same two-column QR layout as the native app.** The device-code / Plex
+  login "pending" view stacked the heading, instruction, QR, and code in a tall single column; it now
+  matches tv-native — heading + instruction + Back on the left, a vertical divider, and the
+  white-framed QR + code on the right — which fits the 10-foot 16:9 aspect (wide, height-constrained)
+  far better.
+
 ## [0.9.59] - 2026-08-09
 
 ### Added

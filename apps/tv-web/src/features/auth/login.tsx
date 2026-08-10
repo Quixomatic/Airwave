@@ -134,18 +134,29 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
       </div>
 
       {pending ? (
-        <div className="flex flex-col items-center gap-5 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-8">
-          <p className="text-lg font-medium">{pending.heading}</p>
-          <p className="max-w-sm text-zinc-400">{pending.instruction}</p>
-          <Qr value={pending.qrValue} />
-          <p className="font-mono text-5xl font-bold tracking-[0.3em]">{pending.code}</p>
-          <button
-            onClick={() => reset(null)}
-            style={ring(0)}
-            className="rounded-lg px-4 py-2 text-sm text-zinc-400 transition hover:text-zinc-200"
-          >
-            ← Back
-          </button>
+        // Two columns (16:9 has width to spare, height is tight): heading + instruction + Back on
+        // the left, a vertical divider, then the QR + code on the right — matching tv-native.
+        <div className="flex flex-row items-center rounded-2xl border border-zinc-800 bg-zinc-900/60 p-8">
+          <div className="flex max-w-sm flex-col gap-4 pr-8 text-left">
+            <p className="text-2xl font-semibold">{pending.heading}</p>
+            <p className="leading-relaxed text-zinc-400">{pending.instruction}</p>
+            <button
+              onClick={() => reset(null)}
+              style={ring(0)}
+              className="self-start rounded-lg px-4 py-2 text-sm text-zinc-400 transition hover:text-zinc-200"
+            >
+              ← Back
+            </button>
+          </div>
+
+          <div className="w-px self-stretch bg-white/10" />
+
+          <div className="flex flex-col items-center gap-4 pl-8">
+            <div className="rounded-xl bg-white p-3">
+              <Qr value={pending.qrValue} size={190} />
+            </div>
+            <p className="font-mono text-4xl font-bold tracking-[0.2em]">{pending.code}</p>
+          </div>
         </div>
       ) : (
         <div className="flex w-full max-w-md flex-col gap-4">
