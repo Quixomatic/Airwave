@@ -147,16 +147,20 @@ React Native + **mpv** for wide-codec native playback), so features land everywh
 
 ### Platform availability
 
-| Platform | Status | How |
+| Platform | Status | Distribution |
 |---|---|---|
-| **Apple TV** | ✅ Available | native app |
-| **iPad** | ✅ Available | native app |
-| **Android TV** | ✅ Available | native app |
-| **Fire TV** | ✅ Available | native app (Amazon Appstore) |
-| **LG webOS** | ✅ Available | packaged `.ipk` (attached to each release) |
-| **Any browser** | ✅ Available | the `tvweb` Docker role — an auth-gated web player (this is what runs at [tv.turboforge.io](https://tv.turboforge.io), served from the compose stack) |
+| **Apple TV** | ✅ Available | App Store |
+| **iPad** | ✅ Available | App Store |
+| **Android TV** | ✅ Available | Google Play |
+| **Fire TV** | ✅ Available | Amazon Appstore |
+| **LG webOS** | ✅ Available | LG Content Store |
+| **Any browser** | ✅ Live now | the `tvweb` Docker role — an auth-gated web player (this is what runs at [tv.turboforge.io](https://tv.turboforge.io), served from the compose stack) |
 | **Samsung (Tizen)** | 🔜 Coming soon | — |
 | **Roku** | 🔜 Coming soon | — |
+
+The native apps are distributed through their platform stores (a small paid download — see
+[Why I built this](#why-i-built-this)). Because Airwave is source-available, you can also **build and
+sideload** any of them yourself. The browser player and the self-hosted server work today, for free.
 
 Plus the **admin web** app (any browser) to create channels & packages, manage users/bumpers, run jobs,
 and preview lineups.
