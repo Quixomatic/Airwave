@@ -8,6 +8,7 @@
 import prisma from "@airwave/db";
 
 import { getLibraries } from "@airwave/api/services/plex/client";
+import { decryptToken } from "@airwave/api/services/plex/token";
 
 const H = (token: string) => ({ Accept: "application/json", "X-Plex-Token": token });
 
@@ -34,14 +35,15 @@ async function main() {
   const source = await prisma.mediaSource.findFirst({ where: { baseUrl: { not: null } }, orderBy: { isDefault: "desc" } });
   if (!source?.baseUrl) return console.log("No connected source.");
   const base = source.baseUrl;
-  const libs = await getLibraries(base, source.token);
+  const token = decryptToken(source.token);
+  const libs = await getLibraries(base, token);
   const movieLibs = libs.filter((l: any) => l.type === "movie");
   console.log(`Source: ${source.name} — movie libraries: ${movieLibs.map((l: any) => l.title).join(", ")}\n`);
 
   const hits: { title: string; year?: number; rk: string; v?: string; a?: string; res?: string; lib: string }[] = [];
   for (const lib of movieLibs) {
     // hdr=1 is Plex's advanced HDR filter; then keep the ones whose default audio is DTS.
-    const items = await fetchAll(base, source.token, lib.key, "hdr=1");
+    const items = await fetchAll(base, token, lib.key, "hdr=1");
     for (const it of items) {
       const m = it.Media?.[0];
       if (isDts(m?.audioCodec)) {

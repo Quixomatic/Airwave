@@ -4,6 +4,7 @@ import { normalizeCallsign } from "../generator/callsign";
 import type { FilterNode } from "../plex/filter-fields";
 import { type ResolveSource, resolveFilter } from "../plex/resolve";
 import { channelSortParam } from "../plex/sort-fields";
+import { decryptToken } from "../plex/token";
 import { INITIAL_WINDOW_SECONDS, generateChannelSchedule } from "../schedule/generate";
 import { LINEUP_EXPORT_VERSION } from "./export";
 
@@ -640,5 +641,5 @@ export async function loadResolveSource(
 ): Promise<ResolveSource | null> {
   const s = await prisma.mediaSource.findUnique({ where: { id: sourceId }, select: { id: true, baseUrl: true, token: true } });
   if (!s?.baseUrl) return null;
-  return { id: s.id, baseUrl: s.baseUrl, token: s.token };
+  return { id: s.id, baseUrl: s.baseUrl, token: decryptToken(s.token) };
 }

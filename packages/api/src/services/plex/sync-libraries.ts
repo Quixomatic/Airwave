@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@airwave/db";
 
 import { getLibraries } from "./client";
+import { decryptToken } from "./token";
 
 type ConnectedSource = { id: string; token: string; baseUrl: string | null };
 
@@ -11,7 +12,7 @@ type ConnectedSource = { id: string; token: string; baseUrl: string | null };
  */
 export async function syncLibraries(prisma: PrismaClient, source: ConnectedSource) {
   if (!source.baseUrl) return [];
-  const libs = await getLibraries(source.baseUrl, source.token);
+  const libs = await getLibraries(source.baseUrl, decryptToken(source.token));
   const now = new Date();
   for (const lib of libs) {
     await prisma.mediaLibrary.upsert({

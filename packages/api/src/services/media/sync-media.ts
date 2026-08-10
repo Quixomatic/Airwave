@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@airwave/db";
 
 import { type PlexItem, getAllSectionItems } from "../plex/client";
+import { decryptToken } from "../plex/token";
 import { type SyncProgress, toMediaItemData } from "./media-item";
 
 /** Full upsert (refresh) of a batch of items, each with an optional parent-show id. */
@@ -72,7 +73,8 @@ export async function syncMediaItems(
     include: { libraries: { where: { enabled: true } } },
   });
   if (!source?.baseUrl) throw new Error("Source is not connected.");
-  const { baseUrl, token } = source;
+  const { baseUrl } = source;
+  const token = decryptToken(source.token);
   const scanStart = new Date();
 
   let shows = 0;

@@ -7,6 +7,7 @@
 import prisma from "@airwave/db";
 
 import { getLibraries } from "@airwave/api/services/plex/client";
+import { decryptToken } from "@airwave/api/services/plex/token";
 
 const COLLECTION = "HDR DTS Test";
 const H = (token: string) => ({ Accept: "application/json", "X-Plex-Token": token });
@@ -34,7 +35,7 @@ async function main() {
   const source = await prisma.mediaSource.findFirst({ where: { baseUrl: { not: null } }, orderBy: { isDefault: "desc" } });
   if (!source?.baseUrl) return console.log("No connected source.");
   const base = source.baseUrl;
-  const token = source.token;
+  const token = decryptToken(source.token);
   const libs = await getLibraries(base, token);
   const movieLib = libs.find((l: any) => l.type === "movie");
   if (!movieLib) return console.log("No movie library.");

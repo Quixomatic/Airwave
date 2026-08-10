@@ -2,6 +2,38 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.56] - 2026-08-09
+
+### Security — encrypt the Plex owner token at rest
+
+The Plex owner token (`MediaSource.token`) — used server-side to talk to Plex and to sign the
+image/playback URLs handed to clients — is now stored **encrypted** (AES-256-GCM keyed off
+`BETTER_AUTH_SECRET`, the same scheme the AI provider keys already use) instead of plaintext.
+Defense-in-depth: a dumped or leaked database no longer exposes the token.
+
+### What ships
+
+- **Encrypt on write** — `plex.saveConnection` encrypts the token before persisting it.
+- **Decrypt only at server-side use** — the token is decrypted where a loaded source makes a Plex
+  call: the playback broker (direct-play/transcode + the `/img` proxy), schedule resolution (channel
+  create/backfill/refresh, the AI-lineup and import workflows, the admin preview), metadata sync,
+  user import, field-value discovery, the token-check + connection-refresh jobs, and session
+  teardown. Clients never receive the bare token, so nothing client-side changes.
+- **Automatic one-time backfill** — on first boot after upgrading, any token still stored as
+  plaintext is encrypted in place (idempotent; also runnable via `scripts/encrypt-source-tokens.ts`).
+  Decryption tolerates legacy plaintext, so nothing breaks in the window before the backfill runs.
+- New `services/crypto.ts` + `services/plex/token.ts` (encrypt / tolerant decrypt / row helper /
+  backfill), with unit tests.
+
+### Notes
+
+- **No schema migration** (the existing `token` column holds the longer ciphertext) and **no client
+  changes**.
+- Depends on a **stable `BETTER_AUTH_SECRET`** (already true — it also keys auth and the AI keys); if
+  rotated, re-connect the Plex source.
+- One-way after upgrade: once tokens are encrypted, a pre-encryption build can't read them — re-connect
+  Plex if you ever roll back.
+
 ## [0.9.55] - 2026-08-09
 
 ### Fixed

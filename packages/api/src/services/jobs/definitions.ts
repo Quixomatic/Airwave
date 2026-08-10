@@ -11,6 +11,7 @@ import { syncMediaItems } from "../media/sync-media";
 import { syncRecentlyAdded } from "../media/sync-recent";
 import { getPlexUser, resolveConnectionUrls, stopTranscode } from "../plex/client";
 import { syncLibraries } from "../plex/sync-libraries";
+import { decryptToken, withDecryptedToken } from "../plex/token";
 import {
   INITIAL_WINDOW_SECONDS,
   extendChannelSchedule,
@@ -64,8 +65,10 @@ const throwIfAborted = (signal: AbortSignal) => {
   if (signal.aborted) throw new Error("Job canceled");
 };
 
-const enabledSources = () =>
-  prisma.mediaSource.findMany({ where: { enabled: true } });
+// Owner tokens are stored encrypted; decrypt here so every job consumer (token-check,
+// connection-refresh, metadata sync) gets a source ready for a Plex call. See services/plex/token.ts.
+const enabledSources = async () =>
+  (await prisma.mediaSource.findMany({ where: { enabled: true } })).map(withDecryptedToken);
 
 export const JOB_DEFINITIONS: JobDefinition[] = [
   {
@@ -394,7 +397,7 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
         if (s.transcodeSession && src?.baseUrl) {
           await stopTranscode(
             src.baseUrl,
-            src.token,
+            decryptToken(src.token),
             src.clientIdentifier ?? "channelguide-server",
             s.transcodeSession,
           );

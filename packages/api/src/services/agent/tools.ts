@@ -6,6 +6,7 @@ import { getFilterValues, type GuideMeta, type PlexItem } from "../plex/client";
 import { fieldMeta, FILTER_FIELDS, OPS_FOR_KIND, type FilterNode } from "../plex/filter-fields";
 import { resolveFilter } from "../plex/resolve";
 import { channelSortParam } from "../plex/sort-fields";
+import { decryptToken } from "../plex/token";
 
 /**
  * The channel-building agent's TOOLBOX — plain service functions the AI chat calls (wrapped as AI
@@ -18,7 +19,7 @@ export type MediaType = "movie" | "show";
 async function requireSource(prisma: PrismaClient, mediaSourceId: string) {
   const s = await prisma.mediaSource.findUnique({ where: { id: mediaSourceId } });
   if (!s?.baseUrl) throw new Error(`Media source ${mediaSourceId} not found or has no base URL`);
-  return { id: s.id, baseUrl: s.baseUrl, token: s.token };
+  return { id: s.id, baseUrl: s.baseUrl, token: decryptToken(s.token) };
 }
 
 const asFilterNode = (f: unknown): FilterNode | undefined => (f ? (JSON.parse(JSON.stringify(f)) as FilterNode) : undefined);

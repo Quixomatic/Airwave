@@ -4,6 +4,7 @@ import { getDeviceNativeCaps } from "../capabilities/native-caps";
 import { notFound, preconditionFailed } from "../errors";
 import { getPlaybackInfo, stopTranscode } from "../plex/client";
 import { QUALITY_PRESETS, type ClientCaps } from "../plex/quality";
+import { withDecryptedToken } from "../plex/token";
 import { getChannelTimeline } from "../schedule/generate";
 
 /**
@@ -20,8 +21,10 @@ export async function resolveChannelSource(prisma: PrismaClient, channelId: stri
     include: { mediaSource: true },
   });
   if (!channel) throw notFound("Channel not found.");
-  const source = channel.mediaSource;
-  if (!source?.baseUrl) throw preconditionFailed("Source is not connected.");
+  if (!channel.mediaSource?.baseUrl) throw preconditionFailed("Source is not connected.");
+  // Decrypt the owner token here — every consumer of this source (playback, stopTranscode, the
+  // /img proxy) makes a Plex call with it. See services/plex/token.ts.
+  const source = withDecryptedToken(channel.mediaSource);
   return { channel, source, clientId: source.clientIdentifier ?? "channelguide-server" };
 }
 

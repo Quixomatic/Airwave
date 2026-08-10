@@ -9,6 +9,7 @@ import { runJob } from "../services/jobs/scheduler";
 import { getFilterValues } from "../services/plex/client";
 import { FILTER_FIELDS, OPS_FOR_KIND, fieldMeta } from "../services/plex/filter-fields";
 import { resolveChannel } from "../services/plex/resolve";
+import { decryptToken } from "../services/plex/token";
 import { previewItems } from "../services/agent/tools";
 import { SORT_FIELDS } from "../services/plex/sort-fields";
 import { normalizeCallsign } from "../services/generator/callsign";
@@ -229,7 +230,7 @@ export const channelsRouter = router({
       });
       const titles = new Set<string>();
       for (const lib of libs) {
-        const vals = await getFilterValues(source.baseUrl, source.token, lib.key, meta.plex);
+        const vals = await getFilterValues(source.baseUrl, decryptToken(source.token), lib.key, meta.plex);
         for (const v of vals) titles.add(v.title);
       }
       return [...titles].sort((a, b) => a.localeCompare(b));

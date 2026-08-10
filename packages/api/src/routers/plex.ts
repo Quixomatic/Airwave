@@ -5,6 +5,7 @@ import { adminProcedure, router } from "../index";
 import * as plex from "../services/plex/client";
 import { importPlexUsers } from "../services/plex/import-users";
 import { syncLibraries } from "../services/plex/sync-libraries";
+import { encryptToken } from "../services/plex/token";
 
 export const plexRouter = router({
   /** Begin "Sign in with Plex": create a pin + the hosted auth URL. */
@@ -55,7 +56,7 @@ export const plexRouter = router({
         remoteUrl: conns?.remoteUrl ?? null,
         relayUrl: conns?.relayUrl ?? null,
         machineIdentifier: input.machineIdentifier,
-        token: input.token,
+        token: encryptToken(input.token), // encrypted at rest — decrypt via services/plex/token
         clientIdentifier: input.clientId,
         webAppUrl: input.webAppUrl ?? null,
         ownerUserId: ctx.session.user.id,

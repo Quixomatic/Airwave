@@ -6,6 +6,7 @@ import { contentTypeFor } from "@airwave/api/services/bumper-music/store";
 import { startJobs } from "@airwave/api/services/jobs/scheduler";
 import { resolveChannelSource } from "@airwave/api/services/playback/broker";
 import { buildAuthUrl, createPin } from "@airwave/api/services/plex/client";
+import { encryptExistingSourceTokens } from "@airwave/api/services/plex/token";
 import prisma from "@airwave/db";
 import { auth } from "@airwave/auth";
 import { PLEX_CLIENT_ID } from "@airwave/auth/lib/plex-login";
@@ -232,6 +233,15 @@ try {
   await seedAdmin();
 } catch (err) {
   console.error("Admin seeding failed:", err);
+}
+
+// Encrypt any Plex owner token still stored as plaintext (one-time, idempotent — no-op once
+// done). Runs before jobs so nothing reads a token mid-migration; decryption is tolerant of
+// plaintext, so a hiccup here is non-fatal. See packages/api/src/services/plex/token.ts.
+try {
+  await encryptExistingSourceTokens(prisma);
+} catch (err) {
+  console.error("Plex token encryption backfill failed:", err);
 }
 
 // Register background jobs (metadata sync, library scan, schedule refresh).

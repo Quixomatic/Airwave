@@ -14,6 +14,7 @@
 import prisma from "@airwave/db";
 
 import { getLibraries } from "@airwave/api/services/plex/client";
+import { decryptToken } from "@airwave/api/services/plex/token";
 
 const H = (token: string) => ({ Accept: "application/json", "X-Plex-Token": token });
 
@@ -66,18 +67,19 @@ async function main() {
   const source = await prisma.mediaSource.findFirst({ where: { baseUrl: { not: null } }, orderBy: { isDefault: "desc" } });
   if (!source?.baseUrl) return console.log("No connected source.");
   const base = source.baseUrl;
-  const libs = await getLibraries(base, source.token);
+  const token = decryptToken(source.token);
+  const libs = await getLibraries(base, token);
   const movieLibs = libs.filter((l: any) => l.type === "movie");
   console.log(`Source: ${source.name} — movie libraries: ${movieLibs.map((l: any) => l.title).join(", ")}\n`);
 
   // ---- Part 1: Plex — find DV titles + their profile / BL-compat-id ----
   const hits: { title: string; year?: number; rk: string; profile: number; level?: number; blCompatId?: number; lib: string }[] = [];
   for (const lib of movieLibs) {
-    const items = await fetchAll(base, source.token, lib.key, "hdr=1"); // DV is a subset of HDR
+    const items = await fetchAll(base, token, lib.key, "hdr=1"); // DV is a subset of HDR
     let scanned = 0;
     for (const it of items) {
       if (scanned >= SCAN_CAP) break;
-      const media = await fetchMediaWithStreams(base, source.token, it.ratingKey);
+      const media = await fetchMediaWithStreams(base, token, it.ratingKey);
       scanned++;
       const dovi = doviOf(media);
       if (dovi) hits.push({ title: it.title, year: it.year, rk: String(it.ratingKey), ...dovi, lib: lib.title });

@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@airwave/db";
 
 import { type PlexItem, getMetadata, getRecentlyAdded } from "../plex/client";
+import { decryptToken } from "../plex/token";
 import type { SyncProgress } from "./media-item";
 import { upsertMany, upsertShows } from "./sync-media";
 
@@ -58,7 +59,8 @@ export async function syncRecentlyAdded(
     include: { libraries: { where: { enabled: true } } },
   });
   if (!source?.baseUrl) throw new Error("Source is not connected.");
-  const ctx = { id: source.id, baseUrl: source.baseUrl, token: source.token };
+  // Decrypt once here — ctx feeds ensureShows + getRecentlyAdded. See services/plex/token.ts.
+  const ctx = { id: source.id, baseUrl: source.baseUrl, token: decryptToken(source.token) };
 
   let items = 0;
   for (const lib of source.libraries) {

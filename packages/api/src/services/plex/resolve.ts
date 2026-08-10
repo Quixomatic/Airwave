@@ -3,6 +3,7 @@ import type { PrismaClient } from "@airwave/db";
 import { type PlexItem, getFilterValues, getSectionItemsRaw } from "./client";
 import { type FilterCondition, type FilterNode, buildParam } from "./filter-fields";
 import { channelSortParam } from "./sort-fields";
+import { decryptToken } from "./token";
 
 type LibCtx = {
   baseUrl: string;
@@ -135,7 +136,7 @@ export async function resolveChannel(
   const sort = channelSortParam(channel.ordering, channel.sortField, channel.sortDir);
   return resolveFilter(
     prisma,
-    { id: source.id, baseUrl: source.baseUrl, token: source.token },
+    { id: source.id, baseUrl: source.baseUrl, token: decryptToken(source.token) },
     mediaTypes,
     filter.filter,
     sort,

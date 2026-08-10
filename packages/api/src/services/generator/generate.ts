@@ -3,6 +3,7 @@ import type { PrismaClient } from "@airwave/db";
 import { channelAccentAt } from "../accents";
 import type { SyncProgress } from "../media/media-item";
 import { resolveFilter } from "../plex/resolve";
+import { decryptToken } from "../plex/token";
 import { INITIAL_WINDOW_SECONDS, generateChannelSchedule } from "../schedule/generate";
 import { normalizeCallsign, uniqueCallsign } from "./callsign";
 import { PRESET_PACKAGES, type PresetPackage } from "./presets";
@@ -40,7 +41,7 @@ export async function generateLineup(
   const scope = opts.scope ?? "all";
   const source = await prisma.mediaSource.findUnique({ where: { id: sourceId } });
   if (!source?.baseUrl) throw new Error("Source is not connected.");
-  const src = { id: source.id, baseUrl: source.baseUrl, token: source.token };
+  const src = { id: source.id, baseUrl: source.baseUrl, token: decryptToken(source.token) };
   const targets = packagesFor(scope);
 
   // Upsert package metadata (all scopes) — keeps ids stable across regens.

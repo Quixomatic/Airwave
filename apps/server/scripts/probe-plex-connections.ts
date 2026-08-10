@@ -5,6 +5,7 @@
  *   bun --env-file=.env run scripts/probe-plex-connections.ts
  */
 import { getServers, pickConnectionUrls } from "@airwave/api/services/plex/client";
+import { decryptToken } from "@airwave/api/services/plex/token";
 import prisma from "@airwave/db";
 
 const sources = await prisma.mediaSource.findMany({ where: { type: "PLEX" } });
@@ -13,7 +14,7 @@ if (!sources.length) console.log("no PLEX sources");
 for (const s of sources) {
   console.log(`\n=== ${s.name} (machineIdentifier=${s.machineIdentifier}) ===`);
   console.log(`stored baseUrl: ${s.baseUrl}`);
-  const servers = await getServers(s.clientIdentifier ?? "channelguide-server", s.token);
+  const servers = await getServers(s.clientIdentifier ?? "channelguide-server", decryptToken(s.token));
   const server = servers.find((x) => x.clientIdentifier === s.machineIdentifier);
   if (!server) {
     console.log("  ⚠ no matching server in /resources");

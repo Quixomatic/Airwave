@@ -18,6 +18,7 @@ import prisma from "@airwave/db";
 
 import { canonicalAudioCodec } from "@airwave/api/services/capabilities/codecs";
 import { getDeviceNativeCaps } from "@airwave/api/services/capabilities/native-caps";
+import { decryptToken } from "@airwave/api/services/plex/token";
 
 const H = (t: string) => ({ Accept: "application/json", "X-Plex-Token": t });
 
@@ -139,7 +140,7 @@ async function main() {
   });
   if (!item?.mediaSource?.baseUrl || !item.ratingKey) return console.log(`No cached "${title}" with a source.`);
   const base = item.mediaSource.baseUrl;
-  const token = item.mediaSource.token;
+  const token = decryptToken(item.mediaSource.token);
   const clientId = item.mediaSource.clientIdentifier ?? "channelguide-server";
   console.log(`Title: ${item.title} (ratingKey ${item.ratingKey})`);
 

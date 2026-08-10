@@ -9,6 +9,7 @@ import prisma from "@airwave/db";
 
 import { getDeviceNativeCaps } from "@airwave/api/services/capabilities/native-caps";
 import { getPlaybackInfo } from "@airwave/api/services/plex/client";
+import { decryptToken } from "@airwave/api/services/plex/token";
 
 async function probe(url: string) {
   const ctrl = new AbortController();
@@ -58,7 +59,7 @@ async function main() {
     for (const offset of [30, 3000]) {
       let info: any;
       try {
-        info = await getPlaybackInfo(src.baseUrl, src.token, clientId, it.ratingKey, offset, {
+        info = await getPlaybackInfo(src.baseUrl, decryptToken(src.token), clientId, it.ratingKey, offset, {
           caps: caps ?? undefined,
         });
       } catch (e) {

@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@airwave/db";
 
 import { getSharedUsers } from "./client";
+import { decryptToken } from "./token";
 
 type ConnectedSource = {
   token: string;
@@ -21,7 +22,7 @@ export async function importPlexUsers(prisma: PrismaClient, source: ConnectedSou
 
   const shared = await getSharedUsers(
     source.clientIdentifier,
-    source.token,
+    decryptToken(source.token),
     source.machineIdentifier,
   );
 

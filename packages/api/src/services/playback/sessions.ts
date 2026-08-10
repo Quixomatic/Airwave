@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@airwave/db";
 
 import { type GuideMeta, stopTranscode } from "../plex/client";
+import { decryptToken } from "../plex/token";
 
 /** A session is "active" while it's heartbeated within this window. */
 export const SESSION_ACTIVE_MS = 30_000;
@@ -73,7 +74,7 @@ export async function endWatchSession(prisma: PrismaClient, userId: string) {
   if (existing.transcodeSession && src?.baseUrl) {
     await stopTranscode(
       src.baseUrl,
-      src.token,
+      decryptToken(src.token),
       src.clientIdentifier ?? "channelguide-server",
       existing.transcodeSession,
     );
