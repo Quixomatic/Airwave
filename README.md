@@ -15,12 +15,9 @@ Apple TV / iPad apps on the App Store — and you're welcome to build and sidelo
 > **Status:** actively developed, pre-1.0, and used daily on real hardware (LG webOS TV, Apple TV 4K, TrueNAS).
 > See [Project status](#project-status) for what's solid vs. in progress.
 
-<!--
-SCREENSHOTS — add real ones before/at launch (drop them in docs/screenshots/ and reference here):
-![The channel guide](docs/screenshots/guide.png)
-![A channel playing](docs/screenshots/watch.png)
-![Building a channel](docs/screenshots/channel-editor.png)
--->
+![The Airwave channel guide on a TV](docs/screenshots/appletv-guide.webp)
+
+<sub>The Aurora channel guide, running on Apple TV. More in [Screenshots](#screenshots) below.</sub>
 
 ---
 
@@ -90,6 +87,36 @@ runtime by `CG_ROLE`:
 - `tvweb` *(optional)* — the 10-foot TV app served as an auth-gated browser player, for casting/kiosk setups.
 
 A Postgres database and [`docker-compose.yml`](./docker-compose.yml) wire it together.
+
+---
+
+## Screenshots
+
+### On your TV (the 10-foot app)
+
+|   |   |
+|---|---|
+| ![The Aurora channel guide](docs/screenshots/appletv-guide.webp) | ![A channel playing with the DVR scrubber](docs/screenshots/appletv-fullchrome.webp) |
+| *The Aurora channel guide — channels on the rail, what's on now/next.* | *A channel playing, with the DVR scrubber and glass controls.* |
+| ![The "Up Next" bumper card](docs/screenshots/appletv-bumper.webp) | ![Channel surf carousel](docs/screenshots/appletv-channelsurfing.webp) |
+| *The "Up Next" bumper between programs (with an optional music bed).* | *Channel surf — flip channels without leaving what's on.* |
+| ![Filter the guide](docs/screenshots/appletv-sidebarfilter.webp) | ![Full program info](docs/screenshots/appletv-fullchrome-programinfo.webp) |
+| *Filter the guide by package, favorites, or recents.* | *Full program info while you watch.* |
+
+### In the admin (build & manage)
+
+|   |   |
+|---|---|
+| ![Build a channel from a filter](docs/screenshots/admin-channel-filter.webp) | ![Preview and schedule](docs/screenshots/admin-channel-preview-and-schedule.webp) |
+| *Build a channel from a metadata filter, with grouping & rotation strategies — and a live preview of what resolves.* | *Preview the resolved pool and the generated schedule.* |
+| ![The guide previewed in a TV mockup](docs/screenshots/admin-guidepreview.webp) | ![All your channels](docs/screenshots/admin-channels.webp) |
+| *The guide, previewed in a TV-device mockup.* | *All your channels at a glance.* |
+| ![Channel packages](docs/screenshots/admin-packages.webp) | ![Connect your Plex source](docs/screenshots/admin-source.webp) |
+| *Group channels into packages.* | *Connect your Plex server and choose libraries.* |
+| ![Per-user access control](docs/screenshots/admin-users.webp) | ![Now Playing sessions](docs/screenshots/admin-settings-sessions.webp) |
+| *Plex-style per-user access control.* | *Now Playing — who's watching, and how each stream is delivered.* |
+| ![Bumpers and music](docs/screenshots/admin-bumpers.webp) | ![Optional AI assistant](docs/screenshots/admin-settings-ai.webp) |
+| *Bumpers + an optional ambient-music library.* | *Optional AI assistant — bring your own key.* |
 
 ---
 

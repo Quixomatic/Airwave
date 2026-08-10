@@ -1,18 +1,23 @@
 # Screenshots
 
-Drop the README screenshots here. The root [`README.md`](../../README.md) references these exact filenames in an
-HTML comment near the top — add the images, then **uncomment** those `![…]` lines to make them show:
+These are referenced from the root [`README.md`](../../README.md) (the hero image + the **Screenshots**
+section). Current set:
 
-| File | Shows |
-|---|---|
-| `guide.png` | The channel-guide grid (the Aurora guide — channels + now/next). |
-| `watch.png` | A channel playing full-screen (with the DVR scrubber / now-playing chrome). |
-| `channel-editor.png` | The admin channel editor (filter builder + preview tiles, ideally the strategy section). |
+**TV app (Apple TV):** `appletv-guide`, `appletv-fullchrome`, `appletv-fullchrome-programinfo`,
+`appletv-channelsurfing`, `appletv-sidebarfilter`, `appletv-bumper`, `appletv-devicesettings`,
+`appletv-serversettings`.
 
-Tips:
-- Landscape, 16:9, ~1920×1080 (or the TV app's native capture) reads best on GitHub.
-- PNG (or optimized) — keep each well under a few hundred KB so clones stay light.
-- Consider a light + dark example if you want to show both themes.
+**Admin:** `admin-channels`, `admin-channel-details`, `admin-channel-filter`,
+`admin-channel-preview-and-schedule`, `admin-packages`, `admin-guidepreview`, `admin-source`,
+`admin-users`, `admin-jobs`, `admin-bumpers`, `admin-settings-ai`, `admin-settings-sessions`.
 
-Add more as needed and reference them from the README.
-</content>
+## Conventions
+
+- **Format: `.webp`, quality 80**, native resolution (4K captures come in around ~50–250 KB each —
+  crisp on GitHub, tiny in the repo). Convert a new PNG with:
+  ```bash
+  ffmpeg -i shot.png -c:v libwebp -quality 80 -compression_level 6 shot.webp && rm shot.png
+  ```
+- **Redact PII** before capture (imported user emails, etc.) — a solid bar is safer than a light blur
+  on short strings. (LAN IPs and the Plex server GUID are not sensitive.)
+- Keep names descriptive (`surface-what-it-shows`) and reference them from the root README.
