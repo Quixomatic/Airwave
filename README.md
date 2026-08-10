@@ -31,6 +31,11 @@ I built Airwave for myself — to bring back the feeling of flipping on live cab
 channels of good content for my own kid to grow up with. I self-host it, I use it every day, and I plan to keep
 maintaining it for many years.
 
+It goes further than the couch, too: on a recent road trip I put on a channel of mixed kids' shows for my son
+instead of being stuck on one Plex title the whole drive and manually changing it — a nice variety kept him from
+getting bored. That worked because Airwave streams from Plex **remotely** whenever your Plex server is reachable
+from outside your network (see [Watch from anywhere](#what-it-does)).
+
 It's yours to run and tinker with. The server, admin UI, and web/browser TV app are free and open — **change
 whatever you want, that's encouraged.** You're welcome to modify the native TV apps and build/sideload your own
 copies too, and **contributions and PRs are very welcome** — I'm happy to take improvements.
@@ -59,7 +64,9 @@ and effort I've put in, for folks who just want to grab it and go. Everything el
   automatic diagnostic), so Airwave direct-plays natively wherever possible and only transcodes when it must —
   4K HDR HEVC, TrueHD/DTS, the works, per device.
 - **Watch from anywhere.** Off-network playback resolves the right connection to your media server
-  automatically (local → remote → relay), so the same app works at home and on the road.
+  automatically (local → remote → relay), so the same app works at home and on the road — **as long as your
+  Plex server is set up for remote access** (Plex Remote Access, or a reachable domain/port). Tune in from a
+  phone hotspot on a road trip and your channels just play.
 - **Move channels between instances.** Export a lineup (packages + channels + filters) and import it into another
   Airwave — with dry-run and de-duplication.
 - **Optional AI channel builder.** *Off by default.* If you want, bring your own API key and let an assistant
@@ -128,15 +135,25 @@ A Postgres database and [`docker-compose.yml`](./docker-compose.yml) wire it tog
 
 ## Clients
 
-| Surface | Runs on | Notes |
-|---|---|---|
-| **Admin web** | any browser | create channels & packages, manage users/bumpers, run jobs, preview lineups |
-| **TV app (native)** | Apple TV, iPad, Android TV, Fire TV | Expo / React Native + **mpv** for wide-codec native playback |
-| **TV app (webOS)** | LG smart TVs | packaged `.ipk` (attached to each release) |
-| **TV app (browser)** | any Chromium browser / kiosk | the `tvweb` role above |
-
 The TV app is a full 10-foot experience: an Aurora channel-guide grid, a native-first player with a DVR
-scrubber, channel up/down, and the "Up Next" bumper card.
+scrubber, channel up/down, and the "Up Next" bumper card. It's the **same app** across platforms (Expo /
+React Native + **mpv** for wide-codec native playback), so features land everywhere at once.
+
+### Platform availability
+
+| Platform | Status | How |
+|---|---|---|
+| **Apple TV** | ✅ Available | native app |
+| **iPad** | ✅ Available | native app |
+| **Android TV** | ✅ Available | native app |
+| **Fire TV** | ✅ Available | native app (Amazon Appstore) |
+| **LG webOS** | ✅ Available | packaged `.ipk` (attached to each release) |
+| **Any browser** | ✅ Available | the `tvweb` Docker role — an auth-gated web player (this is what runs at [tv.turboforge.io](https://tv.turboforge.io), served from the compose stack) |
+| **Samsung (Tizen)** | 🔜 Coming soon | — |
+| **Roku** | 🔜 Coming soon | — |
+
+Plus the **admin web** app (any browser) to create channels & packages, manage users/bumpers, run jobs,
+and preview lineups.
 
 ---
 
@@ -281,7 +298,8 @@ On the roadmap / in progress:
 
 - Rotation **weighting + freshness** (make a show air more/less often; surface just-added episodes)
 - **Jellyfin / Emby** media-server support
-- A manual schedule editor, more platforms, and general pre-1.0 polish
+- **Samsung (Tizen)** and **Roku** clients
+- A manual schedule editor and general pre-1.0 polish
 
 ---
 
