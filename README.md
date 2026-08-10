@@ -278,6 +278,17 @@ airwave/
 The web apps share shadcn/ui primitives via `@airwave/ui` — edit tokens in `packages/ui/src/styles/globals.css`,
 primitives in `packages/ui/src/components/*`. Import them with `import { Button } from "@airwave/ui/components/button"`.
 
+### Architecture docs
+
+"How it works" deep-dives live in [`docs/`](docs/) — for contributors and the curious:
+
+- [Background jobs](docs/jobs.md) — the in-process `node-schedule` system + the job catalog
+- [Durable workflows](docs/workflows.md) — how the AI lineup builder and importer run on the Workflow SDK
+- [Import / Export](docs/import-export.md) — moving a lineup between instances
+- [Users & access control](docs/users-and-access.md) — Plex user import + granular per-user access
+
+More subsystem docs are on the way — see the [docs index](docs/README.md).
+
 ---
 
 ## Tech stack
