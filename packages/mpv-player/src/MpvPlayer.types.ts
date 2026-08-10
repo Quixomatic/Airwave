@@ -62,6 +62,12 @@ export interface MpvPlayerViewProps extends ViewProps {
   audioTrack?: number;
   /** mpv subtitle track id (`sid`). `-1` = none. */
   subtitleTrack?: number;
+  /**
+   * Audio channel handling (mpv `audio-channels`). `"auto"` (default) uses the full negotiated route —
+   * real 5.1/7.1 LPCM to an AVR/soundbar; `"stereo"` forces a fold-down. Applied at init and switchable
+   * live (the caller reloads the current program for a switch to take effect).
+   */
+  audioMode?: "auto" | "stereo";
   /** Extra mpv options applied at init, e.g. `{ "cache": "yes", "hwdec": "videotoolbox" }`. */
   options?: Record<string, string>;
 

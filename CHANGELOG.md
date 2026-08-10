@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.64] - 2026-08-10
+
+### Fixed
+
+- **tv-native: 5.1 audio plays correctly on Apple TV / Android TV — dialogue is no longer lost.** A 5.1
+  (E-AC3, etc.) track direct-playing through mpv came out with the center channel — which carries the
+  dialogue — missing, as if routed to speakers that aren't there, while the Plex app played the same file
+  fine as LPCM 5.1. Cause: the video player never configured the shared AVAudioSession, so tvOS/iOS never
+  negotiated a multichannel output route and mpv's 5.1 got mangled down. The player now puts the session
+  into long-form video playback (`.playback` / `.moviePlayback` / `.longFormAudio`) and re-asserts it when
+  mpv's audio unit spins up (mpv stomps the shared session on init), and mpv's `audio-channels` defaults to
+  the full negotiated layout (`auto`) instead of the stereo-capped `auto-safe`. Real 5.1/7.1 LPCM now
+  reaches a capable receiver/soundbar; a stereo route still folds down cleanly; stereo and transcoded
+  tracks are unaffected.
+
+### Added
+
+- **Settings → Audio (tv-native): choose the audio output layout.** A new per-device setting —
+  **Multichannel** (default: real 5.1/7.1 to a capable receiver/soundbar) or **Stereo** (always fold down,
+  for plain TV speakers or a receiver that mishandles multichannel). Client-side only via mpv
+  `audio-channels`, so it never forces a transcode; switching reloads the current program at the same spot.
+
 ## [0.9.63] - 2026-08-10
 
 ### Added

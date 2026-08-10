@@ -74,6 +74,10 @@ class MpvCore(private val appContext: Context) {
           setOption("opengl-es", "yes")
           setOption("hwdec", "mediacodec,mediacodec-copy")
           setOption("ao", "audiotrack")
+          // Use the full layout the HDMI sink accepts (real 5.1/7.1 LPCM) instead of the timid `auto-safe`
+          // default that caps at stereo. On a 2-channel sink this resolves to stereo (mpv folds the center
+          // in), so it's correct everywhere. The JS `audioMode` setting overrides this to force stereo.
+          setOption("audio-channels", "auto")
           // Signals the target colorspace to gpu-next. On a Vulkan/HDR-capable path this passes HDR metadata
           // through, but Android's OpenGL-ES gpu-next path tone-maps HDR→SDR regardless (see §13). Kept
           // (harmless) — real HDR passthrough is the dynamic mediacodec_embed arc (§13.5), not this option.
@@ -151,6 +155,10 @@ class MpvCore(private val appContext: Context) {
   fun setSubtitleTrack(id: Int) = launchOnPlayer {
     if (id < 0) it.setProperty("sid", "no") else it.setProperty("sid", id)
   }
+
+  /** Audio channel layout: `"auto"` uses the full HDMI-sink layout (real 5.1/7.1), `"stereo"` forces a
+   *  fold-down. Applied when the audio chain is next (re)initialized, so callers reload the current file. */
+  fun setAudioChannels(layout: String) = launchOnPlayer { it.setProperty("audio-channels", layout) }
 
   fun setContentFit(fit: String) = launchOnPlayer {
     when (fit) {

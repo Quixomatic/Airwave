@@ -8,6 +8,7 @@ import { TvPressable as Pressable } from "@/components/tv-pressable";
 import { cs, scaled } from "@/features/guide/layout";
 import { useGuide } from "@/hooks/queries";
 import { api } from "@/lib/api";
+import { useAudioMode } from "@/lib/audio-pref";
 import { onInputActivity } from "@/lib/input";
 import { C } from "@/lib/theme";
 
@@ -174,13 +175,16 @@ function PlayerHost({
   const [quality, setQuality] = useState("original");
   const [audioStreamId, setAudioStreamId] = useState<string | undefined>(undefined);
   const [subtitleStreamId, setSubtitleStreamId] = useState<string | undefined>(undefined);
+  // Device audio-output pref (Settings → Audio). Reactive: flipping it reloads the current program with
+  // the new mpv `audio-channels` (see useTvPlayer's reload key + the MpvPlayerView `audioMode` prop).
+  const audioMode = useAudioMode();
   const [qualities, setQualities] = useState<{ id: string; label: string }[]>([]);
   useEffect(() => {
     api.qualities().then((r) => setQualities(r.qualities)).catch(() => {});
   }, []);
   // Only build the scrubber when full-screen (the feature panel is the only consumer) — skip the per-tick
   // work while a mini feed is docked / off.
-  const tv = useTvPlayer(channelId, { quality, audioStreamId, subtitleStreamId }, layout === "full");
+  const tv = useTvPlayer(channelId, { quality, audioStreamId, subtitleStreamId, audioMode }, layout === "full");
   const { status } = tv;
 
   // Ambient music bed under bumpers (§7.14 Phase B) — on the persistent host, so it plays full-screen AND
@@ -235,7 +239,7 @@ function PlayerHost({
         // Subtitles OFF by default: mpv otherwise auto-selects the embedded/forced sub track (sid=auto).
         // In this app subs are delivered by SERVER burn-in (selecting them re-resolves to a transcode
         // that hardcodes them into the video), so mpv must never render a text sub track itself.
-        <MpvPlayerView ref={tv.viewRef} source={tv.source} startTime={tv.startTime} options={{ sid: "no", "sub-auto": "no" }} {...tv.videoEvents} style={StyleSheet.absoluteFill} contentFit={full ? "contain" : "cover"} />
+        <MpvPlayerView ref={tv.viewRef} source={tv.source} startTime={tv.startTime} audioMode={audioMode} options={{ sid: "no", "sub-auto": "no" }} {...tv.videoEvents} style={StyleSheet.absoluteFill} contentFit={full ? "contain" : "cover"} />
       )}
 
       {/* bumper interstitial — full (blurred art + big title + donut) or compact (mini feed) */}

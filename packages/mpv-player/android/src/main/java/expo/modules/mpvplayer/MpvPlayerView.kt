@@ -30,6 +30,9 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   private var disposed = false
 
   var options: Map<String, String> = emptyMap()
+  // "auto" = full negotiated multichannel layout (default); "stereo" = force a fold-down. Merged into the
+  // init options so the first load is right, and pushed live (setAudioChannels) for a mid-playback switch.
+  private var audioMode: String = "auto"
 
   // Events (names must match `Events(...)` in the module).
   private val onLoad by EventDispatcher()
@@ -84,6 +87,10 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   fun setVolume(v: Double) = core.setVolume(v)
   fun setAudioTrack(id: Int) = core.setAudioTrack(id)
   fun setSubtitleTrack(id: Int) = core.setSubtitleTrack(id)
+  fun setAudioMode(mode: String) {
+    audioMode = if (mode == "stereo") "stereo" else "auto"
+    core.setAudioChannels(audioMode) // live switch (no-op until setup); JS reloads the program to apply
+  }
 
   // MARK: imperative control (from module AsyncFunctions)
 
@@ -105,7 +112,9 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   private fun applySource() {
     if (disposed) return
     if (!didSetup) {
-      core.setup(options)
+      // Inject the current audio mode so the first load negotiates the right layout (options override the
+      // core's `audio-channels` default). Later switches go through setAudioMode → live property + reload.
+      core.setup(options + mapOf("audio-channels" to audioMode))
       didSetup = true
     }
     if (pendingSource == lastLoadedSource) return

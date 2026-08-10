@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Libmpv
 import QuartzCore
@@ -34,6 +35,13 @@ final class MpvCore {
   /// Create + initialize mpv, rendering into `layer` (its pointer is handed to mpv as `wid`, which the
   /// MPVKit `avfoundation` VO draws into). Extra `options` override the defaults.
   func setup(layer: CALayer, options: [String: String]) -> Bool {
+    // Configure the shared audio session for long-form video playback BEFORE mpv's audio unit spins up,
+    // so it negotiates the real multichannel route (5.1/7.1 LPCM to an AVR/soundbar). Without this, the
+    // session stays stereo-capped and mpv's multichannel output gets mangled — the center channel
+    // (dialogue) is lost. Re-applied when the AO comes up (see `current-ao` / PLAYBACK_RESTART), because
+    // mpv stomps the shared session when its audio unit initializes (streamyfin's hard-won lesson).
+    configureAudioSession()
+
     mpv = mpv_create()
     guard let mpv else { return false }
 
@@ -47,6 +55,10 @@ final class MpvCore {
       "hwdec": "videotoolbox",
       "hwdec-codecs": "all",
       "target-colorspace-hint": "auto",
+      // Use the FULL layout the negotiated audio route reports (real 5.1/7.1), not the timid `auto-safe`
+      // default that caps at stereo. On a 2-channel route this still resolves to stereo (mpv folds the
+      // center in), so it's correct everywhere. The JS `audioMode` setting overrides this to force stereo.
+      "audio-channels": "auto",
       // Keep the last frame at EOF so a seek-back after the program ends still works.
       "keep-open": "yes",
       // Big, forward-biased network cache for smooth LAN direct-play + resilient seeks.
@@ -73,6 +85,9 @@ final class MpvCore {
     mpv_observe_property(mpv, 0, "width", MPV_FORMAT_INT64)
     mpv_observe_property(mpv, 0, "height", MPV_FORMAT_INT64)
     mpv_observe_property(mpv, 0, "paused-for-cache", MPV_FORMAT_FLAG)
+    // When mpv's audio output initializes it re-touches the shared AVAudioSession — re-apply ours so the
+    // multichannel long-form route sticks.
+    mpv_observe_property(mpv, 0, "current-ao", MPV_FORMAT_STRING)
 
     // Retain self for the (non-retaining) wakeup callback; released in dispose().
     let ctx = Unmanaged.passRetained(self).toOpaque()
@@ -106,6 +121,9 @@ final class MpvCore {
   func setVolume(_ volume: Double) { setProperty("volume", String(volume)) }
   func setAudioTrack(_ id: Int) { setProperty("aid", id < 0 ? "no" : String(id)) }
   func setSubtitleTrack(_ id: Int) { setProperty("sid", id < 0 ? "no" : String(id)) }
+  /// Audio channel layout: `"auto"` uses the full negotiated route (real 5.1/7.1), `"stereo"` forces a
+  /// fold-down. Applied when the audio chain is next (re)initialized, so callers reload the current file.
+  func setAudioChannels(_ layout: String) { setProperty("audio-channels", layout) }
 
   /// Absolute seek in seconds. mpv estimates → fast even on un-indexed MKV.
   func seek(_ seconds: Double) { command(["seek", String(seconds), "absolute"]) }
@@ -122,6 +140,22 @@ final class MpvCore {
         mpv_terminate_destroy(handle)
       }
       if let ctx { Unmanaged<MpvCore>.fromOpaque(ctx).release() }
+    }
+  }
+
+  // MARK: audio session
+
+  /// Put the shared session into long-form video playback so tvOS/iOS negotiates the full multichannel
+  /// route to an AVR/soundbar (LPCM 5.1/7.1). `.longFormAudio` is the routing policy Apple designates for
+  /// movie/TV playback; `.moviePlayback` mode adds the matching signal processing. Idempotent — safe to
+  /// call repeatedly (we re-assert it whenever mpv's audio unit re-touches the session).
+  private func configureAudioSession() {
+    let session = AVAudioSession.sharedInstance()
+    do {
+      try session.setCategory(.playback, mode: .moviePlayback, policy: .longFormAudio, options: [])
+      try session.setActive(true)
+    } catch {
+      print("[MpvCore] audio session config failed: \(error)")
     }
   }
 
@@ -163,6 +197,9 @@ final class MpvCore {
     case MPV_EVENT_FILE_LOADED:
       emitLoad()
     case MPV_EVENT_PLAYBACK_RESTART:
+      // The AO is up by now — re-assert our long-form multichannel session (mpv reconfigures the shared
+      // session when its audio unit starts, which can drop the route back to stereo).
+      configureAudioSession()
       // A frame is now decoded → width/height are guaranteed available. Emit onLoad here too (in case the
       // file-loaded / property-change paths didn't yet have dimensions), then the first-frame signal.
       emitLoad()
@@ -212,6 +249,10 @@ final class MpvCore {
       if prop.format == MPV_FORMAT_FLAG, let f = prop.data?.assumingMemoryBound(to: Int32.self).pointee {
         DispatchQueue.main.async { self.delegate?.mpvBuffering(f != 0) }
       }
+    case "current-ao":
+      // The audio unit (re)initialized and stomped the shared session — re-apply the long-form
+      // multichannel category so the receiver keeps getting real 5.1/7.1.
+      DispatchQueue.main.async { self.configureAudioSession() }
     case "duration", "width", "height":
       emitLoad()
     default:

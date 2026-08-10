@@ -1,5 +1,5 @@
 import { Slot, usePathname, useRouter } from "expo-router";
-import { ArrowLeft, Cpu, Info, Server as ServerIcon, SlidersHorizontal, UserRound } from "lucide-react-native";
+import { ArrowLeft, Cpu, Info, Server as ServerIcon, SlidersHorizontal, UserRound, Volume2 } from "lucide-react-native";
 import { useCallback, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 
@@ -24,6 +24,7 @@ const NAV = [
   { key: "user", label: "User", icon: ic(UserRound), to: "/settings/user" as const },
   { key: "server", label: "Server", icon: ic(ServerIcon), to: "/settings/server" as const },
   { key: "device", label: "Device", icon: ic(Cpu), to: "/settings/device" as const },
+  { key: "audio", label: "Audio", icon: ic(Volume2), to: "/settings/audio" as const },
   { key: "about", label: "About", icon: ic(Info), to: "/settings/about" as const },
 ];
 
@@ -32,6 +33,7 @@ const KEY_BY_PATH: Record<string, string> = {
   "/settings/user": "user",
   "/settings/server": "server",
   "/settings/device": "device",
+  "/settings/audio": "audio",
   "/settings/about": "about",
 };
 

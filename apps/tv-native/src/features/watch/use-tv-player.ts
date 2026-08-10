@@ -77,7 +77,7 @@ const RESUME_MAX_RETRIES = 2;
 
 const titleOf = (g?: GuideMeta | null) => (!g ? "" : g.showTitle ? `${g.showTitle} — ${g.title}` : g.title);
 
-export type PlayerOptions = { quality?: string; audioStreamId?: string; subtitleStreamId?: string };
+export type PlayerOptions = { quality?: string; audioStreamId?: string; subtitleStreamId?: string; audioMode?: string };
 
 export function useTvPlayer(channelId: string | null, options: PlayerOptions = {}, scrubberActive = true) {
   const viewRef = useRef<MpvPlayerViewRef>(null);
@@ -85,7 +85,10 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   const [startTime, setStartTime] = useState(0); // mpv open-at position (seconds) — loadfile … start=<offset>
   const positionSecRef = useRef(0); // latest onProgress currentTime (seconds); the effectiveTime clock reads this
   const playingRef = useRef(false);
-  const paramsKey = `${options.quality ?? ""}|${options.audioStreamId ?? ""}|${options.subtitleStreamId ?? ""}`;
+  // audioMode is client-side only (mpv output layout — not a server param), but it's in the reload key so
+  // flipping Stereo/Multichannel re-resolves the current program at the same spot and mpv re-inits its
+  // audio chain with the new `audio-channels`.
+  const paramsKey = `${options.quality ?? ""}|${options.audioStreamId ?? ""}|${options.subtitleStreamId ?? ""}|${options.audioMode ?? ""}`;
   const optionsRef = useRef(options);
   optionsRef.current = options;
   // Only the feature panel (full-screen chrome) shows the scrubber, so only build it when full — skip the

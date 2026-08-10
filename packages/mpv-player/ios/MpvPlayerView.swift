@@ -27,6 +27,10 @@ final class MpvPlayerView: ExpoView, MpvCoreDelegate {
   #endif
 
   var options: [String: String] = [:]
+  // "auto" = full negotiated multichannel route (default); "stereo" = force a fold-down. Merged into the
+  // init options so the FIRST load is right, and pushed live (setAudioChannels) so a settings change that
+  // reloads the current program takes effect.
+  private var audioMode: String = "auto"
 
   // Events (names must match `Events(...)` in the module).
   let onLoad = EventDispatcher()
@@ -77,6 +81,10 @@ final class MpvPlayerView: ExpoView, MpvCoreDelegate {
   func setVolume(_ v: Double) { core.setVolume(v) }
   func setAudioTrack(_ id: Int) { core.setAudioTrack(id) }
   func setSubtitleTrack(_ id: Int) { core.setSubtitleTrack(id) }
+  func setAudioMode(_ mode: String) {
+    audioMode = (mode == "stereo") ? "stereo" : "auto"
+    core.setAudioChannels(audioMode) // live switch (no-op until setup); JS reloads the program to apply
+  }
 
   // MARK: imperative control (from module AsyncFunctions)
 
@@ -97,7 +105,13 @@ final class MpvPlayerView: ExpoView, MpvCoreDelegate {
   }
 
   private func applySource() {
-    if !didSetup { didSetup = core.setup(layer: videoLayer, options: options) }
+    if !didSetup {
+      // Inject the current audio mode so the first load negotiates the right layout (options override the
+      // core's `audio-channels` default). Later switches go through setAudioMode → live property + reload.
+      var opts = options
+      opts["audio-channels"] = audioMode
+      didSetup = core.setup(layer: videoLayer, options: opts)
+    }
     guard pendingSource != lastLoadedSource else { return }
     lastLoadedSource = pendingSource
     guard let src = pendingSource, !src.isEmpty else {

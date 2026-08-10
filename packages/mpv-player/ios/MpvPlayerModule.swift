@@ -41,6 +41,7 @@ public class MpvPlayerModule: Module {
       Prop("contentFit") { (view: MpvPlayerView, fit: String) in view.setContentFit(fit) }
       Prop("audioTrack") { (view: MpvPlayerView, id: Int) in view.setAudioTrack(id) }
       Prop("subtitleTrack") { (view: MpvPlayerView, id: Int) in view.setSubtitleTrack(id) }
+      Prop("audioMode") { (view: MpvPlayerView, mode: String) in view.setAudioMode(mode) }
       Prop("options") { (view: MpvPlayerView, options: [String: String]?) in view.options = options ?? [:] }
 
       AsyncFunction("play") { (view: MpvPlayerView) in view.play() }
