@@ -41,15 +41,6 @@
         "RCT_HERMES_V1_ENABLED": "1"
       }
     },
-    "testflight-tvos": {
-      "developmentClient": true,
-      "distribution": "store",
-      "env": {
-        "EXPO_TV": "1",
-        "REACT_NATIVE_NODE_MODULES_DIR": "/Users/expo/workingdir/build/apps/tv-native/node_modules",
-        "RCT_HERMES_V1_ENABLED": "1"
-      }
-    },
     "preview": {
       "distribution": "internal",
       "env": {
@@ -77,11 +68,29 @@
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "distribution": "store",
+      "env": {
+        "REACT_NATIVE_NODE_MODULES_DIR": "/Users/expo/workingdir/build/apps/tv-native/node_modules",
+        "RCT_HERMES_V1_ENABLED": "1",
+        "RCT_BUILD_HERMES_FROM_SOURCE": "true",
+        "EXPO_USE_PRECOMPILED_MODULES": "0"
+      }
+    },
+    "production-tvos": {
+      "autoIncrement": true,
+      "distribution": "store",
+      "env": {
+        "EXPO_TV": "1",
+        "REACT_NATIVE_NODE_MODULES_DIR": "/Users/expo/workingdir/build/apps/tv-native/node_modules",
+        "RCT_HERMES_V1_ENABLED": "1",
+        "RCT_BUILD_HERMES_FROM_SOURCE": "true",
+        "EXPO_USE_PRECOMPILED_MODULES": "0"
+      }
     }
   },
   "submit": {
     "production": {},
-    "testflight-tvos": {}
+    "production-tvos": {}
   }
 }
