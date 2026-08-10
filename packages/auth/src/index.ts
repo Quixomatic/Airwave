@@ -47,8 +47,13 @@ export function createAuth() {
 
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
-    // Admin web origin + the TV app origin (when set) — for OAuth/device flows.
-    trustedOrigins: [env.CORS_ORIGIN, ...(env.TV_APP_ORIGIN ? [env.TV_APP_ORIGIN] : [])],
+    // Admin web origin + the TV app origin (when set) + any EXTRA_CORS_ORIGINS (comma-separated,
+    // e.g. a LAN IP alongside the public domain) — for OAuth/device flows and cross-origin auth.
+    trustedOrigins: [
+      env.CORS_ORIGIN,
+      ...(env.TV_APP_ORIGIN ? [env.TV_APP_ORIGIN] : []),
+      ...(env.EXTRA_CORS_ORIGINS ?? "").split(",").map((o) => o.trim()).filter(Boolean),
+    ],
 
     // Regular email/password login is always available. Linking a personal
     // Plex account is optional (playback falls back to the owner's connection).

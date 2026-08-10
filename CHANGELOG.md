@@ -2,6 +2,25 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.62] - 2026-08-10
+
+### Added
+
+- **`EXTRA_CORS_ORIGINS` — allow the admin panel at more than one origin.** A comma-separated list of
+  extra admin origins, added to both the cookie-CORS allowlist and better-auth `trustedOrigins`
+  alongside `CORS_ORIGIN`. Use it when the admin is reachable at more than one address — e.g.
+  `WEB_PUBLIC_URL`/`CORS_ORIGIN` is a public HTTPS domain but you also open the admin over the LAN by
+  IP: `EXTRA_CORS_ORIGINS=http://192.168.1.10:36021`. Without it, loading the admin from a
+  non-`CORS_ORIGIN` address failed its cross-origin `/api/auth` calls (`No 'Access-Control-Allow-Origin'
+  header is present`). The auth cookie is already `SameSite=None; Secure` on an HTTPS server, so a
+  LAN-IP origin works once allow-listed — note that's a genuine cross-site request, so it relies on
+  third-party cookies (the clean long-term path is to reach the admin at its own domain).
+
+### Deploy
+
+- New optional env var, wired through `docker-compose.yml` (`EXTRA_CORS_ORIGINS: ${EXTRA_CORS_ORIGINS:-}`)
+  and documented in `.env.example`. Empty by default = no change.
+
 ## [0.9.61] - 2026-08-10
 
 ### Fixed

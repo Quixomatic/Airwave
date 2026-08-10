@@ -44,8 +44,11 @@ app.use("/api/tv/auth/*", bearerCors);
 // different origin — so it needs permissive CORS like the rest of the bearer surface.
 app.use("/api/health", bearerCors);
 
-// Cookie/admin surface (tRPC + web auth) — allowlisted origins + credentials.
-const allowedOrigins = [env.CORS_ORIGIN, ...(env.TV_APP_ORIGIN ? [env.TV_APP_ORIGIN] : [])];
+// Cookie/admin surface (tRPC + web auth) — allowlisted origins + credentials. CORS_ORIGIN is the
+// primary admin origin; EXTRA_CORS_ORIGINS (comma-separated) allow-lists additional admin addresses
+// (e.g. a LAN IP alongside a public domain) so the admin works from more than one origin.
+const extraOrigins = (env.EXTRA_CORS_ORIGINS ?? "").split(",").map((o) => o.trim()).filter(Boolean);
+const allowedOrigins = [env.CORS_ORIGIN, ...(env.TV_APP_ORIGIN ? [env.TV_APP_ORIGIN] : []), ...extraOrigins];
 const cookieCors = cors({
   origin: allowedOrigins,
   allowMethods: corsMethods,

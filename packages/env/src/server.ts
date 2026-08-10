@@ -12,6 +12,11 @@ export const env = createEnv({
     // origin). Optional — when set, it's allowed through CORS + better-auth
     // trustedOrigins so the TV app can call /api/auth, /api/tv/auth, /api/v1.
     TV_APP_ORIGIN: z.url().optional(),
+    // Extra allowed admin origins beyond CORS_ORIGIN — a COMMA-SEPARATED list of exact origins
+    // (scheme + host + port). Added to both the cookie-CORS allowlist and better-auth trustedOrigins.
+    // Use it when the admin is reachable at more than one address, e.g. a public domain in CORS_ORIGIN
+    // plus a LAN IP: EXTRA_CORS_ORIGINS=http://192.168.1.168:36021
+    EXTRA_CORS_ORIGINS: z.string().optional(),
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 
     // First-admin seed (Overseerr-style). Optional — set both to bootstrap an

@@ -49,6 +49,9 @@ services:
       # The TV web player's origin, allow-listed for its login flow (empty unless the tvweb
       # service is enabled — see COMPOSE_PROFILES / TV_WEB_PUBLIC_URL in .env).
       TV_APP_ORIGIN: ${TV_WEB_PUBLIC_URL:-}
+      # Extra admin origins allow-listed for CORS + auth, beyond CORS_ORIGIN — a comma-separated list
+      # (e.g. reach the admin at a LAN IP too when CORS_ORIGIN is a public domain). See .env.example.
+      EXTRA_CORS_ORIGINS: ${EXTRA_CORS_ORIGINS:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
