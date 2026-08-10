@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.57] - 2026-08-09
+
+### Changed
+
+- **Consolidated secret encryption into one shared module.** The AI provider-key encryption now uses
+  the same `services/crypto.ts` that the Plex owner-token encryption uses (introduced in v0.9.56),
+  and the duplicate `services/agent/crypto.ts` is removed. Pure refactor — identical AES-256-GCM
+  scheme keyed off `BETTER_AUTH_SECRET`, so existing encrypted AI keys and Plex tokens keep
+  decrypting unchanged. No behavior change.
+
 ## [0.9.56] - 2026-08-09
 
 ### Security — encrypt the Plex owner token at rest

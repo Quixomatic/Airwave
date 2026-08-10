@@ -4,7 +4,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import type { PrismaClient } from "@airwave/db";
 import type { LanguageModel } from "ai";
 
-import { decryptSecret, encryptSecret } from "./crypto";
+import { decryptSecret, encryptSecret } from "../crypto";
 
 /**
  * Saved AI provider connections + the provider factory. Several connections can exist; exactly one
