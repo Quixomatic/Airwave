@@ -2,6 +2,25 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.59] - 2026-08-09
+
+### Added
+
+- **Brand wordmark assets + a generator** (`apps/tv-native/scripts/gen-wordmark.py`, Pillow +
+  ffmpeg). Renders the logo mark + "Airwave" in white to match tv-web's `Logo` component (Inter Bold,
+  fontSize = 0.66 × mark width, gap = 0.16 × mark width, letter-spacing −0.01em) on the same dark
+  radial gradient as the app icons: an **inline** (row) wordmark, a **stacked** (column) wordmark, and
+  an animated **splash** (GIF + animated WebP) reproducing the login flourish — the mark fades/scales
+  in, then the letters cascade — using the component's exact `cubic-bezier(0.22, 1, 0.36, 1)` easing.
+  Inter Bold (OFL) is vendored at `assets/fonts/Inter-Bold.ttf`. Assets land in `assets/brand/`.
+
+### Changed
+
+- **Apple TV top-shelf images now use the inline wordmark** (mark + "Airwave") instead of the mark
+  alone, since tvOS shows no app name on the top shelf. Regenerated
+  `tv-topshelf{,-2x,-wide,-wide-2x}.png` (takes effect on the next EAS build).
+- **README** now leads with the animated Airwave splash above the title.
+
 ## [0.9.58] - 2026-08-09
 
 ### Release

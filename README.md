@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/screenshots/splash.gif" alt="Airwave" width="620">
+</p>
+
 # Airwave
 
 **Turn your Plex library into your own always-on live TV.**
@@ -115,8 +119,10 @@ A Postgres database and [`docker-compose.yml`](./docker-compose.yml) wire it tog
 | *Group channels into packages.* | *Connect your Plex server and choose libraries.* |
 | ![Per-user access control](docs/screenshots/admin-users.webp) | ![Now Playing sessions](docs/screenshots/admin-settings-sessions.webp) |
 | *Plex-style per-user access control.* | *Now Playing — who's watching, and how each stream is delivered.* |
-| ![Bumpers and music](docs/screenshots/admin-bumpers.webp) | ![Optional AI assistant](docs/screenshots/admin-settings-ai.webp) |
-| *Bumpers + an optional ambient-music library.* | *Optional AI assistant — bring your own key.* |
+| ![Bumpers and music](docs/screenshots/admin-bumpers.webp) | ![AI connections](docs/screenshots/admin-settings-ai.webp) |
+| *Bumpers + an optional ambient-music library.* | *Optional AI — bring your own provider key.* |
+| ![The AI assistant in action](docs/screenshots/admin-aiassistant.webp) | ![Background jobs](docs/screenshots/admin-jobs.webp) |
+| *The AI assistant analyzing a channel's filter, with tool calls.* | *Background jobs — metadata sync, schedule refresh, and more.* |
 
 ---
 
