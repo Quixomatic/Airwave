@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.58] - 2026-08-09
+
+### Release
+
+- Cuts a deployable release of the Plex owner-token encryption-at-rest work (v0.9.56 encrypt-at-rest
+  + v0.9.57 shared-crypto consolidation). No functional change since v0.9.57 — this is the tag that
+  builds the image and ships that work to self-hosted instances.
+
 ## [0.9.57] - 2026-08-09
 
 ### Changed
