@@ -1,0 +1,125 @@
+# Packages
+
+> How Airwave groups channels into packages — the unit of organization in the admin, the filter "lenses" on the TV guide, and the thing a viewer is granted access to.
+
+## Overview
+
+A **package** (`ChannelPackage`) is a named, styled grouping of channels — "Kids & Family", "Time Machine", "Movie Night". Every `Channel` optionally belongs to one package via a nullable `Channel.packageId`; a channel with no package is "ungrouped". The relationship is defined in `packages/db/prisma/schema/channel.prisma`:
+
+- `ChannelPackage` — `id`, a stable unique `key` (slug), `name`, optional `description`, `icon`, `tint`, a `sortIndex` for ordering, two provenance flags (`generated`, `aiGenerated`), and back-relations to `channels` and `userAccess`. Mapped to the `channel_package` table.
+- `Channel.packageId` — nullable FK with `onDelete: SetNull`, so **deleting a package never deletes its channels** — they just become ungrouped. Indexed (`@@index([packageId])`).
+
+Packages do three jobs, each covered below:
+
+1. **Organization** — the admin panel lists and edits channels grouped by package, and a package carries a shared icon + tint that its channels inherit.
+2. **Guide filter lenses** — on the TV guide, each package with at least one visible channel becomes a sidebar lens the viewer can filter to.
+3. **Access** — a viewer can be granted FULL access to a *package*, which automatically includes any channel added to it later (see [Packages & access](#packages--access)).
+
+Packages are managed from the admin panel only. Every procedure in `packages/api/src/routers/packages.ts` is an `adminProcedure`, and the admin UI lives under `apps/web/src/routes/_auth/packages/`. Viewers never touch these; they only ever *see* packages as guide lenses.
+
+## Creating a package
+
+**UI:** `apps/web/src/routes/_auth/packages/new.tsx` (the "New package" button on the list page). A package has four author-controlled fields:
+
+- **Name** (required) — e.g. "Kids & Family".
+- **Description** (optional) — a short line describing the lineup.
+- **Icon** and **tint** — chosen together in the `IconTintField` (`apps/web/src/features/icons/icon-tint-field.tsx`). The icon is stored as a namespaced string like `"lucide:Sparkles"`; the tint is an accent-palette key (see [Icon & tint](#icon--tint)).
+
+Submitting calls `trpc.packages.create`. On the server (`packages.ts` → `create`):
+
+- The `name` is slugified and de-duplicated into a unique `key` (`uniqueKey` appends `-2`, `-3`, … on collision), so the slug is stable even if two packages share a name.
+- `sortIndex` is set to `max(sortIndex) + 1` — new packages sort to the end.
+- `tint` is coerced through `toAccentKey` (from `packages/api/src/services/accents.ts`), which folds any legacy or hand-entered value to a valid accent key (default `slate`) so the stored value is always paintable.
+
+Editing (`apps/web/src/routes/_auth/packages/$packageId.tsx` → `trpc.packages.update`) changes the same four fields plus lets you delete the package. Delete prompts "Its channels stay but become unassigned" — matching the `SetNull` behavior above.
+
+## Adding channels to a package
+
+Channels are **not** assigned from the package page — they're assigned from each channel's own edit form. The package detail page (`$packageId.tsx`) shows the channels currently filed into the package (read-only list, with an enable/disable switch per channel), and its empty state says: *"Assign a channel to this package from its edit page (the Package dropdown)."*
+
+**Where the assignment happens:** `apps/web/src/features/channels/channel-form.tsx`. The form has a **Package** `Select` (in its "Options" section) populated from `trpc.packages.list`. Choosing a package sets the channel's `packageId`; choosing "None" sends `packageId: null` (the form maps the empty string to null on save).
+
+### Tint (and icon) inheritance
+
+A package's `icon` and `tint` are **defaults its channels inherit** unless the channel sets its own. This is resolved everywhere by `resolveTile` (`apps/web/src/features/icons/app-icon.tsx`), which is passed the channel's own `icon`/`tint` plus the package's as `inheritedIcon`/`inheritedTint`:
+
+- Channel sets its own icon/tint → that wins (`Channel.icon` / `Channel.tint` are documented in the schema as "overrides the package icon/tint").
+- Channel sets neither → it shows the package's icon/tint.
+- Neither exists → a default (`Tv` icon, `slate`-ish fallback).
+
+The channel form makes this explicit: when a package is selected and the channel has no own icon/tint, it shows *"Inherits '{package}' — pick an icon or tint to override."* The same inheritance drives the tint on both the admin guide (`apps/web/src/features/guide/aurora-guide.tsx`) and the TV guide.
+
+> **Note on auto-generated channels.** The preset generator does *not* rely on tint inheritance for its channels — it assigns each generated channel its own tint from a cycling palette (`channelAccentAt` in `accents.ts`) so a package's contiguous channel block reads as varied colors on the guide rather than one long single-color band. A preset that specifies its own tint still wins. Manually-created channels left blank do inherit the package tint.
+
+## Icon & tint
+
+The color system is one shared palette, `packages/ui/src/lib/accent-palette.ts` — 16 swatches ordered around the hue wheel (`purple` … `slate`). Airwave **stores the key** (e.g. `"orange"`), never a hex, so the palette can be retuned in one place. Each swatch has two roles:
+
+- **`vivid`** — the saturated hex, used only on small high-contrast surfaces (the picker swatch, the TV sidebar's package dot).
+- **`tint`** — a hand-tuned muted hex, used wherever the color fills a large area on the dark guide (rail/cell fill, channel-row icon).
+
+Rule of thumb baked into the code: **store vivid, present muted**. The server keeps its own copy of the key list (`packages/api/src/services/accents.ts`, `ACCENT_KEYS`) so the API layer never has to depend on the UI kit; the two lists must stay in sync, and an unknown key degrades gracefully to a neutral rather than crashing. Icons are stored as `"lucide:Name"` (or `"phosphor:Name"`) strings and resolved by name at render time.
+
+## Provenance
+
+Every package carries two independent boolean flags recording where it came from. The combination defines three "types" the list page can filter by (`packages.list`'s `gen` input, surfaced as the **Type** filter → *Auto (preset)* / *AI-generated* / *Manual*):
+
+| Provenance | Flags | Meaning |
+| --- | --- | --- |
+| **Preset ("Auto")** | `generated = true` | Built by the static auto-lineup generator from the built-in preset catalog. |
+| **AI** | `aiGenerated = true` | Built by the AI assistant / WDK workflow. Tracked separately so it can be listed and cleanly reverted. |
+| **Manual** | both `false` | Hand-created by an admin. |
+
+The flags exist so automated rebuilds only ever touch their own rows and never clobber hand-made packages:
+
+- **Refresh styling** (list page → "Refresh styling", `trpc.generator.regeneratePackages`). Re-applies the preset catalog's **name, description, icon, tint, and sort order** to the `generated` packages via an upsert keyed on `key` — it does **not** add, remove, or change channels. Ids stay stable across regens. (`packages/api/src/services/generator/generate.ts`, scope `"packages"`.)
+- **Regenerate channels** (package detail page, shown only when `pkg.generated` is true, `trpc.generator.regeneratePackage`). Rebuilds *one* preset package's channels: it deletes the `generated` channels in that package and recreates them from the preset, reserving numbers/callsigns used by surviving manual channels. A generated package that ends up with zero channels is dropped.
+- **Clear AI** (`clearAiGenerated` in `packages/api/src/services/agent/tools.ts`, exposed to the assistant as the `clear_ai_generated` tool and used by a job). Deletes rows flagged `aiGenerated`; for the `packages`/`both` scope it first un-assigns channels of AI packages (`packageId = null`) then deletes the AI packages. This is the one-shot "undo the AI's lineup" button.
+
+Because these operations scope strictly by flag, a **manual** package is never touched by any regen or clear — it changes only when an admin edits or deletes it.
+
+## Packages & access
+
+Packages are the unit of the per-user access model (see **[docs/users-and-access.md](./users-and-access.md)** for the full picture). The link is the `UserPackageAccess` row (`packages/db/prisma/schema/access.prisma`), which grants a user access to one package at one of two modes:
+
+- **FULL** — every channel in the package, **including channels added to it later**. This is the crux of packages-as-access: file a new channel into a package and every viewer with FULL access picks it up automatically, with no admin follow-up.
+- **PARTIAL** — only the specific channels explicitly granted for that user (`UserChannelAccess`). Channels added to the package later are **not** granted automatically.
+
+Above both sits `User.allAccess` (default `true`), which grants everything including all future packages and channels. A restricted user (`allAccess = false`) with no grant rows sees nothing.
+
+This is why grouping channels into packages matters beyond cosmetics: **FULL package access is one of only two ways (the other being all-access) that new content reaches a restricted viewer automatically.** Ungrouped channels have no package to hang a FULL grant on, so a restricted user can only receive them one-by-one. Enforcement is entirely server-side on the REST surface — see the access doc's [Enforcement](./users-and-access.md#enforcement) section.
+
+## Packages on the guide
+
+On the TV client, packages appear as the **filter lenses** in the guide's left sidebar. The data comes from a viewer-facing endpoint distinct from the admin `packages.list`:
+
+- **Service:** `listActivePackages` (`packages/api/src/services/packages.ts`) returns only packages that have **at least one enabled channel the viewer can access**, ordered by the admin sort (`sortIndex`, then name), each carrying its own `icon`, `tint`, and a `channelCount`. It's access-scoped: a `Set` of accessible channel ids counts only those channels and **drops** packages that end up empty for that viewer (e.g. a PARTIAL package with zero granted channels). Empty packages never appear as lenses.
+- **REST:** `GET /packages` in `apps/server/src/rest.ts` wraps that service with the request's resolved access set.
+- **TV client:** `apps/tv-web/src/hooks/use-packages.ts` fetches it; `apps/tv-web/src/features/guide/guide-sidebar.tsx` turns each package into a `Lens` of `{ type: "packages", ids: [id] }`. Collapsed, the whole filter group folds into one "Filters" circle; focused, it stagger-reveals **Favorites**, **Recents**, then one lens per package — each in its own icon and its **vivid** accent (the small-surface role of the tint). Selecting a package lens filters the grid to that package's channels; a "Show All" item clears it.
+
+So the admin's package name, icon, tint, and sort order flow straight through to how the lens looks and where it sits in the viewer's sidebar.
+
+## Source map
+
+| Concern | File |
+| --- | --- |
+| `ChannelPackage` model, `Channel.packageId` (`SetNull`) | `packages/db/prisma/schema/channel.prisma` |
+| Admin router — list (q/gen/sort/dir), get, create, update, remove | `packages/api/src/routers/packages.ts` |
+| Admin list UI (search / filter / sort / refresh styling) | `apps/web/src/routes/_auth/packages/index.tsx` |
+| Admin new / edit (+ regenerate channels, delete) | `apps/web/src/routes/_auth/packages/new.tsx`, `.../$packageId.tsx` |
+| Assigning a channel to a package (the Package select) | `apps/web/src/features/channels/channel-form.tsx` |
+| Icon/tint inheritance resolver | `apps/web/src/features/icons/app-icon.tsx` (`resolveTile`) |
+| Accent palette (vivid/tint, 16 keys) | `packages/ui/src/lib/accent-palette.ts` |
+| Server accent contract + coercion + channel color cycle | `packages/api/src/services/accents.ts` |
+| Preset generator (upsert packages, regen scopes) | `packages/api/src/services/generator/generate.ts`, `packages/api/src/routers/generator.ts` |
+| AI provenance undo (`clearAiGenerated`) | `packages/api/src/services/agent/tools.ts` |
+| Access grants (`UserPackageAccess` FULL/PARTIAL) | `packages/db/prisma/schema/access.prisma` |
+| Guide lens service (viewer-facing) | `packages/api/src/services/packages.ts` (`listActivePackages`) |
+| REST guide-packages endpoint | `apps/server/src/rest.ts` (`GET /packages`) |
+| TV guide sidebar lenses | `apps/tv-web/src/features/guide/guide-sidebar.tsx`, `apps/tv-web/src/hooks/use-packages.ts` |
+
+## See also
+
+- **[docs/channels.md](./channels.md)** — the channel model itself (definitions, ordering, strategies) that packages group.
+- **[docs/users-and-access.md](./users-and-access.md)** — the per-user access model that packages feed into.
+- **[docs/getting-started.md](./getting-started.md)** — first-run setup, including the auto-lineup generator that creates the initial packages.

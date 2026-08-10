@@ -278,16 +278,15 @@ airwave/
 The web apps share shadcn/ui primitives via `@airwave/ui` — edit tokens in `packages/ui/src/styles/globals.css`,
 primitives in `packages/ui/src/components/*`. Import them with `import { Button } from "@airwave/ui/components/button"`.
 
-### Architecture docs
+### Documentation
 
-"How it works" deep-dives live in [`docs/`](docs/) — for contributors and the curious:
+Full guides and "how it works" docs live in **[`docs/`](docs/)** (see the [index](docs/README.md)):
 
-- [Background jobs](docs/jobs.md) — the in-process `node-schedule` system + the job catalog
-- [Durable workflows](docs/workflows.md) — how the AI lineup builder and importer run on the Workflow SDK
-- [Import / Export](docs/import-export.md) — moving a lineup between instances
-- [Users & access control](docs/users-and-access.md) — Plex user import + granular per-user access
+- New here? Start with **[Getting started](docs/getting-started.md)** — connect a source → build a channel → watch.
+- **Using it:** [sources](docs/sources.md) · [channels](docs/channels.md) · [packages](docs/packages.md) · [users & access](docs/users-and-access.md) · [AI assistant](docs/ai-assistant.md) · [sessions](docs/sessions.md) · [import/export](docs/import-export.md)
+- **Internals:** [jobs](docs/jobs.md) · [durable workflows](docs/workflows.md) · [capability diagnostic](docs/capability-diagnostic.md)
 
-More subsystem docs are on the way — see the [docs index](docs/README.md).
+More subsystem docs (the apps + stacks, the scheduling engine, playback) are on the way.
 
 ---
 

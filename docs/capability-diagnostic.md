@@ -1,0 +1,208 @@
+# Device capability diagnostic
+
+> How Airwave learns what a real TV can actually decode — by *playing* a matrix of short test clips and *measuring* what came out — instead of guessing from `canPlayType()` or maintaining a database of device profiles. Plus how you override any verdict it gets wrong.
+
+## Overview
+
+Every playback decision Airwave makes for a device comes down to one question: **can this panel decode this container/codec/audio combination natively, or does the server have to transcode it first?** Get it wrong in the optimistic direction and you hand the TV a stream it renders as a black screen or silent audio; get it wrong in the pessimistic direction and you burn CPU transcoding something that would have direct-played in full quality (HDR intact).
+
+The obvious way to answer the question is to ask the browser: `HTMLVideoElement.canPlayType()` and `MediaSource.isTypeSupported()`. Airwave *does* collect those as a first guess (`clientCaps()` / `collectDeviceInfo()` in `apps/tv-web/src/lib/device.ts`), but they **lie**. `canPlayType` returning `"probably"` reflects what the codec *string* claims, not what the panel's silicon actually has a decoder for — and the two disagree constantly on real TVs. The header comment on `plex/quality.ts` records one such trap: the LG C2 reports `"probably"` for E-AC3/DTS/TrueHD (its native decoder does have them) yet those same codecs throw `bufferAddCodecError` the moment hls.js tries to feed them through MSE. The panel "supports" the codec and can't play it through the path we use.
+
+The other obvious way is to keep a catalog: a table of "LG C2 → these codecs, Sony X90J → those codecs, …". That is a losing game. There are too many combinations of panel model, firmware, browser build, decode path (native `<video>` vs hls.js/MSE vs mpv), and codec/container pairing to ever enumerate, and every one drifts with firmware.
+
+So Airwave does neither. It **measures the real device, once.** On first sign-in it plays a matrix of ~49 short clips — one per container/codec/audio/feature combination worth knowing — through the exact playback element the app uses, and records for each whether frames *actually decoded* and whether audio *actually came out*. The union of what decoded becomes that device's real playback profile, stored server-side and fed to Plex so the server direct-plays only what the panel proved it can handle. The philosophy, in the words of `broker.ts`: *"measure, don't guess."*
+
+Two capability sets, not one: the native `<video>` element (raw-file direct-play, using the panel's hardware decoder) and hls.js/MSE (the transcode-delivery path) can decode *different* things. The diagnostic measures the native decoder — that is the set that governs whether we can avoid transcoding at all.
+
+## The test clips (the capability-media matrix)
+
+### The matrix is the single source of truth
+
+Everything keys off one table: `CAP_MATRIX` in `packages/api/src/services/capabilities/matrix.ts`. Each entry is one test — an `id`, a `container`, a `video`/`audio` codec key, an optional `feature` (hdr10, 4k60@80M, …) or `subtitle`, a human `diagnostic` label, and an ffmpeg recipe. The clip generator, the server manifest, and both TV apps all read from this one list, so adding a test is a one-line change that propagates everywhere.
+
+The matrix is deliberately **axis-comprehensive plus the cross-combos that actually break**:
+
+- **Containers** (`cont_*`) — MP4 (the control), MKV, MPEG-TS, MOV, AVI/DivX, WebM, FLV — baseline H.264/AAC to isolate demuxer support.
+- **Video codecs** (`vid_*`) — H.264 8-bit, H.264 Hi10P, HEVC 8-bit, HEVC Main10, AV1, VP9, MPEG-2 — most in MKV, with HEVC10/AV1 *also* tested in MP4 because the container changes the answer.
+- **Audio codecs** (`aud_*`) — AAC, AC3, E-AC3 (in **both** MKV and MP4, the sensitivity that bit us), DTS, TrueHD, FLAC, ALAC, Opus, PCM, plus real-sample DTS-HD MA / Atmos.
+- **HDR / color** (`hdr_*`) — HDR10 (generatable), plus HDR10+, HLG, and Dolby Vision P5/P7/P8 as real samples.
+- **Performance ladder** (`perf_*`) — HEVC at 1080p60/4K30/4K60/8K60 across a bitrate ladder, to find the decode ceiling.
+- **Subtitles** (`sub_*`) — SRT and ASS (generatable), PGS and VobSub image subs (real samples).
+- **Edge cases** (`edge_*`) — 1080i interlaced, anamorphic non-square pixels, a 30-audio-track demuxer stress, 120fps.
+
+Entries flagged `realSample: true` are ones ffmpeg **can't** fabricate (proprietary or dynamic metadata — Dolby Vision, HDR10+, DTS-HD, Atmos, PGS). The generator skips them; you drop a real clip of that filename in by hand if you want those rows covered.
+
+### How the clips are generated
+
+`apps/server/scripts/gen-capability-media.ts` fabricates one ~5-second clip per non-`realSample` entry from a single master source, driven entirely by `CAP_MATRIX`. Run on a box with a full ffmpeg (libx265, libsvtav1, libvpx-vp9, plus the `truehd`/`dca` encoders):
+
+```
+bun --env-file=.env run scripts/gen-capability-media.ts <master> <outdir>
+```
+
+Details that matter for the measurement to be *honest*:
+
+- **Audio is synthesized, not taken from the master.** The script builds a 5.1 tone bed once (`sine=…join=inputs=6:channel_layout=5.1`), a distinct pitch per channel, so every audio-codec test encodes *real multichannel* audio regardless of whether the master had any — and you can verify surround by ear.
+- **Non-HDR clips are tonemapped to 8-bit SDR BT.709.** The master is 10-bit HDR PQ/BT.2020; without normalizing, the HDR transfer would ride along on clips that are supposed to be plain SDR and confuse TV decoders. The HDR10 clips instead get explicit `-x265-params hdr10=1:…`.
+- **8-bit codecs pin `yuv420p`.** Otherwise libx264/libx265 emit High-10/Main-10 from the 10-bit master, which real TV hardware decoders reject with error 4 even though desktop software decoders accept it — exactly the kind of false positive the whole exercise exists to avoid.
+
+### How they're baked into the image and served
+
+The generated clips (~430 MB) are frozen into a tarball and published on the private `media-v1` GitHub release. The Docker build stages that tarball into the image (`Dockerfile`, lines ~40–63):
+
+```
+gh release download media-v1 -p capability-media.tar.gz -D docker/cap-media
+```
+
+The build copies it in, extracts it to `/app/apps/server/capability-media`, and sets `CAP_MEDIA_DIR` to that path. **No ffmpeg and no release token ever live in the running image** — the clips are pre-generated and simply unpacked. If the tarball is absent the image still builds; the diagnostic clips are just missing (it falls back to a `CAP_MEDIA_URL` fetch only once the release is public).
+
+The server serves them as **public static files** at `/caps/media/<id>.<container>` (`apps/server/src/index.ts`, ~lines 125–156). They must be public and unauthenticated because the TV plays them through a bare `<video src>` (or mpv `source`), which can't attach a bearer token. A small middleware overrides `serveStatic`'s `octet-stream` with the real per-extension video MIME (`video/x-matroska`, `video/mp2t`, …) because some TV players refuse `octet-stream` on the native element.
+
+The **manifest** the apps iterate is built from the same matrix by `getCapabilityManifest()` (`packages/api/src/services/capabilities/service.ts`): each row plus its `url: /caps/media/<id>.<container>`. The whole diagnostic is thus self-contained in the backend — the app fetches the manifest, then plays each `url`.
+
+## Running the probe
+
+### First-run trigger
+
+The diagnostic runs automatically on first sign-in, and again whenever the device is pointed at a **new** server. The guide screen checks a flag and, if unset, sends the device to the diagnostic route:
+
+- tv-web: `apps/tv-web/src/features/guide/guide-screen.tsx` — `if (!capsDoneForCurrentServer()) onDiagnostic();`
+- tv-native: `apps/tv-native/app/guide.tsx` — `if (!capsDoneForCurrentServer()) router.replace("/diagnostic");`
+
+(Why "new server" re-triggers it is covered under [Re-running & per-server storage](#re-running--per-server-storage).)
+
+### The run loop (tv-web)
+
+`apps/tv-web/src/features/diagnostic/diagnostic.tsx` fetches the manifest, then walks it clip by clip through **one native `<video>` element**. For each clip (`runOne`):
+
+1. Set `v.muted = true` (so autoplay is never blocked — the `audioTracks` list still populates while muted), point `v.src` at `${SERVER_URL}${test.url}`, and `play()`.
+2. On the first decoded frame (`loadeddata`), let it run ~2.5s (to let dropped-frame stutter and the audio-track list settle), then **snapshot**.
+3. A 10-second hard timeout catches clips that never produce a frame; an `error` event catches decode failures.
+
+The snapshot records the two independent signals:
+
+- **Video decode** — `decoded = !err && v.videoWidth > 0 && v.videoHeight > 0`. A real decoded frame has real dimensions; a codec the panel can't decode leaves `0×0` (or fires `error` with `v.error.code`). It also captures `getVideoPlaybackQuality()` dropped/total frame counts.
+- **Audio decode — measured *separately*.** This is the subtle part. A video-only check would over-credit audio codecs the panel has no decoder for: the clip's *video* plays fine (H.264) while the DTS/TrueHD/ALAC audio silently produces nothing, and a naive check would mark the whole clip "decoded" and wrongly credit that audio. So audio is read from a different signal — `HTMLVideoElement.audioTracks`: the panel lists a *decodable* audio track for codecs it can decode and drops/disables it for ones it can't. (`webkitAudioDecodedByteCount` is stubbed to `0` on the C2's Chrome 108 and useless, so `audioTracks` is the signal that actually works; the raw readout is kept in `audioDebug` for confirmation.)
+
+### The derived audio verdict
+
+`audioOk` is **not** decided inline per clip — it needs a cross-clip control, so it's derived in a second pass after the whole matrix runs (see the "audio-verdict pass" in `diagnostic.tsx`):
+
+- If a clip listed a usable, enabled audio track → `audioOk = true`.
+- Else, **if any clip in the run ever got a track** (proving the `audioTracks` API works on this panel) and this clip's video decoded but exposed no usable track → `audioOk = false`.
+- Otherwise → left **`undefined` (unknown)**. If the API is absent, or no clip ever produced a track, or the video never decoded, we refuse to guess — so a working codec is *never* wrongly marked unsupported.
+
+Each result is upserted to the server as it's measured (`api.capsResult` → `saveCapabilityResult`), then re-sent with the derived `audioOk`. On screen the user sees a live progress bar and a running `N native · M transcode` tally; there's no human judgment involved (`manual` subtitle/HDR verdicts exist in the schema but the auto-run doesn't prompt for them).
+
+### The native (mpv) variant
+
+`apps/tv-native/src/features/diagnostic/diagnostic.tsx` does the same thorough measurement on the RN/mpv client, with platform-specific mechanics:
+
+- Decode signal comes from mpv's `onLoad` MediaInfo (`width`/`height > 0` = a real parsed frame) and `onError`. mpv decodes essentially all audio it can open, so a decoded clip implies audio; the same cross-clip `audioOk` derivation runs, but in practice it *confirms* broad support rather than culling.
+- The player is **mounted fresh per clip** (`source = null` between clips, with a ~400ms settle) — cycling ~49 mixed-4K clips through one reused mpv instance stacks VideoToolbox decoder sessions and surfaces until it OOMs around clip 8.
+- **AV1 is skipped, not played, on Apple** (`CRASHY_VIDEO_ON_APPLE`): mpv software-decodes AV1 via dav1d, which null-crashes the whole app on iPad/Apple TV. It's recorded unsupported — which is honest, because the server quirk (below) force-transcodes AV1 on those platforms anyway.
+
+### The resulting map
+
+Every clip's outcome is one `DeviceCapability` row (`packages/db/prisma/schema/device-capability.prisma`), upserted by `(deviceId, testId)` so a re-run overwrites in place. Auto-detected fields (`decoded`, `decodedWidth/Height`, `droppedFrames/totalFrames`, `error`) come from the video element; `audioOk` (and the currently-unused `hdrOk`/`subtitleOk`) hold the derived/manual verdicts. Together these rows *are* the device's real capability map.
+
+## From measurements to a playback profile
+
+The rows are raw evidence. Turning them into the codec sets that drive playback is `getDeviceNativeCaps()` in `packages/api/src/services/capabilities/native-caps.ts`, which resolves in **layers**:
+
+**1. Measured** (`getMeasuredCaps`). A video codec or container is credited only if a clip that *actually decoded* contained it (mapped to Plex's tokens — `hvc1`/`hev1` → `hevc`, etc.). Audio is credited from the measured `audioOk` where present, falling back to *inference* (audio rode along in a video-decoded clip) — but a **measured negative supersedes inference**: if a clip decoded video but `audioOk === false`, that audio is dropped even though it "rode along." Note H.264 Hi10P is mapped to `null` so a 10-bit clip decoding never credits base H.264 support.
+
+**2. Known-issue quirks** (`codecs.ts`, `videoQuirks`/`audioQuirks`). Some codecs pass the *isolated* diagnostic but fail our real playback paths, so they're dropped by default:
+
+- `dts` (audio) — LG webOS has no DTS/DCA decoder (licensing); the clip's video decodes but audio is silent. Global.
+- `vp9` (video) — on the LG C2, VP9 decodes in isolation (it's what YouTube uses) but raw-file direct-play errors (code 4) and VP9-in-MSE stalls. Force a transcode.
+- `av1` (video) — crashes mpv's dav1d software decoder on Apple clients; scoped to `platform: ["ios"]`.
+
+Quirks are **platform-scoped**: one with no `platforms` applies to every device; one with `platforms` applies only to matching `TvDevice.platform` values, so a codec broken on one client isn't needlessly transcoded on another. `getDeviceNativeCaps` looks up the device's platform to resolve which quirks apply.
+
+**3. Per-device overrides** (`readOverrides`, from `TvDevice.capabilityOverrides`). Manual toggles from the Device settings page are applied **last and win** over both measured and quirks — force a codec on or off. Container overrides also carry aliases (forcing `mp4` on also covers `m4v`).
+
+The **effective** set per token is: `override ?? (measured && !quirk)` — the exact formula surfaced on the settings page and applied by `applyEffective()`.
+
+### Feeding Plex
+
+The effective profile becomes an `X-Plex-Client-Profile-Extra` string so Plex direct-plays what the device proved it can decode. `resolveMedia()` in `packages/api/src/services/playback/broker.ts` prefers the measured caps over the client's self-reported guess:
+
+```js
+const measured = opts.deviceId ? await getDeviceNativeCaps(prisma, opts.deviceId) : null;
+// … caps: measured ?? opts.caps
+```
+
+and stamps the response with `capsSource: "measured" | "reported" | "default"` so you can see which was used. `clientProfileExtra()` (`plex/quality.ts`) turns the codec sets into Plex `add-direct-play-target` / `add-transcode-target` directives.
+
+### Native-first delivery
+
+The profile drives a **native-first ladder** (`getPlaybackInfo` in `packages/api/src/services/plex/client.ts`, `mode: "direct" | "http" | "hls"`):
+
+1. **`direct`** — if the device's effective caps cover the file's container + video + its default audio, serve the **raw file** as-is and let the client seek. No transcode, HDR/HEVC intact, off the MSE buffering path. (There's a middle case that still direct-plays the raw file while the client switches to a decodable companion audio track.)
+2. **`http`** — a progressive transcode played by the native `<video>` (full native audio set is safe here, no MSE remux).
+3. **`hls`** — fMP4/CMAF via hls.js/MSE, the last rung, forced by `forceHls` after a native attempt errors. Only MSE-safe audio (aac/mp3) survives the SourceBuffer append, so the transcode target advertises only those and Plex transcodes the rest.
+
+The better the diagnostic's measurement, the more often a device stays on rung 1.
+
+## Overriding the findings
+
+The measurement is authoritative but not infallible, so every verdict is user-overridable from **Settings → Device** (`apps/tv-web/src/routes/_auth/settings/device.tsx`; the RN port at `apps/tv-native/app/settings/device.tsx`). The data behind the page is `getDeviceCapabilityView()` (`packages/api/src/services/capabilities/device-settings.ts`).
+
+The page lists a fixed set of candidate tokens per group (Video / Audio / Containers) and, for each, shows all four layers:
+
+- **measured** — did the diagnostic credit it?
+- **quirk** — is it a known-issue token, off by default (with the reason)?
+- **override** — is there a manual override (and which way)?
+- **effective** — what playback actually uses (`override ?? (measured && !quirk)`).
+
+Each row's sublabel reflects its state — *"Measured: plays natively"*, *"Known issue — off by default"*, or *"Overriding — diagnostic measured plays/doesn't play"* — and a **Forced** pill warns when you've forced on something the diagnostic says doesn't play (`t.effective && !t.measured`), since that can break playback.
+
+Toggling is smart about staying tidy: if your new value equals the natural default (`measured && !quirk`), the override is **cleared** rather than stored (`value = next === naturalDefault ? null : next`), so overrides only persist where they actually differ from the diagnostic. A **Reset to diagnostic** row appears whenever any override exists and clears them all.
+
+Under the hood, `setDeviceCapabilityOverride` / `resetDeviceCapabilityOverrides` write `TvDevice.capabilityOverrides` — a sparse JSON blob `{ video?: {token:bool}, audio?: {…}, container?: {…} }` — pruning empty groups, and `Prisma.DbNull` on a full reset.
+
+For context, the page also shows the device's **recent playback issues** — the last dozen `PlaybackLog` rows with `outcome: "error" | "not_decoding"` or a non-null `error`, each showing the channel/title, the source `container/videoCodec/audioCodec`, the delivery `mode`, and the error — so you can correlate a stutter or black screen with a codec and decide whether to flip an override.
+
+## Re-running & per-server storage
+
+The measured profile lives in the **server's** database, keyed by a stable client-generated `deviceId` (`TvDevice` / `DeviceCapability`). That placement has a consequence: if a device is pointed at a *different* Airwave server, that server has no profile for it and would fall back to guessing.
+
+So the "already ran" flag is keyed **by server URL**, not just a boolean (`apps/tv-web/src/lib/device.ts`, native equivalent in `apps/tv-native/src/lib/device.ts`):
+
+```js
+export const CAPS_DONE_KEY = "cg-caps-done";
+export function capsDoneForCurrentServer() {
+  return localStorage.getItem(CAPS_DONE_KEY) === SERVER_URL;
+}
+export function markCapsDone() {
+  localStorage.setItem(CAPS_DONE_KEY, SERVER_URL); // stores WHICH server it ran against
+}
+```
+
+`markCapsDone()` stores the current server's URL; `capsDoneForCurrentServer()` only returns true if that stored URL matches the server the device is currently pointed at. Point the TV at a new server and the flag no longer matches → the guide screen re-runs the diagnostic on first entry, so the new server gets this device's profile too. `markCapsDone()` is also called on error/skip so a broken diagnostic doesn't nag on every login. You can always re-run it manually from **Settings → Device → Run capability diagnostic**.
+
+## Source map
+
+| Concern | File |
+| --- | --- |
+| The test matrix (single source of truth) | `packages/api/src/services/capabilities/matrix.ts` |
+| Clip generator (ffmpeg, from the matrix) | `apps/server/scripts/gen-capability-media.ts` |
+| Baking clips into the image (media-v1 tarball) | `Dockerfile` (~lines 40–63), `docker/cap-media/` |
+| Serving clips + manifest (`/caps/media/*`) | `apps/server/src/index.ts` (~125–156), `packages/api/src/services/capabilities/service.ts` |
+| Probe screen — measure & record (web) | `apps/tv-web/src/features/diagnostic/diagnostic.tsx` |
+| Probe screen — measure & record (mpv/native) | `apps/tv-native/src/features/diagnostic/diagnostic.tsx` |
+| Saving one result | `packages/api/src/services/capabilities/service.ts` (`saveCapabilityResult`) |
+| Result & device models | `packages/db/prisma/schema/device-capability.prisma`, `packages/db/prisma/schema/tv-device.prisma` |
+| Measured → quirks → overrides → effective | `packages/api/src/services/capabilities/native-caps.ts` |
+| Codec canonicalization + known-issue quirks | `packages/api/src/services/capabilities/codecs.ts` |
+| Device settings view + override writes | `packages/api/src/services/capabilities/device-settings.ts` |
+| Override UI (per-codec toggles, reset, errors) | `apps/tv-web/src/routes/_auth/settings/device.tsx`, `apps/tv-native/app/settings/device.tsx` |
+| Feeding the profile to Plex | `packages/api/src/services/playback/broker.ts`, `packages/api/src/services/plex/quality.ts` |
+| Native-first delivery ladder (direct/http/hls) | `packages/api/src/services/plex/client.ts` (`getPlaybackInfo`) |
+| First-run + per-server re-run flag | `apps/tv-web/src/lib/device.ts`, `apps/tv-native/src/lib/device.ts`; triggered in the guide screens |
+
+## Related
+
+- [Media sources](./sources.md) — connecting the Plex server this profile is measured against and streamed from.
+- [Sessions](./sessions.md) — the play log that surfaces the per-tune delivery decision (direct-play vs transcode) this profile drives.
