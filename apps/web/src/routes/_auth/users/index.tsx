@@ -9,11 +9,12 @@ import {
 } from "@airwave/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronRight, Loader2, ShieldCheck, User, UserPlus, Users } from "lucide-react";
+import { ChevronRight, Loader2, Plus, ShieldCheck, User, UserPlus, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/empty-state";
+import { TopHeaderRight } from "@/context/header-provider";
 import { trpc, trpcClient } from "@/utils/trpc";
 
 /** Role pill — admin gets an amber shield, everyone else a muted user outline. */
@@ -57,6 +58,15 @@ function UsersPage() {
 
   return (
     <div>
+      {/* New user lives in the TOP header's right slot (`order-first` pulls it ahead of the AI
+          Assistant button) — matching channels/packages. Import Plex Users stays in the section header. */}
+      <TopHeaderRight>
+        <Button variant="outline" size="sm" className="order-first" render={<Link to="/users/new" />}>
+          <Plus className="mr-2 h-4 w-4" />
+          New user
+        </Button>
+      </TopHeaderRight>
+
       <Frame>
         <FrameHeader className="flex-row items-center justify-between">
           <div>
@@ -79,14 +89,19 @@ function UsersPage() {
               title="No users yet"
               description="Import your Plex server's shared users, or they'll appear here once created."
               action={
-                <Button size="sm" onClick={importUsers} disabled={importing}>
-                  {importing ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <UserPlus className="mr-2 h-4 w-4" />
-                  )}
-                  Import Plex Users
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={importUsers} disabled={importing}>
+                    {importing ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <UserPlus className="mr-2 h-4 w-4" />
+                    )}
+                    Import Plex Users
+                  </Button>
+                  <Button size="sm" render={<Link to="/users/new" />}>
+                    <Plus className="mr-2 h-4 w-4" /> New user
+                  </Button>
+                </div>
               }
             />
           ) : (

@@ -2,6 +2,41 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.63] - 2026-08-10
+
+### Added
+
+- **Create a viewer account from the admin.** A "New user" button (in the top-header portal, matching
+  channels/packages) opens a new `/users/new` page to create a Viewer with an email, name, and
+  password, via better-auth's admin-plugin `createUser` (`users.create`) — which hashes the password
+  and creates the credential account properly (a raw insert can't do either). New users default to
+  all-access; restrict them afterward on their access page. Previously accounts could only come from
+  the env-seeded admin or Import Plex Users.
+- **Delete a user.** The user detail page gains a danger-zone "Delete user" (with a confirm) →
+  `users.delete` → better-auth's `removeUser` (cleans up their sessions + credential account; access
+  grants cascade via Prisma). Refuses to delete an admin, so the sole owner can't remove themselves.
+
+### Fixed
+
+- **Viewers can now reach `/device` to approve a TV code.** The admin-only lockout was bouncing every
+  non-admin — including a viewer following their TV's device-login link — to `/not-authorized`.
+  `/device` is now reachable by any authenticated user; everything else stays admin-only. Added a
+  general `?redirect=` return-path (local paths only, `lib/safe-redirect`) threaded through
+  `/login` → `/post-login`, so a viewer who has to sign in mid-flow lands back on `/device` instead of
+  the admins-only notice.
+
+### Security
+
+- **Public email/password sign-up is now disabled** (`emailAndPassword.disableSignUp: true`).
+  Previously `POST /api/auth/sign-up/email` was reachable — and not subject to CORS, since it isn't a
+  browser request — so anyone could self-provision a Viewer account (which defaults to all-access).
+  Accounts are now admin-created only. The admin-create path is unaffected (a separate admin-only pathway).
+
+### Internal
+
+- The tRPC context now also exposes the request `headers`, so a procedure can call better-auth server
+  APIs that authenticate the caller via the session cookie (used by `users.create` / `users.delete`).
+
 ## [0.9.62] - 2026-08-10
 
 ### Added

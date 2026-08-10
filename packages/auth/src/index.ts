@@ -60,6 +60,10 @@ export function createAuth() {
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: false,
+      // No public sign-up — accounts are admin-created only (the seeded admin, an admin-created
+      // viewer via the admin plugin's createUser, or Import Plex Users). Without this, the
+      // `/api/auth/sign-up/email` endpoint would let anyone self-provision a viewer account.
+      disableSignUp: true,
     },
 
     ...(Object.keys(socialProviders).length > 0 && { socialProviders }),

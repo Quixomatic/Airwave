@@ -1,6 +1,6 @@
 import { ArrowLeft, Mail, Tv } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import { Button } from "@airwave/ui/components/button";
@@ -17,6 +17,7 @@ import { GithubIcon } from "@/components/icons/github-icon";
 import { GoogleIcon } from "@/components/icons/google-icon";
 import { Logo } from "@/components/logo";
 import { signIn } from "@/lib/auth-client";
+import { safeRedirect } from "@/lib/safe-redirect";
 
 type Mode = "password" | "magic";
 
@@ -28,7 +29,13 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
 
-  const callbackURL = `${window.location.origin}/post-login`;
+  // A `?redirect=` intended destination (e.g. /device) threaded from the _auth guard — carried through
+  // the whole login flow so a viewer lands back where they were headed. Local paths only (safeRedirect).
+  const { redirect: redirectParam } = useSearch({ from: "/login" });
+  const dest = safeRedirect(redirectParam);
+  const callbackURL = `${window.location.origin}/post-login${
+    dest ? `?redirect=${encodeURIComponent(dest)}` : ""
+  }`;
 
   const handlePlex = async () => {
     try {
@@ -59,7 +66,7 @@ export function LoginPage() {
         toast.error(response.error.message || "Invalid email or password");
         return;
       }
-      navigate({ to: "/post-login" });
+      navigate({ to: "/post-login", search: dest ? { redirect: dest } : {} });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to sign in";
       toast.error(message);

@@ -13,6 +13,10 @@ export async function createContext({ context }: CreateContextOptions) {
   return {
     prisma,
     session,
+    // The raw request headers — carried through so a procedure can call better-auth server APIs
+    // that authenticate the caller via the session cookie (e.g. auth.api.createUser). getSession
+    // already read them above; we just also expose them instead of discarding them.
+    headers: context.req.raw.headers,
   };
 }
 

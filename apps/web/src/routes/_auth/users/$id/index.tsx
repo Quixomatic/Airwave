@@ -1,11 +1,20 @@
 import { Badge } from "@airwave/ui/components/badge";
 import { Button } from "@airwave/ui/components/button";
-import { Frame, FramePanel } from "@airwave/ui/components/frame";
+import {
+  Frame,
+  FrameDescription,
+  FrameHeader,
+  FramePanel,
+  FrameTitle,
+} from "@airwave/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { KeyRound, ShieldCheck, User } from "lucide-react";
+import { KeyRound, Loader2, ShieldCheck, Trash2, User } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
-import { trpc } from "@/utils/trpc";
+import { Modal } from "@/components/modal";
+import { trpc, trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/users/$id/")({
   component: UserOverview,
@@ -19,6 +28,21 @@ function UserOverview() {
   const u = user.data;
   const a = access.data;
   const admin = u?.role === "admin";
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const remove = async () => {
+    setDeleting(true);
+    try {
+      await trpcClient.users.delete.mutate({ id });
+      toast.success("User deleted.");
+      navigate({ to: "/users" });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete user");
+    } finally {
+      setDeleting(false);
+    }
+  };
   const initials = (u?.name || u?.email || "?")
     .trim()
     .split(/\s+/)
@@ -45,7 +69,8 @@ function UserOverview() {
   }
 
   return (
-    <Frame>
+    <div className="space-y-6">
+      <Frame>
       <FramePanel className="space-y-6">
         {/* Hero — big avatar + name. */}
         <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
@@ -112,7 +137,49 @@ function UserOverview() {
           )}
         </div>
       </FramePanel>
-    </Frame>
+      </Frame>
+
+      {/* Danger zone — delete a user. Never an admin (the sole owner can't remove themselves). */}
+      {!admin && (
+        <Frame>
+          <FrameHeader>
+            <FrameTitle className="text-destructive">Danger zone</FrameTitle>
+            <FrameDescription>Irreversible — there's no undo.</FrameDescription>
+          </FrameHeader>
+          <FramePanel className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Delete this user</p>
+              <p className="text-muted-foreground text-sm">
+                Permanently removes their account, sign-in, and channel access. This{" "}
+                <strong>cannot be undone</strong>.
+              </p>
+            </div>
+            <Button variant="destructive" className="shrink-0" onClick={() => setDeleteOpen(true)}>
+              <Trash2 className="mr-2 size-4" /> Delete user
+            </Button>
+          </FramePanel>
+        </Frame>
+      )}
+
+      {deleteOpen && (
+        <Modal open onClose={() => !deleting && setDeleteOpen(false)}>
+          <h3 className="text-lg font-semibold">Delete user?</h3>
+          <p className="text-muted-foreground mt-2 text-sm">
+            This permanently removes <strong>{u?.name || u?.email}</strong> — their account, sign-in,
+            and channel access. This can't be undone.
+          </p>
+          <div className="mt-6 flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={remove} disabled={deleting}>
+              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete user
+            </Button>
+          </div>
+        </Modal>
+      )}
+    </div>
   );
 }
 
