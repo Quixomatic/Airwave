@@ -168,6 +168,14 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
           currentRef.current = { index: slots.indexOf(entry), kind: "BUMPER", startS: entry.startS, endS: entry.endS, ratingKey: null, guide: entry.slot.guide, offset: 0, playStartCurrentTime: 0, baselineReady: true, session: null };
           bumperEffRef.current = clamped;
           pausedRef.current = false;
+          // Entering a bumper hard-pauses mpv (above), and mpv's `pause` persists across loadfile. Clear
+          // the last-loaded URL so the bumper→program rollover ALWAYS takes the fresh-load path (a real
+          // `setSource` change → onLoad → play()), instead of a same-URL no-op that leaves the next
+          // program paused on its first frame. Every way of entering a bumper — rolling in naturally, or
+          // seeking forward/backward into it — passes through here, so this covers them all. Within-program
+          // DVR seeks re-populate currentUrlRef on the next program load, so the same-media seek fast-path
+          // is unaffected.
+          currentUrlRef.current = null;
           return;
         }
         const gen = ++genRef.current;

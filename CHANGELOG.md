@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.61] - 2026-08-10
+
+### Fixed
+
+- **tv-native: a channel no longer stalls at the end of a bumper after you seek back into it.** Rolling
+  into the next program after a bumper you'd seeked or tracked back into would load the program's first
+  frame but leave it paused. Entering a bumper hard-pauses the mpv video (and mpv's `pause` persists
+  across `loadfile`); the un-pause at the bumper→program rollover only fired on a real source change
+  (`onLoad` → `play()`). But seeking back into a bumper left `currentUrlRef` pointing at the program
+  that *follows* it, so the rollover resolved to the same URL, `setSource` no-op'd, `onLoad` never
+  fired, and the persisted pause stuck (non-direct / transcoded channels). `goTo` now clears
+  `currentUrlRef` on bumper entry, so every bumper→program rollover takes the fresh-load path and plays.
+  The within-program DVR-seek fast path is unaffected. Natural forward playback was never affected.
+
 ## [0.9.60] - 2026-08-10
 
 ### Fixed
