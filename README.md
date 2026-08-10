@@ -113,6 +113,8 @@ A Postgres database and [`docker-compose.yml`](./docker-compose.yml) wire it tog
 | *The "Up Next" bumper between programs (with an optional music bed).* | *Channel surf — flip channels without leaving what's on.* |
 | ![Filter the guide](docs/screenshots/appletv-sidebarfilter.webp) | ![Full program info](docs/screenshots/appletv-fullchrome-programinfo.webp) |
 | *Filter the guide by package, favorites, or recents.* | *Full program info while you watch.* |
+| ![Device capability check](docs/screenshots/appletv-diagnostic.webp) | ![Sign in with a QR code](docs/screenshots/tvweb-qrcode.webp) |
+| *First run: each device measures exactly what it can decode.* | *Sign in by scanning a code — Plex device-link or an Airwave code.* |
 
 ### In the admin (build & manage)
 
@@ -130,6 +132,10 @@ A Postgres database and [`docker-compose.yml`](./docker-compose.yml) wire it tog
 | *Bumpers + an optional ambient-music library.* | *Optional AI — bring your own provider key.* |
 | ![The AI assistant in action](docs/screenshots/admin-aiassistant.webp) | ![Background jobs](docs/screenshots/admin-jobs.webp) |
 | *The AI assistant analyzing a channel's filter, with tool calls.* | *Background jobs — metadata sync, schedule refresh, and more.* |
+| ![Import a lineup](docs/screenshots/admin-importer.webp) | ![AI lineup run — observability](docs/screenshots/admin-ailineupworkflow-observability.webp) |
+| *Import a lineup — pick and choose packages & channels, with de-dup.* | *The AI lineup builder, fully observable — per-channel steps, tokens, cost.* |
+| ![Import run — observability](docs/screenshots/admin-importworkflow-observability.webp) | ![Import / Export](docs/screenshots/admin-settings-importexport.webp) |
+| *Every durable workflow run is inspectable end to end.* | *Export a lineup to move it to another Airwave instance.* |
 
 ---
 
