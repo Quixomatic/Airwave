@@ -24,6 +24,7 @@ const ENC_SHAPE = /^[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,
 export function looksEncrypted(value: string): boolean {
   if (!value || !ENC_SHAPE.test(value)) return false;
   const [ivB, tagB] = value.split(":");
+  if (!ivB || !tagB) return false; // guaranteed by ENC_SHAPE, but narrows string|undefined for tsc
   try {
     return Buffer.from(ivB, "base64").length === 12 && Buffer.from(tagB, "base64").length === 16;
   } catch {

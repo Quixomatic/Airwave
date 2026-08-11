@@ -2,6 +2,26 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.70] - 2026-08-11
+
+### Changed
+
+- **Changing a playback-only bumper setting no longer regenerates every channel's schedule.** The global
+  bumper-config `update` bumped the reconcile `rev` on *every* save, so toggling ambient bumper music (or its
+  volume/fades, the "Up Next" card style, etc.) fired `schedule-bumper-sync` to rebuild every channel's
+  schedule from scratch — expensive, and it wiped whatever you were about to watch. Now the `rev` advances
+  (and the sync job runs) **only when a structural setting changes** — the fields that actually shape the
+  materialized timeline: bumper enable + the break durations
+  (`interstitialSeconds`/`afterMovieSeconds`/`afterEpisodeSeconds`/`quickSeconds`/`shortEpisodeMinutes`). The
+  music controls, card style, and legacy music key are playback-only (read by the client at play time) and
+  now save without touching any schedule. (The music *library* router already didn't trigger rebuilds.)
+
+### Fixed
+
+- Pre-existing `tsc` error in `services/plex/token.ts` (`looksEncrypted` — a `string | undefined` from the
+  `iv:tag` split) that had left the server `check-types` gate red; added the narrowing guard the regex
+  already guarantees. No runtime change; the gate is green again.
+
 ## [0.9.69] - 2026-08-11
 
 ### Fixed

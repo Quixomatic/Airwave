@@ -31,6 +31,20 @@ export const bumpersRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const existing = await getGlobalBumperConfig(ctx.prisma);
+      // Only STRUCTURAL settings change the materialized schedule (bumper presence + break DURATIONS baked
+      // into the timeline — the fields `resolveBumperPlan`/`breakSeconds` read). Everything else here is
+      // PLAYBACK-ONLY, read by the client at play time: the ambient-music controls (musicEnabled/volume/
+      // fades — the bed is DVR-derived client-side), the "Up Next" card style, and the legacy music key.
+      // So only bump `rev` (→ schedule-bumper-sync rebuilds every stale channel) when a structural field
+      // actually changed value — otherwise flipping e.g. bumper music on/off needlessly regenerates every
+      // channel's schedule from scratch.
+      const structuralChanged =
+        input.enabled !== existing.enabled ||
+        input.interstitialSeconds !== existing.interstitialSeconds ||
+        input.afterMovieSeconds !== existing.afterMovieSeconds ||
+        input.afterEpisodeSeconds !== existing.afterEpisodeSeconds ||
+        input.quickSeconds !== existing.quickSeconds ||
+        input.shortEpisodeMinutes !== existing.shortEpisodeMinutes;
       await ctx.prisma.bumperConfig.update({
         where: { id: existing.id },
         data: {
@@ -46,14 +60,14 @@ export const bumpersRouter = router({
           ...(input.musicVolume !== undefined ? { musicVolume: input.musicVolume } : {}),
           ...(input.musicFadeInMs !== undefined ? { musicFadeInMs: input.musicFadeInMs } : {}),
           ...(input.musicFadeOutMs !== undefined ? { musicFadeOutMs: input.musicFadeOutMs } : {}),
-          // Any settings change advances the rev; channels built under an older rev
-          // become stale and get rebuilt by the schedule-bumper-sync job.
-          rev: { increment: 1 },
+          // Advance the rev ONLY on a structural change; channels built under an older rev become stale and
+          // get rebuilt by the schedule-bumper-sync job. Playback-only changes leave every schedule intact.
+          ...(structuralChanged ? { rev: { increment: 1 } } : {}),
         },
       });
-      // Kick off the reconcile immediately (it self-throttles to a batch per run and
-      // the cron picks up the rest); no-ops when nothing is stale.
-      void runJob("schedule-bumper-sync");
+      // Reconcile only when a structural change actually happened (it self-throttles to a batch per run and
+      // the cron picks up the rest). Skipping it on playback-only saves avoids a needless full-lineup rebuild.
+      if (structuralChanged) void runJob("schedule-bumper-sync");
       return { ok: true };
     }),
 });
