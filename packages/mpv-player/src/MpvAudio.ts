@@ -26,6 +26,18 @@ export interface MpvAudioBuffering {
   buffering: boolean;
 }
 
+/** What the current audio output route/sink advertises — for showing whether real 5.1/7.1 is available. */
+export interface AudioOutputInfo {
+  /** Max output channels the route/sink reports (2 = stereo, 6 = 5.1, 8 = 7.1). 0 = unknown. */
+  maxChannels: number;
+  /** Channels currently active on the output (iOS `outputNumberOfChannels`); 0 on Android (no equivalent). */
+  currentChannels: number;
+  /** Human name of the output route (e.g. the soundbar/receiver name, or "HDMI"). May be empty. */
+  routeName: string;
+  /** Route/port type (e.g. "HDMI", "HDMI ARC", "Built-in speaker"). May be empty. */
+  routeType: string;
+}
+
 interface MpvAudioNative {
   audioLoad(url: string, startTime: number): Promise<void>;
   audioAppend(url: string, startTime: number): Promise<void>;
@@ -38,6 +50,7 @@ interface MpvAudioNative {
   audioSetMuted(muted: boolean): Promise<void>;
   audioSetRate(rate: number): Promise<void>;
   audioSetLoop(loop: boolean): Promise<void>;
+  getAudioOutputInfo(): Promise<AudioOutputInfo>;
   addListener(event: "onAudioProgress", listener: (e: MpvAudioProgress) => void): MpvAudioSubscription;
   addListener(event: "onAudioEnded", listener: () => void): MpvAudioSubscription;
   addListener(event: "onAudioError", listener: (e: MpvAudioError) => void): MpvAudioSubscription;
@@ -72,6 +85,9 @@ export const mpvAudio = {
   setRate: (rate: number): Promise<void> => Native.audioSetRate(rate),
   /** Loop the track when it reaches the end (mpv `loop-file`). */
   setLoop: (loop: boolean): Promise<void> => Native.audioSetLoop(loop),
+  /** What the current audio output supports (max channels + route name) — for the Audio settings readout.
+   *  Read live (it changes when you plug in / switch a soundbar), not a cached diagnostic. */
+  getOutputInfo: (): Promise<AudioOutputInfo> => Native.getAudioOutputInfo(),
   /** Position ticks (mpv `time-pos`) + the track's duration. */
   onProgress: (listener: (e: MpvAudioProgress) => void): MpvAudioSubscription =>
     Native.addListener("onAudioProgress", listener),

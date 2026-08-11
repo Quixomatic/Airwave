@@ -1,3 +1,4 @@
+import AVFoundation
 import ExpoModulesCore
 
 public class MpvPlayerModule: Module {
@@ -22,6 +23,22 @@ public class MpvPlayerModule: Module {
     AsyncFunction("audioSetMuted") { (muted: Bool) in self.audio?.setMuted(muted) }
     AsyncFunction("audioSetRate") { (rate: Double) in self.audio?.setRate(rate) }
     AsyncFunction("audioSetLoop") { (loop: Bool) in self.audio?.setLoop(loop) }
+
+    // Report what the current audio output route advertises, so the app can show whether real 5.1/7.1 is
+    // available (Settings → Audio). Configures the same long-form playback session the video player uses so
+    // the numbers reflect what playback would actually get (idempotent — safe while audio is playing).
+    AsyncFunction("getAudioOutputInfo") { () -> [String: Any] in
+      let session = AVAudioSession.sharedInstance()
+      try? session.setCategory(.playback, mode: .moviePlayback, policy: .longFormAudio, options: [])
+      try? session.setActive(true)
+      let out = session.currentRoute.outputs.first
+      return [
+        "maxChannels": session.maximumOutputNumberOfChannels,
+        "currentChannels": session.outputNumberOfChannels,
+        "routeName": out?.portName ?? "",
+        "routeType": out?.portType.rawValue ?? "",
+      ]
+    }
 
     OnDestroy {
       self.audio?.dispose()

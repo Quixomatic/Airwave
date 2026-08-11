@@ -1,5 +1,8 @@
 package expo.modules.mpvplayer
 
+import android.content.Context
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
@@ -31,6 +34,25 @@ class MpvPlayerModule : Module() {
     AsyncFunction("audioSetRate") { rate: Double -> audio?.setRate(rate) }
     AsyncFunction("audioSetLoop") { loop: Boolean -> audio?.setLoop(loop) }
 
+    // Report what the current audio output can do (Settings → Audio), mirroring the iOS probe. Android has
+    // no single "session channels" number, so we take the max channel count across the output devices (the
+    // HDMI/eARC sink reports the receiver's real capability) and label the widest one.
+    AsyncFunction("getAudioOutputInfo") {
+      val am = appContext.reactContext?.applicationContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+      var maxCh = 0
+      var routeName = ""
+      var routeType = ""
+      am?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)?.forEach { d ->
+        val m = d.channelCounts.maxOrNull() ?: 0
+        if (m > maxCh) {
+          maxCh = m
+          routeName = d.productName?.toString() ?: ""
+          routeType = audioDeviceTypeName(d.type)
+        }
+      }
+      mapOf("maxChannels" to maxCh, "currentChannels" to 0, "routeName" to routeName, "routeType" to routeType)
+    }
+
     OnDestroy {
       audio?.dispose()
       audio = null
@@ -56,6 +78,16 @@ class MpvPlayerModule : Module() {
       AsyncFunction("pause") { view: MpvPlayerView -> view.pause() }
       AsyncFunction("seek") { view: MpvPlayerView, seconds: Double -> view.seek(seconds) }
     }
+  }
+
+  private fun audioDeviceTypeName(type: Int): String = when (type) {
+    AudioDeviceInfo.TYPE_HDMI -> "HDMI"
+    AudioDeviceInfo.TYPE_HDMI_ARC -> "HDMI ARC"
+    AudioDeviceInfo.TYPE_AUX_LINE -> "Line out"
+    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> "Bluetooth"
+    AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "Built-in speaker"
+    AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_WIRED_HEADSET -> "Wired"
+    else -> "Output"
   }
 
   private fun ensureAudio(): MpvAudioCore {

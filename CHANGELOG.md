@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.65] - 2026-08-11
+
+### Added
+
+- **Settings → Audio: show what the audio output actually supports.** The Audio page now reads the current
+  output route **live** (mpv-player's new `getAudioOutputInfo` — iOS `AVAudioSession.maximumOutputNumberOfChannels`
+  + route name; Android `AudioManager` output devices) and shows the detected sink and its max channel count
+  (e.g. "5.1 (6 ch)"). Read live, not cached like the codec diagnostic, because it changes when a
+  soundbar/receiver is plugged in or switched — so you can confirm whether real surround is actually reaching
+  the receiver in Multichannel mode (≥ 6 ch) or the route is only stereo. Software can't verify a sound
+  physically leaves a speaker, but the route's reported capability is the honest, useful signal.
+
 ## [0.9.64] - 2026-08-10
 
 ### Fixed
