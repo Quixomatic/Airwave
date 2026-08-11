@@ -171,6 +171,11 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
           currentRef.current = { index: slots.indexOf(entry), kind: "BUMPER", startS: entry.startS, endS: entry.endS, ratingKey: null, guide: entry.slot.guide, offset: 0, playStartCurrentTime: 0, baselineReady: true, session: null };
           bumperEffRef.current = clamped;
           pausedRef.current = false;
+          // Disarm the resume-stall watchdog: the video is intentionally paused for the bumper (no progress
+          // events), so an armed watchdog would mistake it for a dead stream, burn its retries reloading the
+          // bumper, then give up by setting pausedRef=true — which would poison the next program's onLoad
+          // play() gate and leave it stuck paused. (Belt-and-suspenders; only armed after a manual Play.)
+          resumeWatchRef.current = false;
           // Entering a bumper hard-pauses mpv (above) but leaves the current program LOADED; mpv's `pause`
           // is a persistent property that survives into the next load. Deliberately KEEP `currentUrlRef`
           // pointing at that loaded program — when the bumper rolls back into the SAME program (you seeked
@@ -257,6 +262,16 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
           console.log(`[mpv] LOAD mode=${info.mode} offset=${offset}s conn=${info.connection ?? "?"} ${info.container ?? "?"}/${info.videoCodec ?? "?"}/${info.audioCodec ?? "?"} ${info.url.slice(0, 90)}`);
           setStartTime(info.mode === "direct" ? offset : 0);
           setSource(info.url);
+          // Proactively clear mpv's pause here — do NOT rely solely on onLoad to un-pause. mpv's `pause`
+          // is PERSISTENT across loadfile, so entering a bumper (which pauses) leaves the next program
+          // loading paused. The fast path above already plays explicitly; this reload path used to depend
+          // entirely on the onLoad event's play(), which is a single point of failure: in a seek-back
+          // sequence (program → bumper → previous program → bumper → program) there are several
+          // consecutive loadfile-while-paused loads, and if that final onLoad's play() doesn't stick the
+          // program sits paused on a black frame. Setting pause=no now (a durable property — order vs the
+          // loadfile doesn't matter) guarantees the freshly-loaded program plays. Guarded by pausedRef so a
+          // user pause is respected. onLoad + onFirstFrame remain as additional backstops.
+          if (!pausedRef.current) void viewRef.current?.play();
           // Watchdog (tv-web's pattern): whether or not onLoad/onError ever fires, post ONE PlaybackLog
           // row ~6s later capturing the real outcome — so a stuck load still records (firstFrame/buffering).
           setTimeout(() => {
@@ -304,7 +319,9 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
       if (currentRef.current?.kind === "PROGRAM" && !currentRef.current.baselineReady) baselineArmedRef.current = true;
       // A fresh program load: resume unless the user paused. mpv's `pause` persists across loadfile,
       // so after a bumper (which paused) the next program would paint its first frame but stay paused —
-      // exactly tv-web's `tryPlay(video)` on every load.
+      // exactly tv-web's `tryPlay(video)` on every load. (The reload path also plays proactively now; this
+      // stays as a backstop.)
+      console.log(`[mpv] onLoad play? paused=${pausedRef.current}`);
       if (!pausedRef.current) void viewRef.current?.play();
       recordLog(width > 0 && height > 0 ? "playing" : "not_decoding");
       setStatus((s) => (s.buffering ? { ...s, buffering: false } : s));

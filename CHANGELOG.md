@@ -2,6 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.67] - 2026-08-11
+
+### Fixed
+
+- **tv-native: a program after a bumper no longer stays black/paused after you seek *backward* across the
+  bumper.** Follow-up to v0.9.66 (which fixed the same-media case but not this one). Root cause was a
+  structural asymmetry in the loader: the same-media resume path plays explicitly, but the **reload path
+  had no direct `play()`** — it relied entirely on the `onLoad` event to un-pause. mpv's `pause` is
+  persistent across `loadfile`, and a seek-back sequence (program → bumper → previous program → bumper →
+  program) performs several consecutive loadfile-while-paused loads; if that final `onLoad`'s `play()`
+  didn't stick, the freshly-loaded program sat paused on a black frame (the previous program had already
+  been unloaded — hence black, not a stale frame). Natural forward flow only ever does a single
+  bumper→program load, so it never hit the fragile timing. The reload path now clears mpv's pause
+  **proactively** (a durable property, so ordering vs the loadfile doesn't matter), guarded by the
+  user-pause flag, with `onLoad` + `onFirstFrame` as backstops. Also disarms the resume-stall watchdog on
+  bumper entry so an intentionally-paused bumper can't be mistaken for a dead stream and poison the next
+  program's pause state. Added an `[mpv] onLoad play? paused=…` log to pinpoint it if any case remains.
+
 ## [0.9.66] - 2026-08-11
 
 ### Fixed
