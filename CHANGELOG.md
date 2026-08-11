@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.71] - 2026-08-11
+
+### Fixed
+
+- **tv-native: no more audio crackle when a bumper you seeked back into ends (Case A).** Now that the
+  AVAudioSession conflict between the two mpv cores is fixed (v0.9.69), the compensating "play *before* seek"
+  logic from v0.9.68 is no longer needed — and was itself the artifact: playing before the seek briefly
+  resumed the program at its OLD (pre-bumper) position (an audible crackle) before the seek pulled it to the
+  start. Reverted the same-media resume to the clean path — seek while paused (silent), then a single
+  `play()` to resume (the same clean resume the Play button does). Case B (the reload path) is unaffected.
+
 ## [0.9.70] - 2026-08-11
 
 ### Changed

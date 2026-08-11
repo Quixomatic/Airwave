@@ -236,14 +236,13 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
           // must play() explicitly.
           console.log(`[mpv] RESUME ${offset}s (same media, ${info.mode})`);
           positionSecRef.current = offset;
-          // UN-PAUSE FIRST, THEN SEEK — order is load-bearing. When entering a bumper we hard-pause mpv,
-          // and issuing `seek` to a still-PAUSED mpv followed by `pause=no` does NOT resume it (the seek
-          // leaves it paused — the bumper→program "stuck on the frame I seeked from" / black-screen bug).
-          // A plain `pause=no` on its own DOES resume (that's the Play button). So we play() first, which
-          // puts mpv in exactly the state a normal in-program DVR seek is in — playing — and THEN seek on
-          // the playing stream (the known-good path). Applies whether or not the user ever pressed pause,
-          // because it's the bumper that paused mpv.
-          void viewRef.current?.play();
+          // SEEK (while still paused) THEN a single play(). Seeking a paused mpv is silent, so there's no
+          // audio artifact; the plain `pause=no` then resumes cleanly at the new position (exactly what the
+          // Play button does). We formerly play()'d BEFORE the seek (v0.9.68) to force a resume, but that was
+          // compensating for the AVAudioSession conflict between the two mpv cores that ACTUALLY caused the
+          // stall — fixed in v0.9.69 by harmonizing their shared session. With that gone, playing first only
+          // resumes at the OLD (pre-bumper) position for a beat before the seek → an audible crackle. So:
+          // seek first, then one play().
           if (info.mode === "direct") {
             // A raw file's URL is offset-independent → seek to the new position (fast ffmpeg estimate); its
             // time-pos IS the media offset, so the baseline can be anchored inline.
@@ -256,8 +255,6 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
             // load's onLoad barrier, rather than guessing here.
             baselineArmedRef.current = true;
           }
-          // …and play() AFTER the seek too — belt-and-suspenders. If the seek ever re-pauses mpv, this
-          // catches it; if not, it's a harmless no-op (mpv is already playing from the play() above).
           void viewRef.current?.play();
         } else {
           decodedDimsRef.current = { w: 0, h: 0 };
