@@ -171,14 +171,14 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
           currentRef.current = { index: slots.indexOf(entry), kind: "BUMPER", startS: entry.startS, endS: entry.endS, ratingKey: null, guide: entry.slot.guide, offset: 0, playStartCurrentTime: 0, baselineReady: true, session: null };
           bumperEffRef.current = clamped;
           pausedRef.current = false;
-          // Entering a bumper hard-pauses mpv (above), and mpv's `pause` persists across loadfile. Clear
-          // the last-loaded URL so the bumper→program rollover ALWAYS takes the fresh-load path (a real
-          // `setSource` change → onLoad → play()), instead of a same-URL no-op that leaves the next
-          // program paused on its first frame. Every way of entering a bumper — rolling in naturally, or
-          // seeking forward/backward into it — passes through here, so this covers them all. Within-program
-          // DVR seeks re-populate currentUrlRef on the next program load, so the same-media seek fast-path
-          // is unaffected.
-          currentUrlRef.current = null;
+          // Entering a bumper hard-pauses mpv (above) but leaves the current program LOADED; mpv's `pause`
+          // is a persistent property that survives into the next load. Deliberately KEEP `currentUrlRef`
+          // pointing at that loaded program — when the bumper rolls back into the SAME program (you seeked
+          // back into the bumper), the loader below detects `sameMedia` and resumes it IN PLACE (seek +
+          // play). We must NOT null it: forcing the reload path instead is a no-op, because `setSource`
+          // with an unchanged URL is deduped in BOTH React state and the native view (applySource's
+          // `pendingSource != lastLoadedSource` guard) — which left the program stuck, paused, on the frame
+          // you left (the v0.9.61 regression). Rolling into a DIFFERENT program still reloads (URL differs).
           return;
         }
         const gen = ++genRef.current;
@@ -223,15 +223,26 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
         loadStartRef.current = Date.now();
         const sameMedia = info.url === currentUrlRef.current;
         currentUrlRef.current = info.url;
-        if (sameMedia && info.mode === "direct") {
-          // DVR seek WITHIN the same direct file (same URL → no reload): mpv seeks fast (ffmpeg estimate).
-          console.log(`[mpv] SEEK ${offset}s (same media)`);
-          loaded.playStartCurrentTime = offset;
-          loaded.baselineReady = true;
+        if (sameMedia) {
+          // The target program is ALREADY the loaded file/stream — a DVR seek within it, or rolling back
+          // out of a bumper into the program we paused for it. No reload happens (an unchanged URL is a
+          // no-op in both React state and the native view), so we RESUME IN PLACE. mpv `pause` is a
+          // PERSISTENT property (survives the bumper's pause + loadfile/seek), so onLoad won't fire and we
+          // must play() explicitly.
+          console.log(`[mpv] RESUME ${offset}s (same media, ${info.mode})`);
           positionSecRef.current = offset;
-          void viewRef.current?.seek(offset);
-          // mpv `pause` is a PERSISTENT property (survives loadfile/seek). A bumper paused it; a
-          // same-media DVR seek back into this program won't fire onLoad, so resume here explicitly.
+          if (info.mode === "direct") {
+            // A raw file's URL is offset-independent → seek to the new position (fast ffmpeg estimate); its
+            // time-pos IS the media offset, so the baseline can be anchored inline.
+            loaded.playStartCurrentTime = offset;
+            loaded.baselineReady = true;
+            void viewRef.current?.seek(offset);
+          } else {
+            // A transcode URL already encodes its offset — the stream is positioned, don't seek. Anchor the
+            // baseline off the next real onProgress (its time-pos may be 0- or offset-based), like a fresh
+            // load's onLoad barrier, rather than guessing here.
+            baselineArmedRef.current = true;
+          }
           void viewRef.current?.play();
         } else {
           decodedDimsRef.current = { w: 0, h: 0 };
@@ -303,6 +314,11 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   // onFirstFrame = mpv `playback-restart` (first painted frame after load/seek).
   const onFirstFrame = useCallback(() => {
     console.log(`[mpv] +${Date.now() - loadStartRef.current}ms FIRST-FRAME`);
+    // Backstop for the persistent-pause rollover: mpv `pause` survives loadfile, so a fresh program load
+    // after a bumper must un-pause. onLoad already does this, but onFirstFrame (playback-restart — the
+    // first painted frame) is a second, independent hook: if a load ever paints without onLoad's play()
+    // sticking, this catches it. Guarded by pausedRef so a user pause is respected.
+    if (!pausedRef.current) void viewRef.current?.play();
     setStatus((s) => (s.buffering ? { ...s, buffering: false } : s));
   }, []);
   const onBuffering = useCallback((e: { nativeEvent: { buffering: boolean } }) => {

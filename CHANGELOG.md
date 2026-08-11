@@ -2,6 +2,23 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.66] - 2026-08-11
+
+### Fixed
+
+- **tv-native: the bumper→program rollover no longer stalls or shows a stale frame after you seek back into
+  a bumper.** The v0.9.61 fix aimed at the wrong layer: it cleared the last-loaded URL on bumper entry to
+  force a reload, but rolling back into the program you paused for the bumper resolves to the **same URL**,
+  and `setSource` with an unchanged URL is a no-op in **both** React state and the native view (its
+  `pendingSource != lastLoadedSource` guard) — so no reload fired, mpv's persistent pause never lifted, and
+  the program sat paused on the frame you left. Clearing the URL also disabled the direct-play fast path
+  that previously worked, regressing direct playback. Now the player **keeps** the loaded URL so it detects
+  "same media" and **resumes in place**: a direct file seeks to the new offset and plays; a transcode stream
+  (already positioned by its offset-encoded URL) just plays, anchoring its clock off the next progress tick.
+  A second, independent un-pause hook was added on `onFirstFrame` (first painted frame) as a backstop for
+  the fresh-load path. Fixes both the "won't start playing" stall and the "stuck on the frame I seeked away
+  from" stale frame.
+
 ## [0.9.65] - 2026-08-11
 
 ### Added
