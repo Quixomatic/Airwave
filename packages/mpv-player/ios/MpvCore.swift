@@ -151,6 +151,15 @@ final class MpvCore {
   /// call repeatedly (we re-assert it whenever mpv's audio unit re-touches the session).
   private func configureAudioSession() {
     let session = AVAudioSession.sharedInstance()
+    // IDEMPOTENT: no-op when the session is already long-form movie playback. Re-setting the SAME category
+    // mid-playback renegotiates the audio route and PAUSES mpv — that's the ~250ms post-bumper re-pause when
+    // the bumper-music core (a second libmpv instance) had left the shared session in a different category.
+    // Only act when it's genuinely wrong, so re-asserting is always safe to call (setup / current-ao /
+    // playback-restart). The music core (`MpvAudioCore`) pins the SAME config, so between them the session
+    // never actually changes and this stays a no-op. See `MpvAudioCore.configureAudioSession`.
+    if session.category == .playback, session.mode == .moviePlayback, session.routeSharingPolicy == .longFormAudio {
+      return
+    }
     do {
       try session.setCategory(.playback, mode: .moviePlayback, policy: .longFormAudio, options: [])
       try session.setActive(true)

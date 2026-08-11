@@ -2,6 +2,25 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.69] - 2026-08-11
+
+### Fixed
+
+- **tv-native: the program no longer pauses ~250ms after a bumper (the confirmed root cause of the whole
+  rollover saga).** With bumper music on, the ambient-music core is a SECOND libmpv instance, and iOS/tvOS
+  gives an app exactly ONE shared `AVAudioSession`. The music core configured it as `.playback/.default`
+  while the video core uses `.playback/.moviePlayback/.longFormAudio` — so when a program resumed after a
+  bumper, the video core re-asserted its category at the first frame (~250ms), the audio route renegotiated,
+  and mpv paused. Proven by disabling bumper music (no second core → no conflict → clean playback). Fix: both
+  cores now agree on the **identical** session config, each **re-asserts it idempotently** (a configure call
+  no-ops when the session is already correct), and each re-pins after its own audio unit spins up (mpv
+  re-touches the shared session on AO init). So the session never flips between the two players and nothing
+  renegotiates mid-playback. Completes the rollover fix with v0.9.66–68 (which made `play()` actually fire —
+  that then revealed this second, deeper re-pause). The 5.1/7.1 multichannel path (v0.9.64) is unchanged —
+  same config + re-assert, just gated to skip when already right. The two players stay fully separate; they
+  just stop disagreeing about the one shared session. (iOS/tvOS only; Android uses `ao=audiotrack`, no
+  `AVAudioSession`.)
+
 ## [0.9.68] - 2026-08-11
 
 ### Fixed

@@ -30,9 +30,10 @@ final class MpvAudioCore {
 
   @discardableResult
   func setup() -> Bool {
-    // Play under the video and ignore the ring/silent switch (it's intentional playback, not a UI sound).
-    try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
-    try? AVAudioSession.sharedInstance().setActive(true)
+    // Pin the SAME shared-session config the video core uses (see `configureAudioSession` below). This is a
+    // SECOND libmpv instance sharing the app's ONE `AVAudioSession`; if the two cores disagree on the
+    // category the session flips and pauses the video ~250ms after a bumper. Idempotent → safe to re-pin.
+    configureAudioSession()
 
     mpv = mpv_create()
     guard let mpv else { return false }
@@ -60,6 +61,9 @@ final class MpvAudioCore {
 
     mpv_observe_property(mpv, 0, "time-pos", MPV_FORMAT_DOUBLE)
     mpv_observe_property(mpv, 0, "paused-for-cache", MPV_FORMAT_FLAG)
+    // mpv re-touches the shared AVAudioSession when THIS core's audio unit spins up — re-pin our config so
+    // it doesn't drift the session out from under the video core (which would pause the video on resume).
+    mpv_observe_property(mpv, 0, "current-ao", MPV_FORMAT_STRING)
 
     let ctx = Unmanaged.passRetained(self).toOpaque()
     wakeupContext = ctx
@@ -224,9 +228,23 @@ final class MpvAudioCore {
                 prop.format == MPV_FORMAT_FLAG,
                 let f = prop.data?.assumingMemoryBound(to: Int32.self).pointee {
         DispatchQueue.main.async { self.onBuffering?(f != 0) }
+      } else if name == "current-ao" {
+        // Our audio unit (re)initialized and may have stomped the shared session — re-pin it (idempotent).
+        DispatchQueue.main.async { self.configureAudioSession() }
       }
     default:
       break
     }
+  }
+
+  /// Idempotently pin the app's shared `AVAudioSession` to the SAME config the video core uses
+  /// (`.playback / .moviePlayback / .longFormAudio`) — no-op when already correct, so re-pinning after this
+  /// core's AO spins up never disrupts the video. Both cores agreeing on one config is what stops the two
+  /// libmpv instances from flipping the session and pausing playback. Mirrors `MpvCore.configureAudioSession`.
+  private func configureAudioSession() {
+    let s = AVAudioSession.sharedInstance()
+    if s.category == .playback, s.mode == .moviePlayback, s.routeSharingPolicy == .longFormAudio { return }
+    try? s.setCategory(.playback, mode: .moviePlayback, policy: .longFormAudio, options: [])
+    try? s.setActive(true)
   }
 }
