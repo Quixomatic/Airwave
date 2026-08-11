@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.68] - 2026-08-11
+
+### Fixed
+
+- **tv-native: the bumper→program rollover after seeking back now actually resumes (the real root cause).**
+  Entering a bumper hard-pauses mpv, and on the same-media rollback into a program we were issuing `seek`
+  to the *still-paused* mpv and *then* `play()` — and a seek on a paused mpv followed by `pause=no` does
+  **not** resume (it leaves it paused on the seeked frame). That's why "same-media" Case A (seek back into
+  the bumper, program stays loaded) showed the frame you left, and why it needed no manual pause to
+  trigger — the bumper is what paused mpv. A normal in-program DVR seek works only because mpv is already
+  *playing* when it seeks. Fix: on the same-media resume, **un-pause first, then seek** (putting mpv in the
+  same known-good playing state a DVR seek is in), and `play()` again after the seek as belt-and-suspenders.
+  Together with v0.9.67 (reload-path proactive un-pause) this covers both the same-media and reload
+  rollbacks.
+
 ## [0.9.67] - 2026-08-11
 
 ### Fixed
