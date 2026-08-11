@@ -9,6 +9,17 @@ public class MpvPlayerModule: Module {
   public func definition() -> ModuleDefinition {
     Name("MpvPlayer")
 
+    // Configure the app's ONE shared AVAudioSession at module init (app launch) — plezy's pattern. Both
+    // mpv cores (video + headless audio) then just PLAY THROUGH it and never touch it themselves, so
+    // neither the bumper-music core's start nor its teardown can flip the session out from under the video
+    // (the post-bumper re-pause + lost-5.1). `.longFormAudio` negotiates the full multichannel route; and a
+    // fresh tune that lands straight on a bumper still has an active session for the music bed.
+    OnCreate {
+      let session = AVAudioSession.sharedInstance()
+      try? session.setCategory(.playback, mode: .moviePlayback, policy: .longFormAudio, options: [])
+      try? session.setActive(true)
+    }
+
     // Module-level (view-less) AUDIO events — the bumper bed + future radio player subscribe to these.
     Events("onAudioProgress", "onAudioEnded", "onAudioError", "onAudioBuffering")
 

@@ -2,6 +2,23 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.72] - 2026-08-11
+
+### Fixed
+
+- **tv-native: bumper music no longer breaks the video's 5.1 audio (or stalls it) at a bumper→program
+  transition — the two mpv cores now claim audio the same way (plezy's model).** The app has ONE shared iOS
+  `AVAudioSession` and one output, and the bumper-music core (a second libmpv instance) fought the video over
+  it two ways: (1) it configured + **re-pinned** the session on its own setup AND teardown — poking it right
+  as the video resumed after a bumper; and (2) it lacked the video's `audio-channels=auto`, so it claimed the
+  shared output as **stereo** and the video couldn't reclaim 5.1. Fix, following plezy: configure the session
+  **once at app launch** (module `OnCreate`, `.moviePlayback/.longFormAudio`); make the bumper-music core
+  fully **session-passive** (it never touches `AVAudioSession`, so its start/teardown can't flip it out from
+  under the video); and give it **`audio-channels=auto`** so both engines negotiate the shared output
+  identically. Also fixes a fresh tune landing straight on a bumper (the session is already active from
+  launch). The video core's session ownership and the Settings → Audio Stereo/Multichannel toggle are
+  unchanged. (iOS/tvOS only.)
+
 ## [0.9.71] - 2026-08-11
 
 ### Fixed
