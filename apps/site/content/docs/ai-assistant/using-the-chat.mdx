@@ -1,0 +1,37 @@
+---
+title: "Using the chat"
+description: "The slide-in chat panel — live streaming of reasoning and tool calls, conversation history, the model badge, the approval flow, and the reliability details behind long chats."
+---
+
+The assistant lives in a **slide-in global side panel**, toggled by the **AI Assistant** button (a Sparkles icon) in the top-right of the admin header (`apps/web/src/components/layout/app-layout.tsx:74-86`). The panel UI is built on Airwave's base-lyra **AI Elements** components (`apps/web/src/components/ai-elements/` — conversation, message, prompt-input, reasoning, response, tool).
+
+## Streaming
+
+The client uses the AI SDK `useChat` hook with `DefaultChatTransport` against `/api/ai/chat` (`ai-chat-panel.tsx:168-177`). The server streams a UI-message response via `streamText(...).toUIMessageStreamResponse(...)` (`chat.ts:153-170`). You see reasoning, tool calls, tool results, and the final answer appear live. A turn may chain up to **40 steps** (`stepCountIs(40)`) so a long discover → preview → build sequence completes in one turn.
+
+## History
+
+Conversations persist to `AiConversation` / `AiMessage` (Prisma models in `ai.prisma:102-130`), keyed per user. **New chat** and **History** controls let you start fresh or resume a past thread (`ai-chat-panel.tsx:104-140`); the history list is fetched via the `ai.conversations` tRPC query. Each message stores the full AI SDK part list as JSON so a thread replays faithfully — reasoning, tool calls, and results all come back exactly as they happened.
+
+## Model badge
+
+A footer badge shows the active model and lets you switch the chat's active connection inline (`ModelBadge`, `ai-chat-panel.tsx:291-319`) — handy for moving a heavy build session onto a cheaper or a stronger model without leaving the chat.
+
+## The Approve / Deny flow
+
+When the assistant wants to write, the tool card renders an **"Apply this change?"** footer with Approve / Deny (`ai-chat-panel.tsx:242-254`). Approving resumes the turn and runs the tool; denying leaves nothing changed. Every [write tool](/docs/ai-assistant/building-channels) flows through this gate — reads never do.
+
+> Implementation note: the client sets `sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses` so the decision actually POSTs the resume request rather than sticking on "Working" (`ai-chat-panel.tsx:172-177`).
+
+## Reliability details
+
+Long AI chats are fragile in specific ways, and the server handles them so a big build session doesn't fall apart:
+
+- **Prompt caching.** A cache breakpoint is set on the last message so Anthropic reuses the whole prior prefix each turn — a channel-building chat grows past 100k tokens fast (previews are large), and without caching every turn would re-ship all of it (`chat.ts:143-151`). Namespaced to Anthropic; a no-op for other providers.
+- **Idle timeout.** Bun's default 10s idle timeout is raised to **255s** so a slow thinking / tool turn isn't killed mid-stream (`apps/server/src/index.ts:263-271`).
+- **Resume / heal.** On each request the server strips unsigned / broken reasoning parts while keeping valid signed ones (`stripReasoning`, `chat.ts:56-63`) and injects synthetic "not applied" results for dangling write tool calls you've already moved past (`healDanglingToolCalls`, `chat.ts:79-98`) — without this a crashed approval turn would brick the whole conversation.
+
+---
+
+See also: [Building channels & packages](/docs/ai-assistant/building-channels) · [Exploring your library](/docs/ai-assistant/exploring-your-library) ·
+[Connections & keys](/docs/ai-assistant/connections)

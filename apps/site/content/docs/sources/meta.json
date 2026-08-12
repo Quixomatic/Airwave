@@ -1,6 +1,5 @@
 {
   "title": "Sources",
   "icon": "Plug",
-  "defaultOpen": true,
   "pages": ["connecting", "libraries", "metadata-sync", "connections", "token-security", "managing"]
 }

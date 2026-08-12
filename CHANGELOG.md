@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.86] - 2026-08-12
+
+### Changed
+
+- **Docs information architecture: Settings absorbs its sub-sections, and the AI assistant becomes its own
+  section.** On getairwave.tv/docs:
+  - **Sessions** and **Import / Export** now nest under **Settings** (alongside General and AI connections)
+    instead of sitting at the top level. Their standalone sidebar icons were dropped to match the other
+    Settings subpages, "Sessions (Now Playing)" is now just **Sessions**, and the **"Settings:"** title
+    prefix was removed from General and AI connections.
+  - **AI assistant** moved below the Settings grouping and expanded from a single page into its own
+    **folder-with-overview** — a clickable landing plus five focused subpages: *Connections & keys*,
+    *Exploring your library* (the read tools), *Building channels & packages* (the write tools), *Using the
+    chat*, and *Assistant vs the lineup builder*. Each tool is broken down with what it does **for you**,
+    grounded in the real `agent-tools.ts` inventory.
+  - **Tinted sidebar icons for the "Using Airwave" sections**, matching the admin app's palette (Channels
+    indigo, Sources sky, Packages violet, Bumpers amber, Users emerald, Settings rose, plus AI assistant
+    purple); the Getting Started and How it works groups stay untinted.
+  - **Sidebar folders now load collapsed** by default (dropped `defaultOpen` across every folder `meta.json`).
+  - All internal links were updated for the moved pages (`/docs/sessions` → `/docs/settings/sessions`,
+    `/docs/import-export` → `/docs/settings/import-export`).
+
 ## [0.9.85] - 2026-08-12
 
 ### Added

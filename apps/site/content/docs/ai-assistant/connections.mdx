@@ -1,0 +1,51 @@
+---
+title: "Connections & keys"
+description: "Add a provider connection, store the key encrypted at rest, test it, and assign the chat / planner / worker roles the AI features use."
+---
+
+The assistant is inert until you give it a model to talk to. That's a **connection**: a provider, a model, and (usually) an API key, added under **Settings → AI Assistant** (`/settings/ai`, `apps/web/src/routes/_auth/settings/ai.tsx`). This page is everything about setting one up.
+
+## Adding a connection
+
+Go to **Settings → AI Assistant** and add a connection with a provider, a model, and (usually) an API key.
+
+Supported providers (`AI_PROVIDERS`, `config.ts:16`), each mapped to a Vercel AI SDK model by the `getModel` factory (`config.ts:21-35`):
+
+| Provider (`provider`) | Adapter | Notes |
+| --- | --- | --- |
+| `anthropic` | `@ai-sdk/anthropic` | Claude models |
+| `openai` | `@ai-sdk/openai` | GPT / o-series |
+| `google` | `@ai-sdk/google` | Gemini |
+| `compatible` | `@ai-sdk/openai` with a custom `baseUrl` | Any OpenAI-compatible endpoint — Ollama, LM Studio, vLLM, OpenRouter. The key may be omitted for a keyless local endpoint. Only tool-calling-capable models drive the agent well. |
+
+The assistant is a **tool-using** agent — it only works well with a model that can call tools. A model that can't will chat but never actually discover fields, preview filters, or build anything.
+
+## Keys are encrypted at rest
+
+A key is stored in `AiConnection.apiKeyEnc` as AES-256-GCM ciphertext, never plaintext (`config.ts:152`, `createConnection`). Encryption is app-level via `node:crypto`, with the key derived from `BETTER_AUTH_SECRET` (`packages/api/src/services/crypto.ts`). Two consequences worth knowing:
+
+- The API never returns a key back to the UI — the connection list exposes only `hasKey` (`listConnections`, `config.ts:51-64`).
+- If `BETTER_AUTH_SECRET` changes, every stored key (and the Plex token, which uses the same scheme) becomes undecryptable and must be re-entered. Keep it stable.
+
+## Test button
+
+Each connection card has a **Test** action that does a cheap round-trip ("reply with the single word: ok") to prove the provider / model / key actually work (`testConnection`, `config.ts:192-208`). Use it before you rely on a connection — a wrong key or an unreachable local endpoint fails here instead of mid-build.
+
+![The AI Assistant settings tab — saved connections and their roles](/screenshots/admin-settings-ai.webp)
+
+## Per-role connections
+
+A connection can hold up to three independent **roles** (`AiConnection` in `packages/db/prisma/schema/ai.prisma:12-34`):
+
+- **Chat** (`isActive`) — the model the admin assistant uses. This is the only role that matters for the chat on this page.
+- **Planner** (`isPlanner`) — one big reasoning call in the durable [AI lineup builder](/docs/workflows/lineup-builder).
+- **Worker** (`isWorker`) — the ~50 per-channel build loops in that same builder.
+
+The **first** connection you create automatically claims all three roles, so a single-connection setup needs no further configuration (`createConnection`, `config.ts:144-159`). The split only matters once you add a second connection — e.g. point the high-volume *worker* at a cheap model to cut lineup-build cost. Assign roles under **"How connections are used"** on the settings page (`settings/ai.tsx:252-296`); planner / worker also offer "Same as chat". Roles are explicit with no runtime fallback — a cleared planner / worker genuinely disables the AI lineup builder (`getConnectionForRole`, `config.ts:99-112`).
+
+> The full role reference — including which model each AI feature reaches for — lives on [Settings → AI connections](/docs/settings/ai-connections).
+
+---
+
+See also: [Settings → AI connections](/docs/settings/ai-connections) · [Exploring your library](/docs/ai-assistant/exploring-your-library) ·
+[Assistant vs the lineup builder](/docs/ai-assistant/vs-lineup-builder)

@@ -1,0 +1,5 @@
+{
+  "title": "AI assistant",
+  "icon": "Sparkles",
+  "pages": ["connections", "exploring-your-library", "building-channels", "using-the-chat", "vs-lineup-builder"]
+}

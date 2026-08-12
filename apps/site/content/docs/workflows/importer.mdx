@@ -3,7 +3,7 @@ title: "The importer"
 description: "The durable Import workflow — how an uploaded lineup is deduped, numbered, and rebuilt against your own media server, with an end-to-end dry-run that skips every write."
 ---
 
-The importer is the execution half of [Import / Export](/docs/import-export). Once you upload a
+The importer is the execution half of [Import / Export](/docs/settings/import-export). Once you upload a
 lineup file and pick which packages and channels to bring in, the staging **Import** button dispatches
 a durable [Workflow SDK](/docs/workflows) run that recreates them on your instance — resolving each
 channel's filter against *your* media server as it goes. It uses the same durable machinery as the
@@ -42,7 +42,7 @@ The importer only rebuilds the *authoring* — packages, channels, and their fil
 instance regenerates locally is deliberately left behind and rebuilt on your box: the media-source
 binding (the target picks its own), the materialized schedule (regenerated from the filters), the
 media-metadata cache, and the per-instance scheduling cursor. The full file format and the round-trip
-rules are documented in [Import / Export](/docs/import-export).
+rules are documented in [Import / Export](/docs/settings/import-export).
 
 ## Source map
 
@@ -52,10 +52,10 @@ rules are documented in [Import / Export](/docs/import-export).
 | Reusable import brains (`planImport`, dedupe/remap) | `packages/api/src/services/transfer/import.ts` |
 | Runner registry (dispatch + poll) | `packages/api/src/services/transfer/import-runner.ts` |
 | Trace + run read model (observability) | `packages/api/src/services/transfer/import-trace.ts`, `import-runs.ts` |
-| Export / import file format | [Import / Export](/docs/import-export) |
+| Export / import file format | [Import / Export](/docs/settings/import-export) |
 
 ---
 
-See also: [Import / Export](/docs/import-export) (the file format and the round-trip) ·
+See also: [Import / Export](/docs/settings/import-export) (the file format and the round-trip) ·
 [Observability](/docs/workflows/observability) (watching an import run) ·
 [Channels](/docs/channels) (what a rebuilt channel is).

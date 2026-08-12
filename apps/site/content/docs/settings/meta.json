@@ -1,6 +1,5 @@
 {
   "title": "Settings",
   "icon": "Settings",
-  "defaultOpen": true,
-  "pages": ["general", "ai-connections"]
+  "pages": ["general", "ai-connections", "sessions", "import-export"]
 }

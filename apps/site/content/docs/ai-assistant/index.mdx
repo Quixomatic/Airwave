@@ -1,0 +1,60 @@
+---
+icon: Sparkles
+title: "AI assistant"
+description: "The optional, bring-your-own-key chat that helps you author channels."
+---
+
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+> An optional, bring-your-own-key admin chat that builds channels and packages from your own Plex library — grounded in real library data, and gated only by adding an AI connection. Nothing is ever sent to a provider until you configure one.
+
+## Overview
+
+Airwave ships an in-app **channel-building assistant**: a chat that can inspect your library, propose filters, preview what they match, and (with your approval) create or edit channels and packages for you. It is entirely **opt-in** and **bring-your-own-key** — Airwave has no built-in model and makes no outbound AI calls of its own.
+
+Two facts define the feature:
+
+- **It does nothing until you add a connection.** The chat resolves the *active* AI connection at request time (`getActiveModel` → `getActiveConnection`, `packages/api/src/services/agent/config.ts:73`). With no connection assigned to the chat role, the endpoint returns `400 "No active AI connection. Add one in Settings → AI Assistant."` (`packages/api/src/services/agent/chat.ts:129-135`) and the panel shows an empty state instead of a prompt box (`apps/web/src/components/ai/ai-chat-panel.tsx:63-87`). No key, no traffic.
+- **The chat is gated ONLY by an `AiConnection` — not by `WORKFLOW_ENABLED`.** `WORKFLOW_ENABLED` gates a *separate* system: the durable, multi-agent AI **lineup builder** (and the lineup importer) that runs on the Workflow SDK. The two are easy to conflate but are wired independently — see [Assistant vs the AI lineup builder](/docs/ai-assistant/vs-lineup-builder) and [Durable workflows](/docs/workflows).
+
+The endpoint is admin-only. `POST /api/ai/chat` is cookie-authenticated and rejects any non-admin session (`apps/server/src/index.ts:64-73`).
+
+## In this section
+
+<Cards>
+  <Card title="Connections & keys" href="/docs/ai-assistant/connections" description="Add a provider (Anthropic, OpenAI, Google, or any OpenAI-compatible/local endpoint), store the key encrypted at rest, test it, and assign the chat / planner / worker roles." />
+  <Card title="Exploring your library" href="/docs/ai-assistant/exploring-your-library" description="The read tools — the ones that let it discover your fields, sample real tag values, search titles, and measure a filter before anything is built." />
+  <Card title="Building channels & packages" href="/docs/ai-assistant/building-channels" description="The write tools — creating, editing, renumbering, and grouping channels and packages — each pausing for your Approve / Deny, plus the one-click undo." />
+  <Card title="Using the chat" href="/docs/ai-assistant/using-the-chat" description="The slide-in panel: live streaming of reasoning and tool calls, conversation history, the model badge, the approval flow, and the reliability details behind long chats." />
+  <Card title="Assistant vs the lineup builder" href="/docs/ai-assistant/vs-lineup-builder" description="Airwave has two AI systems — the in-the-loop chat and the autonomous durable lineup builder. How they differ and what they share." />
+</Cards>
+
+## Privacy & cost
+
+- **Bring your own key, opt-in.** Airwave ships no model and no key. Until you add a connection in Settings, the assistant is inert and no data leaves your server — the chat endpoint returns a 400 with no upstream call, and the UI shows an empty state.
+- **You pick the provider.** Point it at a hosted provider (Anthropic / OpenAI / Google) or keep everything on your own hardware via an OpenAI-compatible local endpoint (Ollama, LM Studio, vLLM) — in which case nothing leaves your network at all.
+- **You pay the provider directly.** Airwave has no billing layer; usage is billed by whichever provider your key belongs to. Chats can grow large (previews are token-heavy), which is why prompt caching is on — but the cost is still yours and metered by the provider.
+- **Fully separable.** Delete the connection and the assistant goes dark again. The feature is a bolt-on: no connection, no AI, no difference to the rest of Airwave.
+
+## Source map
+
+| Concern | File |
+| --- | --- |
+| Connections, provider factory, roles, encryption entry points | `packages/api/src/services/agent/config.ts` |
+| Streaming chat, persistence, resume/heal, prompt caching | `packages/api/src/services/agent/chat.ts` |
+| Tool service functions (reads + writes, `aiGenerated`, undo) | `packages/api/src/services/agent/tools.ts` |
+| AI SDK tool wrappers (`needsApproval` on writes) | `packages/api/src/services/agent/agent-tools.ts` |
+| Chat HTTP route (`POST /api/ai/chat`, cookie + admin) | `apps/server/src/index.ts` |
+| Secret encryption (AES-256-GCM, `BETTER_AUTH_SECRET`) | `packages/api/src/services/crypto.ts` |
+| tRPC router (connection CRUD, roles, test, history) | `packages/api/src/routers/ai.ts` |
+| Prisma models (`AiConnection`, `AiConversation`, `AiMessage`) | `packages/db/prisma/schema/ai.prisma` |
+| Chat side panel (useChat, Approve/Deny, history, model badge) | `apps/web/src/components/ai/ai-chat-panel.tsx` |
+| AI Elements (base-lyra chat components) | `apps/web/src/components/ai-elements/` |
+| Settings → AI Assistant (connection config + roles) | `apps/web/src/routes/_auth/settings/ai.tsx` |
+| Header trigger for the panel | `apps/web/src/components/layout/app-layout.tsx` |
+| Durable AI lineup builder (separate system) | [Durable workflows](/docs/workflows), `apps/server/workflows/lineup.ts` |
+
+---
+
+See also: [Settings → AI connections](/docs/settings/ai-connections) · [Durable workflows](/docs/workflows) ·
+[Channels](/docs/channels)

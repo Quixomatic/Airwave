@@ -1,0 +1,61 @@
+---
+title: "Exploring your library"
+description: "The assistant's read tools — how it discovers your fields, samples real tag values, searches titles, and measures a filter before anything is built."
+---
+
+Before the assistant builds anything, it **looks**. Its read tools are safe and run automatically (no approval), and they're what keep it honest: every filter it proposes is built from fields and values it actually found in *your* library, not guessed. This page breaks down each read tool and what it does for you.
+
+The tools are plain service functions (`packages/api/src/services/agent/tools.ts`) wrapped as AI SDK tools (`packages/api/src/services/agent/agent-tools.ts`).
+
+## Grounding tools
+
+These are the "measure the room" tools — the assistant calls them to learn the shape of your library and to test an idea before committing to it.
+
+### `list_media_sources`
+The connected source(s), their enabled libraries, and item counts. **What it does for you:** it's the first call of almost every session — it hands the assistant the `mediaSourceId` everything else needs, and tells it whether you have movies, shows, or both to work with.
+
+### `library_overview`
+Movie / show / episode counts for a source. **What it does for you:** a quick sense of scale — "you have 1,200 movies and 340 shows" — so the assistant proposes channels that actually have enough content to fill a schedule.
+
+### `list_filter_fields`
+The catalog of filterable fields — each field's key, label, kind, and the operators it allows. **What it does for you:** this is the assistant's rulebook. It may build filters **only** from these fields, so it can't invent a "mood" or "decade" field your library doesn't support. If a field isn't here, the assistant can't filter on it — and it'll tell you so instead of faking it.
+
+### `discover_field_values`
+The **real** values of a tag field — genre, studio, actor, content rating, and so on — pulled from the live Plex library. **What it does for you:** when you say "make a horror channel," the assistant checks what your library actually calls that genre (is it `Horror`? `Horror/Thriller`?) rather than guessing a label that matches nothing. This is the difference between a channel with 200 titles and one with zero.
+
+### `search_titles`
+Substring search over titles — "does the library contain *X*?" Returns matches as full items, with a show's episodes coalesced into one show entry carrying season / episode counts. **What it does for you:** answers concrete questions — "do I have all the Star Trek series?", "is *Die Hard* in here?" — and confirms a specific title exists before the assistant builds a channel around it.
+
+### `preview_filter`
+The most important read tool. It resolves an **unsaved** filter tree and reports the total match count plus the matching items (episodes coalesced into their show, with season / episode counts). Depth is tunable — `quick` for a fast glance, `default` for full metadata, `verbose` to see every matched episode. **What it does for you:** this is the "measure before you build" step. You see *exactly* what a channel would contain — the count and the actual titles — before a single row is written. If a filter returns 0 or the wrong stuff, the assistant refines it instead of creating a broken channel.
+
+## Inspection tools
+
+These let the assistant see what you already have, so it can extend or reorganize your lineup instead of duplicating it.
+
+### `list_channels`
+Every channel — id, number, name, enabled state, package. **What it does for you:** lets the assistant answer "what do I already have?" and avoid clashing channel numbers or rebuilding something that exists.
+
+### `get_channel`
+One channel in full — its filter tree, sort, package, and appearance. **What it does for you:** the assistant can read back exactly how a channel is defined, so "make another one like channel 12 but for comedies" actually works.
+
+### `list_packages`
+Every package — id, name, channel count. **What it does for you:** shows the groups your lineup is organized into, so new channels land in the right package.
+
+### `get_package`
+A package and its channels. **What it does for you:** the full picture of a group before the assistant reorganizes it or adds to it.
+
+## Why the filters are trustworthy
+
+The system prompt (`chat.ts:14-34`) forces a grounded, safe workflow, and the tool design enforces it:
+
+- Build filters **only** from fields returned by `list_filter_fields` and values discovered via `discover_field_values` — never an invented genre or studio.
+- **Always** `preview_filter` before creating a channel, and refine (don't create) if it returns 0 or looks wrong.
+- It knows Plex operator quirks — e.g. `title is "Bear"` is a *substring* match, so it uses distinctive substrings and verifies with a preview.
+
+The filter tree the tools accept is the real resolver grammar (a recursive `condition | and/or group`, `agent-tools.ts:43-48`), the same one the admin filter UI and the schedule resolver use — so a channel the assistant builds is indistinguishable from one you built by hand. For the grammar itself, see [Channel filters](/docs/channels/filters).
+
+---
+
+See also: [Building channels & packages](/docs/ai-assistant/building-channels) · [Channel filters](/docs/channels/filters) ·
+[Using the chat](/docs/ai-assistant/using-the-chat)

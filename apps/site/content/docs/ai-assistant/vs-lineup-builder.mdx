@@ -1,0 +1,30 @@
+---
+title: "Assistant vs the lineup builder"
+description: "Airwave has two distinct AI systems — the in-the-loop chat and the autonomous durable lineup builder. How they differ, and what they share."
+---
+
+Airwave has **two** distinct AI systems, and they're easy to conflate because they share a toolbox. Keep them separate:
+
+| | **AI assistant** (this section) | **AI lineup builder** |
+| --- | --- | --- |
+| What it is | Interactive admin chat that builds channels one at a time, with you in the loop | Autonomous, durable job that designs and builds a *whole* lineup (~50 channels) in one run |
+| Gated by | An `AiConnection` assigned the **chat** role (`isActive`). Nothing else. | `WORKFLOW_ENABLED=1` **and** planner / worker connections |
+| Runs on | The Vercel AI SDK, streamed live over `/api/ai/chat` | The Vercel **Workflow SDK** (durable, resumable, crash-surviving) |
+| Approval | Every write is Approve / Deny in the chat | Runs autonomously (the services skip the `needsApproval` wrapper); the *start* is confirmed once because a re-run wipes prior AI rows |
+| Model roles used | `active` (chat) | `planner` (one big design call) + `worker` (per-channel loops) |
+| Where | `packages/api/src/services/agent/{chat,agent-tools,tools}.ts` | `apps/server/workflows/lineup.ts` (+ `import.ts`) |
+
+## What they share
+
+Both systems use the **same toolbox** in `tools.ts`, and both stamp their output `aiGenerated` — so [`clear_ai_generated`](/docs/ai-assistant/building-channels#undo-everything-the-ai-made) cleanly reverses whatever *either* one made. The difference is entirely in the harness around those tools: the assistant wraps them for approval and streams them to you live; the builder calls them directly and runs unattended.
+
+## Why the gates are different
+
+The chat assistant is gated **only** by a chat-role `AiConnection` — add one and it works. The lineup builder additionally needs `WORKFLOW_ENABLED=1` *and* planner / worker connections, because it runs on the durable Workflow SDK. If `WORKFLOW_ENABLED` is unset, the lineup builder is simply unavailable — but the chat assistant still works, because it never touched the workflow engine.
+
+The durable builder is documented in full under **[Durable workflows](/docs/workflows)** (see [the AI lineup builder](/docs/workflows/lineup-builder)).
+
+---
+
+See also: [Durable workflows](/docs/workflows) · [The AI lineup builder](/docs/workflows/lineup-builder) ·
+[Building channels & packages](/docs/ai-assistant/building-channels)

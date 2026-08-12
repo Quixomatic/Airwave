@@ -1,0 +1,52 @@
+---
+title: "Building channels & packages"
+description: "The assistant's write tools — creating, editing, renumbering, and grouping channels and packages — each pausing for your approval, plus the one-click undo."
+---
+
+Once the assistant has [explored your library](/docs/ai-assistant/exploring-your-library) and previewed a filter, it can actually **build**. Every write tool is `needsApproval: true` (`agent-tools.ts:117-165`), so the chat pauses and renders an **Approve / Deny** card before anything touches the database — nothing is written behind your back. This page breaks down each write tool and what it does for you.
+
+## Channel writes
+
+### `create_channel`
+Creates a channel from a name, media source, media types, and a filter tree (plus optional ordering, package, number, callsign, icon, tint, description). **What it does for you:** turns "make me a 90s action channel" into a real, scheduled channel — but only after it has tested the filter with `preview_filter`, and only after you approve.
+
+### `update_channel`
+A partial patch — you pass *only* the fields to change (number, package, enabled, filter, sort, tint, name, …). **What it does for you:** "move channel 12 into the Kids package," "rename this to Retro Toons," "tighten this filter" — targeted edits that leave everything else untouched.
+
+### `delete_channel`
+Removes a channel. **What it does for you:** clears out a channel you no longer want — with an Approve / Deny gate so it never happens by accident.
+
+### `update_channels` (bulk)
+Moves a set of channels to a package (or unassigns them) and/or enables / disables them in one shot. **What it does for you:** "put all my news channels in one package," "disable everything in the Sports package for now" — sweeping reorganizations without editing each channel by hand.
+
+### `renumber_channels` (bulk)
+Sets channel numbers in bulk from an id → number mapping. **What it does for you:** "renumber the movie channels to start at 200" — a clean re-lay of your dial in a single approved step.
+
+## Package writes
+
+### `create_package`
+Creates a package — a named group of channels, with optional description, icon, and tint. **What it does for you:** gives your lineup structure ("Kids," "Movies," "Late Night") that viewers see in the guide.
+
+### `update_package`
+Edits a package's name, description, or appearance. **What it does for you:** rebrand or restyle a group without disturbing the channels inside it.
+
+### `delete_package`
+Deletes a package; its channels become unassigned rather than deleted. **What it does for you:** dissolve a group you don't need while keeping the channels themselves safe.
+
+## Undo everything the AI made
+
+### `clear_ai_generated`
+Deletes everything the assistant (or the [lineup builder](/docs/workflows/lineup-builder)) created — scoped to channels, packages, or both. **What it does for you:** a clean, one-shot undo. Experiment freely: if you don't like what the AI produced, wipe *only* its work and start over.
+
+This works because **everything the assistant creates is stamped `aiGenerated = true`** (`createChannel`, `tools.ts:308`; `createPackage`, `tools.ts:387`). That stamp is what lets `clear_ai_generated` delete only the rows the AI made, leaving your hand-made and preset channels and packages completely untouched (`clearAiGenerated`, `tools.ts:411-421`).
+
+## How approval works
+
+Every tool in this list carries `needsApproval: true`. In the chat, that surfaces as an **"Apply this change?"** card with Approve / Deny — approving resumes the turn and runs the tool; denying leaves nothing changed. The mechanics of that flow (and why the decision reliably posts back rather than hanging) are covered in [Using the chat](/docs/ai-assistant/using-the-chat#the-approve--deny-flow).
+
+> The autonomous [AI lineup builder](/docs/workflows/lineup-builder) calls these same service functions directly, **without** the approval wrapper — it runs unattended. Both paths stamp `aiGenerated`, so `clear_ai_generated` reverses whatever either one made. See [Assistant vs the lineup builder](/docs/ai-assistant/vs-lineup-builder).
+
+---
+
+See also: [Exploring your library](/docs/ai-assistant/exploring-your-library) · [Using the chat](/docs/ai-assistant/using-the-chat) ·
+[Channels](/docs/channels) · [Packages](/docs/packages)
