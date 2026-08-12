@@ -4,3 +4,47 @@
 
 /* Tailwind v4 needs to scan fumadocs-ui's compiled classes so its utilities aren't purged. */
 @source "../node_modules/fumadocs-ui/dist/**/*.js";
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Airwave brand theme
+
+   BASE = fumadocs `neutral` + `preset` — identical to fumadocs.dev's own site.
+   Everything below LAYERS the 10-foot product palette on top (ported from
+   tv-web / tv-native `src/lib/theme.ts`): deep-navy surfaces + a sky-blue accent.
+   Dark is the primary, brand-defining look; light keeps clean fumadocs surfaces
+   with the same blue accent. Tune brand values here — the base stays untouched.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* Light — fumadocs-neutral surfaces, Airwave blue accent (deeper, for contrast on white). */
+:root {
+  --color-fd-primary: #2563eb;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-ring: #3b82f6;
+}
+
+/* Dark — the full 10-foot navy palette (C.* from the tv theme). */
+.dark {
+  --color-fd-background: #060a14; /* C.bg */
+  --color-fd-foreground: #f1f5f9; /* C.fg */
+  --color-fd-muted: #0f1626; /* C.navBg */
+  --color-fd-muted-foreground: #94a3b8; /* C.mutedFg */
+  --color-fd-popover: #0b1120; /* C.card */
+  --color-fd-popover-foreground: #f1f5f9;
+  --color-fd-card: #0b1120; /* C.card */
+  --color-fd-card-foreground: #f1f5f9;
+  --color-fd-border: rgba(148, 163, 184, 0.14); /* C.border */
+  --color-fd-primary: #4a9fe0; /* C.accent — the sky-blue brand */
+  --color-fd-primary-foreground: #08111f;
+  --color-fd-secondary: #0f1626; /* C.navBg */
+  --color-fd-secondary-foreground: #f1f5f9;
+  --color-fd-accent: #12233d; /* C.highlight — hover surfaces */
+  --color-fd-accent-foreground: #f1f5f9;
+  --color-fd-ring: #3b82f6; /* C.ring */
+}
+
+/* Sidebar surfaces sit a touch above the page, like the 10-foot guide's sidebar
+   (mirrors how fumadocs' neutral.css tunes `#nd-sidebar`). */
+.dark #nd-sidebar {
+  --color-fd-background: #0b1120; /* C.sidebarBg */
+  --color-fd-card: #0b1120;
+}

@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.81] - 2026-08-12
+
+### Changed
+
+- **`apps/site` gets the Airwave brand theme.** Kept fumadocs' `neutral` + `preset` as the base (verified
+  identical to fumadocs.dev's own tokens), then layered the **10-foot product palette** on top — ported from
+  `tv-web`/`tv-native` `src/lib/theme.ts`, not the admin app. Dark is the brand-defining look: deep-navy
+  surfaces (`#060a14` bg, `#0b1120` cards/sidebar), near-white text, `#94a3b8` muted, and the signature
+  sky-blue accent (`#4a9fe0`, ring `#3b82f6`); light keeps clean fumadocs surfaces with a deeper blue accent
+  for contrast. Sidebar tuned via `#nd-sidebar`. All in one tunable `--color-fd-*` override block in
+  `global.css` — the base stays untouched.
+
 ## [0.9.80] - 2026-08-12
 
 ### Added
