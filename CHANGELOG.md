@@ -2,6 +2,32 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.88] - 2026-08-12
+
+### Changed
+
+- **`apps/site` landing page rebuilt in fumadocs.dev's own landing style.** Replaced the marketing home page
+  with a spacious, rounded-panel layout modeled on fumadocs' MIT-licensed landing: a big hero panel with an
+  animated WebGL **shader glow** (`@paper-design/shaders-react` — GrainGradient + a dithered mark), the
+  oversized brand-highlighted intro statement, a `ServerCodeBlock` "self-host in minutes" `compose.yaml`
+  showcase, a sliding **preview switcher** (Guide / Playing / Bumper), cva-style feature cards, a platforms
+  panel, a three-step strip, an admin showcase, and a CTA. Reskinned entirely to the Airwave navy/sky-blue
+  brand.
+  - The hero's dithered shape is the **Airwave logo itself** — `ImageDithering` fed a pre-baked, spherically
+    shaded copy of the mark (`public/logo-lit.png`), so the logo retains its detail while dithering with the
+    same light-to-shadow, masked-into-the-corner look the abstract sphere had.
+  - New landing brand tokens in `global.css` (`bg-brand`, `text-brand`, `text-landing-foreground`, …) wired
+    through `--brand*` vars so light/dark still switch; the shaders and text were tuned dark-first for
+    readability (darker gradient, brighter headline/subtext, a frosted pill).
+  - The "self-host in minutes" showcase renders the **real** repo-root `docker-compose.yml` verbatim (via a
+    generated `compose.ts`), in a scrollable block.
+  - A fumadocs "For Engineers"-style grid: a **"Works on most platforms"** card with a subtle dithered-warp
+    background (`AgnosticBackground`) and the platform badges, beside a **"Three steps to live TV"** card built
+    on the fumadocs **`Steps`** component.
+  - Added `@paper-design/shaders-react` (^0.0.78) as the one new dependency; the shaders are client-only
+    (`ssr:false`) and pause when off-screen.
+  - Still a work in progress — more polish to come.
+
 ## [0.9.87] - 2026-08-12
 
 ### Fixed

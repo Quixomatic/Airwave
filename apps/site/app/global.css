@@ -48,3 +48,41 @@
   --color-fd-background: #0b1120; /* C.sidebarBg */
   --color-fd-card: #0b1120;
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Landing-page brand tokens
+
+   The marketing landing (`app/(home)/page.tsx`) is built in fumadocs.dev's own
+   landing style (cva button/card/heading variants + a shader hero). Those
+   patterns lean on a small brand scale + a softened body-text color, which we
+   register here as Tailwind utilities (`bg-brand`, `text-brand`, `bg-brand-200`,
+   `bg-brand-secondary`, `text-landing-foreground`, …). Values track the sky-blue
+   accent already used above; `@theme inline` makes the utilities resolve through
+   the `--brand*` vars so light/dark still switches via `:root` / `.dark`.
+   ──────────────────────────────────────────────────────────────────────────── */
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-200: var(--brand-200);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-secondary: var(--brand-secondary);
+  --color-brand-secondary-foreground: var(--brand-secondary-foreground);
+  --color-landing-foreground: var(--landing-foreground);
+}
+
+:root {
+  --brand: #2563eb;
+  --brand-200: #60a5fa;
+  --brand-foreground: #ffffff;
+  --brand-secondary: #eef4ff;
+  --brand-secondary-foreground: #1e3a8a;
+  --landing-foreground: #334155;
+}
+
+.dark {
+  --brand: #4a9fe0; /* C.accent — the sky-blue brand */
+  --brand-200: #7bb8ea;
+  --brand-foreground: #08111f;
+  --brand-secondary: #0f1d34;
+  --brand-secondary-foreground: #dbeafe;
+  --landing-foreground: #cbd5e1;
+}
