@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.83] - 2026-08-12
+
+### Changed
+
+- **Docs Introduction rewritten** with the flavor from the About page — the channel-surfing hook,
+  server-first ("channels belong to your server, not a device"), and live-with-a-DVR — plus an accurate
+  "how these docs are organized" map (the earlier scaffold placeholder said guides were "coming" that now
+  exist). Links out to `/about` for the full story.
+- **README now points to [getairwave.tv](https://www.getairwave.tv)** — a link block (Website · Docs ·
+  Features · FAQ) under the title.
+
 ## [0.9.82] - 2026-08-12
 
 ### Changed

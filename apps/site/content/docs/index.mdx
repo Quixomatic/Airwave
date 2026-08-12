@@ -1,32 +1,52 @@
 ---
 icon: BookOpen
 title: Introduction
-description: What Airwave is, and how this documentation is organized.
+description: What Airwave is, why it exists, and how these docs are organized.
 ---
 
 import { Cards, Card } from "fumadocs-ui/components/card";
 
-**Airwave** is a self-hostable service that turns your Plex library into custom, always-on **live-TV
-channels** — a real channel guide, DVR, and bumpers — streamed directly from your own Plex to native
-apps on webOS, Apple TV, iPad, Android TV, and Fire TV. It's free and self-hosted: you run the server,
-there's no subscription.
+You know the feeling — you turn on the TV, something's already playing, and you drop into a movie halfway
+through instead of staring at a catalog deciding what to watch. **Airwave** brings that back, built from
+media you already own.
 
-You build channels from **metadata filters** over your library ("90s comedies", "everything Studio
-Ghibli", "unwatched sci-fi"), Airwave lays each one onto a continuous, deterministic timeline, and
-your viewers channel-surf it like cable — joining whatever's on *now*, mid-program, at the correct
-offset.
+Airwave is a **self-hostable service that turns your Plex library into custom, always-on live-TV
+channels** — a real channel guide, DVR, and bumpers — streamed straight from your own Plex to native apps
+on LG webOS, Apple TV, iPad, Android TV, and Fire TV, plus any browser. It's free and self-hosted: you run
+the server, and there's no subscription.
+
+Make a 90s-sitcom channel, a Saturday-morning-cartoons channel, a kids' channel, or one that quietly
+marathons a favorite show — from practically any mix of genre, year, network, cast, rating, collection, or
+playlist. Airwave turns that into a continuous schedule and presents it through a proper 10-foot guide.
+
+## What makes it different
+
+- **You join what's airing.** Tune in and you land on whatever's on *now*, at the point it would actually
+  be — not the start of a file. Everyone watching a channel sees the same thing at the same moment.
+- **Live, but with a DVR.** Scrub back through programs that already aired, restart what's on, or jump to
+  an earlier episode. The only thing you can't do is seek *ahead* of live.
+- **The channels belong to your server, not a device.** The server owns the lineup, schedules, packages,
+  users, and playback state; every app is just a client tuning into the same network. Open Airwave
+  anywhere and you see the same channels and the same thing currently airing.
+
+The result is discovery — you stumble onto something buried in your library and end up watching it,
+instead of endlessly scrolling thumbnails. For the fuller story of why Airwave exists, see
+[About Airwave](/about).
 
 ## Start here
 
 <Cards>
   <Card title="Quick Start" href="/docs/getting-started" description="Zero to watching — connect a source, build a channel, add viewers, and tune in." />
-  <Card title="Media sources" href="/docs/sources" description="Connect your Plex server, enable libraries, and sync metadata." />
   <Card title="Channels" href="/docs/channels" description="Build a channel from a filter — ordering, grouping/rotation strategies, and its schedule." />
+  <Card title="Self-hosting" href="/docs/self-hosting" description="Deploy the server with Docker, configure it, and keep it updated." />
 </Cards>
 
-## What's here (and what's coming)
+## How these docs are organized
 
-These docs cover **using** Airwave and **how it works** internally. Still to be written up: the apps
-and their stacks, the deterministic scheduling engine, the `effectiveTime`/DVR playback model, bumpers
-& ambient music, and the self-hosting/Docker deploy. For install today, see the project
-[README](https://github.com/Quixomatic/Airwave).
+- **Getting Started** — what Airwave is, the [platforms](/docs/platforms) it runs on, the
+  [architecture](/docs/architecture), and how to [self-host](/docs/self-hosting) it.
+- **Using Airwave** — the day-to-day from the admin panel: [sources](/docs/sources),
+  [channels](/docs/channels), [packages](/docs/packages),
+  [users & access](/docs/users-and-access), [bumpers](/docs/bumpers), and [settings](/docs/settings).
+- **How it works** — the internals: [background jobs](/docs/jobs), [durable workflows](/docs/workflows),
+  and the [device capability diagnostic](/docs/capability-diagnostic).

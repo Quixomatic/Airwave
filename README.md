@@ -6,6 +6,13 @@
 
 **Turn your Plex library into your own always-on live TV.**
 
+<p align="center">
+  <a href="https://www.getairwave.tv"><b>🌐 getairwave.tv</b></a>
+  &nbsp;·&nbsp; <a href="https://www.getairwave.tv/docs">Documentation</a>
+  &nbsp;·&nbsp; <a href="https://www.getairwave.tv/features">Features</a>
+  &nbsp;·&nbsp; <a href="https://www.getairwave.tv/faq">FAQ</a>
+</p>
+
 Airwave is a self-hostable service that builds curated, 24/7 **live TV channels** out of the media you already
 own — a "90s Sitcoms" channel, a "Saturday Morning Cartoons" channel, a channel that quietly marathons your
 favorite show — and streams them to a proper 10-foot TV app with a channel guide, a now/next lineup, and instant
