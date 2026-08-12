@@ -2,6 +2,27 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.80] - 2026-08-12
+
+### Added
+
+- **`apps/site` blog** — a fumadocs-style blog: a `content/blog` collection (title/description + `author`/
+  `date` frontmatter), a `/blog` index of post cards, and post pages with a gradient header, an
+  `InlineTOC`, and fumadocs `prose`. Seeded with a first post, "Introducing Airwave."
+- **About page rewritten** as a personal origin story (why Airwave exists — the channel-surfing itch, the
+  server-first idea, live-with-a-DVR, the AI-assisted transparency).
+- **FAQ page** is now accordion-based (fumadocs `Accordions`), grouped, and expanded with the questions
+  people actually ask — Plex Pass, Jellyfin/Emby, "will Plex block it," "do I pick exactly what plays,"
+  trial/sideload, privacy, and pricing.
+
+### Changed
+
+- **Site nav** leads with **Documentation**, keeps Features · Channel guide · FAQ top-level, and tucks the
+  rest behind a native **Resources** dropdown (Blog · About · Contact · Platforms). Nav items are scoped
+  `on: "nav"` so they no longer duplicate into the docs sidebar.
+- **Docs sidebar switcher** — a fumadocs **Sidebar Tabs** dropdown (Documentation · Blog · FAQ · Home) with
+  tinted colored icons + subtitles, for jumping between the main site areas from inside the docs.
+
 ## [0.9.79] - 2026-08-12
 
 ### Changed

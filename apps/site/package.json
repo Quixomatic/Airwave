@@ -1,6 +1,6 @@
 {
   "name": "site",
-  "version": "0.9.79",
+  "version": "0.9.80",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,7 +17,8 @@
     "lucide-react": "catalog:",
     "next": "^16.3.0",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@airwave/config": "workspace:*",
