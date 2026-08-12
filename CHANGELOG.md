@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.85] - 2026-08-12
+
+### Added
+
+- **Platform-support matrix on `/docs/platforms`.** Swapped the plain markdown availability table for a
+  checkmark-style `<PlatformMatrix>` component (registered globally in `apps/site/components/mdx.tsx`
+  alongside `<Video>`, so it needs no per-page import), in the vein of native-sdk.dev's platform-support
+  table. Three tiers with tinted status pills: **Full support** (green ✓) for Apple TV, iPad, LG webOS, and
+  the browser player; **Supported** (amber ✓) for Android TV and Fire TV — they run, just a secondary
+  priority; **Planned** (gray clock) for Samsung/Tizen and Roku. Each row also names the app type and
+  playback engine (mpv vs. native `<video>` + hls.js). Kept the prose table's card/border styling but forced
+  its margins off (`!my-0`) so the rows sit flush inside the bordered box.
+
 ## [0.9.84] - 2026-08-12
 
 ### Changed
