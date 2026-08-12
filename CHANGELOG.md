@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.82] - 2026-08-12
+
+### Changed
+
+- **`apps/site` defaults to the dark theme.** The navy 10-foot brand is the intended first impression, so
+  the site now leads with dark (`RootProvider theme={{ defaultTheme: "dark", enableSystem: false }}`). The
+  theme toggle still works and persists per-visitor; we just no longer follow the OS preference by default.
+
 ## [0.9.81] - 2026-08-12
 
 ### Changed

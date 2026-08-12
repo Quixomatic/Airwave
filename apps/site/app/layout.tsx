@@ -20,7 +20,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={inter.className} suppressHydrationWarning>
       <body className="flex min-h-screen flex-col">
-        <RootProvider>{children}</RootProvider>
+        {/* Default to dark — the navy 10-foot brand is the intended first impression. The theme toggle still
+            works and persists per-visitor; we just don't follow the OS preference by default. */}
+        <RootProvider theme={{ defaultTheme: "dark", enableSystem: false }}>{children}</RootProvider>
       </body>
     </html>
   );
