@@ -13,7 +13,6 @@ import { onInputActivity } from "@/lib/input";
 import { C } from "@/lib/theme";
 
 import { BumperCard } from "./bumper-card";
-import { useBumperMusic } from "./use-bumper-music";
 import { ChannelNumberEntry } from "./channel-number-entry";
 import { Ctx, type Layout, type PlayerCtx } from "./player-ctx";
 import { useTvPlayer } from "./use-tv-player";
@@ -187,16 +186,9 @@ function PlayerHost({
   const tv = useTvPlayer(channelId, { quality, audioStreamId, subtitleStreamId, audioMode }, layout === "full");
   const { status } = tv;
 
-  // Ambient music bed under bumpers (§7.14 Phase B) — on the persistent host, so it plays full-screen AND
-  // docked. Its own headless mpv audio core (`mpvAudio`), derived from the bumper's timeline position (seeks
-  // + fades with DVR scrubbing). Independent of the video player.
-  useBumperMusic({
-    active: status.state === "bumper",
-    elapsed: status.bumperElapsed,
-    total: status.bumperTotal,
-    bumperKey: status.bumperKey,
-    paused: status.paused,
-  });
+  // Ambient music bed under bumpers (§7.14 Phase B) now plays on the SINGLE hybrid engine, driven inside
+  // useTvPlayer (source swaps to the music track in audio mode during a bumper; the fade is DVR-derived).
+  // No second libmpv instance ⇒ no AVAudioSession contention with the video's 5.1. See .plans/mpv-hybrid-core.md.
 
   // Release the CH▲/▼ lock once this channel is actually showing content.
   useEffect(() => {
@@ -239,7 +231,7 @@ function PlayerHost({
         // Subtitles OFF by default: mpv otherwise auto-selects the embedded/forced sub track (sid=auto).
         // In this app subs are delivered by SERVER burn-in (selecting them re-resolves to a transcode
         // that hardcodes them into the video), so mpv must never render a text sub track itself.
-        <MpvPlayerView ref={tv.viewRef} source={tv.source} startTime={tv.startTime} audioMode={audioMode} options={{ sid: "no", "sub-auto": "no" }} {...tv.videoEvents} style={StyleSheet.absoluteFill} contentFit={full ? "contain" : "cover"} />
+        <MpvPlayerView ref={tv.viewRef} source={tv.source} startTime={tv.startTime} mode={tv.mode} audioMode={audioMode} options={{ sid: "no", "sub-auto": "no" }} {...tv.videoEvents} style={StyleSheet.absoluteFill} contentFit={full ? "contain" : "cover"} />
       )}
 
       {/* bumper interstitial — full (blurred art + big title + donut) or compact (mini feed) */}

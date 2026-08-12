@@ -64,6 +64,7 @@ class MpvPlayerModule : Module() {
       // `startTime` is set alongside `source` in the same render; store it first, then a source change
       // triggers the coalesced load. (DVR seeks go through the imperative `seek` below, not startTime.)
       Prop("startTime") { view: MpvPlayerView, t: Double -> view.setPendingStartTime(t) }
+      Prop("mode") { view: MpvPlayerView, mode: String -> view.setPendingMode(mode) }
       Prop("source") { view: MpvPlayerView, source: String? -> view.setPendingSource(source) }
       Prop("paused") { view: MpvPlayerView, paused: Boolean -> view.setPaused(paused) }
       Prop("muted") { view: MpvPlayerView, muted: Boolean -> view.setMuted(muted) }
@@ -77,6 +78,11 @@ class MpvPlayerModule : Module() {
       AsyncFunction("play") { view: MpvPlayerView -> view.play() }
       AsyncFunction("pause") { view: MpvPlayerView -> view.pause() }
       AsyncFunction("seek") { view: MpvPlayerView, seconds: Double -> view.seek(seconds) }
+      // Audio-only controls (bumper music bed + radio) on the same single engine.
+      AsyncFunction("fadeVolume") { view: MpvPlayerView, target: Double, durationMs: Double -> view.fadeVolume(target, durationMs) }
+      AsyncFunction("setLoop") { view: MpvPlayerView, loop: Boolean -> view.setLoop(loop) }
+      AsyncFunction("setRate") { view: MpvPlayerView, rate: Double -> view.setRate(rate) }
+      AsyncFunction("append") { view: MpvPlayerView, url: String, startTime: Double -> view.appendTrack(url, startTime) }
     }
   }
 

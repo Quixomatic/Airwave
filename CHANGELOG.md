@@ -2,6 +2,30 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.73] - 2026-08-11
+
+### Changed
+
+- **tv-native: the bumper music bed now plays on the ONE video engine (a single hybrid mpv core) instead of a
+  second libmpv instance — the structural fix for the bumper→program 5.1 contention.** iOS/tvOS gives an app
+  exactly one shared `AVAudioSession`/output, and the ambient-music core was a *second* libmpv engine
+  fighting the video over it — dropping the program's 5.1 (dialogue) and stalling playback coming out of a
+  bumper. Every session/config fix (v0.9.69, v0.9.72) failed because mpv's own audio output disturbs the
+  shared session per-instance, below our code. The only real fix is one engine: during a bumper the (idle)
+  video player now plays the music itself, sequentially — program (video+5.1) → bumper (audio-only music) →
+  program — so there is only ever one audio output, nothing to contend. One libmpv build already plays both;
+  the merge folds the audio-only capabilities (`fadeVolume`/`setLoop`/`setRate`/`append`, gapless options)
+  into the view engine and adds a per-load **`mode`** ("video" | "audio"): an audio load suppresses
+  cover-art-as-video and starts silent (JS fades it in); a video load resets the shared engine's persistent
+  props (`loop-file`/`speed`/`volume`) so nothing an audio track set bleeds into the program. Wired all the
+  way through `use-tv-player` (it now owns the bumper-music source + DVR-derived fade, absorbing the old
+  `use-bumper-music` hook, which is removed). Also gated tvOS HDR display-criteria off audio loads so a bumper
+  never bounces an HDR program HDR→SDR→HDR. **Bumper music OFF is byte-for-byte the proven prior path**
+  (pause-and-hold, no second engine, no contention). Radio channels (future) reuse this same one engine.
+  (iOS/tvOS + Android, in lockstep; Android had no `AVAudioSession` contention, so there it's pure
+  feature-folding.) The `MpvAudioCore` second engine + its module `audio*` functions are now unused for
+  bumpers (kept in-tree, minus the Settings→Audio route probe, until the hybrid is proven on device).
+
 ## [0.9.72] - 2026-08-11
 
 ### Fixed

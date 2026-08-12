@@ -7,7 +7,7 @@ import QuartzCore
 protocol MpvCoreDelegate: AnyObject {
   func mpvDidLoad(duration: Double, width: Int, height: Int)
   func mpvFirstFrame()
-  func mpvProgress(time: Double)
+  func mpvProgress(time: Double, duration: Double)
   func mpvBuffering(_ buffering: Bool)
   func mpvError(_ message: String)
   func mpvEnd(reason: String)
@@ -29,6 +29,11 @@ final class MpvCore {
   private var isDisposing = false
   private var loadedEmitted = false
   private var firstFrameEmitted = false
+  // Our last commanded volume in mpv units (0..100), so a fade always resumes from where the last left off.
+  // The hybrid single-engine model (see .plans/mpv-hybrid-core.md) shares this ONE `volume` property between
+  // video (full) and audio-only bumper/radio content (JS-driven fades) — a video load resets it to 100.
+  private var currentVolume: Double = 100
+  private var fadeTimer: DispatchSourceTimer?
 
   // MARK: setup
 
@@ -65,6 +70,10 @@ final class MpvCore {
       "cache": "yes",
       "demuxer-max-bytes": "150MiB",
       "demuxer-max-back-bytes": "50MiB",
+      // Audio-only capability (bumper music bed + future radio) folded into this ONE engine — harmless to
+      // single-file video (there's no playlist to prefetch). `append` + these make radio handoffs gapless.
+      "gapless-audio": "weak",
+      "prefetch-playlist": "yes",
     ]
     #if targetEnvironment(simulator)
       opts["hwdec"] = "no"
@@ -103,14 +112,51 @@ final class MpvCore {
 
   /// Load `url`, opening AT `startTime` seconds (mpv estimates the byte position → a range seek, not a
   /// sequential read from the head). Replaces any current file.
-  func load(url: String, startTime: Double) {
+  ///
+  /// `mode` is the ONLY place content-type branches (see `.plans/mpv-hybrid-core.md`). Because this is now
+  /// ONE shared engine, persistent properties an audio track set (`loop-file`, faded-down `volume`, `speed`)
+  /// would otherwise bleed into the next program — so a video load RESETS them, and an audio load starts
+  /// SILENT (JS fades the bumper bed in / a radio caller sets its level) + suppresses cover-art-as-video.
+  func load(url: String, startTime: Double, mode: String = "video") {
     loadedEmitted = false
     firstFrameEmitted = false
+    cancelFade()
     // mpv 0.38+ loadfile signature is `loadfile <url> <flags> <index> <options>` — the `index` arg was
     // inserted before options. It MUST be present (`-1` = default position), or the options string lands
     // in the index slot, the command is malformed, no file loads, and mpv emits ZERO events (silent
-    // failure). Matches plezy's `loadfile <uri> replace -1 <options>`.
+    // failure). Matches plezy's `loadfile <uri> replace -1 <options>`. Per-file options are ONE
+    // comma-joined arg, and are scoped to THIS file's playback (they persist through seeks, not reloads).
+    var fileOpts: [String] = []
+    if startTime > 0 { fileOpts.append("start=\(Int(startTime))") }
+    if mode == "audio" {
+      // Audio-only: never decode a video track or draw an mp3/m4a's embedded cover art to the surface.
+      fileOpts.append("vid=no")
+      fileOpts.append("audio-display=no")
+      // Start silent; the caller (bumper fade / radio) raises the volume. Deterministic regardless of when
+      // the view ref is available (a fresh tune that lands straight on a bumper mounts the view mid-load).
+      // Set BEFORE the load: the new file inherits silence, and lowering the OUTGOING file can't pop.
+      currentVolume = 0
+      setProperty("volume", "0")
+    }
     var args = ["loadfile", url, "replace", "-1"]
+    if !fileOpts.isEmpty { args.append(fileOpts.joined(separator: ",")) }
+    command(args)
+    if mode != "audio" {
+      // Video: undo persistent props audio content may have left on the shared engine — AFTER the loadfile,
+      // so raising the volume back to full can't briefly blast the OUTGOING (faded-down) music before it's
+      // replaced. mpv applies these to the freshly loaded file well before its first audio buffer, so the
+      // program still starts at full volume, un-looped, at normal speed.
+      setProperty("loop-file", "no")
+      setProperty("speed", "1")
+      currentVolume = 100
+      setProperty("volume", "100")
+    }
+  }
+
+  /// Queue `url` AFTER the current track (mpv playlist `append`) for GAPLESS radio playback — with
+  /// `prefetch-playlist` the next entry opens before this one ends, so there's no gap. Call after a `load`.
+  func append(url: String, startTime: Double) {
+    var args = ["loadfile", url, "append", "-1"]
     if startTime > 0 { args.append("start=\(Int(startTime))") }
     command(args)
   }
@@ -118,18 +164,64 @@ final class MpvCore {
   func stop() { command(["stop"]) }
   func setPaused(_ paused: Bool) { setProperty("pause", paused ? "yes" : "no") }
   func setMuted(_ muted: Bool) { setProperty("mute", muted ? "yes" : "no") }
-  func setVolume(_ volume: Double) { setProperty("volume", String(volume)) }
+  /// Set volume in mpv units (0..100). Cancels any in-flight fade.
+  func setVolume(_ volume: Double) {
+    cancelFade()
+    currentVolume = volume
+    setProperty("volume", String(volume))
+  }
   func setAudioTrack(_ id: Int) { setProperty("aid", id < 0 ? "no" : String(id)) }
   func setSubtitleTrack(_ id: Int) { setProperty("sid", id < 0 ? "no" : String(id)) }
   /// Audio channel layout: `"auto"` uses the full negotiated route (real 5.1/7.1), `"stereo"` forces a
   /// fold-down. Applied when the audio chain is next (re)initialized, so callers reload the current file.
   func setAudioChannels(_ layout: String) { setProperty("audio-channels", layout) }
 
+  /// Loop the current file at EOF (mpv `loop-file`) — for the ambient bumper bed + looping radio. A video
+  /// load resets this to `no`, so it never bleeds into a program.
+  func setLoop(_ loop: Bool) { setProperty("loop-file", loop ? "inf" : "no") }
+  /// Playback speed (1.0 = normal — mpv `speed`).
+  func setRate(_ rate: Double) { setProperty("speed", String(rate)) }
+
+  /// Smoothly ramp the volume to `target` (0..1) over `durationMs` — a native 60fps ramp of mpv's `volume`
+  /// (0..100), so it's buttery with a SINGLE bridge call. The primitive for bumper fade in/out. Starts from
+  /// the current commanded volume; cancels any prior fade.
+  func fadeVolume(to target: Double, durationMs: Double) {
+    cancelFade()
+    let end = max(0, min(1, target)) * 100
+    let start = currentVolume
+    if durationMs <= 0 || abs(end - start) < 0.1 {
+      currentVolume = end
+      setProperty("volume", String(end))
+      return
+    }
+    let dur = durationMs / 1000.0
+    let startTime = DispatchTime.now()
+    let timer = DispatchSource.makeTimerSource(queue: queue)
+    timer.schedule(deadline: .now(), repeating: .milliseconds(16))
+    timer.setEventHandler { [weak self] in
+      guard let self else { return }
+      let elapsed = Double(DispatchTime.now().uptimeNanoseconds - startTime.uptimeNanoseconds) / 1_000_000_000
+      let t = min(1, elapsed / dur)
+      let v = start + (end - start) * t
+      self.currentVolume = v
+      self.setProperty("volume", String(v))
+      if t >= 1 { self.cancelFade() }
+    }
+    fadeTimer = timer
+    timer.resume()
+  }
+
+  private func cancelFade() {
+    fadeTimer?.cancel()
+    fadeTimer = nil
+  }
+
   /// Absolute seek in seconds. mpv estimates → fast even on un-indexed MKV.
   func seek(_ seconds: Double) { command(["seek", String(seconds), "absolute"]) }
 
   func dispose() {
     isDisposing = true
+    cancelFade()
     let handle = mpv
     let ctx = wakeupContext
     mpv = nil
@@ -252,7 +344,9 @@ final class MpvCore {
     switch name {
     case "time-pos":
       if prop.format == MPV_FORMAT_DOUBLE, let d = prop.data?.assumingMemoryBound(to: Double.self).pointee {
-        DispatchQueue.main.async { self.delegate?.mpvProgress(time: d) }
+        // Carry duration too — the audio-only bumper bed derives its loop-position from it (video ignores it).
+        let dur = getDouble("duration")
+        DispatchQueue.main.async { self.delegate?.mpvProgress(time: d, duration: dur) }
       }
     case "paused-for-cache":
       if prop.format == MPV_FORMAT_FLAG, let f = prop.data?.assumingMemoryBound(to: Int32.self).pointee {

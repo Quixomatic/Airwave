@@ -25,6 +25,9 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   private var didSetup = false
   private var pendingSource: String? = null
   private var pendingStartTime: Double = 0.0
+  // Content mode for the NEXT load ("video" | "audio"). Set alongside `source` in one render, read by
+  // applySource → core.load. Audio = the bumper music bed / radio (no video track, JS-driven volume).
+  private var pendingMode: String = "video"
   private var lastLoadedSource: String? = null
   private var applyScheduled = false
   private var disposed = false
@@ -81,6 +84,10 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
     pendingStartTime = t
   }
 
+  fun setPendingMode(mode: String) {
+    pendingMode = if (mode == "audio") "audio" else "video"
+  }
+
   fun setContentFit(fit: String) = core.setContentFit(fit)
   fun setPaused(paused: Boolean) = core.setPaused(paused)
   fun setMuted(muted: Boolean) = core.setMuted(muted)
@@ -97,6 +104,11 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   fun play() = core.setPaused(false)
   fun pause() = core.setPaused(true)
   fun seek(seconds: Double) = core.seek(seconds)
+  // Audio-only capabilities (bumper bed + radio) on the same single engine.
+  fun fadeVolume(target: Double, durationMs: Double) = core.fadeVolume(target, durationMs)
+  fun setLoop(loop: Boolean) = core.setLoop(loop)
+  fun setRate(rate: Double) = core.setRate(rate)
+  fun appendTrack(url: String, startTime: Double) = core.append(url, startTime)
 
   // MARK: load coalescing
 
@@ -124,7 +136,7 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
       core.stop()
       return
     }
-    core.load(src, pendingStartTime)
+    core.load(src, pendingStartTime, pendingMode)
   }
 
   // MARK: MpvCoreDelegate → JS events
@@ -137,8 +149,8 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
     onFirstFrame(mapOf())
   }
 
-  override fun mpvProgress(time: Double) {
-    onProgress(mapOf("currentTime" to time))
+  override fun mpvProgress(time: Double, duration: Double) {
+    onProgress(mapOf("currentTime" to time, "duration" to duration))
   }
 
   override fun mpvBuffering(buffering: Boolean) {

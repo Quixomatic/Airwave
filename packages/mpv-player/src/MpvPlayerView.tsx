@@ -9,6 +9,10 @@ type NativeRef = {
   play: () => Promise<void>;
   pause: () => Promise<void>;
   seek: (seconds: number) => Promise<void>;
+  fadeVolume: (target: number, durationMs: number) => Promise<void>;
+  setLoop: (loop: boolean) => Promise<void>;
+  setRate: (rate: number) => Promise<void>;
+  append: (url: string, startTime: number) => Promise<void>;
 };
 const NativeView = requireNativeView<MpvPlayerViewProps & { ref?: React.Ref<NativeRef> }>("MpvPlayer");
 
@@ -30,6 +34,18 @@ export const MpvPlayerView = forwardRef<MpvPlayerViewRef, MpvPlayerViewProps>((p
       },
       seek: async (seconds: number) => {
         await nativeRef.current?.seek(seconds);
+      },
+      fadeVolume: async (target: number, durationMs: number) => {
+        await nativeRef.current?.fadeVolume(target, durationMs);
+      },
+      setLoop: async (loop: boolean) => {
+        await nativeRef.current?.setLoop(loop);
+      },
+      setRate: async (rate: number) => {
+        await nativeRef.current?.setRate(rate);
+      },
+      append: async (url: string, startTime = 0) => {
+        await nativeRef.current?.append(url, startTime);
       },
     }),
     [],

@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import type { MpvPlayerViewRef } from "@airwave/mpv-player";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { api, type GuideMeta, type MediaInfo, type Track, type TimelineSlot } from "@/lib/api";
+import { api, type BumperMusic, type GuideMeta, type MediaInfo, type Track, type TimelineSlot } from "@/lib/api";
+import { getServerUrl } from "@/lib/auth";
 import { deviceId } from "@/lib/device";
 
 /**
@@ -67,6 +68,29 @@ export type PlayerStatus = {
 const LIVE_THRESHOLD = 5;
 const PEEK_L = 0.14;
 const PEEK_R = 0.14;
+// Ambient bumper-music bed (folded in from the old use-bumper-music hook — now driven on the ONE hybrid
+// engine instead of a second libmpv instance). Track pick is deterministic from the bumper's start second
+// (survives scrubbing); volume + loop-position are DVR-derived from the bumper's elapsed.
+const BUMPER_SEEK_THRESHOLD = 1.5;
+const BUMPER_TICK_FADE_MS = 600; // fade a touch longer than the 500ms tick so ramps stay continuous
+const BUMPER_SEEK_FADE_MS = 250; // a scrub snaps faster
+function hashString(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function bumperVolume(elapsed: number, total: number, fadeInMs: number, fadeOutMs: number, target: number): number {
+  const fin = fadeInMs / 1000;
+  const fout = fadeOutMs / 1000;
+  let v = target;
+  if (fin > 0 && elapsed < fin) v = target * (elapsed / fin);
+  const remaining = total - elapsed;
+  if (fout > 0 && remaining < fout) v = Math.min(v, (target * Math.max(0, remaining)) / fout);
+  return Math.max(0, Math.min(target, v));
+}
 const LOOKBACK_S = 6 * 60;
 const LOOKAHEAD_S = 6 * 60;
 // Resume-stall watchdog: after unpausing, if mpv produces NO progress for this long, the stream is dead
@@ -83,6 +107,9 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   const viewRef = useRef<MpvPlayerViewRef>(null);
   const [source, setSource] = useState<string | null>(null);
   const [startTime, setStartTime] = useState(0); // mpv open-at position (seconds) — loadfile … start=<offset>
+  // Content mode for the single hybrid engine: "video" for programs, "audio" for the bumper music bed (and
+  // future radio). Set alongside `source`; the view applies it per-load. See .plans/mpv-hybrid-core.md.
+  const [mode, setMode] = useState<"video" | "audio">("video");
   const positionSecRef = useRef(0); // latest onProgress currentTime (seconds); the effectiveTime clock reads this
   const playingRef = useRef(false);
   // audioMode is client-side only (mpv output layout — not a server param), but it's in the reload key so
@@ -98,6 +125,14 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   scrubberActiveRef.current = scrubberActive;
 
   const timeline = useQuery({ queryKey: ["timeline", channelId], queryFn: () => api.timeline(channelId!, 360, 180), refetchInterval: 120_000, enabled: !!channelId });
+
+  // Bumper-music config (track pool + volume/fades), fetched once for the session — drives the ambient bed on
+  // the single hybrid engine (see the tick's bumper branch + goTo). Missing/disabled ⇒ silent bumpers.
+  useEffect(() => {
+    let cancelled = false;
+    api.bumperMusic().then((d) => { if (!cancelled) bumperMusicRef.current = d; }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const clockOffset = useRef(0);
   const slotsRef = useRef<SlotEntry[]>([]);
@@ -124,6 +159,12 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   const resumeWatchRef = useRef(false);
   const resumeDeadlineRef = useRef(0);
   const resumeAttemptsRef = useRef(0);
+  // Ambient bumper-music bed on the single hybrid engine (folded in from use-bumper-music).
+  const bumperMusicRef = useRef<BumperMusic | null>(null); // config (track pool + volume/fades), fetched once
+  const audioDurRef = useRef(0); // loaded bumper-music duration (from onProgress), for loop-position sync
+  const lastVolRef = useRef(-1); // last commanded music fade target (−1 = none yet this bumper)
+  const lastBumperElapsedRef = useRef<number | null>(null); // for scrub detection (snap fade faster)
+  const bumperMusicActiveRef = useRef(false); // is the current bumper playing music on the one engine?
 
   const [tracks, setTracks] = useState<{ audio: Track[]; subtitle: Track[] }>({ audio: [], subtitle: [] });
   const [status, setStatus] = useState<PlayerStatus>({ loading: true, buffering: false, state: "idle", guide: null, paused: false, bumperRemaining: null, bumperElapsed: null, bumperTotal: null, bumperKey: null, canRestart: false, error: null, scrubber: null, delivery: null });
@@ -167,25 +208,49 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
           return;
         }
         if (entry.slot.kind === "BUMPER" || !entry.slot.ratingKey) {
-          void viewRef.current?.pause();
           currentRef.current = { index: slots.indexOf(entry), kind: "BUMPER", startS: entry.startS, endS: entry.endS, ratingKey: null, guide: entry.slot.guide, offset: 0, playStartCurrentTime: 0, baselineReady: true, session: null };
           bumperEffRef.current = clamped;
           pausedRef.current = false;
-          // Disarm the resume-stall watchdog: the video is intentionally paused for the bumper (no progress
-          // events), so an armed watchdog would mistake it for a dead stream, burn its retries reloading the
-          // bumper, then give up by setting pausedRef=true — which would poison the next program's onLoad
-          // play() gate and leave it stuck paused. (Belt-and-suspenders; only armed after a manual Play.)
+          // Disarm the resume-stall watchdog: a bumper is intentionally not a program stream (no program
+          // progress events), so an armed watchdog would mistake it for a dead stream, burn its retries, then
+          // give up by setting pausedRef=true — poisoning the next program's resume. (Only armed after Play.)
           resumeWatchRef.current = false;
-          // Entering a bumper hard-pauses mpv (above) but leaves the current program LOADED; mpv's `pause`
-          // is a persistent property that survives into the next load. Deliberately KEEP `currentUrlRef`
-          // pointing at that loaded program — when the bumper rolls back into the SAME program (you seeked
-          // back into the bumper), the loader below detects `sameMedia` and resumes it IN PLACE (seek +
-          // play). We must NOT null it: forcing the reload path instead is a no-op, because `setSource`
-          // with an unchanged URL is deduped in BOTH React state and the native view (applySource's
-          // `pendingSource != lastLoadedSource` guard) — which left the program stuck, paused, on the frame
-          // you left (the v0.9.61 regression). Rolling into a DIFFERENT program still reloads (URL differs).
+
+          const cfg = bumperMusicRef.current;
+          if (cfg && cfg.enabled && cfg.tracks.length > 0) {
+            // HYBRID single engine (.plans/mpv-hybrid-core.md): during a bumper the ONE player plays the
+            // ambient MUSIC (audio mode) — the program is unloaded, and exiting the bumper cleanly RELOADS
+            // the next program (video mode → volume reset → audible 5.1). One libmpv instance ⇒ one audio
+            // output ⇒ no AVAudioSession contention (the whole point). The music track is picked
+            // deterministically from the bumper's start second so it survives scrubbing.
+            const key = String(Math.round(entry.startS));
+            const track = cfg.tracks[hashString(key) % cfg.tracks.length]!;
+            const url = `${getServerUrl()}${track.url}`;
+            audioDurRef.current = 0;
+            lastVolRef.current = -1;
+            lastBumperElapsedRef.current = null;
+            bumperMusicActiveRef.current = true;
+            currentUrlRef.current = url;
+            setMode("audio");
+            setStartTime(0);
+            setSource(url);
+            void viewRef.current?.setLoop(true);
+            void viewRef.current?.fadeVolume(0, 0); // start silent; the tick fades in from the DVR position
+            void viewRef.current?.play();
+          } else {
+            // MUSIC OFF: the proven pause-and-hold path (no second engine, so no contention — unchanged).
+            // Entering a bumper hard-pauses mpv but leaves the current program LOADED; mpv's `pause` is a
+            // persistent property. Deliberately KEEP `currentUrlRef` on that program so a seek-back into the
+            // SAME program resolves `sameMedia` → resume-in-place (a forced reload of an unchanged URL is a
+            // no-op in both React state and the native view — the v0.9.61 regression). A DIFFERENT program
+            // still reloads (URL differs).
+            bumperMusicActiveRef.current = false;
+            void viewRef.current?.pause();
+          }
           return;
         }
+        bumperMusicActiveRef.current = false;
+        setMode("video");
         const gen = ++genRef.current;
         const offset = Math.max(0, Math.floor(clamped - entry.startS));
         setStatus((s) => ({ ...s, loading: true, error: null, buffering: true }));
@@ -294,9 +359,12 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
 
   // mpv view events — returned as `videoEvents`, spread onto <MpvPlayerView>. currentTime is in SECONDS
   // (mpv `time-pos` — absolute media time, exactly like an HTML <video>, so the tv-web clock maps 1:1).
-  const onProgress = useCallback((e: { nativeEvent: { currentTime: number } }) => {
+  const onProgress = useCallback((e: { nativeEvent: { currentTime: number; duration: number } }) => {
     const t = e.nativeEvent.currentTime;
     positionSecRef.current = t;
+    // Stash the loaded file's duration — the bumper-music branch uses it for the loop-position sync (reset
+    // to 0 on each music load, so a stale program duration can't leak in). Harmless for programs (unused).
+    if (e.nativeEvent.duration > 0) audioDurRef.current = e.nativeEvent.duration;
     lastProgressAtRef.current = Date.now(); // liveness for the resume-stall watchdog
     // Baseline (tv-web's model, mode-agnostic): the clock is `startS + offset + (currentTime −
     // playStartCurrentTime)`, so anchor playStartCurrentTime to the FIRST real position of the NEW
@@ -486,6 +554,30 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
       } else {
         if (!pausedRef.current) bumperEffRef.current += wallDt;
         effective = bumperEffRef.current;
+        // Drive the ambient bumper music bed on the ONE hybrid engine (absorbs the old use-bumper-music
+        // hook): DVR-derived volume fade + loop-position sync. `positionSecRef` here holds the MUSIC's
+        // time-pos (the engine is playing the music during a bumper); the fade goes through the native ramp.
+        if (bumperMusicActiveRef.current && !pausedRef.current) {
+          const cfg = bumperMusicRef.current;
+          if (cfg) {
+            const bElapsed = Math.max(0, effective - cur.startS);
+            const bTotal = Math.max(0, cur.endS - cur.startS);
+            const targetMax = Math.max(0, Math.min(1, cfg.volume / 100));
+            const v = bumperVolume(bElapsed, bTotal, cfg.fadeInMs, cfg.fadeOutMs, targetMax);
+            const jumped = lastBumperElapsedRef.current == null || Math.abs(bElapsed - lastBumperElapsedRef.current) > BUMPER_SEEK_THRESHOLD;
+            lastBumperElapsedRef.current = bElapsed;
+            if (jumped || Math.abs(v - lastVolRef.current) >= 0.01) {
+              if (lastVolRef.current < 0) void viewRef.current?.setLoop(true); // ensure loop once (fresh-mount safety)
+              lastVolRef.current = v;
+              void viewRef.current?.fadeVolume(v, jumped ? BUMPER_SEEK_FADE_MS : BUMPER_TICK_FADE_MS);
+            }
+            const dur = audioDurRef.current;
+            if (dur > 0) {
+              const desired = bElapsed % dur;
+              if (Math.abs(positionSecRef.current - desired) > BUMPER_SEEK_THRESHOLD) void viewRef.current?.seek(desired);
+            }
+          }
+        }
         if (effective >= cur.endS) {
           void goTo(cur.endS);
           return;
@@ -551,6 +643,7 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
     positionSecRef.current = 0;
     transitioning.current = false;
     resumeWatchRef.current = false; // disarm the resume-stall watchdog across channel change / Close
+    bumperMusicActiveRef.current = false; // no bumper bed carries across a channel change / Close
     if (!channelId) {
       // Close: pause + release. The view is conditionally rendered on `source`, so nulling it unmounts
       // the MpvPlayerView (deinit → mpv_terminate_destroy); pause() first halts audio so nothing leaks.
@@ -602,6 +695,11 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
           }
         } else {
           pausedRef.current = !pausedRef.current;
+          // If this bumper is playing music on the single engine, pause/resume it with the channel.
+          if (bumperMusicActiveRef.current) {
+            if (pausedRef.current) void viewRef.current?.pause();
+            else void viewRef.current?.play();
+          }
         }
         // On resume, clear a prior "Playback stopped" so pressing Play dismisses it immediately.
         setStatus((s) => ({ ...s, paused: pausedRef.current, error: pausedRef.current ? s.error : null }));
@@ -623,5 +721,5 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
     [onLoad, onFirstFrame, onProgress, onBuffering, onError, onEnd],
   );
 
-  return { viewRef, source, startTime, videoEvents, status, controls, tracks, titleOf };
+  return { viewRef, source, startTime, mode, videoEvents, status, controls, tracks, titleOf };
 }

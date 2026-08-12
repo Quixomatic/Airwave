@@ -7,18 +7,21 @@ import dev.jdtech.mpv.MpvEvent
 import dev.jdtech.mpv.MpvPlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlin.math.abs
 
 /** Events surfaced from the mpv flows up to the Expo view (mirrors the iOS `MpvCoreDelegate`). */
 interface MpvCoreDelegate {
   fun mpvDidLoad(duration: Double, width: Int, height: Int)
   fun mpvFirstFrame()
-  fun mpvProgress(time: Double)
+  fun mpvProgress(time: Double, duration: Double)
   fun mpvBuffering(buffering: Boolean)
   fun mpvError(message: String)
   fun mpvEnd(reason: String)
@@ -55,11 +58,16 @@ class MpvCore(private val appContext: Context) {
   private var pendingSurface: Surface? = null
   private var loadedEmitted = false
   private var firstFrameEmitted = false
+  // Last commanded volume in mpv units (0..100); a fade resumes from here. The hybrid single engine shares
+  // this ONE `volume` between video (full) and audio-only bumper/radio content — a video load resets it.
+  private var currentVolume = 100.0
+  private var fadeJob: Job? = null
 
   // `MpvPlayer.create` is a SUSPEND function (async), so a load() call can arrive before the player
   // exists. Remember the last requested load and run it as soon as create() finishes.
   private var pendingLoadUrl: String? = null
   private var pendingLoadStart: Double = 0.0
+  private var pendingLoadMode: String = "video"
 
   // MARK: setup
 
@@ -74,6 +82,10 @@ class MpvCore(private val appContext: Context) {
           setOption("opengl-es", "yes")
           setOption("hwdec", "mediacodec,mediacodec-copy")
           setOption("ao", "audiotrack")
+          // Audio-only capability (bumper music bed + future radio) folded into this ONE engine — harmless
+          // to single-file video. `append` + these make radio handoffs gapless.
+          setOption("gapless-audio", "weak")
+          setOption("prefetch-playlist", "yes")
           // Use the full layout the HDMI sink accepts (real 5.1/7.1 LPCM) instead of the timid `auto-safe`
           // default that caps at stereo. On a 2-channel sink this resolves to stereo (mpv folds the center
           // in), so it's correct everywhere. The JS `audioMode` setting overrides this to force stereo.
@@ -105,7 +117,11 @@ class MpvCore(private val appContext: Context) {
       // Observe the running state. Dims/duration are read synchronously at the load event instead (see
       // maybeEmitLoad), matching the iOS core — a direct get returns the current value even when the new
       // file's dimensions match the previous one (which wouldn't fire a change event).
-      p.observeDouble("time-pos").onEach { delegate?.mpvProgress(it) }.launchIn(scope)
+      p.observeDouble("time-pos").onEach { t ->
+        // Carry duration too — the audio-only bumper bed derives its loop-position from it (video ignores it).
+        val dur = p.getDouble("duration") ?: 0.0
+        delegate?.mpvProgress(t, dur)
+      }.launchIn(scope)
       p.observeFlag("paused-for-cache").onEach { delegate?.mpvBuffering(it) }.launchIn(scope)
 
       p.eventFlow.onEach { handleEvent(it) }.launchIn(scope)
@@ -114,7 +130,7 @@ class MpvCore(private val appContext: Context) {
       p.logFlow.onEach { android.util.Log.i("MpvCore", "[${it.level}] ${it.prefix}: ${it.text}") }.launchIn(scope)
 
       // A load() may have been requested before create() finished (create is suspend) — run it now.
-      pendingLoadUrl?.let { doLoad(p, it, pendingLoadStart) }
+      pendingLoadUrl?.let { doLoad(p, it, pendingLoadStart, pendingLoadMode) }
     }
   }
 
@@ -125,28 +141,57 @@ class MpvCore(private val appContext: Context) {
    * <options>` — the `-1` index MUST be present before options, or the options string lands in the index
    * slot, the command is malformed, and no file loads (silent). Matches plezy's `loadfile <uri> replace -1`.
    */
-  fun load(url: String, startTime: Double) {
+  fun load(url: String, startTime: Double, mode: String = "video") {
     loadedEmitted = false
     firstFrameEmitted = false
+    fadeJob?.cancel()
     pendingLoadUrl = url
     pendingLoadStart = startTime
+    pendingLoadMode = mode
     // If the player is already up, load immediately; otherwise setup()'s create() runs it on completion.
     val p = player ?: return
-    scope.launch { doLoad(p, url, startTime) }
+    scope.launch { doLoad(p, url, startTime, mode) }
   }
 
-  private suspend fun doLoad(p: MpvPlayer, url: String, startTime: Double) {
-    if (startTime > 0) {
-      p.command("loadfile", url, "replace", "-1", "start=${startTime.toInt()}")
-    } else {
-      p.command("loadfile", url, "replace", "-1")
+  /**
+   * `mode` is the ONLY place content-type branches (see `.plans/mpv-hybrid-core.md`). On this ONE shared
+   * engine, persistent props an audio track sets (`loop-file`, faded `volume`, `speed`) would bleed into the
+   * next program — so a video load RESETS them, and an audio load starts SILENT (JS fades the bumper bed in /
+   * radio sets its level) + suppresses cover-art-as-video. Per-file options are ONE comma-joined arg, scoped
+   * to this file (they survive seeks, not reloads).
+   */
+  private suspend fun doLoad(p: MpvPlayer, url: String, startTime: Double, mode: String) {
+    val fileOpts = mutableListOf<String>()
+    if (startTime > 0) fileOpts.add("start=${startTime.toInt()}")
+    if (mode == "audio") {
+      fileOpts.add("vid=no")
+      fileOpts.add("audio-display=no")
+      // Start silent (graceful — the outgoing program just goes quiet); JS fades the bed in. BEFORE the load
+      // so the new file inherits silence and lowering the OUTGOING file can't pop.
+      currentVolume = 0.0
+      p.setProperty("volume", 0.0)
+    }
+    if (fileOpts.isEmpty()) p.command("loadfile", url, "replace", "-1")
+    else p.command("loadfile", url, "replace", "-1", fileOpts.joinToString(","))
+    if (mode != "audio") {
+      // Video: undo persistent props audio content may have left — AFTER the loadfile, so raising the volume
+      // back to full can't briefly blast the OUTGOING (faded-down) music before it's replaced.
+      p.setProperty("loop-file", "no")
+      p.setProperty("speed", 1.0)
+      currentVolume = 100.0
+      p.setProperty("volume", 100.0)
     }
   }
 
   fun stop() = launchOnPlayer { it.command("stop") }
   fun setPaused(paused: Boolean) = launchOnPlayer { it.setProperty("pause", paused) }
   fun setMuted(muted: Boolean) = launchOnPlayer { it.setProperty("mute", muted) }
-  fun setVolume(volume: Double) = launchOnPlayer { it.setProperty("volume", volume) }
+  /** Set volume in mpv units (0..100). Cancels any in-flight fade. */
+  fun setVolume(volume: Double) {
+    fadeJob?.cancel()
+    currentVolume = volume
+    launchOnPlayer { it.setProperty("volume", volume) }
+  }
 
   fun setAudioTrack(id: Int) = launchOnPlayer {
     if (id < 0) it.setProperty("aid", "no") else it.setProperty("aid", id)
@@ -170,6 +215,48 @@ class MpvCore(private val appContext: Context) {
 
   /** Absolute seek in seconds. mpv estimates → fast even on un-indexed MKV. */
   fun seek(seconds: Double) = launchOnPlayer { it.command("seek", seconds.toString(), "absolute") }
+
+  // MARK: audio-only capabilities (bumper music bed + radio) on the same single engine
+
+  /** Queue `url` AFTER the current track (mpv playlist `append`) — with `prefetch-playlist` the next entry
+   *  opens before this one ends → gapless radio. Call after a `load`. */
+  fun append(url: String, startTime: Double = 0.0) = launchOnPlayer {
+    if (startTime > 0) it.command("loadfile", url, "append", "-1", "start=${startTime.toInt()}")
+    else it.command("loadfile", url, "append", "-1")
+  }
+
+  /** Loop the current file at EOF (mpv `loop-file`) — ambient bumper bed + looping radio. A video load
+   *  resets this to `no`, so it never bleeds into a program. */
+  fun setLoop(loop: Boolean) = launchOnPlayer { it.setProperty("loop-file", if (loop) "inf" else "no") }
+  /** Playback speed (1.0 = normal — mpv `speed`). */
+  fun setRate(rate: Double) = launchOnPlayer { it.setProperty("speed", rate) }
+
+  /** Smoothly ramp the volume to `target` (0..1) over `durationMs` — a native 60fps ramp of mpv's `volume`
+   *  (0..100). The primitive for bumper fade in/out. Starts from the current commanded volume; cancels any
+   *  prior fade. */
+  fun fadeVolume(target: Double, durationMs: Double) {
+    fadeJob?.cancel()
+    val end = target.coerceIn(0.0, 1.0) * 100.0
+    val start = currentVolume
+    val p = player
+    if (p == null || durationMs <= 0 || abs(end - start) < 0.1) {
+      currentVolume = end
+      launchOnPlayer { it.setProperty("volume", end) }
+      return
+    }
+    fadeJob = scope.launch {
+      val startNs = System.nanoTime()
+      while (true) {
+        val elapsedMs = (System.nanoTime() - startNs) / 1_000_000.0
+        val t = (elapsedMs / durationMs).coerceAtMost(1.0)
+        val v = start + (end - start) * t
+        currentVolume = v
+        p.setProperty("volume", v)
+        if (t >= 1.0) break
+        delay(16)
+      }
+    }
+  }
 
   // MARK: surface
   //

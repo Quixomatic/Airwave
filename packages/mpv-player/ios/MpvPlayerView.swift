@@ -15,6 +15,13 @@ final class MpvPlayerView: ExpoView, MpvCoreDelegate {
   private var didSetup = false
   private var pendingSource: String?
   private var pendingStartTime: Double = 0
+  // Content mode for the NEXT load ("video" | "audio"). Set alongside `source` in one render, read by
+  // applySource → core.load. Audio = the bumper music bed / radio (no video track, JS-driven volume).
+  private var pendingMode: String = "video"
+  // The mode of the CURRENTLY loaded file (set at load time). Gates tvOS HDR display-criteria: an audio-only
+  // load (bumper bed) must NOT touch the HDMI dynamic-range mode, or every bumper would bounce an HDR program
+  // HDR→SDR→HDR (a black re-sync). We leave the last program's criteria in place across the bumper.
+  private var currentMode: String = "video"
   private var lastLoadedSource: String?
   private var applyScheduled = false
   private var lastWidth: Int = 0
@@ -67,6 +74,7 @@ final class MpvPlayerView: ExpoView, MpvCoreDelegate {
     scheduleApply()
   }
   func setPendingStartTime(_ t: Double) { pendingStartTime = t }
+  func setPendingMode(_ mode: String) { pendingMode = (mode == "audio") ? "audio" : "video" }
 
   func setContentFit(_ fit: String) {
     switch fit {
@@ -91,6 +99,11 @@ final class MpvPlayerView: ExpoView, MpvCoreDelegate {
   func play() { core.setPaused(false) }
   func pause() { core.setPaused(true) }
   func seek(_ seconds: Double) { core.seek(seconds) }
+  // Audio-only capabilities (bumper bed + radio) on the same single engine.
+  func fadeVolume(_ target: Double, _ durationMs: Double) { core.fadeVolume(to: target, durationMs: durationMs) }
+  func setLoop(_ loop: Bool) { core.setLoop(loop) }
+  func setRate(_ rate: Double) { core.setRate(rate) }
+  func appendTrack(_ url: String, _ startTime: Double) { core.append(url: url, startTime: startTime) }
 
   // MARK: load coalescing
 
@@ -122,7 +135,8 @@ final class MpvPlayerView: ExpoView, MpvCoreDelegate {
       #endif
       return
     }
-    core.load(url: src, startTime: pendingStartTime)
+    currentMode = pendingMode
+    core.load(url: src, startTime: pendingStartTime, mode: pendingMode)
   }
 
   // MARK: MpvCoreDelegate → JS events
@@ -133,13 +147,17 @@ final class MpvPlayerView: ExpoView, MpvCoreDelegate {
     onLoad(["duration": duration, "width": width, "height": height])
   }
   func mpvFirstFrame() { onFirstFrame([:]) }
-  func mpvProgress(time: Double) { onProgress(["currentTime": time]) }
+  func mpvProgress(time: Double, duration: Double) { onProgress(["currentTime": time, "duration": duration]) }
   func mpvBuffering(_ buffering: Bool) { onBuffering(["buffering": buffering]) }
   func mpvError(_ message: String) { onError(["message": message]) }
   func mpvEnd(reason: String) { onEnd(["reason": reason]) }
 
   func mpvColorInfo(gamma: String?, primaries: String?, colorMatrix: String?, fps: Double, sigPeak: Double) {
     #if os(tvOS)
+      // An audio-only load (bumper bed / radio) reports no real colorimetry — do NOT drive the HDMI dynamic
+      // range from it, or it would clear a program's HDR mode for the bumper and re-sync HDR→SDR→HDR. Leave
+      // the current program's criteria untouched across the bumper; the next program re-establishes its own.
+      if currentMode == "audio" { return }
       applyDisplayCriteria(gamma: gamma, primaries: primaries, colorMatrix: colorMatrix, fps: fps, sigPeak: sigPeak)
     #endif
   }

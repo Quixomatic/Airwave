@@ -12,6 +12,9 @@ export interface MpvLoadEvent {
 /** Playback position tick (mpv `time-pos`), in seconds. */
 export interface MpvProgressEvent {
   currentTime: number;
+  /** The loaded file's duration in seconds (0 if unknown). Used by the audio-only bumper bed to derive its
+   *  loop position; the video program clock ignores it. */
+  duration: number;
 }
 
 /** mpv `paused-for-cache` — true = stalled waiting on the network buffer. */
@@ -52,6 +55,14 @@ export interface MpvPlayerViewProps extends ViewProps {
    * (an ffmpeg-estimated byte-range seek, NOT a play-from-0-then-seek). This is the fix libVLC couldn't do.
    */
   startTime?: number;
+  /**
+   * Content mode for the current `source` (default `"video"`). `"audio"` = an audio-only load (the bumper
+   * music bed / a radio track): mpv decodes no video track and draws no cover art to the surface, and the
+   * load starts SILENT so JS can fade it in. It's applied per-load (set it alongside `source`), so the ONE
+   * engine plays program video and bumper/radio audio sequentially with no second instance. See
+   * `.plans/mpv-hybrid-core.md`.
+   */
+  mode?: "video" | "audio";
   /** `true` = paused. */
   paused?: boolean;
   muted?: boolean;
@@ -87,4 +98,14 @@ export interface MpvPlayerViewRef {
   pause: () => Promise<void>;
   /** Absolute seek in **seconds**. mpv estimates the byte position → fast even on un-indexed MKV. */
   seek: (seconds: number) => Promise<void>;
+  /** Smoothly ramp the volume to 0..1 over `durationMs` — a native 60fps fade (one bridge call). For the
+   *  bumper music bed's fade in/out. Audio-only loads start silent, so this is how they become audible. */
+  fadeVolume: (target: number, durationMs: number) => Promise<void>;
+  /** Loop the current file at EOF (mpv `loop-file`) — the ambient bumper bed / looping radio. A video load
+   *  resets this, so it never bleeds into a program. */
+  setLoop: (loop: boolean) => Promise<void>;
+  /** Playback speed (1.0 = normal — mpv `speed`). */
+  setRate: (rate: number) => Promise<void>;
+  /** Queue a track AFTER the current one for GAPLESS handoff (radio). Call after a `source` load. */
+  append: (url: string, startTime?: number) => Promise<void>;
 }
