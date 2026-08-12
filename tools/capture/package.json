@@ -1,0 +1,20 @@
+{
+  "name": "airwave-capture",
+  "private": true,
+  "type": "module",
+  "description": "Playwright capture harness — real screenshots + videos of the admin UI (:3001), tv-web (:3002), and the marketing/docs site, for getairwave.tv assets. Standalone (outside the pnpm workspace).",
+  "scripts": {
+    "signin": "tsx login.ts",
+    "admin": "tsx shots.admin.ts",
+    "channel": "tsx shots.channel.ts",
+    "tvweb": "tsx shots.tvweb.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.14",
+    "playwright": "^1.55.0",
+    "tsx": "^4.20.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  }
+}
