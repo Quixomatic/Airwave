@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.84] - 2026-08-12
+
+### Changed
+
+- **Privacy Policy and Terms brought up to snuff** (modeled on the plezy / nostalgex / Bunny Ears policies,
+  adapted to Airwave's fully self-hosted, zero-project-hosted-services reality). Privacy now has proper
+  sections — the website, the self-hosted software (you are the data controller), what it connects to,
+  on-device app data, no analytics/tracking, children (COPPA), retention, your rights (incl. VCDPA),
+  security, and contact — with the accurate token wording (encrypted at rest, used server-side to broker
+  playback) and a "GitHub is public" caution. Terms gains a **Governing law** section (Commonwealth of
+  Virginia); both note Airwave is operated from Virginia, USA. (Still honest drafts — worth a lawyer's pass.)
+
 ## [0.9.83] - 2026-08-12
 
 ### Changed

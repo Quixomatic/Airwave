@@ -53,6 +53,14 @@ export default function TermsPage() {
         unavailable at any time.
       </p>
 
+      <h2>Governing law</h2>
+      <p>
+        Airwave is operated from Virginia, USA. These terms are governed by the laws of the Commonwealth of
+        Virginia, without regard to its conflict-of-laws rules, and any dispute will be subject to the courts
+        located in Virginia — except where your local consumer-protection law grants you rights that cannot be
+        waived.
+      </p>
+
       <h2>Changes to these terms</h2>
       <p>
         We may update these terms as the project evolves; the “Last updated” date above reflects the current
