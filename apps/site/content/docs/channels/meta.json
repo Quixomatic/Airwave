@@ -1,0 +1,6 @@
+{
+  "title": "Channels",
+  "icon": "Tv",
+  "defaultOpen": true,
+  "pages": ["filters", "ordering", "strategies", "schedule"]
+}

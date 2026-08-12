@@ -1,0 +1,166 @@
+---
+icon: Workflow
+title: "Durable workflows"
+description: "How the AI lineup builder and the importer run on the Workflow SDK."
+---
+
+
+> How Airwave runs its two long-lived, crash-resilient jobs — the AI lineup builder and the lineup importer — on Vercel's Workflow SDK (WDK), against our own Postgres, with no Redis and no Vercel.
+
+## Overview
+
+Most background work in Airwave runs on the plain in-process job scheduler (node-schedule; see [`docs/jobs.md`](/docs/jobs)). That system is perfect for short, idempotent, fire-and-forget tasks: a job function is `await`ed to completion and its state lives in memory. It cannot represent a multi-hour run that must survive a process restart — the moment the container recycles, an in-flight job is simply gone.
+
+Two operations need more than that:
+
+- **The AI lineup builder** — analyze the whole library, design a full lineup, and build ~50 channels, each of which is its own multi-call LLM agent loop. This takes a long time and costs real money, so it must never restart from zero.
+- **The lineup importer** — recreate packages + channels from an uploaded lineup file, resolving each channel's filter against Plex.
+
+Both run on the **Vercel Workflow SDK** (the `workflow` + `@workflow/world-postgres` packages, pinned at `4.3.0`), which gives durable, resumable, at-least-once execution. The headline property proven during the go/no-go spike: a workflow ran its first step, the process was **killed mid-flight**, and a brand-new process **resumed and finished it** — replaying the completed step from the event log instead of re-running it.
+
+Crucially, we run WDK with **no Nitro, no framework adapter, and not on Vercel**. `bunx workflow build` emits standalone HTTP handlers we host ourselves on Bun, and durable state lives in our own Postgres.
+
+The whole engine is **opt-in and off by default**. It is gated by `WORKFLOW_ENABLED=1`:
+
+- The check lives in `startWorkflowEngine()` (`apps/server/src/workflow-engine.ts:41`). With the flag unset, the function logs `disabled` and returns immediately — the server boots exactly as before.
+- The handler bundles (`apps/server/.well-known/…`) are imported **lazily** (`workflow-engine.ts:48`), so a fresh checkout that has never run `workflow build` still starts.
+- The tRPC procedures that trigger runs report the runner as unavailable when the flag is off (`requireLineupRunner()`, `lineup-runner.ts:58`).
+- `.env.example:74` documents it; its Postgres connection is derived from the same Postgres settings the rest of the app uses.
+
+## The two workflows
+
+Both workflows live in `apps/server/workflows/` (a hard requirement — the WDK CLI scans `./workflows` relative to the app, and the `"use workflow"` / `"use step"` directives only get their build-time transform there). They share the same shape: a deterministic **orchestrator body** (`"use workflow"`) with no side effects, and a set of durable **steps** (`"use step"`) that do the actual I/O and are individually retried and checkpointed.
+
+### AI lineup builder — `apps/server/workflows/lineup.ts`
+
+Entry point `aiLineupWorkflow(args)` (`lineup.ts:111`). The body calls these steps in order; the fan-out step runs in bounded waves.
+
+1. **`analyzeLibrary`** (`:214`) — distill the real library into a few-KB `LibraryProfile` (movie/show/episode counts, genres, studios, sizeable shows).
+2. **`buildSharedContext`** (`:232`) — build the shared cached prefix: the profile plus the *full* filter tag vocabulary (one Plex round-trip per field, checkpointed so a resume never repeats them). This exact string is handed byte-identically to every channel build, so the whole run shares **one prompt-cache entry**.
+3. **`listExistingPackages`** (`:261`) — the packages already on the server (preset + manual), so the planner can file channels into an existing package instead of minting a near-duplicate. AI packages are deliberately excluded, because `createPackages` wipes them.
+4. **`planLineup`** (`:296`) — one structured-output call (on the *planner* model) that designs the full lineup, sized to the library, not a quota.
+5. **`createPackages`** (`:332`) — **destructive**: wipes any previous `aiGenerated` lineup (manual + preset rows untouched), then creates this run's packages. Returns plan-key → real packageId. This is why the admin action confirms first.
+6. **`assignNumbers`** (`:314`) — resolve every channel's number against live state, *after* the wipe so it allocates against numbers that are actually free.
+7. **`buildChannel` ×N** (`:382`) — the fan-out. Each channel is its own durable step running a grounded agent loop (on the cheap *worker* model) that verifies its filter before committing, then lays a windowed (~12h) initial schedule so the channel is watchable immediately. Fanned out in waves of `BUILD_CONCURRENCY = 6` (`:62`) via `Promise.all`, so a crash resumes only the unfinished channels.
+8. **`reportLineup`** (`:425`) — aggregate the outcome and token usage into a `LineupReport` (the workflow's return value).
+
+Two body-level details worth noting, both pure functions safe to run in the deterministic body:
+
+- `args.limit` caps the **build fan-out, not the plan** — the planner always plans the whole lineup; a capped run shows the full design but only pays to build a sample.
+- `sampleAcrossPackages` (`:187`) spreads that sample **across packages** (round-robin) rather than taking the first N, so a capped run exercises interpretive channels, not just the obvious first package.
+
+### Lineup importer — `apps/server/workflows/import.ts`
+
+Entry point `importLineupWorkflow(args)` (`:52`). Same durable machinery **minus the AI**: no analyze, no planner, no per-channel agent loop.
+
+1. **`planStep`** (`:78`) — a *deterministic* plan (dedupe + number assignment + library remap), reads only. Traces each duplicate it will skip.
+2. **`createPackagesStep`** (`:125`) — create or reuse (by key) every needed package.
+3. **`buildChannelStep` ×N** (`:150`) — create the channel + its PREDICATE definitions and lay a windowed schedule. Fanned out in waves of `BUILD_CONCURRENCY = 4` (`:31`), lower because schedule generation (~30s/channel) is the slow step.
+4. **`reportStep`** (`:196`) — summarize into an `ImportReport`.
+
+The importer's distinctive feature is **dry-run** (`args.dryRun`): the whole thing runs end-to-end *for real* — validates, resolves each filter against Plex for true pool sizes, writes trace rows so the run page shows live progress — but skips every persisting write. It is how a deployed (e.g. TrueNAS) build gets validated before committing an import.
+
+Full round-trip of the import/export format is documented in [`docs/import-export.md`](/docs/import-export).
+
+## How durability works
+
+### At-least-once + body replay
+
+WDK is **at-least-once**, and the workflow **body replays from the top every time a step completes**. On replay, completed steps return their stored result from the event log (they are never re-run), but **in-flight steps can be dispatched again**. This is the single most important fact to internalize when editing a workflow body — and the reason the body must be strictly deterministic: no `Date.now()`, no `Math.random()`, no I/O outside a step, and all step params/returns must be JSON-serializable.
+
+The fan-out is where at-least-once bites. A `Promise.all` of build steps has its still-running members re-dispatched on each completion. This was measured directly on a 5-channel run: the first build finished at 9.2s and the remaining four were **immediately started a second time** — 16 `step_started` events against 12 `step_created`, with zero `step_retrying` (nothing had failed). Left unaddressed, roughly a third of build spend was duplicate work.
+
+### Reserve, don't check
+
+The fix is the **reserve-don't-check** pattern in `buildPlannedChannel` (`packages/api/src/services/agent/channel-builder.ts:199`). Instead of checking for an existing channel and creating it at the *end* of the agent loop (which let every duplicate pass the check while the original was still mid-loop, so both ran the full ~40k-token build), the builder **creates the channel row up front as an atomic claim**:
+
+```
+createChannel(…, { number: channel.number, enabled: false })   // channel-builder.ts:232
+```
+
+`Channel.number` is `@unique`, so exactly **one** attempt can win the insert; a duplicate dispatch loses the race on the unique constraint and **exits in milliseconds** (`:249`), returning the winner's channel id. The reservation is `enabled: false` so a half-built channel never reaches the guide or the schedule-backfill job, and it carries the planner's proposed filter so the row is meaningful even if the agent dies before committing. On commit the row is flipped to enabled and updated with the verified filter (`:341`); on any failure the reservation is deleted (`:358`, `:428`, `:459`).
+
+This is the inversion the pattern's name captures: **reserve first (a claim that a duplicate collides with), don't merely check (a read a duplicate sails past)**.
+
+The importer relies on the same idea more simply — its plan step already deduplicates, and each build's create is idempotent against existing rows.
+
+### State in Postgres, no Redis
+
+All durable state lives in **the app's own Postgres**, in three schemas WDK owns:
+
+- `workflow` — runs, steps, events (drizzle-managed).
+- `workflow_drizzle` — WDK's migration bookkeeping.
+- `graphile_worker` — the job queue that drives step dispatch.
+
+There is **no Redis**. Prisma coexists in the same database because its schema describer **filters by namespace** — it simply cannot see those three schemas, which is exactly what keeps `prisma db push` / `migrate` from ever touching them. This was verified during the spike: `db push` left all of WDK's tables untouched, with zero WDK tables in `public`. The reverse is also respected: Airwave reads WDK's own tables only via raw SQL (see Observability), never through Prisma models.
+
+## Observability
+
+WDK persists every step's input and output already (as CBOR in its own `workflow` schema). Two things it **structurally cannot** capture drove a pair of dedicated trace tables in `public`:
+
+1. **The inside of a step.** A channel build is *one* step wrapping a whole `generateText` tool loop. Its previews, filter revisions, and reasoning are invisible from the outside — and that is precisely the part worth reading.
+2. **Honest cost.** The run report aggregated usage only from builds that *succeeded*, which understated a run three ways: the planner call (on a pricier model) was never counted, retries were free, and everything was priced at worker rates.
+
+### The trace tables
+
+- **`AiLineupTrace`** (`ai_lineup_trace`, `packages/db/prisma/schema/ai.prisma:51`), written by `recordTrace` in `packages/api/src/services/agent/lineup-trace.ts`. Captures per-attempt phase (`analyze`/`context`/`plan`/`packages`/`numbering`/`build`/`report`), status/reason, the summarized input/output, the **agent's tool-call trace** (`trace` JSON), and per-model token usage (input/output/cacheRead/cacheWrite/agentSteps).
+- **`ImportTrace`** (`import_trace`, `packages/db/prisma/schema/transfer.prisma:11`), written by `recordImportTrace` in `packages/api/src/services/transfer/import-trace.ts`. Trimmed — no AI, no tokens — so it records per-package/per-channel outcomes (created/skipped/disabled/failed), the resolved pool size, the reassigned number, and a `dryRun` flag the run page banners.
+
+Key design points shared by both:
+
+- **Keyed by WDK's own ids** — `getWorkflowMetadata().workflowRunId` + `getStepMetadata().stepId` / `.attempt` — so a trace row joins back to the step timeline. Those ids are read inside the workflow via a small `traceContext()` helper (`lineup.ts:74`, `import.ts:34`) and handed *down* to the service. `packages/api` must **never** import the Workflow SDK — that dependency inversion is what keeps the services usable, and the server bootable, with the engine off.
+- **`attempt` is load-bearing.** A retried step writes a *second* row instead of overwriting, which is what finally makes retries visible in the cost accounting.
+- **Recording is best-effort.** Every write is wrapped so a trace failure can never fail an otherwise-successful, expensive step (`lineup-trace.ts:94`, `import-trace.ts:61`). Payloads are JSON-normalized and size-capped at 200k chars.
+
+### The run pages
+
+Read models live in `lineup-runs.ts` and `import-runs.ts` (both under `packages/api/src/services/…`). Because the runs themselves live in WDK's `workflow` schema (invisible to Prisma), these read **run/step metadata via raw SQL** over the same connection — `workflow.workflow_runs` LEFT JOIN `workflow.workflow_steps`, filtered by workflow name (`LIKE '%aiLineupWorkflow%'` / `'%importLineupWorkflow%'`). A run's *return value* (the `LineupReport` with token totals) is CBOR in `output_cbor`, so decoding it goes back through the SDK via `getRun().returnValue` (`workflow-engine.ts:83`).
+
+The admin UI is under `apps/web/src/routes/_auth/settings/workflows/`:
+
+- `index.tsx` — one card per workflow (AI Lineup, Lineup Import) with run counts.
+- `ai-lineup/$runId.tsx` and `import/$runId.tsx` — per-run detail pages that live-poll while a run is in flight, correlating WDK step metadata with the trace rows (by channel name).
+
+## Build & deploy notes
+
+### The client transform (load-bearing)
+
+`start(workflow, …)` reads `workflow.workflowId` off the function object — a field that **only the Workflow SDK's SWC plugin in *client* mode attaches**. Without it, starting a run throws `start-invalid-workflow-function` even though `bunx workflow build` succeeded (the build produces the flow/step *handlers*; the caller still holds an untransformed plain function).
+
+That transform must be applied in **two** places, because dev and prod load code differently:
+
+- **Dev** runs `src` through Bun, so the transform is a Bun `onLoad` preload: `apps/server/workflow-plugin.ts`, wired via `preload` in `apps/server/bunfig.toml`. It transforms only files containing a directive.
+- **Prod** runs the compiled `dist/index.mjs` (`docker/entrypoint.sh:69`), where the preload does **nothing** — everything is already inlined by the time an `onLoad` hook for `.ts` files could run. So the *same* `@workflow/swc-plugin` client transform is applied at **bundle time** by a tsdown plugin: `apps/server/tsdown.config.ts:21` (`workflowClientTransform`). This was the v0.9.20 production bug — before this plugin, every `start(workflow)` threw `start-invalid-workflow-function` in prod while working fine in dev.
+
+The two must stay in sync — in particular the **workflow-id derivation** (`relative(process.cwd(), path)`, forward slashes, cwd = `apps/server`) must match the id the CLI baked into the manifest, or the caller's id won't line up. Both files carry that reasoning; the Windows drive-letter colon in an absolute path is why relativization is mandatory.
+
+### Don't run `workflow build` in a running container
+
+The generated handlers (`apps/server/.well-known/workflow/v1/{flow,step}.js`) are built **once, at image-build time**, never at container start:
+
+- `Dockerfile:78` runs `pnpm --filter server build` (which runs `workflow build` + the tsdown bundle) as part of the image. The header comment (`Dockerfile:8`) is explicit: everything URL-independent is built once here.
+- `docker/entrypoint.sh` deliberately does **not** run `workflow build`. Doing so inside a live container is the documented gotcha — the bundle is already correct and rebuilding at start would only risk restoring a build with no handlers (every dispatch would then 404).
+
+Note also that `bun --hot` does **not** re-run the transform: after editing anything under `workflows/`, you must re-run `bunx workflow build` yourself (the directives are a build-time transform, not runtime).
+
+### Migrate / bootstrap on start
+
+On `CG_ROLE=server` startup (`docker/entrypoint.sh`):
+
+1. Prisma migrations are applied (`prisma migrate deploy`, `:46`) — the `public` schema only.
+2. If `WORKFLOW_ENABLED=1`, the WDK schema is bootstrapped (`pnpm --filter server workflow:bootstrap`, `:55`). This is a migration runner: it records what it applied and skips it next time, so it is **idempotent and safe on every start**. It is non-fatal — if it fails the API still boots and the engine self-disables on the missing schema.
+3. The server is launched from `cwd = apps/server` (`:68`) so Bun resolves the generated `./.well-known` handlers relative to the bundle.
+
+### How the engine wires up at runtime
+
+`startWorkflowEngine()` (`apps/server/src/workflow-engine.ts`, called from `apps/server/src/index.ts:258`, wrapped so a failure never stops the server) brings up three pieces — miss any one and it fails confusingly:
+
+1. **The world's poller** — `createWorld().start()` runs graphile-worker. Without it a suspended run sits `running` forever, because nothing pulls work off the queue.
+2. **The generated handlers** — served on their **own loopback listener** bound to `127.0.0.1:${WORKFLOW_LOCAL_PORT ?? 3152}`. The world dispatches by POSTing to `/.well-known/workflow/v1/{flow,step}`. These handlers execute steps and have **no auth** — on Vercel they'd ride queue-consumer security, which self-hosting doesn't provide — so they are bound to loopback only and never mounted on the public Hono app (same posture as Postgres on :5433).
+3. **The client transform** — described above, so `start()` can read `workflowId`.
+
+The engine then registers runners (`setLineupRunner` / `setImportRunner`) that `packages/api` looks up. That registry indirection (`lineup-runner.ts`, `import-runner.ts`) exists because the workflows must live in `apps/server` but the tRPC procedures that trigger and poll them live in `packages/api`, which cannot import from `apps/server` (apps depend on packages, never the reverse) — and must never see WDK at all.
+
+---
+
+*Cross-links: [`docs/jobs.md`](/docs/jobs) (the separate plain-cron job system) · [`docs/import-export.md`](/docs/import-export) (the import/export file format the importer consumes). History is in `CHANGELOG.md`.*

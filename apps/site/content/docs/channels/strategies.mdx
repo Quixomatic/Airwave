@@ -1,0 +1,66 @@
+---
+title: Strategies
+description: The optional grouping & rotation layer — marathons, round-robins, length-aware runs, and no-repeat constraints, on top of the base ordering.
+---
+
+By default a channel just plays its pool in the [base order](/docs/channels/ordering).
+The **Advanced — grouping & rotation** section (`strategy-editor.tsx`) turns on a **strategy**: an
+optional layer that buckets the pool into groups and decides how those groups interleave. It's a
+bolt-on — off means byte-for-byte the old behavior; the base ordering still governs the order *within*
+each group and how groups are sorted.
+
+Turn on **Group & rotate this channel's content** to reveal:
+
+## Rotation — how groups are woven together
+
+- **Marathon each group** (`clustered`) — play a group's whole run, then the next group. Great for
+  "one series at a time" blocks.
+- **Rotate between groups** (`round_robin`) — take a *run* from one group, then move to another, never
+  the same group back-to-back. This is the "channel-surfing variety" mode. A sub-option, **Order**,
+  picks **Varied** (`shuffle` — reshuffle the group order each lap) or **Fixed cycle** (`cycle` —
+  rotate the same pattern).
+
+## Grouping rules — what a group is
+
+One or more rules that decide *what a group is*. Each rule has a **scope**, a **run**, and an optional
+**filter**. Rules are tried top-down and **the first matching rule wins**, so put a narrow carve-out
+above a catch-all.
+
+- **Scope:**
+  - **Each show** — one group per series.
+  - **Movies** — all movies collapse into one group.
+  - **Filtered set** — the items this rule's filter matches become **one** group (a marathon
+    carve-out, e.g. "the Star Wars films as a block").
+- **Run** — how much of a group plays per turn:
+  - **One at a time** (`1`)
+  - **Block of…** — a fixed count or a seeded `[min, max]` range of episodes (e.g. 2–3)
+  - **~ Minutes** — a seeded `{minutes: [min, max]}` window; the engine packs items toward that
+    duration **without overshooting the ceiling**, so short-episode shows self-adjust (a 22-min show
+    in a 24–30 window is one episode; 7-min shorts pack in until they fill it). Length-aware, no
+    per-show tuning needed.
+  - **Whole run** (`all`) — the whole group in one turn (a marathon that then drops out).
+- **Filter** (the funnel icon) — narrow which pool items the rule claims, using the *same* filter
+  builder. Unlike the content filter, a grouping filter is evaluated **locally** against cached pool
+  metadata (no server round-trip), so it's restricted to fields Airwave caches
+  (`local-filter.ts` `LOCAL_FILTER_FIELDS` — title, genre, director, actor, year, rating,
+  resolution, HDR, release date, …). Time-relative fields are deliberately excluded to keep the build
+  deterministic.
+
+## Don't repeat a show
+
+An optional cross-pass constraint (`noRepeatWithin`): keep the same group off the air for **N minutes**
+or **N shows**. The engine runs a starvation scheduler that prefers the longest-un-aired eligible
+group, and *relaxes* rather than stalling if a tiny pool can't satisfy the window — every item is still
+laid exactly once.
+
+## How it works (briefly)
+
+Each schedule pass is still a **full permutation of the pool** (every item exactly once), so a
+strategy is a pure function of `(pool, ordering, seed, passIndex)` and slots into the same
+deterministic build with no special state — except the no-repeat constraint, which carries a small
+"recently aired" tail across pass boundaries so the window holds at a build seam
+(`timeline.ts` `strategyPassOrder` / `constrainedPassOrder`). A malformed or empty strategy safely
+falls back to plain ordering (`parseStrategy`), so bad config never bricks a channel.
+
+Strategy changes only take effect the **next time the schedule is built** — use **Generate schedule**
+(see [The schedule](/docs/channels/schedule)) to apply them immediately.

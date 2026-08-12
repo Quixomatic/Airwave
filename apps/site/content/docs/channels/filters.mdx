@@ -1,0 +1,74 @@
+---
+title: Filters
+description: The filter builder — conditions, AND/OR nesting, how fields resolve for movies vs TV, and previewing the resolved pool.
+---
+
+The **Content & filter** section decides the pool. First pick the content types with the **Movies**
+and **TV Shows** checkboxes (at least one is required); then build a predicate in the filter builder
+(`apps/web/src/features/channels/filter-builder.tsx`).
+
+## Conditions
+
+A condition is `field · operator · value`. The available fields, their kinds, and which operators
+each kind allows come from the server catalog
+(`packages/api/src/services/plex/filter-fields.ts`, exposed via `channels.filterFields`). Field kinds
+and their operators (`OPS_FOR_KIND`):
+
+| Kind | Operators | Notes |
+|---|---|---|
+| `tag` | is / is not | Value picked from a dropdown of real library values (genre, studio, network, actor, collection, content rating, resolution, …) |
+| `text` | contains / does not contain | Title, episode title — substring match |
+| `int` | is / ≥ / ≤ | Year, decade, ratings, duration (minutes), play count, … |
+| `date` | ≥ / ≤ | Release / air date, last watched — a date picker |
+| `recency` | is | "Added within N days" |
+| `bool` | is | true/false — unwatched, in progress, HDR, Dolby Vision, … |
+
+For a **tag** field the value box becomes a dropdown populated live from your libraries — the
+`channels.filterValues` endpoint unions the distinct tag titles across the enabled libraries of the
+selected content types. Tag values are matched **by title**, then resolved to the per-library key at
+query time (each library keys its tags differently), so you pick "Comedy" and Airwave finds the right
+key in each library.
+
+## AND / OR and nesting
+
+The builder is a **recursive predicate tree**. Each group combines its children with **all (AND)** or
+**any (OR)**; a group can hold conditions *and* nested sub-groups, so you can express
+`Genre is Comedy AND (Year ≥ 1990 OR Studio is HBO)`. The resolver
+(`packages/api/src/services/plex/resolve.ts`) evaluates this with **set algebra**: it runs each leaf
+as a simple Plex query and combines results in code — **intersect** for AND, **union** for OR. That's
+why arbitrary nesting works even though the media server only understands simple operators. An
+all-conditions AND group is optimized into a single query (the fast path).
+
+> **UI nesting cap.** The resolver handles *any* depth, but the builder only offers the **Add group**
+> button at the root (`filter-builder.tsx`), so through the UI you get one level of sub-groups. That's
+> enough for the vast majority of channels; deeper trees are only reachable via import or the API.
+
+## Movies vs TV — where a field applies
+
+Movies resolve at the movie level; **TV resolves at the episode level**. Airwave uses the media
+server's dotted advanced-filter syntax so a single query mixes both levels: `show.genre`,
+`episode.resolution`, and so on (`filter-fields.ts` `tvScope`, applied in `buildParam`). The practical
+consequences:
+
+- **Genre lives on the *show*, not the episode.** `genre` resolves as `show.genre`; there is no such
+  thing as an episode genre. Filtering TV by genre filters by the parent series' genre.
+- Some fields are **episode-level**: resolution, audio/subtitle language, release/air date, added-within,
+  HDR/DoVi, unwatched/in-progress. On TV these describe the individual episode.
+- A field can be scoped to one library type (`appliesTo`). "Network" is show-only; "Duration (min)"
+  is movie-only; "Episode title" / "Episode year" are TV-only. A field that doesn't apply to a given
+  library type is simply skipped for it.
+
+## Other definition kinds
+
+The data model reserves other ways to define a pool — `PLEX_COLLECTION`, `PLEX_PLAYLIST`, and
+`MANUAL_ITEMS` (explicit include/exclude of specific items) — see `ChannelDefinitionKind` in
+`packages/db/prisma/schema/channel.prisma`. **The current admin builder and resolver implement the
+`PREDICATE` (filter) path only**; collection/playlist/manual definitions are scaffolding for later and
+aren't yet selectable in the UI. (Note: the *strategy* "Filtered set" scope described under
+[Strategies](/docs/channels/strategies) is a grouping concept, not a Plex collection.)
+
+## Previewing the pool
+
+On the channel page, the **Preview** card shows what the filter currently resolves to — shows with
+their episode counts coalesced up, movies passed through (`channels.preview` →
+`resolveChannel`). Use **Refresh preview** after editing the filter to re-resolve against the server.

@@ -1,0 +1,34 @@
+---
+title: The schedule
+description: How a channel's filter/ordering recipe becomes a materialized, deterministic timeline — the initial windowed build, generate/extend, and the jobs that grow and heal it.
+---
+
+A channel's filter/ordering is only the *recipe*; the **schedule** is the materialized timeline the
+guide and players actually read — rows in `ScheduleItem`, each a program (or bumper) with a start
+time and duration.
+
+**On create**, Airwave builds a **windowed initial schedule** inline (`channels.create` →
+`generateChannelSchedule` with `windowSeconds = INITIAL_WINDOW_SECONDS`, ~12h) so the channel is
+watchable immediately instead of waiting for a job — but capped, so a huge pool doesn't lay a 300-day
+pass up front. A build capped mid-pass records a **resume cursor** so later extensions continue from
+that exact item rather than replaying the top of the pool. If the inline build fails, the channel is
+simply left for the backfill job to pick up.
+
+**Generate schedule** (on the channel page → Schedule card, `channels.generateSchedule`) does a **full
+rebuild** from *now*: at least one complete pass of the pool (every item scheduled), looping whole
+passes — each reshuffled for a Shuffle channel — until it covers a ~7-day floor. This **replaces** the
+timeline, so use it after you change the filter, ordering, or strategy. **Extend**
+(`channels.extendSchedule`) is the non-disruptive counterpart: it appends a fresh block at the tail and
+leaves what's on now untouched.
+
+**Growing and healing** the schedule over time is handled by background jobs — see
+[Background jobs](/docs/jobs):
+
+| Job | Cadence | Role |
+|---|---|---|
+| **Schedule Backfill** (`schedule-backfill`) | every 10 min | Builds the *initial* schedule for enabled channels that have none (in batches). Picks up freshly created/auto-generated channels. |
+| **Schedule Refresh** (`schedule-refresh`) | hourly | For each enabled channel, appends at the tail *only when the timeline is running low* (`extendChannelSchedule`, ~2-day threshold). Continues mid-pass from the stored cursor. |
+| **Bumper Sync** (`schedule-bumper-sync`) | every 10 min | Reconciles a schedule with the current bumper settings when the channel's mode/rev falls behind. Also kicked immediately when you save a channel's bumper mode. |
+
+Because the build is deterministic and seed-driven, all of these reproduce a consistent lineup: a
+rebuild, an extension, and a repair all lay the same items in the same order for a given seed.

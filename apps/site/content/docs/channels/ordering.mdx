@@ -1,0 +1,24 @@
+---
+title: Ordering
+description: The base order of the pool — Shuffle (seeded, deterministic, reshuffled per pass) or Sorted by a field and direction.
+---
+
+The **Options** section sets the base order of the pool. Two user-facing choices:
+
+- **Shuffle** — the pool is shuffled. The shuffle is a **seeded, deterministic** Fisher–Yates over a
+  stable base order (ratingKey-sorted, so it never depends on the server's return order), and it
+  **reshuffles per pass** so a looping channel doesn't repeat the same sequence every lap
+  (`timeline.ts` `seededShuffle` / `passOrder`).
+- **Sorted by…** — pick a **sort field** and **direction**. The pool is ordered by that field and the
+  scheduler preserves it exactly. Sort fields come from `sort-fields.ts` (`channels.sortFields`):
+  Title, Year, Release / air date, Critic/Audience/Personal rating, Content rating, Duration, Plays,
+  Date added, Date viewed, Resolution, Bitrate.
+
+Internally these map to the `ordering` enum: Shuffle → `SHUFFLE`, Sorted → `IN_ORDER` (with
+`sortField`/`sortDir`). A legacy `BY_AIR_DATE` value still exists in the enum but isn't offered as a
+distinct option in the current UI. For a sorted TV channel remember the level rule: `releaseDate`
+sorts episodes by *their* air date; a sorted movie channel sorts by the movie's own field.
+
+An optional **strategy** layers grouping and rotation on top of this base order — see
+[Strategies](/docs/channels/strategies). With no strategy, the channel simply plays its
+pool in the order set here.

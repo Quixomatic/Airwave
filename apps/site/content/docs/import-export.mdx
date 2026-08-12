@@ -1,0 +1,129 @@
+---
+icon: ArrowRightLeft
+title: "Import / Export"
+description: "Move a lineup — packages, channels, and filters — between Airwave instances."
+---
+
+
+Export every package + channel + filter from one Airwave instance as a portable JSON file, then import it into another to recreate the same lineup — without touching anything instance-specific.
+
+## Overview
+
+Airwave's lineup lives in three related tables: `ChannelPackage` (the top-level groupings), `Channel` (the numbered channels), and each channel's `ChannelDefinition` rows (the filters that decide what plays). Import/Export moves that *authoring* — packages, channels, and their filters — between two instances. It is the "share a lineup" / "migrate to a new box" feature for a self-hosted, source-available service.
+
+What deliberately **does not** travel is everything an instance rebuilds locally:
+
+- the **media-source binding** (which Plex/media server a channel resolves against — the target picks its own),
+- the **materialized schedule** (regenerated on the target from the channel's filters),
+- the **media metadata cache** (`MediaItem` rows — repopulated by the target's own sync),
+- the **schedule-pass cursor / horizon state** (per-instance scheduling bookkeeping).
+
+The reason: those are all functions of *this* server's Plex connection and clock. A filter like "genre = Comedy on the Movies library" is portable; the specific `ratingKey`s it matched on the source server are not. So the export carries the *intent* (field+value filters, library-by-name) and the target re-resolves it against its own Plex at import time.
+
+History: see `CHANGELOG.md` (v0.9.16 → v0.9.20).
+
+## Export
+
+Source: `packages/api/src/services/transfer/export.ts` (`exportLineup`), surfaced by the `transfer.export` tRPC query in `packages/api/src/routers/transfer.ts`. The web upload/download page is `apps/web/src/routes/_auth/settings/transfer/index.tsx`, which serializes the query result to `airwave-lineup-<date>.json`.
+
+The exported object (`LINEUP_EXPORT_VERSION = 1`) is:
+
+```
+{
+  version, exportedAt,
+  packages: [{ key, name, description, icon, tint, sortIndex }],
+  channels: [{
+    number, name, callsign, description, icon, tint, enabled,
+    sortIndex, ordering, sortField, sortDir, bumperMode,
+    packageKey,                 // ← how a channel names its package
+    definitions: [{
+      kind, mode, sortIndex,
+      plexFilter,               // field+value filter tree (portable)
+      plexLibraryTitle,         // ← library by NAME, not key
+      plexCollectionKey, plexPlaylistKey, manualItemKeys   // per-server ids
+    }]
+  }]
+}
+```
+
+Two reference-survival tricks make it portable across servers:
+
+- **Channel → package by `key`.** A channel carries `packageKey` (`c.package?.key`), never a database id. Package keys are stable, human-meaningful slugs, so the importer can match/reuse a package by key on the target (`export.ts:56`).
+- **Definition → library by title.** Library keys differ per server, so the exporter looks up each definition's `plexLibraryKey` in the source's `MediaLibrary` table and writes the human **title** instead (`plexLibraryTitle`, `export.ts:63`). The importer remaps that title back to a key on the target.
+
+What's *omitted* is enforced simply by what `exportLineup` selects — there is no `mediaSourceId`, no schedule, no media-cache, no cursor in the output. `plexCollectionKey` / `plexPlaylistKey` / `manualItemKeys` are still written "for completeness," but as the file header notes they reference per-server ids and the importer drops them (see PREDICATE-only below).
+
+## Import — staging
+
+Before anything is written, an upload is annotated against *this* instance so the admin can pick and choose. This is read-only.
+
+Flow (all in `apps/web/src/routes/_auth/settings/transfer/`):
+
+1. `index.tsx` parses the uploaded JSON client-side, calls `transfer.importPreview` (a **mutation**, not a query, so the file rides the POST body rather than a length-limited URL — `transfer.ts:65`), and stashes the parsed file + preview in a module singleton (`apps/web/src/features/transfer/staging.ts`). That singleton survives SPA navigation but not a hard refresh — so the preview page redirects home when it's empty.
+2. `import-preview.tsx` renders the pick-and-choose grid: one `FramePanel` tile per package, each with a package-level select-all toggle over its channels, and a per-channel toggle row.
+
+The preview payload is built by `previewImport` in `packages/api/src/services/transfer/import.ts`. Per channel it computes a `ChannelPreview` with these warning flags (rendered as an amber hover-card in `ChannelRow`, `import-preview.tsx:186`):
+
+- `droppedKinds` — non-PREDICATE definitions (collection/playlist/manual) that won't survive import.
+- `willBeDisabled` — no PREDICATE definition remains, so the channel would have an empty pool and imports **disabled**.
+- `numberInUse` — the channel's number already exists here, so it'll be reassigned.
+- `libraryUnmatched` — a filter targets a `plexLibraryTitle` this instance doesn't have; it'll fall back to searching all libraries.
+- `duplicate` — an identical channel already exists here (same content signature); it'll be skipped on import.
+
+The preview also reports whether the target `source` is `ready` (enabled, has a base URL, and has synced media items — `import.ts:273`) and whether the file's `version` is `supported`. The staging screen gates the Import button on a ready source and on the workflow engine being available (`transfer.importAvailable`). Duplicates default their toggle **off** and can't be selected (they're skipped regardless), so re-importing the same file is opt-in per channel rather than a wall of no-ops (`import-preview.tsx:35`).
+
+## Import — rules
+
+The deterministic plan is built by `planImport` (`import.ts:335`) — reads only, no writes — and applied by `executePackagePlan` / `executeChannelPlan`. Three rules govern portability:
+
+**PREDICATE-only.** Only `kind === "PREDICATE"` definitions are imported. Collection/playlist/manual definitions reference per-server ids that mean nothing on the target, so they're filtered out (`import.ts:365`, and flagged as `droppedKinds` in staging). PREDICATE filters are field+value trees, matched by title against the target's Plex, so they carry across.
+
+**Disabled-on-no-predicate.** If stripping non-portable definitions leaves a channel with zero PREDICATE definitions, it has nothing to schedule. It still imports (name, number, appearance preserved) but with `enabled = false` (`plan.disabled`, applied at `import.ts:587`). Staging warns via `willBeDisabled`.
+
+**Number collision → probe upward.** Channel numbers are preserved when free, otherwise bumped to the next free number, assigned in two passes over the channels being created (`import.ts:400`):
+
+1. Pass 1 — any channel whose original number isn't already taken keeps it (processing ascending original number, so lower numbers claim their spot first).
+2. Pass 2 — collisions probe upward: start at `originalNumber + 1` and increment past every reserved number.
+
+The `reserved` set starts from the numbers already on the instance and grows as the plan assigns, so assignments are unique *in-memory across the whole run* — even in dry-run, so the reported numbers are accurate. Only channels that will actually be created consume numbers; duplicates and non-selected channels don't. Packages follow a parallel rule: reuse an existing package by `key`, else create one **preserving the file's key** (not a fresh slug, unlike the AI generator — `executePackagePlan`, `import.ts:455`).
+
+## Dedup
+
+Idempotency is James's explicit design call: drop the same file twice and the second import is a no-op.
+
+Channels dedupe by a **content signature** (`signatureParts`, `import.ts:91`) built from:
+
+```
+(name, package key, ordering, sortField, sortDir, canonicalized plexFilter(s))
+```
+
+Notably it **excludes the channel number** and all appearance-only fields (icon, tint, description, callsign). Identical content is "the same channel" even if its number differs. When a field is omitted from the file, the signature fills in the same defaults `createChannel` uses (`DEFAULT_ORDERING = "SHUFFLE"`, `DEFAULT_SORT_FIELD = "title"`, `DEFAULT_SORT_DIR = "asc"` — `import.ts:56`) so an imported channel matches an equivalent local one that was created with defaults.
+
+The filter is canonicalized via a deterministic JSON stringify (`canonicalJson`, `import.ts:66`) that recursively sorts object keys and drops `undefined`, so two filter trees that are structurally equal but written key-in-different-order hash identically. The per-channel filters are themselves sorted before hashing, so definition order doesn't change the signature.
+
+Matching:
+
+- **Packages** dedupe by `key` — reused, never duplicated (`action: "reuse"`).
+- **Channels** dedupe by signature. `loadExistingSignatures` (`import.ts:151`) hashes every existing channel; an imported channel whose signature is in that set gets `action: "skip-duplicate"` and is reported "identical channel already exists."
+- A **partial** match is not a duplicate. Same name but an edited filter → different signature → imports as a new channel (with the number probe). `previewImport` computes both sides' signatures the same way, so staging's "already imported" flag agrees with what the import brains actually do.
+
+## Dry-run
+
+A `dryRun` toggle on the staging screen threads through `transfer.import({ dryRun })` → the workflow args → the import brains. When on, the workflow runs **end-to-end for real** but skips every persisting write:
+
+- `planImport` runs fully — dedupe, number assignment (reserving in-memory), library remap.
+- Each channel's PREDICATE filter is **resolved against the target's Plex** (`resolveDryRunPool`, `import.ts:503`) to compute a true pool size — INCLUDE defs add, EXCLUDE defs remove, deduped by `ratingKey`, the same combining the real build does. This surfaces the real match count and catches filters that match nothing.
+- Trace rows are still written (`recordImportTrace`) so the run page shows live progress.
+- But no package, channel, or schedule is created — `executePackagePlan` and `executeChannelPlan` short-circuit before every write when `dryRun` is set (`import.ts:465`, `import.ts:558`).
+
+Its purpose: validate the workflow engine + observability on a *deployed* build (testing means a tagged release onto TrueNAS) without importing anything, and give a deeper preview than the fast structural staging screen. The run page banners "DRY RUN — nothing was imported."
+
+## How it executes
+
+The actual import runs as a **durable WDK workflow**, not inline in the request. `transfer.import` dispatches it through a runner registered at server startup (`packages/api/src/services/transfer/import-runner.ts` — an indirection so `packages/api` can trigger a workflow that lives in `apps/server` without importing it), and returns a `runId` the staging page navigates to.
+
+The workflow is `importLineupWorkflow` in `apps/server/workflows/import.ts`: `planStep → createPackagesStep → buildChannelStep ×N (fan-out, concurrency 4) → reportStep`. It's the same durable machinery as the AI lineup workflow minus the AI — the plan is deterministic and each build step just creates the channel + its PREDICATE definitions and lays a windowed initial schedule (`generateChannelSchedule`) so the channel is watchable immediately; the hourly refresh grows it afterward. Build steps are retry-safe: because `planImport` assigns numbers from the free set, a unique-constraint hit (P2002) on an assigned number means a prior attempt already created that channel, so it's treated as already-created rather than failing the run (`import.ts:629`).
+
+Steps write `ImportTrace` rows (`import-trace.ts` / `import-runs.ts`) that power the multi-tier run page at `/settings/workflows/import/$runId` (packages tier over channels tier, live-polling, dry-run banner).
+
+Note: the durable-execution mechanics — `"use workflow"` vs `"use step"`, checkpointing, retries, why editing a workflow requires re-running `bunx workflow build` and a server restart — are shared with the AI lineup builder and documented in **[`docs/workflows.md`](/docs/workflows)** rather than repeated here. (The separate in-process job scheduler is covered in [`docs/jobs.md`](/docs/jobs).)

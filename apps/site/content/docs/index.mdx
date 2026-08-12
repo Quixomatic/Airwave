@@ -1,25 +1,32 @@
 ---
+icon: BookOpen
 title: Introduction
-description: What Airwave is and how the documentation is organized.
+description: What Airwave is, and how this documentation is organized.
 ---
 
-Welcome to the **Airwave** documentation.
+import { Cards, Card } from "fumadocs-ui/components/card";
 
-Airwave is a self-hostable service that turns your Plex library into custom, always-on **live-TV
-channels** — a real channel guide, DVR, and bumpers, streamed directly from your own Plex to native
-apps on webOS, Apple TV, iPad, Android TV, and Fire TV.
+**Airwave** is a self-hostable service that turns your Plex library into custom, always-on **live-TV
+channels** — a real channel guide, DVR, and bumpers — streamed directly from your own Plex to native
+apps on webOS, Apple TV, iPad, Android TV, and Fire TV. It's free and self-hosted: you run the server,
+there's no subscription.
 
-> This documentation is a work in progress. Pages here are scaffolding — the real guides (install,
-> channel building, self-hosting, clients) land as we build them out from the existing `docs/` guides.
+You build channels from **metadata filters** over your library ("90s comedies", "everything Studio
+Ghibli", "unwatched sci-fi"), Airwave lays each one onto a continuous, deterministic timeline, and
+your viewers channel-surf it like cable — joining whatever's on *now*, mid-program, at the correct
+offset.
 
-## Sections (coming soon)
+## Start here
 
-- **Getting started** — stand up the server, connect Plex, build your first channels.
-- **Channels** — the flexible channel model, ordering, strategies, and bumpers.
-- **Clients** — webOS, Apple TV, iPad, Android TV, Fire TV.
-- **Self-hosting** — Docker, TrueNAS, remote playback.
+<Cards>
+  <Card title="Quick Start" href="/docs/getting-started" description="Zero to watching — connect a source, build a channel, add viewers, and tune in." />
+  <Card title="Media sources" href="/docs/sources" description="Connect your Plex server, enable libraries, and sync metadata." />
+  <Card title="Channels" href="/docs/channels" description="Build a channel from a filter — ordering, grouping/rotation strategies, and its schedule." />
+</Cards>
 
-## A quick test
+## What's here (and what's coming)
 
-This page proves the docs pipeline works end-to-end: MDX authoring, the sidebar tree, table of
-contents, and search are all live.
+These docs cover **using** Airwave and **how it works** internally. Still to be written up: the apps
+and their stacks, the deterministic scheduling engine, the `effectiveTime`/DVR playback model, bumpers
+& ambient music, and the self-hosting/Docker deploy. For install today, see the project
+[README](https://github.com/Quixomatic/Airwave).

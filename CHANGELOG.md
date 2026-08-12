@@ -2,6 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.75] - 2026-08-12
+
+### Added
+
+- **`apps/site` docs: the `docs/` guides are now a live fumadocs documentation site at `/docs`.** All
+  twelve guides were migrated into `content/docs` as MDX (frontmatter titles/descriptions, internal
+  `.md` links rewritten to `/docs/*` routes, root-README links pointed at GitHub). The information
+  architecture uses **non-clickable separator headings** (Getting Started · Using Airwave · How it
+  works) with top-level pages, and **Channels is its own expanded folder-section** — the big channels
+  guide is split into an overview index page plus `filters`, `ordering`, `strategies`, and `schedule`
+  sub-pages (the folder-index pattern, `defaultOpen`). High-level pages get **Lucide sidebar icons**
+  (via a `loader` icon resolver — Quick Start → Rocket, Channels → Tv, etc.); sub-pages stay icon-less.
+  The nav wordmark is the **Airwave `Logo`** rebuilt from the admin app. **Media support** is wired for
+  the screenshots/videos to come: markdown images render through fumadocs' `ImageZoom` (zoomable,
+  auto-sized `next/image` via fumadocs-mdx), plus a styled `<Video>` MDX component; the existing
+  screenshot set is copied into `public/screenshots/`. `next build` is green (22 static routes) and the
+  docs sidebar, search, and a sample screenshot all render.
+
 ## [0.9.74] - 2026-08-12
 
 ### Changed

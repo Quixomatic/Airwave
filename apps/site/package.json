@@ -1,6 +1,6 @@
 {
   "name": "site",
-  "version": "0.9.74",
+  "version": "0.9.75",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,6 +14,7 @@
     "fumadocs-core": "^16.14.3",
     "fumadocs-mdx": "^15.2.3",
     "fumadocs-ui": "^16.14.3",
+    "lucide-react": "catalog:",
     "next": "^16.3.0",
     "react": "catalog:",
     "react-dom": "catalog:"

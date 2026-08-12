@@ -1,0 +1,19 @@
+{
+  "pages": [
+    "---Getting Started---",
+    "index",
+    "getting-started",
+    "---Using Airwave---",
+    "sources",
+    "channels",
+    "packages",
+    "users-and-access",
+    "ai-assistant",
+    "sessions",
+    "import-export",
+    "---How it works---",
+    "jobs",
+    "workflows",
+    "capability-diagnostic"
+  ]
+}
