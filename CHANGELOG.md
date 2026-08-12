@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.87] - 2026-08-12
+
+### Fixed
+
+- **`apps/site`: the marketing mobile menu was empty.** Every top-nav link (Documentation, Features, Channel
+  guide, FAQ, Resources) was set to `on: "nav"` — which, per fumadocs, is "only displayed on navbar, not
+  mobile menu" — so the hamburger menu on the home/marketing pages had nothing in it. That flag was there for
+  a different reason: to stop the links duplicating into the docs sidebar. `baseOptions()` is shared by both
+  layouts, so it's now context-aware: the **home** layout leaves `on` unset (the fumadocs default shows links
+  in both the navbar and the mobile menu), while the **docs** layout keeps `on: "nav"` (navbar-only, no
+  sidebar duplication — it has its own switcher).
+
 ## [0.9.86] - 2026-08-12
 
 ### Changed

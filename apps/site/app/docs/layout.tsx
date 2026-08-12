@@ -46,7 +46,7 @@ const sidebarTabs = [
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
-    <DocsLayout tree={source.getPageTree()} tabs={sidebarTabs} {...baseOptions()}>
+    <DocsLayout tree={source.getPageTree()} tabs={sidebarTabs} {...baseOptions("docs")}>
       {children}
     </DocsLayout>
   );

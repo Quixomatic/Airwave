@@ -6,24 +6,28 @@ import { Logo } from "@/components/logo";
  * the header is identical across `/`, `/about`, `/faq`, and `/docs`. The wordmark is the Airwave brand mark
  * (rebuilt from the admin app's `Logo`).
  */
-export function baseOptions(): BaseLayoutProps {
+export function baseOptions(context: "home" | "docs" = "home"): BaseLayoutProps {
+  // The DOCS layout pins links to the navbar only (`on: "nav"`) so they don't duplicate into the docs
+  // sidebar, which has its own switcher (see `app/docs/layout.tsx` sidebar tabs). The HOME/marketing layout
+  // leaves `on` unset — the fumadocs default shows links in BOTH the desktop navbar and the mobile hamburger
+  // menu. (Using `on: "nav"` everywhere is what emptied the marketing mobile menu: per fumadocs, `on: "nav"`
+  // is "only displayed on navbar, not mobile menu".)
+  const on = context === "docs" ? ("nav" as const) : undefined;
   return {
     nav: {
       title: <Logo />,
     },
     // Keep the marquee items top-level; tuck the secondary ones behind a native fumadocs "Resources" menu.
     // The logo (nav title) links home to `/` by default.
-    // `on: "nav"` keeps each item in the TOP NAV only — not duplicated in the docs sidebar menu, which now
-    // has its own switcher (see `app/docs/layout.tsx` sidebar tabs).
     links: [
-      { text: "Documentation", url: "/docs", on: "nav" },
-      { text: "Features", url: "/features", on: "nav" },
-      { text: "Channel guide", url: "/channel-guide", on: "nav" },
-      { text: "FAQ", url: "/faq", on: "nav" },
+      { text: "Documentation", url: "/docs", on },
+      { text: "Features", url: "/features", on },
+      { text: "Channel guide", url: "/channel-guide", on },
+      { text: "FAQ", url: "/faq", on },
       {
         type: "menu",
         text: "Resources",
-        on: "nav",
+        on,
         items: [
           { text: "Blog", description: "News + the occasional dev-log", url: "/blog" },
           { text: "About", description: "Why Airwave exists", url: "/about" },
