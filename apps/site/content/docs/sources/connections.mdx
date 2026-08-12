@@ -1,0 +1,63 @@
+---
+title: "Connections"
+description: "The LAN, remote, and relay URLs a source stores, the hourly refresh that keeps them current, and how a TV probes them to stream from off-network."
+---
+
+The Airwave server always talks to Plex over the LAN `baseUrl` — it runs next to Plex, so that path
+is fast and is used **for all of the server's own fetches** (libraries, metadata, playback
+resolution). The other two URLs exist only so a **client** — a TV app that's away from home — can
+still reach the media server directly to stream.
+
+## The three URLs
+
+A `MediaSource` stores three connection URLs (`packages/db/prisma/schema/media-source.prisma`):
+
+| Field | Meaning |
+|---|---|
+| `baseUrl` | LAN / local URL — the server uses this for everything, and it's the client's first choice. |
+| `remoteUrl` | The Plex remote/WAN connection (an HTTPS `plex.direct` URL). Requires Plex **Remote Access** to be enabled on the server. |
+| `relayUrl` | Plex Relay — the last-resort fallback, bandwidth-limited (~2 Mbps). |
+
+`remoteUrl` and `relayUrl` come from Plex's `/resources` listing. `pickConnectionUrls`
+(`packages/api/src/services/plex/client.ts`) prefers the HTTPS `plex.direct` forms so an HTTPS
+client stays mixed-content-safe: `remoteUrl` is the first non-local, non-relay connection; `relayUrl`
+is the first relay connection.
+
+## Keeping them fresh
+
+A home's WAN IP drifts, so a remote URL captured at connect time goes stale. The
+**`plex-connection-refresh`** job re-resolves both URLs **hourly**
+(`packages/api/src/services/jobs/definitions.ts`): for each enabled source with a
+`machineIdentifier`, it calls `resolveConnectionUrls`, matches the server in the current
+`/resources` response by `machineIdentifier`, and writes the fresh `remoteUrl` / `relayUrl` back to
+the row. plex.tv's `/resources` always reflects the server's present WAN IP, so the remote URL a TV
+gets is never stale. The URLs are also captured best-effort at
+[save time](/docs/sources/connecting) — the hourly job is what keeps them right afterward.
+
+## How a client uses them
+
+The server hands a client the three URLs and lets it decide which to stream from:
+
+- **`GET /api/v1/connections`** (`apps/server/src/rest.ts`) returns
+  `{ local, remote, relay }` for the default enabled Plex source (ordered `isDefault` first, then
+  oldest). **No token is included** — the token is added only at playback-resolve time, so this is
+  never a credential leak.
+- The TV app **probes local → remote → relay** at launch and picks the first reachable one.
+- It then passes its pick as `GET /api/v1/channels/:id/media?…&network=remote|relay`. The playback
+  broker (`resolveMedia`, `packages/api/src/services/playback/broker.ts`) stamps that connection's
+  base onto the returned stream URL via `clientBaseUrl`, while the server's own metadata fetch still
+  goes over `baseUrl`. Any `network` value other than `remote` / `relay` — or a requested URL that
+  isn't stored — falls back to **local**.
+
+So the split is clean: the **server** always fetches over `baseUrl`; only the **base stamped onto
+the client's stream URL** changes for an off-network TV. The owner token is baked into that URL by
+the server, so the client never handles it directly.
+
+> **Testing the off-network path on your LAN.** Force-Remote usually can't work from inside the
+> network (NAT hairpinning), so to verify the non-local path, force **Relay** instead — it's proven
+> to work from on-network. This is a client-app testing note, not a source setting.
+
+---
+
+See also: [Connecting a server](/docs/sources/connecting) · [Background jobs](/docs/jobs) ·
+[Token security](/docs/sources/token-security)

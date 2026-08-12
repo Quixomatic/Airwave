@@ -1,0 +1,161 @@
+---
+title: "Formats tested"
+description: "The full CAP_MATRIX — every container, video codec, audio codec, HDR mode, performance rung, subtitle, and edge case the diagnostic measures, and what each maps to."
+---
+
+Everything keys off one table: `CAP_MATRIX` in
+`packages/api/src/services/capabilities/matrix.ts`. Each entry is one test — an `id`, a `category`, a
+`container`, a `video`/`audio` codec key, an optional `feature` or `subtitle`, a human `diagnostic`
+label, and an ffmpeg recipe. The clip generator, the server manifest, and both TV apps all read from
+this one list, so **adding a test is a one-line change that propagates everywhere**.
+
+The matrix is deliberately **axis-comprehensive** (every container / video codec / audio codec /
+feature / subtitle) **plus the cross-combos that actually break** — E-AC3, DTS, and Dolby Vision are
+sensitive to whether they sit in MKV vs MP4, so those pairings are tested in both.
+
+## Fabricated vs real samples
+
+Two ways a clip comes to exist:
+
+- **Fabricated by ffmpeg** — `apps/server/scripts/gen-capability-media.ts` builds a ~5-second clip
+  from a single master source, driven entirely by `CAP_MATRIX`. Run on a box with a full ffmpeg
+  (libx265, libsvtav1, libvpx-vp9, plus the `truehd`/`dca` encoders):
+
+  ```
+  bun --env-file=.env run scripts/gen-capability-media.ts <master> <outdir>
+  ```
+
+- **Real sample (`realSample: true`)** — formats ffmpeg **can't** fabricate, because they carry
+  proprietary or dynamic metadata (Dolby Vision, HDR10+, DTS-HD MA, Atmos, PGS/VobSub image subs).
+  The generator skips these; you drop a real clip of that filename in by hand to cover those rows.
+
+Of the ~49 entries, **39 are ffmpeg-fabricated and 10 are real samples**. Three details keep the
+fabricated clips *honest* (so the measurement isn't a false positive):
+
+- **Audio is synthesized, not copied from the master.** The script builds a 5.1 tone bed once (a
+  distinct pitch per channel via `sine=…join=inputs=6:channel_layout=5.1`), so every audio-codec
+  test encodes *real multichannel* audio regardless of the master — and you can verify surround by
+  ear.
+- **Non-HDR clips are tonemapped to 8-bit SDR BT.709.** The master is 10-bit HDR PQ/BT.2020; without
+  normalizing, the HDR transfer would ride along on clips meant to be plain SDR and confuse TV
+  decoders. HDR10 clips instead get explicit `-x265-params hdr10=1:…`.
+- **8-bit codecs pin `yuv420p`.** Otherwise libx264/libx265 emit High-10/Main-10 from the 10-bit
+  master, which real TV hardware decoders reject with error 4 even though desktop software decoders
+  accept it — exactly the false positive the whole exercise exists to avoid.
+
+## Containers (`cont_*`)
+
+Baseline H.264/AAC in each container, to isolate demuxer support. MP4 is the control.
+
+| Test id | Container | Video / Audio | Source | Notes |
+| --- | --- | --- | --- | --- |
+| `cont_mp4` | MP4 | H.264 / AAC | ffmpeg | Control: MP4 baseline |
+| `cont_mkv` | MKV | H.264 / AAC | ffmpeg | MKV demuxer |
+| `cont_ts` | MPEG-TS | H.264 / AAC | ffmpeg | MPEG-TS demuxer |
+| `cont_mov` | MOV | H.264 / AAC | ffmpeg | QuickTime MOV |
+| `cont_avi` | AVI | MPEG-4 (DivX) / MP3 | ffmpeg | Legacy AVI/DivX |
+| `cont_webm` | WebM | VP9 / Opus | ffmpeg | WebM (VP9/Opus) |
+| `cont_flv` | FLV | H.264 / AAC | ffmpeg | Flash FLV demuxer |
+
+Container tokens map to their Plex aliases in `native-caps.ts`: `mp4` covers `m4v`, `ts` covers
+`mpegts`.
+
+## Video codecs (`vid_*`)
+
+Each in MKV, with HEVC Main10 and AV1 *also* tested in MP4 because the container changes the answer.
+The **Plex token** column is what a decoded clip credits; `null` means the variant must *not* credit
+base support.
+
+| Test id | Codec / profile | Container | ffmpeg encoder | Source | Plex token |
+| --- | --- | --- | --- | --- | --- |
+| `vid_h264_mkv` | H.264 8-bit | MKV | libx264, `yuv420p` | ffmpeg | `h264` |
+| `vid_h264_10_mkv` | H.264 Hi10P (10-bit AVC) | MKV | libx264, `yuv420p10le` | ffmpeg | `null` (never credits base H.264) |
+| `vid_hevc_mkv` | HEVC 8-bit | MKV | libx265, `yuv420p`, `hvc1` | ffmpeg | `hevc` |
+| `vid_hevc_10_mkv` | HEVC Main10 | MKV | libx265, `yuv420p10le`, `hvc1` | ffmpeg | `hevc` |
+| `vid_hevc_10_mp4` | HEVC Main10 | MP4 | libx265, `yuv420p10le`, `hvc1` | ffmpeg | `hevc` |
+| `vid_av1_mkv` | AV1 | MKV (Opus) | libsvtav1 | ffmpeg | `av1` |
+| `vid_av1_mp4` | AV1 | MP4 (AAC) | libsvtav1 | ffmpeg | `av1` |
+| `vid_vp9_webm` | VP9 | WebM (Opus) | libvpx-vp9 | ffmpeg | `vp9` |
+| `vid_mpeg2_ts` | MPEG-2 (broadcast/DVD) | MPEG-TS (AC3) | mpeg2video | ffmpeg | `mpeg2video` |
+
+## Audio codecs (`aud_*`)
+
+Each over H.264 video in MKV, so a silent-audio result is unambiguous. E-AC3 is tested in **both**
+MKV and MP4 — the container-sensitivity that bit us. Surround codecs (AC3/E-AC3/DTS/TrueHD/FLAC) are
+encoded from the synthesized 5.1 tone bed. Plex names get folded to one token by
+`canonicalAudioCodec()` (`dca`/`dca-ma` → `dts`, `ec-3` → `eac3`, `mlp` → `truehd`).
+
+| Test id | Codec | Container | ffmpeg encoder | Source | Plex token |
+| --- | --- | --- | --- | --- | --- |
+| `aud_aac` | AAC | MKV | aac | ffmpeg | `aac` |
+| `aud_ac3` | AC3 (Dolby Digital) | MKV | ac3 | ffmpeg | `ac3` |
+| `aud_eac3_mkv` | E-AC3 in MKV | MKV | eac3 | ffmpeg | `eac3` |
+| `aud_eac3_mp4` | E-AC3 in MP4 | MP4 | eac3 | ffmpeg | `eac3` |
+| `aud_dts` | DTS Digital Surround | MKV | dca (`-strict -2`) | ffmpeg | `dts` |
+| `aud_truehd` | Dolby TrueHD (lossless) | MKV | truehd (`-strict -2`) | ffmpeg | `truehd` |
+| `aud_flac` | FLAC (lossless) | MKV | flac | ffmpeg | `flac` |
+| `aud_alac` | ALAC | MKV | alac | ffmpeg | `alac` |
+| `aud_opus` | Opus | MKV | libopus | ffmpeg | `opus` |
+| `aud_pcm` | PCM (raw) | MKV | pcm_s16le | ffmpeg | `pcm` |
+| `aud_dtshd` | DTS-HD Master Audio | MKV (HEVC) | — | **real sample** | `dts` |
+| `aud_atmos_eac3` | Atmos (E-AC3 JOC) | MP4 (HEVC) | — | **real sample** | `eac3` |
+| `aud_atmos_truehd` | Atmos (TrueHD) | MKV (HEVC) | — | **real sample** | `truehd` |
+
+## HDR / color (`hdr_*`)
+
+HEVC Main10 video throughout. Only HDR10 is generatable (via explicit `-x265-params`); dynamic-metadata
+and broadcast HDR need real samples.
+
+| Test id | Feature | Container | Source | Notes |
+| --- | --- | --- | --- | --- |
+| `hdr_hdr10_mkv` | HDR10 | MKV (AC3) | ffmpeg | `-x265-params hdr10=1:…` |
+| `hdr_hdr10_mp4` | HDR10 | MP4 (E-AC3) | ffmpeg | HDR10 in MP4 |
+| `hdr_hdr10plus` | HDR10+ dynamic metadata | MKV | **real sample** | — |
+| `hdr_hlg` | HLG (broadcast HDR) | MKV | **real sample** | — |
+| `hdr_dv_p5_mp4` | Dolby Vision Profile 5 | MP4 | **real sample** | — |
+| `hdr_dv_p8_mp4` | Dolby Vision Profile 8.1 | MP4 | **real sample** | — |
+| `hdr_dv_p7_mkv` | Dolby Vision Profile 7 | MKV (TrueHD) | **real sample** | Usually rejected in MKV |
+
+HDR verdicts are marked `manual` in the matrix (whether HDR *renders correctly* is a subjective axis
+the auto-probe can't verify), so the automatic run measures decode but doesn't assert the HDR result.
+
+## Performance ladder (`perf_*`)
+
+HEVC/AAC in MKV at a rising resolution + bitrate, to find the panel's decode ceiling — all
+ffmpeg-fabricated.
+
+| Test id | Feature | Notes |
+| --- | --- | --- |
+| `perf_1080p60_10m` | 1080p60 @ 10 Mbps | HFR baseline |
+| `perf_4k30_40m` | 4K30 @ 40 Mbps | Standard 4K |
+| `perf_4k60_80m` | 4K60 @ 80 Mbps | 4K60 streaming tier |
+| `perf_4k60_120m` | 4K60 @ 120 Mbps | 4K decode ceiling |
+| `perf_8k60_150m` | 8K60 @ 150 Mbps | 8K raster + network limit |
+
+## Subtitles (`sub_*`)
+
+Text subs are generatable; image subs (which force software rendering) need real samples.
+
+| Test id | Subtitle | Container | Source | Notes |
+| --- | --- | --- | --- | --- |
+| `sub_srt` | SRT text | MKV | ffmpeg | — |
+| `sub_ass` | ASS/SSA styled | MKV | ffmpeg | — |
+| `sub_pgs` | PGS image subs | MKV (HEVC) | **real sample** | SW-render torture |
+| `sub_vobsub` | VobSub image subs | MKV | **real sample** | — |
+
+## Edge cases (`edge_*`)
+
+| Test id | Feature | Container / codec | Source | Notes |
+| --- | --- | --- | --- | --- |
+| `edge_interlaced` | 1080i interlaced | MPEG-TS / MPEG-2 / AC3 | ffmpeg | De-interlace path |
+| `edge_anamorphic` | Non-square pixels (SAR) | MP4 / H.264 | ffmpeg | `setsar=32/27` |
+| `edge_tracks_30` | 30 audio tracks | MKV / H.264 | ffmpeg | Demuxer stress |
+| `edge_hfr_120` | 120 fps | MKV / HEVC | ffmpeg | Panel refresh ceiling |
+
+## Baking the clips into the image
+
+The fabricated clips are frozen into a tarball and published on the private `media-v1` GitHub
+release. The Docker build stages it into the image (`gh release download media-v1 -p
+capability-media.tar.gz`), extracts it, and sets `CAP_MEDIA_DIR`. **No ffmpeg and no release token
+ever live in the running image** — the clips are pre-generated and simply unpacked. If the tarball
+is absent the image still builds; the diagnostic clips are just missing.

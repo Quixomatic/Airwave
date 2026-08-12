@@ -1,0 +1,67 @@
+---
+title: "Creating a package"
+description: "Create and edit a package — its author-controlled fields, the slugified key, and where a new package sorts."
+---
+
+Packages are created and edited from the admin panel's **Packages** page. There's no viewer path — every
+procedure in `packages/api/src/routers/packages.ts` is an `adminProcedure`.
+
+## The fields you control
+
+A package has four author-controlled fields, the same on create and edit:
+
+- **Name** (required) — e.g. "Kids & Family".
+- **Description** (optional) — a short line describing the lineup.
+- **Icon** and **tint** — chosen together in the `IconTintField`
+  (`apps/web/src/features/icons/icon-tint-field.tsx`). The icon is stored as a namespaced string like
+  `"lucide:Sparkles"`; the tint is stored as an accent-palette **key** (see
+  [Icon & tint](/docs/packages/styling)).
+
+Everything else on the row — the `key`, `sortIndex`, and the two provenance flags — is derived by the
+server, not entered by hand.
+
+## Creating
+
+**UI:** `apps/web/src/routes/_auth/packages/new.tsx`, reached from the **New package** button on the
+list page. Submitting calls `trpc.packages.create`. On the server (`packages.ts` → `create`):
+
+- The `name` is **slugified** and de-duplicated into a unique `key`. `slugify` lowercases, replaces
+  runs of non-alphanumerics with `-`, and falls back to `"package"` for an all-symbol name; `uniqueKey`
+  then appends `-2`, `-3`, … on collision. So two packages named the same still get distinct, stable
+  slugs (e.g. `kids-family` and `kids-family-2`).
+- **`sortIndex`** is set to `max(sortIndex) + 1` — a new package sorts to the **end** of the list.
+- **`tint`** is coerced through `toAccentKey` (`packages/api/src/services/accents.ts`), which folds any
+  legacy or hand-entered value to a valid accent key (default `slate`) so the stored value is always
+  paintable. An empty tint stays `null`.
+
+The `key` is what the preset generator upserts against and what the "Regenerate channels" action keys on
+— it stays stable across edits and regens even as the name changes.
+
+## Editing
+
+**UI:** `apps/web/src/routes/_auth/packages/$packageId.tsx` → `trpc.packages.update`. The edit form
+("Edit package" frame) changes the same four fields. `update` does **not** re-slug the `key` — renaming a
+package keeps its original slug and id, so nothing that references it breaks.
+
+The detail page also carries the actions covered elsewhere: the read-only channel list with a per-channel
+enable switch (see [Assigning channels](/docs/packages/assigning-channels)), a **Regenerate channels**
+button that appears only for preset packages (see [Provenance](/docs/packages/provenance)), and **Delete**.
+
+## Deleting
+
+Delete prompts *"Delete this package? Its channels stay but become unassigned."* — matching the schema's
+`onDelete: SetNull` on `Channel.packageId`. `remove` simply deletes the `channelPackage` row; Postgres
+nulls the `packageId` on every channel that pointed at it, so those channels survive as
+[ungrouped](/docs/packages/access) channels.
+
+## Listing, searching, sorting
+
+The list page (`apps/web/src/routes/_auth/packages/index.tsx`) drives `packages.list` entirely through
+URL params, so a filtered view is linkable:
+
+- **Search** (`q`) — case-insensitive `contains` over name and description.
+- **Filter → Type** (`gen`) — provenance filter: *Auto (preset)* / *AI-generated* / *Manual* (see
+  [Provenance](/docs/packages/provenance)).
+- **Sort** (`sort` + `dir`) — by **Order** (`sortIndex`, the default), **Name**, or **Channels** (the
+  channel count). Each row shows the package's icon tile, name, provenance badge, description, and channel
+  count.

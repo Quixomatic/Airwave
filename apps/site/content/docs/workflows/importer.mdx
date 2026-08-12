@@ -1,0 +1,61 @@
+---
+title: "The importer"
+description: "The durable Import workflow — how an uploaded lineup is deduped, numbered, and rebuilt against your own media server, with an end-to-end dry-run that skips every write."
+---
+
+The importer is the execution half of [Import / Export](/docs/import-export). Once you upload a
+lineup file and pick which packages and channels to bring in, the staging **Import** button dispatches
+a durable [Workflow SDK](/docs/workflows) run that recreates them on your instance — resolving each
+channel's filter against *your* media server as it goes. It uses the same durable machinery as the
+[AI lineup builder](/docs/workflows/lineup-builder), **minus the AI**: no library analysis, no
+planner call, no per-channel agent loop.
+
+Entry point is `importLineupWorkflow(args)` in `apps/server/workflows/import.ts`.
+
+## The steps
+
+1. **`planStep`** — a **deterministic** plan (dedupe + number assignment + library remap), reads
+   only. It traces each duplicate it will skip.
+2. **`createPackagesStep`** — create or reuse (by key) every needed package.
+3. **`buildChannelStep` ×N** — create the channel plus its `PREDICATE` filter definitions and lay a
+   windowed schedule so it's watchable immediately. Fanned out in waves of `BUILD_CONCURRENCY = 4` —
+   lower than the AI builder's, because schedule generation (~30s/channel) is the slow step here.
+4. **`reportStep`** — summarize the outcome into an `ImportReport` (the run's return value).
+
+Because the plan step already deduplicates and each build's create is idempotent against existing
+rows, the importer gets the fan-out safety of the AI builder's [reserve-don't-check
+guard](/docs/workflows/lineup-builder) for free — there is no expensive agent loop to duplicate.
+
+## Dry-run
+
+The importer's distinctive feature is **dry-run** (`args.dryRun`). The whole workflow runs
+end-to-end *for real* — it validates, resolves every channel's filter against Plex to report true
+pool sizes, and writes trace rows so the run page shows live progress — but **skips every persisting
+write**. Nothing is created; you get an honest preview of exactly what a real import would do.
+
+This is how a deployed build (on TrueNAS, say) gets validated before you commit an import. The run
+page banners the `dryRun` flag so a dry run is never mistaken for the real thing.
+
+## What travels, and what doesn't
+
+The importer only rebuilds the *authoring* — packages, channels, and their filters. Everything an
+instance regenerates locally is deliberately left behind and rebuilt on your box: the media-source
+binding (the target picks its own), the materialized schedule (regenerated from the filters), the
+media-metadata cache, and the per-instance scheduling cursor. The full file format and the round-trip
+rules are documented in [Import / Export](/docs/import-export).
+
+## Source map
+
+| Concern | File |
+|---|---|
+| Workflow orchestrator + steps | `apps/server/workflows/import.ts` |
+| Reusable import brains (`planImport`, dedupe/remap) | `packages/api/src/services/transfer/import.ts` |
+| Runner registry (dispatch + poll) | `packages/api/src/services/transfer/import-runner.ts` |
+| Trace + run read model (observability) | `packages/api/src/services/transfer/import-trace.ts`, `import-runs.ts` |
+| Export / import file format | [Import / Export](/docs/import-export) |
+
+---
+
+See also: [Import / Export](/docs/import-export) (the file format and the round-trip) ·
+[Observability](/docs/workflows/observability) (watching an import run) ·
+[Channels](/docs/channels) (what a rebuilt channel is).

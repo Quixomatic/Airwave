@@ -1,0 +1,6 @@
+{
+  "title": "Capability Diagnostic",
+  "icon": "Gauge",
+  "defaultOpen": true,
+  "pages": ["how-it-works", "formats-tested", "device-overrides"]
+}

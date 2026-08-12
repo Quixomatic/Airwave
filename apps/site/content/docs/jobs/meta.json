@@ -1,0 +1,6 @@
+{
+  "title": "Background Jobs",
+  "icon": "CalendarClock",
+  "defaultOpen": true,
+  "pages": ["catalog", "lifecycle", "controls"]
+}

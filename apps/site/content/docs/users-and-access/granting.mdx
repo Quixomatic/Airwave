@@ -1,0 +1,61 @@
+---
+title: "Granting access"
+description: "The admin Access UI — the master switch, the package/channel grid, and how Save translates back to grants."
+---
+
+An admin manages a viewer's access from the **Users** area
+(`apps/web/src/routes/_auth/users/`). The three [access levels](/docs/users-and-access/access-model)
+are hidden behind a simple switch-and-grid editor — you check what the viewer should see, and Save
+translates the selection back into grant rows.
+
+![The admin Users page](/screenshots/admin-users.webp)
+
+## The Users area
+
+| Route | What it is |
+| --- | --- |
+| `users/index.tsx` | The list — the "Import Plex Users" button and a per-user badge ("All access" or "N of M channels"). |
+| `users/new.tsx` | Create an email + password viewer (`users.create`). |
+| `users/$id/index.tsx` | The profile — summarizes what the user can see. |
+| `users/$id/access.tsx` | The access editor grid. Admins show as "always full access, nothing to configure." |
+
+The list badge comes from `users.list`, which resolves each _restricted_ user's `accessCount` (how
+many **enabled** channels they can actually see); admins and all-access users skip the resolve and
+show as unrestricted.
+
+## The editor grid
+
+The editor maps the three levels onto plain switches:
+
+- A master **"All packages & channels"** switch bound to `allAccess`. **On** → the viewer sees
+  everything (including future content) and the grid is hidden. **Off** → the grid appears,
+  pre-populated with everything currently selected.
+- Each package tile has a **header switch** plus per-channel toggles. Ungrouped channels appear in
+  their own section.
+- **"Reset to all access"** flips the master switch back on.
+
+## How Save translates to grants
+
+On **Save**, the selected set is translated back into grant rows (the `save()` in `access.tsx`,
+calling `trpc.users.setAccess` → `setUserAccess`):
+
+| Selection | Becomes |
+| --- | --- |
+| A package with **all** its channels selected | `UserPackageAccess` `FULL` — future channels included |
+| A package with **some** selected | `UserPackageAccess` `PARTIAL` + explicit `UserChannelAccess` rows for the checked channels |
+| Selected **ungrouped** channels | Explicit `UserChannelAccess` rows |
+| `allAccess` on | Grant rows cleared entirely (they're moot) |
+
+`setUserAccess` runs as a **single `prisma.$transaction`**: it sets `allAccess`, deletes the prior
+grant rows, and recreates them from the payload — a "stage → apply once" replace, never a
+diff-and-patch. Because grant rows are cleared whenever `allAccess` is on, toggling all-access back
+_off_ later starts from a clean, all-selected grid.
+
+## Source map
+
+| Concern | File |
+| --- | --- |
+| Admin users UI (list, new, profile, access grid) | `apps/web/src/routes/_auth/users/**` |
+| Users / access router (`list`, `create`, `delete`, `getAccess`, `setAccess`) | `packages/api/src/routers/users.ts` |
+| Read the config + catalog for the grid | `packages/api/src/services/access/access.ts` (`getUserAccess`) |
+| Replace the config in one transaction | `packages/api/src/services/access/access.ts` (`setUserAccess`) |

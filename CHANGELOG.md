@@ -2,6 +2,30 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.76] - 2026-08-12
+
+### Added
+
+- **Comprehensive documentation build-out — the docs site grows from 22 to 63 pages.** Each major subject
+  now gets the folder-with-subpages treatment (an overview "meta" page plus focused deep-dives), authored by
+  a fan-out of research agents that read the actual source (routers, services, admin routes, DB schema) plus
+  the master plan, changelog, and session summaries — not guessed:
+  - **Sources** → connecting · libraries · metadata-sync · connections · token-security · managing
+  - **Packages** → creating · assigning-channels · styling · provenance · access · guide-lenses
+  - **Users & access** → importing · access-model · enforcement · admin-lockout · granting
+  - **Bumpers** *(new topic)* → interstitials · ambient-music · configuration · scheduling
+  - **Background jobs** → catalog (all 15 scheduled jobs) · lifecycle · controls
+  - **Workflows** → lineup-builder · importer · observability
+  - **Capability diagnostic** → how-it-works · formats-tested (the full CAP_MATRIX) · device-overrides
+  - **Settings** *(new)* → an admin-area map + general/AI-connections subpages, cross-linking (not
+    duplicating) the sections that already have dedicated docs
+  - **Self-hosting** *(new)* → docker · configuration (the full `.env` reference) · roles (`CG_ROLE`) ·
+    updating — built from the real `docker-compose.yml`/`.env.example`/publish workflow
+  - New top-level **Platforms** (the support matrix) and **Architecture** (the parts + data flow) pages.
+- Sidebar polish: non-clickable separator headings (Getting Started / Using Airwave / How it works),
+  Lucide icons on every high-level section, folders `defaultOpen`, and the old flat guide pages retired in
+  favor of the folders. `next build` is green (63 static routes).
+
 ## [0.9.75] - 2026-08-12
 
 ### Added

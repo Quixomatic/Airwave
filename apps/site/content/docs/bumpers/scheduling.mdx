@@ -1,0 +1,84 @@
+---
+title: Scheduling
+description: How bumpers are materialized into a channel's timeline, the rev-based Bumper Sync reconcile job, and why only structural settings rebuild schedules while music and style are playback-only.
+---
+
+Bumpers aren't decided at play time — they're **baked into the schedule**. When Airwave materializes a
+channel's [timeline](/docs/channels/schedule), it weaves interstitial breaks in as their own slots, so
+the guide and players read them straight from `ScheduleItem` rows.
+
+## How a bumper lands in the timeline
+
+During a schedule build (`packages/api/src/services/schedule/timeline.ts`), the engine first resolves
+the channel's **break plan** — `resolveBumperPlan(globalConfig, channel)`. If that returns null
+(bumpers globally off, or the channel's mode is Off) no breaks are woven and the timeline is
+programs-only. Otherwise an interstitial is inserted **before each program**, with two rules:
+
+- **Never before the very first slot** of the build — so tuning into a mid-stream channel isn't greeted
+  by a break.
+- **Each break targets the program that follows it** — that upcoming item is the "Up Next" the
+  [interstitial card](/docs/bumpers/interstitials) renders.
+
+Each break's length is chosen contextually by `breakSeconds` from the outgoing→incoming pair (see
+[Interstitials](/docs/bumpers/interstitials)). The resulting slot is a `ScheduleItem` with:
+
+| Field | Value on a bumper |
+|---|---|
+| `kind` | `BUMPER` |
+| `ratingKey` | `null` — nothing streams; the client renders the card |
+| `bumperKind` | `"interstitial"` |
+| `targetMediaItemId` | the upcoming program's `MediaItem` (the "Up Next") |
+
+## The `rev` stamp and Bumper Sync
+
+Because breaks are baked in, a settings change has to *reach* already-built schedules. That's handled by
+a version stamp:
+
+- The global `BumperConfig` has a **`rev`** counter. A full schedule build stamps the channel's
+  **`Channel.bumperRev`** with the rev it built under (`generate.ts`).
+- Changing a **structural** setting increments `rev`, making every channel built under the old rev
+  **stale**.
+
+The **Bumper Sync** job (`schedule-bumper-sync`) reconciles the stragglers. It runs **every 10 minutes**
+in batches of 10 channels (and is kicked immediately when you save a channel's bumper mode, or a
+structural global change lands). A channel is **out of sync** when either:
+
+1. Whether bumpers *should* be present differs from whether they *are* — i.e. bumpers were toggled on/off
+   globally or the channel's mode changed; or
+2. Bumpers are present as they should be, but the channel's `bumperRev` is behind the global `rev` —
+   which catches *any* structural settings change (break-length tiers, the short-episode threshold, …).
+
+For each stale channel it does a full `generateChannelSchedule`, which re-weaves the breaks and
+re-stamps `bumperRev`. Batching keeps a lineup-wide change from rebuilding everything at once; the cron
+picks up the rest on the next passes. Bumper Sync only touches channels that **already have a
+schedule** — the initial build for a new channel is [Schedule Backfill](/docs/channels/schedule)'s job.
+
+## Structural vs playback-only
+
+Not every setting rebuilds schedules — the update handler (`packages/api/src/routers/bumpers.ts`) bumps
+`rev` **only** when a structural field actually changed value:
+
+| Structural (rebuilds schedules) | Playback-only (no rebuild) |
+|---|---|
+| `enabled` (master switch) | Ambient music: `musicEnabled`, `musicVolume`, fades |
+| Break lengths + `shortEpisodeMinutes` | Interstitial card style |
+| — | Deprecated `interstitialMusicKey` |
+| — | The track library (upload / toggle / rename / delete) |
+
+The reason: only bumper **presence** and **durations** are baked into the timeline. Everything else —
+the ambient bed (DVR-derived client-side), the card's look — is read by the client at play time. So
+flipping bumper music on or off, or nudging its volume, takes effect on the next break **without
+regenerating a single schedule**. Toggling breaks on/off or retuning a break length **does** rebuild,
+via the flow above.
+
+## The music scan job
+
+Separately, **Scan Bumper Music** (`bumper-music-scan`) is a **manual** job that reconciles the
+[music library](/docs/bumpers/ambient-music) with its volume — indexing files dropped straight into the
+folder, flagging tracks whose file went missing, and clearing the flag on any that reappear. It has
+nothing to do with schedules; run it after adding files to the volume by hand.
+
+---
+
+See also: [The schedule](/docs/channels/schedule) · [Background jobs](/docs/jobs) ·
+[Configuration](/docs/bumpers/configuration) · [Interstitials](/docs/bumpers/interstitials)

@@ -1,0 +1,42 @@
+---
+title: "Packages & access"
+description: "Why grouping channels into packages matters beyond cosmetics — a FULL package grant is one of only two ways new content reaches a restricted viewer automatically."
+---
+
+Packages are the unit of the per-user access model. This page is the package-side summary; the full
+picture — the resolver, enforcement, and the admin granting UI — is in
+[Users & access](/docs/users-and-access).
+
+## The link: `UserPackageAccess`
+
+A grant is a `UserPackageAccess` row (`packages/db/prisma/schema/access.prisma`) tying a user to one
+package at one of two modes:
+
+- **FULL** — every channel in the package, **including channels added to it later**. This is the crux
+  of packages-as-access: file a new channel into a package and every viewer with FULL access picks it
+  up automatically, with no admin follow-up.
+- **PARTIAL** — only the specific channels explicitly granted to that user
+  (`UserChannelAccess`). Channels added to the package later are **not** granted automatically.
+
+Above both sits `User.allAccess` (default `true`), which grants everything including all future packages
+and channels. A restricted user (`allAccess = false`) with **no** grant rows sees nothing.
+
+## Why packages matter for access
+
+**FULL package access and all-access are the only two ways new content reaches a restricted viewer
+automatically.** Every other case — a PARTIAL package, or a package the user simply isn't granted —
+requires an admin to grant each new channel explicitly.
+
+**Ungrouped channels** (a `Channel` with `packageId = null`) are the sharp edge here: there's no package
+to hang a FULL grant on, so a restricted user can only receive them **one at a time** via
+`UserChannelAccess`, and a newly added ungrouped channel is auto-granted only to all-access users. If you
+want new channels to flow to a restricted audience without ongoing admin work, put them in a package
+those viewers hold FULL access to.
+
+## Enforcement is server-side
+
+Deleting a package doesn't revoke anything on its own — its `UserPackageAccess` rows are removed with it,
+and the channels become ungrouped. All access is resolved server-side and woven into every viewer-facing
+REST read plus the playback gate; hiding a channel in a client is never what protects it. See the access
+doc's [Enforcement](/docs/users-and-access#enforcement) section for the resolver
+(`accessibleChannels`) and where it's applied.

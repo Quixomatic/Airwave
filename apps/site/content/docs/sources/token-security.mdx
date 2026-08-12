@@ -1,0 +1,76 @@
+---
+title: "Token security"
+description: "The Plex owner token encrypted at rest, its dependency on BETTER_AUTH_SECRET, the boot backfill, and how to recover after a secret rotation."
+---
+
+The Plex **owner token** (`MediaSource.token`) is the single most sensitive value Airwave stores —
+it authenticates every metadata and playback call to your server, for every viewer. It is stored
+**encrypted at rest** and used decrypted, and it never leaves the server.
+
+## Encrypted at rest
+
+`packages/api/src/services/plex/token.ts` enforces one invariant: the token is **stored encrypted,
+used decrypted**.
+
+- **Encrypt at the one write site.** [`saveConnection`](/docs/sources/connecting) runs the token
+  through `encryptToken` before writing the row — the only place a token is written.
+- **Decrypt at every Plex-call boundary.** A loaded source row is passed through
+  `withDecryptedToken` (or `decryptToken` on the field) right before it's handed to
+  `plex/client.ts`. Jobs, the playback broker, and library sync all do this.
+- **Clients never see the bare token.** The server bakes it into `X-Plex-Token=…` on the URLs it
+  hands out, so it's a **server-only** secret. It is deliberately excluded from `sources.list` /
+  `sources.get`.
+
+The crypto is **AES-256-GCM** (`packages/api/src/services/crypto.ts`). The stored shape is
+`` `ivB64:tagB64:ctB64` `` — a 12-byte IV, the ciphertext, and the 16-byte GCM auth tag, all
+base64. A raw Plex token is a single colon-free string, so this three-segment shape is an
+unambiguous marker for "already encrypted" (`looksEncrypted`).
+
+Because it runs server-side via `node:crypto`, encryption has **no secure-context / HTTPS
+requirement** — plain-HTTP LAN deployments are unaffected (that constraint only applies to browser
+`crypto.subtle`).
+
+## The key comes from BETTER_AUTH_SECRET
+
+There is **no separate encryption env var**. The key is derived as `sha256(BETTER_AUTH_SECRET)`, so
+the same secret that signs auth sessions also protects the token (and the AI provider key, encrypted
+the same way).
+
+The consequence is the one thing to remember: **rotating `BETTER_AUTH_SECRET` makes every existing
+token undecryptable.** `decryptToken` fails **loudly** rather than returning garbage — it throws:
+
+> Failed to decrypt the Plex owner token. Has BETTER_AUTH_SECRET changed since the source was
+> connected? Re-connect the Plex source to fix.
+
+## Reconnecting after a rotate
+
+The fix is to **reconnect the source**. Because [`saveConnection`](/docs/sources/connecting) dedupes
+by `machineIdentifier`, running the Sign-in-with-Plex flow again and picking the same server
+**updates the existing row in place** with a freshly-encrypted token — no channels, schedules, or
+cached metadata are lost. Keep `BETTER_AUTH_SECRET` stable to avoid this entirely.
+
+## Legacy-plaintext tolerance and the boot backfill
+
+Token encryption was added after early deployments already stored plaintext tokens, so the code is
+tolerant of both:
+
+- **Decryption passes plaintext through.** A value that isn't in the encrypted shape is returned
+  as-is, so a deployment keeps working the instant the new build boots — before any migration runs,
+  and even if one never does.
+- **A one-time boot backfill.** `encryptExistingSourceTokens` runs at server startup: it scans every
+  `MediaSource`, skips rows already in the encrypted shape, and encrypts any still stored as
+  plaintext (idempotent — safe to run on every boot). It's also exposed as a standalone script,
+  `scripts/encrypt-source-tokens.ts`.
+
+## Catching a revoked token
+
+Separately from encryption, the **`plex-token-check`** job (daily 05:00,
+`packages/api/src/services/jobs/definitions.ts`) verifies each source's owner token still works by
+calling `getPlexUser`, and logs a warning if it's been revoked — so a broken connection surfaces
+early rather than at the next playback attempt. The fix is the same: reconnect the source to mint a
+fresh token.
+
+---
+
+See also: [Connecting a server](/docs/sources/connecting) · [Managing a source](/docs/sources/managing) ·
+[Background jobs](/docs/jobs)

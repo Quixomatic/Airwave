@@ -1,0 +1,70 @@
+---
+title: "Access model"
+description: "The three levels — all-access, FULL package, PARTIAL package + channels — and how future content flows (or doesn't)."
+---
+
+A viewer's effective access resolves to a **set of channel ids**. There are three levels of
+granularity, defined in `packages/db/prisma/schema/access.prisma` and the `User` model in
+`auth.prisma`. Each level differs mainly in **how future content reaches the viewer**.
+
+## Level 1 — All access (`User.allAccess`)
+
+`User.allAccess` is a boolean, **default `true`** for every new user. When true, the viewer sees
+**everything, including packages and channels added later.** This is the "just works" default: an
+imported or admin-created viewer sees the whole lineup until someone narrows them.
+
+## Level 2 — FULL access to a package
+
+A `UserPackageAccess` row with `mode = FULL` grants **every channel in that package, including
+channels added to it later.** This is how new content flows automatically without granting
+all-access: add a channel to a package, and everyone with FULL access to that package picks it up for
+free.
+
+## Level 3 — PARTIAL package + explicit channels
+
+A `UserPackageAccess` row with `mode = PARTIAL` grants **only** the specific channels listed for that
+user in `UserChannelAccess`. Channels added to the package later are **not** granted automatically —
+an admin has to come back and grant each new one.
+
+## The two grant tables
+
+Defined in `access.prisma`:
+
+| Table | Meaning |
+| --- | --- |
+| `UserPackageAccess` | One row per package the user has _some_ access to (`@@unique([userId, packageId])`), carrying `mode` (`FULL` or `PARTIAL`). **Absence of a row = no access to that package.** |
+| `UserChannelAccess` | An explicit per-channel grant (`@@unique([userId, channelId])`). Used for the channels of a PARTIAL package, and for ungrouped channels. |
+
+Both cascade on delete of the user, package, or channel, so grants clean themselves up.
+
+## How future content flows — the crux
+
+| Level | Future channels in that scope? |
+| --- | --- |
+| 1 — all-access | **Yes** — automatically, everywhere |
+| 2 — package FULL | **Yes** — automatically, within that package |
+| 3 — package PARTIAL | **No** — admin must grant each new channel |
+| No grant at all | **No** — the package and its channels stay invisible |
+
+Levels 1 and 2 are the **only** ways new content reaches a viewer without admin action.
+
+## Ungrouped channels
+
+A `Channel` with `packageId = null` has no package to hang a FULL grant on, so a restricted viewer can
+only receive it **individually** via `UserChannelAccess`. Consequently a newly-added ungrouped channel
+is auto-granted **only** to all-access (Level 1) viewers; restricted viewers keep exactly the ungrouped
+channels they were granted and must be re-granted when new ones appear.
+
+## The empty case
+
+A viewer with `allAccess = false` and **no** grant rows sees **nothing** — the resolver fails closed.
+This is intentional: restriction is opt-out from everything, then add back, never the reverse.
+
+## Source map
+
+| Concern | File |
+| --- | --- |
+| `UserPackageAccess`, `UserChannelAccess`, `PackageAccessMode` | `packages/db/prisma/schema/access.prisma` |
+| `User.allAccess` (default `true`), `User.role` | `packages/db/prisma/schema/auth.prisma` |
+| Resolver that turns the levels into a channel-id set | `packages/api/src/services/access/access.ts` (`accessibleChannels`) |
+| Packages & channels | [Packages](/docs/packages) · [Channels](/docs/channels) |

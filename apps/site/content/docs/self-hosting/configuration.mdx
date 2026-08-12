@@ -1,0 +1,143 @@
+---
+title: "Configuration"
+description: "The full .env reference for self-hosting Airwave — every variable, what it does, its default or example, and whether it's required."
+---
+
+Everything about a deployment is configured through a single **`.env`** file that
+`docker-compose.yml` reads. Copy `.env.example` to `.env`, fill it in, and deploy. This page documents
+**every variable**, grouped by concern.
+
+Required variables have no safe default — the stack won't work without them. Everything else is
+optional and shown with its default.
+
+## Image
+
+| Variable | What it does | Default / example | Required |
+|---|---|---|---|
+| `CG_IMAGE` | The published image to run. Pin a version for reproducible deploys, or track `latest`. | `ghcr.io/quixomatic/airwave:latest` | No |
+
+## Public URLs (browser + TV facing)
+
+These are the addresses your **browser and TV** actually use to reach the apps. They're **baked into
+the admin build** and drive auth + CORS, so they must be real, reachable addresses — a LAN IP or a
+domain with the **published** ports below. Do **not** use `localhost` unless you only ever browse from
+the host machine.
+
+| Variable | What it does | Default / example | Required |
+|---|---|---|---|
+| `SERVER_PUBLIC_URL` | Where the API/server is reachable (also the TV's server URL). Feeds `BETTER_AUTH_URL` and the admin's `VITE_SERVER_URL`. | `http://192.168.1.10:36020` | **Yes** |
+| `WEB_PUBLIC_URL` | Where the admin web is reachable. Feeds the server's `CORS_ORIGIN`. | `http://192.168.1.10:36021` | **Yes** |
+| `EXTRA_CORS_ORIGINS` | Extra admin origins to allow-list for CORS + auth beyond `WEB_PUBLIC_URL` — a comma-separated list of exact origins (scheme + host + port, no trailing slash). Use it when the admin is reachable at more than one address (e.g. a public HTTPS domain plus a LAN IP). | *(empty)* | No |
+
+## Published ports
+
+Host-side ports mapped to the fixed container ports (`3000` server, `3001` web). Each **must match**
+the port in the matching public URL above.
+
+| Variable | What it does | Default / example | Required |
+|---|---|---|---|
+| `SERVER_PORT` | Host port for the server → container `3000`. | `36020` | No (default `36020`) |
+| `WEB_PORT` | Host port for the admin web → container `3001`. | `36021` | No (default `36021`) |
+
+## Postgres
+
+The database credentials. `docker-compose.yml` builds the server's `DATABASE_URL` from these and points
+it at the `postgres` service by name.
+
+| Variable | What it does | Default / example | Required |
+|---|---|---|---|
+| `POSTGRES_USER` | Database user. | `channelguide` | **Yes** |
+| `POSTGRES_PASSWORD` | Database password — change it. | `change-me-please` | **Yes** |
+| `POSTGRES_DB` | Database name. | `channelguide` | **Yes** |
+
+## Auth & security
+
+| Variable | What it does | Default / example | Required |
+|---|---|---|---|
+| `BETTER_AUTH_SECRET` | Signing secret for sessions/tokens. Must be **32+ characters** of random data — generate with `openssl rand -base64 48`. | *(random string)* | **Yes** |
+| `ADMIN_EMAIL` | Email for the first admin, seeded on first boot. | `admin@example.com` | No (recommended) |
+| `ADMIN_PASSWORD` | Password for that first admin. Set **both** to seed the account. | `change-me` | No (recommended) |
+
+The admin seed runs on server startup: it creates the account once (if the email doesn't exist) and
+gives it the `admin` role, then on later boots just re-asserts the role. Leave both unset for a pure
+Plex/OAuth deployment — the seed becomes a no-op.
+
+## Runtime user & timezone
+
+Control the uid/gid the container writes as (so files land as your host's owner) and the timezone.
+Important on TrueNAS datasets and other bind-mounted storage.
+
+| Variable | What it does | Default / example | Required |
+|---|---|---|---|
+| `PUID` | User id the app process runs as (files are written as this owner). | `1000` | No (default `1000`) |
+| `PGID` | Group id the app process runs as. | `1000` | No (default `1000`) |
+| `UMASK` | File-creation mask for the app process. | `022` | No (default `022`) |
+| `TZ` | Timezone (also applied to Postgres). | `UTC` | No (default `UTC`) |
+
+## Bumper ambient music (optional)
+
+The bumper-music library persists via a volume mounted at the **fixed** container path
+`/data/bumper-music`. You choose only the **host** side.
+
+| Variable | What it does | Default / example | Required |
+|---|---|---|---|
+| `BUMPER_MUSIC_VOLUME` | Host side of the bumper-music mount. Unset = a Docker named volume (`channelguide_bumpermusic`). Set a bind path to manage the files from your host (drop tracks in, then "Scan folder" on the Bumpers page). | `/mnt/tank/apps/airwave/bumper-music` | No |
+
+## TV web player (optional)
+
+The 10-foot TV app served as an auth-gated **browser** web player. Off by default; enable it by adding
+`tvweb` to `COMPOSE_PROFILES`. See [Roles & the single image](/docs/self-hosting/roles). The installed
+webOS/Tizen apps need none of this (they're bearer-auth, origin-agnostic).
+
+| Variable | What it does | Default / example | Required |
+|---|---|---|---|
+| `COMPOSE_PROFILES` | Set to `tvweb` to bring up the optional TV web player service. | *(empty)* | No |
+| `TV_WEB_PUBLIC_URL` | Where the player is reachable in the browser. Also allow-listed on the server (as `TV_APP_ORIGIN`) for the TV login flow. | `http://192.168.1.10:36022` | Only if `tvweb` enabled |
+| `TV_WEB_PORT` | Host port for the player → container `3002`. | `36022` | No (default `36022`) |
+| `TV_SERVER_URL` | The server URL baked into the **player** build. Defaults to `SERVER_PUBLIC_URL`; override to point the player at its own public domain (e.g. reverse-proxied with `/api` forwarded) so the server itself can stay unexposed. | `https://airwave-tv.example.com` | No |
+
+## Social OAuth (optional)
+
+Set **both** the id and secret to enable a provider; leave blank to disable it.
+
+| Variable | What it does | Default / example | Required |
+|---|---|---|---|
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Enable Google sign-in. | *(empty)* | No |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | Enable GitHub sign-in. | *(empty)* | No |
+
+## Plex & AI workflow (optional)
+
+| Variable | What it does | Default / example | Required |
+|---|---|---|---|
+| `PLEX_CLIENT_IDENTIFIER` | A stable `X-Plex-Client-Identifier` for the Plex login handshake. | *(empty)* | No |
+| `WORKFLOW_ENABLED` | Set to `1` to enable the durable AI-lineup workflow engine (its Postgres schema is bootstrapped on start). Off by default. | *(empty)* | No |
+
+## Values compose derives for you
+
+You normally **don't set these directly** — `docker-compose.yml` builds them from the variables above
+and injects them per service. Listed here so you recognize them in logs and the compose file:
+
+| Variable | Where it comes from |
+|---|---|
+| `CG_ROLE` | Fixed per service (`server` / `web` / `tvweb`) — selects which app the image runs as. |
+| `DATABASE_URL` | Built from `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB`, pointed at the `postgres` service. |
+| `BETTER_AUTH_URL` | Set to `SERVER_PUBLIC_URL` (also decides the auth cookie's `SameSite`/`Secure` from its scheme). |
+| `CORS_ORIGIN` | Set to `WEB_PUBLIC_URL`. |
+| `VITE_SERVER_URL` | Baked into the admin build from `SERVER_PUBLIC_URL` (and the player build from `TV_SERVER_URL`). |
+| `TV_APP_ORIGIN` | Set to `TV_WEB_PUBLIC_URL` when the `tvweb` service is enabled. |
+| `BUMPER_MUSIC_DIR` | Fixed container path `/data/bumper-music` — leave it alone; pick the host side with `BUMPER_MUSIC_VOLUME`. |
+| `WORKFLOW_TARGET_WORLD` / `WORKFLOW_LOCAL_BASE_URL` / `WORKFLOW_POSTGRES_URL` | Defaulted / derived when `WORKFLOW_ENABLED=1`. |
+
+## Source map
+
+| Concern | File |
+|---|---|
+| Env reference (copy to `.env`) | `.env.example` |
+| Compose (where each var is consumed / derived) | `docker-compose.yml` |
+| Server env schema (validated at boot) | `packages/env/src/server.ts` |
+| Auth cookie scheme derivation | `packages/auth/src/index.ts` |
+
+---
+
+See also: [Docker quick start](/docs/self-hosting/docker) ·
+[Roles & the single image](/docs/self-hosting/roles) · [Updating](/docs/self-hosting/updating)

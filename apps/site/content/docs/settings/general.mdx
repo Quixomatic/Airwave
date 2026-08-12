@@ -1,0 +1,42 @@
+---
+title: "Settings: General"
+description: The General tab — your admin profile (display name and email) and the server-wide preferences planned to live here.
+---
+
+**General** (`/settings/main`) is the landing tab of Settings and holds your own account details. Opening
+`/settings` redirects here (`apps/web/src/routes/_auth/settings/main.tsx`).
+
+## Profile
+
+The **Profile** card is the one thing you can change today:
+
+- **Name** — your display name. Editable; **Save** is enabled only once you've actually changed it and
+  the field isn't blank. The update goes through better-auth, which owns the user record and session
+  (`authClient.updateUser`), so the change is reflected everywhere your name appears after a refresh.
+- **Email** — shown read-only. It comes from your account and isn't editable here.
+
+This is a per-admin profile, not an instance setting — it changes *your* name, not anyone else's.
+Managing other users (who can sign in, and what they can see) lives under
+[Users & access](/docs/users-and-access), not here.
+
+## General server preferences (planned)
+
+The tab also carries a **General** card that is currently a placeholder. It reads:
+
+> General server settings will live here — playback defaults, IPTV output, and appearance.
+
+Those are **planned** and not yet configurable — the card is a stub marking where server-wide
+preferences will land. Until they ship, playback behavior is decided per-client and by the schedule
+engine's defaults, and there's nothing on this card to set.
+
+## Source map
+
+| Concern | File |
+|---|---|
+| General tab (Profile + placeholder) | `apps/web/src/routes/_auth/settings/main.tsx` |
+| Profile update (name) | better-auth `authClient.updateUser` |
+| Settings layout + tabs | `apps/web/src/routes/_auth/settings.tsx` |
+
+---
+
+See also: [Settings](/docs/settings) · [Users & access](/docs/users-and-access)

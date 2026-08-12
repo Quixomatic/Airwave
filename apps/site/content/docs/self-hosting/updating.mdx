@@ -1,0 +1,88 @@
+---
+title: "Updating"
+description: "The Airwave release loop — pull a new image tag and restart, migrations apply themselves; plus how images are published to GHCR."
+---
+
+Updating a self-hosted Airwave is a two-command loop: pull a newer image and restart. Database
+migrations apply automatically when the `server` role boots, so you don't run anything by hand.
+
+## Update the stack
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+`pull` fetches the newer image; `up -d` recreates the containers on it. On restart the **`server`**
+role runs `prisma migrate deploy` before serving, so any schema changes in the new version roll forward
+on their own. The **`web`** role rebuilds the admin SPA (a minute or two) and serves the new build.
+
+> **Pin or track?** `CG_IMAGE=ghcr.io/quixomatic/airwave:latest` always pulls the newest release.
+> Prefer control? Pin a version — `CG_IMAGE=ghcr.io/quixomatic/airwave:0.6.30` — and bump it
+> deliberately when you want to update. Both are set in `.env`.
+
+## Image tags
+
+Each published release is tagged three ways, so you can be as specific as you like:
+
+| Tag | Example | Moves? |
+|---|---|---|
+| Full version | `0.6.30` | No — pinned, immutable. |
+| Major.minor | `0.6` | Follows the latest patch in that minor line. |
+| `latest` | `latest` | Follows the newest stable release. |
+
+Pre-release tags (a version containing `-`) publish the versioned tags but are **not** promoted to
+`latest`.
+
+## After updating
+
+- **Force a rebuild if you changed a public URL.** `VITE_SERVER_URL` is baked into the admin at the
+  `web` container's build. A version update recreates the container and rebuilds anyway, but if you
+  *only* edited `SERVER_PUBLIC_URL`, force it: `docker compose up -d --force-recreate web`, then
+  hard-refresh the browser.
+- **Migrations are forward-only and automatic.** There's no manual migration step; the `server` role
+  applies them on boot. Back up your Postgres volume before a major jump if you want a safety net.
+
+## How images are published (GHCR)
+
+Images are built and pushed to the GitHub Container Registry by
+`.github/workflows/docker-publish.yml`:
+
+- **On a pushed version tag** (`v*`, e.g. `git tag v0.6.30 && git push origin v0.6.30`) the workflow
+  builds a **multi-arch** image (linux/amd64 + linux/arm64 via QEMU) and publishes the
+  `{version}` / `{major}.{minor}` / `latest` tags to `ghcr.io/quixomatic/airwave`.
+- **Manually** (`workflow_dispatch`) it publishes a `sha-<short>` image for testing, without moving
+  `latest`.
+
+The build first pulls the frozen **capability-probe media** from the private `media-v1` release into
+the build context (so the TV capability diagnostic works out of the box), then bakes it in. No Plex or
+media tokens are ever embedded in the image.
+
+> The GHCR **package** is public even though the source repo is private — package visibility is
+> independent, so `docker compose pull` works without authenticating.
+
+## Build the image yourself
+
+You don't need to — the published image is the supported path — but you can:
+
+```bash
+# stage the capability-probe clips (baked in for the TV diagnostic), then build:
+gh release download media-v1 -p capability-media.tar.gz -D docker/cap-media
+docker build -t airwave:local .
+```
+
+Set `CG_IMAGE=airwave:local` in your `.env` to run the local build. If the capability media isn't
+staged, the image still builds — the diagnostic clips are simply absent.
+
+## Source map
+
+| Concern | File |
+|---|---|
+| GHCR publish / release workflow | `.github/workflows/docker-publish.yml` |
+| Image build (one artifact, roles) | `Dockerfile` |
+| Migrations on start (`server` role) | `docker/entrypoint.sh` |
+| Image tag in your deployment | `.env` (`CG_IMAGE`) |
+
+---
+
+See also: [Docker quick start](/docs/self-hosting/docker) ·
+[Configuration](/docs/self-hosting/configuration) · [Roles & the single image](/docs/self-hosting/roles)

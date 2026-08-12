@@ -1,0 +1,141 @@
+---
+title: "Docker quick start"
+description: "Grab the stack files, fill in .env, and bring Airwave up with docker compose — first boot, the seeded admin, and reaching the panel."
+---
+
+This walks the deploy end to end with `docker-compose.yml` and `.env.example` from the repo root. It
+works the same in a terminal (`docker compose`) or a UI like **Dockge** / **Portainer** — paste the
+compose and the env, then deploy.
+
+For what every variable means, see [Configuration](/docs/self-hosting/configuration). For why the same
+image runs as more than one service, see [Roles & the single image](/docs/self-hosting/roles).
+
+## 1. Grab the stack files
+
+You need two files from the repo root: **`docker-compose.yml`** and **`.env.example`**. In Dockge,
+create a stack and paste the compose in; in a terminal, drop both in a directory. The compose already
+points at the published image — you don't build anything.
+
+```yaml
+# docker-compose.yml — the three services (optional tvweb omitted)
+services:
+  postgres:   # postgres:16-alpine, healthchecked
+  server:     # CG_ROLE=server — API + TV REST, applies migrations
+  web:        # CG_ROLE=web — builds + serves the admin SPA
+```
+
+Both `server` and `web` run the same image, defaulting to
+`ghcr.io/quixomatic/airwave:latest` (override with `CG_IMAGE`).
+
+## 2. Fill in `.env`
+
+Copy `.env.example` to `.env` and set, at minimum:
+
+```bash
+# The addresses your BROWSER and TV actually use — LAN IP or domain + published ports.
+# NOT localhost (unless you only browse from the host). Baked into the admin build.
+SERVER_PUBLIC_URL=http://192.168.1.50:36020
+WEB_PUBLIC_URL=http://192.168.1.50:36021
+
+# Published host ports — must match the ports in the URLs above.
+SERVER_PORT=36020
+WEB_PORT=36021
+
+# Postgres + auth
+POSTGRES_PASSWORD=a-strong-password
+BETTER_AUTH_SECRET=change-me-to-a-long-random-string-at-least-32-chars
+
+# First admin, seeded on first boot
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=change-me
+
+# Match your host — important on TrueNAS datasets
+PUID=1000
+PGID=1000
+TZ=UTC
+```
+
+Generate the auth secret with:
+
+```bash
+openssl rand -base64 48
+```
+
+> **Get the public URLs right.** `SERVER_PUBLIC_URL` and `WEB_PUBLIC_URL` are **baked into the admin
+> SPA at build time** and drive auth + CORS, so they must be the addresses your browser and TV really
+> reach — a LAN IP or a domain, with the **published** ports. `localhost` only works from the host
+> machine. Getting these wrong is the most common first-deploy snag (see
+> [Gotchas](#gotchas-that-actually-bite)).
+
+## 3. Bring it up
+
+```bash
+docker compose up -d
+```
+
+Watch the logs on first boot — the sequence is:
+
+1. **Postgres** starts and passes its healthcheck.
+2. **`server`** runs `prisma migrate deploy` (builds the schema), seeds the first admin from
+   `ADMIN_EMAIL` / `ADMIN_PASSWORD`, then starts the API on container port `3000`. Its healthcheck
+   hits `/api/health`.
+3. **`web`** runs `vite build` with `SERVER_PUBLIC_URL` baked in — **this takes a minute or two on
+   first start** (the healthcheck has a generous start period) — then serves the SPA on container
+   port `3001`.
+
+The build-on-start for `web` is by design: each self-host lives at a different address, so the admin
+SPA is compiled for *your* server URL rather than shipped pre-baked.
+
+## 4. Sign in and connect Plex
+
+1. Open the admin at your **`WEB_PUBLIC_URL`** (e.g. `http://192.168.1.50:36021`).
+2. Sign in with the **`ADMIN_EMAIL` / `ADMIN_PASSWORD`** you set. That account is seeded on first boot
+   and given the `admin` role; it's your way in. Public sign-up is disabled — every other account is
+   admin-provisioned.
+3. From there, follow the [Quick Start](/docs/getting-started): connect your Plex
+   [source](/docs/sources), run a metadata sync, and build your first channel.
+
+> **The admin seed is optional but recommended.** If you leave `ADMIN_EMAIL` / `ADMIN_PASSWORD` unset
+> (e.g. a pure Plex/OAuth deployment), no admin is created — the seed is a no-op. The seed is also
+> **idempotent**: on later boots it just re-asserts the `admin` role, it doesn't reset the password.
+
+## 5. Watch
+
+Open a TV app and point it at the server. The native apps scan your LAN automatically; if that misses,
+enter `SERVER_PUBLIC_URL` by hand. Want a browser instead of a native app? Enable the optional
+**`tvweb`** role — see [Roles & the single image](/docs/self-hosting/roles).
+
+## Gotchas that actually bite
+
+These are the real snags from deploying on TrueNAS SCALE and plain-HTTP LANs:
+
+- **Wrong IP baked into the admin.** `VITE_SERVER_URL` is baked at the `web` container's **build,
+  which runs on every start**. If you fix a typo in `SERVER_PUBLIC_URL`, a plain restart isn't enough —
+  force a rebuild: `docker compose up -d --force-recreate web`, then hard-refresh the browser.
+- **TrueNAS Postgres permissions.** A `user: "1000:1000"` on the `postgres` service can fail on a
+  TrueNAS dataset (`mkdir: can't create '…/pgdata': Permission denied` — a dataset ACL overrides
+  POSIX). The fix that works is to **drop the `user:` line** so Postgres runs as its default and chowns
+  itself. The stock compose doesn't set `user:` on Postgres, so this only bites if you added one.
+- **Plain-HTTP LAN login already handled.** Over `http://` on a LAN IP, the auth cookie is
+  automatically issued `SameSite=Lax` (not `None;Secure`) — derived from the `BETTER_AUTH_URL` scheme —
+  because admin and server share a host. So LAN-IP-over-HTTP login works without any extra config. (An
+  HTTPS server keeps `SameSite=None;Secure`.)
+- **The `tvweb` service stays dormant by default.** It's gated behind `profiles: ["tvweb"]`, so
+  `docker compose up` won't start it unless you set `COMPOSE_PROFILES=tvweb`. That's intentional — see
+  [Roles](/docs/self-hosting/roles).
+
+## Source map
+
+| Concern | File |
+|---|---|
+| Compose stack | `docker-compose.yml` |
+| Env reference | `.env.example` |
+| Entrypoint (migrations, seed, role dispatch) | `docker/entrypoint.sh` |
+| First-admin seed | `packages/auth/src/lib/seed-admin.ts` |
+| Static SPA server (web / tvweb roles) | `docker/serve-web.ts` |
+
+---
+
+See also: [Configuration](/docs/self-hosting/configuration) ·
+[Roles & the single image](/docs/self-hosting/roles) · [Updating](/docs/self-hosting/updating) ·
+[Quick Start](/docs/getting-started)

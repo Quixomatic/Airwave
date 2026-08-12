@@ -1,0 +1,53 @@
+---
+title: "Provenance"
+description: "The generated and aiGenerated flags that sort packages into Auto / AI / Manual, and exactly what Refresh styling, Regenerate channels, and Clear AI touch."
+---
+
+Every package carries two independent boolean flags recording where it came from. Their combination
+defines three "types" the list page filters by (`packages.list`'s `gen` input, surfaced as the **Type**
+filter):
+
+| Provenance | Flags | Badge | Meaning |
+|---|---|---|---|
+| **Preset ("Auto")** | `generated = true` | `Auto` | Built by the static auto-lineup generator from the built-in preset catalog. |
+| **AI** | `aiGenerated = true` | `AI` | Built by the AI assistant / workflow. Tracked separately so it can be listed and cleanly reverted. |
+| **Manual** | both `false` | — | Hand-created by an admin. |
+
+The flags exist so automated rebuilds only ever touch their **own** rows and never clobber hand-made
+packages. A **manual** package is never touched by any regen or clear — it changes only when an admin
+edits or deletes it.
+
+## Refresh styling (all preset packages)
+
+List page → **Refresh styling** → `trpc.generator.regeneratePackages` (scope `"packages"` in
+`packages/api/src/services/generator/generate.ts`). It re-applies the preset catalog's **name,
+description, icon, tint, and sort order** to the `generated` packages via an `upsert` keyed on `key` —
+ids stay stable across regens. It **does not** add, remove, or change any channels; the confirm modal
+says exactly that. Use it after pulling a release that retunes the preset styling.
+
+## Regenerate channels (one preset package)
+
+Package detail page → **Regenerate channels**, shown only when `pkg.generated` is true →
+`trpc.generator.regeneratePackage({ packageKey })` (scope `{ packageKey }`). It rebuilds *one* preset
+package's channels: it `deleteMany`s the `generated` channels in that package and recreates them from
+the preset, **reserving** the numbers and callsigns already used by surviving manual channels so nothing
+collides. Each rebuilt channel also gets a windowed initial schedule so it's watchable immediately. A
+generated package that ends up with **zero** channels is dropped (`deleteMany` where
+`generated: true, channels: { none: {} }`). The confirm prompt warns *"Existing generated channels here
+are replaced."*
+
+Both regen paths flow through `generateLineup`, whose scopes are:
+
+- `"all"` — rebuild every generated package + channel.
+- `"packages"` — refresh only package metadata, leave channels (Refresh styling).
+- `{ packageKey }` — rebuild just that one package's channels (Regenerate channels).
+
+## Clear AI (undo the assistant's lineup)
+
+`clearAiGenerated` (`packages/api/src/services/agent/tools.ts`) is the one-shot undo of AI-made rows,
+exposed to the assistant as the `clear_ai_generated` tool and also run by a job. It deletes rows flagged
+`aiGenerated`; for the `packages` or `both` scope it first **un-assigns** the channels of AI packages
+(`packageId = null`) and then deletes the AI packages, returning `{ channelsDeleted, packagesDeleted }`.
+
+Because every one of these operations scopes strictly by flag, your hand-made packages and channels are
+never collateral.

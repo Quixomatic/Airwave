@@ -1,0 +1,6 @@
+{
+  "title": "Bumpers",
+  "icon": "Clapperboard",
+  "defaultOpen": true,
+  "pages": ["interstitials", "ambient-music", "configuration", "scheduling"]
+}

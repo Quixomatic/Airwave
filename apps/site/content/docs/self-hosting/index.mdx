@@ -1,0 +1,83 @@
+---
+title: "Self-hosting (Docker)"
+description: "Run Airwave on your own hardware — one prebuilt image, a Postgres database, and docker compose. The deploy model, prerequisites, and where each piece lives."
+---
+
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+Airwave is built to be **self-hosted**: you run the server next to your media, point it at a Plex
+library, and stream your own channels to the TV apps. There's nothing to sign up for and no hosted
+tier — the whole stack runs from a single prebuilt image plus a Postgres database.
+
+## The deploy model
+
+Everything ships as **one image, run several ways**. The published container
+(`ghcr.io/quixomatic/airwave`) is a single artifact; which app it becomes is chosen at runtime by the
+`CG_ROLE` environment variable:
+
+- **`server`** — the Bun API + the TV REST surface. Applies database migrations on start, then serves
+  the API that the admin panel and every TV client talk to.
+- **`web`** — the admin panel (a Vite SPA). Because each self-host lives at a different address, the
+  SPA is **built at container start** with your `SERVER_PUBLIC_URL` baked in, then served.
+- **`tvweb`** *(optional)* — the 10-foot TV app served as an auth-gated **browser** web player. Off by
+  default; enable it with a compose profile.
+
+A typical stack is therefore three services from two images: **Postgres**, the **server**, and the
+**web** admin — all wired together by `docker-compose.yml` and a single `.env`. See
+[Roles & the single image](/docs/self-hosting/roles) for why it's built this way.
+
+```
+                 ┌─────────────┐
+  browser ─────► │  web (SPA)  │ ──┐
+                 └─────────────┘   │  built with SERVER_PUBLIC_URL
+                 ┌─────────────┐   ▼
+  TV apps ─────► │   server    │ ──────► Postgres
+                 └─────────────┘         (channelguide DB)
+                        │
+                        └──────► your Plex server
+```
+
+## Prerequisites
+
+- **A host that runs Docker** — a NAS (TrueNAS SCALE is proven), a mini-PC, or any Linux box with
+  `docker compose` (or a UI like Dockge / Portainer). The image is **multi-arch** (amd64 + arm64).
+- **A LAN address or domain** for the host. The admin and TV apps reach the server over the network,
+  so you need an address that your **browser and TV** can actually use — a LAN IP or a domain, **not**
+  `localhost` (unless you only ever browse from the host itself).
+- **A Plex server** whose library you want to turn into channels, reachable from the Airwave server
+  (same LAN is simplest). Plex is the only media server supported today.
+
+## In this section
+
+<Cards>
+  <Card title="Docker quick start" href="/docs/self-hosting/docker" description="Grab the stack files, fill in .env, bring it up — first boot, admin seed, and reaching the panel." />
+  <Card title="Configuration" href="/docs/self-hosting/configuration" description="The full .env reference — every variable, what it does, defaults, and which are required." />
+  <Card title="Roles & the single image" href="/docs/self-hosting/roles" description="One image, N roles (CG_ROLE) — the server, the admin web, and the optional browser TV player." />
+  <Card title="Updating" href="/docs/self-hosting/updating" description="The release loop — pull a new tag, restart, migrations apply themselves; how images reach GHCR." />
+</Cards>
+
+## Once it's up
+
+Deploying gets you a **running server and an admin login** — that's the starting point for the rest of
+the docs. From the admin panel you connect a source, build channels, and add viewers:
+
+- [Quick Start](/docs/getting-started) — zero to watching, end to end.
+- [Sources](/docs/sources) — connect and sync your Plex library.
+- [Settings](/docs/settings) — jobs, sessions, AI, and import/export.
+
+## Source map
+
+| Concern | File |
+|---|---|
+| Compose stack (postgres + server + web + optional tvweb) | `docker-compose.yml` |
+| Environment reference (copy to `.env`) | `.env.example` |
+| Image build (one image, roles via `CG_ROLE`) | `Dockerfile` |
+| Container entrypoint (PUID/PGID remap, migrations, role dispatch) | `docker/entrypoint.sh` |
+| GHCR publish / release workflow (on a `v*` tag) | `.github/workflows/docker-publish.yml` |
+| First-admin seed (from `ADMIN_EMAIL` / `ADMIN_PASSWORD`) | `packages/auth/src/lib/seed-admin.ts` |
+| Server env schema (validated at boot) | `packages/env/src/server.ts` |
+
+---
+
+See also: [Quick Start](/docs/getting-started) · [Sources](/docs/sources) ·
+[Settings](/docs/settings)

@@ -1,0 +1,77 @@
+---
+icon: MonitorSmartphone
+title: "Platforms"
+description: "What Airwave runs on — the client platform matrix (native apps vs. the browser player), the playback engine each uses, and current status."
+---
+
+Airwave's viewer app is a full **10-foot TV experience** — an Aurora channel-guide grid, a native-first
+player with a DVR scrubber, channel up/down, and the "Up Next" bumper card. It's the **same app** across
+platforms, delivered two ways: as a **native binary** (`tv-native`) for the living-room streaming boxes,
+and as a **web player** (`tv-web`) for browsers and packaged webOS. Features land in one codebase and
+show up everywhere.
+
+## The 10-foot / large-tablet stance
+
+Airwave is built for a **couch, a remote, and a big screen** — TVs, streaming boxes, and large tablets.
+The iPad build is deliberately **iPad-only** (a large-tablet layout, not a phone UI). **There is no
+phone app**, by design: the guide grid and glass player are laid out for a 10-foot viewing distance, not
+a 6-inch screen.
+
+## Availability matrix
+
+| Platform | App type | Playback engine | Status |
+|---|---|---|---|
+| **LG webOS** | Web app (`tv-web`, packaged) | Native `<video>` + hls.js fallback | Runs today (proven daily on a real LG C2); store publishing planned |
+| **Apple TV** (tvOS) | Native (`tv-native`) | **mpv** (wide-codec direct play) | Runs today on device; App Store submission in progress |
+| **iPad** (iPadOS) | Native (`tv-native`) | **mpv** | Runs today on device; App Store submission in progress |
+| **Android TV** | Native (`tv-native`) | **mpv** | Runs today on device; store publishing planned |
+| **Fire TV** | Native (`tv-native`) | **mpv** | Runs today on device; store publishing planned |
+| **Any browser** | Web player (`tv-web`) | Native `<video>` + hls.js fallback | Live now, self-hosted, free |
+| **Samsung** (Tizen) | Web app (`tv-web`) | Native `<video>` + hls.js fallback | Roadmap |
+| **Roku** | Native | — | Roadmap |
+
+> **Store status vs. what runs today.** The native apps are **built and running on real hardware now**
+> (iPad, Apple TV 4K, Android TV, Fire TV) and webOS runs daily on a real LG C2. Publishing them to the
+> App Store / Google Play / Amazon Appstore / LG Content Store is a **prerequisite still being
+> completed** — iPad and Apple TV first, then the rest. The intended store-by-store distribution is
+> listed in the project [README's availability table](https://github.com/Quixomatic/Airwave#platform-availability).
+> Because Airwave is source-available, you can also **build and sideload** any native app yourself.
+
+## Native apps (`tv-native`)
+
+The native app is **Expo / React Native** (`react-native-tvos`) with an **mpv** playback engine
+(`@airwave/mpv-player`). mpv is what lets it **direct-play wide codecs natively** — 4K HDR HEVC,
+TrueHD/DTS, and more — instead of forcing a server transcode. On first launch each device runs a short
+**capability diagnostic** that measures exactly what it can decode, so Airwave direct-plays where
+possible and only transcodes when it must.
+
+![The Airwave channel guide on Apple TV](/screenshots/appletv-guide.webp)
+
+Distributed through each platform's store (a small paid download), or built and sideloaded from source.
+
+## The web player (`tv-web`)
+
+`tv-web` is the same 10-foot app built with **Vite + React + TanStack Router**, using the browser's
+native `<video>` element with an **hls.js** fallback for MSE playback. It powers two things:
+
+- **Any browser** — via the optional **`tvweb` Docker role**, an auth-gated web player you serve from the
+  same compose stack. This works today, for free, on any modern browser.
+- **LG webOS** — the same web app packaged as a webOS TV app (with Roku and Samsung Tizen builds on the
+  roadmap).
+
+TV clients sign in with a **device-code flow** — scan a QR or enter a short code — using either "Sign in
+with Plex" or any Airwave account.
+
+![Signing in to the web player with a QR code](/screenshots/tvweb-qrcode.webp)
+
+## Also: the admin panel
+
+Separately from the viewer apps, the **admin web app** runs in **any browser** — it's where you create
+channels and packages, manage users and bumpers, run jobs, and preview lineups. It's admin-only;
+viewers only ever use the TV apps. See [Architecture](/docs/architecture) for how the admin and the
+players relate.
+
+---
+
+See also: [Architecture](/docs/architecture) · [Getting started](/docs/getting-started) ·
+[Capability diagnostic](/docs/capability-diagnostic) · [Sessions](/docs/sessions)

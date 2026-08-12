@@ -1,0 +1,160 @@
+---
+title: "The job catalog"
+description: "Every scheduled and manual background job — its purpose, how it works, and its default cadence — straight from JOB_DEFINITIONS."
+---
+
+Everything here comes from `JOB_DEFINITIONS` in `packages/api/src/services/jobs/definitions.ts`. There
+are **15** jobs: **11 auto** (cron-scheduled) and **4 manual** (`manual: true`, `interval: "fixed"`,
+run-now only). Manual jobs carry a `defaultCron` of `0 0 0 1 1 *` (midnight, Jan 1) as a placeholder,
+but it **never fires** — `manual` jobs are never armed with `node-schedule`.
+
+**Cron format** is node-schedule's 6-field, seconds-first form: `sec min hour dom mon dow`. So
+`0 0 3 * * *` = daily at 03:00, and `0 */5 * * * *` = every 5 minutes.
+
+## Auto (scheduled)
+
+| Name (id) | Default cadence | What it does |
+|---|---|---|
+| [Metadata Sync](#metadata-sync-metadata-sync) (`metadata-sync`) | Daily 03:00 `0 0 3 * * *` | Full metadata-cache refresh for every enabled source; pages all movies/episodes, links episodes to shows, flags removed content as unavailable. |
+| [Recently Added Scan](#recently-added-scan-recently-added-scan) (`recently-added-scan`) | Every 5 min `0 */5 * * * *` | Cheap incremental pull of only the newest items per library, so new content appears in guides within minutes. |
+| [Library Scan](#library-scan-library-scan) (`library-scan`) | Daily 04:00 `0 0 4 * * *` | Re-reads each source's list of libraries/sections, picking up added/removed ones while keeping your enabled choices. |
+| [Schedule Refresh](#schedule-refresh-schedule-refresh) (`schedule-refresh`) | Hourly `0 0 * * * *` | Appends fresh programming at each channel's tail *only when the timeline is running low*. |
+| [Schedule Backfill](#schedule-backfill-schedule-backfill) (`schedule-backfill`) | Every 10 min `0 */10 * * * *` | Builds the *initial* schedule for enabled channels that have none, in batches of 25; idles once all are scheduled. |
+| [Bumper Sync](#bumper-sync-schedule-bumper-sync) (`schedule-bumper-sync`) | Every 10 min `0 */10 * * * *` | Reconciles existing schedules with current bumper settings, in batches of 10. |
+| [Schedule Prune](#schedule-prune-schedule-prune) (`schedule-prune`) | Daily 02:00 `0 0 2 * * *` | Deletes schedule slots that have already aired, past a 6-hour safety buffer. |
+| [Missing Media Repair](#missing-media-repair-schedule-missing-media-repair) (`schedule-missing-media-repair`) | Hourly at :30 `0 30 * * * *` | Splice-repairs upcoming schedules that point at now-unavailable media, in batches of 10. |
+| [Watch Session Reaper](#watch-session-reaper-watch-session-reap) (`watch-session-reap`) | Every 2 min `0 */2 * * * *` | Clears stale watch sessions and stops any Plex transcode they left running. |
+| [Plex Token Check](#plex-token-check-plex-token-check) (`plex-token-check`) | Daily 05:00 `0 0 5 * * *` | Verifies each source's owner token still works; warns if it's been revoked. |
+| [Plex Connection Refresh](#plex-connection-refresh-plex-connection-refresh) (`plex-connection-refresh`) | Hourly `0 0 * * * *` | Refreshes each source's LAN/remote/relay URLs from plex.tv so clients reach the server as its WAN IP changes. |
+
+## Manual (run-now only)
+
+| Name (id) | What it does |
+|---|---|
+| [Auto-Generate Lineup](#auto-generate-lineup-lineup-generate) (`lineup-generate`) | Evaluates the preset catalog against your library and creates the channels it can fill. |
+| [Build Lineup with AI](#build-lineup-with-ai-ai-lineup-build) (`ai-lineup-build`) | **Dispatcher only** — kicks off the durable AI-lineup workflow and returns a `runId`. |
+| [Clear AI Lineup](#clear-ai-lineup-ai-lineup-clear) (`ai-lineup-clear`) | Deletes every AI-generated channel and package (the 1000+ block). |
+| [Scan Bumper Music](#scan-bumper-music-bumper-music-scan) (`bumper-music-scan`) | Indexes audio dropped into the bumper-music volume; flags missing files, un-flags reappeared ones. |
+
+## Auto jobs, in detail
+
+### Metadata Sync (`metadata-sync`)
+
+The full-refresh backbone of the [metadata cache](/docs/sources). For every enabled source it runs
+`syncMediaItems` — paging all movies and episodes, linking each episode to its show (so episodes
+inherit show-level genre/cast), and **flagging anything no longer on the server as unavailable**
+(removal detection). Reports `{ current, total, label }` progress. Runs nightly at 03:00 because it is
+the most expensive scan; the removal flag it sets is what
+[Missing Media Repair](#missing-media-repair-schedule-missing-media-repair) later acts on. Also
+triggered on demand from a source page's **Sync metadata** button.
+
+### Recently Added Scan (`recently-added-scan`)
+
+The cheap incremental counterpart. For every enabled source it runs `syncRecentlyAdded`, pulling only
+the most-recently-added items from each library so new content surfaces in guides within minutes
+rather than waiting for the nightly full sync. It does **not** detect removals — that's the full sync's
+job.
+
+### Library Scan (`library-scan`)
+
+Runs `syncLibraries` per enabled source: re-reads the server's list of libraries (sections) and picks
+up newly-added or removed libraries, **preserving** your per-library enabled/disabled choices. Daily
+at 04:00.
+
+### Schedule Refresh (`schedule-refresh`)
+
+For each enabled channel, calls `extendChannelSchedule`, which appends a fresh block of programming at
+the **tail** only when that channel's timeline is running low — a self-adjusting top-up that never
+disturbs what's currently on. Continues mid-pass from the channel's stored resume cursor, so it grows a
+consistent, deterministic lineup. No-ops on a channel that has no schedule yet — that's backfill's job.
+See [The schedule](/docs/channels/schedule).
+
+### Schedule Backfill (`schedule-backfill`)
+
+Builds the **initial** schedule for enabled channels that have none yet (`scheduleItems: { none: {} }`)
+— freshly created or auto-generated channels. It processes a batch of **25** per run, ordered by
+channel number, reporting progress with the channel name as the `label`, and does a **windowed** build
+(~12h via `INITIAL_WINDOW_SECONDS`) rather than laying a channel's entire pool up front. Refresh then
+grows each channel from its cursor. Idles once every enabled channel has a schedule. A per-channel
+failure is caught and logged so one bad channel doesn't stall the batch.
+
+### Bumper Sync (`schedule-bumper-sync`)
+
+Reconciles existing schedules with the current [bumper](/docs/bumpers) settings, a batch of **10** at a
+time. A channel is **stale** when either:
+
+- whether bumpers *should* be present (global `enabled` and the channel's `bumperMode !== "OFF"`)
+  differs from whether they actually are; or
+- they are present as they should be, but the channel was last built under an older config — its
+  `bumperRev` is behind the global `BumperConfig.rev` (this catches *any* settings change: break-length
+  tiers, threshold, style, and so on).
+
+It rebuilds each stale channel via `generateChannelSchedule` and only touches channels that already
+have a schedule. Besides its 10-minute cron, it is **kicked immediately** when you save a channel's
+bumper mode or change global bumper settings (`void runJob("schedule-bumper-sync")` in the channels and
+bumpers routers), so reconciliation doesn't wait for the next tick.
+
+### Schedule Prune (`schedule-prune`)
+
+Deletes `scheduleItem` rows whose `startsAt` is older than a **6-hour** cutoff — a safety buffer past
+"a couple hours" so a long item that's still playing (a 3h movie that began 2h ago) is never cut. Keeps
+the schedule table lean. Daily at 02:00.
+
+### Missing Media Repair (`schedule-missing-media-repair`)
+
+Acts on the unavailability flag set by [Metadata Sync](#metadata-sync-metadata-sync). For enabled
+channels whose **upcoming** schedule (from a ~5-minute-out cutoff) points at a `mediaItem` or
+`targetMediaItem` that is now `available: false`, it calls `repairChannelSchedule` — re-flowing the
+timeline from the first bad slot forward, leaving what's on now and the still-valid near-term slots
+untouched. Batches of **10**, hourly at **:30** (offset from the other schedule jobs). It's a cheap
+no-op when nothing is broken.
+
+### Watch Session Reaper (`watch-session-reap`)
+
+Every 2 minutes, finds `watchSession` rows with no heartbeat for ~1 minute (`lastHeartbeatAt` older
+than 60s — e.g. a closed tab), stops any Plex transcode they left running via `stopTranscode`, then
+deletes the stale rows. This keeps zombie transcode sessions from piling up on the media server.
+
+### Plex Token Check (`plex-token-check`)
+
+Daily at 05:00. For each enabled source it calls `getPlexUser` to verify the owner token still works
+and logs a warning if it's been revoked, so a broken connection is caught early rather than at
+playback time. (Tokens are stored encrypted and decrypted per job for the Plex call.)
+
+### Plex Connection Refresh (`plex-connection-refresh`)
+
+Hourly. For each enabled source with a `machineIdentifier`, it resolves the current LAN / remote /
+relay connection URLs from plex.tv (`resolveConnectionUrls`) and writes `remoteUrl` / `relayUrl` back
+onto the `mediaSource`. Because plex.tv's `/resources` reflects the present WAN IP, this keeps the
+remote URL fresh for a client that probes local → remote → relay at launch — dynamic-IP safe. See
+[Sources](/docs/sources).
+
+## Manual jobs, in detail
+
+### Auto-Generate Lineup (`lineup-generate`)
+
+Runs `generateLineup(scope: "all")` for each enabled source: evaluates the built-in preset catalog
+against your library and creates the channels it can actually fill, reporting progress. Triggered from
+the **Channels** page's Auto-generate button (never auto-scheduled).
+
+### Build Lineup with AI (`ai-lineup-build`)
+
+**Dispatcher only.** This job does not build anything itself — it kicks off the durable AI-lineup
+**workflow** (`getLineupRunner().start(...)`), which outlives the call and survives restarts, and
+returns a `runId` immediately. Its **"success" therefore means *dispatched*, not *finished***: the
+`Job` table's in-memory state can't represent a multi-hour run, which is exactly why this work is a
+workflow rather than a job. It is **destructive** — the workflow clears the existing AI lineup first —
+and requires `WORKFLOW_ENABLED=1` plus configured planner and worker AI connections, or it throws. Its
+`detailHref` points at `/settings/workflows/ai-lineup`, where real progress and cost live; the Jobs row
+renders a "View runs & cost" link for it.
+
+### Clear AI Lineup (`ai-lineup-clear`)
+
+Runs `clearAiGenerated(prisma, "both")` — deletes every AI-generated channel and package (the 1000+
+block), leaving preset-generated and hand-made channels completely untouched. Manual.
+
+### Scan Bumper Music (`bumper-music-scan`)
+
+Runs `scanMusicDir` over the bumper-music volume: indexes audio files dropped in directly (so they join
+the random rotation), flags tracks whose file has gone missing, and clears the flag on any that
+reappeared. Run it after adding files to the music volume.

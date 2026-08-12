@@ -1,0 +1,82 @@
+---
+title: Configuration
+description: The global Bumpers page settings — the master switch, contextual break lengths, and ambient-music controls — plus the per-channel bumperMode that decides whether a channel shows breaks.
+---
+
+Bumpers follow a **global config + thin per-channel switch** model. Everything about *what* a break is
+lives in one global record; each channel only picks *whether* to show breaks.
+
+## The global config
+
+The **Bumpers** page (`apps/web/src/routes/_auth/bumpers.tsx`, admin only) edits a **singleton**
+`BumperConfig` row (`key = "global"`, created on first read). Its fields:
+
+### Enable
+
+- **Enable bumpers** (`enabled`, default **on**) — the master switch. Off means no channel shows
+  breaks, whatever its own mode. Channels can still opt out individually.
+
+### Break lengths
+
+These are the contextual tiers the schedule engine picks between per transition (see
+[Interstitials](/docs/bumpers/interstitials) for the selection rule). All are in seconds unless noted,
+clamped 1–600 (the threshold 1–240 minutes):
+
+| Setting | Field | Default | When it applies |
+|---|---|---|---|
+| After a movie | `afterMovieSeconds` | 120 | A feature just ended — a real intermission. |
+| After an episode | `afterEpisodeSeconds` | 30 | A normal between-shows breather. |
+| Quick break | `quickSeconds` | 10 | Same show continues, or a short episode is up next. |
+| Short-episode threshold | `shortEpisodeMinutes` | 20 (minutes) | An episode at/under this counts as "short" → quick break. |
+| Default (anything else) | `interstitialSeconds` | 15 | Fallback when no tier above applies. |
+
+These are **structural** — they're baked into the timeline at build time, so changing one bumps the
+config `rev` and triggers a rebuild of affected channels. See [Scheduling](/docs/bumpers/scheduling).
+
+### Ambient music
+
+Global controls for the optional [music bed](/docs/bumpers/ambient-music); the track library is managed
+separately on the same page:
+
+| Setting | Field | Default | Notes |
+|---|---|---|---|
+| Play ambient music | `musicEnabled` | on | Master toggle for the bed. |
+| Volume | `musicVolume` | 30 | 0–100; kept low so it's a bed, not the foreground. |
+| Fade in | `musicFadeInMs` | 1000 | Ramp up as the bumper starts (ms, 0–10000). |
+| Fade out | `musicFadeOutMs` | 1500 | Ramp down before the next program (ms, 0–10000). |
+
+Music settings are **playback-only** — the client reads them at play time and derives the bed live, so
+changing them does **not** rebuild any schedule. (An older single-track `interstitialMusicKey` hook is
+deprecated and unused; the bed now comes from the `BumperMusic` library.)
+
+## The per-channel `bumperMode`
+
+Each channel carries a thin **`Channel.bumperMode`** — set on the channel's edit page (the **Bumpers**
+control in its Details section), not on the global page. It's a four-way choice:
+
+| Mode | Behavior |
+|---|---|
+| **Inherit** (`INHERIT`, default) | Follow the global config — show interstitials when bumpers are globally enabled. |
+| **Off** (`OFF`) | Never show breaks on this channel, even when globally enabled. |
+| **Interstitial only** (`INTERSTITIAL_ONLY`) | Interstitials, no commercial clips (relevant once the future commercials layer ships). |
+| **Full** (`FULL`) | Interstitials plus commercial clips (future). |
+
+Today `INHERIT`, `INTERSTITIAL_ONLY`, and `FULL` all resolve to **the interstitial** — the
+commercials-within layer isn't built yet, so the distinction only matters later. The resolution rule
+(`resolveBumperPlan` in `packages/api/src/services/bumpers/bumper-config.ts`) is simple: bumpers apply
+only when the **global config is enabled** *and* the channel's mode **isn't Off** — otherwise the
+channel gets no break plan at all.
+
+Saving a channel's bumper mode immediately kicks the [Bumper Sync](/docs/bumpers/scheduling) job so its
+timeline reconciles right away.
+
+## Coming later
+
+The page surfaces two future layers whose schema is already in place: **commercial clips** (from a Plex
+playlist/collection or a local folder) that play *inside* the up-next frame, and a **mid-program** break
+cadence (`BumperPlacement.MID_PROGRAM` + `midProgramCadenceMinutes`). Neither is active yet.
+
+---
+
+See also: [Interstitials](/docs/bumpers/interstitials) · [Ambient music](/docs/bumpers/ambient-music) ·
+[Scheduling](/docs/bumpers/scheduling) · [Channels](/docs/channels)

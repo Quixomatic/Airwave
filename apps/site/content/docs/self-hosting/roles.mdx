@@ -1,0 +1,81 @@
+---
+title: "Roles & the single image"
+description: "One image, N roles — how CG_ROLE turns a single Airwave container into the API server, the admin web, or the optional browser TV player."
+---
+
+Airwave ships as **one image** (`ghcr.io/quixomatic/airwave`) that runs as one of several apps
+depending on a single environment variable, **`CG_ROLE`**. The compose stack runs the same image twice
+(server + web), plus an optional third (tvweb) — same bytes, different env.
+
+## Why one image
+
+Everything that's independent of the deployment address — the server bundle and the workflow-SDK
+handlers — is built **once** when the image is published. Only the browser apps carry a
+per-deployment server URL, and that URL differs for every self-host, so those are **built at container
+start** instead of being frozen into the image.
+
+That's the whole reason the split exists: rather than publish a separate admin image per possible
+address (impossible), the `web` role compiles the SPA against *your* `SERVER_PUBLIC_URL` the first time
+it boots. One artifact covers every deployment.
+
+The entrypoint (`docker/entrypoint.sh`) reads `CG_ROLE`, remaps the app user to your `PUID`/`PGID`,
+sets the timezone, then dispatches to the right role.
+
+## The roles
+
+| `CG_ROLE` | What it runs | Container port | On start |
+|---|---|---|---|
+| `server` | The Bun API + TV REST surface. | `3000` | `prisma migrate deploy`, seed the first admin, (optionally bootstrap the workflow schema), then `bun run dist/index.mjs`. |
+| `web` | The admin panel SPA. | `3001` | `vite build` with `VITE_SERVER_URL` baked in, then serve the static build. |
+| `tvweb` *(optional)* | The 10-foot TV app as a browser web player. | `3002` | `vite build` the player with the server URL baked in, then serve it. |
+
+### `server` — the API
+
+The heart of the stack. It owns the database: on every start it applies pending Prisma migrations
+(`prisma migrate deploy`), so schema changes roll forward automatically when you update the image. It
+then seeds the first admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` and serves the API that the admin
+panel and every TV client (native and browser) talk to. Its healthcheck hits `/api/health`.
+
+### `web` — the admin panel
+
+A Vite SPA. Because the admin's server URL (`VITE_SERVER_URL`, from `SERVER_PUBLIC_URL`) is baked at
+build and every self-host lives at a different address, this role **compiles the SPA at container
+start** — which is why the first `web` boot takes a minute or two before it's reachable. Change the
+public URL later and you must force a rebuild (`docker compose up -d --force-recreate web`) so the new
+address gets baked in.
+
+### `tvweb` — the browser TV player (optional)
+
+The same 10-foot TV app the native clients run, served as an **auth-gated browser web player**. It's
+**off by default** — the compose service is gated behind `profiles: ["tvweb"]`, so it stays dormant
+unless you opt in with `COMPOSE_PROFILES=tvweb`.
+
+When you enable it, set `TV_WEB_PUBLIC_URL` (the address browsers reach the player at). The server
+allow-lists that origin as `TV_APP_ORIGIN` for the player's login flow — **required**, because a
+browser enforces CORS on the login call (the native webOS/Tizen apps don't, which is why they need none
+of this). The player uses **bearer** tokens, so it has no cookie concerns over plain HTTP.
+
+By default the player talks to the same server URL as the admin. If you reverse-proxy the player at its
+own public domain with `/api`, `/img`, and `/caps` forwarded to the server, point it there with
+`TV_SERVER_URL` — then the server itself never needs to be exposed.
+
+## Server vs. web, at a glance
+
+- **`server`** is the durable service: it holds the DB connection, runs migrations and background jobs,
+  and is what TVs stream against. It does **not** rebuild on start — its bundle is baked in the image.
+- **`web`** is a thin, stateless SPA host that **rebuilds on every start** to bake in your server URL.
+  It talks only to the server over the network, exactly like a browser does.
+
+## Source map
+
+| Concern | File |
+|---|---|
+| Role dispatch (remap user, TZ, then run the role) | `docker/entrypoint.sh` |
+| Image build (one artifact, roles documented) | `Dockerfile` |
+| Compose services (`server` / `web` / `tvweb` profile) | `docker-compose.yml` |
+| Static SPA server (web / tvweb) | `docker/serve-web.ts` |
+
+---
+
+See also: [Docker quick start](/docs/self-hosting/docker) ·
+[Configuration](/docs/self-hosting/configuration) · [Updating](/docs/self-hosting/updating)

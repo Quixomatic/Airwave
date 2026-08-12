@@ -1,0 +1,6 @@
+{
+  "title": "Packages",
+  "icon": "Package",
+  "defaultOpen": true,
+  "pages": ["creating", "assigning-channels", "styling", "provenance", "access", "guide-lenses"]
+}

@@ -1,0 +1,121 @@
+---
+title: "The AI lineup builder"
+description: "The durable, multi-agent 'Build Lineup with AI' workflow — how the planner authors filters, the workers verify-and-commit, and why a full lineup costs about a dollar."
+---
+
+The AI lineup builder is the admin action **"Build Lineup with AI"**: one durable run that analyzes
+your whole library, designs a full lineup sized to what you actually own, and builds every channel —
+tens of them — each channel its own grounded agent loop. It is the autonomous cousin of the
+interactive [AI assistant](/docs/ai-assistant): same toolbox, same `aiGenerated` stamp, but it runs
+end-to-end without you in the loop, on the [Workflow SDK](/docs/workflows) so a crash never restarts
+it from zero.
+
+Entry point is `aiLineupWorkflow(args)` in `apps/server/workflows/lineup.ts`. The deterministic body
+calls its steps in order; the per-channel build fans out in bounded waves.
+
+## The steps
+
+1. **`analyzeLibrary`** — distill the real library into a few-KB `LibraryProfile` (movie / show /
+   episode counts, genres, studios, sizeable shows).
+2. **`buildSharedContext`** — build the cached prefix: the profile plus the *full* filter tag
+   vocabulary (one Plex round-trip per field, checkpointed so a resume never repeats them). This exact
+   string is handed byte-identically to every channel build, so the whole run shares **one
+   prompt-cache entry**.
+3. **`listExistingPackages`** — the packages already on the server (preset + manual) so the planner
+   can file channels into an existing package instead of minting a near-duplicate. AI packages are
+   deliberately excluded, because `createPackages` wipes them.
+4. **`planLineup`** — one structured-output call (on the **planner** model) that designs the full
+   lineup, sized to the library rather than to a quota.
+5. **`createPackages`** — **destructive**: wipes any previous `aiGenerated` lineup (manual + preset
+   rows untouched), then creates this run's packages. This is why the admin action confirms first.
+6. **`assignNumbers`** — resolve every channel's number against live state, *after* the wipe, so it
+   allocates against numbers that are actually free. AI channels live at 1001+ in per-package
+   hundred-blocks.
+7. **`buildChannel` ×N** — the fan-out. Each channel is its own durable step running a grounded agent
+   loop (on the cheap **worker** model) that verifies its filter before committing, then lays a
+   windowed (~12h) initial schedule so the channel is watchable immediately. Fanned out in waves of
+   `BUILD_CONCURRENCY = 6` via `Promise.all`, so a crash resumes only the unfinished channels.
+8. **`reportLineup`** — aggregate the outcome and token usage into a `LineupReport` (the workflow's
+   return value).
+
+Two body-level details, both pure functions safe to run in the deterministic body:
+
+- `args.limit` caps the **build fan-out, not the plan** — the planner always plans the whole lineup;
+  a capped run shows the full design but only pays to build a sample.
+- `sampleAcrossPackages` spreads that sample **across packages** (round-robin) rather than taking the
+  first N, so a capped run exercises interpretive channels, not just the obvious first package.
+
+## Planner authors, workers verify
+
+The design that makes this affordable is a division of labor:
+
+- **The planner authors the real Plex filters.** It is the one call that holds the *full* tag
+  vocabulary, so it writes each channel's actual filter — not a vague brief.
+- **The workers verify-and-commit rather than explore.** Each `buildChannel` loop starts from the
+  planner's filter, previews it against Plex to confirm the pool, refines only if needed, then
+  commits — instead of discovering a filter from scratch.
+
+That change, plus the shared prompt-cache prefix, took a channel build from **~209k → ~43k tokens and
+10.2 → 4.25 agent steps**, dropping a full lineup from **~$20 to ~$1.15** (all measured via the token
+and cache accounting on the run page). The lineup is sized by **coverage**, not a channel quota: on a
+real 584-movie / 275-show / 14,793-episode library it designs on the order of 33 channels across 9
+packages.
+
+Curation is the product. A bare `genre = X` filter is treated as a *failure*; the prompt teaches a
+general predicate followed by curated exceptions, so a built channel is indistinguishable from one
+you authored by hand.
+
+## Reserve, don't check (the fan-out guard)
+
+WDK is at-least-once, so a `Promise.all` of build steps has its still-running members re-dispatched
+on each completion — measured directly, a 5-channel run started four builds a *second* time. Left
+unguarded, roughly a third of build spend is duplicate work.
+
+The fix lives in `buildPlannedChannel` (`packages/api/src/services/agent/channel-builder.ts`).
+Instead of checking for an existing channel and creating it at the *end* of the loop (which let every
+duplicate pass the check while the original was still mid-loop), the builder **creates the channel row
+up front as an atomic claim**:
+
+```
+createChannel(…, { number: channel.number, enabled: false })
+```
+
+`Channel.number` is `@unique`, so exactly **one** dispatch wins the insert; a duplicate loses the
+race on the constraint and **exits in milliseconds**, returning the winner's channel id. The
+reservation is `enabled: false` so a half-built channel never reaches the guide or the schedule
+jobs, and it carries the planner's proposed filter so the row is meaningful even if the agent dies
+before committing. On commit the row is flipped to enabled and updated with the verified filter; on
+any failure the reservation is deleted. The name captures the inversion: **reserve first** (a claim a
+duplicate collides with), don't merely **check** (a read a duplicate sails past).
+
+## Bring your own key
+
+The builder ships no model and no key — same as the rest of Airwave's AI. It runs on
+**bring-your-own-key** [`AiConnection`s](/docs/ai-assistant) with two roles assigned:
+
+- **Planner** — the one big design call. Typically pointed at a strong reasoning model.
+- **Worker** — the per-channel build loops. Point this at a cheap, fast model to cut lineup-build
+  cost, since it runs tens of times per lineup.
+
+Roles are explicit with **no runtime fallback**: a cleared planner or worker connection genuinely
+disables the AI lineup builder, even with `WORKFLOW_ENABLED=1`. (The first connection you create
+claims all three roles — chat, planner, worker — so a single-connection setup just works.) You pay
+your provider directly; Airwave has no billing layer. Configure connections and roles under
+**Settings → AI Assistant**.
+
+## Source map
+
+| Concern | File |
+|---|---|
+| Workflow orchestrator + steps | `apps/server/workflows/lineup.ts` |
+| Per-channel agent loop, reserve-don't-check | `packages/api/src/services/agent/channel-builder.ts` |
+| AI connections, planner / worker roles | `packages/api/src/services/agent/config.ts` |
+| Shared toolbox + `aiGenerated` stamp | `packages/api/src/services/agent/tools.ts` |
+| Runner registry (dispatch + poll) | `packages/api/src/services/agent/lineup-runner.ts` |
+| Trace + run read model (observability) | `packages/api/src/services/agent/lineup-trace.ts`, `lineup-runs.ts` |
+
+---
+
+See also: [AI assistant](/docs/ai-assistant) (the interactive, in-the-loop chat) ·
+[Observability](/docs/workflows/observability) (watching a build run) ·
+[Channels](/docs/channels) and [Filters](/docs/channels/filters) (what a built channel actually is).

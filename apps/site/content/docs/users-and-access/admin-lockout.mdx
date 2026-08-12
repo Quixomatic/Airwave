@@ -1,0 +1,71 @@
+---
+title: "Admin-only lockout"
+description: "disableSignUp, the admins-only panel (two layers of defense), and the last-admin protection."
+---
+
+Viewers never belong in the admin panel — they use the TV apps. Three independent mechanisms keep the
+panel closed to strangers and to viewers, and keep at least one admin alive.
+
+## No public sign-up (`disableSignUp`)
+
+Every credential path is provisioning-only, set in `packages/auth/src/index.ts`:
+
+- **Email / password** login is always on, but `emailAndPassword.disableSignUp: true` disables the
+  `/api/auth/sign-up/email` endpoint. Without this, anyone could self-provision a viewer account.
+- **Every OAuth provider** (Plex, Google, GitHub) also carries `disableSignUp: true`, so a social
+  sign-in only ever _matches_ an existing account by email — it never creates one.
+
+So the only ways an account comes to exist are the seeded admin, an admin-created viewer, and
+[Import Plex Users](/docs/users-and-access/importing).
+
+## The admin panel is admins-only — two layers
+
+Defense in depth: even if one layer were bypassed, the other still holds.
+
+1. **Route guard** (`apps/web/src/routes/_auth/route.tsx`). The `_auth` layout's `beforeLoad` calls
+   `authClient.getSession()` — a real server round-trip, so `role` is the DB-backed, better-auth-issued
+   value, not something the client can forge. No session → redirect to `/login`. A non-admin →
+   redirect to `/not-authorized`, **except** the single viewer-allowed route `/device` (where a viewer
+   approves a TV device-code login). A viewer simply can't render any admin route.
+
+2. **Every data call is an `adminProcedure`** (`packages/api/src/index.ts`). Even past the route
+   guard, each admin tRPC procedure re-checks the role server-side and throws `FORBIDDEN` for
+   non-admins:
+
+   ```ts
+   export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
+     const role = (ctx.session.user as { role?: string | null }).role ?? null;
+     if (role !== "admin") {
+       throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+     }
+     return next({ ctx });
+   });
+   ```
+
+The UI guard is a convenience and a redirect; the actual protection is the server refusing non-admin
+calls.
+
+## Last-admin protection
+
+Airwave is built around **a single owner admin**, and several rules conspire to make sure that admin
+can't be removed or accidentally lost:
+
+- **The seed is idempotent.** `seedAdmin()` (`packages/auth/src/lib/seed-admin.ts`) creates the owner
+  from `ADMIN_EMAIL` / `ADMIN_PASSWORD` on first boot; on later boots it only ensures the `admin` role
+  on that account. It's a no-op if the env vars are unset (a pure Plex/OAuth deployment).
+- **Admins can't be deleted.** `users.delete` (`packages/api/src/routers/users.ts`) refuses any target
+  whose `role === "admin"` with `FORBIDDEN` — _"Admin accounts can't be deleted."_ Since an admin
+  can't delete the only admin (themselves), the panel can never be orphaned.
+- **New accounts are always viewers.** `users.create` hard-codes `role: "user"`, and Import Plex Users
+  creates `role: "user"` accounts. Promotion to admin isn't a panel action — it comes only from the
+  env seed.
+
+## Source map
+
+| Concern | File |
+| --- | --- |
+| `disableSignUp` on email + every OAuth provider | `packages/auth/src/index.ts` |
+| Seed the one admin from env (idempotent) | `packages/auth/src/lib/seed-admin.ts` |
+| Admin route guard (`/device` the only viewer route) | `apps/web/src/routes/_auth/route.tsx` |
+| `adminProcedure` (server-side role re-check) | `packages/api/src/index.ts` |
+| Refuse to delete an admin; create viewers only | `packages/api/src/routers/users.ts` |

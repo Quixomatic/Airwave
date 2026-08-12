@@ -1,0 +1,6 @@
+{
+  "title": "Workflows",
+  "icon": "Workflow",
+  "defaultOpen": true,
+  "pages": ["lineup-builder", "importer", "observability"]
+}

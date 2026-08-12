@@ -1,0 +1,78 @@
+---
+title: "Connecting a server"
+description: "The Sign-in-with-Plex device-pin handshake, picking your server, confirming connection details, and what saveConnection writes."
+---
+
+Connecting a Plex server lives in the admin UI at **Sources → New source**
+(`apps/web/src/routes/_auth/sources/new.tsx`) and is backed by the `plex` tRPC router
+(`packages/api/src/routers/plex.ts`), which talks to Plex through
+`packages/api/src/services/plex/client.ts`. It is the same **"Sign in with Plex" device-pin
+handshake** Overseerr uses — Airwave never sees your Plex password.
+
+## The device-pin flow
+
+1. **Sign in with Plex.** The UI calls `plex.createAuthPin`, which asks
+   `plex.tv/api/v2/pins?strong=true` for a pin (`id` + `code`) and builds the hosted auth URL
+   (`https://app.plex.tv/auth#?…` via `buildAuthUrl`). The browser opens that URL in a popup.
+2. **Approve + poll.** After you approve in the popup, the UI polls `plex.checkAuthPin` **every 2
+   seconds** with a **2-minute deadline**. `checkAuthPin` calls `getPinToken`; once Plex returns an
+   `authToken`, it also fetches the Plex account (`getPlexUser`) so the UI can show "Signed in as
+   `<email>`". If the deadline passes first, the popup closes and you're asked to try again.
+3. **Pick a server.** `plex.listServers` calls Plex's `/resources?includeHttps=1&includeRelay=1`
+   (`getServers`) and returns every server the token can reach — **owned and shared**. Shared
+   servers are labelled `(shared)` in the picker. Selecting one pre-fills its host/port from the
+   server's local, non-relay connection.
+4. **Confirm connection details.** Hostname or IP, port (default `32400`), an optional **Use SSL**
+   switch, and an optional **Web App URL** override. The `baseUrl` saved is literally
+   `` `${ssl ? "https" : "http"}://${host}:${port}` ``.
+5. **Save.** `plex.saveConnection` creates (or updates) the `MediaSource` and **immediately syncs
+   its libraries** (`syncLibraries`). The UI then redirects to the source detail page.
+
+Only an admin can run any of this — every procedure on the `plex` router is an `adminProcedure`.
+
+## The SSL switch
+
+Selecting a server always **resets SSL to off** and fills in the *local* address, because Airwave
+normally runs **alongside** Plex on the LAN and reaches it over plain HTTP at
+`http://<host>:32400`. Flip SSL on only if you're pointing `baseUrl` at an HTTPS endpoint — a
+`plex.direct` hostname or a reverse proxy.
+
+Off-network HTTPS URLs are a separate concern: the server always fetches over `baseUrl`, and clients
+that are away from home use the stored remote/relay URLs instead. See
+[Connections](/docs/sources/connections).
+
+## What saveConnection writes
+
+`saveConnection` (`packages/api/src/routers/plex.ts`) writes a `MediaSource` row with:
+
+| Field | Value |
+|---|---|
+| `type` | `"PLEX"` |
+| `name` | The server's name (from the picker). |
+| `baseUrl` | `http(s)://<host>:<port>` — the LAN URL the server uses for everything. |
+| `remoteUrl` / `relayUrl` | Best-effort off-network URLs, resolved at save time via `resolveConnectionUrls`. A failure here is fine — the hourly refresh job keeps them current. |
+| `machineIdentifier` | Plex's `clientIdentifier` for the server (the dedupe key). |
+| `token` | The owner token, **encrypted at rest** via `encryptToken`. See [Token security](/docs/sources/token-security). |
+| `clientIdentifier` | The `X-Plex-Client-Identifier` used to obtain the token (reused for later Plex calls). |
+| `webAppUrl` | Optional Plex web-app URL override, or `null`. |
+| `ownerUserId` | The admin who connected it (`ctx.session.user.id`). |
+| `enabled` | `true` |
+| `isDefault` | `true` |
+
+**Reconnecting is idempotent.** `saveConnection` dedupes by `machineIdentifier`: if a source for the
+same physical server already exists, it **updates that row in place** rather than creating a
+duplicate. That's exactly how you refresh a re-issued token or a changed address — just run the
+sign-in flow again and pick the same server. It's also the fix after a
+[secret rotation](/docs/sources/token-security) makes the stored token undecryptable.
+
+## After saving
+
+The source detail page opens with the freshly-synced library list. A source is only usable for
+building channels once it's both **connected** and **synced** — connecting discovers the libraries,
+but the item metadata is cached by a separate step. Run **Sync metadata** (or wait for the daily
+job) so the source reaches **Ready**. See [Metadata sync](/docs/sources/metadata-sync).
+
+---
+
+See also: [Libraries](/docs/sources/libraries) · [Connections](/docs/sources/connections) ·
+[Token security](/docs/sources/token-security) · [Managing a source](/docs/sources/managing)

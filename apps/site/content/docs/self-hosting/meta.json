@@ -1,0 +1,6 @@
+{
+  "title": "Self-hosting",
+  "icon": "Container",
+  "defaultOpen": true,
+  "pages": ["docker", "configuration", "roles", "updating"]
+}

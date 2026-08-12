@@ -1,0 +1,92 @@
+---
+title: "Users & access control"
+description: "Import viewers from Plex and grant granular, server-enforced per-user access — down to the individual channel."
+---
+
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+> How Airwave provisions viewer accounts from a Plex server and gates what each viewer can see and
+> play, down to the individual channel — enforced **server-side**, not just hidden in the UI.
+
+## Two questions, kept separate
+
+Airwave splits identity from access on purpose:
+
+- **Authentication answers _"who is this?"_** Signing in establishes a `User` row and a role. That's
+  all it does — a valid login never, by itself, unlocks any content.
+- **Access answers _"what may they watch?"_** A distinct layer resolves a known `User` to a concrete
+  set of channels, and every viewer-facing read and the playback gate are filtered through it.
+
+Because the two are separate, a stranger who can complete a Google or Plex OAuth flow still can't get
+in unless an admin already provisioned an account for them — and an account, once it exists, sees
+exactly what its grants allow and nothing more.
+
+## Admin-provisioned, never self-serve
+
+There is **no public sign-up**. Accounts come into being three ways, all admin-driven:
+
+1. **The seeded owner** — one admin bootstrapped from `ADMIN_EMAIL` / `ADMIN_PASSWORD` on first boot
+   (`packages/auth/src/lib/seed-admin.ts`).
+2. **Admin-created viewers** — email + password accounts made in the admin panel
+   (`users.create` → better-auth's admin plugin).
+3. **Imported Plex viewers** — everyone the Plex server is shared with, matched by email in one click
+   (see [Importing users](/docs/users-and-access/importing)).
+
+Every OAuth provider (Plex, Google, GitHub) is configured **login-only** (`disableSignUp: true` in
+`packages/auth/src/index.ts`): a social sign-in only ever _matches_ an existing account by email and
+never creates one.
+
+## Viewers vs admins
+
+Two roles, via the better-auth admin plugin (`admin({ defaultRole: "user", adminRoles: ["admin"] })`):
+
+| Role | Who | Surface | Access |
+| --- | --- | --- | --- |
+| `admin` | The owner (usually just one) | The admin panel (tRPC / `apps/web`) | Bypasses all filtering — resolves to `"all"` |
+| `user` (Viewer) | Everyone in the household | The TV apps (REST / `apps/tv-web`, `apps/tv-native`) | Exactly what their grants allow |
+
+`role` is a column on `User`, server-issued by better-auth — a client can't forge it. Viewers are
+kept out of the admin panel entirely; see [Admin-only lockout](/docs/users-and-access/admin-lockout).
+
+## The content token vs identity distinction
+
+Importing a viewer creates an _account_, but it deliberately does **not** store a Plex token for that
+user or log them in. Playback for every viewer brokers the **admin's** media-source connection (§10) —
+a viewer needs no token of their own to watch. A viewer's optional personal Plex link exists only to
+let them sign in with Plex; it is not what streams their video. Identity and the content token are two
+different things.
+
+## In this section
+
+<Cards>
+  <Card title="Importing users" href="/docs/users-and-access/importing" description="The one-click, email-matched, idempotent Import Plex Users action — and what it pointedly does not do." />
+  <Card title="Access model" href="/docs/users-and-access/access-model" description="The three levels — all-access, FULL package, PARTIAL package + channels — and how future content flows (or doesn't)." />
+  <Card title="Enforcement" href="/docs/users-and-access/enforcement" description="The central accessibleChannels resolver and the REST + playback gates. Why it's server-side, not UI hiding." />
+  <Card title="Admin-only lockout" href="/docs/users-and-access/admin-lockout" description="disableSignUp, the admins-only panel (two layers), and the last-admin protection." />
+  <Card title="Granting access" href="/docs/users-and-access/granting" description="The admin Access UI — the master switch, the package/channel grid, and how Save translates to grants." />
+</Cards>
+
+## Source map
+
+| Concern | File |
+| --- | --- |
+| Auth config, login-only OAuth, roles | `packages/auth/src/index.ts` |
+| Seed the first admin from env | `packages/auth/src/lib/seed-admin.ts` |
+| `User.role`, `User.allAccess` | `packages/db/prisma/schema/auth.prisma` |
+| `UserPackageAccess`, `UserChannelAccess`, `PackageAccessMode` | `packages/db/prisma/schema/access.prisma` |
+| Import service | `packages/api/src/services/plex/import-users.ts` |
+| Import router | `packages/api/src/routers/plex.ts` (`importUsers`) |
+| Access resolver + read/write helpers | `packages/api/src/services/access/access.ts` |
+| Users / access admin router | `packages/api/src/routers/users.ts` |
+| REST enforcement (middleware + gate) | `apps/server/src/rest.ts` |
+| `adminProcedure` | `packages/api/src/index.ts` |
+| Admin route guard | `apps/web/src/routes/_auth/route.tsx` |
+| Admin users UI | `apps/web/src/routes/_auth/users/**` |
+
+---
+
+See also: [Sources](/docs/sources) · [Packages](/docs/packages) · [Channels](/docs/channels) ·
+[Sessions](/docs/sessions)
+
+_History: see `CHANGELOG.md` (v0.9.21 → v0.9.27) — the access-control config, REST enforcement, and
+the admin-only lockout._

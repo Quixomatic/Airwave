@@ -1,0 +1,59 @@
+---
+title: "Icon & tint"
+description: "The shared accent palette behind a package's look — store vivid, present muted — plus the two accent contracts and the per-channel color cycle."
+---
+
+A package's appearance is two stored strings: an **icon** id and a **tint** key. Both flow down to the
+channels that don't override them (see [Assigning channels](/docs/packages/assigning-channels)) and
+straight through to the [guide lens](/docs/packages/guide-lenses).
+
+## Icons
+
+Icons are stored as a namespaced string — `"lucide:Sparkles"` or `"phosphor:Television"` — and resolved
+by name at render time (`resolveIcon` in `apps/web/src/features/icons/icon-set.ts`). The
+`IconTintField` preview tile opens an icon picker; an unresolved name falls back to the caller's default
+icon.
+
+## The accent palette
+
+Color is one shared palette, `packages/ui/src/lib/accent-palette.ts` — **16 swatches** ordered around
+the hue wheel (`purple`, `violet`, `indigo`, `blue`, `sky`, `cyan`, `teal`, `mint`, `green`, `yellow`,
+`amber`, `orange`, `red`, `rose`, `pink`, `slate`). Airwave **stores the key** (e.g. `"orange"`), never
+a hex, so the palette can be retuned in one place without migrating stored data. Each swatch carries two
+hex roles:
+
+| Role | Used on | Example (`orange`) |
+|---|---|---|
+| **`vivid`** | Small, high-contrast surfaces — the picker swatch, the TV sidebar's package dot | `#f97316` |
+| **`tint`** | Large fills on the dark guide — rail/cell fill, channel-row icon | `#d08b2f` |
+
+The rule of thumb baked into the code: **store vivid, present muted** — never paint a large surface with
+the vivid value. Helpers `accentVivid(key)` / `accentTint(key)` map a key to each hex, and
+`accentSwatch` falls back to `slate` for a null or unknown key, so a stray value reads as "no color"
+rather than crashing.
+
+## Two copies of the key list, on purpose
+
+The server keeps its **own** copy of the key list — `ACCENT_KEYS` in
+`packages/api/src/services/accents.ts` — so the API layer (which the generator and tRPC validation use)
+never has to depend on the UI kit. The two lists must stay in sync; a drift just degrades to a neutral
+on the client rather than failing. The server file also holds `toAccentKey`, which coerces any
+stored/legacy value to a valid key (including a `TOKEN_TO_ACCENT` table that folds retired tokens like
+`gray`, `lime`, `emerald` to a near neighbor). `packages.create` and `packages.update` run the incoming
+tint through it.
+
+## The per-channel color cycle
+
+Channels within a package share **contiguous** guide numbers, so painting them all the package's one
+color made the guide read as long single-color bands. The generator sidesteps this: instead of
+inheriting the package tint, each generated channel gets a color from `CHANNEL_ACCENT_CYCLE` via
+`channelAccentAt(i)` (`accents.ts`), keyed on a running index.
+
+- The cycle is ordered so neighboring colors contrast (warm/cool/hue alternation) and **excludes
+  `slate`** (which reads as "no color").
+- A deterministic hash gives each color a **run length of 1–3** channels before jumping — organic
+  little runs rather than a rigid every-one-different rotation. It's a pure function of the index, so
+  the sequence is stable across the generator and any backfill.
+
+This is a generator behavior, not a package property: a preset channel that sets its own `tint` still
+wins, and a manually created channel left blank still inherits its package's tint.

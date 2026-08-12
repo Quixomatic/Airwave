@@ -1,0 +1,117 @@
+---
+icon: Boxes
+title: "Architecture"
+description: "The main parts of Airwave — the self-hosted server, the admin web app, the tv-web and tv-native players, and the shared packages — and how they fit together."
+---
+
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+Airwave is a **small server plus thin clients**. The server does all the thinking — resolving channels,
+building schedules, running jobs, and holding the one connection to your Plex — and the clients just
+tune in and stream. Everything lives in a single **pnpm + Turborepo** monorepo built on the
+[Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack).
+
+## The parts
+
+| Part | What it is | Stack |
+|---|---|---|
+| **Server** (`apps/server`) | The backend: the API (REST + tRPC), the deterministic scheduling engine, background jobs, durable workflows, and all Plex integration. This is the only piece that talks to Plex. | [Hono](https://hono.dev) on **Bun**, `@hono/trpc-server`, [`workflow`](https://www.npmjs.com/package/workflow) durable engine |
+| **Admin web** (`apps/web`) | The admin-only panel for building channels, packages, users, bumpers, jobs, and previewing lineups. Includes a built-in browser player for a quick check. | React, TanStack Router/Query, **Vite**, TailwindCSS, shadcn/ui, tRPC client |
+| **`tv-web`** (`apps/tv-web`) | The 10-foot TV app as a web player — runs in **any browser** and is packaged for **LG webOS** (and, on the roadmap, Samsung Tizen). Native-first `<video>` with an hls.js fallback. | React, TanStack Router/Query, **Vite**, hls.js |
+| **`tv-native`** (`apps/tv-native`) | The same 10-foot app as a native binary for **Apple TV, iPad, Android TV, and Fire TV**, with an **mpv** engine for wide-codec direct play (4K HDR HEVC, TrueHD/DTS). | **Expo / React Native** (`react-native-tvos`), `@airwave/mpv-player` |
+| **Shared packages** (`packages/*`) | The business logic and shared building blocks every app draws on (see below). | TypeScript workspace packages |
+
+The two web apps (`web`, `tv-web`) and the native app (`tv-native`) are **separate front-ends over the
+same server API**, so a channel you build in the admin plays identically on every client.
+
+### The shared packages
+
+| Package | Role |
+|---|---|
+| `@airwave/api` | **All the business logic** — the services behind the routers: Plex resolution, the scheduling/strategy engine, bumpers, access control, jobs. Also carries the tRPC + REST router definitions. |
+| `@airwave/auth` | [Better-Auth](https://www.better-auth.com) config — Plex OAuth + roles, plus the TV device-code login flow. |
+| `@airwave/db` | The [Prisma](https://www.prisma.io) schema, migrations, and generated client (PostgreSQL). |
+| `@airwave/env` | Typed environment loading. |
+| `@airwave/ui` | Shared shadcn/ui primitives and design tokens, used by `web` and `tv-web`. |
+| `@airwave/config` | Shared TypeScript / build config. |
+| `@airwave/mpv-player` | The native **mpv** playback module (video + headless audio) for `tv-native`. |
+| `@airwave/key-input` | The native remote / hardware-key input module for `tv-native`. |
+
+Business logic stays in `@airwave/api` services; the routers in `apps/server` are kept thin.
+
+## How the pieces talk
+
+```
+  Admin web  ──tRPC (cookie)──┐
+                              ├──►  Server (Hono/Bun)  ──Prisma──►  PostgreSQL
+  tv-web / tv-native  ──REST──┘         │
+       │                                └──owner token──►  Plex Media Server
+       └────────────── streams media directly from Plex ─────────┘
+```
+
+- **Viewers (`tv-web`, `tv-native`) use the REST API** at `/api/v1`, authenticated with a **bearer
+  token** obtained through the TV device-code login. A client asks "what's on channel N right now?" and
+  gets back the item plus the exact offset (the `effectiveTime`) to start playing at.
+- **The admin (`apps/web`) uses tRPC** at `/trpc` with a cookie session — the type-safe channel/package/
+  user/job management surface. (It can also hit REST for the browser player.)
+- **Channel artwork is served through a public `/img` proxy.** A CSS or `<img>` background can't send a
+  bearer token, so the server proxies Plex cover art (guide thumbnails, blurred bumper backgrounds) and
+  injects the source's token for it — clients never handle Plex credentials directly.
+- **Persistence is PostgreSQL via Prisma.** Channels, schedules, the media-metadata cache, users,
+  sessions, and job state all live there.
+
+### Playback is brokered through one Plex owner token
+
+The server holds **a single Plex owner token** for the connected source. It uses that token to sync
+metadata, resolve channel filters, and figure out what's on each channel now — but it is **not** a
+transcode proxy for the schedule itself. When a client tunes in, the server hands it the item, the
+offset, and the right Plex **connection** (resolved automatically **local → remote → relay**, so the
+same app works at home and on the road). The client then **streams the media straight from Plex**,
+direct-playing natively wherever its measured capabilities allow and only transcoding when it must.
+Because the owner token stays on the server, viewers never need their own Plex access to the underlying
+files.
+
+## Deployment shape
+
+The whole backend ships as **one Docker image** whose behavior is chosen at runtime by the `CG_ROLE`
+environment variable:
+
+| `CG_ROLE` | Runs |
+|---|---|
+| `server` | The API (REST + tRPC), scheduling engine, jobs, and Plex integration. |
+| `web` | Builds and serves the admin web app. |
+| `tvweb` *(optional)* | Serves `tv-web` as an auth-gated browser player, for casting / kiosk setups. |
+
+A PostgreSQL database and a `docker-compose.yml` wire it together; the `server` role applies Prisma
+migrations (`prisma migrate deploy`) on start. The native `tv-native` apps are built and distributed
+separately through their platform stores (or sideloaded). See the project
+[README](https://github.com/Quixomatic/Airwave#self-hosting-docker) for the full deploy.
+
+## Where to go next
+
+<Cards>
+  <Card title="Media sources" href="/docs/sources" description="How the server connects to Plex, enables libraries, and syncs metadata into its cache." />
+  <Card title="Channels" href="/docs/channels" description="How a channel's definition becomes a resolved pool and a continuous, deterministic timeline." />
+  <Card title="Platforms" href="/docs/platforms" description="Every client platform — native vs. web, and current status." />
+  <Card title="Background jobs" href="/docs/jobs" description="The scheduled tasks that grow schedules, sync metadata, refresh connections, and reap sessions." />
+</Cards>
+
+## Source map
+
+| Concern | Location |
+|---|---|
+| Server entry (route mounting, CORS, `/img`, `/api/v1`, `/trpc`) | `apps/server/src/index.ts` |
+| REST API (viewer-facing `/api/v1`) | `packages/api` routers + `apps/server/src` |
+| TV device-code auth (`/api/tv/auth`) | `apps/server/src/tv-auth.ts` |
+| Business logic / services | `packages/api/src/services/*` |
+| Auth (Plex OAuth, roles, device-code) | `packages/auth` |
+| Data model (Prisma schema + migrations) | `packages/db/prisma` |
+| Admin web app | `apps/web/src` |
+| `tv-web` player | `apps/tv-web/src` |
+| `tv-native` app | `apps/tv-native` |
+| Native mpv / key-input modules | `packages/mpv-player`, `packages/key-input` |
+
+---
+
+See also: [Platforms](/docs/platforms) · [Getting started](/docs/getting-started) ·
+[Channels](/docs/channels) · [Users & access control](/docs/users-and-access)

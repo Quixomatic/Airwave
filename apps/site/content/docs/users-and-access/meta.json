@@ -1,0 +1,6 @@
+{
+  "title": "Users & Access",
+  "icon": "Users",
+  "defaultOpen": true,
+  "pages": ["importing", "access-model", "enforcement", "admin-lockout", "granting"]
+}

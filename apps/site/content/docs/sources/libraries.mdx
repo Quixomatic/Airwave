@@ -1,0 +1,55 @@
+---
+title: "Libraries"
+description: "How Plex sections become MediaLibrary rows, which ones feed channels, and how a rescan picks up added or removed libraries without clobbering your choices."
+---
+
+A Plex server's libraries (Plex calls them **sections**) become `MediaLibrary` rows. Only the
+libraries you leave **enabled** feed channels and metadata sync — everything else is ignored.
+
+## Sections become MediaLibrary rows
+
+`syncLibraries` (`packages/api/src/services/plex/sync-libraries.ts`) fetches the sections via
+`getLibraries` → `GET /library/sections` on the server's `baseUrl`, and **upserts** each one keyed
+by `(mediaSourceId, key)`:
+
+- **New libraries are added enabled.** The `create` branch sets no `enabled` value, so the schema
+  default (`true`) applies.
+- **Existing libraries keep your choice.** The `update` branch only touches `title`, `type`, and
+  `lastScanAt` — it **never overwrites `enabled`**. So a library you toggled off stays off across
+  rescans.
+
+Each row records its Plex `key` (the section key), `title`, `type` (`"movie"`, `"show"`, …), the
+`enabled` flag, and `lastScanAt`. `syncLibraries` runs automatically at the end of
+[`saveConnection`](/docs/sources/connecting) and again on every rescan.
+
+> **Only movie and show libraries are useful.** Channels are built from movies and episodes, so
+> music (`artist`) and photo sections can be left disabled — nothing reads them.
+
+## Enabling and disabling
+
+On the source detail page (`apps/web/src/routes/_auth/sources/$sourceId.tsx`), the **Libraries**
+card lists every section with an **Enabled** switch. Toggling it calls `sources.setLibraryEnabled`,
+which flips `MediaLibrary.enabled`. Only enabled libraries are:
+
+- read by [metadata sync](/docs/sources/metadata-sync) (`syncMediaItems` includes
+  `libraries: { where: { enabled: true } }`), and
+- offered as sources of filter values when building a [channel](/docs/channels).
+
+Disabling a library doesn't delete anything already cached or scheduled — it just stops that section
+from being scanned or filtered against going forward.
+
+## Rescanning the library list
+
+**Rescan** (the button on the same card → `sources.rescan`) re-runs `syncLibraries`. Use it after
+you **add or remove a section on the Plex side** — it picks up the new list while preserving every
+enable/disable choice, per the upsert rules above.
+
+A rescan only refreshes the **list of libraries**. It does **not** page the item metadata inside
+them — that's the heavier job covered under [Metadata sync](/docs/sources/metadata-sync), triggered
+by the separate **Sync metadata** button. The same library-list refresh also runs unattended once a
+day as the **Library Scan** job (`library-scan`, daily 04:00).
+
+---
+
+See also: [Metadata sync](/docs/sources/metadata-sync) · [Connecting a server](/docs/sources/connecting) ·
+[Channels](/docs/channels)

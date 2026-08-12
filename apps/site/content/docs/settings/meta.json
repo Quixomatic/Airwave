@@ -1,0 +1,6 @@
+{
+  "title": "Settings",
+  "icon": "Settings",
+  "defaultOpen": true,
+  "pages": ["general", "ai-connections"]
+}

@@ -1,0 +1,84 @@
+---
+title: "Device capability diagnostic"
+description: "Measuring what a device can actually decode instead of cataloging device profiles — and how that drives direct-play vs transcode."
+---
+
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+> How Airwave learns what a real TV can actually decode — by *playing* a matrix of short test
+> clips and *measuring* what came out — instead of guessing from `canPlayType()` or maintaining a
+> database of device profiles. Plus how you override any verdict it gets wrong.
+
+## Measure, don't catalog
+
+Every playback decision Airwave makes for a device comes down to one question: **can this panel
+decode this container / codec / audio combination natively, or does the server have to transcode it
+first?** Guess optimistically and you hand the TV a stream it renders as a black screen or silent
+audio; guess pessimistically and you burn CPU transcoding something that would have direct-played in
+full quality, HDR intact.
+
+There are two obvious ways to answer, and Airwave rejects both:
+
+- **Ask the browser.** `HTMLVideoElement.canPlayType()` and `MediaSource.isTypeSupported()` reflect
+  what the codec *string* claims, not what the panel's silicon actually has a decoder for — and the
+  two disagree constantly on real TVs. The LG C2 reports `"probably"` for E-AC3/DTS/TrueHD yet
+  throws `bufferAddCodecError` the moment hls.js feeds them through MSE. `canPlayType` **lies**.
+- **Keep a catalog.** A table of "LG C2 → these codecs, Sony X90J → those codecs" is a losing game:
+  too many combinations of panel model, firmware, browser build, decode path (native `<video>` vs
+  hls.js/MSE vs mpv), and codec/container pairing to ever enumerate — and every entry drifts with
+  the next firmware update.
+
+So Airwave does neither. It **measures the real device, once.** On first sign-in the TV plays a
+matrix of ~49 short clips — one per container/codec/audio/feature combination worth knowing —
+through the exact playback element the app uses, and records for each whether frames *actually
+decoded* and whether audio *actually came out*. The union of what decoded becomes that device's real
+playback profile, stored server-side. The philosophy, in the words of the playback broker:
+*"measure, don't guess."*
+
+## How the result drives playback
+
+The measured rows are raw evidence. `getDeviceNativeCaps()`
+(`packages/api/src/services/capabilities/native-caps.ts`) resolves them into an effective codec set
+through three layers — `override ?? (measured && !quirk)`:
+
+1. **Measured** — a codec or container is credited only if a clip that *actually decoded* contained
+   it.
+2. **Known-issue quirks** — a few codecs pass the isolated test but fail our real playback paths
+   (VP9 on the C2, AV1 on Apple, DTS on LG), so they're dropped by default.
+3. **Per-device overrides** — manual toggles from the Device settings page win over both.
+
+That effective profile becomes an `X-Plex-Client-Profile-Extra` string, so Plex **direct-plays only
+what the panel proved it can handle** and transcodes the rest. It also feeds a native-first delivery
+ladder (`direct` raw-file → `http` progressive → `hls`/MSE): the better the measurement, the more
+often a device stays on rung one, HDR and HEVC untouched. The playback log stamps each tune with
+`capsSource: "measured" | "reported" | "default"` so you can see which profile was used.
+
+## In this section
+
+<Cards>
+  <Card title="How it works" href="/docs/capability-diagnostic/how-it-works" description="The on-device measurement flow — playing each test clip, reading the decode and audio signals, and the web vs native (mpv) differences." />
+  <Card title="Formats tested" href="/docs/capability-diagnostic/formats-tested" description="The full CAP_MATRIX: every video codec, audio codec, container, HDR mode, and edge case — what ffmpeg fabricates vs needs a real sample, and what each maps to." />
+  <Card title="Device overrides" href="/docs/capability-diagnostic/device-overrides" description="The per-device capability toggles, the sparse capabilityOverrides JSON, and the known-issue quirks (like AV1 off by default on Apple)." />
+</Cards>
+
+## Source map
+
+| Concern | File |
+| --- | --- |
+| The test matrix (single source of truth) | `packages/api/src/services/capabilities/matrix.ts` |
+| Clip generator (ffmpeg, from the matrix) | `apps/server/scripts/gen-capability-media.ts` |
+| Serving clips + manifest (`/caps/media/*`) | `apps/server/src/index.ts`, `packages/api/src/services/capabilities/service.ts` |
+| Probe screen — measure & record (web) | `apps/tv-web/src/features/diagnostic/diagnostic.tsx` |
+| Probe screen — measure & record (mpv/native) | `apps/tv-native/src/features/diagnostic/diagnostic.tsx` |
+| Result & device models | `packages/db/prisma/schema/device-capability.prisma`, `.../tv-device.prisma` |
+| Measured → quirks → overrides → effective | `packages/api/src/services/capabilities/native-caps.ts` |
+| Codec canonicalization + known-issue quirks | `packages/api/src/services/capabilities/codecs.ts` |
+| Device settings view + override writes | `packages/api/src/services/capabilities/device-settings.ts` |
+| Override UI (per-codec toggles, reset) | `apps/tv-web/src/routes/_auth/settings/device.tsx`, `apps/tv-native/app/settings/device.tsx` |
+| Feeding the profile to Plex | `packages/api/src/services/playback/broker.ts`, `packages/api/src/services/plex/quality.ts` |
+| First-run + per-server re-run flag | `apps/tv-web/src/lib/device.ts`, `apps/tv-native/src/lib/device.ts` |
+
+## Related
+
+- [Media sources](/docs/sources) — connecting the Plex server this profile is measured against and streamed from.
+- [Sessions](/docs/sessions) — the play log that surfaces the per-tune delivery decision this profile drives.

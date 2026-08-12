@@ -1,0 +1,131 @@
+---
+title: "A run's lifecycle"
+description: "How a single background-job run works internally — the LiveJob registry, the abort signal, progress reporting, and best-effort DB bookkeeping."
+---
+
+The runtime lives in `packages/api/src/services/jobs/scheduler.ts`. It is small on purpose: a
+module-level registry, one run path shared by scheduled ticks and manual triggers, cooperative
+cancellation, and a joined read model for the admin UI.
+
+## The registry: `live`
+
+The scheduler keeps a module-level `Map<string, LiveJob>` named `live`. A `LiveJob` bundles the static
+definition, the live `node-schedule` handle (`null` for manual jobs), the current cron, a `running`
+flag, an optional `AbortController`, and the latest progress value:
+
+```ts
+type LiveJob = {
+  def: JobDefinition;
+  job: schedule.Job | null; // null for manual jobs (run-now only)
+  cronSchedule: string;
+  running: boolean;
+  controller?: AbortController;
+  progress: JobProgress | null;
+};
+```
+
+Everything on a `LiveJob` other than `def` and `cronSchedule` is **in-memory only** — the `running`
+flag, the controller, and `progress` are never persisted.
+
+## Boot: `startJobs()`
+
+Called once at startup (`apps/server/src/index.ts`, `await startJobs()`). It clears the registry, then
+for **every** definition in `JOB_DEFINITIONS`:
+
+1. **`prisma.job.upsert`** — ensures a `Job` row exists, seeding `cronSchedule` from the definition's
+   `defaultCron` on first boot only (`update: {}` leaves an existing row untouched, so a self-hoster's
+   edited cron survives restarts).
+2. If the job is **not** `manual`, arms it with `schedule.scheduleJob(row.cronSchedule, ...)` whose
+   callback is just `void runJob(def.id)`. An invalid cron logs an error and skips that job. Manual
+   jobs get `job: null` and are never armed.
+3. Stores the `LiveJob` in `live`.
+
+So on restart the schedule is rebuilt from the **persisted** cron in the DB, not the code default — the
+code default only supplies the value for a job the DB has never seen.
+
+## The run path: `runJob(id)`
+
+One code path serves **both** the scheduled tick and the "Run now" button.
+
+- **Self-overlap guard.** The first line is `if (!l || l.running) return;`. A job already running is a
+  **no-op** — *skipped, not queued*. If a nightly sync overruns into the next tick, that tick simply
+  doesn't fire; the following one catches up (the jobs are idempotent top-ups).
+- Creates an `AbortController`, sets `running = true`, stashes the controller, clears `progress`, and
+  stamps `lastRunAt`.
+- Awaits `l.def.run(controller.signal, { progress: (p) => (l.progress = p) })` — handing the job the
+  **abort signal** and a **progress callback** that writes straight into `l.progress`.
+- **On success:** writes `lastFinishedAt`, `lastStatus: "success"`, clears `lastError`.
+- **On throw:** logs, writes `lastFinishedAt`, `lastStatus: "failed"`, and the message to `lastError`.
+- **`finally`:** clears `running`, the controller, and `progress`.
+
+### Best-effort bookkeeping
+
+Every `prisma.job.update` in `runJob` is wrapped in `.catch(() => {})`. A database hiccup while
+recording status **never** fails an otherwise-successful job — but it can leave `lastStatus` /
+`lastFinishedAt` momentarily stale. Because running state is in-memory, a server restart mid-run loses
+that a job was running: the attempt just won't get a `lastFinishedAt`.
+
+## Cancellation: `cancelJob(id)`
+
+Cooperative, via `AbortSignal`. `cancelJob` only calls `l.controller?.abort()` — it does **not**
+forcibly kill anything. Each job's `run` is responsible for checking `signal.aborted` between units of
+work and bailing out. The shared helper in `definitions.ts` is:
+
+```ts
+const throwIfAborted = (signal: AbortSignal) => {
+  if (signal.aborted) throw new Error("Job canceled");
+};
+```
+
+Most jobs call this at the top of each loop iteration (per source, per channel, …), so **Cancel takes
+effect at the next boundary**, not instantly. A job stuck inside one long call won't stop until that
+call returns.
+
+## Progress reporting
+
+A job may call `ctx.progress({ current, total, label })`. The scheduler stores only the **latest**
+value in `l.progress` (in memory); the read model returns it so the admin UI can draw a live bar.
+Conventions:
+
+- Batched schedule jobs report `current` / `total` across the batch and use the **channel name** as
+  the `label`.
+- `total: 0` (or no progress yet) is treated as **indeterminate** — the UI shows a pulsing one-third
+  bar instead of a percentage.
+
+The `JobProgress` type is `{ current: number; total: number; label: string }`.
+
+## The read model: `listJobs()`
+
+The single query the admin page renders. It joins three sources per job:
+
+| Source | Fields |
+|---|---|
+| `JOB_DEFINITIONS` (static) | `id`, `name`, `description`, `interval`, `manual`, `detailHref` |
+| `live` registry (in-memory) | `running`, `progress`, effective `cronSchedule`, `nextRunAt` via `job.nextInvocation()` |
+| `Job` row (persisted) | `lastRunAt`, `lastFinishedAt`, `lastStatus` |
+
+## The `Job` model
+
+`packages/db/prisma/schema/job.prisma` (table `job`). Deliberately thin — only what must outlive the
+process:
+
+| Column | Meaning |
+|---|---|
+| `id` | Stable slug, e.g. `"metadata-sync"` (matches the definition `id`) |
+| `cronSchedule` | The editable node-schedule cron expression |
+| `enabled` | Boolean, default `true` |
+| `lastRunAt` | When the last run started |
+| `lastFinishedAt` | When it finished (success or fail) |
+| `lastStatus` | `"success"` or `"failed"` |
+| `lastError` | Message from the last failed run |
+| `createdAt` / `updatedAt` | Standard timestamps |
+
+What is **not** here — the `running` flag, the `AbortController`, live `progress` — is all in-memory,
+as noted above.
+
+## Adding a job
+
+Append a `JobDefinition` to `JOB_DEFINITIONS` with a `run(signal, ctx)` that wraps a service function
+and checks `signal.aborted` between units of work. On the next boot, `startJobs()` seeds its `Job` row
+and it becomes listable, runnable, cancellable, and — if not `manual` — reschedulable, with no other
+wiring. Keep business logic in `packages/api/src/services/<domain>/`, not in the definition itself.

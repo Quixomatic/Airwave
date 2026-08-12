@@ -1,0 +1,91 @@
+---
+title: "Enforcement"
+description: "The central accessibleChannels resolver and the REST + playback gates. Why enforcement is server-side, not UI hiding."
+---
+
+Every access level resolves through **one function**, and that resolver is woven into every
+viewer-facing REST read plus the playback gate. Enforcement is **server-side** — hiding a channel in
+the UI is not what protects it. A direct bearer call or a deep-link to a channel a viewer can't see is
+refused with a 403, regardless of what any client shows.
+
+## The central resolver — `accessibleChannels`
+
+`packages/api/src/services/access/access.ts`:
+
+```ts
+export type AccessSet = "all" | Set<string>;
+export async function accessibleChannels(prisma, userId): Promise<AccessSet>
+```
+
+Resolution logic:
+
+- Load the user's `role`, `allAccess`, their `FULL` package grants, and their explicit channel grants.
+- **`role === "admin"` OR `allAccess` → return `"all"`** — a sentinel that short-circuits every
+  downstream filter and gate. Admins and all-access users are never filtered.
+- Otherwise build a `Set<string>`: the explicit `UserChannelAccess` channel ids, **unioned** with
+  every channel whose `packageId` is one of the user's FULL packages.
+- An unknown user resolves to an **empty set** (sees nothing) — fail-closed.
+
+Two helpers make the sentinel ergonomic for callers:
+
+```ts
+isChannelAllowed(access, channelId)  // "all" ⇒ true, else set membership
+filterAccessibleIds(ids, access)     // "all" ⇒ unchanged, else intersection
+```
+
+## Woven into the REST surface — `apps/server/src/rest.ts`
+
+This is the REST API the TV apps (`apps/tv-web`, `apps/tv-native`) hit as viewers. Two pieces of
+middleware do the work:
+
+1. **Resolve once per request.** The `api.use("*")` middleware requires an authenticated session
+   (cookie or `Authorization: Bearer <token>`), then stashes `accessibleChannels(...)` on the Hono
+   context as `c.get("access")`. A viewer tunes across several endpoints per session, so the set is
+   resolved a single time and reused.
+
+2. **Gate every per-channel route in one place.** `api.use("/channels/:id/*")` returns **403** unless
+   `isChannelAllowed(access, id)`. The must-have here is **`GET /channels/:id/media`** — the actual
+   stream resolver — so no viewer can stream a channel they can't see, even by guessing the id.
+
+### Filtered reads
+
+These endpoints _filter_ by the access set — channels the viewer can't see simply never appear:
+
+| Route | How |
+| --- | --- |
+| `GET /channels` | `listGuideChannels(prisma, access)` |
+| `GET /packages` | `listActivePackages(prisma, access)` |
+| `GET /guide` | `getGuideGrid(..., access)` |
+| `GET /favorites`, `GET /recents` | `filterAccessibleIds(...)` — inaccessible favorites/recents are **hidden, not deleted**; re-granting restores them |
+
+### Body-carried routes gated inline
+
+Routes whose channel id lives in the request **body** are gated inline with `isChannelAllowed` —
+middleware can't read the body without consuming it:
+
+- `POST /favorites`
+- `POST /sessions/heartbeat`
+- `POST /playback/log`
+
+### Not channel-scoped
+
+Device-level routes (`/qualities`, `/connections`, `/caps/*`, `/device/*`) aren't channel-scoped and
+aren't gated. `GET /sessions` (the "Now Watching" view) is **admin-only**, checked inline.
+
+**Admins bypass everything** — their access resolves to `"all"`, which short-circuits every filter and
+every gate above.
+
+## Not duplicated on the admin surface
+
+The admin panel is tRPC (`packages/api/src/routers/`), every procedure is an `adminProcedure`, and
+admins resolve to `"all"` — so no viewer filtering is added there. All access enforcement lives on the
+REST surface, keeping the check in exactly one place per concern.
+
+## Source map
+
+| Concern | File |
+| --- | --- |
+| Access resolver + `isChannelAllowed` / `filterAccessibleIds` | `packages/api/src/services/access/access.ts` |
+| REST middleware (resolve once) + per-channel gate | `apps/server/src/rest.ts` |
+| Filtered read services | `packages/api/src/services/{guide,packages,favorites,recents}.ts` |
+| Stream resolver (`GET /channels/:id/media`) | `packages/api/src/services/playback/broker.ts` |

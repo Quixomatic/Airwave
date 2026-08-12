@@ -1,0 +1,63 @@
+---
+title: "Importing users"
+description: "The one-click, email-matched, idempotent Import Plex Users action — and what it pointedly does not do."
+---
+
+Rather than making every household member register by hand, an admin can pull in everyone the Plex
+server is already shared with. This is an **explicit, Overseerr-style action** (a button) — not an
+automatic background sync.
+
+![The admin Users page — the list and the Import Plex Users button](/screenshots/admin-users.webp)
+
+## Where it lives
+
+| Layer | File |
+| --- | --- |
+| UI — the "Import Plex Users" button | `apps/web/src/routes/_auth/users/index.tsx` (calls `trpc.plex.importUsers`) |
+| Router — `importUsers` (an `adminProcedure`) | `packages/api/src/routers/plex.ts` |
+| Service — `importPlexUsers(prisma, source)` | `packages/api/src/services/plex/import-users.ts` |
+| Plex fetch — `getSharedUsers(...)` | `packages/api/src/services/plex/client.ts` |
+
+The router picks the first Plex `MediaSource` (by `createdAt`); if there is none it throws
+`PRECONDITION_FAILED` with _"Connect a Plex server first."_ Connect and sync a
+[source](/docs/sources) before importing.
+
+## How it works
+
+1. The chosen source must carry both a `clientIdentifier` and a `machineIdentifier`; otherwise the
+   service throws _"…missing its identifiers — reconnect it."_
+2. `getSharedUsers` calls the classic `https://plex.tv/api/users` XML endpoint (the same one
+   Overseerr and Tautulli use) with the **decrypted** owner token. Each `<User>` carries nested
+   `<Server>` entries; the client keeps only users whose server list includes **this** server's
+   `machineIdentifier`. Each kept result is `\{ plexId, email, username, thumb \}`.
+3. For each shared user:
+   - **Skip** anyone with no email — email is the identity key.
+   - **Skip** anyone whose email already matches an existing `User`.
+   - Otherwise **create** a `User` with a fresh UUID, the Plex email, the Plex username as `name`,
+     `emailVerified: true`, and `role: "user"` (Viewer).
+4. It returns `\{ imported, skipped, total \}`, surfaced by the UI as a toast.
+
+## Idempotent by email
+
+Skipping any email that already exists is what makes the import **safe to re-run**: it never
+duplicates accounts and never touches owner-created or env-seeded admins. Re-run it whenever you share
+the Plex library with someone new — only the genuinely new emails become accounts.
+
+## What import does _not_ do
+
+- **It stores no Plex token for the imported user** and **does not log them in.** It only makes an
+  account _exist_, so that later "Sign in with Plex" (login-only) can match it by email. Playback for
+  every viewer brokers the admin's connection — a viewer never needs a token of their own.
+- **It sets no explicit access.** New users are created with `allAccess = true` (the schema default —
+  see [Access model](/docs/users-and-access/access-model)), so a freshly imported viewer sees the
+  **whole lineup** until an admin narrows them on the [Access page](/docs/users-and-access/granting).
+
+## Source map
+
+| Concern | File |
+| --- | --- |
+| Import service (idempotent create) | `packages/api/src/services/plex/import-users.ts` |
+| Plex shared-users fetch | `packages/api/src/services/plex/client.ts` (`getSharedUsers`) |
+| Import router | `packages/api/src/routers/plex.ts` (`importUsers`) |
+| Import button | `apps/web/src/routes/_auth/users/index.tsx` |
+| `User` model + `allAccess` default | `packages/db/prisma/schema/auth.prisma` |

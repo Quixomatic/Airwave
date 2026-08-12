@@ -1,0 +1,116 @@
+---
+title: "Durable workflows"
+description: "How Airwave runs its long-lived, crash-resilient jobs — the AI lineup builder and the lineup importer — on the Workflow SDK, against its own Postgres."
+---
+
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+> Two of Airwave's jobs are too long and too expensive to lose to a container restart: the **AI
+> lineup builder** and the **lineup importer**. Both run on Vercel's **Workflow SDK** (WDK), against
+> Airwave's own Postgres — no Redis, no Vercel, no framework adapter. This section is how that engine
+> works and how you watch it run.
+
+## What a durable workflow is here
+
+Most background work in Airwave runs on a plain in-process scheduler (node-schedule; see
+[Background jobs](/docs/jobs)). That is right for short, idempotent, fire-and-forget tasks: the job
+function is `await`ed to completion and its state lives in memory. It **cannot** represent a
+multi-hour run that must survive a process restart — the moment the container recycles, an in-flight
+job is simply gone.
+
+A **durable workflow** solves exactly that. It is split into two kinds of code:
+
+- A deterministic **orchestrator body** (a function marked `"use workflow"`) that decides *what runs
+  in what order*, but does no I/O itself.
+- A set of durable **steps** (functions marked `"use step"`) that do the actual work — hit Plex, call
+  a model, write rows — and are individually checkpointed and retried.
+
+Every completed step's input and output is persisted to Postgres. If the process dies mid-run, a
+brand-new process **resumes from the event log**: finished steps return their stored result instead
+of re-running, and only the unfinished work is dispatched again. This is the headline property proven
+during the go/no-go spike — a run's first step completed, the process was killed mid-flight, and a
+*different* process finished the run.
+
+## Why the Workflow SDK, not a one-shot call
+
+The AI lineup builder analyzes a whole library, designs a lineup, and builds dozens of channels —
+each channel its own multi-call LLM agent loop. A single `await`ed function call has no way to
+represent that: it holds all state in memory, so a restart loses hours of progress and real money.
+WDK gives three things a one-shot call can't:
+
+- **Resumable multi-step / multi-agent runs** — a crash resumes only the channels that hadn't
+  finished, never re-paying for the ones that had.
+- **At-least-once, checkpointed execution** — each step's result is durable, so retries and restarts
+  are safe.
+- **A run history** — every run, step, and event is queryable after the fact (see
+  [Observability](/docs/workflows/observability)).
+
+## How flows and steps run
+
+WDK is **at-least-once**, and the workflow body **replays from the top every time a step completes**.
+On replay, completed steps return their stored result from the event log — they are never re-run —
+but an **in-flight step can be dispatched again**. That single fact is why the body must be strictly
+deterministic: no `Date.now()`, no `Math.random()`, no I/O outside a step, and every step parameter
+and return value must be JSON-serializable.
+
+The at-least-once behavior bites hardest on **fan-out**. A `Promise.all` of build steps has its
+still-running members re-dispatched on each completion, so without a guard a third of build spend
+could be duplicate work. Airwave's fix is the **reserve-don't-check** pattern — a build creates its
+channel row up front as an atomic claim on the `@unique` channel number, so a duplicate dispatch
+loses the race on the constraint and exits in milliseconds. See
+[The AI lineup builder](/docs/workflows/lineup-builder) for the full account.
+
+All durable state lives in **the app's own Postgres**, in three schemas WDK owns (`workflow`,
+`workflow_drizzle`, `graphile_worker`). Prisma coexists in the same database because its schema
+describer filters by namespace and simply cannot see those schemas — so `prisma db push` never
+touches them, and `packages/api` reads WDK's tables only via raw SQL, never through a Prisma model.
+There is **no Redis**.
+
+## The `WORKFLOW_ENABLED` gate
+
+The whole engine is **opt-in and off by default**, gated by `WORKFLOW_ENABLED=1`:
+
+- The check lives in `startWorkflowEngine()` (`apps/server/src/workflow-engine.ts`). With the flag
+  unset, the function logs `disabled` and returns immediately — the server boots exactly as before.
+- The generated handler bundles under `apps/server/.well-known/` are imported **lazily**, so a fresh
+  checkout that has never run `workflow build` still starts.
+- The tRPC procedures that trigger runs report the runner as unavailable when the flag is off
+  (`requireLineupRunner()`).
+- On a self-hosted container, if `WORKFLOW_ENABLED=1`, the WDK schema is bootstrapped on start
+  (`pnpm --filter server workflow:bootstrap`) — an idempotent migration runner, non-fatal, that
+  records what it applied and skips it next time.
+
+Note the gate is **separate** from the [AI assistant](/docs/ai-assistant) chat, which is gated only
+by having an `AiConnection` — the two AI systems are wired independently. The lineup builder
+additionally needs planner and worker connections; without them it stays unavailable even with the
+flag on.
+
+## In this section
+
+<Cards>
+  <Card title="The AI lineup builder" href="/docs/workflows/lineup-builder" description="The durable, multi-agent 'Build Lineup with AI' run — planner authors filters, workers verify-and-commit, and the token economics that make a full lineup cost ~$1." />
+  <Card title="The importer" href="/docs/workflows/importer" description="The durable Import workflow — dedupe, number, and remap an uploaded lineup, with an end-to-end dry-run that skips every write." />
+  <Card title="Observability" href="/docs/workflows/observability" description="Watching a run — the Workflow SDK inspector (pnpm workflow:ui) and Airwave's in-app run pages with their trace tables." />
+</Cards>
+
+## Source map
+
+| Concern | File |
+|---|---|
+| Engine wiring + `WORKFLOW_ENABLED` gate | `apps/server/src/workflow-engine.ts` |
+| AI lineup workflow (orchestrator + steps) | `apps/server/workflows/lineup.ts` |
+| Import workflow (orchestrator + steps) | `apps/server/workflows/import.ts` |
+| Reserve-don't-check channel builder | `packages/api/src/services/agent/channel-builder.ts` |
+| Runner registry (server ⇄ `packages/api`) | `packages/api/src/services/agent/lineup-runner.ts`, `import-runner.ts` |
+| Client transform (dev preload) | `apps/server/workflow-plugin.ts`, `apps/server/bunfig.toml` |
+| Client transform (prod bundle) | `apps/server/tsdown.config.ts` (`workflowClientTransform`) |
+| `workflow:build` / `workflow:ui` tasks | `package.json`, `turbo.json`, `apps/server/package.json` |
+| Observability UI launcher | `apps/server/scripts/workflow-ui.ts` |
+| Start / migrate / bootstrap on boot | `docker/entrypoint.sh`, `Dockerfile` |
+
+---
+
+See also: [Background jobs](/docs/jobs) (the separate plain-cron system) ·
+[AI assistant](/docs/ai-assistant) (the interactive chat, gated independently) ·
+[Import / Export](/docs/import-export) (the file format the importer consumes). History is in
+`CHANGELOG.md`.

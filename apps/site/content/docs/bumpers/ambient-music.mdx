@@ -1,0 +1,81 @@
+---
+title: Ambient music
+description: The optional soft music bed under a bumper — a folder of tracks, a deterministic per-break pick, and a DVR-derived position and fade that scrubs along with you.
+---
+
+Bumpers can play a soft **ambient music bed** underneath the "Up Next" card — a quiet track that fades
+in as the break starts and fades out just before the next program begins, like the between-shows music
+on Pluto TV. It's entirely optional: with no tracks in the library, or with music switched off, breaks
+are simply silent.
+
+## The track library
+
+Tracks live in a **library** backed by the `BumperMusic` table
+(`packages/db/prisma/schema/bumper.prisma`). Each row indexes one audio file plus its state:
+
+| Field | Meaning |
+|---|---|
+| `filename` | The file's name inside `BUMPER_MUSIC_DIR` — its on-disk identity (unique). |
+| `title` | Display name (defaults to the filename without extension; editable). |
+| `enabled` | In the random pool when true — the per-track toggle. |
+| `contentType` / `sizeBytes` | `audio/mpeg` \| `audio/mp4` \| `audio/aac`, and file size. |
+| `source` | How it arrived: `upload` (admin UI) or `scan` (found in the volume). |
+| `missing` | Set when the indexed file has gone missing — kept and flagged, not deleted. |
+
+The **folder is the source of truth for bytes**, the DB for "what's in the random pool". Files live in
+`BUMPER_MUSIC_DIR` (a mounted volume on self-host); the TV apps stream them over the API.
+
+There are **two ways in**:
+
+1. **Upload** through the admin **Bumpers** page → **Music library** (a multipart POST to
+   `/api/admin/bumper-music`, since tRPC is JSON-only).
+2. **Drop files into the volume** and run the manual **Scan Bumper Music** (`bumper-music-scan`) job —
+   it indexes new files, flags ones whose file has gone missing, and clears the flag on any that
+   reappear.
+
+Everything else — list, per-track enable/disable, rename, delete, and the scan — is on the
+`bumperMusic.*` tRPC router (`packages/api/src/routers/bumper-music.ts`). See
+[Configuration](/docs/bumpers/configuration) for the global volume and fade controls.
+
+## How a track is chosen and driven
+
+Two properties make the bed behave like *part of* the bumper rather than a separate timer, so DVR
+scrubbing feels right:
+
+- **Deterministic pick.** The track is chosen by hashing the bumper's **stable key** (its timeline
+  start) with an FNV-1a hash into the enabled-track pool. The *same* bumper always draws the *same*
+  track, so it survives scrubbing and re-mounts — no server round-trip, and each track keeps its own
+  cacheable URL.
+- **DVR-derived position and fade.** The audio position tracks `elapsed % trackDuration` (looping if
+  the track is shorter than the break), and the volume is a **pure function** of `elapsed` versus the
+  bumper's total length — ramp up over the fade-in, ramp down over the fade-out. A DVR scrub just moves
+  `elapsed`, so the music seeks and fades right along with the picture. Pause the channel and the bed
+  pauses with it, holding the fade.
+
+## Two clients, two mixing strategies
+
+The *logic* above is shared, but **how** the music is produced differs by platform:
+
+- **tv-web** mixes it on a **separate `<audio>` element** alongside the video, driven by the
+  `useBumperMusic` hook (`apps/tv-web/src/features/watch/use-bumper-music.ts`). The browser happily
+  plays two independent audio sources at once.
+- **tv-native** plays the bed on the **one hybrid mpv engine**, folded into
+  `apps/tv-native/src/features/watch/use-tv-player.ts`. During a bumper the single player unloads the
+  program and plays the *music* (in an "audio" content mode); exiting the bumper cleanly reloads the
+  next program (back to "video" mode).
+
+### Why tv-native uses a single engine (the contention fix)
+
+An earlier tv-native design ran the ambient music on a **second** libmpv instance. On iOS/tvOS that
+broke the video's surround sound: an app gets **one** shared `AVAudioSession` and one audio output, and
+two libmpv engines contend over it — the stereo music engine claimed the output and the video couldn't
+reclaim 5.1 coming out of a break. No amount of session/config tuning fixed it, because each mpv
+instance's internal audio output grabs and releases the shared session on its own. The resolution
+(shipped v0.9.73) was to have **one engine** that switches between video and audio modes, so there's
+only ever a single audio output and no contention. The full diagnosis trail lives in
+`.plans/bumper-music-audio-contention.md`, and the engine design in `.plans/mpv-hybrid-core.md`.
+
+---
+
+See also: [Interstitials](/docs/bumpers/interstitials) · [Configuration](/docs/bumpers/configuration) ·
+[Background jobs](/docs/jobs)
