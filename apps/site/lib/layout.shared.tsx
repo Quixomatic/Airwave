@@ -12,9 +12,9 @@ export function baseOptions(): BaseLayoutProps {
       title: <Logo />,
     },
     links: [
+      { text: "Features", url: "/features" },
+      { text: "Channel guide", url: "/channel-guide" },
       { text: "Docs", url: "/docs" },
-      { text: "About", url: "/about" },
-      { text: "FAQ", url: "/faq" },
     ],
     githubUrl: "https://github.com/Quixomatic/Airwave",
   };

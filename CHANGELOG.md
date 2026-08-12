@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.78] - 2026-08-12
+
+### Added
+
+- **`apps/site` marketing pages + a real landing.** Rebuilt the home page in the fumadocs-landing style
+  (gradient hero + hero shot, a feature grid, a platforms strip, a three-step "how it works", an admin
+  showcase, and a final CTA), and added a **sticky sitemap footer** across all `(home)` pages. New pages:
+  **Features** (grouped feature showcase), **Channel guide** (the guide experience), **Contact** (GitHub +
+  email), and **Privacy Policy** + **Terms of Service** (honest drafts — accurate to Airwave's self-hosted,
+  no-telemetry reality; review before relying on them). Top nav is now Features · Channel guide · Docs. A
+  small `components/marketing.tsx` kit (Container / ButtonLink / SectionHeading / LegalPage) keeps them
+  consistent. All Tailwind v4 + fumadocs `fd-*` tokens — no new deps. `next build` green (68 static routes).
+
 ## [0.9.77] - 2026-08-12
 
 ### Fixed
