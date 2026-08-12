@@ -1,0 +1,31 @@
+{
+  "name": "site",
+  "version": "0.9.74",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3003",
+    "build": "next build",
+    "start": "next start -p 3003",
+    "postinstall": "fumadocs-mdx",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fumadocs-core": "^16.14.3",
+    "fumadocs-mdx": "^15.2.3",
+    "fumadocs-ui": "^16.14.3",
+    "next": "^16.3.0",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@airwave/config": "workspace:*",
+    "@tailwindcss/postcss": "^4.3.2",
+    "@types/mdx": "^2.0.14",
+    "@types/node": "^22.13.14",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:"
+  }
+}

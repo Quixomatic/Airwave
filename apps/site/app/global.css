@@ -1,0 +1,6 @@
+@import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+
+/* Tailwind v4 needs to scan fumadocs-ui's compiled classes so its utilities aren't purged. */
+@source "../node_modules/fumadocs-ui/dist/**/*.js";

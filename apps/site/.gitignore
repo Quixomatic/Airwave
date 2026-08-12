@@ -1,0 +1,15 @@
+# next.js
+/.next/
+/out/
+
+# fumadocs-mdx generated content source
+/.source/
+
+# production
+/build
+
+# misc
+next-env.d.ts
+*.tsbuildinfo
+.turbo/
+node_modules/
