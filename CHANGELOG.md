@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.77] - 2026-08-12
+
+### Fixed
+
+- **`apps/site` Vercel deploy: scope the install to the site's own dependency subgraph.** Vercel installs
+  the whole pnpm workspace, which fired `packages/db`'s `postinstall` (`prisma generate`) and failed on the
+  missing `DATABASE_URL` — an env the static docs/marketing site has no business needing. Added
+  `apps/site/vercel.json` pinning `installCommand: "pnpm install --filter site..."`, so only `site` + its
+  deps (fumadocs, Next, React, `@airwave/config`) install and `packages/db`/`api`/`server` postinstalls never
+  run. No runtime change; docs deploy only.
+
 ## [0.9.76] - 2026-08-12
 
 ### Added
