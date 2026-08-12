@@ -2,7 +2,7 @@
   "expo": {
     "name": "Airwave",
     "slug": "airwave",
-    "version": "0.9.73",
+    "version": "0.9.74",
     "scheme": "airwave",
     "orientation": "landscape",
     "userInterfaceStyle": "dark",
@@ -14,6 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
+      "isTabletOnly": true,
       "bundleIdentifier": "com.airwave.tv",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,

@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.74] - 2026-08-12
+
+### Changed
+
+- **tv-native: the iOS (iPad) app is now iPad-only for App Store submission** (`ios.isTabletOnly: true` →
+  `TARGETED_DEVICE_FAMILY = "2"`), so review doesn't flag a missing iPhone UI — the 10-foot / large-tablet
+  layout is deliberately not a phone experience. This is safe for the Apple TV build: on a tvOS target
+  (`EXPO_TV=1`) both Expo's own device-family setter (it forces family `"3"` whenever `TVOS_DEPLOYMENT_TARGET`
+  is present) and `@react-native-tvos/config-tv` (which explicitly overwrites `TARGETED_DEVICE_FAMILY = "3"`)
+  override it — so `isTabletOnly` only ever yields family `"2"` on the non-TV iPad build. First of the
+  App-Store-submission prerequisites (Apple iPad + Apple TV first, then webOS — see `.docs/publishing.md`).
+
 ## [0.9.73] - 2026-08-11
 
 ### Changed
