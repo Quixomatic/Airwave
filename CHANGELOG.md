@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.79] - 2026-08-12
+
+### Changed
+
+- **`apps/site`: restored FAQ to the top nav** (Features · Channel guide · Docs · FAQ). About remains in the
+  footer's Project column.
+
 ## [0.9.78] - 2026-08-12
 
 ### Added

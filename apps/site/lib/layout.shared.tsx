@@ -15,6 +15,7 @@ export function baseOptions(): BaseLayoutProps {
       { text: "Features", url: "/features" },
       { text: "Channel guide", url: "/channel-guide" },
       { text: "Docs", url: "/docs" },
+      { text: "FAQ", url: "/faq" },
     ],
     githubUrl: "https://github.com/Quixomatic/Airwave",
   };
