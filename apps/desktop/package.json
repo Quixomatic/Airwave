@@ -1,0 +1,22 @@
+{
+  "name": "desktop",
+  "version": "0.9.91",
+  "private": true,
+  "type": "module",
+  "description": "Airwave Desktop — an Electrobun tray-only supervisor that runs embedded Postgres + the Airwave server + admin + tv-web on local ports, next to Plex. The browser is the UI. See .plans/desktop-server.md.",
+  "scripts": {
+    "start": "electrobun dev",
+    "dev": "electrobun dev --watch",
+    "prebuild": "turbo -F server build -F web build -F tv-web build",
+    "build": "electrobun build",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "electrobun": "^1.15.1",
+    "embedded-postgres": "18.4.0-beta.17"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

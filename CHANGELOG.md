@@ -2,6 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.91] - 2026-08-13
+
+### Added
+
+- **`apps/desktop` — Airwave Desktop (Electrobun tray supervisor).** A one-click, **tray-only** desktop app
+  that runs the Airwave stack — **embedded Postgres + server + admin + tv-web** — on local ports next to Plex,
+  no Docker/NAS, for the run-Plex-on-your-main-machine crowd. The **browser is the UI** (tray → Open Admin);
+  real TVs on the LAN connect to the machine's LAN IP. It mirrors `docker/entrypoint.sh` natively: start
+  **embedded Postgres** (a real PG binary via `embedded-postgres` → zero app-code change, full workflow
+  parity; PGlite/SQLite deliberately rejected) → `prisma migrate deploy` → spawn the built server → serve the
+  admin + tv-web SPAs (replicating `serve-web.ts`), all driven by a config file with a friendly **"expose on
+  my network"** toggle (the docker-compose CORS/exposure knobs). Points the server at `CAP_MEDIA_DIR` for the
+  capability-diagnostic clips.
+- **Real** in this pass: the tray (Electrobun `Tray` API), config load/save, browser-open, LAN detection, the
+  `/setup` server, and the full supervisor wiring. **Stage-5 TODOs**: distribution bundling — shipping the
+  server + fetching the ~430MB `media-v1` capability media on first run. Not yet verified on a real Electrobun
+  run (`pnpm -F desktop dev` + build-script approval needed). Full plan: `.plans/desktop-server.md`.
+
 ## [0.9.90] - 2026-08-12
 
 ### Changed
