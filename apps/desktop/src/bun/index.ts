@@ -1,6 +1,7 @@
 import { Tray } from "electrobun/bun";
 import { spawn, type Subprocess } from "bun";
 import { randomBytes } from "node:crypto";
+import { createServer } from "node:net";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir, networkInterfaces } from "node:os";
 import { dirname, join, normalize, sep } from "node:path";
@@ -150,6 +151,47 @@ async function isServing(url: string): Promise<boolean> {
 /** Attach to an already-running `pnpm dev` stack when its admin (or server) dev port answers; else self-host. */
 async function detectAttach(): Promise<boolean> {
   return (await isServing("http://localhost:3001")) || (await isServing("http://localhost:3000"));
+}
+
+// ── Dynamic ports (we share the host's port space — no container network — so never assume a port is free) ──
+/** True if `port` can be bound on `host` right now. */
+function portFree(port: number, host: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const s = createServer();
+    s.once("error", () => resolve(false));
+    s.once("listening", () => s.close(() => resolve(true)));
+    s.listen(port, host);
+  });
+}
+
+/** Return `preferred` if free, else scan upward, else let the OS hand out any free port. */
+async function freePort(preferred: number, host = "127.0.0.1"): Promise<number> {
+  if (await portFree(preferred, host)) return preferred;
+  for (let p = preferred + 1; p < preferred + 200; p++) {
+    if (await portFree(p, host)) {
+      console.log(`[desktop] port ${preferred} busy → using ${p}.`);
+      return p;
+    }
+  }
+  return await new Promise<number>((resolve) => {
+    const s = createServer();
+    s.listen(0, host, () => {
+      const p = (s.address() as { port: number }).port;
+      s.close(() => resolve(p));
+    });
+  });
+}
+
+/** Resolve the ports we're about to bind to free ones (mutating `config.ports`) so nothing collides with an
+ * existing service. PG + setup are loopback-internal; the server/admin/tv-web ports feed the browser URLs. */
+async function resolvePorts(supervise: boolean): Promise<void> {
+  config.ports.setup = await freePort(config.ports.setup);
+  if (!supervise) return;
+  const bind = host();
+  config.ports.server = await freePort(config.ports.server, bind);
+  config.ports.admin = await freePort(config.ports.admin, bind);
+  if (config.tvwebEnabled) config.ports.tvweb = await freePort(config.ports.tvweb, bind);
+  config.ports.pg = await freePort(config.ports.pg);
 }
 
 // Dev points at the running `pnpm dev` stack (3000/1/2); supervise uses the desktop's own config ports.
@@ -462,6 +504,9 @@ saveConfig(config);
 
 // Attach to a running `pnpm dev` stack if one's up; otherwise supervise our own full stack.
 attach = await detectAttach();
+
+// Resolve to actually-free ports before anything binds or bakes a URL (no container network to isolate us).
+await resolvePorts(!attach);
 
 startSetupServer();
 buildTray(); // show the tray immediately — builds/PG can take a while on first run.

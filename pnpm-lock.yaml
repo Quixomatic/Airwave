@@ -159,10 +159,13 @@ importers:
         version: 4.1.1(@swc/core@1.15.3)
       tsdown:
         specifier: ^0.22.3
-        version: 0.22.4(typescript@6.0.3)
+        version: 0.22.4(typescript@6.0.3)(unrun@0.3.1)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      unrun:
+        specifier: ^0.3.1
+        version: 0.3.1
 
   apps/site:
     dependencies:
@@ -10033,6 +10036,16 @@ packages:
       vite:
         optional: true
       webpack:
+        optional: true
+
+  unrun@0.3.1:
+    resolution: {integrity: sha512-onIck/oNnCaytwths1ZVp1LK2Gq2hPoyFhiHebObuUXqR3S0uHuLLaBK8K6mRRgV7Ptip8AnNvaUsgzwWwBZuA==}
+    engines: {node: ^22.13.0 || >=24.0.0}
+    hasBin: true
+    peerDependencies:
+      synckit: ^0.11.11
+    peerDependenciesMeta:
+      synckit:
         optional: true
 
   untyped@2.0.0:
@@ -21548,7 +21561,7 @@ snapshots:
       minimist: 1.2.8
       strip-bom: 3.0.0
 
-  tsdown@0.22.4(typescript@6.0.3):
+  tsdown@0.22.4(typescript@6.0.3)(unrun@0.3.1):
     dependencies:
       ansis: 4.3.1
       cac: 7.0.0
@@ -21567,6 +21580,7 @@ snapshots:
       unconfig-core: 7.5.0
     optionalDependencies:
       typescript: 6.0.3
+      unrun: 0.3.1
     transitivePeerDependencies:
       - '@ts-macro/tsc'
       - '@typescript/native-preview'
@@ -21719,6 +21733,10 @@ snapshots:
       esbuild: 0.28.2
       rolldown: 1.1.5
       vite: 8.1.4(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.0)
+
+  unrun@0.3.1:
+    dependencies:
+      rolldown: 1.1.5
 
   untyped@2.0.0:
     dependencies:

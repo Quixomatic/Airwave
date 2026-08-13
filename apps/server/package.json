@@ -1,6 +1,6 @@
 {
   "name": "server",
-  "version": "0.9.92",
+  "version": "0.9.93",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
@@ -33,6 +33,7 @@
     "@types/bun": "catalog:",
     "@workflow/swc-plugin": "4.1.1",
     "tsdown": "^0.22.3",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "unrun": "^0.3.1"
   }
 }

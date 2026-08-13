@@ -2,6 +2,33 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.93] - 2026-08-13
+
+### Added
+
+- **Airwave Desktop: dynamic port allocation.** Electrobun is a native host process, not a container — it
+  shares the machine's single port space — so the supervisor no longer assumes its ports are free. On startup
+  `resolvePorts()` probes each preferred port (`net.createServer` bind test) and falls back to the next free one
+  (then an OS-assigned ephemeral). Postgres and the `/setup` page are loopback-internal; the server/admin/tv-web
+  ports feed the browser URLs, and everything downstream (CORS, `BETTER_AUTH_URL`, the tray label, and the SPAs'
+  baked `VITE_SERVER_URL`) is derived from the *resolved* ports — with the marker-based rebuild re-baking the
+  SPAs if the server port shifted. A running Plex/dev-stack/anything on `36020`/`54329`/etc. no longer collides.
+
+### Fixed
+
+- **`pnpm --filter server build` was broken locally, blocking the desktop's build-on-demand.** A drifted install
+  had floated `tsdown` up to 0.22.4, whose `.ts`-config loader is an *optional peer* (`unrun`) that pnpm doesn't
+  auto-install — so `tsdown` died with "Failed to import module 'unrun'" while loading `tsdown.config.ts`. Added
+  `unrun` to the server's devDependencies so the config loads and the server bundle builds again.
+
+### Verified
+
+- The full **standalone desktop pipeline** runs green end-to-end on Windows: free-port resolution →
+  build-on-demand (server bundle + admin SPA baked to the chosen server URL) → **embedded Postgres** (initdb +
+  start) → `prisma migrate deploy` (all 8 migrations, against the *embedded* DB — confirmed via the datasource
+  line, never a real one) → the server boots (`GET /api/health` → `200 {"ok":true}`) → the admin SPA is served
+  (`200`) → clean shutdown. Embedded PG init/start/createDatabase/stop all confirmed on Windows.
+
 ## [0.9.92] - 2026-08-13
 
 ### Fixed
