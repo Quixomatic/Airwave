@@ -1,0 +1,29 @@
+{
+  "name": "@airwave/desktop-setup",
+  "version": "0.9.96",
+  "private": true,
+  "type": "module",
+  "description": "Airwave Desktop first-run onboarding / settings UI — a small Vite + React app built with @airwave/ui (shadcn + oklch theme), rendered in the desktop app's native webview and driven by the supervisor's /config, /save, /status endpoints.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@airwave/ui": "workspace:*",
+    "@tailwindcss/vite": "^4.3.2",
+    "framer-motion": "^12.42.2",
+    "lucide-react": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@airwave/config": "workspace:*",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "^6.0.3",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "^8.1.3"
+  }
+}

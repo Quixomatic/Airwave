@@ -1,8 +1,8 @@
-import { Tray } from "electrobun/bun";
+import { BrowserWindow, Tray } from "electrobun/bun";
 import { spawn, type Subprocess } from "bun";
 import { randomBytes } from "node:crypto";
 import { createServer } from "node:net";
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir, networkInterfaces } from "node:os";
 import { dirname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,6 +43,7 @@ const SERVER_DIR = join(REPO_ROOT, "apps", "server");
 const SERVER_ENTRY = join(SERVER_DIR, "dist", "index.mjs"); // built by `turbo -F server build`
 const ADMIN_DIST = join(REPO_ROOT, "apps", "web", "dist");
 const TVWEB_DIST = join(REPO_ROOT, "apps", "tv-web", "dist");
+const SETUP_UI_DIST = join(REPO_ROOT, "apps", "desktop-setup", "dist"); // TODO(bundle): views/setup in prod
 
 // ── Config (the docker-compose knobs, persisted to user-data) ──────────────────────────────────────────
 type Config = {
@@ -52,6 +53,8 @@ type Config = {
   workflowEnabled: boolean;
   tvwebEnabled: boolean;
   autoStart: boolean;
+  /** First-run setup completed (admin account + options chosen in the browser). */
+  configured: boolean;
   /** Optional external Postgres; when set, the embedded engine is skipped (e.g. point at a dev DB). */
   databaseUrl?: string;
 };
@@ -63,6 +66,7 @@ const DEFAULT_CONFIG: Config = {
   workflowEnabled: false,
   tvwebEnabled: true,
   autoStart: true,
+  configured: false,
 };
 
 // TODO: prefer Electrobun's `Paths` API for the per-OS user-data dir; this is a safe fallback.
@@ -76,6 +80,37 @@ function userDataDir(): string {
 
 const DATA_DIR = userDataDir();
 const CONFIG_PATH = join(DATA_DIR, "airwave-desktop.json");
+
+// ── File logging — a tray app has no attached console, and `electrobun dev` scrollback is painful to copy.
+// Tee every supervisor + child line to <user-data>/desktop.log (append). ─────────────────────────────────
+mkdirSync(DATA_DIR, { recursive: true });
+const LOG_PATH = join(DATA_DIR, "desktop.log");
+const logStream = createWriteStream(LOG_PATH, { flags: "a" });
+for (const method of ["log", "error", "warn"] as const) {
+  const orig = console[method].bind(console);
+  console[method] = (...args: unknown[]) => {
+    orig(...args);
+    try {
+      logStream.write(
+        `[${new Date().toISOString()}] ${args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ")}\n`,
+      );
+    } catch {
+      /* ignore */
+    }
+  };
+}
+/** Tee a child process's piped stdout/stderr to BOTH the terminal and the log file. */
+function pipeToLog(stream: ReadableStream<Uint8Array> | null | undefined): void {
+  if (!stream) return;
+  void (async () => {
+    for await (const chunk of stream) {
+      process.stdout.write(chunk);
+      logStream.write(chunk);
+    }
+  })().catch(() => {
+    /* ignore */
+  });
+}
 const SECRET_PATH = join(DATA_DIR, "better-auth-secret");
 const PG_DATA_DIR = join(DATA_DIR, "pgdata");
 const BUMPER_MUSIC_DIR = join(DATA_DIR, "bumper-music");
@@ -126,6 +161,23 @@ let config = loadConfig();
  * missing, boot embedded Postgres + the server, and serve admin/tv-web on our OWN ports. This same code path
  * is what the eventual installed binary runs. */
 let attach = false;
+
+// The first-run admin (owner) for this local install. Public sign-up is disabled, so the fresh embedded DB
+// needs a seeded owner; the setup page collects these, we persist them, and the server's seedAdmin creates the
+// account from ADMIN_EMAIL/ADMIN_PASSWORD on boot. Plaintext on disk (like the auth secret) — localhost app.
+const ADMIN_CREDS_PATH = join(DATA_DIR, "admin-credentials.json");
+type AdminCreds = { email: string; password: string };
+function loadAdminCreds(): AdminCreds | null {
+  try {
+    return JSON.parse(readFileSync(ADMIN_CREDS_PATH, "utf8")) as AdminCreds;
+  } catch {
+    return null;
+  }
+}
+function saveAdminCreds(c: AdminCreds): void {
+  mkdirSync(DATA_DIR, { recursive: true });
+  writeFileSync(ADMIN_CREDS_PATH, JSON.stringify(c, null, 2), { mode: 0o600 });
+}
 
 /** A stable BETTER_AUTH_SECRET (also the token/Plex-encryption key) — generate once, persist. */
 function authSecret(): string {
@@ -292,6 +344,7 @@ async function startPostgres(): Promise<string> {
     console.log("[desktop] using external DATABASE_URL (embedded Postgres skipped).");
     return config.databaseUrl;
   }
+  setPhase("database");
   mkdirSync(DATA_DIR, { recursive: true });
   const EmbeddedPostgres = await loadEmbeddedPostgres();
   pg = new EmbeddedPostgres({
@@ -318,9 +371,11 @@ async function run(cmd: string[], opts: { cwd?: string; env?: Record<string, str
   const p = spawn(cmd, {
     cwd: opts.cwd,
     env: { ...process.env, ...opts.env },
-    stdout: "inherit",
-    stderr: "inherit",
+    stdout: "pipe",
+    stderr: "pipe",
   });
+  pipeToLog(p.stdout);
+  pipeToLog(p.stderr);
   return await p.exited;
 }
 
@@ -359,20 +414,30 @@ async function ensureBuilds(serverUrl: string): Promise<void> {
   if (!existsSync(SERVER_ENTRY)) {
     // `workflow build && tsdown` is non-idempotent — `workflow build` chokes on a stale dist/ from a prior
     // run (e.g. a half-built dist with no index.mjs). Clean it first. (Docker never hits this — fresh checkout.)
+    setPhase("building-server");
     rmSync(join(SERVER_DIR, "dist"), { recursive: true, force: true });
     rmSync(join(SERVER_DIR, ".well-known"), { recursive: true, force: true });
     await build("server");
   }
   if (!existsSync(join(ADMIN_DIST, "index.html")) || marker.web !== serverUrl) {
+    setPhase("building-admin");
     await build("web", { VITE_SERVER_URL: serverUrl });
     marker.web = serverUrl;
     saveMarker(marker);
   }
   if (config.tvwebEnabled && (!existsSync(join(TVWEB_DIST, "index.html")) || marker.tvweb !== serverUrl)) {
+    setPhase("building-tvweb");
     await build("tv-web", { VITE_SERVER_URL: serverUrl });
     marker.tvweb = serverUrl;
     saveMarker(marker);
   }
+}
+
+/** Build the onboarding/settings UI (@airwave/desktop-setup) if missing, so the setup window has something to
+ * render at first run. Small Vite app → fast. (The packaged binary pre-bakes it into views/setup.) */
+async function ensureSetupUiBuilt(): Promise<void> {
+  if (existsSync(join(SETUP_UI_DIST, "index.html"))) return;
+  await build("@airwave/desktop-setup");
 }
 
 async function startStack(): Promise<void> {
@@ -384,6 +449,7 @@ async function startStack(): Promise<void> {
 
   const DATABASE_URL = await startPostgres();
 
+  setPhase("migrating");
   console.log("[desktop] prisma migrate deploy…");
   await run(pnpmArgs(["--filter", "@airwave/db", "db:migrate:deploy"]), {
     cwd: REPO_ROOT,
@@ -398,29 +464,34 @@ async function startStack(): Promise<void> {
   if (!existsSync(SERVER_ENTRY)) {
     console.error(`[desktop] server build missing at ${SERVER_ENTRY} — run \`turbo -F server build\`.`);
   } else {
+    setPhase("server");
     console.log(`[desktop] starting server on ${host()}:${config.ports.server}…`);
-    children.push(
-      spawn(["bun", "run", "dist/index.mjs"], {
-        cwd: SERVER_DIR,
-        stdout: "inherit",
-        stderr: "inherit",
-        env: {
-          ...process.env,
-          CG_ROLE: "server",
-          PORT: String(config.ports.server),
-          HOST: host(),
-          DATABASE_URL,
-          BETTER_AUTH_SECRET: authSecret(),
-          BETTER_AUTH_URL: serverPublicUrl(),
-          CORS_ORIGIN: adminUrl(),
-          TV_APP_ORIGIN: tvwebUrl(),
-          EXTRA_CORS_ORIGINS: lanOrigins,
-          WORKFLOW_ENABLED: config.workflowEnabled ? "1" : "",
-          BUMPER_MUSIC_DIR,
-          CAP_MEDIA_DIR: capMediaDir(),
-        },
-      }),
-    );
+    // The first-run admin — seedAdmin creates it from these on boot (no-op if unset / already present).
+    const admin = loadAdminCreds();
+    const srv = spawn(["bun", "run", "dist/index.mjs"], {
+      cwd: SERVER_DIR,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        CG_ROLE: "server",
+        PORT: String(config.ports.server),
+        HOST: host(),
+        DATABASE_URL,
+        BETTER_AUTH_SECRET: authSecret(),
+        BETTER_AUTH_URL: serverPublicUrl(),
+        CORS_ORIGIN: adminUrl(),
+        TV_APP_ORIGIN: tvwebUrl(),
+        EXTRA_CORS_ORIGINS: lanOrigins,
+        WORKFLOW_ENABLED: config.workflowEnabled ? "1" : "",
+        BUMPER_MUSIC_DIR,
+        CAP_MEDIA_DIR: capMediaDir(),
+        ...(admin ? { ADMIN_EMAIL: admin.email, ADMIN_PASSWORD: admin.password } : {}),
+      },
+    });
+    pipeToLog(srv.stdout);
+    pipeToLog(srv.stderr);
+    children.push(srv);
   }
 
   // Admin + tv-web static SPAs (already built for `serverUrl` by ensureBuilds above; rebuilt on URL change).
@@ -430,6 +501,13 @@ async function startStack(): Promise<void> {
     const tv = serveDir(TVWEB_DIST, config.ports.tvweb);
     if (tv) servers.push(tv);
   }
+
+  // Wait for the server to actually answer before declaring ready, so the onboarding progress is honest.
+  for (let i = 0; i < 120; i++) {
+    if (await isServing(`${serverLocalUrl()}/api/health`)) break;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  setPhase("ready");
 }
 
 async function stopStack(): Promise<void> {
@@ -459,38 +537,241 @@ async function stopStack(): Promise<void> {
   }
 }
 
-// ── /setup page — the exposure/ports/workflow config (friendly docker-compose knobs) ────────────────────
+// ── Stack lifecycle (single-flight) ─────────────────────────────────────────────────────────────────────
+let stackState: "idle" | "starting" | "up" = "idle";
+// Granular provisioning phase for the onboarding UI's progress bar (surfaced via /status).
+// Ordered keys: building-server → building-admin → building-tvweb → database → migrating → server → ready.
+let stackPhase = "idle";
+function setPhase(p: string): void {
+  stackPhase = p;
+  console.log(`[desktop] phase: ${p}`);
+}
+/** Start the supervised stack once; safe to call repeatedly. Returns whether the stack is up. */
+async function ensureStackUp(): Promise<boolean> {
+  if (stackState === "up") return true;
+  if (stackState === "starting") return false;
+  stackState = "starting";
+  try {
+    await startStack();
+    stackState = "up";
+    console.log("[desktop] stack up.");
+    return true;
+  } catch (err) {
+    stackState = "idle";
+    console.error("[desktop] failed to start the stack:", err);
+    return false;
+  }
+}
+
+// ── /setup page — first-run config (admin account + the docker-compose exposure knobs), served in the browser ──
 function startSetupServer(): void {
   Bun.serve({
     port: config.ports.setup,
     hostname: "127.0.0.1",
     async fetch(req) {
       const url = new URL(req.url);
+
       if (req.method === "POST" && url.pathname === "/save") {
-        const body = (await req.json().catch(() => ({}))) as Partial<Config>;
-        config = { ...config, ...body };
+        const body = (await req.json().catch(() => ({}))) as {
+          adminEmail?: string;
+          adminPassword?: string;
+          expose?: boolean;
+          tvwebEnabled?: boolean;
+          workflowEnabled?: boolean;
+        };
+        const email = (body.adminEmail ?? "").trim();
+        const password = body.adminPassword ?? "";
+        // Admin creds are required on first run (none exist yet); on later edits they're optional.
+        if (!config.configured || email || password) {
+          if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+            return Response.json({ ok: false, error: "Enter a valid admin email address." }, { status: 400 });
+          }
+          if (password.length < 8) {
+            return Response.json({ ok: false, error: "Admin password must be at least 8 characters." }, { status: 400 });
+          }
+          saveAdminCreds({ email, password });
+        }
+        config = {
+          ...config,
+          expose: !!body.expose,
+          tvwebEnabled: body.tvwebEnabled !== false,
+          workflowEnabled: !!body.workflowEnabled,
+          configured: true,
+        };
         saveConfig(config);
         if (!attach) {
-          await stopStack();
-          await startStack();
+          if (stackState === "up") {
+            await stopStack();
+            stackState = "idle";
+          }
+          // Long-running (build/PG/migrate) — the page polls /status; when up we hand off to the browser.
+          void ensureStackUp().then((up) => {
+            if (up) onStackReady();
+          });
         }
         return Response.json({ ok: true });
       }
+
+      if (url.pathname === "/config") {
+        // Initial state for the setup UI: first-run vs settings, current toggles, the admin email (no password).
+        return Response.json({
+          configured: config.configured,
+          expose: config.expose,
+          tvwebEnabled: config.tvwebEnabled,
+          workflowEnabled: config.workflowEnabled,
+          adminEmail: loadAdminCreds()?.email ?? "",
+          serverLan: serverLanUrl(),
+        });
+      }
+
+      if (url.pathname === "/status") {
+        const up = attach ? true : stackState === "up" && (await isServing(`${serverLocalUrl()}/api/health`));
+        return Response.json({
+          state: attach ? "attached" : stackState,
+          phase: up ? "ready" : stackPhase,
+          up,
+          adminUrl: adminUrl(),
+        });
+      }
+
+      // Static: serve the built onboarding/settings UI (@airwave/desktop-setup) with SPA fallback.
+      if (existsSync(join(SETUP_UI_DIST, "index.html"))) {
+        let pathname = decodeURIComponent(url.pathname);
+        if (pathname === "/" || pathname === "") pathname = "/index.html";
+        const filePath = normalize(join(SETUP_UI_DIST, pathname));
+        if (
+          (filePath === SETUP_UI_DIST || filePath.startsWith(SETUP_UI_DIST + sep)) &&
+          existsSync(filePath) &&
+          statSync(filePath).isFile()
+        ) {
+          return new Response(Bun.file(filePath));
+        }
+        return new Response(Bun.file(join(SETUP_UI_DIST, "index.html")), {
+          headers: { "content-type": "text/html; charset=utf-8" },
+        });
+      }
+      // Fallback before the UI is built (or if its build failed): the minimal inline page.
       return new Response(setupHtml(), { headers: { "content-type": "text/html; charset=utf-8" } });
     },
   });
 }
 
 function setupHtml(): string {
-  // TODO: real form (toggle expose / edit ports / workflows) POSTing JSON to /save. Placeholder for now.
-  return `<!doctype html><meta charset="utf-8"><title>Airwave — Setup</title>
-  <body style="font-family:system-ui;max-width:640px;margin:48px auto;padding:0 16px;line-height:1.5">
-    <h1>Airwave desktop — setup</h1>
-    <p><strong>Point your TVs at:</strong> <code>${serverLanUrl()}</code></p>
-    <p><strong>Expose on my network:</strong> ${config.expose ? "ON" : "off — localhost only"}</p>
-    <pre style="background:#f4f4f5;padding:12px;border-radius:8px;overflow:auto">${JSON.stringify(config, null, 2)}</pre>
-    <p style="color:#888">TODO: real controls (POST to <code>/save</code>).</p>
-  </body>`;
+  const firstRun = !config.configured;
+  const creds = loadAdminCreds();
+  const chk = (b: boolean) => (b ? " checked" : "");
+  // NOTE: the client <script> below uses NO backticks / ${} so it survives this template literal verbatim.
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Airwave — Setup</title>
+<style>
+  :root{color-scheme:dark}
+  *{box-sizing:border-box}
+  body{font-family:system-ui,-apple-system,sans-serif;background:#0a0a0f;color:#e7e7ea;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px}
+  .card{width:100%;max-width:520px;background:#141420;border:1px solid #26263a;border-radius:16px;padding:32px}
+  h1{margin:0 0 4px;font-size:22px}
+  p.sub{margin:0 0 24px;color:#9a9aae;font-size:14px}
+  label{display:block;font-size:13px;color:#b9b9c8;margin:16px 0 6px}
+  input[type=text],input[type=email],input[type=password]{width:100%;padding:10px 12px;background:#0e0e18;border:1px solid #2b2b42;border-radius:9px;color:#fff;font-size:14px}
+  input:focus{outline:none;border-color:#6366f1}
+  .toggle{display:flex;align-items:center;gap:10px;margin:14px 0;font-size:14px;color:#d5d5e0}
+  .toggle input{width:16px;height:16px;accent-color:#6366f1}
+  .hint{font-size:12px;color:#75758a;margin-top:2px}
+  button{margin-top:24px;width:100%;padding:12px;background:#6366f1;border:0;border-radius:10px;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+  button:disabled{opacity:.6;cursor:default}
+  #status{margin-top:16px;font-size:14px;color:#9a9aae;min-height:20px}
+  #status.err{color:#f87171}
+  a{color:#a5b4fc}
+</style></head>
+<body><div class="card">
+  <h1>Airwave desktop</h1>
+  <p class="sub">${firstRun ? "First-run setup — create your admin account and pick your options." : "Settings — update your options, then save to restart the server."}</p>
+  <form id="f">
+    ${
+      firstRun
+        ? `<label for="email">Admin email</label>
+    <input id="email" type="email" value="${creds?.email ?? ""}" placeholder="you@example.com" autocomplete="username" required>
+    <label for="password">Admin password</label>
+    <input id="password" type="password" placeholder="at least 8 characters" autocomplete="new-password" required>
+    <div class="hint">You'll log in to the admin with these. Change the password later in the admin UI.</div>`
+        : `<div class="hint">Admin account is set (${creds?.email ?? "configured"}). Change credentials from the admin UI.</div>`
+    }
+    <div class="toggle"><input id="expose" type="checkbox"${chk(config.expose)}><label for="expose" style="margin:0">Expose on my network (let TVs on the LAN connect)</label></div>
+    <div class="toggle"><input id="tvweb" type="checkbox"${chk(config.tvwebEnabled)}><label for="tvweb" style="margin:0">Enable the TV web player</label></div>
+    <div class="toggle"><input id="workflow" type="checkbox"${chk(config.workflowEnabled)}><label for="workflow" style="margin:0">Enable AI lineup workflows</label></div>
+    <button id="save" type="submit">${firstRun ? "Create & start Airwave" : "Save & restart"}</button>
+  </form>
+  <div id="status"></div>
+</div>
+<script>
+  var f=document.getElementById('f'),st=document.getElementById('status');
+  f.addEventListener('submit',function(e){
+    e.preventDefault();
+    var btn=document.getElementById('save');btn.disabled=true;st.className='';st.textContent='';
+    var em=document.getElementById('email'),pw=document.getElementById('password');
+    var body={expose:document.getElementById('expose').checked,tvwebEnabled:document.getElementById('tvweb').checked,workflowEnabled:document.getElementById('workflow').checked};
+    if(em)body.adminEmail=em.value; if(pw)body.adminPassword=pw.value;
+    fetch('/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j.ok){st.className='err';st.textContent=j.error||'Something went wrong.';btn.disabled=false;return;}
+        st.textContent='Setting up — building and starting the server. First run can take a few minutes…';
+        poll();
+      })
+      .catch(function(){st.className='err';st.textContent='Network error.';btn.disabled=false;});
+  });
+  function poll(){
+    fetch('/status').then(function(r){return r.json();}).then(function(j){
+      if(j.up){st.textContent='Ready — opening the admin…';setTimeout(function(){location.href=j.adminUrl;},700);return;}
+      setTimeout(poll,2000);
+    }).catch(function(){setTimeout(poll,2000);});
+  }
+</script>
+</body></html>`;
+}
+
+// ── Native setup / settings window (desktop-only; the running app stays tray + browser-for-admin) ─────────
+let setupWindow: BrowserWindow | null = null;
+async function openSetupWindow(): Promise<void> {
+  await ensureSetupUiBuilt(); // make sure the served UI exists before the window loads it
+  if (setupWindow) {
+    try {
+      setupWindow.focus();
+      return;
+    } catch {
+      setupWindow = null;
+    }
+  }
+  const width = 560;
+  const height = 700;
+  setupWindow = new BrowserWindow({
+    title: "Airwave",
+    url: setupUrl(),
+    renderer: "cef",
+    frame: { width, height, x: 160, y: 120 },
+  });
+  setupWindow.on("close", () => {
+    setupWindow = null;
+  });
+  // CEF mismeasures vh on first paint and only remeasures on a real resize — nudge the size once, then revert
+  // (BasicTimeTracker gotcha). Our /setup page uses min-height:100vh, so without this it can overflow.
+  setTimeout(() => {
+    setupWindow?.setSize(width, height + 1);
+    setTimeout(() => setupWindow?.setSize(width, height), 16);
+  }, 150);
+}
+function closeSetupWindow(): void {
+  try {
+    setupWindow?.close();
+  } catch {
+    /* ignore */
+  }
+  setupWindow = null;
+}
+/** Setup done + stack up: hand the admin UI off to the browser and close the onboarding window. */
+function onStackReady(): void {
+  console.log("[desktop] stack ready — opening the admin in your browser.");
+  openBrowser(adminUrl());
+  closeSetupWindow();
 }
 
 // ── Tray ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -515,7 +796,7 @@ function buildTray(): Tray {
         openBrowser(tvwebUrl());
         break;
       case "settings":
-        openBrowser(setupUrl());
+        void openSetupWindow();
         break;
       case "quit":
         void stopStack().finally(() => process.exit(0));
@@ -543,15 +824,12 @@ process.on("SIGTERM", () => void stopStack().finally(() => process.exit(0)));
 
 if (attach) {
   console.log("[desktop] attached to the running `pnpm dev` stack (localhost:3000/1/2) — not supervising.");
+} else if (!config.configured) {
+  console.log(`[desktop] first run — opening the setup window (${setupUrl()}) to configure the admin account + options.`);
+  await openSetupWindow();
 } else {
-  console.log("[desktop] no dev stack detected — supervising the full Airwave stack (embedded PG + server + admin + tv-web).");
-  try {
-    await startStack();
-    console.log("[desktop] stack up — opening admin.");
-    openBrowser(adminUrl());
-  } catch (err) {
-    console.error("[desktop] failed to start the stack:", err);
-  }
+  console.log("[desktop] supervising the full Airwave stack (embedded PG + server + admin + tv-web).");
+  if (await ensureStackUp()) onStackReady();
 }
 
 console.log(`[desktop] supervisor up. data=${DATA_DIR} attach=${attach} admin=${adminUrl()} setup=${setupUrl()}`);

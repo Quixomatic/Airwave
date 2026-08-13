@@ -4,6 +4,7 @@ import type { ElectrobunConfig } from "electrobun";
 // them on local ports. Built by `turbo -F web build && turbo -F tv-web build` before `electrobun build`.
 const adminDist = "../web/dist";
 const tvwebDist = "../tv-web/dist";
+const setupUiDist = "../desktop-setup/dist";
 
 export default {
   app: {
@@ -22,15 +23,17 @@ export default {
     copy: {
       [adminDist]: "views/admin",
       [tvwebDist]: "views/tvweb",
+      [setupUiDist]: "views/setup",
       // Source assets (tray icon, …) so the bundle can resolve `views://assets/*` at runtime.
       assets: "views/assets",
     },
-    watchIgnore: [`${adminDist}/**`, `${tvwebDist}/**`],
-    // No BrowserWindow → no CEF webview needed (much lighter). VERIFY: Electrobun is happy tray-only with
-    // bundleCEF:false; if a webview is ever added (e.g. a settings window instead of the served /setup page),
-    // flip these back on. See apis/bundling-cef.
-    mac: { bundleCEF: false },
-    linux: { bundleCEF: false },
-    win: { bundleCEF: false },
+    watchIgnore: [`${adminDist}/**`, `${tvwebDist}/**`, `${setupUiDist}/**`],
+    // CEF is bundled so first-run setup / settings can render in a NATIVE webview window (BrowserWindow → the
+    // served `/setup` page) — a nicer onboarding than a browser tab, and desktop-only. The RUNNING app is still
+    // tray-first with the browser as the admin/tv-web UI; the window is just for setup/settings. See
+    // apis/bundling-cef. `exitOnLastWindowClosed:false` (above) keeps the tray alive when the window closes.
+    mac: { bundleCEF: true, defaultRenderer: "cef" },
+    linux: { bundleCEF: true, defaultRenderer: "cef" },
+    win: { bundleCEF: true, defaultRenderer: "cef" },
   },
 } satisfies ElectrobunConfig;

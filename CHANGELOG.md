@@ -2,6 +2,35 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.96] - 2026-08-13
+
+### Added
+
+- **Airwave Desktop: a native first-run onboarding + settings experience, built with the real design system.**
+  New **`apps/desktop-setup`** — a small Vite + React app using **`@airwave/ui`** (shadcn components, the oklch
+  theme, the Airwave logo, lucide icons) — renders in a native Electrobun webview window (CEF) as a stepped
+  wizard: welcome → create your admin account → options → **live provisioning progress** (Building the server /
+  Starting the database / Preparing the database / Starting Airwave, with a progress bar + per-step checklist)
+  → done. The running app stays tray-first with the browser as the admin/tv-web UI; the window is only for
+  setup/settings.
+  - The supervisor drives it via three endpoints: **`GET /config`** (first-run vs settings + current toggles),
+    **`POST /save`** (admin creds + knobs → persist → (re)start the stack), **`GET /status`** (granular
+    provisioning `phase` + readiness). It serves the built setup UI at the setup port and builds it on demand.
+  - **Admin account provisioning (the missing piece for a usable desktop install):** the supervisor never set
+    `ADMIN_EMAIL`/`ADMIN_PASSWORD`, so the fresh embedded DB had no owner and no way to make one (public sign-up
+    is disabled). The onboarding form now collects them, the supervisor persists them, and passes them to the
+    server so `seedAdmin` creates the owner on boot.
+  - **Secrets are auto-generated:** `BETTER_AUTH_SECRET` is generated + persisted on first run — a desktop user
+    never sets an env var.
+
+### Changed
+
+- **File logging.** The supervisor tees its own output + every child process (builds, migrate, server,
+  Postgres) to `<user-data>/desktop.log` — a tray app has no attached console, and `electrobun dev` scrollback
+  is painful to copy.
+- Electrobun now bundles CEF (`defaultRenderer: "cef"`) for the native setup/settings window;
+  `exitOnLastWindowClosed` stays false so closing the window keeps the tray (and the running stack) alive.
+
 ## [0.9.95] - 2026-08-13
 
 ### Fixed
