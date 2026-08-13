@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.89] - 2026-08-12
+
+### Changed
+
+- **Features and Channel-guide pages rebuilt in the landing design system, with real demo videos.** Extracted
+  the home page's fumadocs-style helpers (`heading`/`button`/`card`/`Wide` + a new `Pill` and an autoplaying
+  muted-loop `DemoVideo`) into a shared `apps/site/components/landing.tsx`, and refactored the home page to
+  use it — one source of truth for the marketing design language.
+  - **Features** — hero + a showcase clip, then four alternating media/text sections (Watching, Building,
+    Playback, Access & privacy) and a "See it in motion" gallery, wiring in eight screen-recorded clips of
+    the real 10-foot app (`public/demos/*.mp4`).
+  - **Channel guide** — hero clip + alternating points (grid, DVR scrubber, filter lenses, channel surfing)
+    each paired with a clip, plus the admin guide-preview showcase.
+  - Demo clips are silent, autoplaying MP4 loops (h264) cut from a screen recording of tv-web. Still a work
+    in progress.
+
 ## [0.9.88] - 2026-08-12
 
 ### Changed

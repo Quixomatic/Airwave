@@ -2,8 +2,8 @@ import Link from "next/link";
 import { ServerCodeBlock } from "fumadocs-ui/components/codeblock.rsc";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tv, Rewind, Clapperboard, MonitorPlay, ShieldCheck, Sparkles, TerminalIcon } from "lucide-react";
-import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { button, card, heading, Wide } from "@/components/landing";
 import { COMPOSE } from "./compose";
 import { HeroShaders, PreviewImages, AgnosticBackground } from "./page.client";
 
@@ -11,36 +11,8 @@ export const metadata = {
   title: "Airwave — your Plex library, as custom live TV",
 };
 
-// ── Landing variant helpers (fumadocs.dev's cva patterns, as plain dependency-free functions) ───────────
-const heading = (variant: "h2" | "h3", extra = "") =>
-  cn(
-    "font-medium tracking-tight",
-    variant === "h2" ? "text-3xl lg:text-4xl" : "text-xl lg:text-2xl",
-    extra,
-  );
-
-const button = (variant: "primary" | "secondary" = "primary", extra = "") =>
-  cn(
-    "inline-flex justify-center px-5 py-3 rounded-full font-medium tracking-tight transition-colors",
-    variant === "primary"
-      ? "bg-brand text-brand-foreground hover:bg-brand-200"
-      : "border bg-fd-secondary text-fd-secondary-foreground hover:bg-fd-accent",
-    extra,
-  );
-
-const card = (variant: "default" | "secondary" = "default", extra = "") =>
-  cn(
-    "rounded-2xl text-sm p-6 shadow-lg",
-    variant === "secondary"
-      ? "bg-brand-secondary text-brand-secondary-foreground"
-      : "border bg-fd-card",
-    extra,
-  );
-
-// Wide, spacious landing gutter (matches fumadocs.dev's 1400px canvas).
-function Wide({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={cn("mx-auto w-full max-w-[1400px] px-6 md:px-12", className)}>{children}</div>;
-}
+// Landing variant helpers (heading/button/card/Wide) now live in `@/components/landing` (shared across
+// marketing pages — the fumadocs.dev-style design system).
 
 const FEATURES = [
   { icon: Tv, title: "A real channel guide", body: "A grid guide you surf like cable — always-on channels on one continuous, deterministic timeline everyone sees in sync." },
