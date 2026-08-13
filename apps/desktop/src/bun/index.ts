@@ -202,12 +202,23 @@ function authSecret(): string {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────────────────────────────
 function lanIp(): string {
-  for (const ifaces of Object.values(networkInterfaces())) {
+  // Skip virtual/VPN adapters (Docker/WSL/Hyper-V/Tailscale/etc.) — they hand out 10.x/172.x that TVs can't
+  // reach. Then prefer a real home-LAN 192.168.x, then 172.16–31.x, then 10.x, then anything left.
+  const VIRTUAL = /(vEthernet|VMware|VirtualBox|Hyper-?V|Radmin|Hamachi|ZeroTier|Tailscale|WSL|Loopback|Bluetooth|VPN|TAP|Docker|Npcap|Nord|WireGuard|Lynx|OpenVPN|Wintun)/i;
+  const candidates: string[] = [];
+  for (const [name, ifaces] of Object.entries(networkInterfaces())) {
+    if (VIRTUAL.test(name)) continue;
     for (const i of ifaces ?? []) {
-      if (i.family === "IPv4" && !i.internal) return i.address;
+      if (i.family === "IPv4" && !i.internal) candidates.push(i.address);
     }
   }
-  return "127.0.0.1";
+  return (
+    candidates.find((a) => a.startsWith("192.168.")) ??
+    candidates.find((a) => /^172\.(1[6-9]|2\d|3[01])\./.test(a)) ??
+    candidates.find((a) => a.startsWith("10.")) ??
+    candidates[0] ??
+    "127.0.0.1"
+  );
 }
 
 function openBrowser(url: string): void {

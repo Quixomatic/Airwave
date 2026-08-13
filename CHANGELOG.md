@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.100] - 2026-08-13
+
+### Fixed
+
+- **Airwave Desktop picked a virtual/VPN adapter as the "IP TVs can connect to."** `lanIp()` returned the first
+  non-internal IPv4, which on a machine with NordVPN/Docker/WSL was a `10.x`/`172.x` address (e.g. `10.5.0.2`
+  from `NordLynx`) that no TV can reach. It now skips known virtual/VPN adapters (Docker, WSL, Hyper-V,
+  Tailscale, Nord/WireGuard, VMware, …) and prefers a real home-LAN `192.168.x` (then `172.16–31.x`, then
+  `10.x`). Verified it now selects the real `192.168.x` LAN address for tv-web + the tray/setup "point your TVs
+  here" display.
+
 ## [0.9.99] - 2026-08-13
 
 ### Fixed
