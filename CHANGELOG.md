@@ -2,6 +2,27 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.94] - 2026-08-13
+
+### Fixed
+
+- **Airwave Desktop: `pnpm dev:desktop` failed on a real launch — three bundled-context bugs the source-only
+  harness couldn't surface.** All isolated to `apps/desktop`; nothing in the server, Docker, or tag builds
+  changed.
+  - **Repo-root resolution.** Under `electrobun dev` the supervisor runs from the *bundle*
+    (`apps/desktop/build/…/Resources/app/bun`), so the fixed `../../../..` pointed into the build dir — the
+    server-dist check always missed (endless rebuild) and admin/tv-web couldn't be served. `findRepoRoot()` now
+    walks up for `pnpm-workspace.yaml` (works from source *and* the dev bundle; falls back for the future
+    installed binary, which has no monorepo).
+  - **Stale persisted ports.** An old `airwave-desktop.json` in user-data pinned previous defaults
+    (admin 3001 / setup 3009) over the new 36020 range. `loadConfig()` now ignores any persisted `ports`
+    (resolvePorts picks free ones regardless) until `/setup` can actually edit them.
+  - **Non-idempotent server build.** `workflow build && tsdown` chokes on a stale `dist/` left by a prior build
+    — which build-on-demand hits because it runs the production build locally where `dist/` persists (unlike
+    Docker's fresh checkout). The supervisor now cleans `apps/server/dist` + `.well-known` before building the
+    server. **The server build script is unchanged** — Docker and `v*` tag builds are byte-for-byte identical
+    and never hit this (fresh checkout = no stale dist).
+
 ## [0.9.93] - 2026-08-13
 
 ### Added

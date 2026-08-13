@@ -2,7 +2,7 @@ import { Tray } from "electrobun/bun";
 import { spawn, type Subprocess } from "bun";
 import { randomBytes } from "node:crypto";
 import { createServer } from "node:net";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir, networkInterfaces } from "node:os";
 import { dirname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,8 +20,25 @@ import { fileURLToPath } from "node:url";
  */
 
 // ── Paths (DEV: resolve the monorepo from apps/desktop/src/bun) ─────────────────────────────────────────
-const HERE = dirname(fileURLToPath(import.meta.url)); // …/apps/desktop/src/bun
-const REPO_ROOT = join(HERE, "..", "..", "..", ".."); // TODO(bundle): detect bundled layout + shipped assets
+const HERE = dirname(fileURLToPath(import.meta.url)); // …/apps/desktop/src/bun (source) or …/Resources/app/bun (bundle)
+/**
+ * Resolve the monorepo root by walking up for `pnpm-workspace.yaml`. A fixed `../../../..` only works from the
+ * SOURCE layout; under `electrobun dev` this file runs from the bundle
+ * (`apps/desktop/build/dev-win-x64/…/Resources/app/bun`), where a fixed depth lands inside the build dir — which
+ * is exactly why the server-dist check kept missing (→ endless rebuild) and admin wouldn't serve.
+ * TODO(bundle prod): the installed binary has no monorepo — fall back to the server/assets shipped in Resources.
+ */
+function findRepoRoot(start: string): string {
+  let dir = start;
+  for (let i = 0; i < 12; i++) {
+    if (existsSync(join(dir, "pnpm-workspace.yaml"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return join(start, "..", "..", "..", ".."); // source-layout fallback
+}
+const REPO_ROOT = findRepoRoot(HERE);
 const SERVER_DIR = join(REPO_ROOT, "apps", "server");
 const SERVER_ENTRY = join(SERVER_DIR, "dist", "index.mjs"); // built by `turbo -F server build`
 const ADMIN_DIST = join(REPO_ROOT, "apps", "web", "dist");
@@ -87,7 +104,11 @@ function trayIcon(): string {
 
 function loadConfig(): Config {
   try {
-    return { ...DEFAULT_CONFIG, ...JSON.parse(readFileSync(CONFIG_PATH, "utf8")) };
+    const saved = JSON.parse(readFileSync(CONFIG_PATH, "utf8")) as Partial<Config>;
+    // Ignore any persisted `ports`: the defaults moved to the 36020 range and resolvePorts() picks free ones
+    // anyway, so a stale file must not pin old ports (e.g. 3001/3009 from an earlier build). Re-enable
+    // per-field once /setup can actually edit ports.
+    return { ...DEFAULT_CONFIG, ...saved, ports: { ...DEFAULT_CONFIG.ports } };
   } catch {
     return { ...DEFAULT_CONFIG };
   }
@@ -335,7 +356,13 @@ async function build(filter: string, env: Record<string, string> = {}): Promise<
 /** Build the server + admin (+ tv-web) if missing or built for a different server URL. No-ops once built. */
 async function ensureBuilds(serverUrl: string): Promise<void> {
   const marker = loadMarker();
-  if (!existsSync(SERVER_ENTRY)) await build("server");
+  if (!existsSync(SERVER_ENTRY)) {
+    // `workflow build && tsdown` is non-idempotent — `workflow build` chokes on a stale dist/ from a prior
+    // run (e.g. a half-built dist with no index.mjs). Clean it first. (Docker never hits this — fresh checkout.)
+    rmSync(join(SERVER_DIR, "dist"), { recursive: true, force: true });
+    rmSync(join(SERVER_DIR, ".well-known"), { recursive: true, force: true });
+    await build("server");
+  }
   if (!existsSync(join(ADMIN_DIST, "index.html")) || marker.web !== serverUrl) {
     await build("web", { VITE_SERVER_URL: serverUrl });
     marker.web = serverUrl;
