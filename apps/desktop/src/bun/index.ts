@@ -14,7 +14,7 @@ import {
 } from "node:fs";
 import { homedir, networkInterfaces } from "node:os";
 import { dirname, join, normalize, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 /**
  * Airwave Desktop — a tray-only Electrobun supervisor.
@@ -324,12 +324,30 @@ const serverLanUrl = () => `http://${lanIp()}:${port("server")}`;
 const serverPublicUrl = () => (config.expose ? serverLanUrl() : serverLocalUrl());
 
 // ── Static SPA server (replicates docker/serve-web.ts) ───────────────────────────────────────────────────
-function serveDir(dist: string, port: number): ReturnType<typeof Bun.serve> | null {
+// `runtimeEnv` = the "build once, deploy anywhere" recipe: a static SPA's `import.meta.env` is frozen at build
+// time, but the admin must talk to whatever server port we resolved THIS launch (dynamic + proxy-aware). So we
+// inject the runtime values into the served `index.html` as `window.__AIRWAVE_ENV__` — read first by
+// apps/web/src/lib/runtime-env.ts, ahead of the baked value. It's recomputed each supervisor start, so a
+// re-resolved port is always reflected. Only the ADMIN needs it (tv-web resolves its server at runtime on its
+// own); pass `undefined` for tv-web. The HTML text (with the injected tag) is materialized once at startup.
+function serveDir(dist: string, port: number, runtimeEnv?: Record<string, string>): ReturnType<typeof Bun.serve> | null {
   const index = join(dist, "index.html");
   if (!existsSync(index)) {
     console.error(`[desktop] no build at ${dist} (run \`turbo -F web build\` / \`-F tv-web build\`).`);
     return null;
   }
+  const indexHtml = ((): string => {
+    let html = readFileSync(index, "utf8");
+    if (runtimeEnv) {
+      // A classic (non-module) inline script runs during parse, before Vite's deferred module bundle — so the
+      // global is set before the app reads it. Place it right after <head> to guarantee it's first.
+      const tag = `<script>window.__AIRWAVE_ENV__=${JSON.stringify(runtimeEnv)};</script>`;
+      html = html.includes("<head>") ? html.replace("<head>", `<head>${tag}`) : `${tag}${html}`;
+    }
+    return html;
+  })();
+  const htmlResponse = () =>
+    new Response(indexHtml, { headers: { "content-type": "text/html; charset=utf-8", "Cache-Control": "no-cache" } });
   return Bun.serve({
     port,
     hostname: host(),
@@ -341,20 +359,29 @@ function serveDir(dist: string, port: number): ReturnType<typeof Bun.serve> | nu
       const filePath = normalize(join(dist, pathname));
       if (filePath !== dist && !filePath.startsWith(dist + sep)) return new Response("forbidden", { status: 403 });
       if (existsSync(filePath) && statSync(filePath).isFile()) {
+        // Serve the injected HTML for index.html itself; other files (JS/CSS/assets) stream straight from disk.
+        if (filePath === index) return htmlResponse();
         const headers = filePath.includes(`${sep}assets${sep}`)
           ? { "Cache-Control": "public, max-age=31536000, immutable" }
           : { "Cache-Control": "no-cache" };
         return new Response(Bun.file(filePath), { headers });
       }
-      return new Response(Bun.file(index), { headers: { "Cache-Control": "no-cache" } });
+      return htmlResponse(); // SPA fallback — the (injected) index
     },
   });
 }
 
 // ── Process supervision (mirrors docker/entrypoint.sh) ───────────────────────────────────────────────────
-// embedded-postgres dynamically imports one of ~6 per-platform binary packages; only the current platform's
-// is installed. Loading it via a NON-LITERAL specifier keeps the bundler from following those imports at
-// build time (it resolves at runtime instead). Only used in the bundled/prod supervisor — dev never calls it.
+// embedded-postgres dynamically imports one of ~8 per-platform binary packages (only the current platform's is
+// installed). It's loaded via a NON-LITERAL specifier because electrobun's bundler can't resolve node_modules
+// deps at build time (it only knows `bun` builtins + `electrobun/bun`) — a literal `import "embedded-postgres"`
+// fails the electrobun build outright. So:
+//   • dev: resolve the wrapper from node_modules (`"embedded-postgres"`), same as the container.
+//   • packaged: import the pre-bundled `pg/pg-launcher.mjs` by ABSOLUTE path (electrobun never resolves it at
+//     build time). That file is the wrapper + `pg` + `async-exit-hook` bundled into one (via `build:pg-launcher`),
+//     with the 8 platform pkgs left external; the current platform's binary pkg is copied to
+//     `pg/node_modules/@embedded-postgres/<platform>` so the launcher's runtime `import()` of it resolves.
+// See electrobun.config.ts + `.plans/desktop-server.md` §12.
 type EmbeddedPostgresLike = {
   initialise(): Promise<void>;
   start(): Promise<void>;
@@ -371,7 +398,7 @@ type EmbeddedPostgresCtor = new (opts: {
 }) => EmbeddedPostgresLike;
 
 async function loadEmbeddedPostgres(): Promise<EmbeddedPostgresCtor> {
-  const spec = "embedded-postgres";
+  const spec = PACKAGED ? pathToFileURL(join(APP_ROOT, "pg", "pg-launcher.mjs")).href : "embedded-postgres";
   const mod = (await import(spec)) as { default: EmbeddedPostgresCtor };
   return mod.default;
 }
@@ -654,8 +681,10 @@ async function startStack(): Promise<void> {
     children.push(srv);
   }
 
-  // Admin + tv-web static SPAs (already built for `serverUrl` by ensureBuilds above; rebuilt on URL change).
-  const admin = serveDir(ADMIN_DIST, config.ports.admin);
+  // Admin + tv-web static SPAs. The admin's server URL is INJECTED at serve time (runtime-config recipe) so the
+  // prebuilt bundle talks to whatever port we resolved this launch — same dynamic, proxy-aware `adminServerUrl`
+  // dev bakes via vite, just delivered to the static build. tv-web resolves its server on its own → no inject.
+  const admin = serveDir(ADMIN_DIST, config.ports.admin, { VITE_SERVER_URL: adminServerUrl });
   if (admin) servers.push(admin);
   if (config.tvwebEnabled) {
     const tv = serveDir(TVWEB_DIST, config.ports.tvweb);

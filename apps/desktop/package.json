@@ -1,13 +1,14 @@
 {
   "name": "desktop",
-  "version": "0.9.108",
+  "version": "0.9.109",
   "private": true,
   "type": "module",
   "description": "Airwave Desktop — an Electrobun tray-only supervisor that runs embedded Postgres + the Airwave server + admin + tv-web on local ports, next to Plex. The browser is the UI. See .plans/desktop-server.md.",
   "scripts": {
     "start": "electrobun dev",
     "dev": "electrobun dev",
-    "prebuild": "turbo -F server build -F web build -F tv-web build -F @airwave/desktop-setup build",
+    "prebuild": "turbo -F web build -F tv-web build -F @airwave/desktop-setup build && pnpm -F server build:standalone && pnpm run build:pg-launcher",
+    "build:pg-launcher": "bun build src/pg-launcher.ts --target=bun --external @embedded-postgres/darwin-arm64 --external @embedded-postgres/darwin-x64 --external @embedded-postgres/linux-arm --external @embedded-postgres/linux-arm64 --external @embedded-postgres/linux-ia32 --external @embedded-postgres/linux-ppc64 --external @embedded-postgres/linux-x64 --external @embedded-postgres/windows-x64 --outfile pg-launcher/pg-launcher.mjs",
     "build": "electrobun build",
     "build:stable": "electrobun build --env=stable",
     "build:canary": "electrobun build --env=canary",

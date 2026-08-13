@@ -1,9 +1,9 @@
 import type { AppRouter } from "@airwave/api/routers/index";
-import { env } from "@airwave/env/web";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { createTRPCClient, httpBatchLink, httpLink, splitLink } from "@trpc/client";
 import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
 import { toast } from "sonner";
+import { serverUrl } from "@/lib/runtime-env";
 
 function getServerUrl(url: string) {
   const normalized = url.endsWith("/") ? url.slice(0, -1) : url;
@@ -47,7 +47,7 @@ export const queryClient = new QueryClient({
   }),
 });
 
-const url = `${getServerUrl(env.VITE_SERVER_URL)}/trpc`;
+const url = `${getServerUrl(serverUrl())}/trpc`;
 // Signature matches tRPC's `FetchEsque` (which accepts RequestInfo, not just string | URL).
 const withCredentials = (input: URL | RequestInfo, options?: RequestInit) =>
   fetch(input, { ...options, credentials: "include" });

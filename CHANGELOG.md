@@ -2,6 +2,43 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.109] - 2026-08-13
+
+Stage 5 — the packaged desktop app is now self-contained: `electrobun build` produces a booting installer with
+the server, embedded Postgres, migrations, and SPAs all bundled. Nothing on the user's machine needs
+pnpm/turbo/vite/node_modules. (Supersedes the v0.9.108 WIP packaged-mode supervisor.)
+
+### What ships
+
+- **Embedded Postgres in the bundle.** The `embedded-postgres` wrapper is pre-bundled into `pg/pg-launcher.mjs`
+  (wrapper + `pg` + `async-exit-hook`; the 8 per-platform binary packages left external), and the current
+  platform's binary package is copied to `pg/node_modules/@embedded-postgres/<platform>`. The packaged
+  supervisor imports the launcher by absolute path; it resolves `initdb`/`postgres`/`pg_ctl` from the adjacent
+  `node_modules` — verified from the extracted bundle. (A literal `import "embedded-postgres"` can't work —
+  electrobun's bundler resolves only `bun` builtins + `electrobun/bun` — so the wrapper is pre-bundled, the same
+  pattern as the standalone `server.mjs`.)
+- **`electrobun.config` copies the whole runtime into the bundle:** the engine-less `server.mjs` + `migrate.mjs`
+  + the Prisma migration SQL → `server/`; the pg launcher + platform binaries → `pg/`; the admin/tv-web/setup
+  SPAs → `views/`. The platform-package copy source is realpath'd (dodges pnpm's symlink) and made relative
+  (electrobun concatenates copy keys onto the app dir, so an absolute path is mangled).
+- **`desktop prebuild` now builds the standalone server + the pg launcher** (`build:standalone` +
+  `build:pg-launcher`) alongside the SPAs, so CI emits a self-contained bundle. Each matrix runner bundles its
+  own OS/arch (pnpm installs only the matching `@embedded-postgres` optional dep).
+- **Packaged admin server URL via runtime injection** (the "build once, deploy anywhere" recipe). The prebuilt
+  admin can't be rebuilt per-install the way `dev:desktop`/Docker re-bake it with vite, yet the supervisor
+  re-resolves a free server port every launch. So it injects the resolved, proxy-aware server URL into the
+  served `index.html` as `window.__AIRWAVE_ENV__`; a new `apps/web/src/lib/runtime-env.ts` reads it first,
+  falling back to the baked `import.meta.env`. One static admin build then works at whatever port the supervisor
+  picked. Vercel / `pnpm dev` / tv-web are unchanged (tv-web already resolves its server at runtime).
+
+### Still open (non-blocking for a booting install)
+
+- First-run fetch of the ~430 MB `media-v1` capability clips (not bundled — the codec-probe clips are simply
+  absent until then; the server still boots).
+- Workflows / AI-imports stay off in the packaged app until a standalone workflow-bootstrap runner ships.
+- The Windows app icon isn't embedded (electrobun can't find `rcedit` locally); macOS signing/notarization +
+  auto-update are wired but off.
+
 ## [0.9.107] - 2026-08-13
 
 ### Added (Stage 5 — self-contained desktop server, part 1)

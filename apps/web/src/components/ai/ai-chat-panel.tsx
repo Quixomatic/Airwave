@@ -1,5 +1,4 @@
 import { useChat } from "@ai-sdk/react";
-import { env } from "@airwave/env/web";
 import { Button } from "@airwave/ui/components/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@airwave/ui/components/select";
 import { useQuery } from "@tanstack/react-query";
@@ -27,6 +26,7 @@ import { Response } from "@/components/ai-elements/response";
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput, type ToolState } from "@/components/ai-elements/tool";
 import { EmptyState } from "@/components/empty-state";
 import { PanelHeaderTitle } from "@/context/panel-header-provider";
+import { serverUrl } from "@/lib/runtime-env";
 import { cn } from "@/lib/utils";
 import { uuid } from "@/lib/uuid";
 import { trpc, trpcClient } from "@/utils/trpc";
@@ -38,7 +38,7 @@ import { trpc, trpcClient } from "@/utils/trpc";
  */
 
 const serverBase = () => {
-  const u = env.VITE_SERVER_URL;
+  const u = serverUrl();
   return u.startsWith("/") && typeof window !== "undefined" ? `${window.location.origin}${u}` : u;
 };
 

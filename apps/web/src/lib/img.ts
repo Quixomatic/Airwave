@@ -1,8 +1,8 @@
-import { env } from "@airwave/env/web";
+import { serverUrl } from "@/lib/runtime-env";
 
 /** Base URL of the API server (which hosts the public artwork proxy + static assets like bumper music). */
 export function serverBase(): string {
-  const u = env.VITE_SERVER_URL;
+  const u = serverUrl();
   return u.startsWith("/") && typeof window !== "undefined" ? `${window.location.origin}${u}` : u;
 }
 

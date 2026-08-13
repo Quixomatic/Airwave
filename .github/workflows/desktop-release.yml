@@ -4,17 +4,16 @@ name: Desktop Build & Release
 # artifacts to the GitHub Release. Triggers on the same `v*` tags as the Docker image — a tag fires BOTH
 # workflows (this one is entirely separate from docker-publish.yml). Also runnable manually.
 #
-# ⚠️ STAGE-5 PREREQUISITE — READ BEFORE RELYING ON THE ARTIFACTS:
-#   Electrobun `build` bundles whatever is present, but the resulting app is NOT yet a runnable install. The
-#   desktop supervisor (apps/desktop/src/bun/index.ts) currently assumes the MONOREPO is present at runtime —
-#   it resolves paths via `pnpm-workspace.yaml` and rebuilds the server + SPAs on demand with `pnpm`/`turbo`,
-#   which an end user's machine won't have. To ship a working app we still need to (Stage 5):
-#     • ship the pre-built server (dist/index.mjs) + its RUNTIME node_modules (or `bun build --compile` it),
-#     • ship the embedded-postgres binary + Prisma engines + the migrations, run migrate/bootstrap at runtime,
-#     • make the supervisor detect the PACKAGED layout (views://) and SKIP the dev-only build-on-demand,
-#     • fetch the ~430MB media-v1 capability media on first run.
-#   Until that lands, this workflow validates the CI matrix + produces bundles for iteration, not a install.
-#   See .plans/desktop-server.md and [[project-desktop-server-packaging]].
+# The `pnpm -F desktop prebuild` step below produces a SELF-CONTAINED install: the engine-less server bundle
+# (server.mjs + migrate.mjs), the pre-bundled embedded-Postgres launcher (pg-launcher.mjs) + the current
+# runner's platform binary package, the migration SQL, and the admin/tv-web/setup SPAs. The supervisor detects
+# the PACKAGED layout and runs those directly (no pnpm/turbo/vite on the user's machine); the admin's server URL
+# is injected at serve time, so no per-install rebuild. Each matrix runner bundles ITS OWN OS/arch (pnpm only
+# installs the matching @embedded-postgres optional dep). See .plans/desktop-server.md §12.
+#
+# Follow-ups still open (non-blocking for a booting install): the ~430MB media-v1 capability media is fetched on
+# first run (not bundled); workflows/AI-imports are disabled in packaged until a standalone bootstrap ships;
+# macOS signing/notarization + auto-update are wired but off (see the bottom of this file).
 
 on:
   push:
