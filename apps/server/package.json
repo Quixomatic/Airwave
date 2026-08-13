@@ -1,6 +1,6 @@
 {
   "name": "server",
-  "version": "0.9.107",
+  "version": "0.9.108",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {

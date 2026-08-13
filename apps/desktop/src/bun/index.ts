@@ -48,11 +48,24 @@ function findRepoRoot(start: string): string {
   return join(start, "..", "..", "..", ".."); // source-layout fallback
 }
 const REPO_ROOT = findRepoRoot(HERE);
-const SERVER_DIR = join(REPO_ROOT, "apps", "server");
-const SERVER_ENTRY = join(SERVER_DIR, "dist", "index.mjs"); // built by `turbo -F server build`
-const ADMIN_DIST = join(REPO_ROOT, "apps", "web", "dist");
-const TVWEB_DIST = join(REPO_ROOT, "apps", "tv-web", "dist");
-const SETUP_UI_DIST = join(REPO_ROOT, "apps", "desktop-setup", "dist"); // TODO(bundle): views/setup in prod
+// PACKAGED = the installed app (no monorepo). Then everything is pre-baked in the bundle at
+// `Resources/app/{server,views}`: the standalone server bundle + migrate runner + the SPAs. In dev we resolve
+// the monorepo and build on demand. `APP_ROOT` = `Resources/app` in a bundle (dirname of `.../app/bun`).
+const APP_ROOT = dirname(HERE);
+const PACKAGED = !existsSync(join(REPO_ROOT, "pnpm-workspace.yaml"));
+
+const SERVER_DIR = PACKAGED ? join(APP_ROOT, "server") : join(REPO_ROOT, "apps", "server");
+// Dev runs the tsdown bundle from apps/server (cwd there for bunfig/.well-known). Packaged runs the
+// self-contained `server.mjs` (all deps bundled; Prisma engine-less via the pg adapter).
+const SERVER_ENTRY = PACKAGED ? join(SERVER_DIR, "server.mjs") : join(SERVER_DIR, "dist", "index.mjs");
+const MIGRATE_ENTRY = join(SERVER_DIR, "migrate.mjs"); // packaged: the engine-less migration runner
+const MIGRATIONS_DIR = join(SERVER_DIR, "migrations"); // packaged: the shipped prisma/migrations
+const ADMIN_DIST = PACKAGED ? join(APP_ROOT, "views", "admin") : join(REPO_ROOT, "apps", "web", "dist");
+const TVWEB_DIST = PACKAGED ? join(APP_ROOT, "views", "tvweb") : join(REPO_ROOT, "apps", "tv-web", "dist");
+const SETUP_UI_DIST = PACKAGED ? join(APP_ROOT, "views", "setup") : join(REPO_ROOT, "apps", "desktop-setup", "dist");
+
+/** The bun executable to spawn children with — the one we're already running (bundled bun when packaged). */
+const bunBin = (): string => process.execPath;
 
 // ── Config (the docker-compose knobs, persisted to user-data) ──────────────────────────────────────────
 type Config = {
@@ -487,6 +500,7 @@ function stale(artifact: string, srcDirs: string[]): boolean {
 /** Build the server + admin (+ tv-web) if missing, stale (source changed), or built for a different URL.
  * `adminServerUrl` (127.0.0.1) is baked into the admin; `tvwebServerUrl` (the LAN URL when exposed) into tv-web. */
 async function ensureBuilds(adminServerUrl: string, tvwebServerUrl: string): Promise<void> {
+  if (PACKAGED) return; // pre-baked in the bundle — nothing to build
   const marker = loadMarker();
   const pkgSrc = packageSrcDirs();
   // The server bundle inlines @airwave/* (noExternal), so ANY package source change means it's stale.
@@ -526,6 +540,7 @@ async function ensureBuilds(adminServerUrl: string, tvwebServerUrl: string): Pro
 /** Build the onboarding/settings UI (@airwave/desktop-setup) if missing or stale, so the setup window renders
  * the current version. Small Vite app → fast. (The packaged binary pre-bakes it into views/setup.) */
 async function ensureSetupUiBuilt(): Promise<void> {
+  if (PACKAGED) return; // pre-baked at views/setup
   const idx = join(SETUP_UI_DIST, "index.html");
   if (!stale(idx, [join(REPO_ROOT, "apps", "desktop-setup", "src"), join(REPO_ROOT, "packages", "ui", "src")])) return;
   await build("@airwave/desktop-setup");
@@ -547,30 +562,36 @@ async function startStack(): Promise<void> {
   const DATABASE_URL = await startPostgres();
 
   setPhase("migrating");
-  console.log("[desktop] prisma migrate deploy…");
-  await run(pnpmArgs(["--filter", "@airwave/db", "db:migrate:deploy"]), {
-    cwd: REPO_ROOT,
-    env: { DATABASE_URL },
-  });
+  if (PACKAGED) {
+    // No pnpm/prisma CLI in the bundle → apply migrations with the engine-less runner (see migrate-standalone.ts).
+    console.log("[desktop] applying migrations (engine-less)…");
+    await run([bunBin(), MIGRATE_ENTRY], { env: { DATABASE_URL, MIGRATIONS_DIR } });
+  } else {
+    console.log("[desktop] prisma migrate deploy…");
+    await run(pnpmArgs(["--filter", "@airwave/db", "db:migrate:deploy"]), { cwd: REPO_ROOT, env: { DATABASE_URL } });
+  }
 
   // Bootstrap the durable workflow engine's schema (the `workflow.*` tables — graphile-worker + step tracking).
-  // Channel Import AND the AI lineup engine query it (`workflow.workflow_steps`), so run it regardless of the
-  // WORKFLOW_ENABLED toggle. Idempotent (records what it applied); non-fatal if it fails.
-  console.log("[desktop] workflow bootstrap…");
-  const wfCode = await run(pnpmArgs(["--filter", "server", "workflow:bootstrap"]), {
-    cwd: REPO_ROOT,
-    env: {
-      DATABASE_URL,
-      BETTER_AUTH_SECRET: authSecret(),
-      WORKFLOW_ENABLED: "1",
-      // Same connection the engine uses — this is what actually creates the `workflow.*` schema.
-      WORKFLOW_POSTGRES_URL: DATABASE_URL,
-      WORKFLOW_TARGET_WORLD: "@workflow/world-postgres",
-      WORKFLOW_LOCAL_BASE_URL: "http://127.0.0.1:3152",
-    },
-  });
-  if (wfCode !== 0) {
-    console.warn(`[desktop] workflow bootstrap failed (exit ${wfCode}) — imports/workflows may error until it succeeds.`);
+  // Channel Import AND the AI lineup engine query it (`workflow.workflow_steps`). Dev uses `workflow:bootstrap`
+  // (pnpm). Packaged doesn't ship it yet → workflows/AI-imports are disabled in the packaged app for now
+  // (TODO: bundle a standalone bootstrap runner, like the migrate one).
+  if (!PACKAGED) {
+    console.log("[desktop] workflow bootstrap…");
+    const wfCode = await run(pnpmArgs(["--filter", "server", "workflow:bootstrap"]), {
+      cwd: REPO_ROOT,
+      env: {
+        DATABASE_URL,
+        BETTER_AUTH_SECRET: authSecret(),
+        WORKFLOW_ENABLED: "1",
+        // Same connection the engine uses — this is what actually creates the `workflow.*` schema.
+        WORKFLOW_POSTGRES_URL: DATABASE_URL,
+        WORKFLOW_TARGET_WORLD: "@workflow/world-postgres",
+        WORKFLOW_LOCAL_BASE_URL: "http://127.0.0.1:3152",
+      },
+    });
+    if (wfCode !== 0) {
+      console.warn(`[desktop] workflow bootstrap failed (exit ${wfCode}) — imports/workflows may error until it succeeds.`);
+    }
   }
 
   // The admin's primary origin (CORS_ORIGIN) + everything else we allow-list: local + LAN admin, the tv-web
@@ -594,7 +615,9 @@ async function startStack(): Promise<void> {
     console.log(`[desktop] starting server on ${host()}:${config.ports.server}…`);
     // The first-run admin — seedAdmin creates it from these on boot (no-op if unset / already present).
     const admin = loadAdminCreds();
-    const srv = spawn(["bun", "run", "dist/index.mjs"], {
+    // Dev: `bun run dist/index.mjs` from apps/server (bunfig preload + .well-known). Packaged: run the
+    // self-contained `server.mjs` directly with the bundled bun.
+    const srv = spawn(PACKAGED ? [bunBin(), SERVER_ENTRY] : ["bun", "run", "dist/index.mjs"], {
       cwd: SERVER_DIR,
       stdout: "pipe",
       stderr: "pipe",
@@ -612,7 +635,9 @@ async function startStack(): Promise<void> {
         CORS_ORIGIN: corsPrimary,
         TV_APP_ORIGIN: tvAppOrigin,
         EXTRA_CORS_ORIGINS: extraOrigins,
-        WORKFLOW_ENABLED: config.workflowEnabled ? "1" : "",
+        // Packaged doesn't ship the workflow bootstrap yet → keep the engine off there (avoids the missing
+        // `workflow.*` schema errors) until we bundle a standalone bootstrap. Dev honors the toggle.
+        WORKFLOW_ENABLED: !PACKAGED && config.workflowEnabled ? "1" : "",
         // The durable workflow engine connects via its OWN url (mirrors compose) — point it at the embedded PG
         // so its `workflow.*` schema lives in the SAME database Prisma reads (else `workflow.workflow_steps`
         // is missing for the app's observability queries). Defaults match compose.
