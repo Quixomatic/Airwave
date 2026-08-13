@@ -2,6 +2,26 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.106] - 2026-08-13
+
+### Added
+
+- **`.github/workflows/desktop-release.yml` — the desktop build CI (matrix, all three OSes).** A separate
+  workflow from `docker-publish.yml`, triggered on the same `v*` tags (a tag fires both) plus manual dispatch.
+  Builds the Electrobun app natively on **macOS arm64** (`macos-14`) + **x64** (`macos-13`), **Windows x64**
+  (`windows-2025`), and **Linux x64** (`ubuntu-24.04`) + **arm64** (`ubuntu-24.04-arm`) — 5 artifacts — via
+  `pnpm -F desktop prebuild` (server + admin + tv-web + setup UI) then `electrobun build --env=stable|canary`,
+  attaching the artifacts to the GitHub Release. Added `build:stable` / `build:canary` scripts to
+  `apps/desktop`.
+
+### Note
+
+- **The produced bundle is not yet a runnable install** — the supervisor still assumes the monorepo at runtime
+  (rebuilds the server + SPAs with `pnpm`/`turbo`). Making the packaged app self-contained (ship the server +
+  runtime deps + embedded-Postgres binary + migrations, skip the dev-only build-on-demand, first-run media
+  fetch) is the remaining **Stage-5** work. macOS signing/notarization + auto-update (`release.baseUrl`) are
+  also deferred (the workflow documents both). See `.plans/desktop-server.md`.
+
 ## [0.9.105] - 2026-08-13
 
 ### Fixed

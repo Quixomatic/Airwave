@@ -1,0 +1,122 @@
+name: Desktop Build & Release
+
+# Builds the Airwave Desktop app (apps/desktop, Electrobun) NATIVELY on each OS/arch and attaches the
+# artifacts to the GitHub Release. Triggers on the same `v*` tags as the Docker image — a tag fires BOTH
+# workflows (this one is entirely separate from docker-publish.yml). Also runnable manually.
+#
+# ⚠️ STAGE-5 PREREQUISITE — READ BEFORE RELYING ON THE ARTIFACTS:
+#   Electrobun `build` bundles whatever is present, but the resulting app is NOT yet a runnable install. The
+#   desktop supervisor (apps/desktop/src/bun/index.ts) currently assumes the MONOREPO is present at runtime —
+#   it resolves paths via `pnpm-workspace.yaml` and rebuilds the server + SPAs on demand with `pnpm`/`turbo`,
+#   which an end user's machine won't have. To ship a working app we still need to (Stage 5):
+#     • ship the pre-built server (dist/index.mjs) + its RUNTIME node_modules (or `bun build --compile` it),
+#     • ship the embedded-postgres binary + Prisma engines + the migrations, run migrate/bootstrap at runtime,
+#     • make the supervisor detect the PACKAGED layout (views://) and SKIP the dev-only build-on-demand,
+#     • fetch the ~430MB media-v1 capability media on first run.
+#   Until that lands, this workflow validates the CI matrix + produces bundles for iteration, not a install.
+#   See .plans/desktop-server.md and [[project-desktop-server-packaging]].
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Build channel"
+        type: choice
+        options: [stable, canary]
+        default: stable
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # attach artifacts to the GitHub Release
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14 # Apple Silicon
+            arch: arm64
+          - os: macos-13 # Intel
+            arch: x64
+          - os: windows-2025
+            arch: x64
+          - os: ubuntu-24.04
+            arch: x64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Determine build channel
+        id: ch
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "channel=${{ github.event.inputs.channel }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref_name }}" == *"-canary"* ]]; then
+            echo "channel=canary" >> "$GITHUB_OUTPUT"
+          else
+            echo "channel=stable" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Pre-build everything the desktop bundle serves: the API server, the admin + tv-web SPAs, and the
+      # onboarding UI. (This is the `prebuild` script — turbo builds all four.)
+      - name: Build server + SPAs
+        run: pnpm -F desktop prebuild
+
+      - name: Build desktop app (electrobun)
+        working-directory: apps/desktop
+        run: pnpm run build:${{ steps.ch.outputs.channel }}
+
+      - name: List artifacts
+        shell: bash
+        run: ls -la apps/desktop/artifacts/ || echo "no artifacts/"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: airwave-desktop-${{ matrix.os }}-${{ matrix.arch }}
+          path: apps/desktop/artifacts/*
+          if-no-files-found: warn
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apps/desktop/artifacts/*
+          draft: false
+          prerelease: ${{ steps.ch.outputs.channel == 'canary' }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+# Not yet wired (follow-ups):
+#   • macOS code signing + notarization (secrets: MACOS_CERTIFICATE, ELECTROBUN_APPLEID/…) — builds are
+#     unsigned for now, so Gatekeeper will warn. See blackboardsh/audio-tts release.yml for the keychain steps.
+#   • Auto-update: set electrobun.config `release.baseUrl` to a static host + use the Updater. Needs a public
+#     download host (the repo is private pre-1.0), so deferred.
