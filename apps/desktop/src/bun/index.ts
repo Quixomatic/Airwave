@@ -1,6 +1,5 @@
 import { Tray, Updater } from "electrobun/bun";
 import { spawn, type Subprocess } from "bun";
-import EmbeddedPostgres from "embedded-postgres";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir, networkInterfaces } from "node:os";
@@ -162,7 +161,30 @@ function serveDir(dist: string, port: number): ReturnType<typeof Bun.serve> | nu
 }
 
 // ── Process supervision (mirrors docker/entrypoint.sh) ───────────────────────────────────────────────────
-let pg: EmbeddedPostgres | null = null;
+// embedded-postgres dynamically imports one of ~6 per-platform binary packages; only the current platform's
+// is installed. Loading it via a NON-LITERAL specifier keeps the bundler from following those imports at
+// build time (it resolves at runtime instead). Only used in the bundled/prod supervisor — dev never calls it.
+type EmbeddedPostgresLike = {
+  initialise(): Promise<void>;
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  createDatabase(name: string): Promise<void>;
+};
+type EmbeddedPostgresCtor = new (opts: {
+  databaseDir: string;
+  user: string;
+  password: string;
+  port: number;
+  persistent: boolean;
+}) => EmbeddedPostgresLike;
+
+async function loadEmbeddedPostgres(): Promise<EmbeddedPostgresCtor> {
+  const spec = "embedded-postgres";
+  const mod = (await import(spec)) as { default: EmbeddedPostgresCtor };
+  return mod.default;
+}
+
+let pg: EmbeddedPostgresLike | null = null;
 const servers: { stop(): void }[] = [];
 const children: Subprocess[] = [];
 
@@ -173,6 +195,7 @@ async function startPostgres(): Promise<string> {
     return config.databaseUrl;
   }
   mkdirSync(DATA_DIR, { recursive: true });
+  const EmbeddedPostgres = await loadEmbeddedPostgres();
   pg = new EmbeddedPostgres({
     databaseDir: PG_DATA_DIR,
     user: "airwave",
