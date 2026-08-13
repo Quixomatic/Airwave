@@ -2,6 +2,26 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.103] - 2026-08-13
+
+### Fixed
+
+- **Embedded Postgres was initialized as WIN1252, not UTF8 — metadata sync (and any non-Latin-1 title like
+  `Ō`) failed** with "character … has no equivalent in encoding WIN1252". On Windows `initdb` defaults to the
+  system locale (WIN1252). The supervisor now passes `initdbFlags: ["--encoding=UTF8", "--locale=C"]`.
+  **Existing desktop installs must delete `%APPDATA%\Airwave\pgdata`** (a cluster's encoding can't be changed
+  in place) so it re-initializes as UTF8.
+- **The Settings window now reopens from the tray without crashing.** Switched the setup/settings window from
+  bundled **CEF to the system webview** (`bundleCEF: false`, `defaultRenderer: "native"` → WebView2 on Windows).
+  CEF on Windows segfaulted on window *reuse* (BasicTimeTracker never hit this — it uses one CEF window it never
+  reopens); the native webview + the documented `show()`/`hide()` reuse pattern is stable, and lighter (~14MB
+  vs ~100MB). Tray "Settings" reopens the native window (reloads `/setup`, re-reads config); `/save` restarts
+  the stack for changed settings.
+- **Tray icon now renders** — loaded via the `views://assets/airwave-tray.png` scheme (an absolute filesystem
+  path didn't render on the Windows tray), 32×32.
+- **Tray menu label** dropped the Unicode ellipsis (`"Settings…"` → `"Settings"`) that showed as garbage
+  characters in the native menu.
+
 ## [0.9.102] - 2026-08-13
 
 ### Fixed

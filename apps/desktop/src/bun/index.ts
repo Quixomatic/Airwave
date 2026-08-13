@@ -147,11 +147,9 @@ function capMediaDir(): string {
 // apple-touch-icon). TODO(dist): switch to `views://assets/airwave-tray.png` (electrobun `build.copy`) so it
 // resolves inside the bundle. `template:false` — it's a full-color mark, not a macOS monochrome mask.
 function trayIcon(): string {
-  const candidates = [
-    join(REPO_ROOT, "apps", "desktop", "assets", "airwave-tray.png"),
-    join(REPO_ROOT, "apps", "web", "public", "apple-touch-icon.png"),
-  ];
-  return candidates.find((p) => existsSync(p)) ?? "";
+  // Load via the `views://` scheme (electrobun `build.copy` puts `assets/*` into `views/assets/`). The docs use
+  // `views://` for tray images, and an absolute filesystem path did NOT render on the Windows tray.
+  return "views://assets/airwave-tray.png";
 }
 
 function loadConfig(): Config {
@@ -355,6 +353,7 @@ type EmbeddedPostgresCtor = new (opts: {
   password: string;
   port: number;
   persistent: boolean;
+  initdbFlags?: string[];
 }) => EmbeddedPostgresLike;
 
 async function loadEmbeddedPostgres(): Promise<EmbeddedPostgresCtor> {
@@ -382,6 +381,9 @@ async function startPostgres(): Promise<string> {
     password: "airwave",
     port: config.ports.pg,
     persistent: true,
+    // CRITICAL on Windows: initdb otherwise defaults to the system locale (WIN1252), so any non-Latin-1 title
+    // (e.g. `Ō`) fails to insert — "no equivalent in encoding WIN1252". Force a UTF8 cluster (C collation).
+    initdbFlags: ["--encoding=UTF8", "--locale=C"],
   });
   if (!existsSync(join(PG_DATA_DIR, "PG_VERSION"))) {
     console.log("[desktop] initialising embedded Postgres…");
@@ -850,32 +852,31 @@ function setupHtml(): string {
 }
 
 // ── Native setup / settings window (desktop-only; the running app stays tray + browser-for-admin) ─────────
-// Electrobun/CEF on Windows SEGFAULTS on a SECOND operation on a BrowserWindow — recreating one after it's
-// destroyed AND show()/activate() on a hidden one both crash (in USER32.dll). So the native window is used
-// ONCE, for first-run onboarding only; it's created here and never touched again (done → hide()). Everything
-// after (tray "Settings…") opens the same served UI in the browser instead. See apis/browser-window.
+// The setup/settings window uses the SYSTEM webview (native renderer — see electrobun.config). We keep ONE
+// reference and reuse it via the documented show()/hide() pattern: reopening re-loads the /setup URL (so it
+// re-reads /config) and shows the window. (The earlier CEF-based approach segfaulted on window reuse.)
 let setupWindow: BrowserWindow | null = null;
 async function openSetupWindow(): Promise<void> {
   await ensureSetupUiBuilt(); // make sure the served UI exists before the window loads it
-  const width = 560;
-  const height = 700;
+  if (setupWindow) {
+    try {
+      setupWindow.webview?.loadURL(setupUrl()); // reset the flow to its start (re-reads /config)
+      setupWindow.show();
+      return;
+    } catch {
+      setupWindow = null; // ref went stale (window destroyed) — fall through and recreate
+    }
+  }
   setupWindow = new BrowserWindow({
     title: "Airwave",
     url: setupUrl(),
-    renderer: "cef",
-    frame: { width, height, x: 160, y: 120 },
+    frame: { width: 560, height: 700, x: 160, y: 120 },
   });
   setupWindow.on("close", () => {
     setupWindow = null;
   });
-  // CEF mismeasures vh on first paint and only remeasures on a real resize — nudge the size once, then revert
-  // (BasicTimeTracker gotcha). Our /setup page uses min-height:100vh, so without this it can overflow.
-  setTimeout(() => {
-    setupWindow?.setSize(width, height + 1);
-    setTimeout(() => setupWindow?.setSize(width, height), 16);
-  }, 150);
 }
-/** Hide the onboarding window (never close()/reopen — CEF crashes on a second window op). */
+/** Hide the setup window without closing it (documented reuse pattern) so it can be reopened from the tray. */
 function hideSetupWindow(): void {
   try {
     setupWindow?.hide();
@@ -898,7 +899,7 @@ function buildTray(): Tray {
     { type: "normal", label: "Open Admin", action: "open-admin" },
     { type: "normal", label: "Open TV player", action: "open-tvweb", hidden: !config.tvwebEnabled },
     { type: "divider" },
-    { type: "normal", label: "Settings…", action: "settings" },
+    { type: "normal", label: "Settings", action: "settings" },
     { type: "normal", label: `Server: ${serverLanUrl()}`, action: "noop", enabled: false },
     { type: "divider" },
     { type: "normal", label: "Quit", action: "quit" },
@@ -913,10 +914,7 @@ function buildTray(): Tray {
         openBrowser(tvwebUrl());
         break;
       case "settings":
-        // Electrobun/CEF segfaults on ANY second operation on a BrowserWindow (recreate OR show/reload a
-        // hidden one), so Settings opens the SAME served UI in the browser instead. First-run onboarding keeps
-        // the native window (created once); everything after is the browser.
-        openBrowser(setupUrl());
+        void openSetupWindow(); // native settings window (system webview) — reused via show()/hide()
         break;
       case "quit":
         void stopStack().finally(() => process.exit(0));

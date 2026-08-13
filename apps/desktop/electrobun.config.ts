@@ -28,13 +28,16 @@ export default {
       assets: "views/assets",
     },
     watchIgnore: [`${adminDist}/**`, `${tvwebDist}/**`, `${setupUiDist}/**`],
-    // CEF is bundled so first-run setup / settings can render in a NATIVE webview window (BrowserWindow → the
-    // served `/setup` page) — a nicer onboarding than a browser tab, and desktop-only. The RUNNING app is still
-    // tray-first with the browser as the admin/tv-web UI; the window is just for setup/settings. See
-    // apis/bundling-cef. `exitOnLastWindowClosed:false` (above) keeps the tray alive when the window closes.
-    mac: { bundleCEF: true, defaultRenderer: "cef" },
-    linux: { bundleCEF: true, defaultRenderer: "cef" },
-    // The Windows app/taskbar/shortcut icon (packaged build). The tray icon is set separately at runtime.
-    win: { bundleCEF: true, defaultRenderer: "cef", icon: "assets/icon.ico" },
+    // The setup/settings window uses the SYSTEM webview (WebView2 / WKWebView / WebKitGTK), NOT bundled CEF.
+    // Per the docs, the system webview is the right fit for a simple app (~14MB vs ~100MB CEF) — and bundled
+    // CEF on Windows SEGFAULTED on window reuse (show()/activate() a hidden window), which broke reopening the
+    // settings window. The native webview + the documented show()/hide() reuse pattern is stable. The running
+    // app is still tray-first (browser = the admin/tv-web UI); the window is only for setup/settings.
+    // (Linux: the docs prefer CEF for advanced compositing — a plain form is fine on GTKWebKit; revisit at
+    // Stage-5 packaging if needed.)
+    mac: { bundleCEF: false, defaultRenderer: "native" },
+    linux: { bundleCEF: false, defaultRenderer: "native" },
+    // `icon` = the Windows app/taskbar/shortcut icon (packaged build). The tray icon is set at runtime.
+    win: { bundleCEF: false, defaultRenderer: "native", icon: "assets/icon.ico" },
   },
 } satisfies ElectrobunConfig;
