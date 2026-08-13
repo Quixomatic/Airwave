@@ -25,11 +25,16 @@ export async function seedAdmin(): Promise<void> {
     return;
   }
 
-  // Create through better-auth so the password is hashed with its own scheme.
-  await auth.api.signUpEmail({ body: { email, password, name: "Admin" } });
+  // Create through better-auth's admin-plugin `createUser` — the SAME path the admin UI's users module uses.
+  // It hashes the password with better-auth's scheme AND writes the `credential` account row (a plain
+  // `signUpEmail` no longer works: public email/password sign-up is disabled via
+  // `emailAndPassword.disableSignUp`). Called with NO session/headers, which the admin plugin treats as a
+  // trusted server-side call and skips the admin-permission check — the chicken-and-egg first-admin bootstrap
+  // (there's no admin yet to authorize creating the first admin). `role: "admin"` is applied at creation.
+  await auth.api.createUser({ body: { email, password, name: "Admin", role: "admin" } });
   await prisma.user.update({
     where: { email },
-    data: { role: "admin", emailVerified: true },
+    data: { emailVerified: true },
   });
   console.log(`✅ Seeded admin ${email}`);
 }

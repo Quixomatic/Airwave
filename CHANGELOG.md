@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.95] - 2026-08-13
+
+### Fixed
+
+- **First-boot admin seed was broken — it used the disabled email/password sign-up.** `seedAdmin` (the
+  `ADMIN_EMAIL`/`ADMIN_PASSWORD` startup bootstrap) called `auth.api.signUpEmail`, but public email/password
+  sign-up is disabled (`emailAndPassword.disableSignUp: true` — accounts are admin-created only), so the initial
+  admin was silently never created on a fresh deployment (e.g. the desktop app's fresh embedded DB, or a new
+  Docker/self-host install). Switched it to the admin-plugin **`auth.api.createUser`** — the same path the admin
+  UI's users module uses — which hashes the password and writes the `credential` account, with `role: "admin"`
+  applied at creation. It's called with no session/headers, which the admin plugin treats as a trusted
+  server-side call and skips the admin-permission check (the chicken-and-egg first-admin bootstrap: there's no
+  admin yet to authorize creating one). Verified end-to-end against a fresh migrated DB — the admin is created
+  (idempotent on re-run), gets the `admin` role + a credential account, and can actually log in.
+
 ## [0.9.94] - 2026-08-13
 
 ### Fixed
