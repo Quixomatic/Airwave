@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.98] - 2026-08-13
+
+### Fixed
+
+- **Airwave Desktop ran a STALE server bundle, so first-boot admin seeding failed** ("Email and password sign
+  up is not enabled"). Build-on-demand only rebuilt when the artifact was *missing*, so after a source fix (the
+  v0.9.95 `seedAdmin` change) the desktop kept serving the old server bundle that still called the disabled
+  `signUpEmail`. The supervisor now rebuilds server / admin / tv-web / setup-UI whenever **source is newer than
+  the built artifact** (mtime over the app's `src` + all `packages/*/src`, since the server bundle inlines
+  `@airwave/*`) — not just when missing. The packaged binary has no monorepo dirs, so this stays a no-op there.
+- **`electrobun dev --watch` fought the supervisor.** The supervisor writes fresh SPA builds into
+  `apps/web/dist`; `--watch` saw those changes and tried to rebuild the Electrobun app, which `rmSync`s its own
+  `build/dev-win-x64` — locked by the running app → endless `EACCES`. Dropped `--watch` from `pnpm dev:desktop`
+  (a long-running supervisor and watch-rebuild are incompatible — edit the supervisor, then restart it).
+
+### Changed
+
+- **A proper onboarding finish screen.** Setup no longer auto-closes the window and auto-opens the browser the
+  instant the stack is ready. The wizard ends on a calm "Airwave is ready" screen with an animated check, an
+  **Open Airwave** button (→ the supervisor's new `POST /open-admin`), and a "you can close this window —
+  Airwave keeps running in your tray" note.
+
 ## [0.9.97] - 2026-08-13
 
 ### Fixed

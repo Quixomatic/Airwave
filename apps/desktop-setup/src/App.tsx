@@ -258,15 +258,29 @@ export function App() {
             {step === "done" && (
               <Card>
                 <div className="flex flex-col items-center py-6 text-center">
-                  <Logo markWidth={80} />
-                  <h1 className="mt-6 text-xl font-semibold">Airwave is running</h1>
+                  <motion.span
+                    className="mb-5 flex size-16 items-center justify-center rounded-full bg-primary/15 text-primary"
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: "spring", stiffness: 260, damping: 18 }}
+                  >
+                    <Check className="size-8" strokeWidth={3} />
+                  </motion.span>
+                  <h1 className="text-xl font-semibold">Airwave is ready</h1>
                   <p className="mt-2 max-w-[340px] text-sm text-muted-foreground">
-                    Opening the admin in your browser. You can close this window — Airwave stays running in your
-                    system tray.
+                    Your server is up and running. Open the admin to connect Plex and start building channels.
+                  </p>
+                  <Button className="mt-7 w-full" onClick={() => void fetch("/open-admin", { method: "POST" })}>
+                    Open Airwave
+                    <ArrowRight className="ml-1 size-4" />
+                  </Button>
+                  <p className="mt-5 text-xs text-muted-foreground">
+                    You can close this window whenever — Airwave keeps running in your system tray.
                   </p>
                   {cfg?.serverLan && (
-                    <p className="mt-4 text-xs text-muted-foreground">
-                      TVs on your network can connect at <span className="font-mono text-foreground">{cfg.serverLan}</span>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      TVs on your network can connect at{" "}
+                      <span className="font-mono text-foreground">{cfg.serverLan}</span>
                     </p>
                   )}
                 </div>

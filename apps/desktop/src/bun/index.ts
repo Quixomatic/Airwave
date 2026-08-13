@@ -2,7 +2,16 @@ import { BrowserWindow, Tray } from "electrobun/bun";
 import { spawn, type Subprocess } from "bun";
 import { randomBytes } from "node:crypto";
 import { createServer } from "node:net";
-import { createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir, networkInterfaces } from "node:os";
 import { dirname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -408,10 +417,56 @@ async function build(filter: string, env: Record<string, string> = {}): Promise<
   if (code !== 0) throw new Error(`build failed for "${filter}" (exit ${code})`);
 }
 
-/** Build the server + admin (+ tv-web) if missing or built for a different server URL. No-ops once built. */
+// ── Dev staleness: the desktop runs the BUILT bundles, so a stale dist ships old behavior (e.g. an old
+// seedAdmin after a source fix). Rebuild when any relevant source is newer than the artifact. In the packaged
+// binary these monorepo dirs don't exist → newestMtimeMs is 0 → never rebuilds (pre-baked). ─────────────────
+function packageSrcDirs(): string[] {
+  try {
+    const pkgs = join(REPO_ROOT, "packages");
+    return readdirSync(pkgs)
+      .map((p) => join(pkgs, p, "src"))
+      .filter((d) => existsSync(d));
+  } catch {
+    return [];
+  }
+}
+function newestMtimeMs(dirs: string[]): number {
+  let newest = 0;
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue;
+    try {
+      for (const rel of readdirSync(dir, { recursive: true }) as string[]) {
+        try {
+          const s = statSync(join(dir, rel));
+          if (s.isFile() && s.mtimeMs > newest) newest = s.mtimeMs;
+        } catch {
+          /* ignore */
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return newest;
+}
+function artifactMtimeMs(file: string): number {
+  try {
+    return statSync(file).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+/** True if the artifact is missing or any source under `srcDirs` is newer than it. */
+function stale(artifact: string, srcDirs: string[]): boolean {
+  return !existsSync(artifact) || newestMtimeMs(srcDirs) > artifactMtimeMs(artifact);
+}
+
+/** Build the server + admin (+ tv-web) if missing, stale (source changed), or built for a different URL. */
 async function ensureBuilds(serverUrl: string): Promise<void> {
   const marker = loadMarker();
-  if (!existsSync(SERVER_ENTRY)) {
+  const pkgSrc = packageSrcDirs();
+  // The server bundle inlines @airwave/* (noExternal), so ANY package source change means it's stale.
+  if (stale(SERVER_ENTRY, [join(SERVER_DIR, "src"), ...pkgSrc])) {
     // `workflow build && tsdown` is non-idempotent — `workflow build` chokes on a stale dist/ from a prior
     // run (e.g. a half-built dist with no index.mjs). Clean it first. (Docker never hits this — fresh checkout.)
     setPhase("building-server");
@@ -419,13 +474,18 @@ async function ensureBuilds(serverUrl: string): Promise<void> {
     rmSync(join(SERVER_DIR, ".well-known"), { recursive: true, force: true });
     await build("server");
   }
-  if (!existsSync(join(ADMIN_DIST, "index.html")) || marker.web !== serverUrl) {
+  const adminIndex = join(ADMIN_DIST, "index.html");
+  if (marker.web !== serverUrl || stale(adminIndex, [join(REPO_ROOT, "apps", "web", "src"), ...pkgSrc])) {
     setPhase("building-admin");
     await build("web", { VITE_SERVER_URL: serverUrl });
     marker.web = serverUrl;
     saveMarker(marker);
   }
-  if (config.tvwebEnabled && (!existsSync(join(TVWEB_DIST, "index.html")) || marker.tvweb !== serverUrl)) {
+  const tvIndex = join(TVWEB_DIST, "index.html");
+  if (
+    config.tvwebEnabled &&
+    (marker.tvweb !== serverUrl || stale(tvIndex, [join(REPO_ROOT, "apps", "tv-web", "src"), ...pkgSrc]))
+  ) {
     setPhase("building-tvweb");
     await build("tv-web", { VITE_SERVER_URL: serverUrl });
     marker.tvweb = serverUrl;
@@ -433,10 +493,11 @@ async function ensureBuilds(serverUrl: string): Promise<void> {
   }
 }
 
-/** Build the onboarding/settings UI (@airwave/desktop-setup) if missing, so the setup window has something to
- * render at first run. Small Vite app → fast. (The packaged binary pre-bakes it into views/setup.) */
+/** Build the onboarding/settings UI (@airwave/desktop-setup) if missing or stale, so the setup window renders
+ * the current version. Small Vite app → fast. (The packaged binary pre-bakes it into views/setup.) */
 async function ensureSetupUiBuilt(): Promise<void> {
-  if (existsSync(join(SETUP_UI_DIST, "index.html"))) return;
+  const idx = join(SETUP_UI_DIST, "index.html");
+  if (!stale(idx, [join(REPO_ROOT, "apps", "desktop-setup", "src"), join(REPO_ROOT, "packages", "ui", "src")])) return;
   await build("@airwave/desktop-setup");
 }
 
@@ -604,11 +665,15 @@ function startSetupServer(): void {
             await stopStack();
             stackState = "idle";
           }
-          // Long-running (build/PG/migrate) — the page polls /status; when up we hand off to the browser.
-          void ensureStackUp().then((up) => {
-            if (up) onStackReady();
-          });
+          // Long-running (build/PG/migrate). The setup UI polls /status for progress and shows a finish screen
+          // with an "Open Airwave" button (→ /open-admin) — we do NOT auto-open/close (a clear, calm ending).
+          void ensureStackUp();
         }
+        return Response.json({ ok: true });
+      }
+
+      if (req.method === "POST" && url.pathname === "/open-admin") {
+        openBrowser(adminUrl());
         return Response.json({ ok: true });
       }
 
