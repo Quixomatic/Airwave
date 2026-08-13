@@ -461,8 +461,9 @@ function stale(artifact: string, srcDirs: string[]): boolean {
   return !existsSync(artifact) || newestMtimeMs(srcDirs) > artifactMtimeMs(artifact);
 }
 
-/** Build the server + admin (+ tv-web) if missing, stale (source changed), or built for a different URL. */
-async function ensureBuilds(serverUrl: string): Promise<void> {
+/** Build the server + admin (+ tv-web) if missing, stale (source changed), or built for a different URL.
+ * `adminServerUrl` (127.0.0.1) is baked into the admin; `tvwebServerUrl` (the LAN URL when exposed) into tv-web. */
+async function ensureBuilds(adminServerUrl: string, tvwebServerUrl: string): Promise<void> {
   const marker = loadMarker();
   const pkgSrc = packageSrcDirs();
   // The server bundle inlines @airwave/* (noExternal), so ANY package source change means it's stale.
@@ -474,21 +475,27 @@ async function ensureBuilds(serverUrl: string): Promise<void> {
     rmSync(join(SERVER_DIR, ".well-known"), { recursive: true, force: true });
     await build("server");
   }
+  // The admin is only ever opened on THIS machine at 127.0.0.1 → bake the 127.0.0.1 server URL so the admin and
+  // the server share a host (same-site) and better-auth's SameSite=Lax session cookie actually flows. Baking a
+  // LAN IP here breaks login: admin @127.0.0.1 → server @<lan-ip> is cross-site, so the cookie is dropped and
+  // get-session comes back null.
   const adminIndex = join(ADMIN_DIST, "index.html");
-  if (marker.web !== serverUrl || stale(adminIndex, [join(REPO_ROOT, "apps", "web", "src"), ...pkgSrc])) {
+  if (marker.web !== adminServerUrl || stale(adminIndex, [join(REPO_ROOT, "apps", "web", "src"), ...pkgSrc])) {
     setPhase("building-admin");
-    await build("web", { VITE_SERVER_URL: serverUrl });
-    marker.web = serverUrl;
+    await build("web", { VITE_SERVER_URL: adminServerUrl });
+    marker.web = adminServerUrl;
     saveMarker(marker);
   }
+  // tv-web is for TVs on the LAN → bake the LAN URL when exposed (TVs authenticate via a bearer token, not a
+  // cross-site cookie, so a different host is fine).
   const tvIndex = join(TVWEB_DIST, "index.html");
   if (
     config.tvwebEnabled &&
-    (marker.tvweb !== serverUrl || stale(tvIndex, [join(REPO_ROOT, "apps", "tv-web", "src"), ...pkgSrc]))
+    (marker.tvweb !== tvwebServerUrl || stale(tvIndex, [join(REPO_ROOT, "apps", "tv-web", "src"), ...pkgSrc]))
   ) {
     setPhase("building-tvweb");
-    await build("tv-web", { VITE_SERVER_URL: serverUrl });
-    marker.tvweb = serverUrl;
+    await build("tv-web", { VITE_SERVER_URL: tvwebServerUrl });
+    marker.tvweb = tvwebServerUrl;
     saveMarker(marker);
   }
 }
@@ -504,9 +511,11 @@ async function ensureSetupUiBuilt(): Promise<void> {
 async function startStack(): Promise<void> {
   mkdirSync(BUMPER_MUSIC_DIR, { recursive: true });
 
-  // Build the server + SPAs first (baking the SPAs for THIS server URL) so a fresh checkout just works.
-  const serverUrl = serverPublicUrl();
-  await ensureBuilds(serverUrl);
+  // Build the server + SPAs first. Admin bakes 127.0.0.1 (same-host as where it's opened → auth cookies work);
+  // tv-web bakes the LAN URL when exposed (for TVs).
+  const adminServerUrl = serverLocalUrl();
+  const tvwebServerUrl = serverPublicUrl();
+  await ensureBuilds(adminServerUrl, tvwebServerUrl);
 
   const DATABASE_URL = await startPostgres();
 
@@ -540,7 +549,9 @@ async function startStack(): Promise<void> {
         HOST: host(),
         DATABASE_URL,
         BETTER_AUTH_SECRET: authSecret(),
-        BETTER_AUTH_URL: serverPublicUrl(),
+        // The cookie-based client (admin) reaches the server at 127.0.0.1, so anchor auth there — the session
+        // cookie is set host-only on 127.0.0.1 and flows back same-site. (TVs use bearer tokens over the LAN.)
+        BETTER_AUTH_URL: serverLocalUrl(),
         CORS_ORIGIN: adminUrl(),
         TV_APP_ORIGIN: tvwebUrl(),
         EXTRA_CORS_ORIGINS: lanOrigins,

@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.99] - 2026-08-13
+
+### Fixed
+
+- **Airwave Desktop: admin login didn't persist (`get-session` returned null) when "expose on my network" was
+  on.** With expose on, `lanIp()` baked the server's LAN address (e.g. `http://10.5.0.2:36020`) into the admin,
+  but the admin is served at `http://127.0.0.1:36021` — so every auth request was **cross-site** (`127.0.0.1` →
+  `10.5.0.2`), and better-auth's `SameSite=Lax` session cookie is never sent cross-site, so the server saw no
+  cookie. The supervisor now bakes **`127.0.0.1` into the admin** (same host as where it's opened → same-site →
+  the cookie flows) and sets `BETTER_AUTH_URL` to the loopback host, while **tv-web** still bakes the LAN URL
+  when exposed (TVs authenticate with a bearer token, not a cross-site cookie). Relaunch rebuilds the admin
+  automatically (the build marker no longer matches) — you'll just log in once more.
+
 ## [0.9.98] - 2026-08-13
 
 ### Fixed
