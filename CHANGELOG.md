@@ -2,6 +2,26 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.107] - 2026-08-13
+
+### Added (Stage 5 — self-contained desktop server, part 1)
+
+- **`apps/server` `build:standalone` — a fully self-contained server bundle for the packaged desktop app.**
+  The app already uses Prisma's **pg driver adapter** (`@prisma/adapter-pg`), so Prisma runs **engine-less**
+  (pure JS, no Rust query engine). `bun build` bundles the built server + all ~1,639 JS modules into a single
+  **43 MB `server.mjs`** that runs with **zero `node_modules`** — verified end-to-end from an isolated dir (it
+  boots, seeds the admin via a real Prisma write, and serves `/api/health`). The only native binary the whole
+  app needs is embedded-Postgres.
+- **Engine-less migration runner** (`apps/server/scripts/migrate-standalone.ts` → `migrate.mjs`).
+  `prisma migrate deploy` needs the Prisma CLI + Rust schema-engine, which the packaged app doesn't ship. This
+  applies the committed migration SQL directly via `pg`, tracked in `_prisma_migrations` the same way
+  `migrate deploy` does — verified: applies all 8 migrations and builds the full schema on a fresh DB. Added
+  `pg` as a direct server dependency.
+
+This is the server half of Stage-5 packaging. Remaining: bundle the embedded-Postgres binary + wire
+packaged-mode into the supervisor + the electrobun bundle (`build.copy` / `asarUnpack`). See
+`.plans/desktop-server.md`.
+
 ## [0.9.106] - 2026-08-13
 
 ### Added

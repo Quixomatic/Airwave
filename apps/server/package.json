@@ -1,10 +1,11 @@
 {
   "name": "server",
-  "version": "0.9.106",
+  "version": "0.9.107",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
     "build": "workflow build && tsdown",
+    "build:standalone": "bun -e \"require('fs').rmSync('dist',{recursive:true,force:true});require('fs').rmSync('.well-known',{recursive:true,force:true})\" && workflow build && tsdown && bun build dist/index.mjs --target=bun --outfile dist/standalone/server.mjs && bun build scripts/migrate-standalone.ts --target=bun --outfile dist/standalone/migrate.mjs",
     "check-types": "tsc -b",
     "compile": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile server",
     "dev": "bun --env-file=.env run scripts/dev.ts",
@@ -24,6 +25,7 @@
     "better-auth": "catalog:",
     "dotenv": "catalog:",
     "hono": "catalog:",
+    "pg": "^8.22.0",
     "workflow": "4.3.0",
     "zod": "catalog:"
   },
@@ -31,6 +33,7 @@
     "@airwave/config": "workspace:*",
     "@swc/core": "1.15.3",
     "@types/bun": "catalog:",
+    "@types/pg": "^8.20.0",
     "@workflow/swc-plugin": "4.1.1",
     "tsdown": "^0.22.3",
     "typescript": "catalog:",
