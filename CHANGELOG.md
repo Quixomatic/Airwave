@@ -2,6 +2,27 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.101] - 2026-08-13
+
+### Added
+
+- **Airwave Desktop: Docker-style remote-access config (Server / Admin address + Additional allowed origins).**
+  The setup UI gains a "Remote access & tunnels" section mirroring the self-host `SERVER_PUBLIC_URL` /
+  `WEB_PUBLIC_URL` / `EXTRA_CORS_ORIGINS` env vars, so you can reach Airwave over a domain / HTTPS tunnel (e.g.
+  Cloudflare) exactly like the compose deployment. Blank = local: the admin faces **`localhost`** (not
+  `127.0.0.1`) and tv-web bakes your **real LAN IP**; set an HTTPS server/admin address and the admin, TVs, and
+  the tunnel all work — with the local + LAN admin origins always allow-listed so you can still browse there.
+  The supervisor derives `VITE_SERVER_URL` (admin vs tv-web separately), `BETTER_AUTH_URL`, `CORS_ORIGIN`,
+  `TV_APP_ORIGIN`, and `EXTRA_CORS_ORIGINS` from these three fields.
+
+### Fixed
+
+- **Reopening the setup/settings window from the tray crashed (CEF segfault).** Electrobun/CEF segfaults when a
+  second `BrowserWindow` is created after one was destroyed. The supervisor now creates the setup window once
+  and keeps it alive — reopening **shows + reloads** it, and finishing/handing off to the admin **hides** it
+  (never `close()`). Changing settings there still (re)starts the stack via `/save`. If the window is
+  force-closed with the native X, reopening falls back to the browser rather than risking the crash.
+
 ## [0.9.100] - 2026-08-13
 
 ### Fixed

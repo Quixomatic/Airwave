@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Check, Sparkles, Tv, Wifi } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Globe, Sparkles, Tv, Wifi } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -17,6 +17,9 @@ type Cfg = {
   workflowEnabled: boolean;
   adminEmail: string;
   serverLan?: string;
+  serverAddress?: string;
+  webAddress?: string;
+  extraCorsOrigins?: string;
 };
 
 type Step = "welcome" | "account" | "options" | "provisioning" | "done";
@@ -46,6 +49,10 @@ export function App() {
   const [expose, setExpose] = useState(false);
   const [tvweb, setTvweb] = useState(true);
   const [workflow, setWorkflow] = useState(false);
+  const [serverAddress, setServerAddress] = useState("");
+  const [webAddress, setWebAddress] = useState("");
+  const [extraCorsOrigins, setExtraCorsOrigins] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState("");
   const [phase, setPhase] = useState("idle");
 
@@ -61,6 +68,10 @@ export function App() {
         setExpose(c.expose);
         setTvweb(c.tvwebEnabled);
         setWorkflow(c.workflowEnabled);
+        setServerAddress(c.serverAddress ?? "");
+        setWebAddress(c.webAddress ?? "");
+        setExtraCorsOrigins(c.extraCorsOrigins ?? "");
+        setShowAdvanced(Boolean(c.serverAddress || c.webAddress || c.extraCorsOrigins));
         setStep(c.configured ? "options" : "welcome");
       })
       .catch(() => setCfg({ configured: false, expose: false, tvwebEnabled: true, workflowEnabled: false, adminEmail: "" }));
@@ -93,6 +104,9 @@ export function App() {
           expose,
           tvwebEnabled: tvweb,
           workflowEnabled: workflow,
+          serverAddress,
+          webAddress,
+          extraCorsOrigins,
         }),
       });
       const j = (await res.json()) as { ok: boolean; error?: string };
@@ -218,6 +232,48 @@ export function App() {
                     onChange={setWorkflow}
                   />
                 </div>
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced((v) => !v)}
+                    className="flex w-full items-center gap-2 rounded-lg px-1 py-2 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <Globe className="size-4" />
+                    Remote access &amp; tunnels
+                    <ChevronDown className={`ml-auto size-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+                  </button>
+                  {showAdvanced && (
+                    <div className="mt-2 space-y-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+                      <p className="text-xs text-muted-foreground">
+                        Leave blank for local use. Set these to reach Airwave over a domain / HTTPS tunnel (e.g.
+                        Cloudflare) — mirrors self-host <span className="font-mono">SERVER_PUBLIC_URL</span> /{" "}
+                        <span className="font-mono">WEB_PUBLIC_URL</span> /{" "}
+                        <span className="font-mono">EXTRA_CORS_ORIGINS</span>.
+                      </p>
+                      <Adv
+                        label="Server address"
+                        placeholder="https://tv.example.com"
+                        value={serverAddress}
+                        onChange={setServerAddress}
+                        hint="Where the admin + TVs reach the API. Blank = localhost (admin) / your LAN IP (TVs)."
+                      />
+                      <Adv
+                        label="Admin address"
+                        placeholder="https://tv-admin.example.com"
+                        value={webAddress}
+                        onChange={setWebAddress}
+                        hint="Where you open the admin. Blank = the local admin URL."
+                      />
+                      <Adv
+                        label="Additional allowed origins"
+                        placeholder="http://192.168.1.156:36021, https://…"
+                        value={extraCorsOrigins}
+                        onChange={setExtraCorsOrigins}
+                        hint="Comma-separated extra origins allowed to sign in (CORS)."
+                      />
+                    </div>
+                  )}
+                </div>
                 {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
                 <Footer>
                   {firstRun ? (
@@ -338,6 +394,34 @@ function Toggle({
       </span>
       <Switch checked={checked} onCheckedChange={(v) => onChange(Boolean(v))} />
     </label>
+  );
+}
+
+function Adv({
+  label,
+  placeholder,
+  value,
+  onChange,
+  hint,
+}: {
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  hint: string;
+}) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs">{label}</Label>
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        spellCheck={false}
+        autoCapitalize="none"
+      />
+      <p className="text-[11px] text-muted-foreground">{hint}</p>
+    </div>
   );
 }
 

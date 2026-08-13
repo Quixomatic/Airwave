@@ -64,6 +64,14 @@ type Config = {
   autoStart: boolean;
   /** First-run setup completed (admin account + options chosen in the browser). */
   configured: boolean;
+  /** Public base URL the admin + TVs reach the SERVER at — e.g. a Cloudflare tunnel `https://tv.example.com`
+   * (mirrors compose `SERVER_PUBLIC_URL`). Empty = local defaults (admin→localhost, tv-web→LAN IP). */
+  serverAddress?: string;
+  /** Public URL the ADMIN web is reached at → `CORS_ORIGIN` (mirrors compose `WEB_PUBLIC_URL`). Empty = the
+   * local admin origin (`http://localhost:<adminPort>`). */
+  webAddress?: string;
+  /** Extra allow-listed admin origins (CORS + better-auth), comma-separated (mirrors `EXTRA_CORS_ORIGINS`). */
+  extraCorsOrigins?: string;
   /** Optional external Postgres; when set, the embedded engine is skipped (e.g. point at a dev DB). */
   databaseUrl?: string;
 };
@@ -291,9 +299,10 @@ async function resolvePorts(supervise: boolean): Promise<void> {
 const DEV_PORTS = { server: 3000, admin: 3001, tvweb: 3002 } as const;
 const port = (name: "server" | "admin" | "tvweb") => (attach ? DEV_PORTS[name] : config.ports[name]);
 const host = () => (config.expose ? "0.0.0.0" : "127.0.0.1");
-// Vite dev servers bind `localhost` (often ::1 on Windows) → open via `localhost`, NOT 127.0.0.1 (IPv4 would
-// fail to connect). Our own servers bind 127.0.0.1, so open those via 127.0.0.1.
-const uiHost = () => (attach ? "localhost" : "127.0.0.1");
+// Everything the browser touches uses `localhost` (both dev's Vite servers and our own) — a friendlier, and the
+// "same-site as the server" host, so the admin's session cookie sticks (127.0.0.1 vs localhost are different
+// hosts to the browser). Our servers bind 127.0.0.1/0.0.0.0, which localhost resolves to.
+const uiHost = () => "localhost";
 const adminUrl = () => `http://${uiHost()}:${port("admin")}`;
 const tvwebUrl = () => `http://${uiHost()}:${port("tvweb")}`;
 const setupUrl = () => `http://127.0.0.1:${config.ports.setup}`;
@@ -522,10 +531,14 @@ async function ensureSetupUiBuilt(): Promise<void> {
 async function startStack(): Promise<void> {
   mkdirSync(BUMPER_MUSIC_DIR, { recursive: true });
 
-  // Build the server + SPAs first. Admin bakes 127.0.0.1 (same-host as where it's opened → auth cookies work);
-  // tv-web bakes the LAN URL when exposed (for TVs).
-  const adminServerUrl = serverLocalUrl();
-  const tvwebServerUrl = serverPublicUrl();
+  // Public-URL model (mirrors docker-compose SERVER_PUBLIC_URL / WEB_PUBLIC_URL / EXTRA_CORS_ORIGINS):
+  //  - serverAddress set (e.g. an HTTPS tunnel) → the admin + TVs call it; else admin→localhost, TVs→LAN IP.
+  //  - webAddress set → the admin's public origin (CORS_ORIGIN); else the local admin origin.
+  //  - the local + LAN admin origins are ALWAYS allow-listed too, so you can still browse there.
+  const serverAddr = config.serverAddress?.trim();
+  const webAddr = config.webAddress?.trim();
+  const adminServerUrl = serverAddr || serverLocalUrl();
+  const tvwebServerUrl = serverAddr || serverPublicUrl();
   await ensureBuilds(adminServerUrl, tvwebServerUrl);
 
   const DATABASE_URL = await startPostgres();
@@ -537,9 +550,18 @@ async function startStack(): Promise<void> {
     env: { DATABASE_URL },
   });
 
-  const lanOrigins = config.expose
-    ? [serverLanUrl(), `http://${lanIp()}:${config.ports.admin}`, `http://${lanIp()}:${config.ports.tvweb}`].join(",")
-    : "";
+  // The admin's primary origin (CORS_ORIGIN) + everything else we allow-list: local + LAN admin, the tv-web
+  // origins, the tunnel admin/server, and the user's extra origins. All feed CORS + better-auth trustedOrigins.
+  const lanAdmin = `http://${lanIp()}:${config.ports.admin}`;
+  const lanTvweb = `http://${lanIp()}:${config.ports.tvweb}`;
+  const corsPrimary = webAddr || adminUrl();
+  const allowed = new Set<string>([adminUrl(), lanAdmin, lanTvweb, tvwebUrl()]);
+  if (webAddr) allowed.add(webAddr);
+  if (serverAddr) allowed.add(serverAddr);
+  for (const o of (config.extraCorsOrigins ?? "").split(",").map((s) => s.trim()).filter(Boolean)) allowed.add(o);
+  allowed.delete(corsPrimary);
+  const extraOrigins = [...allowed].join(",");
+  const tvAppOrigin = config.expose ? lanTvweb : tvwebUrl();
 
   // The server — built bundle, cwd apps/server (bunfig preload + .well-known handlers), same as the container.
   if (!existsSync(SERVER_ENTRY)) {
@@ -560,12 +582,13 @@ async function startStack(): Promise<void> {
         HOST: host(),
         DATABASE_URL,
         BETTER_AUTH_SECRET: authSecret(),
-        // The cookie-based client (admin) reaches the server at 127.0.0.1, so anchor auth there — the session
-        // cookie is set host-only on 127.0.0.1 and flows back same-site. (TVs use bearer tokens over the LAN.)
-        BETTER_AUTH_URL: serverLocalUrl(),
-        CORS_ORIGIN: adminUrl(),
-        TV_APP_ORIGIN: tvwebUrl(),
-        EXTRA_CORS_ORIGINS: lanOrigins,
+        // Anchor auth at the URL the admin actually calls: local (http → SameSite=Lax, same-host) or the
+        // configured tunnel (https → SameSite=None;Secure, so cross-host origins work). CORS_ORIGIN is the
+        // admin's primary origin; the rest are allow-listed via EXTRA_CORS_ORIGINS.
+        BETTER_AUTH_URL: adminServerUrl,
+        CORS_ORIGIN: corsPrimary,
+        TV_APP_ORIGIN: tvAppOrigin,
+        EXTRA_CORS_ORIGINS: extraOrigins,
         WORKFLOW_ENABLED: config.workflowEnabled ? "1" : "",
         BUMPER_MUSIC_DIR,
         CAP_MEDIA_DIR: capMediaDir(),
@@ -661,6 +684,9 @@ function startSetupServer(): void {
           expose?: boolean;
           tvwebEnabled?: boolean;
           workflowEnabled?: boolean;
+          serverAddress?: string;
+          webAddress?: string;
+          extraCorsOrigins?: string;
         };
         const email = (body.adminEmail ?? "").trim();
         const password = body.adminPassword ?? "";
@@ -679,6 +705,9 @@ function startSetupServer(): void {
           expose: !!body.expose,
           tvwebEnabled: body.tvwebEnabled !== false,
           workflowEnabled: !!body.workflowEnabled,
+          serverAddress: (body.serverAddress ?? "").trim().replace(/\/+$/, ""),
+          webAddress: (body.webAddress ?? "").trim().replace(/\/+$/, ""),
+          extraCorsOrigins: (body.extraCorsOrigins ?? "").trim(),
           configured: true,
         };
         saveConfig(config);
@@ -696,6 +725,7 @@ function startSetupServer(): void {
 
       if (req.method === "POST" && url.pathname === "/open-admin") {
         openBrowser(adminUrl());
+        hideSetupWindow(); // tuck the onboarding window away (kept alive) once you're headed to the admin
         return Response.json({ ok: true });
       }
 
@@ -708,6 +738,9 @@ function startSetupServer(): void {
           workflowEnabled: config.workflowEnabled,
           adminEmail: loadAdminCreds()?.email ?? "",
           serverLan: serverLanUrl(),
+          serverAddress: config.serverAddress ?? "",
+          webAddress: config.webAddress ?? "",
+          extraCorsOrigins: config.extraCorsOrigins ?? "",
         });
       }
 
@@ -817,16 +850,26 @@ function setupHtml(): string {
 }
 
 // ── Native setup / settings window (desktop-only; the running app stays tray + browser-for-admin) ─────────
+// Electrobun/CEF SEGFAULTS if you create a second BrowserWindow after one was destroyed. So we create the setup
+// window ONCE and keep it alive: reopening shows + reloads it, and "closing" it HIDES it (never close()). If the
+// user destroys it with the native X we can't recreate safely → fall back to opening /setup in the browser.
 let setupWindow: BrowserWindow | null = null;
+let setupWindowDead = false;
 async function openSetupWindow(): Promise<void> {
   await ensureSetupUiBuilt(); // make sure the served UI exists before the window loads it
-  if (setupWindow) {
+  if (setupWindow && !setupWindowDead) {
     try {
-      setupWindow.focus();
+      setupWindow.webview?.loadURL(setupUrl()); // reset the flow to its start (re-reads /config)
+      setupWindow.show();
+      setupWindow.activate();
       return;
     } catch {
-      setupWindow = null;
+      setupWindowDead = true;
     }
+  }
+  if (setupWindowDead) {
+    openBrowser(setupUrl()); // recreating a CEF window crashes — open the same page in the browser instead
+    return;
   }
   const width = 560;
   const height = 700;
@@ -837,7 +880,7 @@ async function openSetupWindow(): Promise<void> {
     frame: { width, height, x: 160, y: 120 },
   });
   setupWindow.on("close", () => {
-    setupWindow = null;
+    setupWindowDead = true; // native X destroyed it — don't recreate (CEF crash); browser fallback next time
   });
   // CEF mismeasures vh on first paint and only remeasures on a real resize — nudge the size once, then revert
   // (BasicTimeTracker gotcha). Our /setup page uses min-height:100vh, so without this it can overflow.
@@ -846,19 +889,19 @@ async function openSetupWindow(): Promise<void> {
     setTimeout(() => setupWindow?.setSize(width, height), 16);
   }, 150);
 }
-function closeSetupWindow(): void {
+/** Hide the setup window (never close() it — destroying + recreating a CEF window crashes). */
+function hideSetupWindow(): void {
   try {
-    setupWindow?.close();
+    setupWindow?.hide();
   } catch {
     /* ignore */
   }
-  setupWindow = null;
 }
-/** Setup done + stack up: hand the admin UI off to the browser and close the onboarding window. */
+/** Setup done + stack up: hand the admin UI off to the browser and hide (keep-alive) the onboarding window. */
 function onStackReady(): void {
   console.log("[desktop] stack ready — opening the admin in your browser.");
   openBrowser(adminUrl());
-  closeSetupWindow();
+  hideSetupWindow();
 }
 
 // ── Tray ────────────────────────────────────────────────────────────────────────────────────────────────
