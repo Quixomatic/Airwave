@@ -2,6 +2,25 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.102] - 2026-08-13
+
+### Fixed
+
+- **Reopening Settings from the tray still crashed (CEF segfault in `USER32.dll`).** Electrobun/CEF on Windows
+  segfaults on *any* second operation on a `BrowserWindow` — recreating one, or even `show()`/`activate()` on a
+  hidden one. So the native window is now used **once**, for first-run onboarding only (that works great), and
+  tray **"Settings…" opens the same served UI in the browser** — the identical page, just a tab, with no second
+  window op. `/save` still (re)starts the stack for changed settings.
+- **Tray icon didn't render.** The Electrobun `Tray` defaults to 16×16 and needs an explicit size; the icon was
+  a 180×180 PNG with no dimensions. Now uses the 32×32 Airwave favicon with `width: 32, height: 32`
+  (`template: false`, full-color) — matching the documented tray example.
+
+### Added
+
+- **Windows app icon** (`build.win.icon = assets/icon.ico`) for the packaged app's taskbar / shortcut / window
+  (the title-bar icon in `electrobun dev` still comes from the dev runtime; it applies to the built app). mac/
+  linux app icons are a Stage-5 packaging follow-up.
+
 ## [0.9.101] - 2026-08-13
 
 ### Added

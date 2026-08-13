@@ -34,6 +34,7 @@ export default {
     // apis/bundling-cef. `exitOnLastWindowClosed:false` (above) keeps the tray alive when the window closes.
     mac: { bundleCEF: true, defaultRenderer: "cef" },
     linux: { bundleCEF: true, defaultRenderer: "cef" },
-    win: { bundleCEF: true, defaultRenderer: "cef" },
+    // The Windows app/taskbar/shortcut icon (packaged build). The tray icon is set separately at runtime.
+    win: { bundleCEF: true, defaultRenderer: "cef", icon: "assets/icon.ico" },
   },
 } satisfies ElectrobunConfig;

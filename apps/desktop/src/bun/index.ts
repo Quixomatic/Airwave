@@ -850,27 +850,13 @@ function setupHtml(): string {
 }
 
 // ── Native setup / settings window (desktop-only; the running app stays tray + browser-for-admin) ─────────
-// Electrobun/CEF SEGFAULTS if you create a second BrowserWindow after one was destroyed. So we create the setup
-// window ONCE and keep it alive: reopening shows + reloads it, and "closing" it HIDES it (never close()). If the
-// user destroys it with the native X we can't recreate safely → fall back to opening /setup in the browser.
+// Electrobun/CEF on Windows SEGFAULTS on a SECOND operation on a BrowserWindow — recreating one after it's
+// destroyed AND show()/activate() on a hidden one both crash (in USER32.dll). So the native window is used
+// ONCE, for first-run onboarding only; it's created here and never touched again (done → hide()). Everything
+// after (tray "Settings…") opens the same served UI in the browser instead. See apis/browser-window.
 let setupWindow: BrowserWindow | null = null;
-let setupWindowDead = false;
 async function openSetupWindow(): Promise<void> {
   await ensureSetupUiBuilt(); // make sure the served UI exists before the window loads it
-  if (setupWindow && !setupWindowDead) {
-    try {
-      setupWindow.webview?.loadURL(setupUrl()); // reset the flow to its start (re-reads /config)
-      setupWindow.show();
-      setupWindow.activate();
-      return;
-    } catch {
-      setupWindowDead = true;
-    }
-  }
-  if (setupWindowDead) {
-    openBrowser(setupUrl()); // recreating a CEF window crashes — open the same page in the browser instead
-    return;
-  }
   const width = 560;
   const height = 700;
   setupWindow = new BrowserWindow({
@@ -880,7 +866,7 @@ async function openSetupWindow(): Promise<void> {
     frame: { width, height, x: 160, y: 120 },
   });
   setupWindow.on("close", () => {
-    setupWindowDead = true; // native X destroyed it — don't recreate (CEF crash); browser fallback next time
+    setupWindow = null;
   });
   // CEF mismeasures vh on first paint and only remeasures on a real resize — nudge the size once, then revert
   // (BasicTimeTracker gotcha). Our /setup page uses min-height:100vh, so without this it can overflow.
@@ -889,7 +875,7 @@ async function openSetupWindow(): Promise<void> {
     setTimeout(() => setupWindow?.setSize(width, height), 16);
   }, 150);
 }
-/** Hide the setup window (never close() it — destroying + recreating a CEF window crashes). */
+/** Hide the onboarding window (never close()/reopen — CEF crashes on a second window op). */
 function hideSetupWindow(): void {
   try {
     setupWindow?.hide();
@@ -906,7 +892,8 @@ function onStackReady(): void {
 
 // ── Tray ────────────────────────────────────────────────────────────────────────────────────────────────
 function buildTray(): Tray {
-  const tray = new Tray({ title: "Airwave", image: trayIcon(), template: false });
+  // Tray needs the pixel size (defaults to 16×16); our icon is a 32×32 full-color PNG (template:false).
+  const tray = new Tray({ title: "Airwave", image: trayIcon(), template: false, width: 32, height: 32 });
   tray.setMenu([
     { type: "normal", label: "Open Admin", action: "open-admin" },
     { type: "normal", label: "Open TV player", action: "open-tvweb", hidden: !config.tvwebEnabled },
@@ -926,7 +913,10 @@ function buildTray(): Tray {
         openBrowser(tvwebUrl());
         break;
       case "settings":
-        void openSetupWindow();
+        // Electrobun/CEF segfaults on ANY second operation on a BrowserWindow (recreate OR show/reload a
+        // hidden one), so Settings opens the SAME served UI in the browser instead. First-run onboarding keeps
+        // the native window (created once); everything after is the browser.
+        openBrowser(setupUrl());
         break;
       case "quit":
         void stopStack().finally(() => process.exit(0));
