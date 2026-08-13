@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.105] - 2026-08-13
+
+### Fixed
+
+- **Workflows / channel-Import observability still failed with `relation "workflow.workflow_steps" does not
+  exist`** even after v0.9.104 ran the bootstrap. The durable workflow engine — and its `workflow:bootstrap` —
+  connect via their own **`WORKFLOW_POSTGRES_URL`** (which docker-compose sets), NOT `DATABASE_URL`. The
+  supervisor never set it, so the bootstrap created (or targeted) the wrong/no database and the `workflow.*`
+  schema was absent from the embedded DB that Prisma reads. The supervisor now sets `WORKFLOW_POSTGRES_URL` (=
+  the embedded `DATABASE_URL`) plus `WORKFLOW_TARGET_WORLD` / `WORKFLOW_LOCAL_BASE_URL` for both the bootstrap
+  and the server, matching compose. **Verified end-to-end**: the bootstrap now creates `workflow.workflow_steps`
+  in the embedded DB. Just relaunch — no DB wipe needed.
+
 ## [0.9.104] - 2026-08-13
 
 ### Fixed

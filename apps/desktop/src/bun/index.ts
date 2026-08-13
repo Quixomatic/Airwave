@@ -559,7 +559,15 @@ async function startStack(): Promise<void> {
   console.log("[desktop] workflow bootstrap…");
   const wfCode = await run(pnpmArgs(["--filter", "server", "workflow:bootstrap"]), {
     cwd: REPO_ROOT,
-    env: { DATABASE_URL, BETTER_AUTH_SECRET: authSecret(), WORKFLOW_ENABLED: "1" },
+    env: {
+      DATABASE_URL,
+      BETTER_AUTH_SECRET: authSecret(),
+      WORKFLOW_ENABLED: "1",
+      // Same connection the engine uses — this is what actually creates the `workflow.*` schema.
+      WORKFLOW_POSTGRES_URL: DATABASE_URL,
+      WORKFLOW_TARGET_WORLD: "@workflow/world-postgres",
+      WORKFLOW_LOCAL_BASE_URL: "http://127.0.0.1:3152",
+    },
   });
   if (wfCode !== 0) {
     console.warn(`[desktop] workflow bootstrap failed (exit ${wfCode}) — imports/workflows may error until it succeeds.`);
@@ -605,6 +613,12 @@ async function startStack(): Promise<void> {
         TV_APP_ORIGIN: tvAppOrigin,
         EXTRA_CORS_ORIGINS: extraOrigins,
         WORKFLOW_ENABLED: config.workflowEnabled ? "1" : "",
+        // The durable workflow engine connects via its OWN url (mirrors compose) — point it at the embedded PG
+        // so its `workflow.*` schema lives in the SAME database Prisma reads (else `workflow.workflow_steps`
+        // is missing for the app's observability queries). Defaults match compose.
+        WORKFLOW_POSTGRES_URL: DATABASE_URL,
+        WORKFLOW_TARGET_WORLD: "@workflow/world-postgres",
+        WORKFLOW_LOCAL_BASE_URL: "http://127.0.0.1:3152",
         BUMPER_MUSIC_DIR,
         CAP_MEDIA_DIR: capMediaDir(),
         ...(admin ? { ADMIN_EMAIL: admin.email, ADMIN_PASSWORD: admin.password } : {}),
