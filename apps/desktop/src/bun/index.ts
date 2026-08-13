@@ -1,4 +1,4 @@
-import { Tray } from "electrobun/bun";
+import { Tray, Updater } from "electrobun/bun";
 import { spawn, type Subprocess } from "bun";
 import EmbeddedPostgres from "embedded-postgres";
 import { randomBytes } from "node:crypto";
@@ -87,6 +87,10 @@ function saveConfig(c: Config): void {
 }
 
 let config = loadConfig();
+
+/** In the dev channel the monorepo's `pnpm dev` already runs server + admin + tv-web, so we DON'T supervise —
+ * the tray just points at the running dev stack (same ports). Only the bundled/prod build supervises. */
+let isDev = true;
 
 /** A stable BETTER_AUTH_SECRET (also the token/Plex-encryption key) — generate once, persist. */
 function authSecret(): string {
@@ -290,8 +294,10 @@ function startSetupServer(): void {
         const body = (await req.json().catch(() => ({}))) as Partial<Config>;
         config = { ...config, ...body };
         saveConfig(config);
-        await stopStack();
-        await startStack();
+        if (!isDev) {
+          await stopStack();
+          await startStack();
+        }
         return Response.json({ ok: true });
       }
       return new Response(setupHtml(), { headers: { "content-type": "text/html; charset=utf-8" } });
@@ -348,8 +354,17 @@ mkdirSync(DATA_DIR, { recursive: true });
 const firstRun = !existsSync(CONFIG_PATH);
 saveConfig(config);
 
+isDev = await Updater.localInfo
+  .channel()
+  .then((c) => c === "dev")
+  .catch(() => true);
+
 startSetupServer();
-await startStack();
+if (isDev) {
+  console.log("[desktop] dev channel — using the running `pnpm dev` stack (server/admin/tv-web); no supervision.");
+} else {
+  await startStack();
+}
 buildTray();
 
 process.on("SIGINT", () => void stopStack().finally(() => process.exit(0)));
