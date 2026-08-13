@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.97] - 2026-08-13
+
+### Fixed
+
+- **`pnpm dev` no longer spins up a stray Vite dev server for `apps/desktop-setup`.** The onboarding/settings
+  UI is only ever built and served by the desktop supervisor (never run standalone), so it's now excluded from
+  the root `turbo run dev` alongside `desktop` (`--filter=!@airwave/desktop-setup`).
+
 ## [0.9.96] - 2026-08-13
 
 ### Added

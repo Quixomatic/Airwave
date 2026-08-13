@@ -7,7 +7,7 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "turbo run dev --filter=!desktop",
+    "dev": "turbo run dev --filter=!desktop --filter=!@airwave/desktop-setup",
     "build": "turbo run build",
     "check-types": "turbo run check-types",
     "dev:web": "turbo run dev -F web",
