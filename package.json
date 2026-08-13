@@ -39,8 +39,12 @@
     "patchedDependencies": {
       "react-native-tvos@0.83.6-0": "patches/react-native-tvos@0.83.6-0.patch"
     },
-    "ignoredBuiltDependencies": [
-      "@embedded-postgres/windows-x64"
+    "onlyBuiltDependencies": [
+      "@embedded-postgres/windows-x64",
+      "@embedded-postgres/darwin-arm64",
+      "@embedded-postgres/darwin-x64",
+      "@embedded-postgres/linux-x64",
+      "@embedded-postgres/linux-arm64"
     ]
   }
 }

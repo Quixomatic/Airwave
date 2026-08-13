@@ -1,4 +1,4 @@
-import { Tray, Updater } from "electrobun/bun";
+import { Tray } from "electrobun/bun";
 import { spawn, type Subprocess } from "bun";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
@@ -39,7 +39,8 @@ type Config = {
 };
 
 const DEFAULT_CONFIG: Config = {
-  ports: { server: 3000, admin: 3001, tvweb: 3002, pg: 54329, setup: 3009 },
+  // Supervise (prod) ports = the docker-published range, so they don't clash with dev servers on 3000/1/2.
+  ports: { server: 36020, admin: 36021, tvweb: 36022, pg: 54329, setup: 36029 },
   expose: false,
   workflowEnabled: false,
   tvwebEnabled: true,
@@ -72,6 +73,17 @@ function capMediaDir(): string {
 // TODO(dist): on first run, if CAP_MEDIA_USER is empty, fetch+extract the `media-v1` tarball into it (mirror
 // the Dockerfile's `curl $CAP_MEDIA_URL | tar -xz`). Don't bundle 430MB into the installer.
 
+// The Airwave mark for the system tray. DEV resolves the committed square PNG (falls back to the admin's
+// apple-touch-icon). TODO(dist): switch to `views://assets/airwave-tray.png` (electrobun `build.copy`) so it
+// resolves inside the bundle. `template:false` — it's a full-color mark, not a macOS monochrome mask.
+function trayIcon(): string {
+  const candidates = [
+    join(REPO_ROOT, "apps", "desktop", "assets", "airwave-tray.png"),
+    join(REPO_ROOT, "apps", "web", "public", "apple-touch-icon.png"),
+  ];
+  return candidates.find((p) => existsSync(p)) ?? "";
+}
+
 function loadConfig(): Config {
   try {
     return { ...DEFAULT_CONFIG, ...JSON.parse(readFileSync(CONFIG_PATH, "utf8")) };
@@ -87,9 +99,11 @@ function saveConfig(c: Config): void {
 
 let config = loadConfig();
 
-/** In the dev channel the monorepo's `pnpm dev` already runs server + admin + tv-web, so we DON'T supervise —
- * the tray just points at the running dev stack (same ports). Only the bundled/prod build supervises. */
-let isDev = true;
+/** `attach` = a `pnpm dev` stack is already listening (probed at startup) → don't supervise, just point the
+ * tray at the running dev servers (localhost:3000/1/2). Otherwise we're fully self-contained: build whatever's
+ * missing, boot embedded Postgres + the server, and serve admin/tv-web on our OWN ports. This same code path
+ * is what the eventual installed binary runs. */
+let attach = false;
 
 /** A stable BETTER_AUTH_SECRET (also the token/Plex-encryption key) — generate once, persist. */
 function authSecret(): string {
@@ -123,12 +137,33 @@ function openBrowser(url: string): void {
   spawn(cmd, { stdout: "ignore", stderr: "ignore" });
 }
 
+/** HEAD-probe a URL to see if something's already answering there (used to sniff a running `pnpm dev` stack). */
+async function isServing(url: string): Promise<boolean> {
+  try {
+    await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(700) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Attach to an already-running `pnpm dev` stack when its admin (or server) dev port answers; else self-host. */
+async function detectAttach(): Promise<boolean> {
+  return (await isServing("http://localhost:3001")) || (await isServing("http://localhost:3000"));
+}
+
+// Dev points at the running `pnpm dev` stack (3000/1/2); supervise uses the desktop's own config ports.
+const DEV_PORTS = { server: 3000, admin: 3001, tvweb: 3002 } as const;
+const port = (name: "server" | "admin" | "tvweb") => (attach ? DEV_PORTS[name] : config.ports[name]);
 const host = () => (config.expose ? "0.0.0.0" : "127.0.0.1");
-const adminUrl = () => `http://127.0.0.1:${config.ports.admin}`;
-const tvwebUrl = () => `http://127.0.0.1:${config.ports.tvweb}`;
+// Vite dev servers bind `localhost` (often ::1 on Windows) → open via `localhost`, NOT 127.0.0.1 (IPv4 would
+// fail to connect). Our own servers bind 127.0.0.1, so open those via 127.0.0.1.
+const uiHost = () => (attach ? "localhost" : "127.0.0.1");
+const adminUrl = () => `http://${uiHost()}:${port("admin")}`;
+const tvwebUrl = () => `http://${uiHost()}:${port("tvweb")}`;
 const setupUrl = () => `http://127.0.0.1:${config.ports.setup}`;
-const serverLocalUrl = () => `http://127.0.0.1:${config.ports.server}`;
-const serverLanUrl = () => `http://${lanIp()}:${config.ports.server}`;
+const serverLocalUrl = () => `http://${uiHost()}:${port("server")}`;
+const serverLanUrl = () => `http://${lanIp()}:${port("server")}`;
 /** Where the SPAs point their API calls: the LAN URL when exposed (so paired TVs work), else localhost. */
 const serverPublicUrl = () => (config.expose ? serverLanUrl() : serverLocalUrl());
 
@@ -226,12 +261,62 @@ async function run(cmd: string[], opts: { cwd?: string; env?: Record<string, str
   return await p.exited;
 }
 
+/** Cross-platform `pnpm …` argv — Windows resolves the `pnpm.cmd` shim via `cmd /c`. */
+function pnpmArgs(args: string[]): string[] {
+  return process.platform === "win32" ? ["cmd", "/c", "pnpm", ...args] : ["pnpm", ...args];
+}
+
+// ── Build-on-demand (so a fresh `pnpm dev:desktop` is self-contained; the installed binary pre-bakes these) ──
+// The admin (and, for the browser player, tv-web) bake VITE_SERVER_URL at *build* time, so a build is only
+// valid for one server URL. We record the URL each SPA was built for and rebuild when it changes (or is
+// missing). The server bundle has no URL dependence — just presence.
+const BUILD_MARKER = join(DATA_DIR, "build-marker.json");
+type BuildMarker = { web?: string; tvweb?: string };
+function loadMarker(): BuildMarker {
+  try {
+    return JSON.parse(readFileSync(BUILD_MARKER, "utf8")) as BuildMarker;
+  } catch {
+    return {};
+  }
+}
+function saveMarker(m: BuildMarker): void {
+  mkdirSync(DATA_DIR, { recursive: true });
+  writeFileSync(BUILD_MARKER, JSON.stringify(m, null, 2));
+}
+
+async function build(filter: string, env: Record<string, string> = {}): Promise<void> {
+  console.log(`[desktop] building ${filter}${env.VITE_SERVER_URL ? ` (VITE_SERVER_URL=${env.VITE_SERVER_URL})` : ""}…`);
+  const code = await run(pnpmArgs(["--filter", filter, "build"]), { cwd: REPO_ROOT, env });
+  if (code !== 0) throw new Error(`build failed for "${filter}" (exit ${code})`);
+}
+
+/** Build the server + admin (+ tv-web) if missing or built for a different server URL. No-ops once built. */
+async function ensureBuilds(serverUrl: string): Promise<void> {
+  const marker = loadMarker();
+  if (!existsSync(SERVER_ENTRY)) await build("server");
+  if (!existsSync(join(ADMIN_DIST, "index.html")) || marker.web !== serverUrl) {
+    await build("web", { VITE_SERVER_URL: serverUrl });
+    marker.web = serverUrl;
+    saveMarker(marker);
+  }
+  if (config.tvwebEnabled && (!existsSync(join(TVWEB_DIST, "index.html")) || marker.tvweb !== serverUrl)) {
+    await build("tv-web", { VITE_SERVER_URL: serverUrl });
+    marker.tvweb = serverUrl;
+    saveMarker(marker);
+  }
+}
+
 async function startStack(): Promise<void> {
   mkdirSync(BUMPER_MUSIC_DIR, { recursive: true });
+
+  // Build the server + SPAs first (baking the SPAs for THIS server URL) so a fresh checkout just works.
+  const serverUrl = serverPublicUrl();
+  await ensureBuilds(serverUrl);
+
   const DATABASE_URL = await startPostgres();
 
   console.log("[desktop] prisma migrate deploy…");
-  await run(["pnpm", "--filter", "@airwave/db", "db:migrate:deploy"], {
+  await run(pnpmArgs(["--filter", "@airwave/db", "db:migrate:deploy"]), {
     cwd: REPO_ROOT,
     env: { DATABASE_URL },
   });
@@ -269,8 +354,7 @@ async function startStack(): Promise<void> {
     );
   }
 
-  // Admin + tv-web static SPAs. NOTE: they bake VITE_SERVER_URL at *build* time — a full impl rebuilds them
-  // when serverPublicUrl() changes (TODO). For now they're served as-built.
+  // Admin + tv-web static SPAs (already built for `serverUrl` by ensureBuilds above; rebuilt on URL change).
   const admin = serveDir(ADMIN_DIST, config.ports.admin);
   if (admin) servers.push(admin);
   if (config.tvwebEnabled) {
@@ -317,7 +401,7 @@ function startSetupServer(): void {
         const body = (await req.json().catch(() => ({}))) as Partial<Config>;
         config = { ...config, ...body };
         saveConfig(config);
-        if (!isDev) {
+        if (!attach) {
           await stopStack();
           await startStack();
         }
@@ -342,8 +426,7 @@ function setupHtml(): string {
 
 // ── Tray ────────────────────────────────────────────────────────────────────────────────────────────────
 function buildTray(): Tray {
-  // TODO: template tray icon via `image: "views://assets/airwave-tray.png", template: true`.
-  const tray = new Tray({ title: "Airwave" });
+  const tray = new Tray({ title: "Airwave", image: trayIcon(), template: false });
   tray.setMenu([
     { type: "normal", label: "Open Admin", action: "open-admin" },
     { type: "normal", label: "Open TV player", action: "open-tvweb", hidden: !config.tvwebEnabled },
@@ -353,8 +436,9 @@ function buildTray(): Tray {
     { type: "divider" },
     { type: "normal", label: "Quit", action: "quit" },
   ]);
-  tray.on("tray-clicked", (e: { data: { action: string } }) => {
-    switch (e.data.action) {
+  tray.on("tray-clicked", (e) => {
+    const action = (e as { data?: { action?: string } }).data?.action;
+    switch (action) {
       case "open-admin":
         openBrowser(adminUrl());
         break;
@@ -374,24 +458,28 @@ function buildTray(): Tray {
 
 // ── Main ────────────────────────────────────────────────────────────────────────────────────────────────
 mkdirSync(DATA_DIR, { recursive: true });
-const firstRun = !existsSync(CONFIG_PATH);
 saveConfig(config);
 
-isDev = await Updater.localInfo
-  .channel()
-  .then((c) => c === "dev")
-  .catch(() => true);
+// Attach to a running `pnpm dev` stack if one's up; otherwise supervise our own full stack.
+attach = await detectAttach();
 
 startSetupServer();
-if (isDev) {
-  console.log("[desktop] dev channel — using the running `pnpm dev` stack (server/admin/tv-web); no supervision.");
-} else {
-  await startStack();
-}
-buildTray();
+buildTray(); // show the tray immediately — builds/PG can take a while on first run.
 
 process.on("SIGINT", () => void stopStack().finally(() => process.exit(0)));
 process.on("SIGTERM", () => void stopStack().finally(() => process.exit(0)));
 
-console.log(`[desktop] supervisor up. data=${DATA_DIR} admin=${adminUrl()} setup=${setupUrl()}`);
-if (firstRun) openBrowser(adminUrl());
+if (attach) {
+  console.log("[desktop] attached to the running `pnpm dev` stack (localhost:3000/1/2) — not supervising.");
+} else {
+  console.log("[desktop] no dev stack detected — supervising the full Airwave stack (embedded PG + server + admin + tv-web).");
+  try {
+    await startStack();
+    console.log("[desktop] stack up — opening admin.");
+    openBrowser(adminUrl());
+  } catch (err) {
+    console.error("[desktop] failed to start the stack:", err);
+  }
+}
+
+console.log(`[desktop] supervisor up. data=${DATA_DIR} attach=${attach} admin=${adminUrl()} setup=${setupUrl()}`);

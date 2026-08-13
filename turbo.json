@@ -8,7 +8,10 @@
       // `.well-known/**` = the Workflow SDK's generated flow/step/webhook handlers
       // (`workflow build`, §7.3a). Without it a cache hit would restore a build with no
       // handlers, and every workflow run would 404 on dispatch.
-      "outputs": ["dist/**", ".well-known/**"]
+      // `.next/**` (minus its local cache) = the Next.js build output for `apps/site`.
+      // Without it a turbo cache HIT replays an empty output set and Vercel fails with
+      // "The Next.js output directory .next was not found" (the build never re-runs).
+      "outputs": ["dist/**", ".well-known/**", ".next/**", "!.next/cache/**"]
     },
     "lint": {
       "dependsOn": ["^lint"]

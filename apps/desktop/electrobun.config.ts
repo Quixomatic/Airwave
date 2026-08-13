@@ -22,6 +22,8 @@ export default {
     copy: {
       [adminDist]: "views/admin",
       [tvwebDist]: "views/tvweb",
+      // Source assets (tray icon, …) so the bundle can resolve `views://assets/*` at runtime.
+      assets: "views/assets",
     },
     watchIgnore: [`${adminDist}/**`, `${tvwebDist}/**`],
     // No BrowserWindow → no CEF webview needed (much lighter). VERIFY: Electrobun is happy tray-only with

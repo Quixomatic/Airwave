@@ -2,6 +2,42 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.92] - 2026-08-13
+
+### Fixed
+
+- **`apps/desktop` now runs as a genuinely self-contained stack under `pnpm dev:desktop`.** The supervisor used
+  to decide whether to boot its own stack from the Electrobun *release channel* (`Updater…channel()`), which is
+  always `"dev"` under `electrobun dev` — so it never supervised and just assumed a `pnpm dev` stack was already
+  running (why booting it standalone reached a dead `:3001`). Replaced that with a **runtime port probe**
+  (`detectAttach()` HEAD-probes `localhost:3001`/`:3000`): if a `pnpm dev` stack is already up it attaches to it;
+  otherwise it **self-hosts the entire stack** — embedded Postgres → `prisma migrate deploy` → the server →
+  admin + tv-web — on its own `3602x` ports. Same code path the eventual installed binary runs.
+- **`apps/site` Vercel deploys failing with "The Next.js output directory `.next` was not found".** The root
+  `turbo.json` `build` task never listed `.next/**` in its `outputs` (it was written for the Bun/server apps'
+  `dist/**`), so it worked only while every site deploy was a fresh build. Once a commit that didn't touch
+  `apps/site` triggered a redeploy, site's build task hit turbo's remote cache — and a cache *replay* restores
+  only recorded outputs, which excluded `.next`, so Vercel found nothing. Added `.next/**` (minus
+  `.next/cache/**`) to the build outputs so the Next output is captured and restored correctly.
+
+### Added / Changed
+
+- **Build-on-demand.** In self-hosted mode the supervisor builds whatever's missing before serving: the server
+  bundle if absent, and the admin/tv-web SPAs **built with the correct `VITE_SERVER_URL`** for its own ports
+  (the SPAs bake that at build time — mirroring the Docker `web`/`tvweb` roles, so a paired browser actually
+  reaches the server). A build marker records the URL each SPA was built for and rebuilds only on change, so
+  later launches are fast; the installed binary pre-bakes these, making it a no-op.
+- **Tray shows the Airwave mark** (`apps/desktop/assets/airwave-tray.png`, admin-icon fallback), wired into the
+  electrobun `build.copy` as `views/assets` for the bundle.
+- Windows-safe `pnpm` spawning (a `cmd /c` shim) for the build/migrate steps.
+
+### Housekeeping
+
+- Approved the `embedded-postgres` platform build scripts via `onlyBuiltDependencies` so the PG binary is
+  correct after a fresh install on any OS (on Windows the binary ships already extracted — the postinstall only
+  hydrates symlinks on mac/linux). Added a `three` module shim so `tsc --noEmit` stays clean against
+  electrobun 1.18's untyped transitive import, and typed the tray click handler against electrobun's event.
+
 ## [0.9.91] - 2026-08-13
 
 ### Added
