@@ -7,11 +7,12 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --filter=!desktop",
     "build": "turbo run build",
     "check-types": "turbo run check-types",
     "dev:web": "turbo run dev -F web",
     "dev:server": "turbo run dev -F server",
+    "dev:desktop": "turbo run dev -F desktop",
     "db:push": "turbo run db:push -F @airwave/db",
     "db:studio": "turbo run db:studio -F @airwave/db",
     "db:generate": "turbo run db:generate -F @airwave/db",
@@ -37,6 +38,9 @@
     },
     "patchedDependencies": {
       "react-native-tvos@0.83.6-0": "patches/react-native-tvos@0.83.6-0.patch"
-    }
+    },
+    "ignoredBuiltDependencies": [
+      "@embedded-postgres/windows-x64"
+    ]
   }
 }
