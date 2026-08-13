@@ -147,9 +147,10 @@ function capMediaDir(): string {
 // apple-touch-icon). TODO(dist): switch to `views://assets/airwave-tray.png` (electrobun `build.copy`) so it
 // resolves inside the bundle. `template:false` — it's a full-color mark, not a macOS monochrome mask.
 function trayIcon(): string {
-  // Load via the `views://` scheme (electrobun `build.copy` puts `assets/*` into `views/assets/`). The docs use
-  // `views://` for tray images, and an absolute filesystem path did NOT render on the Windows tray.
-  return "views://assets/airwave-tray.png";
+  // Load via the `views://` scheme (electrobun `build.copy` puts `assets/*` into `views/assets/`). On Windows
+  // the system tray is HICON-native, so a PNG doesn't render — use the multi-size `.ico`. mac/linux take the
+  // PNG. (An absolute filesystem path also didn't render on the Windows tray.)
+  return process.platform === "win32" ? "views://assets/icon.ico" : "views://assets/airwave-tray.png";
 }
 
 function loadConfig(): Config {
@@ -552,6 +553,18 @@ async function startStack(): Promise<void> {
     env: { DATABASE_URL },
   });
 
+  // Bootstrap the durable workflow engine's schema (the `workflow.*` tables — graphile-worker + step tracking).
+  // Channel Import AND the AI lineup engine query it (`workflow.workflow_steps`), so run it regardless of the
+  // WORKFLOW_ENABLED toggle. Idempotent (records what it applied); non-fatal if it fails.
+  console.log("[desktop] workflow bootstrap…");
+  const wfCode = await run(pnpmArgs(["--filter", "server", "workflow:bootstrap"]), {
+    cwd: REPO_ROOT,
+    env: { DATABASE_URL, BETTER_AUTH_SECRET: authSecret(), WORKFLOW_ENABLED: "1" },
+  });
+  if (wfCode !== 0) {
+    console.warn(`[desktop] workflow bootstrap failed (exit ${wfCode}) — imports/workflows may error until it succeeds.`);
+  }
+
   // The admin's primary origin (CORS_ORIGIN) + everything else we allow-list: local + LAN admin, the tv-web
   // origins, the tunnel admin/server, and the user's extra origins. All feed CORS + better-auth trustedOrigins.
   const lanAdmin = `http://${lanIp()}:${config.ports.admin}`;
@@ -867,14 +880,22 @@ async function openSetupWindow(): Promise<void> {
       setupWindow = null; // ref went stale (window destroyed) — fall through and recreate
     }
   }
+  const width = 560;
+  const height = 700;
   setupWindow = new BrowserWindow({
     title: "Airwave",
     url: setupUrl(),
-    frame: { width: 560, height: 700, x: 160, y: 120 },
+    frame: { width, height, x: 160, y: 120 },
   });
   setupWindow.on("close", () => {
     setupWindow = null;
   });
+  // The webview mis-measures viewport height on first paint (content ends up off-center) — nudge the size once
+  // and revert so it re-measures. Same trick BasicTimeTracker used for CEF; WebView2 needs it too.
+  setTimeout(() => {
+    setupWindow?.setSize(width, height + 1);
+    setTimeout(() => setupWindow?.setSize(width, height), 16);
+  }, 150);
 }
 /** Hide the setup window without closing it (documented reuse pattern) so it can be reopened from the tray. */
 function hideSetupWindow(): void {

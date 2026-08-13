@@ -2,6 +2,25 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.104] - 2026-08-13
+
+### Fixed
+
+- **Workflows / channel Import errored with `relation "workflow.workflow_steps" does not exist`.** The desktop
+  supervisor never bootstrapped the durable workflow engine's schema (the `workflow.*` tables graphile-worker +
+  step tracking use) — Docker does this via `workflow:bootstrap`. The supervisor now runs
+  `pnpm --filter server workflow:bootstrap` after migrate (idempotent, non-fatal). It runs regardless of the
+  workflows toggle because channel Import's progress view queries those tables too.
+- **Tray icon was blank on Windows.** The Windows system tray is HICON-native and doesn't render a PNG; on
+  Windows it now loads the multi-size `.ico` (`views://assets/icon.ico`); mac/linux keep the 32×32 PNG.
+- **Setup-window content wasn't centered.** The webview mis-measures viewport height on first paint — re-added
+  the one-pixel `setSize` nudge (WebView2 needs it too, same as CEF) so it re-measures and centers.
+
+### Note
+
+- The window **title-bar icon** only appears in a packaged build (`build.win.icon`); `electrobun dev` uses the
+  dev runtime's icon and there's no per-window icon API — it's correct once we do Stage-5 packaging.
+
 ## [0.9.103] - 2026-08-13
 
 ### Fixed
