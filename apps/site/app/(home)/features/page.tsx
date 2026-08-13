@@ -4,7 +4,10 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { button, card, DemoVideo, heading, Pill, Wide } from "@/components/landing";
+import { heading, Pill, Wide } from "@/components/landing";
+import { ClipCarousel } from "@/components/clip-carousel";
+import { InViewVideo } from "@/components/motion-video";
+import { ShaderCta } from "@/components/shaders";
 
 export const metadata = {
   title: "Features",
@@ -60,12 +63,16 @@ const GROUPS: { eyebrow: string; title: string; media: Media; features: Feature[
   },
 ];
 
-// Extra clips shown as a "see it in motion" gallery.
-const REEL = [
-  { src: "/demos/channel-surf.mp4", label: "Channel-surf overlay" },
-  { src: "/demos/restart.mp4", label: "Start from the beginning" },
+// The hero carousel cycles through every clip (story-style progress indicator).
+const HERO_CLIPS = [
+  { src: "/demos/guide-surf.mp4", label: "Surf the guide" },
+  { src: "/demos/tune-in-info.mp4", label: "Program info" },
+  { src: "/demos/channel-surf.mp4", label: "Channel surf" },
+  { src: "/demos/restart.mp4", label: "Start over" },
+  { src: "/demos/dvr-bumper.mp4", label: "DVR + bumper" },
   { src: "/demos/mini-player.mp4", label: "Mini player" },
-  { src: "/demos/lenses.mp4", label: "Guide filter lenses" },
+  { src: "/demos/lenses.mp4", label: "Filter lenses" },
+  { src: "/demos/filtered-pick.mp4", label: "Filtered pick" },
 ];
 
 function FeatureRow({ icon: Icon, title, body }: Feature) {
@@ -83,7 +90,7 @@ function FeatureRow({ icon: Icon, title, body }: Feature) {
 }
 
 function Media({ media }: { media: Media }) {
-  if (media.video) return <DemoVideo src={media.video} aria-label={media.alt} />;
+  if (media.video) return <InViewVideo src={media.video} aria-label={media.alt} />;
   return (
     <div className="overflow-hidden rounded-xl border shadow-lg">
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -107,9 +114,7 @@ export default function FeaturesPage() {
           From the channel guide your viewers surf to the scheduler that keeps it running — all from your own
           Plex, on your own hardware.
         </p>
-        <div className="mx-auto mt-10 max-w-[1100px]">
-          <DemoVideo src="/demos/dvr-bumper.mp4" aria-label="Live playback with a DVR scrubber and a bumper card" className="border-2" />
-        </div>
+        <ClipCarousel clips={HERO_CLIPS} className="mx-auto mt-10 max-w-[1100px]" />
       </Wide>
 
       {/* Groups — alternating media / feature list */}
@@ -130,31 +135,12 @@ export default function FeaturesPage() {
         </Wide>
       ))}
 
-      {/* See it in motion — the rest of the clips */}
-      <Wide className="mt-16 lg:mt-28">
-        <h2 className={heading("h2", "mb-3 text-center text-brand")}>See it in motion.</h2>
-        <p className="mx-auto mb-10 max-w-2xl text-center text-fd-muted-foreground">
-          The real 10-foot app, driven by a remote — no mockups.
-        </p>
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          {REEL.map((r) => (
-            <figure key={r.src} className={cn(card(), "p-3")}>
-              <DemoVideo src={r.src} aria-label={r.label} />
-              <figcaption className="mt-3 px-1 text-sm font-medium text-fd-muted-foreground">{r.label}</figcaption>
-            </figure>
-          ))}
-        </div>
-      </Wide>
-
       {/* CTA */}
       <Wide className="mt-16 lg:mt-28">
-        <div className={cn(card("secondary"), "flex flex-col items-center p-12 text-center")}>
-          <h2 className={heading("h2", "mb-4")}>Ready to build your lineup?</h2>
-          <div className="flex flex-row flex-wrap items-center justify-center gap-4">
-            <Pill href="/docs/getting-started">Get started</Pill>
-            <Pill href="/docs" variant="secondary">Read the docs</Pill>
-          </div>
-        </div>
+        <ShaderCta title="Ready to build your lineup?">
+          <Pill href="/docs/getting-started">Get started</Pill>
+          <Pill href="/docs" variant="secondary">Read the docs</Pill>
+        </ShaderCta>
       </Wide>
     </main>
   );

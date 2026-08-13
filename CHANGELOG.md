@@ -2,6 +2,37 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.90] - 2026-08-12
+
+### Changed
+
+- **`apps/site` landing polish — motion, a shader CTA, carousels, brand logos, and spacing.** A large
+  iterative pass on the marketing pages:
+  - Extracted the shader components into a shared `components/shaders.tsx` and added a compact **`ShaderCta`**
+    — its own component, a short band with the moving grain wash + a right-anchored dithered logo scaled for
+    it — used on the home / Features / Channel-guide bottom CTAs.
+  - A **`ClipCarousel`** with three variants: `bar` (Features hero, story-style segmented progress
+    indicator), `split` (Channel guide — ~60% player + a synced title/subtitle panel), and `bare` (the home
+    hero's corner loop — screenshot poster fallback, no controls). All lock a 16:9 box so swapping clips never
+    shifts layout.
+  - **In-view demo clips** (`InViewVideo`, framer-motion `useInView`): inline clips play once when scrolled
+    in, pause when they leave, replay on hover/focus, and rest on a representative middle frame.
+  - **Channel guide rebuilt** as editorial side-by-side blocks (heading + paragraphs beside a bulleted
+    checklist card) covering the full guide feature set, instead of a grid of tiny cards.
+  - The home **platforms card** gains brand logos (Apple / LG / Android / Amazon / a globe) via `react-icons`,
+    a divider, and **Roku / Samsung (Tizen)** "Soon" badges; the **10-foot switcher** became a ghost card with
+    a segmented control straddling a small framed screenshot; and the self-host + 10-foot rows read as one
+    2×2 grid (matched gaps).
+  - The self-host `docker-compose.yml` shown on the site drops its comment header, shows `name: airwave`, and
+    scrolls at a `max-h`.
+  - Added `framer-motion` and `react-icons`.
+
+### Note
+
+- The site's displayed compose is a cleaned copy — the repo's real `docker-compose.yml` still uses
+  `name: channelguide` on purpose (changing the compose project name re-prefixes an existing deployment's
+  volumes, which is a migration rather than a rename).
+
 ## [0.9.89] - 2026-08-12
 
 ### Changed

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ComponentProps, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 /**
@@ -61,26 +61,5 @@ export function Pill({
     <Link href={href} className={cls}>
       {children}
     </Link>
-  );
-}
-
-/**
- * A silent, autoplaying, looping demo clip in a rounded bordered frame — the marketing counterpart to the
- * docs `<Video>` (which shows controls). Muted + playsInline so it autoplays on every browser; the demos are
- * screen recordings of the real 10-foot app.
- */
-export function DemoVideo({ src, className = "", poster, ...rest }: ComponentProps<"video"> & { src: string }) {
-  return (
-    <video
-      src={src}
-      poster={poster}
-      autoPlay
-      muted
-      loop
-      playsInline
-      preload="metadata"
-      className={cn("w-full rounded-xl border border-fd-border shadow-lg", className)}
-      {...rest}
-    />
   );
 }

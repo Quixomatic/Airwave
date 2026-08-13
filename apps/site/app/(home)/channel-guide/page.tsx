@@ -1,55 +1,125 @@
-import { Grid3x3, Rewind, Radio, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { button, card, DemoVideo, heading, Pill, Wide } from "@/components/landing";
+import { card, heading, Pill, Wide } from "@/components/landing";
+import { ClipCarousel, type Clip } from "@/components/clip-carousel";
+import { ShaderCta } from "@/components/shaders";
 
 export const metadata = {
   title: "The channel guide",
-  description: "Airwave's channel guide — the grid your viewers surf, with a live playhead, a DVR scrubber, and per-viewer filter lenses.",
+  description: "Airwave's channel guide — the grid your viewers surf, with a live playhead, a DVR scrubber, favorites, filter lenses, a mini player, bumpers, and program details.",
 };
 
-type Point = {
-  icon: typeof Grid3x3;
-  eyebrow: string;
-  title: string;
-  body: string;
-  media: { video?: string; image?: string; alt: string };
-};
-
-const POINTS: Point[] = [
+// The split carousel narrates a few marquee features as each clip plays.
+const GUIDE_CLIPS: Clip[] = [
   {
-    icon: Grid3x3,
-    eyebrow: "The grid",
+    src: "/demos/guide-surf.mp4",
     title: "A grid you surf.",
-    body: "Channels down the side, what's-on across the top, and a live playhead marking now. Arrow to a channel and you join it mid-program — exactly where it is on the shared timeline.",
-    media: { image: "/screenshots/appletv-guide.webp", alt: "The Airwave channel guide grid" },
+    subtitle: "Channels down the side, what's-on across the top, and a live playhead marking now. Arrow to a channel and you join it mid-program — exactly where it is on the shared timeline.",
   },
   {
-    icon: Rewind,
-    eyebrow: "Timeshift",
+    src: "/demos/dvr-bumper.mp4",
     title: "A DVR scrubber.",
-    body: "Every channel has a multi-segment scrubber: the program you're in, flanked by the previous tail and the upcoming bumper. Scrub back within the buffer — you just can't jump ahead of live.",
-    media: { video: "/demos/dvr-bumper.mp4", alt: "Scrubbing back into a bumper, then jumping to live" },
+    subtitle: "The program you're in, flanked by the previous tail and the upcoming bumper. Scrub back within the buffer — you just can't jump ahead of live.",
   },
   {
-    icon: SlidersHorizontal,
-    eyebrow: "Lenses",
+    src: "/demos/lenses.mp4",
     title: "Filter lenses.",
-    body: "Packages become lenses in the guide sidebar — Favorites, Recents, and one per package — each in its own accent, so a viewer can narrow a big lineup to just what they want.",
-    media: { video: "/demos/lenses.mp4", alt: "Applying filter lenses to the guide" },
+    subtitle: "Packages become lenses in the guide sidebar — Favorites, Recents, and one per package — so a viewer can narrow a big lineup to just what they want.",
   },
   {
-    icon: Radio,
-    eyebrow: "The remote",
+    src: "/demos/channel-surf.mp4",
     title: "Channel surfing.",
-    body: "Channel up/down steps the lineup without leaving what's playing, and a channel-surf overlay jumps straight to another channel — the muscle memory of a real remote.",
-    media: { video: "/demos/channel-surf.mp4", alt: "The channel-surf overlay" },
+    subtitle: "Channel up/down steps the lineup without leaving what's playing, and a channel-surf overlay jumps straight to another channel — the muscle memory of a real remote.",
   },
 ];
+
+type Block = { eyebrow: string; title: string; paras: string[]; cardTitle: string; bullets: string[] };
+
+const BLOCKS: Block[] = [
+  {
+    eyebrow: "Navigation & the dial",
+    title: "Surf it like a real dial.",
+    paras: [
+      "The guide is a grid — channels down the side, what's-on across the top, and a live playhead marking now. Arrow to any channel and you join it mid-program, exactly where it sits on the timeline everyone shares.",
+      "It's built for a remote, not a mouse. Channel up/down, number entry, a channel-surf overlay, and one-press lenses do the work of a real set-top box.",
+    ],
+    cardTitle: "Everything's one press away.",
+    bullets: [
+      "Arrow to a channel to join it mid-program at the shared live offset.",
+      "Channel up/down steps the lineup without leaving what's playing.",
+      "Number entry and a channel-surf overlay jump straight to a channel.",
+      "Favorite a channel from the rail — it collects into a Favorites lens.",
+      "Package lenses (Favorites, Recents, one per package) narrow a big lineup fast.",
+    ],
+  },
+  {
+    eyebrow: "Playback & timeshift",
+    title: "Live — with a DVR's controls.",
+    paras: [
+      "You join what's on now at the right offset, then scrub back within the live buffer. You can't jump ahead of live — that's what keeps every viewer on the same channel at the same moment.",
+      "And you never lose your show: a mini player keeps it running while you browse, and full program details are a press away for anything on now, already aired, or coming up.",
+    ],
+    cardTitle: "You never lose your show.",
+    bullets: [
+      "Scrub back within the live buffer; you just can't skip ahead of live.",
+      "Restart the current program from its beginning, DVR-style.",
+      "The mini player keeps the show in a corner while you browse the guide.",
+      "Hold OK — or press the green button — to pop straight back to the mini player.",
+      "Full details (cast, ratings, summary, how it's playing) for any current, past, or upcoming program.",
+    ],
+  },
+  {
+    eyebrow: "Between programs",
+    title: "The connective tissue of a real channel.",
+    paras: [
+      "Programs don't just cut to black. Between them, Airwave plays “Up Next” bumpers — blurred cover art, a countdown, and an optional ambient-music bed mixed from your own tracks — so one show flows into the next.",
+      "And it's tunable: set how long breaks run, and every channel always knows what's coming up next, surfaced in the bumper and across the guide.",
+    ],
+    cardTitle: "Breaks that feel produced.",
+    bullets: [
+      "“Up Next” bumper cards with blurred cover art and a live countdown.",
+      "An optional ambient-music bed under bumpers, faded in and out with the break.",
+      "Configurable bumper length — dial the pacing in to taste.",
+      "Every channel always knows what's on next, in the bumper and the guide.",
+    ],
+  },
+];
+
+function SplitBlock({ block, reverse }: { block: Block; reverse: boolean }) {
+  return (
+    <Wide className="mt-16 lg:mt-28">
+      <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
+        <div className={cn(reverse && "lg:order-2")}>
+          <p className="mb-4 text-xs font-semibold tracking-widest text-brand uppercase">{block.eyebrow}</p>
+          <h2 className={heading("h2", "mb-5")}>{block.title}</h2>
+          {block.paras.map((p, i) => (
+            <p
+              key={i}
+              className={cn("leading-relaxed text-fd-muted-foreground", i < block.paras.length - 1 && "mb-5")}
+            >
+              {p}
+            </p>
+          ))}
+        </div>
+        <div className={cn(card(), "p-7 md:p-8", reverse && "lg:order-1")}>
+          <h3 className="mb-5 text-lg font-medium text-fd-foreground lg:text-xl">{block.cardTitle}</h3>
+          <ul className="space-y-4">
+            {block.bullets.map((b, i) => (
+              <li key={i} className="flex gap-3 text-sm leading-relaxed">
+                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-brand" />
+                <span className="text-fd-muted-foreground">{b}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </Wide>
+  );
+}
 
 export default function ChannelGuidePage() {
   return (
     <main className="pt-4 pb-6 text-landing-foreground md:pb-12">
-      {/* Hero */}
+      {/* Hero + the split carousel */}
       <Wide className="pt-10 text-center lg:pt-16">
         <p className="mx-auto w-fit rounded-full border border-brand/50 px-3 py-1.5 text-xs font-medium text-brand">
           The channel guide
@@ -58,38 +128,19 @@ export default function ChannelGuidePage() {
           The grid your viewers actually <span className="text-brand">live in</span>.
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-fd-muted-foreground md:text-lg">
-          A 10-foot channel guide built for a remote — a live playhead, a DVR scrubber, and per-viewer lenses,
-          all driven off the same deterministic timeline everyone shares.
+          A 10-foot channel guide built for a remote — a live playhead, a DVR scrubber, favorites, per-viewer
+          lenses, a mini player, and bumpers, all driven off the same deterministic timeline everyone shares.
         </p>
-        <div className="mx-auto mt-10 max-w-[1100px]">
-          <DemoVideo src="/demos/guide-surf.mp4" aria-label="Surfing the Airwave channel guide" className="border-2" />
-        </div>
+        <ClipCarousel
+          variant="split"
+          clips={GUIDE_CLIPS}
+          className="mx-auto mt-12 max-w-[1200px] text-left"
+        />
       </Wide>
 
-      {/* Points — alternating media / text */}
-      {POINTS.map((p, i) => (
-        <Wide key={p.title} className="mt-16 lg:mt-24">
-          <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2 lg:gap-12">
-            <div className={cn(i % 2 === 1 && "lg:order-2")}>
-              {p.media.video ? (
-                <DemoVideo src={p.media.video} aria-label={p.media.alt} />
-              ) : (
-                <div className="overflow-hidden rounded-xl border shadow-lg">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.media.image} alt={p.media.alt} className="w-full" />
-                </div>
-              )}
-            </div>
-            <div className={cn(i % 2 === 1 && "lg:order-1")}>
-              <div className="mb-4 flex items-center gap-2 text-brand">
-                <p.icon className="size-5" />
-                <span className="text-xs font-semibold tracking-wide uppercase">{p.eyebrow}</span>
-              </div>
-              <h2 className={heading("h2", "mb-3")}>{p.title}</h2>
-              <p className="max-w-md text-fd-muted-foreground">{p.body}</p>
-            </div>
-          </div>
-        </Wide>
+      {/* The full feature breakdown — alternating editorial blocks */}
+      {BLOCKS.map((block, i) => (
+        <SplitBlock key={block.title} block={block} reverse={i % 2 === 1} />
       ))}
 
       {/* Admin preview */}
@@ -113,13 +164,10 @@ export default function ChannelGuidePage() {
 
       {/* CTA */}
       <Wide className="mt-16 lg:mt-28">
-        <div className={cn(card("secondary"), "flex flex-col items-center p-12 text-center")}>
-          <h2 className={heading("h2", "mb-4")}>Surf your own library.</h2>
-          <div className="flex flex-row flex-wrap items-center justify-center gap-4">
-            <Pill href="/docs/getting-started">Get started</Pill>
-            <Pill href="/features" variant="secondary">All features</Pill>
-          </div>
-        </div>
+        <ShaderCta title="Surf your own library.">
+          <Pill href="/docs/getting-started">Get started</Pill>
+          <Pill href="/features" variant="secondary">All features</Pill>
+        </ShaderCta>
       </Wide>
     </main>
   );

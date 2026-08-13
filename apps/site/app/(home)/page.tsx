@@ -1,11 +1,16 @@
+import type { ComponentType } from "react";
 import Link from "next/link";
 import { ServerCodeBlock } from "fumadocs-ui/components/codeblock.rsc";
 import { Step, Steps } from "fumadocs-ui/components/steps";
-import { Tv, Rewind, Clapperboard, MonitorPlay, ShieldCheck, Sparkles, TerminalIcon } from "lucide-react";
+import { Tv, Rewind, Clapperboard, MonitorPlay, ShieldCheck, Sparkles, TerminalIcon, Globe } from "lucide-react";
+import { SiApple, SiAndroid, SiLg, SiGooglechrome, SiRoku, SiSamsung } from "react-icons/si";
+import { FaAmazon } from "react-icons/fa";
 import { cn } from "@/lib/cn";
 import { button, card, heading, Wide } from "@/components/landing";
+import { ClipCarousel } from "@/components/clip-carousel";
+import { AgnosticBackground, HeroShaders, ShaderCta } from "@/components/shaders";
 import { COMPOSE } from "./compose";
-import { HeroShaders, PreviewImages, AgnosticBackground } from "./page.client";
+import { PreviewImages } from "./page.client";
 
 export const metadata = {
   title: "Airwave — your Plex library, as custom live TV",
@@ -23,7 +28,26 @@ const FEATURES = [
   { icon: Sparkles, title: "Build channels fast", body: "Author channels from metadata filters, auto-generate a whole lineup, or let a bring-your-own-key AI assistant draft one for you." },
 ];
 
-const PLATFORMS = ["Apple TV", "iPad", "LG webOS", "Android TV", "Fire TV", "Any browser"];
+const PLATFORMS: { name: string; Icon: ComponentType<{ className?: string }> }[] = [
+  { name: "Apple TV", Icon: SiApple },
+  { name: "iPad", Icon: SiApple },
+  { name: "LG webOS", Icon: SiLg },
+  { name: "Android TV", Icon: SiAndroid },
+  { name: "Fire TV", Icon: FaAmazon },
+  { name: "Any browser", Icon: Globe },
+];
+
+const COMING_SOON: { name: string; Icon: ComponentType<{ className?: string }> }[] = [
+  { name: "Roku", Icon: SiRoku },
+  { name: "Samsung (Tizen)", Icon: SiSamsung },
+];
+
+// The hero shot quietly cycles these once ready (bare carousel — no controls); the guide screenshot is the poster.
+const HERO_REEL = [
+  { src: "/demos/guide-surf.mp4" },
+  { src: "/demos/mini-player.mp4" },
+  { src: "/demos/lenses.mp4" },
+];
 
 export default function HomePage() {
   return (
@@ -31,12 +55,13 @@ export default function HomePage() {
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
       <div className="relative mx-auto flex h-[76vh] max-h-[900px] min-h-[620px] w-full max-w-[1400px] overflow-hidden rounded-2xl border">
         <HeroShaders />
-        {/* Hero shot anchored lower-right, bleeding off the panel (fumadocs.dev's hero placement).
-            z-1 keeps it above the shaders (-z-1) but below the text content (z-2), so text stays on top. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/screenshots/appletv-guide.webp"
-          alt="The Airwave channel guide on Apple TV"
+        {/* Hero shot anchored lower-right, bleeding off the panel. Starts as the guide screenshot (poster),
+            then quietly cycles the demo clips (bare carousel, no controls). z-1 keeps it above the shaders
+            (-z-1) but below the text content (z-2), so text stays on top. */}
+        <ClipCarousel
+          variant="bare"
+          poster="/screenshots/appletv-guide.webp"
+          clips={HERO_REEL}
           className="pointer-events-none absolute top-[62%] left-[34%] z-1 hidden w-[980px] max-w-none rounded-xl border-2 border-fd-border shadow-2xl shadow-black/40 lg:top-[56%] lg:block xl:left-[38%]"
         />
         <div className="z-2 flex size-full flex-col px-4 max-md:items-center max-md:text-center md:p-12">
@@ -70,7 +95,7 @@ export default function HomePage() {
       </div>
 
       {/* ── Intro statement ──────────────────────────────────────────────────── */}
-      <Wide className="mt-12 lg:mt-20">
+      <Wide className="mt-16 lg:mt-28">
         <p className="text-2xl leading-snug font-light tracking-tight md:text-3xl xl:text-4xl">
           Airwave is a <span className="font-medium text-brand">self-hostable</span> service that turns your
           own <span className="font-medium text-brand">Plex</span> library into curated, always-on{" "}
@@ -80,7 +105,7 @@ export default function HomePage() {
       </Wide>
 
       {/* ── Get running ──────────────────────────────────────────────────────── */}
-      <Wide className="mt-12 grid grid-cols-1 items-start gap-6 lg:mt-20 lg:grid-cols-2">
+      <Wide className="mt-16 grid grid-cols-1 items-start gap-10 lg:mt-28 lg:grid-cols-2">
         <div className="flex flex-col rounded-2xl p-6 md:p-8">
           <h2 className={heading("h2", "mb-4")}>Self-host it in minutes.</h2>
           <p className="mb-6 text-fd-muted-foreground">
@@ -105,14 +130,14 @@ export default function HomePage() {
           <ServerCodeBlock
             code={COMPOSE}
             lang="yaml"
-            codeblock={{ className: "bg-fd-secondary max-h-[560px]" }}
+            codeblock={{ className: "bg-fd-secondary [&_pre]:max-h-[360px]" }}
           />
         </div>
       </Wide>
 
       {/* ── A real 10-foot experience ────────────────────────────────────────── */}
-      <Wide className="mt-12 grid grid-cols-1 gap-10 lg:mt-24 lg:grid-cols-2">
-        <div className={cn(card("secondary"), "flex items-center justify-center p-4")}>
+      <Wide className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-2">
+        <div className="flex items-center justify-center">
           <PreviewImages />
         </div>
         <div className={cn(card(), "flex flex-col")}>
@@ -168,13 +193,30 @@ export default function HomePage() {
               10-foot native apps for the living room, plus a browser player you serve from the same stack —
               the same app everywhere.
             </p>
-            <div className="mb-8 flex flex-row flex-wrap gap-2">
+            <div className="mb-8 flex flex-row flex-wrap items-center gap-3">
               {PLATFORMS.map((p) => (
                 <span
-                  key={p}
-                  className="rounded-full border bg-fd-secondary px-3 py-1.5 text-sm font-medium text-landing-foreground"
+                  key={p.name}
+                  className="inline-flex items-center gap-2.5 rounded-full border bg-fd-secondary px-5 py-3 text-base font-medium text-landing-foreground"
                 >
-                  {p}
+                  <p.Icon className="size-5 shrink-0" />
+                  {p.name}
+                </span>
+              ))}
+
+              {/* separator between what ships today and what's coming */}
+              <span aria-hidden className="mx-1 hidden h-8 w-px self-center bg-fd-border sm:block" />
+
+              {COMING_SOON.map((p) => (
+                <span
+                  key={p.name}
+                  className="inline-flex items-center gap-2.5 rounded-full border border-dashed bg-transparent px-5 py-3 text-base font-medium text-fd-muted-foreground"
+                >
+                  <p.Icon className="size-5 shrink-0 opacity-70" />
+                  {p.name}
+                  <span className="ml-0.5 rounded-full bg-fd-muted-foreground/15 px-2 py-0.5 text-[11px] font-semibold tracking-wide uppercase">
+                    Soon
+                  </span>
                 </span>
               ))}
             </div>
@@ -247,27 +289,22 @@ export default function HomePage() {
 
       {/* ── Final CTA ────────────────────────────────────────────────────────── */}
       <Wide className="mt-16 lg:mt-28">
-        <div className={cn(card("secondary"), "flex flex-col items-center p-12 text-center")}>
-          <h2 className={heading("h2", "mb-4 max-w-2xl")}>
-            Turn your library into a channel you leave on.
-          </h2>
-          <p className="mb-8 max-w-xl text-brand-secondary-foreground/80">
-            Free, self-hosted, and yours. Deploy the server, connect Plex, and start surfing.
-          </p>
-          <div className="flex flex-row flex-wrap items-center justify-center gap-4">
-            <Link href="/docs/getting-started" className={button()}>
-              Read the docs
-            </Link>
-            <a
-              href="https://github.com/Quixomatic/Airwave"
-              target="_blank"
-              rel="noreferrer noopener"
-              className={button("secondary")}
-            >
-              GitHub
-            </a>
-          </div>
-        </div>
+        <ShaderCta
+          title="Turn your library into a channel you leave on."
+          subtitle="Free, self-hosted, and yours. Deploy the server, connect Plex, and start surfing."
+        >
+          <Link href="/docs/getting-started" className={button()}>
+            Read the docs
+          </Link>
+          <a
+            href="https://github.com/Quixomatic/Airwave"
+            target="_blank"
+            rel="noreferrer noopener"
+            className={button("secondary")}
+          >
+            GitHub
+          </a>
+        </ShaderCta>
       </Wide>
     </main>
   );

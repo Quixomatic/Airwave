@@ -1,6 +1,6 @@
 {
   "name": "site",
-  "version": "0.9.89",
+  "version": "0.9.90",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@paper-design/shaders-react": "^0.0.78",
+    "framer-motion": "^12.42.2",
     "fumadocs-core": "^16.14.3",
+    "react-icons": "^5.4.0",
     "fumadocs-mdx": "^15.2.3",
     "fumadocs-ui": "^16.14.3",
     "lucide-react": "catalog:",
