@@ -42,8 +42,8 @@ jobs:
         include:
           - os: macos-14 # Apple Silicon
             arch: arm64
-          - os: macos-13 # Intel
-            arch: x64
+          # macOS Intel (macos-13) dropped for now — the runner is very slow/scarce (20+ min vs ~5 on arm64) and
+          # Intel Macs are a shrinking slice. Apple-Silicon coverage proves macOS builds work. Re-add if needed.
           - os: windows-2025
             arch: x64
           - os: ubuntu-24.04
