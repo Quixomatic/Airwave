@@ -1,33 +1,5 @@
-diff --git a/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm b/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
-index 35cfd7a..5482b64 100644
---- a/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
-+++ b/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
-@@ -470,9 +470,20 @@ void ObjCTurboModule::performVoidMethodInvocation(
-     @try {
-       [inv invokeWithTarget:strongModule];
-     } @catch (NSException *exception) {
--      // Void methods are always async, re-throw instead of converting to
--      // JSError, same as the async branch in performMethodInvocation.
--      @throw exception;
-+      // [Airwave patch — facebook/react-native#54859]
-+      // A void TurboModule method is dispatched ASYNC (see below), so there is NO caller to receive a
-+      // re-thrown NSException: the original `@throw exception;` propagated into C++ on the async queue with
-+      // no handler → std::terminate → abort(), which crashes the whole app at startup with
-+      // 'RCTFatalException: non-std C++ exception' (iOS/tvOS 26 + release + New Architecture, fine in debug).
-+      // Upstream fixed the non-void path (PR #50193) but never the void one. Since a void method is
-+      // fire-and-forget (no return value, nothing awaits it), we LOG the culprit and swallow it instead of
-+      // aborting — so a throwing native call (tvOS keychain, TVEventControl, etc.) can't kill the process.
-+      NSLog(
-+          @"[RN#54859] void TurboModule %s.%s threw (swallowed, NOT aborting): %@: %@",
-+          moduleName,
-+          methodName,
-+          exception.name,
-+          exception.reason);
-     } @finally {
-       [retainedObjectsForInvocation removeAllObjects];
-     }
 diff --git a/React/CxxModule/RCTCxxUtils.mm b/React/CxxModule/RCTCxxUtils.mm
-index 4c018e6..ed377ab 100644
+index 4c018e6fc9673692052c7abe857f27004f96863b..617fba43e2433d7b839c2222610ca4677fd08d13 100644
 --- a/React/CxxModule/RCTCxxUtils.mm
 +++ b/React/CxxModule/RCTCxxUtils.mm
 @@ -12,6 +12,9 @@
@@ -75,8 +47,60 @@ index 4c018e6..ed377ab 100644
    }
  }
  
+diff --git a/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm b/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
+index 35cfd7a13955ec70df558d292ea44d95ce8fa88c..6b43cf06624b94b3e1452ba1e12cf522b80a9f2c 100644
+--- a/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
++++ b/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
+@@ -470,9 +470,20 @@ void ObjCTurboModule::performVoidMethodInvocation(
+     @try {
+       [inv invokeWithTarget:strongModule];
+     } @catch (NSException *exception) {
+-      // Void methods are always async, re-throw instead of converting to
+-      // JSError, same as the async branch in performMethodInvocation.
+-      @throw exception;
++      // [Airwave patch — facebook/react-native#54859]
++      // A void TurboModule method is dispatched ASYNC (see below), so there is NO caller to receive a
++      // re-thrown NSException: the original `@throw exception;` propagated into C++ on the async queue with
++      // no handler → std::terminate → abort(), which crashes the whole app at startup with
++      // 'RCTFatalException: non-std C++ exception' (iOS/tvOS 26 + release + New Architecture, fine in debug).
++      // Upstream fixed the non-void path (PR #50193) but never the void one. Since a void method is
++      // fire-and-forget (no return value, nothing awaits it), we LOG the culprit and swallow it instead of
++      // aborting — so a throwing native call (tvOS keychain, TVEventControl, etc.) can't kill the process.
++      NSLog(
++          @"[RN#54859] void TurboModule %s.%s threw (swallowed, NOT aborting): %@: %@",
++          moduleName,
++          methodName,
++          exception.name,
++          exception.reason);
+     } @finally {
+       [retainedObjectsForInvocation removeAllObjects];
+     }
+diff --git a/sdks/hermes-engine/utils/build-apple-framework.sh b/sdks/hermes-engine/utils/build-apple-framework.sh
+index 1af9c76af96721a5e3359d15e6520a97ec834abc..51cd242bf042a633969526a53a62f260ccdd88c8 100644
+--- a/sdks/hermes-engine/utils/build-apple-framework.sh
++++ b/sdks/hermes-engine/utils/build-apple-framework.sh
+@@ -162,6 +162,19 @@ function build_apple_framework {
+     xcrun dsymutil "./build_$1/lib/hermesvm.framework/hermesvm" -o "./build_$1/lib/hermesvm.framework.dSYM"
+     cp -R "./build_$1"/lib/hermesvm.framework* "destroot/Library/Frameworks/$1"
+ 
++    # [Airwave patch — react-native-tvos#563 / facebook/react-native#45855]
++    # The from-source Hermes build does NOT stamp MinimumOSVersion into the tvOS framework's Info.plist
++    # (it's present for ios-arm64 but missing for tvos-arm64), so an App Store upload of the Apple TV app fails
++    # validation with ITMS-90360: "A value for the key 'MinimumOSVersion' in bundle …/hermesvm.framework is
++    # required." Stamp it here from the deployment target ($3) for every platform — a no-op where it's already
++    # correct (iOS), the fix where it's missing (tvOS). Runs before the universal xcframework is assembled, so
++    # the tvos-arm64 slice inherits it. iOS/tvOS frameworks are flat, so Info.plist is at the framework root.
++    HERMES_FW_PLIST="destroot/Library/Frameworks/$1/hermesvm.framework/Info.plist"
++    if [ -n "$3" ] && [ -f "$HERMES_FW_PLIST" ]; then
++      /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion $3" "$HERMES_FW_PLIST" 2>/dev/null ||
++        /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string $3" "$HERMES_FW_PLIST"
++    fi
++
+     # In a MacOS build, also produce the hermes and hermesc CLI tools.
+     if [[ $1 == macosx ]]; then
+       cmake --build "./build_$1" --target hermesc hermes -j "${NUM_CORES}"
 diff --git a/sdks/hermes-engine/utils/build-hermes-xcode.sh b/sdks/hermes-engine/utils/build-hermes-xcode.sh
-index 60506d1..fb6fb9e 100644
+index 60506d160e5c6ef055dfefc86345432e714e8e1b..76de9d477fedbb375432bd1c02ca7ae30afa2f3a 100644
 --- a/sdks/hermes-engine/utils/build-hermes-xcode.sh
 +++ b/sdks/hermes-engine/utils/build-hermes-xcode.sh
 @@ -19,6 +19,14 @@ function get_platform_copy_destination {
@@ -95,7 +119,7 @@ index 60506d1..fb6fb9e 100644
  
      echo "ios"
 diff --git a/sdks/hermes-engine/utils/create-dummy-hermes-xcframework.sh b/sdks/hermes-engine/utils/create-dummy-hermes-xcframework.sh
-index 76bd3a4..81bf64f 100644
+index 76bd3a4be06f24d77b885ec7bafc694f8a30d933..3f8386d352e12b7939fd83458ef763cd1da3eab0 100644
 --- a/sdks/hermes-engine/utils/create-dummy-hermes-xcframework.sh
 +++ b/sdks/hermes-engine/utils/create-dummy-hermes-xcframework.sh
 @@ -19,7 +19,7 @@ pushd destroot/Library/Frameworks > /dev/null || exit 1

@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.9] - 2026-08-14
+
+Fixes the Apple TV (tvOS) App Store upload, which failed validation on a known from-source-Hermes bug.
+
+### Fixed
+
+- **tvOS App Store upload rejected — `hermesvm.framework` missing `MinimumOSVersion` (ITMS-90360).** A known
+  react-native-tvos bug ([react-native-tvos#563](https://github.com/react-native-tvos/react-native-tvos/issues/563)
+  / [facebook/react-native#45855](https://github.com/facebook/react-native/issues/45855)): the from-source
+  Hermes build stamps `MinimumOSVersion` into the `ios-arm64` slice of the framework's `Info.plist` but **not**
+  the `tvos-arm64` slice, so submitting the Apple TV build to App Store Connect fails validation. Added a hunk
+  to the `react-native-tvos@0.83.6-0` patch (`sdks/hermes-engine/utils/build-apple-framework.sh`) that stamps
+  `MinimumOSVersion` from the deployment target into the framework's `Info.plist` for every platform, right
+  after it's built and before the universal xcframework is assembled — so the `tvos-arm64` slice inherits it.
+  Building Hermes from source is otherwise unchanged. (iPad/iOS builds were never affected.)
+
 ## [0.10.8] - 2026-08-14
 
 Wires up **macOS code-signing + notarization** for the desktop app, and stops the EAS build from uploading a
