@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.3] - 2026-08-14
+
+### Changed
+
+- **Admin login page: Plex-only sign-in.** Removed the "Continue with Google" and "Continue with GitHub"
+  buttons (email/password + magic link remain). The "Continue with Plex" button now uses the real Plex tile
+  logo (dark tile + Plex-gold chevron) instead of a generic TV icon, and its height matches the email/password
+  inputs.
+
 ## [0.10.2] - 2026-08-14
 
 Makes the first-run capability-media fetch (0.10.1) actually work, and surfaces it in onboarding.

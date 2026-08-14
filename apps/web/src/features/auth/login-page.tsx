@@ -1,4 +1,4 @@
-import { ArrowLeft, Mail, Tv } from "lucide-react";
+import { ArrowLeft, Mail } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -13,8 +13,7 @@ import {
 } from "@airwave/ui/components/card";
 import { Input } from "@airwave/ui/components/input";
 
-import { GithubIcon } from "@/components/icons/github-icon";
-import { GoogleIcon } from "@/components/icons/google-icon";
+import { PlexIcon } from "@/components/icons/plex-icon";
 import { Logo } from "@/components/logo";
 import { signIn } from "@/lib/auth-client";
 import { safeRedirect } from "@/lib/safe-redirect";
@@ -46,14 +45,6 @@ export function LoginPage() {
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Plex sign-in failed");
-    }
-  };
-
-  const handleSocial = async (provider: "google" | "github") => {
-    try {
-      await signIn.social({ provider, callbackURL });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : `Failed to sign in with ${provider}`);
     }
   };
 
@@ -146,30 +137,10 @@ export function LoginPage() {
               size="lg"
               onClick={handlePlex}
               disabled={loading}
-              className="w-full justify-start"
+              className="h-12 w-full justify-start"
             >
-              <Tv className="mr-2 h-5 w-5" />
+              <PlexIcon className="mr-2 h-5 w-5" />
               Continue with Plex
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => handleSocial("google")}
-              disabled={loading}
-              className="w-full justify-start"
-            >
-              <GoogleIcon className="mr-2 h-5 w-5" />
-              Continue with Google
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => handleSocial("github")}
-              disabled={loading}
-              className="w-full justify-start"
-            >
-              <GithubIcon className="mr-2 h-5 w-5" />
-              Continue with GitHub
             </Button>
           </div>
 
