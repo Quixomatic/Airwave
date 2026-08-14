@@ -158,28 +158,68 @@ function capMediaDir(): string {
   if (existsSync(join(CAP_MEDIA_MONO, "matrix.json")) || existsSync(CAP_MEDIA_MONO)) return CAP_MEDIA_MONO;
   return CAP_MEDIA_USER;
 }
+/** Progress of the first-run capability-media fetch, surfaced to the onboarding UI via /status. */
+type MediaProgress = {
+  state: "idle" | "downloading" | "extracting" | "ready" | "failed" | "skipped";
+  downloaded: number;
+  total: number;
+  error?: string;
+};
+let mediaProgress: MediaProgress = { state: "idle", downloaded: 0, total: 0 };
+
 /** Packaged first-run: fetch + extract the capability-probe clips into user-data (they're NOT in the installer).
  * Non-blocking, idempotent (a `.airwave-complete` marker), non-fatal — the server boots without them; the TV
- * codec-probe clips just 404 until this finishes, then serve (the server reads the dir per request). Extraction
- * via the system `tar` (bsdtar on Win10+/mac/linux), like the Docker image's `tar -xz`. */
+ * codec-probe clips just 404 until this finishes, then serve (the server reads the dir per request). Streams the
+ * download with byte progress (surfaced to onboarding via /status → `media`), then extracts via the system `tar`
+ * (bsdtar on Win10+/mac/linux), like the Docker image's `tar -xz`. */
 async function ensureCapMedia(): Promise<void> {
-  if (!PACKAGED) return; // dev uses the monorepo copy
-  if (existsSync(CAP_MEDIA_MONO)) return; // an AIRWAVE_BUNDLE_MEDIA offline build baked them
+  if (!PACKAGED || existsSync(CAP_MEDIA_MONO)) {
+    // dev uses the monorepo copy; an AIRWAVE_BUNDLE_MEDIA offline build baked them in.
+    mediaProgress = { state: "skipped", downloaded: 0, total: 0 };
+    return;
+  }
   const marker = join(CAP_MEDIA_USER, ".airwave-complete");
-  if (existsSync(marker)) return; // already fetched
+  if (existsSync(marker)) {
+    mediaProgress = { state: "ready", downloaded: 0, total: 0 };
+    return;
+  }
   console.log(`[desktop] fetching TV capability media (first run) from ${CAP_MEDIA_URL}…`);
-  const tmp = join(DATA_DIR, "capability-media.tar.gz");
+  // Download INTO the target dir + extract with a RELATIVE filename (cwd = the dir, no `-C`), so no arg contains
+  // a `C:\…` drive-colon — git's GNU `tar` (often first on Windows PATH) treats a leading `C:` as a REMOTE HOST
+  // ("Cannot connect to C:") and 128s. bsdtar (Win/mac/linux) is happy either way.
+  const tarName = "capability-media.tar.gz";
+  const tmp = join(CAP_MEDIA_USER, tarName);
   try {
     mkdirSync(CAP_MEDIA_USER, { recursive: true });
     const res = await fetch(CAP_MEDIA_URL, { redirect: "follow" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    await Bun.write(tmp, res); // stream ~430MB to disk
-    const code = await run(["tar", "-xzf", tmp, "-C", CAP_MEDIA_USER], {});
+    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+    const total = Number(res.headers.get("content-length")) || 0;
+    mediaProgress = { state: "downloading", downloaded: 0, total };
+    // Stream to disk explicitly (Bun.write(path, Response) buffers/stalls on a ~430MB body). Count bytes for
+    // the onboarding progress bar.
+    const sink = Bun.file(tmp).writer();
+    const reader = res.body.getReader();
+    let got = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      sink.write(value);
+      got += value.length;
+      mediaProgress = { state: "downloading", downloaded: got, total };
+      if (got % (16 * 1024 * 1024) < value.length) await sink.flush(); // periodic flush for backpressure
+    }
+    await sink.end();
+    console.log(`[desktop] capability media downloaded (${(got / 1e6).toFixed(0)}MB) — extracting…`);
+    mediaProgress = { state: "extracting", downloaded: got, total: total || got };
+    const code = await run(["tar", "-xzf", tarName], { cwd: CAP_MEDIA_USER });
     if (code !== 0) throw new Error(`tar exit ${code}`);
     writeFileSync(marker, new Date().toISOString());
+    mediaProgress = { state: "ready", downloaded: got, total: total || got };
     console.log("[desktop] capability media ready.");
   } catch (err) {
-    console.warn("[desktop] capability media fetch failed (codec-probe clips absent; non-fatal):", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    mediaProgress = { state: "failed", downloaded: mediaProgress.downloaded, total: mediaProgress.total, error: msg };
+    console.warn("[desktop] capability media fetch failed (codec-probe clips absent; non-fatal):", msg);
   } finally {
     try {
       rmSync(tmp, { force: true });
@@ -880,6 +920,7 @@ function startSetupServer(): void {
           phase: up ? "ready" : stackPhase,
           up,
           adminUrl: adminUrl(),
+          media: mediaProgress, // {state, downloaded, total} — the onboarding UI shows a capability-media step
         });
       }
 

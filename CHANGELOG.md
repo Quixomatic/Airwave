@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.2] - 2026-08-14
+
+Makes the first-run capability-media fetch (0.10.1) actually work, and surfaces it in onboarding.
+
+### Fixed
+
+- **The download hung** — `Bun.write(path, Response)` stalled on the ~430 MB body (no bytes written). Now the
+  response is streamed explicitly (`res.body.getReader()` → a `Bun.file().writer()` sink) with byte counting.
+- **Extraction failed on Windows** with `tar: Cannot connect to C: resolve failed` — git's GNU `tar` (often
+  first on the PATH) treats the `C:` in a `C:\…` path as a *remote host*. Now the tarball is downloaded into the
+  target dir and extracted with a **relative** filename (`cwd` = the dir, no `-C`), so no argument carries a
+  drive-colon. Works with both GNU tar and bsdtar. Verified: 39 clips land in `%APPDATA%/Airwave/capability-media`
+  and `/caps/media/*` serves.
+
+### Added
+
+- **The capability-media download is now a visible step in onboarding.** The supervisor reports progress via
+  `/status` (`media: { state, downloaded, total }`), and the provisioning screen shows a "TV capability media"
+  row with a live MB/%, then "Ready — codec-probe clips installed" — so you can see it actually downloaded.
+  Onboarding waits for both the stack *and* the media step to reach a terminal state before the "ready" screen
+  (a failed/optional download doesn't block).
+
 ## [0.10.1] - 2026-08-14
 
 Shrinks the desktop installer from ~400 MB to ~68 MB and tightens the first-run tray UX.

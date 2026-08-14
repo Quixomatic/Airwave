@@ -24,6 +24,15 @@ type Cfg = {
 
 type Step = "welcome" | "account" | "options" | "provisioning" | "done";
 
+type Media = {
+  state: "idle" | "downloading" | "extracting" | "ready" | "failed" | "skipped";
+  downloaded: number;
+  total: number;
+  error?: string;
+};
+const mb = (n: number) => `${(n / 1e6).toFixed(0)} MB`;
+const mpct = (m: Media) => (m.total ? Math.min(100, Math.round((m.downloaded / m.total) * 100)) : 0);
+
 // Ordered provisioning phases the supervisor reports via /status. Some are skipped on later runs (already
 // built) — the bar just advances to whatever phase is current.
 const PHASES: { key: string; label: string }[] = [
@@ -55,6 +64,7 @@ export function App() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState("");
   const [phase, setPhase] = useState("idle");
+  const [media, setMedia] = useState<Media | null>(null);
 
   const firstRun = !cfg?.configured;
 
@@ -80,14 +90,18 @@ export function App() {
   function pollStatus() {
     fetch("/status")
       .then((r) => r.json())
-      .then((j: { phase?: string; up?: boolean }) => {
+      .then((j: { phase?: string; up?: boolean; media?: Media }) => {
         if (j.phase) setPhase(j.phase);
-        if (j.up) {
+        if (j.media) setMedia(j.media);
+        // Wait for BOTH the stack to be up AND the capability-media step to reach a terminal state, so the user
+        // sees the download finish (it runs in parallel with the stack boot).
+        const mediaDone = !j.media || ["ready", "skipped", "failed"].includes(j.media.state);
+        if (j.up && mediaDone) {
           setPhase("ready");
           setStep("done");
           return;
         }
-        setTimeout(pollStatus, 1200);
+        setTimeout(pollStatus, 1000);
       })
       .catch(() => setTimeout(pollStatus, 1500));
   }
@@ -308,6 +322,27 @@ export function App() {
                     );
                   })}
                 </ul>
+                {media && media.state !== "skipped" && media.state !== "idle" && (
+                  <div className="mt-4 rounded-lg border border-border/60 bg-muted/30 p-3">
+                    <div className="flex items-center gap-3 text-sm">
+                      <StatusDot done={media.state === "ready"} active={media.state === "downloading" || media.state === "extracting"} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-medium">TV capability media</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {media.state === "downloading" && `Downloading… ${mb(media.downloaded)} / ${mb(media.total)} (${mpct(media)}%)`}
+                          {media.state === "extracting" && "Extracting…"}
+                          {media.state === "ready" && "Ready — codec-probe clips installed"}
+                          {media.state === "failed" && "Couldn't download (optional — Airwave still works; retries next launch)"}
+                        </span>
+                      </span>
+                    </div>
+                    {media.state === "downloading" && (
+                      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${Math.max(3, mpct(media))}%` }} />
+                      </div>
+                    )}
+                  </div>
+                )}
               </Card>
             )}
 
