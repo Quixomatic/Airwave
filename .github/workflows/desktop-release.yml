@@ -52,6 +52,12 @@ jobs:
             arch: arm64
     runs-on: ${{ matrix.os }}
 
+    # A throwaway DATABASE_URL satisfies `prisma generate` (Prisma 7's config resolves DATABASE_URL even for
+    # generate, which runs in packages/db's postinstall + the server build). It never connects; the real URL is
+    # the embedded Postgres at runtime. Mirrors docker/Dockerfile. Without it `pnpm install` fails on every runner.
+    env:
+      DATABASE_URL: "postgresql://build:build@localhost:5432/build?schema=public"
+
     steps:
       - uses: actions/checkout@v4
 
