@@ -115,7 +115,11 @@ export default {
     // app is still tray-first (browser = the admin/tv-web UI); the window is only for setup/settings.
     // (Linux: the docs prefer CEF for advanced compositing — a plain form is fine on GTKWebKit; revisit at
     // Stage-5 packaging if needed.)
-    mac: { bundleCEF: false, defaultRenderer: "native" },
+    // AIRWAVE_MAC_SIGN=1 (set by CI when the Apple secrets exist) makes us skip electrobun's OWN codesign/notarize
+    // AND its unsigned DMG — scripts/build-mac-signed.ts does the whole thing itself (sign every nested Mach-O incl.
+    // the embedded Postgres binaries electrobun's signer misses, build + sign the DMG, notarize, staple). Without
+    // it, electrobun builds an unsigned DMG exactly as before.
+    mac: { bundleCEF: false, defaultRenderer: "native", createDmg: process.env.AIRWAVE_MAC_SIGN !== "1" },
     linux: { bundleCEF: false, defaultRenderer: "native" },
     // `icon` = the Windows app/taskbar/shortcut icon (packaged build). The tray icon is set at runtime.
     win: { bundleCEF: false, defaultRenderer: "native", icon: "assets/icon.ico" },

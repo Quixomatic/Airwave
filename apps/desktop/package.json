@@ -13,6 +13,7 @@
     "build:stable": "electrobun build --env=stable",
     "build:canary": "electrobun build --env=canary",
     "build:win-installer": "bun scripts/build-win-installer.ts",
+    "build:mac-signed": "bun scripts/build-mac-signed.ts",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
