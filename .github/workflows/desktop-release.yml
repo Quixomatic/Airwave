@@ -61,6 +61,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # GitHub's macOS runners ship ~40GB of Xcode versions + iOS simulators we don't use; without freeing them
+      # the electrobun build + `hdiutil` DMG creation runs out of disk ("No space left on device"). We don't need
+      # Xcode (codesign is skipped without a cert; no icon compilation) — hdiutil/bun/node are unaffected. Mirrors
+      # the docker workflow's cleanup step.
+      - name: Free disk space (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          echo "Before:"; df -h /
+          sudo rm -rf /Applications/Xcode_*.app || true
+          sudo rm -rf /Library/Developer/CoreSimulator || true
+          sudo rm -rf ~/Library/Developer/CoreSimulator || true
+          sudo rm -rf ~/Library/Developer/Xcode/iOS\ DeviceSupport || true
+          echo "After:"; df -h /
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10.11.0

@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.7] - 2026-08-14
+
+### Fixed
+
+- **macOS desktop CI ran out of disk** during `electrobun build`'s DMG creation (`hdiutil: No space left on
+  device`). GitHub's macOS runners ship ~40 GB of Xcode versions + iOS simulators we don't use (codesign is
+  skipped without a cert; no icon compilation). Added a `Free disk space (macOS)` step (removes `Xcode_*.app` +
+  CoreSimulator) before the build, mirroring the Docker workflow's cleanup. Windows (Inno installer), Linux, and
+  the Docker image were unaffected — this just gets the macOS installer building too.
+
 ## [0.10.6] - 2026-08-14
 
 ### Added
