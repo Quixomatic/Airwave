@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.6] - 2026-08-14
+
+### Added
+
+- **A real Windows installer via Inno Setup** (replaces electrobun's bare self-extracting stub). electrobun
+  1.18.1 only produces a console-based self-extractor with no wizard/uninstaller; this wraps its *already-built
+  app bundle* (extracted from the electrobun tarball with a real `tar`) into a branded **Inno Setup** installer:
+  a proper wizard, a per-user install (`%LOCALAPPDATA%\Programs\Airwave`, no UAC), Start-menu + optional desktop
+  shortcuts, an **Apps & Features entry with a clean uninstaller**, and an optional "also remove my data" prompt
+  on uninstall. The app content is byte-identical to what the self-extractor would drop — same launcher, embedded
+  Postgres, and `%APPDATA%\Airwave` data dir. `apps/desktop/installer/airwave.iss` +
+  `scripts/build-win-installer.ts` (`pnpm -F desktop build:win-installer`); the release workflow builds it on the
+  Windows runner (`choco install innosetup`) and ships it as the Windows artifact. **Verified locally**: silent
+  install lays down all files + registers in Apps & Features; silent uninstall removes cleanly and keeps user
+  data by default. (Bonus: Inno + a real `tar` sidestep electrobun's Zig-extractor path-length limit on
+  Windows — Linux/macOS still use electrobun's packaging, so the shallow-path workarounds stay.)
+
+### Note
+
+- macOS/Linux installers are unchanged (still electrobun's format). Windows code-signing + macOS
+  notarization remain the distribution-polish follow-ups.
+
 ## [0.10.5] - 2026-08-14
 
 ### Documentation (getairwave.tv site)

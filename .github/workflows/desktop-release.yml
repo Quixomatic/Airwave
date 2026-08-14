@@ -103,6 +103,23 @@ jobs:
         working-directory: apps/desktop
         run: pnpm run build:${{ steps.ch.outputs.channel }}
 
+      # Windows only: electrobun ships just a bare self-extracting stub (a console with DEBUG spew, no real
+      # wizard/uninstaller). Wrap its app bundle in a proper Inno Setup installer + uninstaller instead, and make
+      # THAT the Windows artifact (self-contained — no separate .tar.zst needed). Inno also sidesteps electrobun's
+      # extractor path-length limit. See apps/desktop/installer/airwave.iss + scripts/build-win-installer.ts.
+      - name: Build Windows installer (Inno Setup)
+        if: matrix.os == 'windows-2025'
+        working-directory: apps/desktop
+        shell: bash
+        run: |
+          choco install innosetup -y --no-progress
+          pnpm run build:win-installer
+          mkdir -p artifacts
+          # Drop electrobun's stub + its archive; ship the Inno installer as the Windows artifact.
+          rm -f artifacts/Airwave-Setup.exe artifacts/Airwave-Setup.tar.zst artifacts/Airwave-Setup.zip artifacts/Airwave-Setup.metadata.json artifacts/update.json 2>/dev/null || true
+          cp build/inno/Airwave-Setup.exe artifacts/Airwave-Setup.exe
+          echo "Windows installer:"; ls -la artifacts/
+
       - name: List artifacts
         shell: bash
         run: ls -la apps/desktop/artifacts/ || echo "no artifacts/"
