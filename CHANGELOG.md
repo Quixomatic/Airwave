@@ -2,6 +2,30 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.8] - 2026-08-14
+
+Wires up **macOS code-signing + notarization** for the desktop app, and stops the EAS build from uploading a
+huge stale cache.
+
+### Added
+
+- **Signed + notarized macOS desktop builds (Developer ID).** The release workflow now signs the macOS app with
+  an Apple **Developer ID Application** certificate, notarizes it with Apple, and staples the ticket — so
+  Gatekeeper opens it without an "unidentified developer" warning. This is done *outside* electrobun (the same
+  way the Windows Inno installer is), because electrobun's built-in signer only reaches `Contents/MacOS` and
+  never signs the embedded-Postgres binaries nested in the app, then notarizes anyway and Apple rejects them.
+  `apps/desktop/scripts/build-mac-signed.ts` signs every Mach-O leaf-first with the hardened runtime +
+  entitlements, builds and signs the DMG, notarizes via an App Store Connect API key, and staples. Fully gated
+  on the Apple secrets existing, so builds without them are unchanged. (Windows Authenticode signing is still to
+  come.)
+
+### Fixed
+
+- **EAS build uploads no longer drag along the ~2 GB Next.js cache.** `apps/site/.next` is git-ignored only by a
+  *nested* `.gitignore`, which the EAS build archive doesn't honor (it reads just the root one) — so a
+  `production-tvos` build archive had ballooned to ~1.2 GB. Added `.next`/`.expo` to the root `.gitignore`. Also
+  pruned 40 stale webOS `.ipk` build artifacts, keeping only the latest.
+
 ## [0.10.7] - 2026-08-14
 
 ### Fixed
