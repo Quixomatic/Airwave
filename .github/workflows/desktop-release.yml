@@ -60,6 +60,8 @@ jobs:
       # Whether macOS code-signing is possible (the cert secret exists). `secrets` is only allowed in job-level
       # env — NOT in a step `if:` — so we evaluate it once here and gate the mac steps on `env.MAC_SIGN_AVAILABLE`.
       MAC_SIGN_AVAILABLE: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 != '' }}
+      # Same gating for Windows Authenticode via Azure Artifact Signing (formerly Trusted Signing).
+      WIN_SIGN_AVAILABLE: ${{ secrets.AZURE_CLIENT_ID != '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -187,6 +189,28 @@ jobs:
           rm -f artifacts/Airwave-Setup.exe artifacts/Airwave-Setup.tar.zst artifacts/Airwave-Setup.zip artifacts/Airwave-Setup.metadata.json artifacts/update.json 2>/dev/null || true
           cp build/inno/Airwave-Setup.exe artifacts/Airwave-Setup.exe
           echo "Windows installer:"; ls -la artifacts/
+
+      # Windows only: Authenticode-sign the Inno installer with Azure Artifact Signing (formerly Trusted Signing)
+      # so Windows doesn't SmartScreen-warn "unknown publisher". Auth = a service principal via env-var credential
+      # (DefaultAzureCredential picks up AZURE_TENANT_ID/CLIENT_ID/CLIENT_SECRET). Signs artifacts/Airwave-Setup.exe
+      # IN PLACE, so the upload/release steps ship the signed installer. Gated on the Azure secrets existing (via
+      # job-level WIN_SIGN_AVAILABLE — `secrets` isn't allowed in a step `if:`), so secretless builds stay green.
+      - name: Sign Windows installer (Azure Artifact Signing)
+        if: matrix.os == 'windows-2025' && env.WIN_SIGN_AVAILABLE == 'true'
+        uses: azure/artifact-signing-action@v2
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        with:
+          endpoint: https://eus.codesigning.azure.net/
+          signing-account-name: airwave
+          certificate-profile-name: airwave-ci-signing
+          files-folder: ${{ github.workspace }}\apps\desktop\artifacts
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
 
       - name: List artifacts
         shell: bash

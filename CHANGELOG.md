@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.12] - 2026-08-14
+
+Completes desktop code-signing — the Windows installer is now Authenticode-signed, alongside the already-signed
++ notarized macOS build.
+
+### Added
+
+- **Windows installer is Authenticode-signed via Azure Artifact Signing.** The release workflow now signs
+  `Airwave-Setup.exe` with **Azure Artifact Signing** (formerly Trusted Signing) using a service principal, so
+  Windows no longer shows the SmartScreen "unknown publisher" warning. Uses `azure/artifact-signing-action@v2`
+  right after the Inno Setup build, signing the installer in place with an RFC-3161 timestamp (so it stays valid
+  after the daily-rotated cert expires). Gated on the Azure secrets existing, so builds without them stay green.
+  With this, both desktop platforms are signed: macOS (Developer ID + notarized) and Windows (Authenticode).
+
 ## [0.10.11] - 2026-08-14
 
 ### Changed
