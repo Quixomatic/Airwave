@@ -1,5 +1,5 @@
 import type { ElectrobunConfig } from "electrobun";
-import { realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -58,6 +58,15 @@ const epPlatformDir = relative(CONFIG_DIR, realpathSync(dirname(epRequire.resolv
 // can't read (TarUnsupportedFileType → installer aborts). A generated stub (build-pg.ts) bridges the import.
 const epNativeDir = join(epPlatformDir, "native");
 
+// Capability-probe media (~430MB, 39 clips, gitignored) — baked into the packaged app so the TV codec
+// diagnostic works offline, exactly like the Docker image. Pulled from the private `media-v1` GitHub release
+// during CI (see .github/workflows/desktop-release.yml); present locally in apps/server/capability-media for
+// dev builds. Only copied when it exists, so a build without it still succeeds (the clips are simply absent and
+// the server boots regardless). The packaged supervisor's capMediaDir() reads it from server/capability-media.
+const capMediaSrc = "../server/capability-media";
+const hasCapMedia = existsSync(join(CONFIG_DIR, capMediaSrc));
+if (!hasCapMedia) console.warn("[electrobun.config] apps/server/capability-media absent — TV codec-probe clips will NOT be bundled.");
+
 export default {
   app: {
     name: "Airwave",
@@ -86,6 +95,8 @@ export default {
       "pg-launcher/pg-launcher.mjs": "pg/pg-launcher.mjs",
       [epNativeDir]: "pg/native",
       [`pg-launcher/stub/${epPkg}`]: `pg/node_modules/${epPkg}`,
+      // The ~430MB capability-probe clips → server/capability-media (only when present; see capMediaSrc note).
+      ...(hasCapMedia ? { [capMediaSrc]: "server/capability-media" } : {}),
       // Source assets (tray icon, …) so the bundle can resolve `views://assets/*` at runtime.
       assets: "views/assets",
     },

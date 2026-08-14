@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.111] - 2026-08-14
+
+Bakes the TV capability-probe media into the packaged desktop app, so the codec diagnostic works offline —
+matching the Docker image.
+
+### What ships
+
+- **Capability-probe clips baked into the installer** (`server/capability-media`). The desktop CI
+  (`desktop-release.yml`) now pulls `capability-media.tar.gz` from the private `media-v1` GitHub release — the
+  same asset `docker-publish.yml` uses, authenticated via `GITHUB_TOKEN` (which the Action has and an end-user
+  install would not) — and `electrobun.config` bundles it into the app. The bundle copy is guarded, so a build
+  without the media still succeeds (clips absent, server boots). Locally, dev's `apps/server/capability-media`
+  is bundled. The packaged supervisor's `capMediaDir()` reads it from `server/capability-media`.
+
+### Note
+
+- This makes the installer ~400 MB (the clips are already-compressed video). A **first-run fetch** (67 MB
+  installer, clips downloaded into user-data on first launch) is the planned optimization — it needs a *public*
+  URL for the asset (a private repo's releases can't be fetched by an end-user install), so it's deferred until
+  the asset is publicly hosted (a separate public assets repo/bucket, or the repo going public at v1.0). The
+  supervisor already has the `CAP_MEDIA_USER` path + `capMediaDir()` fallback for that swap.
+
 ## [0.9.110] - 2026-08-13
 
 Makes the desktop installer actually install. The v0.9.109 bundle built fine but `Airwave-Setup.exe` aborted

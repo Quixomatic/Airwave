@@ -145,16 +145,16 @@ const SECRET_PATH = join(DATA_DIR, "better-auth-secret");
 const PG_DATA_DIR = join(DATA_DIR, "pgdata");
 const BUMPER_MUSIC_DIR = join(DATA_DIR, "bumper-music");
 // The TV capability diagnostic's ~430MB test clips (server serves them at /caps/media/*). Baked into the
-// Docker image from the `media-v1` release; here: use the monorepo copy in dev, else a user-data dir the
-// distribution fetches on first run. See docker/Dockerfile (CAP_MEDIA_URL).
+// packaged app at server/capability-media (electrobun.config copies it in; CI pulls the private `media-v1`
+// release — see desktop-release.yml), exactly like the Docker image. In dev, the monorepo copy at
+// apps/server/capability-media is used. Falls back to a user-data dir if neither exists (clips absent — the
+// server still boots; only the codec-probe clips are missing).
 const CAP_MEDIA_MONO = join(SERVER_DIR, "capability-media");
 const CAP_MEDIA_USER = join(DATA_DIR, "capability-media");
 function capMediaDir(): string {
   if (existsSync(join(CAP_MEDIA_MONO, "matrix.json")) || existsSync(CAP_MEDIA_MONO)) return CAP_MEDIA_MONO;
   return CAP_MEDIA_USER;
 }
-// TODO(dist): on first run, if CAP_MEDIA_USER is empty, fetch+extract the `media-v1` tarball into it (mirror
-// the Dockerfile's `curl $CAP_MEDIA_URL | tar -xz`). Don't bundle 430MB into the installer.
 
 // The Airwave mark for the system tray. DEV resolves the committed square PNG (falls back to the admin's
 // apple-touch-icon). TODO(dist): switch to `views://assets/airwave-tray.png` (electrobun `build.copy`) so it
