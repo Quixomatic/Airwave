@@ -60,15 +60,8 @@ jobs:
       # Whether macOS code-signing is possible (the cert secret exists). `secrets` is only allowed in job-level
       # env — NOT in a step `if:` — so we evaluate it once here and gate the mac steps on `env.MAC_SIGN_AVAILABLE`.
       MAC_SIGN_AVAILABLE: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 != '' }}
-      # Same gating for Windows Authenticode via Azure Artifact Signing (formerly Trusted Signing).
-      WIN_SIGN_AVAILABLE: ${{ secrets.AZURE_CLIENT_ID != '' }}
-      # The Azure service-principal creds MUST live at JOB level, not on the signing step: azure/artifact-signing-action
-      # is a COMPOSITE action, and env set on the `uses:` step does NOT propagate into a composite action's inner
-      # steps — job-level env does. That's how DefaultAzureCredential's EnvironmentCredential picks them up. Harmless
-      # on the non-Windows runners (they never invoke the signer).
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      # Whether Windows signing is possible — gate on the AZURE_CREDENTIALS secret (the SP JSON azure/login uses).
+      WIN_SIGN_AVAILABLE: ${{ secrets.AZURE_CREDENTIALS != '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -196,6 +189,16 @@ jobs:
           rm -f artifacts/Airwave-Setup.exe artifacts/Airwave-Setup.tar.zst artifacts/Airwave-Setup.zip artifacts/Airwave-Setup.metadata.json artifacts/update.json 2>/dev/null || true
           cp build/inno/Airwave-Setup.exe artifacts/Airwave-Setup.exe
           echo "Windows installer:"; ls -la artifacts/
+
+      # Authenticate to Azure BEFORE the signing action. azure/artifact-signing-action is a composite action that
+      # isolates the `env` context, so its DefaultAzureCredential can't read AZURE_* env vars we set (tried job- and
+      # step-level — both come through empty). Instead we `az login` with the service principal here; the signing
+      # action's credential chain then uses AzureCliCredential (which it leaves enabled).
+      - name: Azure login (for Windows signing)
+        if: matrix.os == 'windows-2025' && env.WIN_SIGN_AVAILABLE == 'true'
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       # Windows only: Authenticode-sign the Inno installer with Azure Artifact Signing (formerly Trusted Signing)
       # so Windows doesn't SmartScreen-warn "unknown publisher". Auth = a service principal via env-var credential
