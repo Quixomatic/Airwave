@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.10] - 2026-08-14
+
+Corrects the v0.10.9 tvOS Hermes fix — it was placed in a build script the from-source build never runs.
+
+### Fixed
+
+- **tvOS `hermesvm.framework` `MinimumOSVersion` (ITMS-90360) — now stamped in the script the from-source build
+  actually runs.** v0.10.9 added the stamp to `build-apple-framework.sh`, but that only builds the *prebuilt*
+  Hermes release tarball. Our build uses `buildReactNativeFromSource`, where the `hermes-engine` podspec runs
+  `sdks/hermes-engine/utils/build-hermes-xcode.sh` as a pod **script phase** instead — so the v0.10.9 stamp never
+  executed and the Apple TV upload still failed ITMS-90360. Moved it to `build-hermes-xcode.sh`, right after it
+  copies the built `hermesvm.framework` into `destroot/Library/Frameworks/tvos/` (the framework the app embeds),
+  keyed off `TVOS_DEPLOYMENT_TARGET`, and removed the dead `build-apple-framework.sh` stamp. (iPad/iOS was never
+  affected — it's on TestFlight.)
+
 ## [0.10.9] - 2026-08-14
 
 Fixes the Apple TV (tvOS) App Store upload, which failed validation on a known from-source-Hermes bug.
