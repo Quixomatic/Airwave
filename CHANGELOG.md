@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.11] - 2026-08-14
+
+### Changed
+
+- **Desktop Windows-installer build warns on a stale bundle.** `pnpm -F desktop build:win-installer` only
+  *repackages* the last `electrobun build` output — it doesn't rebuild the app. If the freshly-built admin /
+  tv-web / setup SPAs or the server bundle are newer than that bundle, it now prints a loud warning to rebuild
+  first (`pnpm -F desktop prebuild && pnpm -F desktop build:stable`), so a locally-built installer can't silently
+  ship a stale admin UI (which briefly happened — an old bundle still showed the pre-Plex-only login buttons).
+  CI is unaffected: it always runs prebuild → electrobun build → installer in order, so the bundle is never stale.
+
 ## [0.10.10] - 2026-08-14
 
 Corrects the v0.10.9 tvOS Hermes fix — it was placed in a build script the from-source build never runs.

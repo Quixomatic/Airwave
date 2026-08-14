@@ -8,8 +8,8 @@
  * Prereq: `electrobun build` has produced build/<env>-win-x64/Airwave-Setup.tar.zst. Run: `bun scripts/build-win-installer.ts`.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), ".."); // apps/desktop
@@ -22,6 +22,26 @@ const tarZst = ["stable", "canary", "dev"]
 if (!tarZst) {
   console.error("[installer] no Airwave-Setup.tar.zst found — run `electrobun build` first.");
   process.exit(1);
+}
+
+// Staleness guard: this script only REPACKAGES the last `electrobun build` output — it does NOT rebuild the app.
+// If the freshly-built SPA/server output is newer than that bundle, the installer would ship a STALE admin UI
+// (this bit us once: the Plex-only login change wasn't in a locally-repackaged installer). CI always runs
+// prebuild → electrobun build → this in order, so the bundle is newest there and this never fires. Locally,
+// warn loudly so you re-run the build first. (Warn, don't fail — timestamps can be odd across environments.)
+const tarMtime = statSync(tarZst).mtimeMs;
+const freshnessProbes = [
+  "../web/dist/index.html",
+  "../tv-web/dist/index.html",
+  "../desktop-setup/dist/index.html",
+  "../server/dist/standalone/server.mjs",
+].map((p) => join(APP, p));
+const staleAgainst = freshnessProbes.filter((p) => existsSync(p) && statSync(p).mtimeMs > tarMtime);
+if (staleAgainst.length) {
+  console.warn("\n[installer] ⚠️  STALE BUNDLE — the electrobun output is OLDER than freshly-built app output:");
+  for (const p of staleAgainst) console.warn(`               • ${relative(APP, p)} is newer than the bundled ${relative(APP, tarZst)}`);
+  console.warn("             The installer would package an OUT-OF-DATE app. Rebuild the bundle first:");
+  console.warn("               pnpm -F desktop prebuild && pnpm -F desktop build:stable\n");
 }
 
 const staging = join(APP, "build", "inno-src");
