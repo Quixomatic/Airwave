@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.4] - 2026-08-14
+
+### Changed
+
+- **Admin login page: hid the "Email me a magic link instead" option.** Magic-link sign-in stays in the code
+  (behind a `MAGIC_LINK_ENABLED` flag) but is no longer shown — the login page now offers Plex + email/password.
+
 ## [0.10.3] - 2026-08-14
 
 ### Changed

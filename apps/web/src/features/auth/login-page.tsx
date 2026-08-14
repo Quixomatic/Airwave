@@ -20,6 +20,10 @@ import { safeRedirect } from "@/lib/safe-redirect";
 
 type Mode = "password" | "magic";
 
+// Magic-link sign-in is kept in the code (mode, handlers, forms) but hidden from the UI for now — flip to
+// re-expose the "Email me a magic link instead" toggle.
+const MAGIC_LINK_ENABLED = false;
+
 export function LoginPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("password");
@@ -203,15 +207,17 @@ export function LoginPage() {
               : "Use the email and password your admin issued you."}
           </p>
 
-          <div className="mt-4 text-center text-sm">
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground"
-              onClick={() => setMode(mode === "magic" ? "password" : "magic")}
-            >
-              {mode === "magic" ? "Use email & password" : "Email me a magic link instead"}
-            </button>
-          </div>
+          {MAGIC_LINK_ENABLED && (
+            <div className="mt-4 text-center text-sm">
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => setMode(mode === "magic" ? "password" : "magic")}
+              >
+                {mode === "magic" ? "Use email & password" : "Email me a magic link instead"}
+              </button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
