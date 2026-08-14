@@ -8,6 +8,12 @@ dist
 build
 *.tsbuildinfo
 
+# Next.js build cache (apps/site). It's already ignored by apps/site/.gitignore, but the EAS
+# build archive only honors the ROOT .gitignore (not nested ones) — so without this line the
+# ~2GB .next cache bloats every `eas build` upload. Keep heavy build caches ignored at root.
+.next
+.expo
+
 # Generated files
 apps/web/src/routeTree.gen.ts
 apps/tv-web/src/routeTree.gen.ts
