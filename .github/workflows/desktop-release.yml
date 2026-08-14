@@ -57,6 +57,9 @@ jobs:
     # the embedded Postgres at runtime. Mirrors docker/Dockerfile. Without it `pnpm install` fails on every runner.
     env:
       DATABASE_URL: "postgresql://build:build@localhost:5432/build?schema=public"
+      # Whether macOS code-signing is possible (the cert secret exists). `secrets` is only allowed in job-level
+      # env — NOT in a step `if:` — so we evaluate it once here and gate the mac steps on `env.MAC_SIGN_AVAILABLE`.
+      MAC_SIGN_AVAILABLE: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 != '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -121,7 +124,7 @@ jobs:
           # macOS + signing secrets present → tell electrobun.config to skip its own (unsigned) DMG; the signing
           # step below builds + signs + notarizes its own. Empty on every other runner / when the cert secret is
           # absent (forks, no secrets), so electrobun behaves exactly as before and the build stays green.
-          AIRWAVE_MAC_SIGN: ${{ (runner.os == 'macOS' && secrets.APPLE_CERTIFICATE_P12_BASE64 != '') && '1' || '' }}
+          AIRWAVE_MAC_SIGN: ${{ (matrix.os == 'macos-14' && env.MAC_SIGN_AVAILABLE == 'true') && '1' || '' }}
         run: pnpm run build:${{ steps.ch.outputs.channel }}
 
       # macOS only: electrobun's own codesign can't handle our nested embedded-Postgres binaries (it walks only
@@ -130,7 +133,7 @@ jobs:
       # with the hardened runtime + entitlements, builds the DMG, notarizes via the App Store Connect API key, and
       # staples. Gated on the cert secret existing (skipped on forks / before secrets are set).
       - name: Sign + notarize macOS (Developer ID)
-        if: runner.os == 'macOS' && secrets.APPLE_CERTIFICATE_P12_BASE64 != ''
+        if: matrix.os == 'macos-14' && env.MAC_SIGN_AVAILABLE == 'true'
         working-directory: apps/desktop
         shell: bash
         env:
