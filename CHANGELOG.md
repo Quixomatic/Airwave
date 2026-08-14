@@ -2,6 +2,26 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.110] - 2026-08-13
+
+Makes the desktop installer actually install. The v0.9.109 bundle built fine but `Airwave-Setup.exe` aborted
+mid-extract, so the app never landed on disk — plus a port-collision bug that surfaced once it did boot.
+
+### Fixed
+
+- **The Windows installer crashed mid-extraction with `TarUnsupportedFileType`.** The embedded-Postgres binaries
+  nested under `pg/node_modules/@embedded-postgres/windows-x64/native/…` — paths over 100 chars, which made the
+  tar writer emit PAX / GNU long-name records that electrobun's own Zig self-extractor can't read, so it bailed
+  after ~115 of 1,873 files (dropping `Resources/main.js`, so the launcher had nothing to run). Now the native
+  binaries ship **shallow** at `pg/native/`, with a generated per-platform **stub** package
+  (`scripts/build-pg.ts`) bridging embedded-postgres's `import('@embedded-postgres/<platform>')` to them — every
+  bundle path stays short, so classic ustar is used and the extractor completes. **Verified**: a clean install
+  now extracts all files, promotes to `…\com.airwave.desktop\stable\app`, and boots the packaged supervisor
+  (embedded PG + real onboarding UI).
+- **Dynamic ports could collide.** When the preferred ports (36020/36021/36022) were already taken, `freePort()`
+  handed every service the *same* next-free port, because it probes the OS but nothing is bound between calls.
+  It now tracks the ports already assigned this pass and skips them.
+
 ## [0.9.109] - 2026-08-13
 
 Stage 5 — the packaged desktop app is now self-contained: `electrobun build` produces a booting installer with

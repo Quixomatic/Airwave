@@ -277,11 +277,15 @@ function portFree(port: number, host: string): Promise<boolean> {
   });
 }
 
-/** Return `preferred` if free, else scan upward, else let the OS hand out any free port. */
-async function freePort(preferred: number, host = "127.0.0.1"): Promise<number> {
-  if (await portFree(preferred, host)) return preferred;
+/** Return `preferred` if free, else scan upward, else let the OS hand out any free port. `taken` holds ports
+ * we've ALREADY assigned this pass but not yet bound — critical because portFree() only checks the OS, so
+ * without it two services whose preferred ports are both busy would each pick the same next-free port (they
+ * aren't bound between calls). */
+async function freePort(preferred: number, host = "127.0.0.1", taken?: Set<number>): Promise<number> {
+  const usable = async (p: number) => !taken?.has(p) && (await portFree(p, host));
+  if (await usable(preferred)) return preferred;
   for (let p = preferred + 1; p < preferred + 200; p++) {
-    if (await portFree(p, host)) {
+    if (await usable(p)) {
       console.log(`[desktop] port ${preferred} busy → using ${p}.`);
       return p;
     }
@@ -296,15 +300,22 @@ async function freePort(preferred: number, host = "127.0.0.1"): Promise<number> 
 }
 
 /** Resolve the ports we're about to bind to free ones (mutating `config.ports`) so nothing collides with an
- * existing service. PG + setup are loopback-internal; the server/admin/tv-web ports feed the browser URLs. */
+ * existing service — or with each OTHER (track assigned ports in `taken`, since nothing is bound between the
+ * freePort calls). PG + setup are loopback-internal; the server/admin/tv-web ports feed the browser URLs. */
 async function resolvePorts(supervise: boolean): Promise<void> {
-  config.ports.setup = await freePort(config.ports.setup);
+  const taken = new Set<number>();
+  const pick = async (preferred: number, host?: string): Promise<number> => {
+    const p = await freePort(preferred, host, taken);
+    taken.add(p);
+    return p;
+  };
+  config.ports.setup = await pick(config.ports.setup);
   if (!supervise) return;
   const bind = host();
-  config.ports.server = await freePort(config.ports.server, bind);
-  config.ports.admin = await freePort(config.ports.admin, bind);
-  if (config.tvwebEnabled) config.ports.tvweb = await freePort(config.ports.tvweb, bind);
-  config.ports.pg = await freePort(config.ports.pg);
+  config.ports.server = await pick(config.ports.server, bind);
+  config.ports.admin = await pick(config.ports.admin, bind);
+  if (config.tvwebEnabled) config.ports.tvweb = await pick(config.ports.tvweb, bind);
+  config.ports.pg = await pick(config.ports.pg);
 }
 
 // Dev points at the running `pnpm dev` stack (3000/1/2); supervise uses the desktop's own config ports.

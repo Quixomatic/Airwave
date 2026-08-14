@@ -53,6 +53,10 @@ function pgPlatformPkg(): string {
 const epPkg = pgPlatformPkg();
 const epRequire = createRequire(require.resolve("embedded-postgres/package.json"));
 const epPlatformDir = relative(CONFIG_DIR, realpathSync(dirname(epRequire.resolve(`${epPkg}/package.json`))));
+// Ship the heavy native binaries SHALLOW (pg/native) — NOT under the deep node_modules/@embedded-postgres/…
+// path, whose >100-char entries make the tar writer emit PAX/long-name records electrobun's self-extractor
+// can't read (TarUnsupportedFileType → installer aborts). A generated stub (build-pg.ts) bridges the import.
+const epNativeDir = join(epPlatformDir, "native");
 
 export default {
   app: {
@@ -75,10 +79,13 @@ export default {
       // The engine-less server bundle (server.mjs + migrate.mjs) + the migration SQL it applies.
       [serverStandalone]: "server",
       [migrationsDir]: "server/migrations",
-      // The pre-bundled embedded-postgres wrapper (→ pg/pg-launcher.mjs) + the current platform's binaries
-      // where its runtime import resolves them: pg/node_modules/@embedded-postgres/<platform> (dist + native/).
-      "pg-launcher": "pg",
-      [epPlatformDir]: `pg/node_modules/${epPkg}`,
+      // Embedded Postgres, laid out for SHORT tar paths (see epNativeDir note):
+      //  • the wrapper bundle → pg/pg-launcher.mjs
+      //  • the native binaries SHALLOW → pg/native/{bin,lib,share}
+      //  • a tiny stub platform package → pg/node_modules/@embedded-postgres/<platform> (points at pg/native/bin)
+      "pg-launcher/pg-launcher.mjs": "pg/pg-launcher.mjs",
+      [epNativeDir]: "pg/native",
+      [`pg-launcher/stub/${epPkg}`]: `pg/node_modules/${epPkg}`,
       // Source assets (tray icon, …) so the bundle can resolve `views://assets/*` at runtime.
       assets: "views/assets",
     },
