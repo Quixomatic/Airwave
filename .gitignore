@@ -91,3 +91,11 @@ apps/tv-web/build-ipk/
 # Electrobun desktop build outputs (installer + release artifacts + the pre-bundled pg launcher)
 apps/desktop/artifacts/
 apps/desktop/pg-launcher/
+
+# Code-signing material — NEVER commit. Drop a .p12/.p8 here only to hand it to `gh secret set`, then delete.
+*.p12
+*.p8
+*.pfx
+*.cer
+*.certSigningRequest
+.secrets/
