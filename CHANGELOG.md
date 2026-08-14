@@ -2,6 +2,25 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.1] - 2026-08-14
+
+Shrinks the desktop installer from ~400 MB to ~68 MB and tightens the first-run tray UX.
+
+### What ships
+
+- **First-run capability-media fetch (installer ~400 MB → ~68 MB).** The ~430 MB TV codec-probe clips are no
+  longer baked into the installer — the packaged app now downloads them on first run from the **public
+  `airwave-assets` release** (`github.com/Quixomatic/airwave-assets`, `media-v1` → `capability-media.tar.gz`,
+  unauthenticated) into user-data, extracting via the system `tar`. It's non-blocking (the server boots
+  immediately; the codec-probe clips 404 until the download finishes, then serve), idempotent (a
+  `.airwave-complete` marker), and non-fatal. Overridable via `CAP_MEDIA_URL`. The CI `Fetch capability media`
+  step is removed (faster builds); set `AIRWAVE_BUNDLE_MEDIA=1` to bake the clips in for an offline build.
+- **Tray menu reflects the onboarding state.** Until first-run setup is complete (and not attached to a dev
+  stack), the tray shows **"Set up Airwave"** instead of "Settings" and **disables "Open Admin" / "Open TV
+  player"** (there's no running stack yet). Clicking it reopens the onboarding window — so accidentally closing
+  onboarding is recoverable. Once configured it flips to the normal enabled menu. (The served setup UI already
+  picks onboarding-vs-settings by `/config`.)
+
 ## [0.10.0] - 2026-08-14
 
 **Milestone: Airwave Desktop is real.** Stepping the version line off `0.9.x` (where we'd sat while eyeing v1)

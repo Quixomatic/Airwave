@@ -94,21 +94,10 @@ jobs:
       - name: Build server + SPAs
         run: pnpm -F desktop prebuild
 
-      # Bake the ~430MB capability-probe clips into the bundle (like the Docker image) so the TV codec
-      # diagnostic works offline. Same private `media-v1` release the docker workflow pulls; electrobun.config
-      # copies apps/server/capability-media → server/capability-media when present. Downloaded per-runner.
-      - name: Fetch capability media (private media-v1 release)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          mkdir -p apps/server/capability-media /tmp/capmedia
-          gh release download media-v1 \
-            --repo "${{ github.repository }}" \
-            --pattern capability-media.tar.gz \
-            --dir /tmp/capmedia --clobber
-          tar -xzf /tmp/capmedia/capability-media.tar.gz -C apps/server/capability-media
-          echo "capability media files: $(find apps/server/capability-media -type f | wc -l)"
+      # NOTE: capability-probe media is NO LONGER bundled — the packaged app fetches it on first run from the
+      # PUBLIC airwave-assets release (see ensureCapMedia() in apps/desktop/src/bun/index.ts). This keeps the
+      # installer ~70MB + the build fast. For an OFFLINE build, `gh release download media-v1` into
+      # apps/server/capability-media and set AIRWAVE_BUNDLE_MEDIA=1 before the electrobun build.
 
       - name: Build desktop app (electrobun)
         working-directory: apps/desktop

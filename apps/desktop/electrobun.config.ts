@@ -62,14 +62,15 @@ const epPlatformDir = relative(CONFIG_DIR, realpathSync(dirname(epRequire.resolv
 // can't read (TarUnsupportedFileType → installer aborts). A generated stub (build-pg.ts) bridges the import.
 const epNativeDir = join(epPlatformDir, "native");
 
-// Capability-probe media (~430MB, 39 clips, gitignored) — baked into the packaged app so the TV codec
-// diagnostic works offline, exactly like the Docker image. Pulled from the private `media-v1` GitHub release
-// during CI (see .github/workflows/desktop-release.yml); present locally in apps/server/capability-media for
-// dev builds. Only copied when it exists, so a build without it still succeeds (the clips are simply absent and
-// the server boots regardless). The packaged supervisor's capMediaDir() reads it from server/capability-media.
+// Capability-probe media (~430MB, 39 clips) — NOT bundled by default. The packaged app FETCHES them on first run
+// from the PUBLIC `airwave-assets` release into user-data (keeps the installer ~70MB + a fast extract; see
+// `ensureCapMedia()` in src/bun/index.ts). Set `AIRWAVE_BUNDLE_MEDIA=1` to bake them in for an OFFLINE build
+// (needs apps/server/capability-media present) — then the supervisor's capMediaDir() reads server/capability-media.
+const bundleCapMedia = process.env.AIRWAVE_BUNDLE_MEDIA === "1";
 const capMediaSrc = "../server/capability-media";
-const hasCapMedia = existsSync(join(CONFIG_DIR, capMediaSrc));
-if (!hasCapMedia) console.warn("[electrobun.config] apps/server/capability-media absent — TV codec-probe clips will NOT be bundled.");
+const hasCapMedia = bundleCapMedia && existsSync(join(CONFIG_DIR, capMediaSrc));
+if (bundleCapMedia && !hasCapMedia)
+  console.warn("[electrobun.config] AIRWAVE_BUNDLE_MEDIA=1 but apps/server/capability-media absent — clips NOT bundled.");
 
 export default {
   app: {

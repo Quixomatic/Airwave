@@ -144,16 +144,49 @@ function pipeToLog(stream: ReadableStream<Uint8Array> | null | undefined): void 
 const SECRET_PATH = join(DATA_DIR, "better-auth-secret");
 const PG_DATA_DIR = join(DATA_DIR, "pgdata");
 const BUMPER_MUSIC_DIR = join(DATA_DIR, "bumper-music");
-// The TV capability diagnostic's ~430MB test clips (server serves them at /caps/media/*). Baked into the
-// packaged app at server/capability-media (electrobun.config copies it in; CI pulls the private `media-v1`
-// release — see desktop-release.yml), exactly like the Docker image. In dev, the monorepo copy at
-// apps/server/capability-media is used. Falls back to a user-data dir if neither exists (clips absent — the
-// server still boots; only the codec-probe clips are missing).
+// The TV capability diagnostic's ~430MB test clips (server serves them at /caps/media/*). NOT bundled into the
+// installer (that made it ~400MB + a minutes-long extract) — instead the packaged app FETCHES them on first run
+// from the PUBLIC `airwave-assets` release into user-data (the code repo stays private; the asset is public).
+// In dev, the monorepo copy at apps/server/capability-media is used; an optional bundled build (AIRWAVE_BUNDLE_MEDIA)
+// ships them at server/capability-media for offline installs. Falls back to the user-data dir either way.
 const CAP_MEDIA_MONO = join(SERVER_DIR, "capability-media");
 const CAP_MEDIA_USER = join(DATA_DIR, "capability-media");
+const CAP_MEDIA_URL =
+  process.env.CAP_MEDIA_URL ||
+  "https://github.com/Quixomatic/airwave-assets/releases/download/media-v1/capability-media.tar.gz";
 function capMediaDir(): string {
   if (existsSync(join(CAP_MEDIA_MONO, "matrix.json")) || existsSync(CAP_MEDIA_MONO)) return CAP_MEDIA_MONO;
   return CAP_MEDIA_USER;
+}
+/** Packaged first-run: fetch + extract the capability-probe clips into user-data (they're NOT in the installer).
+ * Non-blocking, idempotent (a `.airwave-complete` marker), non-fatal — the server boots without them; the TV
+ * codec-probe clips just 404 until this finishes, then serve (the server reads the dir per request). Extraction
+ * via the system `tar` (bsdtar on Win10+/mac/linux), like the Docker image's `tar -xz`. */
+async function ensureCapMedia(): Promise<void> {
+  if (!PACKAGED) return; // dev uses the monorepo copy
+  if (existsSync(CAP_MEDIA_MONO)) return; // an AIRWAVE_BUNDLE_MEDIA offline build baked them
+  const marker = join(CAP_MEDIA_USER, ".airwave-complete");
+  if (existsSync(marker)) return; // already fetched
+  console.log(`[desktop] fetching TV capability media (first run) from ${CAP_MEDIA_URL}…`);
+  const tmp = join(DATA_DIR, "capability-media.tar.gz");
+  try {
+    mkdirSync(CAP_MEDIA_USER, { recursive: true });
+    const res = await fetch(CAP_MEDIA_URL, { redirect: "follow" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    await Bun.write(tmp, res); // stream ~430MB to disk
+    const code = await run(["tar", "-xzf", tmp, "-C", CAP_MEDIA_USER], {});
+    if (code !== 0) throw new Error(`tar exit ${code}`);
+    writeFileSync(marker, new Date().toISOString());
+    console.log("[desktop] capability media ready.");
+  } catch (err) {
+    console.warn("[desktop] capability media fetch failed (codec-probe clips absent; non-fatal):", err);
+  } finally {
+    try {
+      rmSync(tmp, { force: true });
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 // The Airwave mark for the system tray. DEV resolves the committed square PNG (falls back to the admin's
@@ -586,6 +619,7 @@ async function ensureSetupUiBuilt(): Promise<void> {
 
 async function startStack(): Promise<void> {
   mkdirSync(BUMPER_MUSIC_DIR, { recursive: true });
+  void ensureCapMedia(); // fire-and-forget: download the codec-probe clips in the background (packaged first run)
 
   // Public-URL model (mirrors docker-compose SERVER_PUBLIC_URL / WEB_PUBLIC_URL / EXTRA_CORS_ORIGINS):
   //  - serverAddress set (e.g. an HTTPS tunnel) → the admin + TVs call it; else admin→localhost, TVs→LAN IP.
@@ -805,6 +839,7 @@ function startSetupServer(): void {
           configured: true,
         };
         saveConfig(config);
+        refreshTray(); // onboarding done → enable Open Admin/TV player + relabel "Set up Airwave" → "Settings"
         if (!attach) {
           if (stackState === "up") {
             await stopStack();
@@ -992,29 +1027,53 @@ function onStackReady(): void {
 }
 
 // ── Tray ────────────────────────────────────────────────────────────────────────────────────────────────
-function buildTray(): Tray {
-  // Tray needs the pixel size (defaults to 16×16); our icon is a 32×32 full-color PNG (template:false).
-  const tray = new Tray({ title: "Airwave", image: trayIcon(), template: false, width: 32, height: 32 });
-  tray.setMenu([
-    { type: "normal", label: "Open Admin", action: "open-admin" },
-    { type: "normal", label: "Open TV player", action: "open-tvweb", hidden: !config.tvwebEnabled },
+let tray: Tray | null = null;
+
+/** The menu, computed from current state. Until onboarding is done (and not attached to a dev stack), the app
+ * has no running admin/tv-web yet — so "Open Admin"/"Open TV player" are DISABLED and the config item reads
+ * "Set up Airwave" (reopens the onboarding window, which the user may have closed). Once configured it flips to
+ * the normal enabled menu with "Settings". `refreshTray()` re-applies it when `configured` changes. */
+function trayMenu() {
+  const ready = attach || config.configured;
+  return [
+    { type: "normal", label: "Open Admin", action: "open-admin", enabled: ready },
+    { type: "normal", label: "Open TV player", action: "open-tvweb", hidden: !config.tvwebEnabled, enabled: ready },
     { type: "divider" },
-    { type: "normal", label: "Settings", action: "settings" },
+    // NO Unicode in labels (the native menu renders U+2026 "…" as garbage) — plain ASCII only.
+    { type: "normal", label: ready ? "Settings" : "Set up Airwave", action: "settings" },
     { type: "normal", label: `Server: ${serverLanUrl()}`, action: "noop", enabled: false },
     { type: "divider" },
     { type: "normal", label: "Quit", action: "quit" },
-  ]);
+  ] as const;
+}
+
+/** Re-apply the tray menu after state changes (e.g. onboarding finishes → enable Open Admin/TV, relabel). */
+function refreshTray(): void {
+  try {
+    tray?.setMenu(trayMenu() as never);
+  } catch {
+    /* ignore */
+  }
+}
+
+function buildTray(): Tray {
+  // Tray needs the pixel size (defaults to 16×16); our icon is a 32×32 full-color PNG (template:false).
+  tray = new Tray({ title: "Airwave", image: trayIcon(), template: false, width: 32, height: 32 });
+  tray.setMenu(trayMenu() as never);
   tray.on("tray-clicked", (e) => {
     const action = (e as { data?: { action?: string } }).data?.action;
     switch (action) {
       case "open-admin":
-        openBrowser(adminUrl());
+        // Guard even though the item is disabled pre-onboarding — the stack isn't up yet.
+        if (attach || config.configured) openBrowser(adminUrl());
+        else void openSetupWindow();
         break;
       case "open-tvweb":
-        openBrowser(tvwebUrl());
+        if (attach || config.configured) openBrowser(tvwebUrl());
+        else void openSetupWindow();
         break;
       case "settings":
-        void openSetupWindow(); // native settings window (system webview) — reused via show()/hide()
+        void openSetupWindow(); // onboarding (pre-config) OR settings (post-config) — the served UI picks by /config
         break;
       case "quit":
         void stopStack().finally(() => process.exit(0));
