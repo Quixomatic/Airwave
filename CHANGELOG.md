@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.9.112] - 2026-08-14
+
+Makes the **durable workflow engine work in the packaged desktop app** — Channel Import and AI lineups (which
+query `workflow.workflow_steps`) were disabled there because the packaged app can't run `workflow:bootstrap`
+(no `node_modules`/CLI). Now it ships a standalone bootstrap, proven end-to-end in a real install.
+
+### What ships
+
+- **Standalone workflow-schema bootstrap** (`apps/server/scripts/workflow-bootstrap.ts` → `wf/bootstrap.mjs`).
+  Replicates `@workflow/world-postgres`'s `setupDatabase()` — runs its drizzle migrations (`workflow.*` tables)
+  + graphile-worker's schema — against the embedded DB, bundled like `server.mjs`/`migrate.mjs`. graphile-worker
+  embeds its SQL in JS, so only world-postgres's 10 drizzle `.sql` files ship (copied to `wf/m/`). `drizzle-orm`
+  + `graphile-worker` added as direct server devDeps so the bundle resolves them. The supervisor runs it on boot
+  in packaged mode and now honors the workflows toggle there (was forced off). **Verified in a real install**:
+  bootstrap creates the schema, `[workflow] engine ready`, zero `workflow.workflow_steps does not exist` errors.
+- **Fixed a second `TarUnsupportedFileType` installer crash.** The workflow drizzle migrations, shipped under
+  `server/wf/src/drizzle/migrations/`, pushed the longer filenames (e.g.
+  `0010_add_events_entity_creation_unique_index.sql`) past 100 chars → PAX/long-name tar records electrobun's
+  self-extractor can't read, aborting the install mid-extract. They now ship at a shallow `wf/m/` (~75 chars),
+  well under the limit. (electrobun's extractor not supporting modern long-path tar entries is the root
+  limitation — worth an upstream fix.)
+
 ## [0.9.111] - 2026-08-14
 
 Bakes the TV capability-probe media into the packaged desktop app, so the codec diagnostic works offline —

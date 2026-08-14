@@ -19,6 +19,10 @@ const setupUiDist = "../desktop-setup/dist";
 const serverStandalone = "../server/dist/standalone";
 // The Prisma migration SQL the engine-less runner applies (server/migrations/<name>/migration.sql at runtime).
 const migrationsDir = "../../packages/db/prisma/migrations";
+// The standalone workflow-schema bootstrap (bootstrap.mjs + its drizzle SQL in m/). Shipped at a SHALLOW
+// top-level `wf/` — nesting it under server/ pushed the longer migration filenames past 100 chars, which the
+// self-extractor can't read (TarUnsupportedFileType). graphile-worker's SQL is embedded, so nothing else needed.
+const serverStandaloneWf = "../server/dist/standalone-wf";
 
 // ── Embedded Postgres — ship the pre-bundled wrapper + ONLY the current platform's binary package ───────────
 // `build:pg-launcher` bundles the `embedded-postgres` wrapper (+ `pg`, `async-exit-hook`) into a single
@@ -88,6 +92,8 @@ export default {
       // The engine-less server bundle (server.mjs + migrate.mjs) + the migration SQL it applies.
       [serverStandalone]: "server",
       [migrationsDir]: "server/migrations",
+      // The standalone workflow bootstrap → wf/ (bootstrap.mjs + m/<drizzle sql>).
+      [serverStandaloneWf]: "wf",
       // Embedded Postgres, laid out for SHORT tar paths (see epNativeDir note):
       //  • the wrapper bundle → pg/pg-launcher.mjs
       //  • the native binaries SHALLOW → pg/native/{bin,lib,share}

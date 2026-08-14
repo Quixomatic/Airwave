@@ -1,11 +1,11 @@
 {
   "name": "server",
-  "version": "0.9.111",
+  "version": "0.9.112",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
     "build": "workflow build && tsdown",
-    "build:standalone": "bun -e \"require('fs').rmSync('dist',{recursive:true,force:true});require('fs').rmSync('.well-known',{recursive:true,force:true})\" && workflow build && tsdown && bun build dist/index.mjs --target=bun --outfile dist/standalone/server.mjs && bun build scripts/migrate-standalone.ts --target=bun --outfile dist/standalone/migrate.mjs",
+    "build:standalone": "bun -e \"require('fs').rmSync('dist',{recursive:true,force:true});require('fs').rmSync('.well-known',{recursive:true,force:true})\" && workflow build && tsdown && bun build dist/index.mjs --target=bun --outfile dist/standalone/server.mjs && bun build scripts/migrate-standalone.ts --target=bun --outfile dist/standalone/migrate.mjs && bun build scripts/workflow-bootstrap.ts --target=bun --outfile dist/standalone-wf/bootstrap.mjs && bun -e \"const fs=require('fs');fs.cpSync(fs.realpathSync('node_modules/@workflow/world-postgres')+'/src/drizzle/migrations','dist/standalone-wf/m',{recursive:true})\"",
     "check-types": "tsc -b",
     "compile": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile server",
     "dev": "bun --env-file=.env run scripts/dev.ts",
@@ -35,6 +35,8 @@
     "@types/bun": "catalog:",
     "@types/pg": "^8.20.0",
     "@workflow/swc-plugin": "4.1.1",
+    "drizzle-orm": "0.45.2",
+    "graphile-worker": "0.16.6",
     "tsdown": "^0.22.3",
     "typescript": "catalog:",
     "unrun": "^0.3.1"

@@ -610,26 +610,26 @@ async function startStack(): Promise<void> {
   }
 
   // Bootstrap the durable workflow engine's schema (the `workflow.*` tables — graphile-worker + step tracking).
-  // Channel Import AND the AI lineup engine query it (`workflow.workflow_steps`). Dev uses `workflow:bootstrap`
-  // (pnpm). Packaged doesn't ship it yet → workflows/AI-imports are disabled in the packaged app for now
-  // (TODO: bundle a standalone bootstrap runner, like the migrate one).
-  if (!PACKAGED) {
-    console.log("[desktop] workflow bootstrap…");
-    const wfCode = await run(pnpmArgs(["--filter", "server", "workflow:bootstrap"]), {
-      cwd: REPO_ROOT,
-      env: {
-        DATABASE_URL,
-        BETTER_AUTH_SECRET: authSecret(),
-        WORKFLOW_ENABLED: "1",
-        // Same connection the engine uses — this is what actually creates the `workflow.*` schema.
-        WORKFLOW_POSTGRES_URL: DATABASE_URL,
-        WORKFLOW_TARGET_WORLD: "@workflow/world-postgres",
-        WORKFLOW_LOCAL_BASE_URL: "http://127.0.0.1:3152",
-      },
-    });
-    if (wfCode !== 0) {
-      console.warn(`[desktop] workflow bootstrap failed (exit ${wfCode}) — imports/workflows may error until it succeeds.`);
-    }
+  // Channel Import AND the AI lineup engine query it (`workflow.workflow_steps`), so it runs regardless of the
+  // workflows toggle. Dev/attach: `pnpm workflow:bootstrap`. Packaged: the bundled standalone bootstrap
+  // (server/wf/dist/bootstrap.mjs + the shipped drizzle SQL — same setupDatabase(), graphile-worker's own SQL
+  // is embedded in the JS). Idempotent (records what it applied), non-fatal.
+  setPhase("workflow-bootstrap");
+  console.log("[desktop] workflow bootstrap…");
+  const wfEnv = {
+    DATABASE_URL,
+    BETTER_AUTH_SECRET: authSecret(),
+    WORKFLOW_ENABLED: "1",
+    // Same connection the engine uses — this is what actually creates the `workflow.*` schema.
+    WORKFLOW_POSTGRES_URL: DATABASE_URL,
+    WORKFLOW_TARGET_WORLD: "@workflow/world-postgres",
+    WORKFLOW_LOCAL_BASE_URL: "http://127.0.0.1:3152",
+  };
+  const wfCode = PACKAGED
+    ? await run([bunBin(), join(APP_ROOT, "wf", "bootstrap.mjs")], { env: wfEnv })
+    : await run(pnpmArgs(["--filter", "server", "workflow:bootstrap"]), { cwd: REPO_ROOT, env: wfEnv });
+  if (wfCode !== 0) {
+    console.warn(`[desktop] workflow bootstrap failed (exit ${wfCode}) — imports/workflows may error until it succeeds.`);
   }
 
   // The admin's primary origin (CORS_ORIGIN) + everything else we allow-list: local + LAN admin, the tv-web
@@ -673,9 +673,9 @@ async function startStack(): Promise<void> {
         CORS_ORIGIN: corsPrimary,
         TV_APP_ORIGIN: tvAppOrigin,
         EXTRA_CORS_ORIGINS: extraOrigins,
-        // Packaged doesn't ship the workflow bootstrap yet → keep the engine off there (avoids the missing
-        // `workflow.*` schema errors) until we bundle a standalone bootstrap. Dev honors the toggle.
-        WORKFLOW_ENABLED: !PACKAGED && config.workflowEnabled ? "1" : "",
+        // The bootstrap above created the `workflow.*` schema (dev via pnpm, packaged via the bundled runner),
+        // so the engine can run in both — honor the toggle.
+        WORKFLOW_ENABLED: config.workflowEnabled ? "1" : "",
         // The durable workflow engine connects via its OWN url (mirrors compose) — point it at the embedded PG
         // so its `workflow.*` schema lives in the SAME database Prisma reads (else `workflow.workflow_steps`
         // is missing for the app's observability queries). Defaults match compose.
