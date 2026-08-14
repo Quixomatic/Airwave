@@ -62,6 +62,13 @@ jobs:
       MAC_SIGN_AVAILABLE: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 != '' }}
       # Same gating for Windows Authenticode via Azure Artifact Signing (formerly Trusted Signing).
       WIN_SIGN_AVAILABLE: ${{ secrets.AZURE_CLIENT_ID != '' }}
+      # The Azure service-principal creds MUST live at JOB level, not on the signing step: azure/artifact-signing-action
+      # is a COMPOSITE action, and env set on the `uses:` step does NOT propagate into a composite action's inner
+      # steps — job-level env does. That's how DefaultAzureCredential's EnvironmentCredential picks them up. Harmless
+      # on the non-Windows runners (they never invoke the signer).
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
 
     steps:
       - uses: actions/checkout@v4
@@ -198,10 +205,6 @@ jobs:
       - name: Sign Windows installer (Azure Artifact Signing)
         if: matrix.os == 'windows-2025' && env.WIN_SIGN_AVAILABLE == 'true'
         uses: azure/artifact-signing-action@v2
-        env:
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         with:
           endpoint: https://eus.codesigning.azure.net/
           signing-account-name: airwave
