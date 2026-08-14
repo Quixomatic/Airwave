@@ -61,19 +61,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # GitHub's macOS runners ship ~40GB of Xcode versions + iOS simulators we don't use; without freeing them
-      # the electrobun build + `hdiutil` DMG creation runs out of disk ("No space left on device"). We don't need
-      # Xcode (codesign is skipped without a cert; no icon compilation) — hdiutil/bun/node are unaffected. Mirrors
-      # the docker workflow's cleanup step.
+      # GitHub's macOS runners are near-full — the electrobun build + `hdiutil` DMG creation runs out of disk
+      # ("No space left on device"). Free the big, SAFE-to-remove hogs (iOS/tvOS/watchOS simulator runtimes ~7GB
+      # each, device support, the Android SDK) but KEEP Xcode + Command Line Tools intact — `codesign` and
+      # `notarytool` come from Xcode and are required once macOS signing/notarization is set up. Do NOT remove
+      # Xcode here.
       - name: Free disk space (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
           echo "Before:"; df -h /
-          sudo rm -rf /Applications/Xcode_*.app || true
-          sudo rm -rf /Library/Developer/CoreSimulator || true
-          sudo rm -rf ~/Library/Developer/CoreSimulator || true
-          sudo rm -rf ~/Library/Developer/Xcode/iOS\ DeviceSupport || true
+          sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/* || true
+          sudo rm -rf ~/Library/Developer/CoreSimulator/Caches ~/Library/Developer/CoreSimulator/Devices || true
+          sudo rm -rf ~/Library/Developer/Xcode/*DeviceSupport || true
+          sudo rm -rf "${ANDROID_SDK_ROOT:-/dev/null}" "${ANDROID_HOME:-/dev/null}" /usr/local/lib/android ~/Library/Android || true
           echo "After:"; df -h /
 
       - uses: pnpm/action-setup@v4
