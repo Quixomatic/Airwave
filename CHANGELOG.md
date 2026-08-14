@@ -2,6 +2,30 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.0] - 2026-08-14
+
+**Milestone: Airwave Desktop is real.** Stepping the version line off `0.9.x` (where we'd sat while eyeing v1)
+to mark a genuine leap — the desktop app went from "a packaged bundle that does nothing" to **self-contained,
+one-click installers that actually boot the whole Airwave server next to Plex**, on every desktop OS.
+
+### Highlights (the work landed across v0.9.109–0.9.112)
+
+- **One-click installers for Windows, macOS (Intel + Apple Silicon), and Linux (x64 + ARM64)** — each bundles
+  the engine-less server, embedded Postgres, the admin + tv-web SPAs, the onboarding UI, and (for now) the TV
+  capability-probe media. Proven end-to-end in a real install: it installs, boots embedded Postgres → applies
+  migrations → bootstraps the workflow schema → starts the server → serves the real onboarding UI, with the
+  durable workflow engine (Channel Import + AI lineups) working.
+- **A green 5-platform GitHub Actions matrix** (`desktop-release.yml`) builds all five installers from a clean
+  checkout. A `v*` tag now produces both the Docker image and the desktop installers, auto-attached to the
+  GitHub Release.
+
+### Notes
+
+- This is a version-line milestone; the substantive changes are itemized under 0.9.109–0.9.112 below.
+- Installers are currently ~400 MB (the capability-probe media is baked in) and macOS builds are unsigned. The
+  next steps — a public `airwave-assets` host for first-run media fetch (→ ~70 MB) and macOS
+  signing/notarization — are tracked in `.plans/desktop-server.md` §12.
+
 ## [0.9.112] - 2026-08-14
 
 Makes the **durable workflow engine work in the packaged desktop app** — Channel Import and AI lineups (which

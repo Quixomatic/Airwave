@@ -1,6 +1,6 @@
 {
   "id": "com.airwave.tv",
-  "version": "0.9.112",
+  "version": "0.10.0",
   "vendor": "Airwave",
   "type": "web",
   "main": "index.html",
