@@ -1,4 +1,5 @@
 import { defineDocs, defineConfig, frontmatterSchema } from "fumadocs-mdx/config";
+import { remarkMdxMermaid } from "fumadocs-core/mdx-plugins";
 import { z } from "zod";
 
 // The `/docs` content collection.
@@ -18,4 +19,9 @@ export const blog = defineDocs({
   },
 });
 
-export default defineConfig();
+export default defineConfig({
+  // Turn ```mermaid code fences into <Mermaid chart="…"/> (rendered by components/mdx/mermaid.tsx).
+  mdxOptions: {
+    remarkPlugins: [remarkMdxMermaid],
+  },
+});

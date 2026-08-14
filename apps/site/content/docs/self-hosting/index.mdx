@@ -7,7 +7,15 @@ import { Cards, Card } from "fumadocs-ui/components/card";
 
 Airwave is built to be **self-hosted**: you run the server next to your media, point it at a Plex
 library, and stream your own channels to the TV apps. There's nothing to sign up for and no hosted
-tier — the whole stack runs from a single prebuilt image plus a Postgres database.
+tier.
+
+**Two ways to run it — same server, pick what fits your setup:**
+
+- **[One-click desktop app](/docs/self-hosting/desktop)** — for running Plex on your own Windows, macOS, or
+  Linux machine. An installer + a tray app with **embedded Postgres**; no Docker, nothing to configure to
+  start.
+- **Docker** — for a NAS, mini-PC, or always-on Linux box. A single prebuilt image plus a Postgres database,
+  wired by `docker compose`. This section walks that path in detail below.
 
 ## The deploy model
 
@@ -26,15 +34,14 @@ A typical stack is therefore three services from two images: **Postgres**, the *
 **web** admin — all wired together by `docker-compose.yml` and a single `.env`. See
 [Roles & the single image](/docs/self-hosting/roles) for why it's built this way.
 
-```
-                 ┌─────────────┐
-  browser ─────► │  web (SPA)  │ ──┐
-                 └─────────────┘   │  built with SERVER_PUBLIC_URL
-                 ┌─────────────┐   ▼
-  TV apps ─────► │   server    │ ──────► Postgres
-                 └─────────────┘         (channelguide DB)
-                        │
-                        └──────► your Plex server
+```mermaid
+graph LR
+  browser(["Browser"]) --> web["web · admin SPA"]
+  web -->|"built with SERVER_PUBLIC_URL"| server["server · API + TV REST"]
+  tv(["TV apps"]) -->|"guide data"| server
+  tv -.->|"stream media directly"| plex["Your Plex server"]
+  server -->|"metadata + filters"| plex
+  server --> db[("Postgres<br/>channelguide DB")]
 ```
 
 ## Prerequisites
@@ -51,6 +58,7 @@ A typical stack is therefore three services from two images: **Postgres**, the *
 
 <Cards>
   <Card title="Docker quick start" href="/docs/self-hosting/docker" description="Grab the stack files, fill in .env, bring it up — first boot, admin seed, and reaching the panel." />
+  <Card title="Desktop app" href="/docs/self-hosting/desktop" description="Run the whole server on your Windows/Mac/Linux machine next to Plex — an installer + tray app, embedded Postgres, no Docker." />
   <Card title="Configuration" href="/docs/self-hosting/configuration" description="The full .env reference — every variable, what it does, defaults, and which are required." />
   <Card title="Roles & the single image" href="/docs/self-hosting/roles" description="One image, N roles (CG_ROLE) — the server, the admin web, and the optional browser TV player." />
   <Card title="Updating" href="/docs/self-hosting/updating" description="The release loop — pull a new tag, restart, migrations apply themselves; how images reach GHCR." />

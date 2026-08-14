@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.5] - 2026-08-14
+
+### Documentation (getairwave.tv site)
+
+- **New "Desktop app" self-hosting guide** (`/docs/self-hosting/desktop`), placed alongside the Docker guide —
+  download/install, the onboarding flow, the tray, LAN/tunnel reachability, where data lives, and a
+  Docker-vs-desktop comparison. The self-hosting overview now frames the two install paths (desktop vs Docker).
+- **Mermaid diagram support on the docs site** via **beautiful-mermaid** (the fumadocs recipe) — a server
+  component that renders diagrams to themed SVG at build time (no client JS), with ```mermaid code fences
+  auto-converted (`remarkMdxMermaid`). The `/docs/self-hosting` deploy diagram is now a proper Mermaid chart
+  (replacing hand-aligned ASCII), corrected to show that **TV apps get guide data from the Airwave server but
+  stream media directly from Plex**.
+
 ## [0.10.4] - 2026-08-14
 
 ### Changed

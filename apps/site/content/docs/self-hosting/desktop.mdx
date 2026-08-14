@@ -1,0 +1,122 @@
+---
+title: "Desktop app"
+description: "Run the whole Airwave server on your own Windows, macOS, or Linux machine with a one-click installer — no Docker, no NAS. Embedded Postgres, a tray app, and the browser as the UI."
+---
+
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+Not everyone has a NAS. If you run **Plex on your main machine**, the desktop app gives you the entire
+Airwave server — API, admin panel, the TV web player, and its database — as a single **one-click install**
+that lives in your system tray, right next to Plex. No Docker, no compose file, nothing to configure to get
+started.
+
+It's the **same server** as the [Docker deploy](/docs/self-hosting/docker) with full feature parity
+(including the durable AI-lineup workflow engine) — it just ships **embedded Postgres** instead of a
+container, and it manages everything for you. The browser is still the UI: the tray opens the admin and the
+TV player in your default browser; TVs on your network connect to this machine.
+
+<Cards>
+  <Card title="Prefer Docker / a NAS?" href="/docs/self-hosting/docker" description="If you already run a NAS or a Linux box with docker compose, the container deploy is the way." />
+  <Card title="Configuration reference" href="/docs/self-hosting/configuration" description="The desktop app's advanced options map 1:1 to the self-host env vars documented here." />
+</Cards>
+
+## Docker or desktop?
+
+| | Desktop app | Docker |
+|---|---|---|
+| Best for | Plex on your everyday PC/Mac | A NAS, mini-PC, or always-on Linux box |
+| Setup | Run an installer, click through onboarding | Compose file + `.env` |
+| Database | Embedded Postgres (managed for you) | A Postgres container you run |
+| Feature parity | Full (workflows included) | Full |
+| Always-on | Runs while your machine is on (launch-at-login) | Runs 24/7 on the host |
+
+## 1. Download
+
+Grab the installer for your platform from the **[GitHub Releases](https://github.com/Quixomatic/Airwave/releases)**
+page (each `v*` release attaches them):
+
+- **Windows** — `Airwave-Setup.exe` (x64)
+- **macOS** — Apple Silicon (arm64)
+- **Linux** — x64 and arm64
+
+The installer is small (~70 MB). The ~430 MB of TV capability-probe clips are **downloaded on first run**, not
+bundled — see step 2.
+
+## 2. Install &amp; first run
+
+Run the installer. Airwave lands in your system tray and opens a short **onboarding** window:
+
+1. **Create your admin account** — the email + password you'll sign in to the panel with. (Public sign-up is
+   off; this is the owner account, same as the Docker `ADMIN_EMAIL` / `ADMIN_PASSWORD` seed.)
+2. **Pick your options** — *Expose on my network* (let TVs connect — see step 3), the *TV web player*, and
+   *AI lineup workflows*. All changeable later.
+3. **Provisioning** — Airwave starts embedded Postgres, applies migrations, bootstraps the workflow schema,
+   downloads the capability media (you'll see a live progress bar), and starts the server. First run takes a
+   minute or two; later launches are quick.
+4. **Done** — it opens the admin panel in your browser. From here it's the same as any deploy: connect a
+   source, build channels, add viewers.
+
+If you close the onboarding window before finishing, reopen it from the tray — until setup is complete it
+shows **"Set up Airwave"** (and *Open Admin* / *Open TV player* stay disabled).
+
+## 3. The tray &amp; reaching Airwave
+
+The tray menu is your control surface: **Open Admin**, **Open TV player**, the **server address** for TVs,
+**Settings**, and **Quit**.
+
+- **On this machine**, the admin opens at `localhost` — nothing to configure.
+- **TVs and other devices on your LAN** connect to *this machine's* LAN IP (e.g.
+  `http://192.168.1.50:36020`). Turn on **Expose on my network** (onboarding or Settings) and the tray shows
+  the address to point your TV at. This is the desktop equivalent of setting `SERVER_PUBLIC_URL` /
+  `WEB_PUBLIC_URL` in Docker.
+- **Remote access / a domain** — Settings has an advanced *Remote access &amp; tunnels* section
+  (server address, admin address, extra allowed origins) that maps directly to the self-host
+  `SERVER_PUBLIC_URL` / `WEB_PUBLIC_URL` / `EXTRA_CORS_ORIGINS`. Point it at a Cloudflare tunnel or reverse
+  proxy for HTTPS.
+
+Ports auto-resolve to free ones (defaults: server `36020`, admin `36021`, TV player `36022`) so nothing
+clashes with an existing service.
+
+## 4. Where your data lives
+
+Everything the app owns — config, the Postgres data directory, the capability media, and logs — lives in one
+per-OS user-data folder:
+
+| OS | Folder |
+|---|---|
+| Windows | `%APPDATA%\Airwave` |
+| macOS | `~/Library/Application Support/Airwave` |
+| Linux | `~/.config/Airwave` |
+
+To **reset to a clean first-run**, quit the app (so Postgres releases the data dir) and delete that folder.
+`desktop.log` in there is the first place to look if something misbehaves.
+
+## 5. Updating
+
+Download the newer installer from the Releases page and run it over the top — your data folder is untouched,
+so your channels, sources, and admin account carry over. (Built-in auto-update is planned.)
+
+## Notes
+
+- **macOS builds are currently unsigned**, so Gatekeeper will warn on first launch — right-click the app and
+  choose **Open** once to allow it. (Signing/notarization is on the roadmap.)
+- **The capability media downloads on first run** (~430 MB, from a public assets release). It's non-blocking —
+  the server works immediately; the TV codec-probe clips just appear once the download finishes. It's cached,
+  so it only happens once.
+- **Workflows work here too** — unlike a bare container without the bootstrap, the desktop app sets up the
+  workflow schema automatically, so Channel Import and AI lineups are available.
+
+## Source map
+
+| Concern | File |
+|---|---|
+| Tray supervisor (embedded PG, migrate, server, tv-web) | `apps/desktop/src/bun/index.ts` |
+| Onboarding / settings UI | `apps/desktop-setup` |
+| Bundle config (per-OS build.copy, embedded PG) | `apps/desktop/electrobun.config.ts` |
+| Release matrix (Win / macOS / Linux installers on a `v*` tag) | `.github/workflows/desktop-release.yml` |
+
+---
+
+See also: [Docker quick start](/docs/self-hosting/docker) ·
+[Configuration](/docs/self-hosting/configuration) · [Quick Start](/docs/getting-started) ·
+[Sources](/docs/sources)
