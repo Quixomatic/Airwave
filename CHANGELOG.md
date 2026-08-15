@@ -2,6 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.13] - 2026-08-14
+
+Fixes two crashes that white-screened the packaged desktop app's admin and TV player after onboarding.
+
+### Fixed
+
+- **Admin white-screened in the packaged app ("Invalid environment variables").** The admin's env schema
+  required `VITE_SERVER_URL` (`z.url()`), but the packaged desktop admin is built with **no** baked URL — the
+  supervisor resolves a free port each launch and injects the real URL at serve time (`window.__AIRWAVE_ENV__`).
+  So `createEnv` threw at import, *before* the runtime injection could be read. Made `VITE_SERVER_URL` optional
+  (Vercel/dev still set it explicitly); `serverUrl()` falls back to same-origin if it's ever absent. This only
+  surfaced when testing the real CI/Inno installer — the dev "build-on-demand" path bakes the URL, which masked it.
+- **TV player white-screened in the packaged app ("PalmSystem is not defined").** `webOSTV.js` (bundled + loaded
+  via `<script>`) *defines* `webOS.keyboard.isShowing` even in a plain browser, and its body references the bare
+  `PalmSystem` global — undefined off-webOS, so calling it threw a `ReferenceError` that optional chaining can't
+  guard (the function exists; it throws *inside*). Wrapped the call in try/catch — no system keyboard anywhere
+  but a real webOS TV.
+
 ## [0.10.12] - 2026-08-14
 
 Completes desktop code-signing — the Windows installer is now Authenticode-signed, alongside the already-signed

@@ -20,8 +20,16 @@ export function useVirtualKeyboard(): boolean {
 
   useEffect(() => {
     const read = () => {
-      const w = (window as unknown as { webOS?: WebOSKeyboard }).webOS;
-      return w?.keyboard?.isShowing?.() ?? false;
+      // webOSTV.js (bundled + loaded via <script> in the packaged app) DEFINES webOS.keyboard.isShowing even in
+      // a plain browser, and its body references the bare `PalmSystem` global — undefined off-webOS → a
+      // ReferenceError that optional chaining can't guard (the function exists; it throws INSIDE). Swallow it:
+      // no system keyboard anywhere but a real webOS TV. (This is why tv-web white-screened in the desktop app.)
+      try {
+        const w = (window as unknown as { webOS?: WebOSKeyboard }).webOS;
+        return w?.keyboard?.isShowing?.() ?? false;
+      } catch {
+        return false;
+      }
     };
     setShowing(read());
     const onChange = (e: Event) => {

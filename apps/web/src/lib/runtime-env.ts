@@ -21,5 +21,7 @@ export function serverUrl(): string {
     const injected = (window as { __AIRWAVE_ENV__?: Record<string, string> }).__AIRWAVE_ENV__?.VITE_SERVER_URL;
     if (typeof injected === "string" && injected.trim()) return injected.trim();
   }
-  return env.VITE_SERVER_URL;
+  // env.VITE_SERVER_URL is optional now (the packaged admin ships it empty + injects at runtime above). It's set
+  // for Vercel/dev; if somehow absent, fall back to same-origin so we never hand consumers `undefined`.
+  return env.VITE_SERVER_URL ?? (typeof window !== "undefined" ? window.location.origin : "");
 }
