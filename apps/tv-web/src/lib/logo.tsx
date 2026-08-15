@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 
+import logoUrl from "../assets/logo.png";
 import { APP_NAME } from "./app-info";
 
 /**
@@ -26,7 +27,7 @@ export function Logo({
 }) {
   const mark = (
     <motion.img
-      src="/logo.png"
+      src={logoUrl}
       alt=""
       style={{ width: markWidth, height: "auto", objectFit: "contain", display: "block" }}
       initial={animate ? { opacity: 0, scale: 0.82 } : false}

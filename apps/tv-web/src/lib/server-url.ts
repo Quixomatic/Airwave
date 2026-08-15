@@ -29,7 +29,15 @@ const BAKED = autoPointServerUrl().replace(/\/+$/, "");
 export function normalizeServerUrl(raw: string): string {
   let u = raw.trim().replace(/\/+$/, "");
   if (!u) return "";
-  if (!/^https?:\/\//i.test(u)) u = `http://${u}`;
+  if (!/^https?:\/\//i.test(u)) {
+    // Pick the scheme by host: LAN / self-host (localhost, an IP, *.local) is plain HTTP; a real domain is
+    // almost always HTTPS. Defaulting a domain to http:// is a silent trap — an http URL to an https server
+    // 301s, and the browser turns the redirected login POST into a GET, so the POST-only auth endpoints 404
+    // (health is a GET, so it survives the redirect and onboarding wrongly "connects"). See the webOS 404 debug.
+    const host = u.split("/")[0].split(":")[0].toLowerCase();
+    const isLan = host === "localhost" || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.endsWith(".local");
+    u = `${isLan ? "http" : "https"}://${u}`;
+  }
   return u;
 }
 

@@ -2,6 +2,23 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.16] - 2026-08-15
+
+Fixes two webOS-only bugs found by debugging the installed TV app with the remote inspector (both invisible when
+running tv-web in a browser).
+
+### Fixed
+
+- **TV login failed with 404 when the server address was entered without a scheme.** A bare domain (e.g.
+  `tv.turboforge.io`) defaulted the stored server URL to `http://`. If the server is HTTPS it 301-redirects
+  http→https, and a browser following that redirect turns the login **POST into a GET** — so the POST-only auth
+  endpoints (`/api/tv/auth/plex/start`, `/api/auth/device/code`) 404. The health check is a GET, so it survives
+  the redirect and onboarding wrongly "connected." `normalizeServerUrl` now defaults a bare **domain** to
+  `https://`, keeping `http://` only for LAN hosts (localhost, IP addresses, `*.local`).
+- **The logo didn't render in the packaged webOS app.** It used a hardcoded `src="/logo.png"`, which on webOS
+  resolves to `file:///logo.png` (filesystem root) and is blocked. Moved `logo.png` into `src/assets` and
+  imported it as a module so Vite emits a base-relative URL that travels correctly inside the `.ipk`.
+
 ## [0.10.15] - 2026-08-14
 
 ### Changed
