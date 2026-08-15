@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.15] - 2026-08-14
+
+### Changed
+
+- **Windows installer has a descriptive, versioned filename.** The release asset is now
+  `Airwave-<version>-windows-x64-Setup.exe` (e.g. `Airwave-0.10.15-windows-x64-Setup.exe`) instead of the generic
+  `Airwave-Setup.exe`, matching the macOS `Airwave-<version>-macos-arm64.dmg` naming so it clearly reads as the
+  Windows installer. The Windows release now ships **only** that installer (electrobun's self-extractor stub,
+  archive, and update.json are dropped from the artifacts).
+
 ## [0.10.14] - 2026-08-14
 
 Makes the packaged desktop TV player auto-point at its own server, instead of showing the "enter a server"

@@ -185,9 +185,11 @@ jobs:
           choco install innosetup -y --no-progress
           pnpm run build:win-installer
           mkdir -p artifacts
-          # Drop electrobun's stub + its archive; ship the Inno installer as the Windows artifact.
-          rm -f artifacts/Airwave-Setup.exe artifacts/Airwave-Setup.tar.zst artifacts/Airwave-Setup.zip artifacts/Airwave-Setup.metadata.json artifacts/update.json 2>/dev/null || true
-          cp build/inno/Airwave-Setup.exe artifacts/Airwave-Setup.exe
+          # Ship ONLY the Inno installer as the Windows artifact — drop everything electrobun dropped in artifacts/
+          # (its self-extractor stub, .tar.zst archive, update.json, etc.). The Inno exe is descriptively named
+          # (Airwave-<version>-windows-x64-Setup.exe) so the release asset reads clearly as the Windows installer.
+          rm -rf artifacts/* 2>/dev/null || true
+          cp build/inno/Airwave-*-windows-x64-Setup.exe artifacts/
           echo "Windows installer:"; ls -la artifacts/
 
       # Authenticate to Azure BEFORE the signing action. azure/artifact-signing-action is a composite action that

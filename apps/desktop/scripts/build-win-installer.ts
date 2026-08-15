@@ -77,7 +77,8 @@ const iscc =
     "C:\\Program Files\\Inno Setup 6\\ISCC.exe",
   ].find(existsSync) ?? "ISCC.exe";
 
-// 3. Compile installer/airwave.iss → build/inno/Airwave-Setup.exe.
+// 3. Compile installer/airwave.iss → build/inno/Airwave-<version>-windows-x64-Setup.exe (OutputBaseFilename).
+const outName = `Airwave-${version}-windows-x64-Setup.exe`;
 console.log(`[installer] compiling with ${iscc} (v${version}) …`);
 const r = spawnSync(
   iscc,
@@ -94,4 +95,4 @@ if (r.status !== 0) {
   console.error(`[installer] ISCC failed (exit ${r.status}).`);
   process.exit(r.status ?? 1);
 }
-console.log(`[installer] ✅ built ${join(outDir, "Airwave-Setup.exe")}`);
+console.log(`[installer] ✅ built ${join(outDir, outName)}`);
