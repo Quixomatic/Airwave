@@ -6,7 +6,24 @@
  */
 
 const KEY = "cg-tv-server-url";
-const BAKED = ((import.meta.env.VITE_SERVER_URL as string | undefined) || "").replace(/\/+$/, "");
+
+/**
+ * The "auto-point" server URL for the BROWSER-PLAYER persona (the Docker web player + the packaged desktop TV
+ * player) — the one that always talks to one fixed server instead of onboarding. Docker BAKES it via vite
+ * (`import.meta.env.VITE_SERVER_URL`); the packaged desktop app can't bake it (a fresh port every launch), so its
+ * supervisor INJECTS it into the served `index.html` at runtime (`window.__AIRWAVE_ENV__`, the same recipe the
+ * admin uses — see apps/desktop `serveDir()`). A real TV app (webOS) has neither → this is "" → it onboards to a
+ * user-chosen server. Injected value wins over the baked one, so one prebuilt bundle serves any launch's port.
+ */
+function autoPointServerUrl(): string {
+  if (typeof window !== "undefined") {
+    const injected = (window as { __AIRWAVE_ENV__?: Record<string, string> }).__AIRWAVE_ENV__?.VITE_SERVER_URL;
+    if (typeof injected === "string" && injected.trim()) return injected.trim();
+  }
+  return (import.meta.env.VITE_SERVER_URL as string | undefined) || "";
+}
+
+const BAKED = autoPointServerUrl().replace(/\/+$/, "");
 
 /** Coerce user input into a usable base URL (add http:// if missing, drop a trailing slash). */
 export function normalizeServerUrl(raw: string): string {

@@ -766,13 +766,15 @@ async function startStack(): Promise<void> {
     children.push(srv);
   }
 
-  // Admin + tv-web static SPAs. The admin's server URL is INJECTED at serve time (runtime-config recipe) so the
-  // prebuilt bundle talks to whatever port we resolved this launch — same dynamic, proxy-aware `adminServerUrl`
-  // dev bakes via vite, just delivered to the static build. tv-web resolves its server on its own → no inject.
+  // Admin + tv-web static SPAs. Both bake VITE_SERVER_URL at BUILD time in dev/Docker, but the packaged bundles
+  // ship WITHOUT it — so we INJECT it at serve time (window.__AIRWAVE_ENV__, the runtime-config recipe) so each
+  // prebuilt bundle talks to whatever port we resolved this launch. Admin → the localhost server (same-site
+  // cookies). tv-web → its browser-player server URL (LAN when exposed) so it AUTO-POINTS at this server instead
+  // of showing the "enter a server" onboarding (that screen is only for a real TV app running on another device).
   const admin = serveDir(ADMIN_DIST, config.ports.admin, { VITE_SERVER_URL: adminServerUrl });
   if (admin) servers.push(admin);
   if (config.tvwebEnabled) {
-    const tv = serveDir(TVWEB_DIST, config.ports.tvweb);
+    const tv = serveDir(TVWEB_DIST, config.ports.tvweb, { VITE_SERVER_URL: tvwebServerUrl });
     if (tv) servers.push(tv);
   }
 

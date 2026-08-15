@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.14] - 2026-08-14
+
+Makes the packaged desktop TV player auto-point at its own server, instead of showing the "enter a server"
+onboarding screen.
+
+### Fixed
+
+- **Packaged desktop TV player had no server URL.** tv-web has two personas: the *browser web player* (Docker
+  bakes `VITE_SERVER_URL` so it auto-points at one fixed server) and a *real TV app* (onboards to a user-typed
+  server). In the desktop app tv-web is the browser-player persona, but the supervisor served it **without** the
+  runtime server-URL injection the admin gets, and the CI build bakes no URL — so it had no server to talk to.
+  Now the supervisor injects `window.__AIRWAVE_ENV__` into tv-web too (mirroring the admin), and tv-web reads
+  that as its auto-point server (injected → baked → onboard). **Docker + webOS are unchanged** — only the desktop
+  supervisor ever injects that global, so both keep using their baked/onboarded URL exactly as before.
+
 ## [0.10.13] - 2026-08-14
 
 Fixes two crashes that white-screened the packaged desktop app's admin and TV player after onboarding.
