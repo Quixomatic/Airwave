@@ -1,9 +1,11 @@
 {
   "_comment": "Copy this to rokudeploy.json (gitignored) and fill in your Roku's Developer-Mode IP + dev password. roku-deploy zips the transpiled staging output and sideloads it. NOTE the explicit `files` — roku-deploy's DEFAULT files list does NOT include fonts/, so without this the bundled TTFs never reach the device and custom-font text renders blank.",
+  "_comment_delete": "deleteInstalledChannel:false makes a re-sideload REPLACE the dev channel in place instead of uninstalling it first — which PRESERVES the registry (server URL, token, caps-done) across builds, so you don't re-onboard/re-login every sideload. (A true uninstall via the Roku dev UI still clears it.)",
   "host": "192.168.1.xxx",
   "password": "YOUR_DEV_PASSWORD",
   "rootDir": "out/staging",
   "outDir": "out",
   "outFile": "airwave-tv-roku.zip",
+  "deleteInstalledChannel": false,
   "files": ["manifest", "source/**/*.*", "components/**/*.*", "images/**/*.*", "fonts/**/*.*", "locale/**/*.*"]
 }
