@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  ScanTask — LAN discovery, port of tv-web lib/server-scan.ts. Roku gives us the local IP directly
+  (roDeviceInfo.GetIPAddrs), so we skip the WebRTC hack: derive the /24 and sweep hosts 1-254 on
+  port 3000 for GET /api/health {ok:true}, in concurrent batches, reporting progress. Never throws.
+  Set control="RUN"; observe `progress` (0..1), `found` (array of base URLs), `finished`.
+-->
+<component name="ScanTask" extends="Task">
+    <interface>
+        <field id="progress" type="float" value="0" alwaysNotify="true" />
+        <field id="found" type="array" alwaysNotify="true" />
+        <field id="finished" type="boolean" value="false" alwaysNotify="true" />
+    </interface>
+</component>

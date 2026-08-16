@@ -45,11 +45,11 @@ namespace Theme
         return "pkg:/images/np/border-12.9.png"
     end function
 
-    ' Build a Font node at an exact px size.
-    function font(uri as string, size as integer) as object
-        f = CreateObject("roSGNode", "Font")
-        f.uri = uri
-        f.size = size
-        return f
-    end function
+    ' Apply a custom font by MUTATING the node's existing font object (jellyfin's pattern:
+    ' `label.font.uri` / `.font.size`). Assigning a new Font node or `<Font role="font">` in XML
+    ' renders BLANK on Roku for our TTFs — this is the working path.
+    sub setFont(node as object, uri as string, size as integer)
+        node.font.uri = uri
+        node.font.size = size
+    end sub
 end namespace

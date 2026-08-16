@@ -1,8 +1,9 @@
 {
-  "_comment": "Copy this to rokudeploy.json (gitignored) and fill in your Roku's Developer-Mode IP + dev password. roku-deploy zips the transpiled staging output and sideloads it.",
+  "_comment": "Copy this to rokudeploy.json (gitignored) and fill in your Roku's Developer-Mode IP + dev password. roku-deploy zips the transpiled staging output and sideloads it. NOTE the explicit `files` — roku-deploy's DEFAULT files list does NOT include fonts/, so without this the bundled TTFs never reach the device and custom-font text renders blank.",
   "host": "192.168.1.xxx",
   "password": "YOUR_DEV_PASSWORD",
   "rootDir": "out/staging",
   "outDir": "out",
-  "outFile": "airwave-tv-roku.zip"
+  "outFile": "airwave-tv-roku.zip",
+  "files": ["manifest", "source/**/*.*", "components/**/*.*", "images/**/*.*", "fonts/**/*.*", "locale/**/*.*"]
 }

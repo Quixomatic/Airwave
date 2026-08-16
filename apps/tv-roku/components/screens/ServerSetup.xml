@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!--
-  ServerSetup — first-launch onboarding. Port of tv-web features/setup/server-setup.tsx, styled to match:
-  #060a14 bg, 720px centered column, Inter type at tv-web's px sizes, 16px rounded input + Connect
-  (9-patch), accent focus rings. LAN scan (server-scan.ts) is Phase 2b.
+  ServerSetup — first-launch onboarding. Full port of tv-web features/setup/server-setup.tsx:
+  manual address entry (keyboard) OR LAN scan, an "OR" divider between them. Fonts are applied in
+  code (Theme.setFont / label.font.uri) — the working Roku path for custom TTFs. 720px centered column.
 -->
 <component name="ServerSetup" extends="Group">
     <interface>
@@ -12,36 +12,49 @@
     <children>
         <Rectangle id="bg" width="1920" height="1080" color="0x060A14FF" />
 
-        <Label id="title" text="Connect to your server" translation="[600,300]" width="720"
-            horizAlign="center" color="0xF1F5F9FF">
-            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="34" />
-        </Label>
-
-        <Label id="subtitle" translation="[600,356]" width="720" height="72" horizAlign="center" wrap="true"
+        <Label id="title" text="Connect to your server" translation="[600,196]" width="720"
+            horizAlign="center" color="0xF1F5F9FF" />
+        <Label id="subtitle" translation="[600,252]" width="720" height="72" horizAlign="center" wrap="true"
             color="0x94A3B8FF"
-            text="Enter the address of your Airwave server — a local IP like 192.168.1.50:3000, or a domain.">
-            <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="18" />
-        </Label>
+            text="Enter the address of your Airwave server — a local IP like 192.168.1.50:3000, or a domain." />
 
-        <RoundedButton id="addr" translation="[600,456]" w="720" h="74" radius="16"
-            fillColor="0x0B1120FF" textColor="0xF1F5F9FF"
-            focusFill="0x0B1120FF" focusInk="0xF1F5F9FF"
-            fontUri="pkg:/fonts/Inter-Regular.ttf" fontSize="24"
-            text="Press OK to enter the address" />
+        <RoundedButton id="addr" translation="[600,352]" w="720" h="74" radius="16"
+            fillColor="0x0B1120FF" textColor="0xF1F5F9FF" focusFill="0x0B1120FF" focusInk="0xF1F5F9FF"
+            fontUri="pkg:/fonts/Inter-Regular.ttf" fontSize="24" text="Press OK to enter the address" />
 
-        <RoundedButton id="connect" translation="[600,550]" w="720" h="72" radius="16"
-            fillColor="0x4A9FE0FF" textColor="0x04060CFF"
-            focusFill="0x66B0EAFF" focusInk="0x04060CFF"
+        <RoundedButton id="connect" translation="[600,446]" w="720" h="72" radius="16"
+            fillColor="0x4A9FE0FF" textColor="0x04060CFF" focusFill="0x66B0EAFF" focusInk="0x04060CFF"
             fontUri="pkg:/fonts/Inter-Bold.ttf" fontSize="20" text="Connect" />
 
-        <Label id="hint" text="Up / Down to move  ·  OK to select" translation="[600,640]" width="720"
-            horizAlign="center" color="0x64748BFF">
-            <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="14" />
-        </Label>
+        <Label id="hint" text="Up / Down to move  ·  OK to select" translation="[600,534]" width="720"
+            horizAlign="center" color="0x64748BFF" />
+        <Label id="status" text="" translation="[600,574]" width="720" height="36" horizAlign="center"
+            color="0xF87171FF" />
 
-        <Label id="status" text="" translation="[600,688]" width="720" height="40" horizAlign="center"
-            color="0xF87171FF">
-            <Font role="font" uri="pkg:/fonts/Inter-Medium.ttf" size="16" />
-        </Label>
+        <!-- OR divider -->
+        <Group id="orRow">
+            <Rectangle translation="[600,640]" width="322" height="1" color="0x94A3B829" />
+            <Label id="orLabel" text="OR" translation="[932,630]" width="56" horizAlign="center"
+                color="0x475569FF" />
+            <Rectangle translation="[998,640]" width="322" height="1" color="0x94A3B829" />
+        </Group>
+
+        <!-- Scan: idle button -->
+        <RoundedButton id="scanBtn" translation="[600,676]" w="720" h="64" radius="14" outlined="true"
+            fillColor="0x94A3B840" textColor="0xE6EAF1FF" focusFill="0x94A3B840" focusInk="0xF1F5F9FF"
+            fontUri="pkg:/fonts/Inter-SemiBold.ttf" fontSize="16" text="Scan for servers on my network" />
+
+        <!-- Scan: in-progress -->
+        <Group id="progressGroup" visible="false">
+            <Poster id="progTrack" translation="[600,686]" width="720" height="8"
+                uri="pkg:/images/np/fill-8.9.png" blendColor="0x94A3B82E" />
+            <Poster id="progFill" translation="[600,686]" width="0" height="8"
+                uri="pkg:/images/np/fill-8.9.png" blendColor="0x4A9FE0FF" />
+            <Label id="progLabel" text="Scanning your network…" translation="[600,706]" width="720"
+                horizAlign="center" color="0x94A3B8FF" />
+        </Group>
+
+        <!-- Scan: results (found buttons + rescan built in code) -->
+        <Group id="foundGroup" visible="false" />
     </children>
 </component>

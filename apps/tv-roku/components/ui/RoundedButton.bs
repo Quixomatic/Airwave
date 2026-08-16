@@ -32,16 +32,20 @@ sub render()
         end if
     end if
 
-    ' Focus ring — an accent outline just outside the button (tv-web's outline + offset).
+    ' Focus ring — an accent outline offset OUTSIDE the button with a visible gap (tv-web's
+    ' outline + outline-offset), so it reads as a ring, not just a bigger button.
+    gap = 9
     m.ring.visible = focused and not m.top.outlined
     m.ring.uri = Theme.npBorder(r)
-    m.ring.blendColor = m.top.focusFill
-    m.ring.width = w + 6
-    m.ring.height = h + 6
-    m.ring.translation = [-3, -3]
+    m.ring.blendColor = Theme.ACCENT   ' focus ring is always accent (tv-web's outline color)
+    m.ring.width = w + gap * 2
+    m.ring.height = h + gap * 2
+    m.ring.translation = [-gap, -gap]
 
     m.label.text = m.top.text
     m.label.width = w
     m.label.height = h
-    m.label.font = Theme.font(m.top.fontUri, m.top.fontSize)
+    ' jellyfin pattern: mutate the label's existing font object (uri+size), don't assign a new Font node.
+    m.label.font.uri = m.top.fontUri
+    m.label.font.size = m.top.fontSize
 end sub

@@ -3,6 +3,7 @@
 sub Main()
     print "[Airwave] booting Roku client"
 
+
     screen = CreateObject("roSGScreen")
     m.port = CreateObject("roMessagePort")
     screen.setMessagePort(m.port)

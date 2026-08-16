@@ -1,0 +1,79 @@
+sub init()
+    m.top.functionName = "scan"
+end sub
+
+sub scan()
+    prefix = localSubnet()
+    if prefix = invalid
+        m.top.progress = 1.0
+        m.top.found = []
+        m.top.finished = true
+        return
+    end if
+
+    total = 254
+    found = []
+    batchSize = 20
+    port = CreateObject("roMessagePort")
+
+    host = 1
+    while host <= total
+        idToUrl = {}
+        xfers = []
+        n = 0
+        while n < batchSize and host <= total
+            url = "http://" + prefix + "." + host.toStr() + ":3000"
+            xfer = CreateObject("roUrlTransfer")
+            xfer.setMessagePort(port)
+            xfer.setUrl(url + "/api/health")
+            idToUrl[xfer.getIdentity().toStr()] = url
+            xfers.push(xfer)
+            xfer.asyncGetToString()
+            host = host + 1
+            n = n + 1
+        end while
+
+        got = 0
+        while got < n
+            msg = wait(1500, port)
+            if msg = invalid then exit while   ' remaining hosts in this batch didn't answer
+            if type(msg) = "roUrlEvent"
+                got = got + 1
+                if msg.getResponseCode() = 200
+                    body = ParseJson(msg.getString())
+                    if body <> invalid and body.ok = true
+                        u = idToUrl[msg.getSourceIdentity().toStr()]
+                        if u <> invalid then found.push(u)
+                    end if
+                end if
+            end if
+        end while
+
+        for each x in xfers
+            x.asyncCancel()
+        end for
+
+        m.top.progress = (host - 1) / total
+        m.top.found = found
+    end while
+
+    m.top.progress = 1.0
+    m.top.found = found
+    m.top.finished = true
+end sub
+
+' The /24 prefix of the Roku's LAN IP (e.g. "192.168.1"), or invalid. Replaces tv-web's WebRTC trick.
+function localSubnet() as dynamic
+    di = CreateObject("roDeviceInfo")
+    addrs = di.GetIPAddrs()
+    if type(addrs) <> "roAssociativeArray" then return invalid
+    re = CreateObject("roRegex", "^(\d+\.\d+\.\d+)\.\d+$", "")
+    for each iface in addrs
+        ip = addrs[iface]
+        if ip <> invalid and ip <> "" and Left(ip, 4) <> "127." and Left(ip, 8) <> "169.254."
+            mm = re.match(ip)
+            if mm.count() > 1 then return mm[1]
+        end if
+    end for
+    return invalid
+end function

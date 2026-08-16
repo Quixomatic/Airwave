@@ -1,53 +1,104 @@
 import "pkg:/source/lib/serverUrl.bs"
 import "pkg:/source/lib/log.bs"
 import "pkg:/source/input/keys.bs"
+import "pkg:/source/theme.bs"
 
-' ServerSetup code-behind — port of tv-web features/setup/server-setup.tsx.
-' Two focusables: [0] address (opens the keyboard dialog), [1] Connect (validates /api/health).
+' ServerSetup — full port of tv-web features/setup/server-setup.tsx: manual entry OR LAN scan.
+' Focusables (dynamic): [address, Connect] + (idle:[Scan]) or (scanned:[found…, Scan again]).
 
 sub init()
     m.addr = m.top.findNode("addr")
     m.connect = m.top.findNode("connect")
     m.status = m.top.findNode("status")
+    m.scanBtn = m.top.findNode("scanBtn")
+    m.progressGroup = m.top.findNode("progressGroup")
+    m.progFill = m.top.findNode("progFill")
+    m.progLabel = m.top.findNode("progLabel")
+    m.foundGroup = m.top.findNode("foundGroup")
 
-    m.url = ""       ' what the user typed
-    m.target = ""    ' the normalized URL we're validating
+    ' Fonts via the mutation path (custom TTFs render blank via <Font role> / new Font node on Roku).
+    Theme.setFont(m.top.findNode("title"), Theme.FONT_BOLD, 34)
+    Theme.setFont(m.top.findNode("subtitle"), Theme.FONT_REG, 18)
+    Theme.setFont(m.top.findNode("hint"), Theme.FONT_REG, 14)
+    Theme.setFont(m.status, Theme.FONT_MED, 16)
+    Theme.setFont(m.top.findNode("orLabel"), Theme.FONT_SEMI, 13)
+    Theme.setFont(m.progLabel, Theme.FONT_REG, 15)
+
+    m.url = ""
+    m.target = ""
     m.sel = 0
+    m.scanState = "idle"   ' idle | scanning | scanned
+    m.foundButtons = []
+    m.rescanBtn = invalid
+    m.items = []
 
     m.http = CreateObject("roSGNode", "HttpTask")
     m.http.observeField("response", "onHttpResponse")
 
-    setSel(0)
+    rebuildItems()
     m.top.setFocus(true)
 end sub
 
+' ---- focus / nav --------------------------------------------------------------
+
+sub rebuildItems()
+    items = []
+    items.push({ node: m.addr, action: "kbd", url: "" })
+    items.push({ node: m.connect, action: "connect", url: "" })
+    if m.scanState = "idle"
+        items.push({ node: m.scanBtn, action: "scan", url: "" })
+    else if m.scanState = "scanned"
+        for each b in m.foundButtons
+            items.push({ node: b, action: "use", url: b.text })
+        end for
+        if m.rescanBtn <> invalid then items.push({ node: m.rescanBtn, action: "scan", url: "" })
+    end if
+    m.items = items
+    setSel(m.sel)
+end sub
+
 sub setSel(i as integer)
+    if i < 0 then i = 0
+    if i > m.items.count() - 1 then i = m.items.count() - 1
     m.sel = i
-    m.addr.focused = (i = 0)
-    m.connect.focused = (i = 1)
+    idx = 0
+    for each it in m.items
+        it.node.focused = (idx = i)
+        idx = idx + 1
+    end for
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
     if key = Keys.UP
-        setSel(0)
+        setSel(m.sel - 1)
         return true
     else if key = Keys.DOWN
-        setSel(1)
+        setSel(m.sel + 1)
         return true
     else if key = Keys.OK
-        if m.sel = 0
-            openKeyboard()
-        else
-            connect()
-        end if
+        dispatch()
         return true
     end if
-    ' Back on the first screen has nowhere to go — let it fall through (exits the app).
     return false
 end function
 
-' Text entry via StandardKeyboardDialog — following jellyfin config/SetServerScreen.bs.
+sub dispatch()
+    if m.sel < 0 or m.sel > m.items.count() - 1 then return
+    it = m.items[m.sel]
+    if it.action = "kbd"
+        openKeyboard()
+    else if it.action = "connect"
+        connect()
+    else if it.action = "scan"
+        startScan()
+    else if it.action = "use"
+        useServer(it.url)
+    end if
+end sub
+
+' ---- manual entry -------------------------------------------------------------
+
 sub openKeyboard()
     dlg = CreateObject("roSGNode", "StandardKeyboardDialog")
     dlg.title = "Enter your server's address"
@@ -66,7 +117,7 @@ sub onKbdButton()
     m.kbd.close = true
     m.kbd = invalid
     m.top.setFocus(true)
-    if idx = 0   ' Connect
+    if idx = 0
         m.url = text
         if m.url <> "" then m.addr.text = m.url
         connect()
@@ -95,16 +146,12 @@ end sub
 
 sub onHttpResponse()
     resp = m.http.response
-    if resp <> invalid then Log.info("health status=" + Str(resp.status))
     ok = false
     if resp <> invalid and resp.ok = true and resp.body <> invalid
         if resp.body.ok = true then ok = true
     end if
-
     if ok
-        ServerUrl.set(m.target)
-        Log.info("onboarded to " + m.target)
-        m.top.done = true
+        useServer(m.target)
     else
         m.status.color = "0xF87171FF"
         if resp <> invalid and resp.status = 0
@@ -113,4 +160,75 @@ sub onHttpResponse()
             m.status.text = "That address didn't look like an Airwave server."
         end if
     end if
+end sub
+
+sub useServer(url as string)
+    ServerUrl.set(url)
+    Log.info("onboarded to " + url)
+    m.top.done = true
+end sub
+
+' ---- LAN scan -----------------------------------------------------------------
+
+sub startScan()
+    m.scanState = "scanning"
+    m.scanBtn.visible = false
+    m.foundGroup.visible = false
+    m.progressGroup.visible = true
+    m.progFill.width = 0
+    m.progLabel.text = "Scanning your network…"
+    m.status.text = ""
+    if m.sel > 1 then m.sel = 1
+
+    m.scan = CreateObject("roSGNode", "ScanTask")
+    m.scan.observeField("progress", "onScanProgress")
+    m.scan.observeField("finished", "onScanFinished")
+    m.scan.control = "RUN"
+
+    rebuildItems()
+end sub
+
+sub onScanProgress()
+    p = m.scan.progress
+    m.progFill.width = 720 * p
+    m.progLabel.text = "Scanning your network… " + Str(Int(p * 100)).trim() + "%"
+end sub
+
+sub onScanFinished()
+    m.scanState = "scanned"
+    m.progressGroup.visible = false
+    buildFound(m.scan.found)
+    m.foundGroup.visible = true
+    rebuildItems()
+end sub
+
+sub buildFound(found as object)
+    fg = m.foundGroup
+    while fg.getChildCount() > 0
+        fg.removeChildIndex(0)
+    end while
+    m.foundButtons = []
+
+    y = 654
+    if found <> invalid and found.count() > 0
+        lbl = fg.createChild("Label")
+        lbl.setFields({ text: "Found on your network", translation: [600, y], width: 720, horizAlign: "center", color: "0x94A3B8FF" })
+        Theme.setFont(lbl, Theme.FONT_REG, 15)
+        y = y + 42
+        for each url in found
+            b = fg.createChild("RoundedButton")
+            b.setFields({ text: url, translation: [600, y], w: 720, h: 62, radius: 14, fillColor: "0x0B1120FF", textColor: "0xF1F5F9FF", focusFill: "0x66B0EAFF", focusInk: "0x04060CFF", fontUri: Theme.FONT_MONO, fontSize: 18 })
+            m.foundButtons.push(b)
+            y = y + 72
+        end for
+    else
+        lbl = fg.createChild("Label")
+        lbl.setFields({ text: "No servers found automatically — enter the address above.", translation: [600, y], width: 720, height: 40, horizAlign: "center", wrap: true, color: "0x94A3B8FF" })
+        Theme.setFont(lbl, Theme.FONT_REG, 15)
+        y = y + 56
+    end if
+
+    rb = fg.createChild("RoundedButton")
+    rb.setFields({ text: "Scan again", translation: [820, y], w: 280, h: 56, radius: 14, outlined: true, fillColor: "0x94A3B840", textColor: "0xE6EAF1FF", focusFill: "0x94A3B840", focusInk: "0xF1F5F9FF", fontUri: Theme.FONT_SEMI, fontSize: 16 })
+    m.rescanBtn = rb
 end sub

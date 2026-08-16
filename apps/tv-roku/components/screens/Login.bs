@@ -3,6 +3,7 @@ import "pkg:/source/lib/auth.bs"
 import "pkg:/source/lib/api.bs"
 import "pkg:/source/lib/log.bs"
 import "pkg:/source/input/keys.bs"
+import "pkg:/source/theme.bs"
 
 ' Login code-behind — port of tv-web features/auth/login.tsx (two device-code flows).
 
@@ -21,6 +22,15 @@ sub init()
     m.error = m.top.findNode("error")
     m.serverLabel = m.top.findNode("serverLabel")
     m.serverLabel.text = "Server: " + ServerUrl.get()
+
+    ' Fonts via the mutation path (custom TTFs render blank via <Font role> / new Font node on Roku).
+    Theme.setFont(m.top.findNode("title"), Theme.FONT_BOLD, 48)
+    Theme.setFont(m.top.findNode("subtitle"), Theme.FONT_REG, 18)
+    Theme.setFont(m.pHeading, Theme.FONT_SEMI, 26)
+    Theme.setFont(m.pInstruction, Theme.FONT_REG, 18)
+    Theme.setFont(m.pCode, Theme.FONT_MONO, 34)
+    Theme.setFont(m.error, Theme.FONT_REG, 18)
+    Theme.setFont(m.serverLabel, Theme.FONT_REG, 14)
 
     m.mode = "chooser"   ' "chooser" | "pending"
     m.sel = 0

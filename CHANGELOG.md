@@ -2,6 +2,33 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.21] - 2026-08-16
+
+Roku **on-device parity** — custom fonts now render on a real Roku Ultra, and ServerSetup gets the full
+LAN-scan section. Verified via on-device screenshots.
+
+### Fixed
+
+- **Bundled fonts weren't reaching the device (all custom-font text rendered blank).** `roku-deploy`'s default
+  `files` list excludes `fonts/`, so the Inter / JetBrains-Mono TTFs were dropped from the `.pkg` — `roFileSystem`
+  confirmed `pkg:/fonts/…` didn't exist on the box (system fonts worked, which masked it as an attach-method
+  problem). Added an explicit `files` list (incl. `fonts/**`) to the deploy config. Fonts are applied via the
+  mutation path (`label.font.uri` / `.font.size`, `Theme.setFont`).
+
+### Added
+
+- **ServerSetup LAN scan — full parity with tv-web.** The **OR** divider, the **"Scan for servers on my network"**
+  button, a **progress bar**, the **found-server list**, and **"Scan again"** — backed by a real `ScanTask` that
+  reads the LAN IP from `roDeviceInfo.GetIPAddrs()` and sweeps the `/24` for `/api/health {ok:true}` in concurrent
+  batches (no WebRTC hack needed). Dynamic D-pad nav over `[address, Connect, found…, Scan]`.
+- Login labels converted to the same font-mutation path (Inter + JetBrains Mono).
+
+### Changed
+
+- **Focus ring polish.** The `RoundedButton` focus ring is now offset with a real 9px gap (was 3px — it looked
+  like the button just grew) and is always the accent color (was tinted with the button's focus fill, so it was
+  invisible on the card-colored input). Matches tv-web's `outline` + `outline-offset`.
+
 ## [0.10.20] - 2026-08-16
 
 Roku **parity styling pass** — real border-radius, exact colors, Inter typography, and focus rings, so
