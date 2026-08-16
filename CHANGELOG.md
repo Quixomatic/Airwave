@@ -2,6 +2,37 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.25] - 2026-08-16
+
+Roku **Phase 4 — the capability diagnostic**, a parity port of tv-web/tv-native's onboarding that runs
+on Roku's authoritative decode API. Verified end-to-end on a real Ultra.
+
+### Added
+
+- **`apps/tv-roku` capability diagnostic.** After login (server + token, caps not yet run for this
+  server → Diagnostic; re-runs on a server switch) the Roku client runs the SAME ~49-test matrix as the
+  other clients: a centered 16:9 Video box plays each clip while the **authoritative Roku decode API**
+  decides the recorded verdict — `roDeviceInfo.CanDecodeVideo` / `CanDecodeAudio` for video + audio
+  codecs, `GetDisplayProperties` for HDR (a real answer the web/native clients can't give — they leave
+  `hdrOk` null), and `CanDecodeVideo` Level queries for the perf/bitrate ladder. Containers use actual
+  Video-node playback (does it demux) combined with the API so a supported container (e.g. MKV) is never
+  wrongly excluded on a playback hiccup. Every result → `POST /api/v1/caps/result` and the device facts
+  → `POST /api/v1/devices/report`, the **same shapes the server already stores**, so the per-device Plex
+  profile derives with zero server changes. (Ultra measured 47 native / 2 transcode — H.264 Hi10P +
+  MPEG-4, both honest.)
+- **Parity UI + animations.** "Setting up your TV" title, the per-test slide-in block (diagnostic +
+  centered chips), the progress bar with "N native · M transcode", and the done state — the accent
+  check disc springs in (`outBack`) and the Continue button rises in after a 0.2s delay. New
+  `source/lib/device.bs` (caps engine + the matrix→CanDecodeVideo codec/profile/level mapping, cribbed
+  from jellyfin-roku's `deviceCapabilities.bs`), `components/screens/Diagnostic.{xml,bs}`, and a
+  generated `images/circle.png`.
+
+### Notes
+
+- The clips PLAY for parity + honest confirmation, but the verdict is the authoritative decode API
+  (jellyfin-roku's approach) — so the clip-playing could be dropped entirely later; kept for now for
+  exact parity with tv-web/tv-native.
+
 ## [0.10.24] - 2026-08-16
 
 Roku login now works end-to-end on a new promise-based API client, plus a reliable LAN scan and a

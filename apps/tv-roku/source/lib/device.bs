@@ -1,0 +1,233 @@
+import "pkg:/source/lib/registry.bs"
+import "pkg:/source/lib/serverUrl.bs"
+import "pkg:/source/lib/api.bs"
+
+' Device — the capability engine (port of tv-web/tv-native lib/device.ts, Roku-native).
+'
+' Unlike the web/mpv clients (which must PLAY a clip to learn what decodes, because canPlayType lies),
+' Roku exposes an AUTHORITATIVE decode API: roDeviceInfo.CanDecodeVideo / CanDecodeAudio and
+' GetDisplayProperties (HDR). So the diagnostic's VERDICT comes from these queries; the Diagnostic
+' screen still plays every clip for parity + confirmation (see components/screens/Diagnostic.bs). Codec
+' vocabulary + the av1-alone / AC3-on-5.1 gotchas cribbed from jellyfin-roku utils/deviceCapabilities.bs.
+namespace Device
+
+    ' Stable per-device id (registry), minted once. The server keys DeviceCapability by this.
+    function id() as string
+        v = Registry.read(RegKey.DEVICE_ID)
+        if v <> "" then return v
+        ' dev-<random>-<uptime> — no Date.now on Roku; roDeviceInfo channel-client-id is stable + unique.
+        cid = CreateObject("roDeviceInfo").GetChannelClientId()
+        v = "roku-" + Left(cid, 12)
+        Registry.write(RegKey.DEVICE_ID, v)
+        return v
+    end function
+
+    ' The diagnostic re-runs per server (a different server has no profile for this device). Store the
+    ' server URL the caps last ran against; done === it matches the current one.
+    function capsDoneForServer() as boolean
+        return Registry.read(RegKey.CAPS_DONE) = ServerUrl.get()
+    end function
+
+    sub markCapsDone()
+        Registry.write(RegKey.CAPS_DONE, ServerUrl.get())
+    end sub
+
+    ' ---- authoritative decode queries -------------------------------------------
+
+    ' CanDecodeVideo — pass invalid to omit a param. ⚠️ av1 must be queried WITHOUT a Container (jellyfin:
+    ' "codec must be checked by itself or the result will always be false").
+    function canDecodeVideo(codec as string, profile = invalid as dynamic, level = invalid as dynamic, container = invalid as dynamic) as boolean
+        q = { Codec: codec }
+        if profile <> invalid then q.Profile = profile
+        if level <> invalid then q.Level = level
+        if container <> invalid and codec <> "av1" then q.Container = container
+        r = CreateObject("roDeviceInfo").CanDecodeVideo(q)
+        return (r <> invalid and r.Result = true)
+    end function
+
+    function canDecodeAudio(codec as string, container = invalid as dynamic, chCnt = invalid as dynamic) as boolean
+        di = CreateObject("roDeviceInfo")
+        q = { Codec: codec }
+        if container <> invalid then q.Container = container
+        if chCnt <> invalid then q.ChCnt = chCnt
+        r = di.CanDecodeAudio(q)
+        ok = (r <> invalid and r.Result = true)
+        ' jellyfin workaround: with 5.1 output enabled some boxes false-negative AC3 → assume supported.
+        if not ok and codec = "ac3" and container <> "mp4" and di.GetAudioOutputChannel() = "5.1 surround" then ok = true
+        return ok
+    end function
+
+    ' GetDisplayProperties HDR flags → { hdr10, hdr10plus, hlg, dolbyvision }.
+    function hdr() as object
+        dp = CreateObject("roDeviceInfo").GetDisplayProperties()
+        return {
+            hdr10: (dp <> invalid and dp.Hdr10 = true),
+            hdr10plus: (dp <> invalid and dp.Hdr10Plus = true),
+            hlg: (dp <> invalid and dp.HLG = true),
+            dolbyvision: (dp <> invalid and dp.DolbyVision = true)
+        }
+    end function
+
+    ' ---- matrix mapping (a CapTest recipe key → a Roku query) --------------------
+
+    ' Map the matrix `video` recipe key + `container` to a CanDecodeVideo verdict.
+    function videoVerdict(videoKey as string, containerKey as string) as boolean
+        c = Device.rokuContainer(containerKey)
+        if videoKey = "h264" then return Device.canDecodeVideo("h264", invalid, invalid, c)
+        if videoKey = "h264_10" then return Device.canDecodeVideo("h264", "high 10", invalid, c)  ' Hi10P — HW usually rejects
+        if videoKey = "hevc" then return Device.canDecodeVideo("hevc", "main", invalid, c)
+        if videoKey = "hevc_10" then return Device.canDecodeVideo("hevc", "main 10", invalid, c)
+        if videoKey = "av1" then return Device.canDecodeVideo("av1")   ' MUST be alone (no container)
+        if videoKey = "vp9" then return Device.canDecodeVideo("vp9", invalid, invalid, c)
+        if videoKey = "mpeg2" then return Device.canDecodeVideo("mpeg2", invalid, "main", c)
+        if videoKey = "mpeg4" then return Device.canDecodeVideo("mpeg4part2", invalid, invalid, c)  ' DivX — usually unsupported
+        return false
+    end function
+
+    ' Map the matrix `audio` recipe key + container to a CanDecodeAudio verdict.
+    function audioVerdict(audioKey as string, containerKey as string) as boolean
+        c = Device.rokuContainer(containerKey)
+        codec = Device.rokuAudioCodec(audioKey)
+        if codec = "" then return false
+        return Device.canDecodeAudio(codec, c)
+    end function
+
+    ' Map the matrix HDR `feature` to a GetDisplayProperties verdict.
+    function hdrVerdict(feature as string) as boolean
+        h = Device.hdr()
+        if feature = "hdr10" then return h.hdr10
+        if feature = "hdr10plus" then return h.hdr10plus
+        if feature = "hlg" then return h.hlg
+        if Left(feature, 12) = "dolbyvision_" then return h.dolbyvision
+        return false
+    end function
+
+    ' Map a perf `feature` (res@fps) to an HEVC Level query — the authoritative "can this box do 4K60?".
+    function perfVerdict(feature as string) as boolean
+        level = "5.1"
+        if Left(feature, 7) = "1080p60" then level = "4.1"
+        if Left(feature, 4) = "4k30" then level = "5.0"
+        if Left(feature, 4) = "4k60" then level = "5.1"
+        if Left(feature, 4) = "8k60" then level = "6.1"   ' no current Roku does 8K → honest false
+        if Left(feature, 8) = "1080p120" then level = "4.2"
+        return Device.canDecodeVideo("hevc", "main", level)
+    end function
+
+    function rokuContainer(containerKey as string) as dynamic
+        if containerKey = "mp4" or containerKey = "mov" then return "mp4"
+        if containerKey = "mkv" or containerKey = "webm" then return "mkv"
+        if containerKey = "ts" then return "ts"
+        return invalid   ' avi / flv — not a Roku container; codec verdict omits container, playback tells the truth
+    end function
+
+    function rokuAudioCodec(audioKey as string) as string
+        if audioKey = "aac" then return "aac"
+        if audioKey = "ac3" then return "ac3"
+        if audioKey = "eac3" or audioKey = "eac3-atmos" then return "eac3"
+        if audioKey = "dts" or audioKey = "dts-hd-ma" then return "dts"
+        if audioKey = "truehd" or audioKey = "truehd-atmos" then return "truehd"
+        if audioKey = "flac" then return "flac"
+        if audioKey = "alac" then return "alac"
+        if audioKey = "opus" then return "opus"
+        if audioKey = "pcm" then return "pcm"
+        if audioKey = "mp3" then return "mp3"
+        if audioKey = "vorbis" then return "vorbis"
+        return ""
+    end function
+
+    ' ---- device report (POST /devices/report) -----------------------------------
+
+    ' Panel/model/codec facts, same shape tv-web sends (deviceId, platform, model, osVersion, hdr,
+    ' colorGamut, screenWidth/Height, capabilities, raw). Built case-sensitively (it's POSTed as JSON).
+    function report() as object
+        di = CreateObject("roDeviceInfo")
+        os = di.GetOSVersion()
+        osVer = ""
+        if os <> invalid then osVer = Device.asStr(os.major) + "." + Device.asStr(os.minor) + "." + Device.asStr(os.revision)
+        mode = di.GetVideoMode()
+        dims = Device.modeDims(mode)
+        h = Device.hdr()
+        anyHdr = (h.hdr10 or h.hdr10plus or h.hlg or h.dolbyvision)
+
+        ' ⚠️ Case-sensitive AA + BRACKET keys (dot-assignment can still fold identifiers to lowercase;
+        ' the server reads top-level deviceId/screenWidth/osVersion/colorGamut by exact case).
+        caps = Api.obj()
+        caps["video"] = Device.probeVideo()
+        caps["audio"] = Device.probeAudio()
+        caps["containers"] = Device.probeContainers()
+        caps["hdr"] = Device.hdrObj(h)
+
+        raw = Api.obj()
+        raw["model"] = di.GetModel()
+        raw["modelDisplayName"] = di.GetModelDisplayName()
+        raw["modelType"] = di.GetModelType()
+        raw["videoMode"] = mode
+        raw["audioOutputChannel"] = di.GetAudioOutputChannel()
+        raw["osVersion"] = osVer
+
+        r = Api.obj()
+        r["deviceId"] = Device.id()
+        r["platform"] = "roku"
+        r["model"] = di.GetModelDisplayName()
+        r["osVersion"] = osVer
+        r["screenWidth"] = dims.w
+        r["screenHeight"] = dims.h
+        r["hdr"] = anyHdr
+        r["colorGamut"] = anyHdr ? "rec2020" : "srgb"
+        r["capabilities"] = caps
+        r["raw"] = raw
+        return r
+    end function
+
+    function probeVideo() as object
+        o = Api.obj()
+        o.h264 = Device.canDecodeVideo("h264")
+        o.hevc = Device.canDecodeVideo("hevc")
+        o.hevc_main10 = Device.canDecodeVideo("hevc", "main 10")
+        o.av1 = Device.canDecodeVideo("av1")
+        o.vp9 = Device.canDecodeVideo("vp9")
+        o.mpeg2 = Device.canDecodeVideo("mpeg2", invalid, "main")
+        return o
+    end function
+
+    function probeAudio() as object
+        o = Api.obj()
+        for each c in ["aac", "ac3", "eac3", "dts", "truehd", "flac", "alac", "opus", "pcm", "mp3", "vorbis"]
+            o[c] = Device.canDecodeAudio(c)
+        end for
+        return o
+    end function
+
+    function probeContainers() as object
+        o = Api.obj()
+        for each c in ["mp4", "mkv", "ts", "hls", "dash"]
+            ' a container "supports" video if the baseline h264 decodes in it
+            o[c] = Device.canDecodeVideo("h264", invalid, invalid, c)
+        end for
+        return o
+    end function
+
+    function hdrObj(h as object) as object
+        o = Api.obj()
+        o.hdr10 = h.hdr10
+        o.hdr10plus = h.hdr10plus
+        o.hlg = h.hlg
+        o.dolbyvision = h.dolbyvision
+        return o
+    end function
+
+    ' "2160p"/"1080p"/"720p"/"480p" → {w,h}.
+    function modeDims(mode as string) as object
+        if Instr(1, mode, "2160") > 0 then return { w: 3840, h: 2160 }
+        if Instr(1, mode, "1080") > 0 then return { w: 1920, h: 1080 }
+        if Instr(1, mode, "720") > 0 then return { w: 1280, h: 720 }
+        if Instr(1, mode, "480") > 0 then return { w: 720, h: 480 }
+        return { w: 1920, h: 1080 }
+    end function
+
+    function asStr(v as dynamic) as string
+        if v = invalid then return "0"
+        if type(v) = "String" or type(v) = "roString" then return v
+        return v.toStr()
+    end function
+end namespace

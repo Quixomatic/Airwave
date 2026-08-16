@@ -261,10 +261,10 @@ namespace Api
         return Api.post("/api/v1/caps/result", Api.jsonBody(pairs))
     end function
 
-    ' The device report is a caps payload with string-array fields (videoCodecs, audioCodecs,
-    ' directContainers) — flat pairs whose values are arrays serialise correctly.
-    function reportDevice(pairs as object) as object
-        return Api.post("/api/v1/devices/report", Api.jsonBody(pairs))
+    ' The device report has nested objects (capabilities, raw), so the caller passes a pre-built
+    ' CASE-SENSITIVE AA (Device.report(), built with Api.obj()) which we serialise directly.
+    function reportDevice(reportObj as object) as object
+        return Api.post("/api/v1/devices/report", FormatJson(reportObj))
     end function
 
     function deviceCaps(deviceId as string) as object

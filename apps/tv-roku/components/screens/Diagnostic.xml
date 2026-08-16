@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  Diagnostic — the capability onboarding, a parity port of tv-web/tv-native features/diagnostic.
+  A centered 16:9 Video "screen" plays each matrix clip while the authoritative Roku decode API
+  (roDeviceInfo.CanDecodeVideo/CanDecodeAudio/GetDisplayProperties — see source/lib/device.bs) records
+  the verdict. Title + a per-test slide-in block (diagnostic + chips) + progress bar + "N native ·
+  M transcode" + a Continue button, exactly like the other clients. Fonts applied in code.
+-->
+<component name="Diagnostic" extends="Group">
+    <interface>
+        <field id="done" type="boolean" alwaysNotify="true" />
+    </interface>
+
+    <children>
+        <Rectangle id="bg" width="1920" height="1080" color="0x060A14FF" />
+
+        <!-- The clip under test — a centered framed 16:9 "screen" (720x405). enableUI off (no trickbar). -->
+        <Video id="clip" translation="[600,140]" width="720" height="405" enableUI="false"
+            disableScreenSaver="true" />
+        <!-- Rounded frame drawn over the video's square corners (approximates overflow:hidden radius). -->
+        <Poster id="clipFrame" translation="[600,140]" width="720" height="405"
+            uri="pkg:/images/np/border-16.9.png" blendColor="0x94A3B829" />
+
+        <!-- Done: accent check disc centered in the box (hidden until the run finishes). Springs in
+             (scale 0.6→1 + fade) via outBack, matching tv-web's spring / tv-native's ZoomIn. -->
+        <Group id="doneMark" translation="[912,292]" scaleRotateCenter="[48,48]" opacity="0" visible="false">
+            <Poster id="doneDisc" width="96" height="96" uri="pkg:/images/circle.png" blendColor="0x4A9FE0FF" />
+            <Label id="doneCheck" text="✓" translation="[0,4]" width="96" height="96" horizAlign="center"
+                vertAlign="center" color="0x04060CFF" />
+            <Animation id="doneAnim" duration="0.42" easeFunction="outBack">
+                <Vector2DFieldInterpolator key="[0.0,1.0]" keyValue="[[0.6,0.6],[1.0,1.0]]"
+                    fieldToInterp="doneMark.scale" />
+                <FloatFieldInterpolator key="[0.0,1.0]" keyValue="[0.0,1.0]" fieldToInterp="doneMark.opacity" />
+            </Animation>
+        </Group>
+
+        <!-- Title -->
+        <Label id="title" text="Setting up your TV" translation="[510,585]" width="900" horizAlign="center"
+            color="0xF1F5F9FF" />
+        <Label id="subtitle" translation="[510,636]" width="900" horizAlign="center" wrap="true" height="40"
+            color="0x94A3B8FF" text="Checking exactly what your TV can play — just a moment." />
+
+        <!-- The thing being tested — animated slide-in per test (diagnostic label + chips, both centered). -->
+        <Group id="testGroup" translation="[600,690]">
+            <Label id="diag" text="" width="720" horizAlign="center" color="0xF1F5F9FF" />
+            <LayoutGroup id="chips" translation="[360,40]" layoutDirection="horiz" itemSpacings="[8]"
+                horizAlignment="center" vertAlignment="center" />
+            <Animation id="testAnim" duration="0.26" easeFunction="outExpo">
+                <FloatFieldInterpolator id="testFade" key="[0.0,1.0]" keyValue="[0.0,1.0]"
+                    fieldToInterp="testGroup.opacity" />
+                <Vector2DFieldInterpolator id="testSlide" key="[0.0,1.0]"
+                    keyValue="[[656,690],[600,690]]" fieldToInterp="testGroup.translation" />
+            </Animation>
+        </Group>
+
+        <!-- Progress -->
+        <Poster id="progTrack" translation="[600,786]" width="720" height="8"
+            uri="pkg:/images/np/fill-8.9.png" blendColor="0x94A3B82E" />
+        <Poster id="progFill" translation="[600,786]" width="0" height="8"
+            uri="pkg:/images/np/fill-8.9.png" blendColor="0x4A9FE0FF" />
+        <Label id="countLeft" text="Preparing…" translation="[600,802]" width="360" horizAlign="left"
+            color="0x94A3B8FF" />
+        <Label id="countRight" text="" translation="[960,802]" width="360" horizAlign="right"
+            color="0x94A3B8FF" />
+
+        <!-- Continue (only when done). Rises + fades in after a 0.2s delay (matches tv-web y:12→0 /
+             tv-native FadeIn.delay(150)). -->
+        <RoundedButton id="continueBtn" translation="[810,858]" w="300" h="64" radius="14" visible="false"
+            opacity="0" fillColor="0x4A9FE0FF" textColor="0x04060CFF" focusFill="0x66B0EAFF" focusInk="0x04060CFF"
+            fontUri="pkg:/fonts/Inter-Bold.ttf" fontSize="20" text="Continue" />
+        <Animation id="continueAnim" duration="0.3" easeFunction="outQuad">
+            <FloatFieldInterpolator key="[0.0,1.0]" keyValue="[0.0,1.0]" fieldToInterp="continueBtn.opacity" />
+            <Vector2DFieldInterpolator key="[0.0,1.0]" keyValue="[[810,858],[810,846]]"
+                fieldToInterp="continueBtn.translation" />
+        </Animation>
+        <!-- 0.2s delay before the Continue button animates in. -->
+        <Timer id="continueDelay" duration="0.2" repeat="false" />
+
+        <!-- 1 frame after chips are (re)built → measure their real width + center the row. -->
+        <Timer id="chipTimer" duration="0.02" repeat="false" />
+
+        <!-- Shows the clip briefly (renders + settles) before we record. -->
+        <Timer id="settle" duration="1.8" repeat="false" />
+        <!-- Hard cap per clip so a stuck/failed load can't hang the run. -->
+        <Timer id="hardCap" duration="6" repeat="false" />
+    </children>
+</component>

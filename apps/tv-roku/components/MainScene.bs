@@ -3,9 +3,11 @@ import "pkg:/source/lib/auth.bs"
 import "pkg:/source/lib/log.bs"
 import "pkg:/source/lib/api.bs"
 import "pkg:/source/lib/dev.bs"
+import "pkg:/source/lib/device.bs"
 
 ' MainScene — app host + entry gate (port of tv-native app/index.tsx routing).
-' no server -> ServerSetup; no token -> Login (Phase 3 placeholder); else -> Guide (Phase 6 placeholder).
+' no server -> ServerSetup; no token -> Login; caps not done for this server -> Diagnostic;
+' else -> Guide (Phase 6 placeholder).
 
 sub init()
     Log.info("MainScene init")
@@ -36,9 +38,24 @@ sub route()
         showServerSetup()
     else if not Auth.hasToken()
         showLogin()
+    else if not Device.capsDoneForServer()
+        showDiagnostic()
     else
         showPlaceholder("Signed in", "The guide is coming in Phase 6.")
     end if
+end sub
+
+sub showDiagnostic()
+    s = CreateObject("roSGNode", "Diagnostic")
+    m.top.appendChild(s)
+    s.observeField("done", "onDiagnosticDone")
+    s.setFocus(true)
+    m.screen = s
+end sub
+
+sub onDiagnosticDone()
+    Log.info("diagnostic done -> re-routing")
+    route()
 end sub
 
 sub showServerSetup()
