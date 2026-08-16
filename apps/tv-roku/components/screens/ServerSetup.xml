@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  ServerSetup — first-launch onboarding. Port of tv-web features/setup/server-setup.tsx.
+  Enter the Airwave server address (StandardKeyboardDialog), validate against /api/health, store it,
+  and signal `done` so the host re-routes. LAN scan (server-scan.ts) is Phase 2b, not here yet.
+  Fires `done=true` on a successful connection.
+-->
+<component name="ServerSetup" extends="Group">
+    <interface>
+        <field id="done" type="boolean" alwaysNotify="true" />
+    </interface>
+
+    <children>
+        <Rectangle id="bg" width="1920" height="1080" color="0x060A14FF" />
+
+        <Label id="title" text="Connect to your server" translation="[510,300]" width="900"
+            horizAlign="center" color="0xF1F5F9FF" font="font:LargeBoldSystemFont" />
+
+        <Label id="subtitle"
+            text="Enter the address of your Airwave server — a local IP like 192.168.1.50:3000, or a domain."
+            translation="[510,372]" width="900" height="80" horizAlign="center" wrap="true"
+            color="0x94A3B8FF" font="font:MediumSystemFont" />
+
+        <Rectangle id="addressBox" translation="[510,480]" width="900" height="96" color="0x0B1120FF">
+            <Label id="addressLabel" translation="[30,0]" width="840" height="96" vertAlign="center"
+                horizAlign="center" color="0xF1F5F9FF" font="font:MediumBoldSystemFont"
+                text="Press OK to enter the address" />
+        </Rectangle>
+
+        <Rectangle id="connectBox" translation="[510,600]" width="900" height="88" color="0x2E6FA0FF">
+            <Label id="connectLabel" width="900" height="88" vertAlign="center" horizAlign="center"
+                color="0xEAF2FBFF" font="font:MediumBoldSystemFont" text="Connect" />
+        </Rectangle>
+
+        <Label id="status" translation="[510,712]" width="900" height="40" horizAlign="center"
+            color="0xF87171FF" font="font:MediumSystemFont" text="" />
+
+        <Label id="hint" translation="[510,762]" width="900" horizAlign="center"
+            color="0x64748BFF" font="font:SmallSystemFont"
+            text="Up / Down to move  ·  OK to select" />
+    </children>
+</component>

@@ -1,0 +1,34 @@
+' Registry — the Roku equivalent of localStorage (persists across launches).
+' Direct analog of tv-web/tv-native storage; crib jellyfin source/utils/config.bs.
+namespace Registry
+    const SECTION = "airwave"
+
+    function read(key as string) as string
+        sec = CreateObject("roRegistrySection", SECTION)
+        if sec.exists(key) then return sec.read(key)
+        return ""
+    end function
+
+    sub write(key as string, value as string)
+        sec = CreateObject("roRegistrySection", SECTION)
+        sec.write(key, value)
+        sec.flush()
+    end sub
+
+    sub delete(key as string)
+        sec = CreateObject("roRegistrySection", SECTION)
+        if sec.exists(key) then sec.delete(key)
+        sec.flush()
+    end sub
+end namespace
+
+' Registry keys — mirror the tv-web/tv-native storage keys exactly (parity).
+namespace RegKey
+    const SERVER_URL = "cg-tv-server-url"
+    const TOKEN = "cg-tv-token"
+    const DEVICE_ID = "cg-device-id"
+    const CAPS_DONE = "cg-caps-done"
+    const RESUME = "cg-tv-resume"
+    const NETWORK = "cg-tv-network"
+    const NETWORK_OVERRIDE = "cg-tv-network-override"
+end namespace

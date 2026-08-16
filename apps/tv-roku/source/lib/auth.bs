@@ -1,0 +1,20 @@
+import "pkg:/source/lib/registry.bs"
+
+' Auth token storage — bearer token in the registry (tv-web lib/auth-client.ts analog).
+namespace Auth
+    function token() as string
+        return Registry.read(RegKey.TOKEN)
+    end function
+
+    sub setToken(t as string)
+        if t = ""
+            Registry.delete(RegKey.TOKEN)
+        else
+            Registry.write(RegKey.TOKEN, t)
+        end if
+    end sub
+
+    function hasToken() as boolean
+        return token() <> ""
+    end function
+end namespace

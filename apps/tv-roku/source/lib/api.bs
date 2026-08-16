@@ -1,0 +1,49 @@
+import "pkg:/source/lib/serverUrl.bs"
+import "pkg:/source/lib/auth.bs"
+
+' REST helpers — the URL/header builders for the Airwave /api/v1 surface (tv-web lib/api.ts analog).
+' Async I/O itself runs in the HttpTask node (components/tasks/HttpTask); this namespace just builds
+' requests + reads the stored server URL/token. Adopt roku-requests/roku-promise later if desired.
+namespace Api
+
+    ' URL-encode a single value via a throwaway roUrlTransfer (no global escape() exists on Roku).
+    function escape(s as string) as string
+        return CreateObject("roUrlTransfer").escape(s)
+    end function
+
+    function asStr(v as dynamic) as string
+        if v = invalid then return ""
+        if type(v) = "String" or type(v) = "roString" then return v
+        return v.toStr()
+    end function
+
+    ' Full URL from the stored server base + path (+ optional query assoc; invalid values are dropped).
+    function url(path as string, query = invalid as object) as string
+        full = ServerUrl.get() + path
+        if query <> invalid
+            qs = ""
+            for each k in query
+                v = query[k]
+                if v <> invalid
+                    if qs <> "" then qs = qs + "&"
+                    qs = qs + k + "=" + escape(asStr(v))
+                end if
+            end for
+            if qs <> "" then full = full + "?" + qs
+        end if
+        return full
+    end function
+
+    ' Public artwork proxy (no bearer needed — that's why the proxy exists).
+    function imageUrl(channelId as string, path as string, w as integer) as string
+        return ServerUrl.get() + "/img/" + channelId + "?path=" + escape(path) + "&w=" + w.toStr()
+    end function
+
+    ' Standard headers incl. bearer when signed in.
+    function headers() as object
+        h = { "Content-Type": "application/json" }
+        t = Auth.token()
+        if t <> "" then h["Authorization"] = "Bearer " + t
+        return h
+    end function
+end namespace

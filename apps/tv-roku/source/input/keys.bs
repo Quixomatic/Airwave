@@ -1,0 +1,21 @@
+' Key names — Roku's onKeyEvent already delivers clean lowercase names (plus "OK"/"back").
+' Centralized here so screens compare against Keys.* instead of magic strings — the seed of the
+' input layer manager (full LAYER/mode/semaphore stack lands in Phase 6/9 when overlapping layers
+' — guide/player/surf/modal — actually exercise it; see .plans/roku.md Phase 1).
+'
+' NOTE: standard Roku remotes have NO number pad and NO channel +/- keys, unlike LG/Apple remotes.
+' Number entry + CH+/- (tv-web/tv-native features) may map to on-screen affordances instead — decide
+' in Phase 9. The media keys below exist on most Roku remotes (rewind/ff/replay/play/options).
+namespace Keys
+    const UP = "up"
+    const DOWN = "down"
+    const LEFT = "left"
+    const RIGHT = "right"
+    const OK = "OK"
+    const BACK = "back"
+    const PLAY = "play"
+    const REWIND = "rewind"
+    const FORWARD = "fastforward"
+    const REPLAY = "instantreplay"
+    const OPTIONS = "options"
+end namespace

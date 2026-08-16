@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  HttpTask — generic async HTTP on a Task thread (roUrlTransfer), so the UI never blocks.
+  Caller: set `request` = { method, url, headers, body, timeout }, then control = "RUN",
+  and observeField("response"). `response` = { ok, status, body (parsed JSON | invalid), raw, error }.
+  Crib: jellyfin source/api/baserequest.bs. Adopt roku-requests later if we want a nicer client.
+-->
+<component name="HttpTask" extends="Task">
+    <interface>
+        <field id="request" type="assocarray" />
+        <field id="response" type="assocarray" alwaysNotify="true" />
+    </interface>
+</component>

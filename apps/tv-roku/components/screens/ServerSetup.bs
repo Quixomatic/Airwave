@@ -1,0 +1,130 @@
+import "pkg:/source/lib/serverUrl.bs"
+import "pkg:/source/lib/log.bs"
+import "pkg:/source/input/keys.bs"
+
+' ServerSetup code-behind — port of tv-web features/setup/server-setup.tsx.
+' Two focusables: [0] address (opens the keyboard dialog), [1] Connect (validates /api/health).
+
+sub init()
+    m.addressBox = m.top.findNode("addressBox")
+    m.addressLabel = m.top.findNode("addressLabel")
+    m.connectBox = m.top.findNode("connectBox")
+    m.connectLabel = m.top.findNode("connectLabel")
+    m.status = m.top.findNode("status")
+
+    m.url = ""       ' what the user typed
+    m.target = ""    ' the normalized URL we're validating
+    m.sel = 0
+
+    m.http = CreateObject("roSGNode", "HttpTask")
+    m.http.observeField("response", "onHttpResponse")
+
+    setSel(0)
+    m.top.setFocus(true)
+end sub
+
+sub setSel(i as integer)
+    m.sel = i
+    if i = 0
+        m.addressBox.color = "0x4A9FE0FF"
+        m.addressLabel.color = "0x04060CFF"
+        m.connectBox.color = "0x2E6FA0FF"
+        m.connectLabel.color = "0xEAF2FBFF"
+    else
+        m.addressBox.color = "0x0B1120FF"
+        m.addressLabel.color = "0xF1F5F9FF"
+        m.connectBox.color = "0x4A9FE0FF"
+        m.connectLabel.color = "0x04060CFF"
+    end if
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+    Log.info("key " + key)
+    if key = Keys.UP
+        setSel(0)
+        return true
+    else if key = Keys.DOWN
+        setSel(1)
+        return true
+    else if key = Keys.OK
+        if m.sel = 0
+            openKeyboard()
+        else
+            connect()
+        end if
+        return true
+    end if
+    ' Back on the first screen has nowhere to go — let it fall through (exits the app).
+    return false
+end function
+
+sub openKeyboard()
+    dlg = CreateObject("roSGNode", "StandardKeyboardDialog")
+    dlg.title = "Server address"
+    if m.url <> "" then dlg.text = m.url
+    dlg.buttons = ["Connect", "Cancel"]
+    m.kbd = dlg
+    dlg.observeField("buttonSelected", "onKbdButton")
+    m.top.getScene().dialog = dlg
+end sub
+
+sub onKbdButton()
+    if m.kbd = invalid then return
+    idx = m.kbd.buttonSelected
+    if idx = 0
+        m.url = m.kbd.text
+        if m.url <> "" then m.addressLabel.text = m.url
+        closeKeyboard()
+        connect()
+    else
+        closeKeyboard()
+    end if
+end sub
+
+sub closeKeyboard()
+    m.top.getScene().dialog = invalid
+    m.kbd = invalid
+    m.top.setFocus(true)
+end sub
+
+sub connect()
+    target = ServerUrl.normalize(m.url)
+    if target = ""
+        m.status.color = "0xF87171FF"
+        m.status.text = "Enter your server's address."
+        return
+    end if
+    m.target = target
+    Log.info("connect -> " + target)
+    m.status.color = "0x94A3B8FF"
+    m.status.text = "Connecting..."
+    m.http.request = {
+        method: "GET",
+        url: target + "/api/health",
+        headers: { "Content-Type": "application/json" },
+        timeout: 7000
+    }
+    m.http.control = "RUN"
+end sub
+
+sub onHttpResponse()
+    resp = m.http.response
+    ok = false
+    if resp <> invalid and resp.ok = true and resp.body <> invalid
+        if resp.body.ok = true then ok = true
+    end if
+
+    if ok
+        ServerUrl.set(m.target)
+        Log.info("onboarded to " + m.target)
+        m.top.done = true
+    else
+        m.status.color = "0xF87171FF"
+        if resp <> invalid and resp.status = 0
+            m.status.text = "Couldn't reach that address — check it, and that the server is running."
+        else
+            m.status.text = "That address didn't look like an Airwave server."
+        end if
+    end if
+end sub

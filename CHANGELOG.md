@@ -2,6 +2,30 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.18] - 2026-08-16
+
+Builds Roku **Phases 1 + 2** — the foundation layer and the onboarding / server-setup screen — a direct port
+of tv-web/tv-native. Transpiles clean; pending on-device verification (the Ultra was asleep at commit time).
+
+### Added
+
+- **`apps/tv-roku` Phase 1 — foundations.** BrighterScript source ported from tv-web: `registry.bs`
+  (`roRegistrySection` + parity storage keys), `serverUrl.bs` (`normalize` with the https-for-domains /
+  http-for-LAN rule — the webOS 404 trap), `auth.bs` (bearer token), `api.bs` (URL/header builders),
+  `input/keys.bs` (semantic keys), `log.bs`, and a generic async `HttpTask` node.
+- **`apps/tv-roku` Phase 2 — onboarding.** `ServerSetup` (on-screen keyboard → validate `GET /api/health` →
+  store → route) + `MainScene` as the entry gate (no server → setup; no token → login; else → guide), so
+  onboarding is verifiable end-to-end.
+- **Networking libraries vendored manually** (ropm is incompatible with our pnpm `catalog:` workspace —
+  `EUNSUPPORTEDPROTOCOL`). `roku-requests` (`source/vendor/Requests.brs`) now backs `HttpTask` (HTTPS,
+  timeout, JSON, retries handled); `@rokucommunity/promises` (`source/vendor/promises.*` +
+  `components/vendor/Promise.xml`) is vendored ready for the async/await api client in Phase 5. A
+  `diagnosticFilters` rule exempts `**/vendor/**` from our bslint.
+
+### Notes
+
+- tv-roku still ships in nothing (Docker/Vercel/desktop/EAS all skip it) — dev-only progress.
+
 ## [0.10.17] - 2026-08-15
 
 Scaffolds the Airwave Roku client (`apps/tv-roku`) — the third 10-foot client — and proves it boots on real

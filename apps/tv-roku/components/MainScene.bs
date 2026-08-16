@@ -1,8 +1,61 @@
-' MainScene code-behind.
-' Stage 1: prove the BrighterScript -> SceneGraph -> roku-deploy loop renders on a real Roku.
-' Next: replace this with the onboarding / server-setup screen (port of tv-web/tv-native).
+import "pkg:/source/lib/serverUrl.bs"
+import "pkg:/source/lib/auth.bs"
+import "pkg:/source/lib/log.bs"
+
+' MainScene — app host + entry gate (port of tv-native app/index.tsx routing).
+' no server -> ServerSetup; no token -> Login (Phase 3 placeholder); else -> Guide (Phase 6 placeholder).
+
 sub init()
-    print "[Airwave] MainScene init"
-    m.brand = m.top.findNode("brand")
-    m.tagline = m.top.findNode("tagline")
+    Log.info("MainScene init")
+    m.screen = invalid
+    route()
+end sub
+
+sub route()
+    if m.screen <> invalid
+        m.top.removeChild(m.screen)
+        m.screen = invalid
+    end if
+
+    if not ServerUrl.has()
+        showServerSetup()
+    else if not Auth.hasToken()
+        showPlaceholder("Connected", ServerUrl.get() + Chr(10) + "Login is coming in Phase 3.")
+    else
+        showPlaceholder("Signed in", "The guide is coming in Phase 6.")
+    end if
+end sub
+
+sub showServerSetup()
+    s = CreateObject("roSGNode", "ServerSetup")
+    m.top.appendChild(s)
+    s.observeField("done", "onSetupDone")
+    s.setFocus(true)
+    m.screen = s
+end sub
+
+sub onSetupDone()
+    Log.info("setup done -> re-routing")
+    route()
+end sub
+
+' A minimal centered two-line screen — a stand-in until Login (Phase 3) / Guide (Phase 6) land,
+' so onboarding can be verified end-to-end on-device now.
+sub showPlaceholder(titleText as string, subText as string)
+    g = CreateObject("roSGNode", "Group")
+
+    t = g.createChild("Label")
+    t.setFields({
+        text: titleText, translation: [510, 440], width: 900, horizAlign: "center",
+        color: "0xF1F5F9FF", font: "font:LargeBoldSystemFont"
+    })
+
+    s = g.createChild("Label")
+    s.setFields({
+        text: subText, translation: [510, 520], width: 900, height: 120, horizAlign: "center",
+        wrap: true, color: "0x94A3B8FF", font: "font:MediumSystemFont"
+    })
+
+    m.top.appendChild(g)
+    m.screen = g
 end sub

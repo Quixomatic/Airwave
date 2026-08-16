@@ -1,0 +1,50 @@
+import "pkg:/source/vendor/Requests.brs"
+
+' HttpTask — async HTTP on a Task thread. Internally uses roku-requests (Requests()), which is
+' blocking (hence the Task) and handles HTTPS (default ca-bundle), timeout (ms), JSON parsing and
+' retries for us. Caller: set `request` = { method, url, headers, body, timeout, useCache }, then
+' control = "RUN", and observeField("response") = { ok, status, body (parsed | invalid), raw, error }.
+sub init()
+    m.top.functionName = "execute"
+end sub
+
+sub execute()
+    req = m.top.request
+    result = { ok: false, status: 0, body: invalid, raw: "", error: "" }
+    if req = invalid or req.url = invalid
+        result.error = "no request"
+        m.top.response = result
+        return
+    end if
+
+    method = req.method
+    if method = invalid then method = "GET"
+
+    args = {}
+    if req.headers <> invalid then args.headers = req.headers
+    if req.timeout <> invalid then args.timeout = req.timeout
+    if req.body <> invalid then args.data = req.body
+    ' Default to NO cache — this backs a dynamic API; callers opt into caching explicitly.
+    if req.useCache <> invalid then args.useCache = req.useCache else args.useCache = false
+
+    http = Requests()
+    if method = "POST"
+        resp = http.post(req.url, args)
+    else
+        resp = http.get(req.url, args)
+    end if
+
+    if resp = invalid
+        result.error = "no response"
+        m.top.response = result
+        return
+    end if
+
+    status = resp.statusCode
+    if status = invalid then status = 0
+    result.status = status
+    result.raw = resp.text
+    result.ok = (status >= 200 and status < 300)
+    if resp.json <> invalid then result.body = resp.json
+    m.top.response = result
+end sub

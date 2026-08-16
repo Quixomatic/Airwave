@@ -10,7 +10,11 @@
   "stagingDir": "./out/staging",
   "retainStagingDir": true,
   "createPackage": false,
-  "autoImportComponentScript": false,
+  "autoImportComponentScript": true,
   "sourceMap": true,
-  "plugins": ["@rokucommunity/bslint"]
+  "plugins": ["@rokucommunity/bslint"],
+  "diagnosticFilters": [
+    { "src": "source/vendor/**/*" },
+    { "src": "components/vendor/**/*" }
+  ]
 }

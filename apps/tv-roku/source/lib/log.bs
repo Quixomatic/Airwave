@@ -1,0 +1,11 @@
+' Minimal logger. Telnet (port 8085) is the ares-inspect analog for reading these.
+' Later: swap for rLog (georgejecook/rLog) if we want structured logging.
+namespace Log
+    sub info(msg as string)
+        print "[Airwave] " + msg
+    end sub
+
+    sub warn(msg as string)
+        print "[Airwave][warn] " + msg
+    end sub
+end namespace

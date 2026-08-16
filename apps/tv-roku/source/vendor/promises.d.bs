@@ -1,0 +1,201 @@
+' @rokucommunity/promises v0.7.1
+' Enable verbose debugging of the promises library
+' Enable the generation of a stack trace when a callback is registered for a promise
+' This can later be used to find the registration location of the promise in
+' the code. This is useful for debugging promise chains that are not working as expected.
+    ' Create a new promise
+    function create() as dynamic
+    end function
+    ' TODO rename this to `then` once BrighterScript supports using keywords as namespaced function names
+    function onThen(promise as dynamic, callback = invalid as dynamic, context = "__INVALID__" as object) as dynamic
+    end function
+    ' TODO rename this to `catch` once BrighterScript supports using keywords as namespaced function names
+    function onCatch(promise as dynamic, callback = invalid as dynamic, context = "__INVALID__" as object) as dynamic
+    end function
+    ' TODO rename this to `finally` once BrighterScript supports using keywords as namespaced function names
+    function onFinally(promise as dynamic, callback = invalid as dynamic, context = "__INVALID__" as object) as dynamic
+    end function
+    ' The Promise.try() method takes a callback of any kind (returns or throws, synchronously or asynchronously) and wraps its result in a Promise.
+    ' @param {function} callback - The callback to wrap in a promise
+    ' @param {dynamic} args - The arguments to pass to the callback. Max 32 arguments.
+    function try(callback as function, args = invalid as dynamic) as dynamic
+    end function
+    ' Takes an array of promises as input and returns a single Promise.
+    ' This returned promise fulfills when all of the input's promises fulfill (including when an empty array is passed), with an array of the fulfillment values.
+    ' It rejects when any of the input's promises rejects, with this first rejection reason.
+    function all(promiseArray as dynamic) as dynamic
+    end function
+    ' Takes an array of promises as input and returns a single Promise.
+    ' This returned promise fulfills when all of the input's promises settle (including when an empty array is passed),
+    ' with an array of objects that describe the outcome of each promise.
+    function allSettled(promiseArray as dynamic) as dynamic
+    end function
+    ' Takes an array of promises as input and returns a single Promise.
+    ' This returned promise fulfills when any of the input's promises fulfills, with this first fulfillment value.
+    ' It rejects when all of the input's promises reject (including when an empty array is passed), with an AggregateError containing an array of rejection reasons.
+    function any(promiseArray as dynamic) as dynamic
+    end function
+    ' Takes an array of promises as input and returns a single Promise.
+    ' This returned promise settles with the eventual state of the first promise that settles.
+    function race(promiseArray as dynamic) as dynamic
+    end function
+    function resolve(result as dynamic, promise = invalid as dynamic) as object
+    end function
+    function reject(error as dynamic, promise = invalid as dynamic) as object
+    end function
+    function isComplete(promise as object) as boolean
+    end function
+    ' Determines if the given item is a promise.
+    '
+    ' Will return true if at least one of the following conditions are true:
+    ' - the SubType exactly equals "Promise"
+    ' - the subtype ends with "_promise" case insensitive
+    ' - the node has a field called "promiseState"
+    function isPromise(promise as dynamic) as boolean
+    end function
+    ' Determines if the given node event was triggered on a promise like node.
+    function isPromiseEvent(event as dynamic) as boolean
+    end function
+    ' Remove all promise storage from the current m
+    sub clean()
+    end sub
+    'Allows chaining multiple promise operations in a row in a clean syntax
+    function chain(initialPromise as object, context = "__INVALID__" as object) as object
+    end function
+    sub setMessagePort(port as dynamic)
+    end sub
+    function getMessagePort() as dynamic
+    end function
+    ' First, consume and process all promise events from the front of the queue.
+    ' This method is similar to the GetMessage() method, but the returned object (if not invalid) remains in the message queue.
+    ' A later call to WaitMessage(), GetMessage() or PeekMessage() will return the same message.
+    function peekMessage(port as dynamic) as dynamic
+    end function
+    ' First, consume and process all promise events from the front of the queue.
+    ' Then, if an event object is available, it is returned. Otherwise `invalid` is returned. The method returns immediately in either case and does not wait.
+    function getMessage(port as dynamic) as dynamic
+    end function
+    ' Same capabilities as the native `wait()` function, except that promise events are automatically processed and removed from its registered `roMessagePort` provided in `promises.setMessagePort()`.
+    function wait2(timeoutMilliseconds as dynamic, port as dynamic) as dynamic
+    end function
+    ' Makes sure the value supplied is a promise
+    function ensurePromise(value as object) as object
+    end function
+    enum PromiseState
+        pending = "pending"
+        resolved = "resolved"
+        rejected = "rejected"
+    end enum
+    interface AggregateError
+        message as string
+        ' array of dynamic rejected values
+        errors as dynamic
+    end interface
+
+namespace configuration
+    ' Sets a global flag to enable or disable logging of crashes when calling callback functions
+    function enableCrashLogging(enabled as boolean) as boolean
+    end function
+end namespace
+namespace internal
+    enum PromiseState
+        pending = "pending"
+        resolved = "resolved"
+        rejected = "rejected"
+    end enum
+    enum PromiseField
+        promiseState = "promiseState"
+        promiseResult = "promiseResult"
+        promiseStateLowerCase = "promisestate"
+        promiseResultLowerCase = "promiseresult"
+    end enum
+    ' Clear storage for a given promise
+    sub clearPromiseStorage(promise as object, nodeEvent = invalid as dynamic)
+    end sub
+    function getLibPath() as string
+    end function
+    ' Get the storage for a promise on `m`
+    function getPromiseStorage(promise as object, nodeEvent = invalid as dynamic) as object
+    end function
+    '
+    ' Registers a listener for a promise for the then, catch, or finally events
+    ' @param eventName - should be "then", "catch", or "finally"
+    '
+    function on(eventName as string, promise as dynamic, callback as function, context = {} as object) as dynamic
+    end function
+    '
+    ' Notify all the listeners of a promise that it has been completed
+    '
+    sub notifyListeners(event as object)
+    end sub
+    ' Used to check if there is a storage item of listeners for the supplied promise
+    function hasStorage(promise as dynamic) as boolean
+    end function
+    ' We use an internal value to represent unset. Check if the parameter is that value
+    function isSet(value as dynamic) as boolean
+    end function
+    ' Is the supplied value a valid String type and is not empty
+    ' @param value - The variable to be checked
+    ' @return true if value is a non-empty string, false otherwise
+    function isNonEmptyString(value as dynamic) as boolean
+    end function
+    ' Handle an individual promise listener
+    sub processPromiseListener(originalPromise as object, originalPromiseState as string, storageItem as object, callCallback as boolean, isThenOrCatch as boolean, promiseValue = invalid as dynamic)
+    end sub
+    function defaultThenCallback(value = invalid as dynamic, _ = invalid as dynamic) as dynamic
+    end function
+    function defaultCatchCallback(value = invalid as dynamic, _ = invalid as dynamic) as dynamic
+    end function
+    sub defaultFinallyCallback(_ = invalid as dynamic)
+    end sub
+    '
+    ' Generates a new UUID
+    '
+    function createUuid() as string
+    end function
+    ' Makes a delayed call to the supplied function. Default behavior is essentially next tick.
+    ' @param {Function} callback - The function to be called after a set delay
+    ' @param {Dynamic} context - a single item of data to be passed into the callback when invoked
+    ' @param {Float} [duration] - the amount of delay before invoking the callback
+    sub delay(callback as function, context as dynamic, duration = 0.0001 as float)
+    end sub
+    ' Observes a node field using observeFieldScoped
+    ' @param {roSGNode} node - The node to apply the observer
+    ' @param {String} field - The name of the field to be monitored.
+    ' @param {Dynamic} callback - The name or message port to be executed when the value of the field changes.
+    ' @return true if field could be observed, false if not
+    function observeFieldScoped(node as object, field as string, callback as dynamic, infoFields = [] as object) as boolean
+    end function
+    ' Unobserve a node field using unobserveFieldScoped
+    ' @param {roSGNode} node - The node to remove the observer from
+    ' @param {String} field - The name of the field to no longer be monitored.
+    ' @return true if field could be unobserved, false if not
+    function unobserveFieldScoped(node as object, field as string) as boolean
+    end function
+    ' Calls the supplied function with the supplied arguments
+    ' @param {Function} callback - The function to be called
+    ' @param {dynamic} args - The arguments to pass to the callback. Max 32 arguments.
+    ' @return {dynamic} The result of the callback
+    function callWithArgs(callback as function, args = invalid as dynamic) as dynamic
+    end function
+    const wrongNumberOfParametersMessage = "Wrong number of parameters in promise callback. We have recovered, but this should be fixed as performance will suffer."
+    ' Returns a string representation of the stack trace
+    ' example:
+    '    Error: some error
+    '        $anon_6c() As Dynamic (pkg:/source/FailedAssertion.spec.brs:11)
+    '        $anon_303() As Dynamic (pkg:/source/rooibos/Test.brs:45)
+    '        $anon_1f2(test As Object) As Dynamic (pkg:/source/rooibos/BaseTestSuite.brs:243)
+    '        $anon_30a() As Dynamic (pkg:/source/rooibos/TestGroup.brs:88)
+    '        $anon_309() As Dynamic (pkg:/source/rooibos/TestGroup.brs:68)
+    '        $anon_1ec() As Dynamic (pkg:/source/rooibos/BaseTestSuite.brs:131)
+    '        $anon_1eb() As Dynamic (pkg:/source/rooibos/BaseTestSuite.brs:121)
+    '        $anon_325(testsuite As Dynamic) As Void (pkg:/source/rooibos/TestRunner.brs:191)
+    '        $anon_322() As Dynamic (pkg:/source/rooibos/TestRunner.brs:72)
+    '        rooibos_init(testscenename As Dynamic) As Void (pkg:/source/rooibos/Rooibos.brs:27)
+    '        main(args As Dynamic) As Dynamic (pkg:/source/Main.brs:2)
+    function formatStackTrace(error as dynamic, message as string) as string
+    end function
+    ' Log the error if crash logging is enabled
+    sub logCrashIfEnabled(error as dynamic)
+    end sub
+end namespace
