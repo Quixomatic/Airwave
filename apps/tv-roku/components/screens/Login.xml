@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!--
-  Login — port of tv-web features/auth/login.tsx. Fonts applied in code (Theme.setFont) — the working
-  Roku path. Chooser (amber Plex + outlined code button) or a pending panel (rounded, translucent) with
-  a vertical divider: heading/instruction/Back on the left, white QR card + mono code on the right.
+  Login — port of tv-web/tv-native login. Static LogoLockup header (markWidth 100, matching tv-native's
+  <Logo width={100}>), then the chooser (amber Plex + outlined code button) OR a pending panel: a vertical
+  divider with heading/instruction/Back on the left, and a CENTERED white QR card + mono code on the right.
 -->
 <component name="Login" extends="Group">
     <interface>
@@ -12,45 +12,47 @@
     <children>
         <Rectangle id="bg" width="1920" height="1080" color="0x060A14FF" />
 
-        <LogoLockup id="logo" markWidth="130" centerY="255" animate="false" />
-        <Label id="subtitle" text="Sign in to start watching." translation="[510,360]" width="900"
+        <LogoLockup id="logo" markWidth="100" centerY="185" animate="false" />
+        <Label id="subtitle" text="Sign in to start watching." translation="[510,240]" width="900"
             horizAlign="center" color="0xA1A1AAFF" />
 
         <!-- Chooser -->
         <Group id="chooser">
-            <RoundedButton id="plexBtn" translation="[700,470]" w="520" h="84" radius="12"
+            <RoundedButton id="plexBtn" translation="[700,330]" w="520" h="84" radius="12"
                 fillColor="0xF59E0BFF" textColor="0x000000FF" focusFill="0xFBBF24FF" focusInk="0x000000FF"
                 fontUri="pkg:/fonts/Inter-SemiBold.ttf" fontSize="22" text="Log in with Plex" />
-            <RoundedButton id="codeBtn" translation="[700,574]" w="520" h="84" radius="12" outlined="true"
+            <RoundedButton id="codeBtn" translation="[700,434]" w="520" h="84" radius="12" outlined="true"
                 fillColor="0x3F3F46FF" textColor="0xE4E4E7FF" focusFill="0x27272AFF" focusInk="0xE4E4E7FF"
                 fontUri="pkg:/fonts/Inter-SemiBold.ttf" fontSize="22" text="Log in with a code" />
         </Group>
 
         <!-- Pending (hidden until a flow starts) -->
         <Group id="pending" visible="false">
-            <Poster id="panelBg" translation="[420,300]" width="1080" height="450"
+            <Poster id="panelBg" translation="[420,320]" width="1080" height="380"
                 uri="pkg:/images/np/fill-16.9.png" blendColor="0x181B24E6" />
-            <Poster id="panelBorder" translation="[420,300]" width="1080" height="450"
+            <Poster id="panelBorder" translation="[420,320]" width="1080" height="380"
                 uri="pkg:/images/np/border-16.9.png" blendColor="0x27272AFF" />
 
-            <Rectangle translation="[940,350]" width="2" height="360" color="0xFFFFFF1A" />
+            <Rectangle translation="[960,352]" width="2" height="316" color="0xFFFFFF1A" />
 
-            <Label id="pHeading" translation="[490,360]" width="420" wrap="true" color="0xF1F5F9FF" />
-            <Label id="pInstruction" translation="[490,440]" width="420" height="180" wrap="true"
+            <!-- Left column -->
+            <Label id="pHeading" translation="[490,356]" width="430" wrap="true" color="0xF1F5F9FF" />
+            <Label id="pInstruction" translation="[490,406]" width="430" height="160" wrap="true"
                 color="0xA1A1AAFF" />
-            <RoundedButton id="backBtn" translation="[490,648]" w="180" h="56" radius="8"
+            <RoundedButton id="backBtn" translation="[490,600]" w="170" h="52" radius="8"
                 fillColor="0x181B24E6" textColor="0xA1A1AAFF" focusFill="0x3F3F46FF" focusInk="0xE4E4E7FF"
                 fontUri="pkg:/fonts/Inter-Medium.ttf" fontSize="16" text="← Back" />
 
-            <Poster id="qrCard" translation="[1010,360]" width="260" height="260"
+            <!-- Right column: white QR card + mono code, centered in the column (center x = 1230) -->
+            <Poster id="qrCard" translation="[1123,356]" width="214" height="214"
                 uri="pkg:/images/np/fill-12.9.png" blendColor="0xFFFFFFFF" />
-            <QRCode id="qr" translation="[1029,379]" width="222" height="222" loadDisplayMode="scaleToFit"
+            <QRCode id="qr" translation="[1135,368]" width="190" height="190" loadDisplayMode="scaleToFit"
                 ecl="MEDIUM" pixel="6" border="2" />
-            <Label id="pCode" translation="[990,644]" width="300" horizAlign="center" color="0x8AB4F8FF" />
+            <Label id="pCode" translation="[1080,590]" width="300" horizAlign="center" color="0xF1F5F9FF" />
         </Group>
 
-        <Label id="error" translation="[510,860]" width="900" height="40" horizAlign="center"
+        <Label id="error" translation="[510,760]" width="900" height="40" horizAlign="center"
             color="0xF87171FF" />
-        <Label id="serverLabel" translation="[510,972]" width="900" horizAlign="center" color="0x52525BFF" />
+        <Label id="serverLabel" translation="[510,900]" width="900" horizAlign="center" color="0x52525BFF" />
     </children>
 </component>

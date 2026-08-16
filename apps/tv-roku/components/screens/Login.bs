@@ -27,7 +27,7 @@ sub init()
     Theme.setFont(m.top.findNode("subtitle"), Theme.FONT_REG, 18)
     Theme.setFont(m.pHeading, Theme.FONT_SEMI, 26)
     Theme.setFont(m.pInstruction, Theme.FONT_REG, 18)
-    Theme.setFont(m.pCode, Theme.FONT_MONO, 34)
+    Theme.setFont(m.pCode, Theme.FONT_MONO, 40)
     Theme.setFont(m.error, Theme.FONT_REG, 18)
     Theme.setFont(m.serverLabel, Theme.FONT_REG, 14)
 
@@ -39,8 +39,7 @@ sub init()
 
     m.start = CreateObject("roSGNode", "HttpTask")
     m.start.observeField("response", "onStartResponse")
-    m.poll = CreateObject("roSGNode", "HttpTask")
-    m.poll.observeField("response", "onPollResponse")
+    m.pollTask = invalid
     m.timer = CreateObject("roSGNode", "Timer")
     m.timer.repeat = true
     m.timer.observeField("fire", "onPollTick")
@@ -118,7 +117,7 @@ sub startPlex()
         method: "POST",
         url: ServerUrl.get() + "/api/tv/auth/plex/start",
         headers: Api.headers(),
-        body: ""
+        body: "{}"
     }
     m.start.control = "RUN"
 end sub
@@ -162,16 +161,17 @@ sub onStartResponse()
     end if
 end sub
 
+' A FRESH HttpTask per tick — reusing one Task doesn't reliably re-run on repeated control="RUN".
 sub onPollTick()
     if m.pollType = "plex"
-        m.poll.request = {
+        req = {
             method: "POST",
             url: ServerUrl.get() + "/api/tv/auth/plex/poll",
             headers: Api.headers(),
             body: FormatJson({ pinId: m.pinId })
         }
     else
-        m.poll.request = {
+        req = {
             method: "POST",
             url: ServerUrl.get() + "/api/auth/device/token",
             headers: Api.headers(),
@@ -182,13 +182,24 @@ sub onPollTick()
             })
         }
     end if
-    m.poll.control = "RUN"
+    Log.info("poll " + m.pollType)
+    if m.pollTask <> invalid then m.top.removeChild(m.pollTask)
+    t = CreateObject("roSGNode", "HttpTask")
+    t.request = req
+    t.observeField("response", "onPollResponse")
+    m.top.appendChild(t)
+    m.pollTask = t
+    t.control = "RUN"
 end sub
 
 sub onPollResponse()
-    resp = m.poll.response
+    if m.pollTask = invalid then return
+    resp = m.pollTask.response
     if resp = invalid then return
     b = resp.body
+    st = "?"
+    if b <> invalid and b.status <> invalid then st = b.status
+    Log.info("poll resp http=" + Str(resp.status) + " status=" + st)
     if b = invalid then return   ' transient — keep polling
 
     if m.pollType = "plex"
