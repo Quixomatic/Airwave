@@ -59,11 +59,14 @@ function onKeyEvent(key as string, press as boolean) as boolean
     return false
 end function
 
+' Text entry via StandardKeyboardDialog — following jellyfin config/SetServerScreen.bs:
+' attach an RSGPalette so it renders styled, show via scene.dialog, and dismiss with `close = true`.
 sub openKeyboard()
     dlg = CreateObject("roSGNode", "StandardKeyboardDialog")
-    dlg.title = "Server address"
-    if m.url <> "" then dlg.text = m.url
+    dlg.title = "Enter your server's address"
     dlg.buttons = ["Connect", "Cancel"]
+    if m.url <> "" then dlg.text = m.url
+    dlg.palette = CreateObject("roSGNode", "RSGPalette")
     m.kbd = dlg
     dlg.observeField("buttonSelected", "onKbdButton")
     m.top.getScene().dialog = dlg
@@ -72,20 +75,15 @@ end sub
 sub onKbdButton()
     if m.kbd = invalid then return
     idx = m.kbd.buttonSelected
-    if idx = 0
-        m.url = m.kbd.text
-        if m.url <> "" then m.addressLabel.text = m.url
-        closeKeyboard()
-        connect()
-    else
-        closeKeyboard()
-    end if
-end sub
-
-sub closeKeyboard()
-    m.top.getScene().dialog = invalid
+    text = m.kbd.text
+    m.kbd.close = true
     m.kbd = invalid
     m.top.setFocus(true)
+    if idx = 0   ' Connect
+        m.url = text
+        if m.url <> "" then m.addressLabel.text = m.url
+        connect()
+    end if
 end sub
 
 sub connect()

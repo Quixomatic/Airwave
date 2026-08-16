@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  Login — port of tv-web features/auth/login.tsx. Two device-code flows:
+   - Plex:   POST /api/tv/auth/plex/start -> poll /api/tv/auth/plex/poll @2s (status ok|expired|unregistered)
+   - Airwave: POST /api/auth/device/code  -> poll /api/auth/device/token @interval (access_token | error)
+  On success: store the bearer token + fire `done` so MainScene re-routes to the guide.
+  QR is deferred (Phase 3b) — we show the verification URL + code as text (fully functional).
+-->
+<component name="Login" extends="Group">
+    <interface>
+        <field id="done" type="boolean" alwaysNotify="true" />
+    </interface>
+
+    <children>
+        <Rectangle id="bg" width="1920" height="1080" color="0x060A14FF" />
+
+        <Label id="title" text="Airwave" translation="[510,280]" width="900" horizAlign="center"
+            color="0x8AB4F8FF" font="font:LargeBoldSystemFont" />
+        <Label id="subtitle" text="Sign in to start watching." translation="[510,352]" width="900"
+            horizAlign="center" color="0x94A3B8FF" font="font:MediumSystemFont" />
+
+        <!-- Chooser -->
+        <Group id="chooser">
+            <Rectangle id="plexBox" translation="[510,470]" width="900" height="92" color="0xF5A623FF">
+                <Label id="plexLabel" width="900" height="92" horizAlign="center" vertAlign="center"
+                    color="0x04060CFF" font="font:MediumBoldSystemFont" text="Log in with Plex" />
+            </Rectangle>
+            <Rectangle id="codeBox" translation="[510,584]" width="900" height="92" color="0x0B1120FF">
+                <Label id="codeLabel" width="900" height="92" horizAlign="center" vertAlign="center"
+                    color="0xF1F5F9FF" font="font:MediumBoldSystemFont" text="Log in with a code" />
+            </Rectangle>
+        </Group>
+
+        <!-- Pending (hidden until a flow starts): two columns like tv-web — heading/instruction/Back
+             on the left, a divider, then the QR + code on the right. -->
+        <Group id="pending" visible="false">
+            <!-- Left column -->
+            <Label id="pHeading" translation="[220,360]" width="600" wrap="true"
+                color="0xF1F5F9FF" font="font:LargeBoldSystemFont" />
+            <Label id="pInstruction" translation="[220,470]" width="600" height="200" wrap="true"
+                color="0x94A3B8FF" font="font:MediumSystemFont" />
+            <Rectangle id="backBox" translation="[220,690]" width="300" height="76" color="0x4A9FE0FF">
+                <Label id="backLabel" width="300" height="76" horizAlign="center" vertAlign="center"
+                    color="0x04060CFF" font="font:MediumBoldSystemFont" text="Back" />
+            </Rectangle>
+
+            <!-- Divider -->
+            <Rectangle translation="[910,350]" width="2" height="400" color="0x1B2740FF" />
+
+            <!-- Right column: white QR card + code -->
+            <Rectangle id="qrCard" translation="[1010,340]" width="260" height="260" color="0xFFFFFFFF">
+                <QRCode id="qr" translation="[19,19]" width="222" height="222" loadDisplayMode="scaleToFit"
+                    ecl="MEDIUM" pixel="6" border="2" />
+            </Rectangle>
+            <Label id="pCode" translation="[990,620]" width="300" horizAlign="center"
+                color="0x8AB4F8FF" font="font:LargeBoldSystemFont" />
+        </Group>
+
+        <Label id="error" translation="[510,900]" width="900" height="40" horizAlign="center"
+            color="0xF87171FF" font="font:MediumSystemFont" text="" />
+        <Label id="serverLabel" translation="[510,1010]" width="900" horizAlign="center"
+            color="0x64748BFF" font="font:SmallSystemFont" text="" />
+    </children>
+</component>

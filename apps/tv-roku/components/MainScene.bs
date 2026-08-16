@@ -20,7 +20,7 @@ sub route()
     if not ServerUrl.has()
         showServerSetup()
     else if not Auth.hasToken()
-        showPlaceholder("Connected", ServerUrl.get() + Chr(10) + "Login is coming in Phase 3.")
+        showLogin()
     else
         showPlaceholder("Signed in", "The guide is coming in Phase 6.")
     end if
@@ -36,6 +36,19 @@ end sub
 
 sub onSetupDone()
     Log.info("setup done -> re-routing")
+    route()
+end sub
+
+sub showLogin()
+    s = CreateObject("roSGNode", "Login")
+    m.top.appendChild(s)
+    s.observeField("done", "onLoginDone")
+    s.setFocus(true)
+    m.screen = s
+end sub
+
+sub onLoginDone()
+    Log.info("login done -> re-routing")
     route()
 end sub
 

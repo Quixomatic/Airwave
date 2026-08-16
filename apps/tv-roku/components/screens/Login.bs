@@ -1,0 +1,221 @@
+import "pkg:/source/lib/serverUrl.bs"
+import "pkg:/source/lib/auth.bs"
+import "pkg:/source/lib/api.bs"
+import "pkg:/source/lib/log.bs"
+import "pkg:/source/input/keys.bs"
+
+' Login code-behind — port of tv-web features/auth/login.tsx (two device-code flows).
+
+sub init()
+    m.chooser = m.top.findNode("chooser")
+    m.plexBox = m.top.findNode("plexBox")
+    m.plexLabel = m.top.findNode("plexLabel")
+    m.codeBox = m.top.findNode("codeBox")
+    m.codeLabel = m.top.findNode("codeLabel")
+
+    m.pending = m.top.findNode("pending")
+    m.pHeading = m.top.findNode("pHeading")
+    m.pInstruction = m.top.findNode("pInstruction")
+    m.pCode = m.top.findNode("pCode")
+    m.qr = m.top.findNode("qr")
+    m.backBox = m.top.findNode("backBox")
+
+    m.error = m.top.findNode("error")
+    m.serverLabel = m.top.findNode("serverLabel")
+    m.serverLabel.text = "Server: " + ServerUrl.get()
+
+    m.mode = "chooser"   ' "chooser" | "pending"
+    m.sel = 0
+    m.pollType = ""      ' "plex" | "device"
+    m.pinId = ""
+    m.deviceCode = ""
+
+    m.start = CreateObject("roSGNode", "HttpTask")
+    m.start.observeField("response", "onStartResponse")
+    m.poll = CreateObject("roSGNode", "HttpTask")
+    m.poll.observeField("response", "onPollResponse")
+    m.timer = CreateObject("roSGNode", "Timer")
+    m.timer.repeat = true
+    m.timer.observeField("fire", "onPollTick")
+    m.top.appendChild(m.timer)
+
+    showChooser()
+    m.top.setFocus(true)
+end sub
+
+' ---- focus / view state -------------------------------------------------------
+
+sub showChooser()
+    m.mode = "chooser"
+    m.timer.control = "stop"
+    m.pending.visible = false
+    m.chooser.visible = true
+    setSel(0)
+end sub
+
+sub showPending(heading as string, instruction as string, code as string, qrValue as string)
+    m.mode = "pending"
+    m.pHeading.text = heading
+    m.pInstruction.text = instruction
+    m.pCode.text = code
+    m.qr.text = qrValue   ' QRCode extends Poster — setting text renders the QR to itself
+    m.chooser.visible = false
+    m.pending.visible = true
+    m.error.text = ""
+    setSel(0)
+end sub
+
+sub setSel(i as integer)
+    m.sel = i
+    if m.mode = "chooser"
+        if i = 0
+            m.plexBox.color = "0xFFC65AFF"
+            m.codeBox.color = "0x0B1120FF"
+            m.codeLabel.color = "0xF1F5F9FF"
+        else
+            m.plexBox.color = "0xF5A623FF"
+            m.codeBox.color = "0x1B2740FF"
+            m.codeLabel.color = "0xFFFFFFFF"
+        end if
+    end if
+end sub
+
+' ---- input --------------------------------------------------------------------
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+
+    if m.mode = "pending"
+        if key = Keys.OK or key = Keys.BACK
+            showChooser()
+            return true
+        end if
+        return key = Keys.UP or key = Keys.DOWN   ' swallow nav while pending
+    end if
+
+    ' chooser
+    if key = Keys.UP
+        setSel(0)
+        return true
+    else if key = Keys.DOWN
+        setSel(1)
+        return true
+    else if key = Keys.OK
+        if m.sel = 0 then startPlex() else startDevice()
+        return true
+    end if
+    return false
+end function
+
+' ---- flows --------------------------------------------------------------------
+
+sub startPlex()
+    m.error.text = ""
+    m.startType = "plex"
+    m.start.request = {
+        method: "POST",
+        url: ServerUrl.get() + "/api/tv/auth/plex/start",
+        headers: Api.headers(),
+        body: ""
+    }
+    m.start.control = "RUN"
+end sub
+
+sub startDevice()
+    m.error.text = ""
+    m.startType = "device"
+    m.start.request = {
+        method: "POST",
+        url: ServerUrl.get() + "/api/auth/device/code",
+        headers: Api.headers(),
+        body: FormatJson({ client_id: "channelguide-tv" })
+    }
+    m.start.control = "RUN"
+end sub
+
+sub onStartResponse()
+    resp = m.start.response
+    if resp = invalid or resp.ok <> true or resp.body = invalid
+        m.error.text = "Could not reach the server."
+        return
+    end if
+    b = resp.body
+
+    if m.startType = "plex"
+        m.pollType = "plex"
+        m.pinId = b.pinId
+        showPending("Log in with Plex", "Go to " + b.verificationUrl + " and enter this code, or scan:", b.code, b.verificationUrl)
+        m.timer.duration = 2
+        m.timer.control = "start"
+    else
+        m.pollType = "device"
+        m.deviceCode = b.device_code
+        iv = b.interval
+        if iv = invalid then iv = 5
+        qrValue = b.verification_uri_complete
+        if qrValue = invalid then qrValue = b.verification_uri
+        showPending("Log in with a code", "Go to " + b.verification_uri + " and enter this code, or scan:", b.user_code, qrValue)
+        m.timer.duration = iv
+        m.timer.control = "start"
+    end if
+end sub
+
+sub onPollTick()
+    if m.pollType = "plex"
+        m.poll.request = {
+            method: "POST",
+            url: ServerUrl.get() + "/api/tv/auth/plex/poll",
+            headers: Api.headers(),
+            body: FormatJson({ pinId: m.pinId })
+        }
+    else
+        m.poll.request = {
+            method: "POST",
+            url: ServerUrl.get() + "/api/auth/device/token",
+            headers: Api.headers(),
+            body: FormatJson({
+                grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+                device_code: m.deviceCode,
+                client_id: "channelguide-tv"
+            })
+        }
+    end if
+    m.poll.control = "RUN"
+end sub
+
+sub onPollResponse()
+    resp = m.poll.response
+    if resp = invalid then return
+    b = resp.body
+    if b = invalid then return   ' transient — keep polling
+
+    if m.pollType = "plex"
+        if b.status = "ok"
+            finishLogin(b.token)
+        else if b.status = "expired"
+            resetToChooser("That code expired — try again.")
+        else if b.status = "unregistered"
+            resetToChooser("No Airwave account for " + b.email + ". Ask an admin to import you.")
+        end if
+        ' "pending" -> keep polling
+    else
+        if b.access_token <> invalid
+            finishLogin(b.access_token)
+        else if b.error = "expired_token" or b.error = "access_denied"
+            resetToChooser("That code expired or was denied — try again.")
+        end if
+        ' authorization_pending / slow_down -> keep polling
+    end if
+end sub
+
+sub finishLogin(token as string)
+    m.timer.control = "stop"
+    Auth.setToken(token)
+    Log.info("signed in")
+    m.top.done = true
+end sub
+
+sub resetToChooser(msg as string)
+    showChooser()
+    m.error.text = msg
+end sub

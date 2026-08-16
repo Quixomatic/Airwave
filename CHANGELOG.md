@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.19] - 2026-08-16
+
+Adds Roku **Phase 3** — the login screen with both device-code flows, a direct port of tv-web `login.tsx`.
+
+### Added
+
+- **`apps/tv-roku` Phase 3 — login.** A `Login` screen with the two device-code flows: **Plex PIN**
+  (`POST /api/tv/auth/plex/start` → poll `/api/tv/auth/plex/poll` @2s, statuses ok/expired/unregistered)
+  and **Airwave / better-auth device code** (`POST /api/auth/device/code` → poll `/api/auth/device/token`
+  @interval, `access_token` | pending | expired/denied). Each shows a **QR code** + the verification URL +
+  the pairing code (tv-web's two-column layout) and polls (a `Timer` firing an `HttpTask`) until it gets a
+  bearer token, which is stored (registry) before routing on to the guide. Wired into `MainScene`'s entry
+  gate (has server + no token → Login).
+- **On-device QR generation** — vendored `@moralcode/qrcode-brightscript` (a `QRCode` node extending
+  `Poster`; set its `text` to render the QR). jellyfin-roku has no QR component (its quick-connect is
+  text-only), so this is an independent choice for parity with tv-web/tv-native, which both show a QR.
+- Keyboard entry (ServerSetup) aligned to jellyfin's `SetServerScreen` idiom (`RSGPalette` + `close = true`).
+
+### Notes
+
+- Transpiles clean; pending on-device verification.
+
 ## [0.10.18] - 2026-08-16
 
 Builds Roku **Phases 1 + 2** — the foundation layer and the onboarding / server-setup screen — a direct port
