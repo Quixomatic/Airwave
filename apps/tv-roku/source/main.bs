@@ -3,6 +3,9 @@
 sub Main()
     print "[Airwave] booting Roku client"
 
+    ' Dev-only: pre-seed the server URL on a sideloaded build (no-op on a store install) so a
+    ' re-sideload doesn't force re-onboarding. See source/lib/dev.bs.
+    Dev.seedRegistry()
 
     screen = CreateObject("roSGScreen")
     m.port = CreateObject("roMessagePort")

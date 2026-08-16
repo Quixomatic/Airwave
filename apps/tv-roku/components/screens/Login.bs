@@ -36,10 +36,9 @@ sub init()
     m.pollType = ""      ' "plex" | "device"
     m.pinId = ""
     m.deviceCode = ""
+    m.pollCount = 0
 
-    m.start = CreateObject("roSGNode", "HttpTask")
-    m.start.observeField("response", "onStartResponse")
-    m.pollTask = invalid
+    ' Polling cadence only — the HTTP itself is promise-based via Api.* (see onPollTick).
     m.timer = CreateObject("roSGNode", "Timer")
     m.timer.repeat = true
     m.timer.observeField("fire", "onPollTick")
@@ -112,95 +111,72 @@ end function
 
 sub startPlex()
     m.error.text = ""
-    m.startType = "plex"
-    m.start.request = {
-        method: "POST",
-        url: ServerUrl.get() + "/api/tv/auth/plex/start",
-        headers: Api.headers(),
-        body: "{}"
-    }
-    m.start.control = "RUN"
+    Log.info("start plex")
+    p = Api.plexStart()
+    onThen(p, onPlexStart, m)
+    onCatch(p, onStartError, m)
 end sub
 
 sub startDevice()
     m.error.text = ""
-    m.startType = "device"
-    m.start.request = {
-        method: "POST",
-        url: ServerUrl.get() + "/api/auth/device/code",
-        headers: Api.headers(),
-        body: FormatJson({ client_id: "channelguide-tv" })
-    }
-    m.start.control = "RUN"
+    Log.info("start device")
+    p = Api.deviceCode()
+    onThen(p, onDeviceStart, m)
+    onCatch(p, onStartError, m)
 end sub
 
-sub onStartResponse()
-    resp = m.start.response
-    if resp = invalid or resp.ok <> true or resp.body = invalid
-        m.error.text = "Could not reach the server."
-        return
-    end if
-    b = resp.body
-
-    if m.startType = "plex"
-        m.pollType = "plex"
-        m.pinId = b.pinId
-        showPending("Log in with Plex", "Go to " + b.verificationUrl + " and enter this code, or scan:", b.code, b.verificationUrl)
-        m.timer.duration = 2
-        m.timer.control = "start"
-    else
-        m.pollType = "device"
-        m.deviceCode = b.device_code
-        iv = b.interval
-        if iv = invalid then iv = 5
-        qrValue = b.verification_uri_complete
-        if qrValue = invalid then qrValue = b.verification_uri
-        showPending("Log in with a code", "Go to " + b.verification_uri + " and enter this code, or scan:", b.user_code, qrValue)
-        m.timer.duration = iv
-        m.timer.control = "start"
-    end if
+sub onPlexStart(b as object, _ctx as object)
+    m.pollType = "plex"
+    m.pinId = b.pinId
+    Log.info("plex start ok — pinId=" + Log.trunc(m.pinId) + " code=" + Log.trunc(b.code))
+    showPending("Log in with Plex", "Go to " + b.verificationUrl + " and enter this code, or scan:", b.code, b.verificationUrl)
+    m.timer.duration = 2
+    m.pollCount = 0
+    m.timer.control = "start"
+    Log.info("poll timer started — every 2s (plex)")
 end sub
 
-' A FRESH HttpTask per tick — reusing one Task doesn't reliably re-run on repeated control="RUN".
+sub onDeviceStart(b as object, _ctx as object)
+    m.pollType = "device"
+    m.deviceCode = b.device_code
+    iv = b.interval
+    if iv = invalid then iv = 5
+    qrValue = b.verification_uri_complete
+    if qrValue = invalid then qrValue = b.verification_uri
+    Log.info("device start ok — code=" + Log.trunc(b.user_code) + " interval=" + Str(iv).Trim())
+    showPending("Log in with a code", "Go to " + b.verification_uri + " and enter this code, or scan:", b.user_code, qrValue)
+    m.timer.duration = iv
+    m.pollCount = 0
+    m.timer.control = "start"
+    Log.info("poll timer started — every " + Str(iv).Trim() + "s (device)")
+end sub
+
+sub onStartError(err as object, _ctx as object)
+    st = 0
+    if err <> invalid and err.status <> invalid then st = err.status
+    Log.warn("start failed http=" + Str(st).Trim() + " — " + Log.trunc(err))
+    m.error.text = "Could not reach the server."
+end sub
+
 sub onPollTick()
+    m.pollCount = m.pollCount + 1
+    Log.info("poll #" + Str(m.pollCount).Trim() + " " + m.pollType)
     if m.pollType = "plex"
-        req = {
-            method: "POST",
-            url: ServerUrl.get() + "/api/tv/auth/plex/poll",
-            headers: Api.headers(),
-            body: FormatJson({ pinId: m.pinId })
-        }
+        p = Api.plexPoll(m.pinId)
     else
-        req = {
-            method: "POST",
-            url: ServerUrl.get() + "/api/auth/device/token",
-            headers: Api.headers(),
-            body: FormatJson({
-                grant_type: "urn:ietf:params:oauth:grant-type:device_code",
-                device_code: m.deviceCode,
-                client_id: "channelguide-tv"
-            })
-        }
+        p = Api.deviceToken(m.deviceCode)
     end if
-    Log.info("poll " + m.pollType)
-    if m.pollTask <> invalid then m.top.removeChild(m.pollTask)
-    t = CreateObject("roSGNode", "HttpTask")
-    t.request = req
-    t.observeField("response", "onPollResponse")
-    m.top.appendChild(t)
-    m.pollTask = t
-    t.control = "RUN"
+    onThen(p, onPollResult, m)
+    onCatch(p, onPollError, m)
 end sub
 
-sub onPollResponse()
-    if m.pollTask = invalid then return
-    resp = m.pollTask.response
-    if resp = invalid then return
-    b = resp.body
+' A resolved poll (HTTP 2xx). The Plex flow returns 200 with a `status` for every state (incl. pending);
+' the device flow returns 200 only once it carries an access_token.
+sub onPollResult(b as object, _ctx as object)
     st = "?"
     if b <> invalid and b.status <> invalid then st = b.status
-    Log.info("poll resp http=" + Str(resp.status) + " status=" + st)
-    if b = invalid then return   ' transient — keep polling
+    Log.info("poll resp status=" + st + " body=" + Log.trunc(b))
+    if b = invalid then return
 
     if m.pollType = "plex"
         if b.status = "ok"
@@ -213,20 +189,37 @@ sub onPollResponse()
     else
         if b.access_token <> invalid
             finishLogin(b.access_token)
-        else if b.error = "expired_token" or b.error = "access_denied"
-            resetToChooser("That code expired or was denied — try again.")
         end if
     end if
+end sub
+
+' A rejected poll (non-2xx). EXPECTED for the device flow while unclaimed (better-auth returns 400
+' authorization_pending) — treat as "keep waiting". Only a terminal error stops the loop.
+sub onPollError(err as object, _ctx as object)
+    st = 0
+    body = invalid
+    if err <> invalid
+        if err.status <> invalid then st = err.status
+        body = err.body
+    end if
+    if body <> invalid and type(body) = "roAssociativeArray" and body.error <> invalid
+        if body.error = "expired_token" or body.error = "access_denied"
+            resetToChooser("That code expired or was denied — try again.")
+            return
+        end if
+    end if
+    Log.info("poll pending (http=" + Str(st).Trim() + ")")
 end sub
 
 sub finishLogin(token as string)
     m.timer.control = "stop"
     Auth.setToken(token)
-    Log.info("signed in")
+    Log.info("signed in — token len=" + Str(Len(token)).Trim())
     m.top.done = true
 end sub
 
 sub resetToChooser(msg as string)
+    Log.warn("reset to chooser: " + msg)
     showChooser()
     m.error.text = msg
 end sub

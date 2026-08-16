@@ -1,6 +1,8 @@
 import "pkg:/source/lib/serverUrl.bs"
 import "pkg:/source/lib/auth.bs"
 import "pkg:/source/lib/log.bs"
+import "pkg:/source/lib/api.bs"
+import "pkg:/source/lib/dev.bs"
 
 ' MainScene — app host + entry gate (port of tv-native app/index.tsx routing).
 ' no server -> ServerSetup; no token -> Login (Phase 3 placeholder); else -> Guide (Phase 6 placeholder).

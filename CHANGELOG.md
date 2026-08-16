@@ -2,6 +2,52 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.24] - 2026-08-16
+
+Roku login now works end-to-end on a new promise-based API client, plus a reliable LAN scan and a
+dev-only registry seed. All verified on a real Roku Ultra.
+
+### Fixed
+
+- **Plex login never completed (the real root cause).** Every poll POSTed `{"pinid":…}` —
+  BrightScript associative arrays fold keys to lowercase, so `FormatJson({ pinId })` serialised as
+  `pinid` and the server rejected all polls with `400 "pinId is required"`, stranding you on the QR
+  page. Request bodies (and query strings) are now built **case-sensitively** via `Api.jsonBody` /
+  `Api.url`, so camelCase fields (`pinId`, `channelId`, `ratingKey`, …) survive. Login signs in
+  end-to-end now.
+- **LAN scan was flaky (found a server once, then not).** The batched `/24` sweep shared one message
+  port across batches, so abandoned probes from an earlier batch leaked late events into a later
+  batch's event count — a batch could exit before the live server answered. Each batch now uses a
+  **fresh `roMessagePort`** (plus explicit straggler-cancel), making discovery deterministic.
+
+### Added
+
+- **Promise-based `api.bs` — the typed API client, a port of tv-web's `api.ts`.** Built on
+  `@rokucommunity/promises`; every endpoint returns a Promise (`onThen` / `onCatch`), so screens read
+  like the web client instead of hand-rolling `HttpTask` + `observeField`. Covers both login flows
+  (Plex PIN + better-auth device code), the `/api/v1` guide/playback surface, favorites/recents, media
+  resolution, sessions/heartbeat, the capability-diagnostic + device-caps endpoints, and connections.
+  **Login and ServerSetup are converted onto it**, verified on-device (bare + real-HTTP promise
+  resolution and callback `m`-scoping all confirmed). The LAN scan intentionally stays a dedicated
+  `ScanTask` — a bulk subnet sweep, not a single request (mirrors tv-native's batched-probe model).
+- **Dev-only registry seed.** On a **sideloaded** build only (`roAppInfo.IsDev()` — never a Channel
+  Store install), the server URL is pre-seeded when none is stored, so re-sideloading (which wipes the
+  dev-channel registry) no longer forces re-onboarding on every build.
+
+## [0.10.23] - 2026-08-16
+
+Roku login layout matched to tv-native, and a first pass at the device-code polling.
+
+### Changed
+
+- **Login layout to tv-native parity.** The login-header lockup is sized to tv-native's values (mark
+  width 100, static — no animation), the QR card is centered within its column, and the pairing code
+  renders large in JetBrains Mono — so the chooser and the pending/QR views are correctly sized.
+- **Device-code polling** sends a `"{}"` JSON start body (the endpoint expects JSON) and creates a
+  fresh `HttpTask` per poll tick (reusing one Task doesn't reliably re-run on repeated
+  `control="RUN"`). (The poll still didn't complete — the real cause, a JSON key-casing bug, is fixed
+  in 0.10.24.)
+
 ## [0.10.22] - 2026-08-16
 
 Roku polish + the animated brand lockup, all verified on the Ultra via on-device screenshots.

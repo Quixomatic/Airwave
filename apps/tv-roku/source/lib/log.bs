@@ -8,4 +8,24 @@ namespace Log
     sub warn(msg as string)
         print "[Airwave][warn] " + msg
     end sub
+
+    ' Truncate a body/string for logging so a 404 HTML page or a huge JSON blob
+    ' doesn't flood the console — keeps the first `n` chars.
+    function trunc(s as dynamic, n = 200 as integer) as string
+        if s = invalid then return "<invalid>"
+        text = ""
+        t = type(s)
+        if t = "String" or t = "roString"
+            text = s
+        else if t = "Boolean" or t = "roBoolean"
+            text = (s = true) ? "true" : "false"
+        else if t = "Integer" or t = "roInt" or t = "roInteger" or t = "LongInteger" or t = "roLongInteger" or t = "Float" or t = "roFloat" or t = "Double" or t = "roDouble"
+            text = Str(s).Trim()
+        else
+            text = FormatJson(s)
+            if text = invalid then text = "<unprintable>"
+        end if
+        if Len(text) <= n then return text
+        return Left(text, n) + "…(len " + Str(Len(text)).Trim() + ")"
+    end function
 end namespace

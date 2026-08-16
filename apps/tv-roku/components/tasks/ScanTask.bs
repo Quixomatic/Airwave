@@ -1,9 +1,18 @@
+import "pkg:/source/lib/log.bs"
+
 sub init()
     m.top.functionName = "scan"
 end sub
 
+' LAN /24 sweep for `/api/health {ok:true}`, mirroring tv-native's batched-concurrent-probe model
+' (server-scan.ts): fire a batch of async probes, collect them within a budget, advance. The Roku
+' twist that makes it RELIABLE: a FRESH roMessagePort per batch. A single shared port let abandoned
+' probes from an earlier batch deliver late roUrlEvents into a later batch, inflating its event count
+' so it could exit before the live server answered (the "found once, then flaky" bug). Per-batch ports
+' isolate the count completely; stragglers are also explicitly cancelled.
 sub scan()
     prefix = localSubnet()
+    Log.info("[scan] subnet=" + Log.trunc(prefix))
     if prefix = invalid
         m.top.progress = 1.0
         m.top.found = []
@@ -13,13 +22,13 @@ sub scan()
 
     total = 254
     found = []
-    batchSize = 20
+    batchSize = 24        ' concurrent probes per batch (matches tv-native)
     timeoutS = 2          ' each transfer self-aborts if no data within this window
-    batchBudgetMs = 3000  ' max time to collect a batch's events
-    port = CreateObject("roMessagePort")
+    batchBudgetMs = 2500  ' max time to collect a batch's events before moving on
 
     host = 1
     while host <= total
+        port = CreateObject("roMessagePort")   ' FRESH per batch — no cross-batch event leakage
         idToUrl = {}
         xfers = []        ' keep transfers referenced until their events fire (else GC cancels them)
         n = 0
@@ -47,18 +56,28 @@ sub scan()
                 got = got + 1
                 if msg.getResponseCode() = 200
                     u = idToUrl[msg.getSourceIdentity().toStr()]
-                    body = ParseJson(msg.getString())
-                    if u <> invalid and body <> invalid and body.ok = true
-                        found.push(u)
+                    if u <> invalid
+                        body = ParseJson(msg.getString())
+                        if body <> invalid and body.ok = true
+                            found.push(u)
+                            Log.info("[scan] found " + u)
+                        end if
                     end if
                 end if
             end if
         end while
 
+        ' Cancel any stragglers so they can't emit late events; the fresh next-batch port already
+        ' isolates us, this just frees sockets promptly.
+        for each x in xfers
+            x.asyncCancel()
+        end for
+
         m.top.progress = (host - 1) / total
         m.top.found = found
     end while
 
+    Log.info("[scan] done — " + Str(found.count()).Trim() + " found")
     m.top.progress = 1.0
     m.top.found = found
     m.top.finished = true

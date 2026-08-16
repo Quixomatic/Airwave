@@ -1,0 +1,25 @@
+import "pkg:/source/lib/serverUrl.bs"
+import "pkg:/source/lib/log.bs"
+
+' Dev-only conveniences. Everything here is gated on roAppInfo.IsDev() — which is true ONLY for a
+' sideloaded dev channel and false for a Channel Store install — so none of it can reach a shipped
+' build (no manifest bs_const juggling needed).
+namespace Dev
+
+    ' The dev server used while iterating. Re-sideloading a dev channel WIPES its registry, so without
+    ' this we'd re-type this URL on every single build. Seeded only when nothing is stored yet, so a
+    ' real onboarding (or a later change) always wins.
+    const SEED_SERVER_URL = "https://tv.turboforge.io"
+
+    function isDev() as boolean
+        return CreateObject("roAppInfo").IsDev()
+    end function
+
+    ' Pre-seed the registry on a sideloaded build so onboarding isn't required after every re-sideload.
+    sub seedRegistry()
+        if not Dev.isDev() then return
+        if ServerUrl.has() then return
+        ServerUrl.set(Dev.SEED_SERVER_URL)
+        Log.info("[dev] seeded server url -> " + Dev.SEED_SERVER_URL)
+    end sub
+end namespace

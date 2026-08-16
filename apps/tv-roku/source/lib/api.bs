@@ -1,10 +1,28 @@
 import "pkg:/source/lib/serverUrl.bs"
 import "pkg:/source/lib/auth.bs"
+import "pkg:/source/vendor/promises.brs"
 
-' REST helpers — the URL/header builders for the Airwave /api/v1 surface (tv-web lib/api.ts analog).
-' Async I/O itself runs in the HttpTask node (components/tasks/HttpTask); this namespace just builds
-' requests + reads the stored server URL/token. Adopt roku-requests/roku-promise later if desired.
+' Api — the typed, promise-based client for Airwave's server, a near-verbatim port of tv-web's
+' `lib/api.ts`. Every method returns a Promise (via @rokucommunity/promises' global `create()`), so
+' callers read like the web client:
+'
+'     onThen(Api.plexStart(), sub(body, m)
+'         m.pinId = body.pinId
+'     end sub, m)
+'     onCatch(Api.plexStart(), sub(err, m) ... end sub, m)
+'
+' A resolved promise yields the PARSED JSON body (roAssociativeArray | roArray | invalid). A rejected
+' promise yields { status, message, body }. Async I/O runs on an HttpTask (roku-requests) off the
+' render thread; `Api.onResponse` (the global HTTP→promise bridge) settles the promise when it returns.
+'
+' ⚠️ Two BrightScript casing traps this layer handles centrally so screens never hit them:
+'   • request BODIES  — a plain { pinId: x } literal serialises as "pinid" (AAs fold keys to
+'     lowercase). Build bodies with `Api.jsonBody(pairs)` / `Api.obj()` instead.
+'   • query STRINGS   — same fold, so `Api.url(path, pairs)` takes [key,value] pairs (string keys keep
+'     their case) rather than an AA.
 namespace Api
+
+    ' ---- low-level builders -----------------------------------------------------
 
     ' URL-encode a single value via a throwaway roUrlTransfer (no global escape() exists on Roku).
     function escape(s as string) as string
@@ -17,16 +35,30 @@ namespace Api
         return v.toStr()
     end function
 
-    ' Full URL from the stored server base + path (+ optional query assoc; invalid values are dropped).
+    ' Join a string array with commas (BrightScript arrays have no .join()).
+    function joinArr(arr as object, sep = "," as string) as string
+        out = ""
+        if arr = invalid then return out
+        first = true
+        for each v in arr
+            if not first then out = out + sep
+            out = out + Api.asStr(v)
+            first = false
+        end for
+        return out
+    end function
+
+    ' Full URL from the stored server base + path (+ optional query as an array of [key, value] pairs;
+    ' invalid values are dropped). Pairs — not an AA — so camelCase keys keep their casing.
     function url(path as string, query = invalid as object) as string
         full = ServerUrl.get() + path
-        if query <> invalid
+        if query <> invalid and query.count() > 0
             qs = ""
-            for each k in query
-                v = query[k]
+            for each pair in query
+                v = pair[1]
                 if v <> invalid
                     if qs <> "" then qs = qs + "&"
-                    qs = qs + k + "=" + escape(asStr(v))
+                    qs = qs + pair[0] + "=" + Api.escape(Api.asStr(v))
                 end if
             end for
             if qs <> "" then full = full + "?" + qs
@@ -36,7 +68,7 @@ namespace Api
 
     ' Public artwork proxy (no bearer needed — that's why the proxy exists).
     function imageUrl(channelId as string, path as string, w as integer) as string
-        return ServerUrl.get() + "/img/" + channelId + "?path=" + escape(path) + "&w=" + w.toStr()
+        return ServerUrl.get() + "/img/" + channelId + "?path=" + Api.escape(path) + "&w=" + w.toStr()
     end function
 
     ' Standard headers incl. bearer when signed in.
@@ -46,4 +78,236 @@ namespace Api
         if t <> "" then h["Authorization"] = "Bearer " + t
         return h
     end function
+
+    ' An empty CASE-SENSITIVE associative array, for building request bodies whose keys must keep their
+    ' casing (camelCase server fields). Use for anything jsonBody's flat pairs can't express.
+    function obj() as object
+        o = {}
+        o.setModeCaseSensitive()
+        return o
+    end function
+
+    ' Build a JSON request body with EXACT key casing from an array of [key, value] pairs. See the trap
+    ' note above — a plain FormatJson({ pinId: x }) emits "pinid" and the server 400s. Values may be
+    ' strings/numbers/booleans/arrays; nested objects should be built with Api.obj().
+    function jsonBody(pairs as object) as string
+        b = Api.obj()
+        for each pair in pairs
+            if pair[1] <> invalid then b[pair[0]] = pair[1]
+        end for
+        return FormatJson(b)
+    end function
+
+    ' ---- promise core -----------------------------------------------------------
+
+    ' Fire an HTTP request against an ABSOLUTE url and return a Promise that resolves with the parsed
+    ' body or rejects with { status, message, body }. Parents the task to the caller (m.top, else
+    ' m.global) so it survives until it returns; Api.onResponse settles the promise + unparents the task.
+    function requestAbs(method as string, absUrl as string, body = invalid as dynamic, timeoutMs = 0 as integer) as object
+        p = create()
+        task = CreateObject("roSGNode", "HttpTask")
+        task.addFields({ apiPromise: p })
+        req = {
+            method: method,
+            url: absUrl,
+            headers: Api.headers(),
+            body: body
+        }
+        if timeoutMs > 0 then req.timeout = timeoutMs
+        task.request = req
+        parent = m.top
+        if parent = invalid then parent = m.global
+        parent.appendChild(task)
+        task.observeField("response", "Api_onResponse")
+        task.control = "RUN"
+        return p
+    end function
+
+    ' Same, but the path is resolved against the stored server base (the normal case).
+    function request(method as string, path as string, body = invalid as dynamic, query = invalid as object) as object
+        return Api.requestAbs(method, Api.url(path, query), body)
+    end function
+
+    function get(path as string, query = invalid as object) as object
+        return Api.request("GET", path, invalid, query)
+    end function
+
+    function post(path as string, body = invalid as dynamic) as object
+        return Api.request("POST", path, body, invalid)
+    end function
+
+    ' ---- Custom Plex device-link login (server flow, /api/tv/auth/plex/*) --------
+
+    function plexStart() as object
+        return Api.post("/api/tv/auth/plex/start", "{}")
+    end function
+
+    function plexPoll(pinId as dynamic) as object
+        return Api.post("/api/tv/auth/plex/poll", Api.jsonBody([["pinId", pinId]]))
+    end function
+
+    ' ---- better-auth device code (/api/auth/device/*) ---------------------------
+
+    function deviceCode() as object
+        return Api.post("/api/auth/device/code", Api.jsonBody([["client_id", "channelguide-tv"]]))
+    end function
+
+    function deviceToken(deviceCode as string) as object
+        return Api.post("/api/auth/device/token", Api.jsonBody([
+            ["grant_type", "urn:ietf:params:oauth:grant-type:device_code"],
+            ["device_code", deviceCode],
+            ["client_id", "channelguide-tv"]
+        ]))
+    end function
+
+    ' ---- health (onboarding) ----------------------------------------------------
+
+    function health() as object
+        return Api.get("/api/health")
+    end function
+
+    ' Probe an arbitrary base (onboarding, before a server URL is stored). 7s timeout, like tv-web.
+    function healthAt(base as string) as object
+        return Api.requestAbs("GET", base + "/api/health", invalid, 7000)
+    end function
+
+    ' ---- REST guide/playback API (/api/v1, bearer) ------------------------------
+
+    function channels() as object
+        return Api.get("/api/v1/channels")
+    end function
+
+    function packages() as object
+        return Api.get("/api/v1/packages")
+    end function
+
+    function bumperMusic() as object
+        return Api.get("/api/v1/bumper-music")
+    end function
+
+    function favorites() as object
+        return Api.get("/api/v1/favorites")
+    end function
+
+    ' Favorite / unfavorite — sends the DESIRED state (idempotent), not a toggle. POST (the /api/v1
+    ' CORS only allows GET/POST).
+    function setFavorite(channelId as string, favorite as boolean) as object
+        return Api.post("/api/v1/favorites", Api.jsonBody([["channelId", channelId], ["favorite", favorite]]))
+    end function
+
+    function recents() as object
+        return Api.get("/api/v1/recents")
+    end function
+
+    function guide(forwardMinutes = 180 as integer) as object
+        return Api.get("/api/v1/guide", [["forwardMinutes", forwardMinutes]])
+    end function
+
+    function timeline(channelId as string, backMinutes = 360 as integer, forwardMinutes = 180 as integer) as object
+        return Api.get("/api/v1/channels/" + channelId + "/timeline", [["backMinutes", backMinutes], ["forwardMinutes", forwardMinutes]])
+    end function
+
+    function now(channelId as string) as object
+        return Api.get("/api/v1/channels/" + channelId + "/now")
+    end function
+
+    function qualities() as object
+        return Api.get("/api/v1/qualities")
+    end function
+
+    ' Resolve a (ratingKey, offset) → playback URL/profile. `opts` (all optional): deviceId, forceHls,
+    ' quality, audioStreamId, subtitleStreamId, caps {videoCodecs,audioCodecs,directContainers}, network.
+    function media(channelId as string, ratingKey as string, offsetSeconds as integer, opts = {} as object) as object
+        q = [["ratingKey", ratingKey], ["offsetSeconds", offsetSeconds]]
+        if opts.deviceId <> invalid then q.push(["deviceId", opts.deviceId])
+        if opts.forceHls = true then q.push(["forceHls", "1"])
+        if opts.quality <> invalid and opts.quality <> "original" then q.push(["quality", opts.quality])
+        if opts.audioStreamId <> invalid then q.push(["audioStreamId", opts.audioStreamId])
+        if opts.subtitleStreamId <> invalid then q.push(["subtitleStreamId", opts.subtitleStreamId])
+        if opts.caps <> invalid
+            q.push(["vcodecs", Api.joinArr(opts.caps.videoCodecs)])
+            q.push(["acodecs", Api.joinArr(opts.caps.audioCodecs)])
+            q.push(["dcontainers", Api.joinArr(opts.caps.directContainers)])
+        end if
+        if opts.network = "remote" or opts.network = "relay" then q.push(["network", opts.network])
+        return Api.get("/api/v1/channels/" + channelId + "/media", q)
+    end function
+
+    function stop(channelId as string, session as string) as object
+        return Api.post("/api/v1/channels/" + channelId + "/stop", Api.jsonBody([["session", session]]))
+    end function
+
+    ' Watch-session lifecycle. `pairs` = [[key,value]…] (e.g. channelId/state/ratingKey/title/
+    ' delaySeconds/positionAt/transcodeSession) — flat, so jsonBody preserves the casing.
+    function heartbeat(pairs as object) as object
+        return Api.post("/api/v1/sessions/heartbeat", Api.jsonBody(pairs))
+    end function
+
+    function endSession() as object
+        return Api.post("/api/v1/sessions/end", "{}")
+    end function
+
+    function logPlayback(pairs as object) as object
+        return Api.post("/api/v1/playback/log", Api.jsonBody(pairs))
+    end function
+
+    ' ---- capability diagnostic (Phase 4) ----------------------------------------
+
+    function capsManifest() as object
+        return Api.get("/api/v1/caps/manifest")
+    end function
+
+    function capsResult(pairs as object) as object
+        return Api.post("/api/v1/caps/result", Api.jsonBody(pairs))
+    end function
+
+    ' The device report is a caps payload with string-array fields (videoCodecs, audioCodecs,
+    ' directContainers) — flat pairs whose values are arrays serialise correctly.
+    function reportDevice(pairs as object) as object
+        return Api.post("/api/v1/devices/report", Api.jsonBody(pairs))
+    end function
+
+    function deviceCaps(deviceId as string) as object
+        return Api.get("/api/v1/device/caps", [["deviceId", deviceId]])
+    end function
+
+    ' Set one codec/container override; value = invalid CLEARS it (revert to measured).
+    function setDeviceCap(deviceId as string, kind as string, token as string, value as dynamic) as object
+        return Api.post("/api/v1/device/caps", Api.jsonBody([["deviceId", deviceId], ["kind", kind], ["token", token], ["value", value]]))
+    end function
+
+    function resetDeviceCaps(deviceId as string) as object
+        return Api.post("/api/v1/device/caps/reset", Api.jsonBody([["deviceId", deviceId]]))
+    end function
+
+    ' ---- connections (off-network Plex, Phase 5) --------------------------------
+
+    function connections() as object
+        return Api.get("/api/v1/connections")
+    end function
 end namespace
+
+' Global HTTP→promise bridge, referenced BY NAME from Api.request's observeField (namespaced
+' `Api.onResponse` transpiles to the global `Api_onResponse`). Runs under the caller component's m —
+' the same m the promise was created on — so resolve/reject reach the right listeners.
+sub Api_onResponse(event as object)
+    task = event.getRoSGNode()
+    if task = invalid then return
+    resp = task.response
+    p = task.apiPromise
+    parent = task.getParent()
+    if parent <> invalid then parent.removeChild(task)
+    if p = invalid then return
+
+    if resp = invalid
+        reject({ status: 0, message: "No response", body: invalid }, p)
+        return
+    end if
+    if resp.ok = true
+        resolve(resp.body, p)
+    else
+        msg = "Request failed (" + Str(resp.status).Trim() + ")"
+        if resp.body <> invalid and type(resp.body) = "roAssociativeArray" and resp.body.error <> invalid then msg = resp.body.error
+        reject({ status: resp.status, message: msg, body: resp.body }, p)
+    end if
+end sub

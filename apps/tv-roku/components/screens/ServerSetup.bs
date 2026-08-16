@@ -1,4 +1,5 @@
 import "pkg:/source/lib/serverUrl.bs"
+import "pkg:/source/lib/api.bs"
 import "pkg:/source/lib/log.bs"
 import "pkg:/source/input/keys.bs"
 import "pkg:/source/theme.bs"
@@ -31,9 +32,6 @@ sub init()
     m.foundButtons = []
     m.rescanBtn = invalid
     m.items = []
-
-    m.http = CreateObject("roSGNode", "HttpTask")
-    m.http.observeField("response", "onHttpResponse")
 
     rebuildItems()
     m.top.setFocus(true)
@@ -152,30 +150,28 @@ sub connect()
     Log.info("connect -> " + target)
     m.status.color = "0x94A3B8FF"
     m.status.text = "Connecting..."
-    m.http.request = {
-        method: "GET",
-        url: target + "/api/health",
-        headers: { "Content-Type": "application/json" },
-        timeout: 7000
-    }
-    m.http.control = "RUN"
+    p = Api.healthAt(target)
+    onThen(p, onHealthOk, m)
+    onCatch(p, onHealthErr, m)
 end sub
 
-sub onHttpResponse()
-    resp = m.http.response
-    ok = false
-    if resp <> invalid and resp.ok = true and resp.body <> invalid
-        if resp.body.ok = true then ok = true
-    end if
-    if ok
+sub onHealthOk(body as object, _ctx as object)
+    if body <> invalid and body.ok = true
         useServer(m.target)
     else
         m.status.color = "0xF87171FF"
-        if resp <> invalid and resp.status = 0
-            m.status.text = "Couldn't reach that address — check it, and that the server is running."
-        else
-            m.status.text = "That address didn't look like an Airwave server."
-        end if
+        m.status.text = "That address didn't look like an Airwave server."
+    end if
+end sub
+
+sub onHealthErr(err as object, _ctx as object)
+    m.status.color = "0xF87171FF"
+    st = 0
+    if err <> invalid and err.status <> invalid then st = err.status
+    if st = 0
+        m.status.text = "Couldn't reach that address — check it, and that the server is running."
+    else
+        m.status.text = "That address didn't look like an Airwave server."
     end if
 end sub
 
