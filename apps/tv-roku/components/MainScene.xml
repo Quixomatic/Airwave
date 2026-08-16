@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  MainScene — the boot scene (Stage 1: prove the toolchain).
+  For now it just renders the Airwave brand on the navy background. This is the
+  entry point that the onboarding / server-setup screen will replace as we port
+  the tv-web/tv-native flow (onboard -> device-code login -> caps -> guide).
+-->
+<component name="MainScene" extends="Scene">
+    <script type="text/brightscript" uri="MainScene.bs" />
+
+    <children>
+        <Rectangle
+            id="background"
+            width="1920"
+            height="1080"
+            color="0x0B1020FF" />
+
+        <Label
+            id="brand"
+            text="Airwave"
+            width="1920"
+            height="1080"
+            horizAlign="center"
+            vertAlign="center"
+            color="0x8AB4F8FF"
+            font="font:LargeBoldSystemFont" />
+
+        <Label
+            id="tagline"
+            text="Live TV from your library"
+            width="1920"
+            height="1080"
+            translation="[0, 110]"
+            horizAlign="center"
+            vertAlign="center"
+            color="0x9AA5B1FF"
+            font="font:MediumSystemFont" />
+    </children>
+</component>

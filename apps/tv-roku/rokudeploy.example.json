@@ -1,0 +1,8 @@
+{
+  "_comment": "Copy this to rokudeploy.json (gitignored) and fill in your Roku's Developer-Mode IP + dev password. roku-deploy zips the transpiled staging output and sideloads it.",
+  "host": "192.168.1.xxx",
+  "password": "YOUR_DEV_PASSWORD",
+  "rootDir": "out/staging",
+  "outDir": "out",
+  "outFile": "airwave-tv-roku.zip"
+}

@@ -1,0 +1,21 @@
+title=Airwave
+subtitle=Live TV from your library
+
+# Version — kept in lockstep with the other apps/* (see /version-bump). Mirrors package.json 0.10.17.
+major_version=0
+minor_version=10
+build_version=17
+
+# Icons + splash (placeholder solid-navy assets for now — replace with real branded art).
+mm_icon_focus_hd=pkg:/images/icon_focus_hd.png
+mm_icon_focus_fhd=pkg:/images/icon_focus_fhd.png
+splash_screen_hd=pkg:/images/splash_hd.png
+splash_screen_fhd=pkg:/images/splash_fhd.png
+splash_color=#0B1020
+splash_min_time=500
+
+# Design/render at FHD (1920x1080); Roku downscales to 720 on HD boxes.
+ui_resolutions=fhd
+supports_input_launch=1
+
+bs_const=DEBUG=false

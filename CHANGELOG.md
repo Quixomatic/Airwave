@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.17] - 2026-08-15
+
+Scaffolds the Airwave Roku client (`apps/tv-roku`) — the third 10-foot client — and proves it boots on real
+hardware. Stage 1 of the Roku port (`.plans/roku.md`).
+
+### Added
+
+- **`apps/tv-roku` — Roku client scaffold (Stage 1), booting on a real Roku Ultra.** A new BrighterScript +
+  SceneGraph app that renders the Airwave brand via the proven `bsc` → `roku-deploy` sideload loop. It's a
+  separately-maintained **direct port** of tv-web/tv-native (Roku shares no code with them), held to strict
+  visual + functional parity through the client-agnostic `/api/v1`. Framework-less stack mirroring the
+  jellyfin-roku reference: `brighterscript`, `roku-deploy`, `brighterscript-formatter`, `@rokucommunity/bslint`,
+  `@rokucommunity/bslib` (Maestro was the intended framework but is officially deprecated, so we build on modern
+  BrighterScript + plain SceneGraph instead). Dev loop: `pnpm -F tv-roku run sideload` (the script is `sideload`,
+  not `deploy`, to dodge pnpm's built-in `deploy` command).
+
+### Isolation
+
+- tv-roku is fully isolated from the other apps and ships in nothing: Docker builds only `server` (filtered),
+  Vercel installs with `--filter site...`, and the desktop/EAS builds never reference it — so it's never built
+  into or packed into any release artifact. `pnpm install --frozen-lockfile` stays green.
+
 ## [0.10.16] - 2026-08-15
 
 Fixes two webOS-only bugs found by debugging the installed TV app with the remote inspector (both invisible when

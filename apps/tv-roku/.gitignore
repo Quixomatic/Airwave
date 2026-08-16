@@ -1,0 +1,9 @@
+# Build output
+out/
+*.zip
+
+# Secrets: your Roku dev-mode IP + password live here (copy from rokudeploy.example.json)
+rokudeploy.json
+
+# Deps
+node_modules/
