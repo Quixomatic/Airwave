@@ -2,6 +2,40 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.26] - 2026-08-16
+
+Roku **Phase 5 — the off-network Plex probe + the promise data layer wired up.**
+
+### Added
+
+- **`apps/tv-roku` off-network connection probe.** `source/lib/plexConnection.bs` (network helpers,
+  stored in the registry as `cg-tv-network` / `cg-tv-network-override` — the **same keys** as
+  tv-web/tv-native) + `components/tasks/ConnectionProbeTask` (fetches `GET /api/v1/connections` and
+  reachability-probes local → remote → relay via each base's `/identity`, remembering the first that
+  answers; relay → remote → local fallback). Runs once after login. `Api.media()` now auto-stamps the
+  probed `?network=` (a manual override wins — ready for the Phase 10 Settings → Server page). A port of
+  tv-web/tv-native `lib/plex-connection.ts`; since the Roku streams **directly** from Plex, this is what
+  makes off-network playback resolve the remote/relay URL instead of the LAN one.
+- **Data layer confirmed on device.** The promise `Api.*` methods already ARE the data layer
+  (channels/guide/packages/favorites/recents/qualities/bumper-music/now/timeline/media); a dev-only
+  smoke test logs live counts over the bearer API. Verified on the Ultra: probe picked `local` on-LAN,
+  and the API returned 41 channels / 12 packages / a 41-channel guide.
+- **Dev: `*` (options) re-runs the capability diagnostic** (clears the per-server caps-done) — useful
+  now that the registry persists across sideloads, since the diagnostic otherwise never re-runs once
+  done. Gated on `roAppInfo.IsDev()`.
+
+### Fixed
+
+- **Diagnostic crash on the first query-bearing request (`roUrlTransfer` on the render thread).**
+  `Api.url` percent-encoded query params via `CreateObject("roUrlTransfer").escape()`, but
+  `roUrlTransfer` is a **MAIN/TASK-thread-only component** (like `roFontRegistry`) and returns
+  `invalid` on the render thread → a `Dot`-on-`invalid` crash the first time a query was built
+  (`guide?forwardMinutes=…`, and it would have hit `media`/`imageUrl` too). Rewrote `escape()` to
+  percent-encode the UTF-8 bytes via `roByteArray` (thread-safe).
+- **Diagnostic chips weren't centered** (left-aligned under the centered title). Replaced the
+  LayoutGroup + `boundingRect` measurement with deterministic manual positioning (we set each pill's
+  width, so the exact centered row is computed directly). Verified centered on-device.
+
 ## [0.10.25] - 2026-08-16
 
 Roku **Phase 4 — the capability diagnostic**, a parity port of tv-web/tv-native's onboarding that runs

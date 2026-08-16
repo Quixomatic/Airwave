@@ -1,5 +1,6 @@
 import "pkg:/source/lib/serverUrl.bs"
 import "pkg:/source/lib/auth.bs"
+import "pkg:/source/lib/plexConnection.bs"
 import "pkg:/source/vendor/promises.brs"
 
 ' Api — the typed, promise-based client for Airwave's server, a near-verbatim port of tv-web's
@@ -24,9 +25,27 @@ namespace Api
 
     ' ---- low-level builders -----------------------------------------------------
 
-    ' URL-encode a single value via a throwaway roUrlTransfer (no global escape() exists on Roku).
+    ' Percent-encode a value. ⚠️ NOT via roUrlTransfer.escape() — roUrlTransfer is a MAIN/TASK-thread-only
+    ' component (like roFontRegistry) and returns invalid on the RENDER thread, where Api.url runs. Encode
+    ' the UTF-8 bytes ourselves via roByteArray (thread-safe): keep RFC-3986 unreserved chars, %-escape the
+    ' rest.
     function escape(s as string) as string
-        return CreateObject("roUrlTransfer").escape(s)
+        ba = CreateObject("roByteArray")
+        ba.fromAsciiString(s)
+        out = ""
+        for each b in ba
+            if (b >= 65 and b <= 90) or (b >= 97 and b <= 122) or (b >= 48 and b <= 57) or b = 45 or b = 95 or b = 46 or b = 126
+                out = out + Chr(b)
+            else
+                out = out + "%" + Api.hex2(b)
+            end if
+        end for
+        return out
+    end function
+
+    function hex2(b as integer) as string
+        h = "0123456789ABCDEF"
+        return Mid(h, (b \ 16) + 1, 1) + Mid(h, (b mod 16) + 1, 1)
     end function
 
     function asStr(v as dynamic) as string
@@ -229,7 +248,11 @@ namespace Api
             q.push(["acodecs", Api.joinArr(opts.caps.audioCodecs)])
             q.push(["dcontainers", Api.joinArr(opts.caps.directContainers)])
         end if
-        if opts.network = "remote" or opts.network = "relay" then q.push(["network", opts.network])
+        ' Stamp the off-network connection the device probed at launch (server default = local). A caller
+        ' can override via opts.network; otherwise use the stored probe result.
+        net = opts.network
+        if net = invalid then net = PlexConnection.getNetwork()
+        if net = "remote" or net = "relay" then q.push(["network", net])
         return Api.get("/api/v1/channels/" + channelId + "/media", q)
     end function
 

@@ -4,6 +4,7 @@ import "pkg:/source/lib/log.bs"
 import "pkg:/source/lib/api.bs"
 import "pkg:/source/lib/dev.bs"
 import "pkg:/source/lib/device.bs"
+import "pkg:/source/lib/registry.bs"
 
 ' MainScene — app host + entry gate (port of tv-native app/index.tsx routing).
 ' no server -> ServerSetup; no token -> Login; caps not done for this server -> Diagnostic;
@@ -12,6 +13,7 @@ import "pkg:/source/lib/device.bs"
 sub init()
     Log.info("MainScene init")
     m.screen = invalid
+    m.probeStarted = false
     showBootSplash()
 end sub
 
@@ -32,6 +34,13 @@ sub route()
     if m.screen <> invalid
         m.top.removeChild(m.screen)
         m.screen = invalid
+    end if
+
+    ' Once signed in, probe which Plex connection this device can reach (local/remote/relay) so /media
+    ' streams from the right URL off-network. One-shot; the result is stored + read by Api.media.
+    if Auth.hasToken() and not m.probeStarted
+        startConnectionProbe()
+        m.probeStarted = true
     end if
 
     if not ServerUrl.has()
@@ -56,6 +65,51 @@ end sub
 sub onDiagnosticDone()
     Log.info("diagnostic done -> re-routing")
     route()
+end sub
+
+sub startConnectionProbe()
+    t = CreateObject("roSGNode", "ConnectionProbeTask")
+    m.top.appendChild(t)
+    m.connProbe = t
+    t.control = "RUN"
+    Log.info("connection probe started")
+end sub
+
+' Dev-only: prove the promise data layer returns real data over the bearer API before the guide
+' (Phase 6) is built on it. Logs counts to the :8085 console.
+sub devDataSmoke()
+    Log.info("[data] smoke: channels / packages / guide")
+    ch = Api.channels()
+    onThen(ch, onSmokeChannels, m)
+    onCatch(ch, onSmokeDataErr, m)
+    pk = Api.packages()
+    onThen(pk, onSmokePackages, m)
+    onCatch(pk, onSmokeDataErr, m)
+    gd = Api.guide(180)
+    onThen(gd, onSmokeGuide, m)
+    onCatch(gd, onSmokeDataErr, m)
+end sub
+
+sub onSmokeChannels(b as object, _c as object)
+    n = 0
+    if b <> invalid and b.channels <> invalid then n = b.channels.count()
+    Log.info("[data] channels=" + Str(n).Trim())
+end sub
+
+sub onSmokePackages(b as object, _c as object)
+    n = 0
+    if b <> invalid and b.packages <> invalid then n = b.packages.count()
+    Log.info("[data] packages=" + Str(n).Trim())
+end sub
+
+sub onSmokeGuide(b as object, _c as object)
+    n = 0
+    if b <> invalid and b.channels <> invalid then n = b.channels.count()
+    Log.info("[data] guide channels=" + Str(n).Trim())
+end sub
+
+sub onSmokeDataErr(e as object, _c as object)
+    Log.warn("[data] smoke error: " + Log.trunc(e))
 end sub
 
 sub showServerSetup()
@@ -103,4 +157,21 @@ sub showPlaceholder(titleText as string, subText as string)
 
     m.top.appendChild(g)
     m.screen = g
+    m.top.setFocus(true)   ' so MainScene.onKeyEvent gets the dev re-run key
+
+    ' Dev-only: verify the data layer end-to-end (real channels/guide over the bearer API).
+    if Dev.isDev() then devDataSmoke()
 end sub
+
+' Dev-only: * (options) re-runs the capability diagnostic (clears the per-server caps-done). Handy now
+' that the registry persists across sideloads — otherwise the diagnostic never re-runs once done.
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+    if Dev.isDev() and key = "options" and Auth.hasToken()
+        Registry.delete(RegKey.CAPS_DONE)
+        Log.info("[dev] cleared caps-done -> re-running diagnostic")
+        route()
+        return true
+    end if
+    return false
+end function

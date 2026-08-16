@@ -27,7 +27,6 @@ sub init()
     m.doneAnim = m.top.findNode("doneAnim")
     m.continueAnim = m.top.findNode("continueAnim")
     m.continueDelay = m.top.findNode("continueDelay")
-    m.chipTimer = m.top.findNode("chipTimer")
     m.settle = m.top.findNode("settle")
     m.hardCap = m.top.findNode("hardCap")
 
@@ -48,7 +47,6 @@ sub init()
     m.settle.observeField("fire", "onSettle")
     m.hardCap.observeField("fire", "onHardCap")
     m.continueDelay.observeField("fire", "onContinueDelay")
-    m.chipTimer.observeField("fire", "onChipCenter")
     m.clip.observeField("state", "onClipState")
 
     ' Report this device (fire-and-forget), then fetch + run the matrix.
@@ -233,38 +231,37 @@ sub buildChips(cur as object)
     for each k in [cur.container, cur.video, cur.audio, cur.feature, cur.subtitle]
         if k <> invalid and k <> "" and k <> "none" then vals.push(k)
     end for
+    ' We set each pill's width explicitly, so the exact row width is known — compute the centered start
+    ' x and lay the pills out left-to-right from there. No LayoutGroup / boundingRect measurement.
+    widths = []
     total = 0
     for each v in vals
-        txt = UCase(v)
-        w = Len(txt) * 9 + 24
+        w = Len(UCase(v)) * 9 + 24
+        widths.push(w)
+        total = total + w
+    end for
+    if vals.count() > 1 then total = total + (vals.count() - 1) * 8
+
+    x = Int((720 - total) / 2)   ' center within the 720-wide testGroup (chips Group sits at [0,40])
+    for i = 0 to vals.count() - 1
+        w = widths[i]
         g = ch.createChild("Group")
+        g.translation = [x, 0]
         p = g.createChild("Poster")
         p.uri = Theme.npFill(12)
         p.width = w
         p.height = 26
         p.blendColor = "0x94A3B824"
         lbl = g.createChild("Label")
-        lbl.text = txt
+        lbl.text = UCase(vals[i])
         lbl.width = w
         lbl.height = 26
         lbl.horizAlign = "center"
         lbl.vertAlign = "center"
         lbl.color = "0xCBD5E1FF"
         Theme.setFont(lbl, Theme.FONT_SEMI, 13)
-        total = total + w
+        x = x + w + 8
     end for
-    if vals.count() > 1 then total = total + (vals.count() - 1) * 8
-    ' Rough center now (avoids a left-flash), then refine from the REAL laid-out width one frame later.
-    m.chips.translation = [Int((720 - total) / 2), 40]
-    m.chipTimer.control = "start"
-end sub
-
-' Center the chip row from its actual boundingRect width (heuristic pill widths ≠ rendered widths).
-sub onChipCenter()
-    r = m.chips.boundingRect()
-    if r <> invalid and r.width > 0
-        m.chips.translation = [Int((720 - r.width) / 2), 40]
-    end if
 end sub
 
 ' Best-effort streamFormat for a raw test clip. Playback correctness isn't critical (the API is the

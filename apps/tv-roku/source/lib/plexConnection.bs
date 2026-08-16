@@ -1,0 +1,39 @@
+import "pkg:/source/lib/registry.bs"
+
+' PlexConnection — which of the media server's Plex connections THIS device can reach (port of
+' tv-web/tv-native lib/plex-connection.ts). The Airwave server talks to Plex over its LAN baseUrl, but
+' the Roku streams DIRECTLY from Plex — so off-network it needs the remote/relay URL. ConnectionProbeTask
+' probes local→remote→relay once after login and stores the winner here; Api.media() stamps it onto
+' /media as ?network= and the server resolves the matching stored URL. Storage-only (no I/O) so it can
+' be imported by api.bs without a cycle — the probe's network I/O lives in the Task.
+namespace PlexConnection
+
+    function coerce(v as string) as string
+        if v = "local" or v = "remote" or v = "relay" then return v
+        return ""
+    end function
+
+    ' The EFFECTIVE network for /media — a manual override (Settings → Server, later) wins over the probe
+    ' so you can force remote from the LAN to test it. "" = none stored yet (server defaults to local).
+    function getNetwork() as string
+        o = PlexConnection.coerce(Registry.read(RegKey.NETWORK_OVERRIDE))
+        if o <> "" then return o
+        return PlexConnection.coerce(Registry.read(RegKey.NETWORK))
+    end function
+
+    function getOverride() as string
+        return PlexConnection.coerce(Registry.read(RegKey.NETWORK_OVERRIDE))
+    end function
+
+    sub setOverride(n as string)
+        if n = ""
+            Registry.delete(RegKey.NETWORK_OVERRIDE)
+        else
+            Registry.write(RegKey.NETWORK_OVERRIDE, n)
+        end if
+    end sub
+
+    sub setProbed(n as string)
+        Registry.write(RegKey.NETWORK, n)
+    end sub
+end namespace

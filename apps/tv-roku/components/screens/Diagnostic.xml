@@ -43,8 +43,8 @@
         <!-- The thing being tested — animated slide-in per test (diagnostic label + chips, both centered). -->
         <Group id="testGroup" translation="[600,690]">
             <Label id="diag" text="" width="720" horizAlign="center" color="0xF1F5F9FF" />
-            <LayoutGroup id="chips" translation="[360,40]" layoutDirection="horiz" itemSpacings="[8]"
-                horizAlignment="center" vertAlignment="center" />
+            <!-- chips positioned + centered manually in code (deterministic — we set each pill width). -->
+            <Group id="chips" translation="[0,40]" />
             <Animation id="testAnim" duration="0.26" easeFunction="outExpo">
                 <FloatFieldInterpolator id="testFade" key="[0.0,1.0]" keyValue="[0.0,1.0]"
                     fieldToInterp="testGroup.opacity" />
@@ -75,9 +75,6 @@
         </Animation>
         <!-- 0.2s delay before the Continue button animates in. -->
         <Timer id="continueDelay" duration="0.2" repeat="false" />
-
-        <!-- 1 frame after chips are (re)built → measure their real width + center the row. -->
-        <Timer id="chipTimer" duration="0.02" repeat="false" />
 
         <!-- Shows the clip briefly (renders + settles) before we record. -->
         <Timer id="settle" duration="1.8" repeat="false" />

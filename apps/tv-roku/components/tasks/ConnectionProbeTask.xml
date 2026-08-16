@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  ConnectionProbeTask — off-network Plex probe (port of tv-web/tv-native probeConnection). Fetches the
+  media server's connections and remembers the first reachable one (local → remote → relay), stored via
+  PlexConnection so Api.media stamps it onto /media. Run once after login. Output: `network`.
+-->
+<component name="ConnectionProbeTask" extends="Task">
+    <interface>
+        <field id="network" type="string" alwaysNotify="true" />
+    </interface>
+</component>

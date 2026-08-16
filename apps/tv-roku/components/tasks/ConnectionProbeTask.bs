@@ -1,0 +1,67 @@
+import "pkg:/source/vendor/Requests.brs"
+import "pkg:/source/lib/serverUrl.bs"
+import "pkg:/source/lib/auth.bs"
+import "pkg:/source/lib/plexConnection.bs"
+import "pkg:/source/lib/log.bs"
+
+' Off-network probe (blocking roku-requests on this Task thread). Fetch /connections, then reachability-
+' probe each base's /identity in order (local → remote → relay); remember the first that answers. If none
+' answer in time, fall back to the most universally-reachable URL we have (relay tunnels through Plex).
+sub init()
+    m.top.functionName = "probe"
+end sub
+
+sub probe()
+    base = ServerUrl.get()
+    conns = fetchConnections(base)
+    Log.info("[conn] connections local=" + present(conns.local) + " remote=" + present(conns.remote) + " relay=" + present(conns.relay))
+
+    chosen = ""
+    for each pair in [["local", conns.local], ["remote", conns.remote], ["relay", conns.relay]]
+        net = pair[0]
+        url = pair[1]
+        if url <> invalid and url <> "" and reachable(url, 4)
+            chosen = net
+            exit for
+        end if
+    end for
+
+    if chosen = ""
+        if conns.relay <> invalid and conns.relay <> ""
+            chosen = "relay"
+        else if conns.remote <> invalid and conns.remote <> ""
+            chosen = "remote"
+        else
+            chosen = "local"
+        end if
+    end if
+
+    PlexConnection.setProbed(chosen)
+    Log.info("[conn] probed network=" + chosen)
+    m.top.network = chosen
+end sub
+
+function fetchConnections(base as string) as object
+    out = { local: invalid, remote: invalid, relay: invalid }
+    headers = { "Content-Type": "application/json" }
+    t = Auth.token()
+    if t <> "" then headers["Authorization"] = "Bearer " + t
+    resp = Requests().get(base + "/api/v1/connections", { headers: headers, timeout: 5000 })
+    if resp <> invalid and resp.json <> invalid
+        out.local = resp.json.local
+        out.remote = resp.json.remote
+        out.relay = resp.json.relay
+    end if
+    return out
+end function
+
+' Reachable === the base answered /identity with any HTTP status (server is there), vs a timeout/failure.
+function reachable(url as string, timeoutS as integer) as boolean
+    resp = Requests().get(url + "/identity", { timeout: timeoutS * 1000 })
+    return (resp <> invalid and resp.statusCode <> invalid and resp.statusCode > 0)
+end function
+
+function present(v as dynamic) as string
+    if v = invalid or v = "" then return "-"
+    return "yes"
+end function
