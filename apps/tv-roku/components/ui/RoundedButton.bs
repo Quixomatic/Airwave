@@ -1,0 +1,47 @@
+import "pkg:/source/theme.bs"
+
+sub init()
+    m.bg = m.top.findNode("bg")
+    m.ring = m.top.findNode("ring")
+    m.label = m.top.findNode("label")
+    render()
+end sub
+
+sub render()
+    if m.bg = invalid then return   ' fields can change before init()
+    r = m.top.radius
+    w = m.top.w
+    h = m.top.h
+    focused = m.top.focused
+
+    m.bg.width = w
+    m.bg.height = h
+
+    if m.top.outlined and not focused
+        m.bg.uri = Theme.npBorder(r)
+        m.bg.blendColor = m.top.fillColor    ' border color when outlined + unfocused
+        m.label.color = m.top.textColor
+    else
+        m.bg.uri = Theme.npFill(r)
+        if focused
+            m.bg.blendColor = m.top.focusFill
+            m.label.color = m.top.focusInk
+        else
+            m.bg.blendColor = m.top.fillColor
+            m.label.color = m.top.textColor
+        end if
+    end if
+
+    ' Focus ring — an accent outline just outside the button (tv-web's outline + offset).
+    m.ring.visible = focused and not m.top.outlined
+    m.ring.uri = Theme.npBorder(r)
+    m.ring.blendColor = m.top.focusFill
+    m.ring.width = w + 6
+    m.ring.height = h + 6
+    m.ring.translation = [-3, -3]
+
+    m.label.text = m.top.text
+    m.label.width = w
+    m.label.height = h
+    m.label.font = Theme.font(m.top.fontUri, m.top.fontSize)
+end sub

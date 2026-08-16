@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  RoundedButton — the parity button/input surface: a tintable rounded-rect 9-patch background + an
+  Inter label, with a focus ring (matches tv-web's `outline` focus). The parent drives `focused`.
+  `outlined=true` = transparent centre + colored border (tv-web's "code" button); focus fills it accent.
+-->
+<component name="RoundedButton" extends="Group">
+    <interface>
+        <field id="text" type="string" onChange="render" />
+        <field id="radius" type="integer" value="16" onChange="render" />
+        <field id="w" type="float" value="900" onChange="render" />
+        <field id="h" type="float" value="92" onChange="render" />
+        <field id="fillColor" type="string" value="0x0B1120FF" onChange="render" />
+        <field id="textColor" type="string" value="0xF1F5F9FF" onChange="render" />
+        <field id="focusFill" type="string" value="0x4A9FE0FF" onChange="render" />
+        <field id="focusInk" type="string" value="0x04060CFF" onChange="render" />
+        <field id="fontUri" type="string" value="pkg:/fonts/Inter-SemiBold.ttf" onChange="render" />
+        <field id="fontSize" type="integer" value="26" onChange="render" />
+        <field id="outlined" type="boolean" value="false" onChange="render" />
+        <field id="focused" type="boolean" value="false" onChange="render" />
+    </interface>
+    <children>
+        <Poster id="ring" visible="false" />
+        <Poster id="bg" />
+        <Label id="label" horizAlign="center" vertAlign="center" />
+    </children>
+</component>

@@ -1,0 +1,55 @@
+' Theme — the single source of truth for Roku styling, ported EXACTLY from tv-web.
+' Colors are ARGB (0xRRGGBBAA). Fonts are bundled Inter (matches tv-native) + JetBrains Mono for codes.
+' Rounded corners come from tintable white 9-patch PNGs (blendColor); radii match tv-web px.
+namespace Theme
+    ' --- Colors (from tv-web lib/theme.ts C + the inline hexes in setup/login) ---
+    const BG = "0x060A14FF"          ' C.bg #060a14
+    const CARD = "0x0B1120FF"        ' C.card / input #0b1120
+    const FG = "0xF1F5F9FF"          ' text #f1f5f9
+    const MUTED = "0x94A3B8FF"       ' subtext #94a3b8
+    const ACCENT = "0x4A9FE0FF"      ' server-setup ACCENT #4a9fe0
+    const ACCENT_INK = "0x04060CFF"  ' dark ink on accent #04060c
+    const ERROR = "0xF87171FF"       ' red-400 #f87171
+    const HINT = "0x64748BFF"        ' #64748b
+    const BORDER = "0x94A3B840"      ' rgba(148,163,184,0.25)
+
+    ' login (Tailwind) colors
+    const PLEX = "0xF59E0BFF"        ' amber-500 #f59e0b
+    const PLEX_INK = "0x000000FF"    ' text-black
+    const PLEX_HOVER = "0xFBBF24FF"  ' amber-400 (focused)
+    const ZINC200 = "0xE4E4E7FF"     ' text-zinc-200
+    const ZINC400 = "0xA1A1AAFF"     ' text-zinc-400
+    const ZINC700 = "0x3F3F46FF"     ' border-zinc-700
+    const ZINC800 = "0x27272AFF"     ' border-zinc-800
+    const ZINC600 = "0x52525BFF"     ' text-zinc-600
+    const PANEL = "0x181B24E6"       ' zinc-900/60-ish panel over bg
+    const WHITE = "0xFFFFFFFF"
+
+    ' --- Fonts (bundled) ---
+    const FONT_REG = "pkg:/fonts/Inter-Regular.ttf"
+    const FONT_MED = "pkg:/fonts/Inter-Medium.ttf"
+    const FONT_SEMI = "pkg:/fonts/Inter-SemiBold.ttf"
+    const FONT_BOLD = "pkg:/fonts/Inter-Bold.ttf"
+    const FONT_MONO = "pkg:/fonts/JetBrainsMono-Medium.ttf"
+
+    ' --- Rounded-rect 9-patches (white; tint via Poster blendColor) ---
+    function npFill(radius as integer) as string
+        if radius >= 16 then return "pkg:/images/np/fill-16.9.png"
+        if radius >= 14 then return "pkg:/images/np/fill-14.9.png"
+        if radius >= 12 then return "pkg:/images/np/fill-12.9.png"
+        return "pkg:/images/np/fill-8.9.png"
+    end function
+
+    function npBorder(radius as integer) as string
+        if radius >= 16 then return "pkg:/images/np/border-16.9.png"
+        return "pkg:/images/np/border-12.9.png"
+    end function
+
+    ' Build a Font node at an exact px size.
+    function font(uri as string, size as integer) as object
+        f = CreateObject("roSGNode", "Font")
+        f.uri = uri
+        f.size = size
+        return f
+    end function
+end namespace

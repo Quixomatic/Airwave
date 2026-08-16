@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!--
-  ServerSetup — first-launch onboarding. Port of tv-web features/setup/server-setup.tsx.
-  Enter the Airwave server address (StandardKeyboardDialog), validate against /api/health, store it,
-  and signal `done` so the host re-routes. LAN scan (server-scan.ts) is Phase 2b, not here yet.
-  Fires `done=true` on a successful connection.
+  ServerSetup — first-launch onboarding. Port of tv-web features/setup/server-setup.tsx, styled to match:
+  #060a14 bg, 720px centered column, Inter type at tv-web's px sizes, 16px rounded input + Connect
+  (9-patch), accent focus rings. LAN scan (server-scan.ts) is Phase 2b.
 -->
 <component name="ServerSetup" extends="Group">
     <interface>
@@ -13,30 +12,36 @@
     <children>
         <Rectangle id="bg" width="1920" height="1080" color="0x060A14FF" />
 
-        <Label id="title" text="Connect to your server" translation="[510,300]" width="900"
-            horizAlign="center" color="0xF1F5F9FF" font="font:LargeBoldSystemFont" />
+        <Label id="title" text="Connect to your server" translation="[600,300]" width="720"
+            horizAlign="center" color="0xF1F5F9FF">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="34" />
+        </Label>
 
-        <Label id="subtitle"
-            text="Enter the address of your Airwave server — a local IP like 192.168.1.50:3000, or a domain."
-            translation="[510,372]" width="900" height="80" horizAlign="center" wrap="true"
-            color="0x94A3B8FF" font="font:MediumSystemFont" />
+        <Label id="subtitle" translation="[600,356]" width="720" height="72" horizAlign="center" wrap="true"
+            color="0x94A3B8FF"
+            text="Enter the address of your Airwave server — a local IP like 192.168.1.50:3000, or a domain.">
+            <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="18" />
+        </Label>
 
-        <Rectangle id="addressBox" translation="[510,480]" width="900" height="96" color="0x0B1120FF">
-            <Label id="addressLabel" translation="[30,0]" width="840" height="96" vertAlign="center"
-                horizAlign="center" color="0xF1F5F9FF" font="font:MediumBoldSystemFont"
-                text="Press OK to enter the address" />
-        </Rectangle>
+        <RoundedButton id="addr" translation="[600,456]" w="720" h="74" radius="16"
+            fillColor="0x0B1120FF" textColor="0xF1F5F9FF"
+            focusFill="0x0B1120FF" focusInk="0xF1F5F9FF"
+            fontUri="pkg:/fonts/Inter-Regular.ttf" fontSize="24"
+            text="Press OK to enter the address" />
 
-        <Rectangle id="connectBox" translation="[510,600]" width="900" height="88" color="0x2E6FA0FF">
-            <Label id="connectLabel" width="900" height="88" vertAlign="center" horizAlign="center"
-                color="0xEAF2FBFF" font="font:MediumBoldSystemFont" text="Connect" />
-        </Rectangle>
+        <RoundedButton id="connect" translation="[600,550]" w="720" h="72" radius="16"
+            fillColor="0x4A9FE0FF" textColor="0x04060CFF"
+            focusFill="0x66B0EAFF" focusInk="0x04060CFF"
+            fontUri="pkg:/fonts/Inter-Bold.ttf" fontSize="20" text="Connect" />
 
-        <Label id="status" translation="[510,712]" width="900" height="40" horizAlign="center"
-            color="0xF87171FF" font="font:MediumSystemFont" text="" />
+        <Label id="hint" text="Up / Down to move  ·  OK to select" translation="[600,640]" width="720"
+            horizAlign="center" color="0x64748BFF">
+            <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="14" />
+        </Label>
 
-        <Label id="hint" translation="[510,762]" width="900" horizAlign="center"
-            color="0x64748BFF" font="font:SmallSystemFont"
-            text="Up / Down to move  ·  OK to select" />
+        <Label id="status" text="" translation="[600,688]" width="720" height="40" horizAlign="center"
+            color="0xF87171FF">
+            <Font role="font" uri="pkg:/fonts/Inter-Medium.ttf" size="16" />
+        </Label>
     </children>
 </component>

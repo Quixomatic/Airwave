@@ -8,17 +8,15 @@ import "pkg:/source/input/keys.bs"
 
 sub init()
     m.chooser = m.top.findNode("chooser")
-    m.plexBox = m.top.findNode("plexBox")
-    m.plexLabel = m.top.findNode("plexLabel")
-    m.codeBox = m.top.findNode("codeBox")
-    m.codeLabel = m.top.findNode("codeLabel")
+    m.plexBtn = m.top.findNode("plexBtn")
+    m.codeBtn = m.top.findNode("codeBtn")
 
     m.pending = m.top.findNode("pending")
     m.pHeading = m.top.findNode("pHeading")
     m.pInstruction = m.top.findNode("pInstruction")
     m.pCode = m.top.findNode("pCode")
     m.qr = m.top.findNode("qr")
-    m.backBox = m.top.findNode("backBox")
+    m.backBtn = m.top.findNode("backBtn")
 
     m.error = m.top.findNode("error")
     m.serverLabel = m.top.findNode("serverLabel")
@@ -43,7 +41,7 @@ sub init()
     m.top.setFocus(true)
 end sub
 
-' ---- focus / view state -------------------------------------------------------
+' ---- view state ---------------------------------------------------------------
 
 sub showChooser()
     m.mode = "chooser"
@@ -62,22 +60,13 @@ sub showPending(heading as string, instruction as string, code as string, qrValu
     m.chooser.visible = false
     m.pending.visible = true
     m.error.text = ""
-    setSel(0)
+    m.backBtn.focused = true
 end sub
 
 sub setSel(i as integer)
     m.sel = i
-    if m.mode = "chooser"
-        if i = 0
-            m.plexBox.color = "0xFFC65AFF"
-            m.codeBox.color = "0x0B1120FF"
-            m.codeLabel.color = "0xF1F5F9FF"
-        else
-            m.plexBox.color = "0xF5A623FF"
-            m.codeBox.color = "0x1B2740FF"
-            m.codeLabel.color = "0xFFFFFFFF"
-        end if
-    end if
+    m.plexBtn.focused = (i = 0)
+    m.codeBtn.focused = (i = 1)
 end sub
 
 ' ---- input --------------------------------------------------------------------
@@ -101,7 +90,11 @@ function onKeyEvent(key as string, press as boolean) as boolean
         setSel(1)
         return true
     else if key = Keys.OK
-        if m.sel = 0 then startPlex() else startDevice()
+        if m.sel = 0
+            startPlex()
+        else
+            startDevice()
+        end if
         return true
     end if
     return false
@@ -197,14 +190,12 @@ sub onPollResponse()
         else if b.status = "unregistered"
             resetToChooser("No Airwave account for " + b.email + ". Ask an admin to import you.")
         end if
-        ' "pending" -> keep polling
     else
         if b.access_token <> invalid
             finishLogin(b.access_token)
         else if b.error = "expired_token" or b.error = "access_denied"
             resetToChooser("That code expired or was denied — try again.")
         end if
-        ' authorization_pending / slow_down -> keep polling
     end if
 end sub
 

@@ -2,6 +2,27 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.20] - 2026-08-16
+
+Roku **parity styling pass** — real border-radius, exact colors, Inter typography, and focus rings, so
+ServerSetup + Login match tv-web pixel-for-pixel instead of being roughly-styled skeletons.
+
+### Added
+
+- **Shared styling foundation.** `source/theme.bs` (exact ARGB colors + font URIs ported from tv-web's
+  `theme.ts` + the setup/login source), the bundled **Inter** family + **JetBrains Mono** (for pairing codes),
+  tintable rounded-rect **9-patch** PNGs (anti-aliased, generated with Pillow — `images/np/`), and a reusable
+  **`RoundedButton`** component (9-patch background + `blendColor` tint + Inter label + accent focus ring, plus
+  an `outlined` variant).
+
+### Changed
+
+- **ServerSetup + Login retrofit to pixel parity** with tv-web: 16px-rounded input/buttons (9-patch — no more
+  sharp rectangles), exact colors (`#060a14`/`#0b1120`/`#4a9fe0`/amber-500/zinc tokens), Inter at tv-web's real
+  px sizes, outline focus rings (not background swaps), and a monospace pairing code. Login's pending view is the
+  two-column translucent panel + white QR card, matching tv-web's layout.
+- `bsconfig.json` `files` now includes `fonts/**` so the bundled TTFs ship in the package.
+
 ## [0.10.19] - 2026-08-16
 
 Adds Roku **Phase 3** — the login screen with both device-code flows, a direct port of tv-web `login.tsx`.

@@ -6,10 +6,8 @@ import "pkg:/source/input/keys.bs"
 ' Two focusables: [0] address (opens the keyboard dialog), [1] Connect (validates /api/health).
 
 sub init()
-    m.addressBox = m.top.findNode("addressBox")
-    m.addressLabel = m.top.findNode("addressLabel")
-    m.connectBox = m.top.findNode("connectBox")
-    m.connectLabel = m.top.findNode("connectLabel")
+    m.addr = m.top.findNode("addr")
+    m.connect = m.top.findNode("connect")
     m.status = m.top.findNode("status")
 
     m.url = ""       ' what the user typed
@@ -25,22 +23,12 @@ end sub
 
 sub setSel(i as integer)
     m.sel = i
-    if i = 0
-        m.addressBox.color = "0x4A9FE0FF"
-        m.addressLabel.color = "0x04060CFF"
-        m.connectBox.color = "0x2E6FA0FF"
-        m.connectLabel.color = "0xEAF2FBFF"
-    else
-        m.addressBox.color = "0x0B1120FF"
-        m.addressLabel.color = "0xF1F5F9FF"
-        m.connectBox.color = "0x4A9FE0FF"
-        m.connectLabel.color = "0x04060CFF"
-    end if
+    m.addr.focused = (i = 0)
+    m.connect.focused = (i = 1)
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
-    Log.info("key " + key)
     if key = Keys.UP
         setSel(0)
         return true
@@ -59,8 +47,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
     return false
 end function
 
-' Text entry via StandardKeyboardDialog — following jellyfin config/SetServerScreen.bs:
-' attach an RSGPalette so it renders styled, show via scene.dialog, and dismiss with `close = true`.
+' Text entry via StandardKeyboardDialog — following jellyfin config/SetServerScreen.bs.
 sub openKeyboard()
     dlg = CreateObject("roSGNode", "StandardKeyboardDialog")
     dlg.title = "Enter your server's address"
@@ -81,7 +68,7 @@ sub onKbdButton()
     m.top.setFocus(true)
     if idx = 0   ' Connect
         m.url = text
-        if m.url <> "" then m.addressLabel.text = m.url
+        if m.url <> "" then m.addr.text = m.url
         connect()
     end if
 end sub
@@ -108,6 +95,7 @@ end sub
 
 sub onHttpResponse()
     resp = m.http.response
+    if resp <> invalid then Log.info("health status=" + Str(resp.status))
     ok = false
     if resp <> invalid and resp.ok = true and resp.body <> invalid
         if resp.body.ok = true then ok = true
