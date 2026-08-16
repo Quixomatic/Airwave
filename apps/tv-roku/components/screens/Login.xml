@@ -12,9 +12,8 @@
     <children>
         <Rectangle id="bg" width="1920" height="1080" color="0x060A14FF" />
 
-        <Label id="title" text="Airwave" translation="[510,290]" width="900" horizAlign="center"
-            color="0x8AB4F8FF" />
-        <Label id="subtitle" text="Sign in to start watching." translation="[510,364]" width="900"
+        <LogoLockup id="logo" markWidth="130" centerY="255" animate="false" />
+        <Label id="subtitle" text="Sign in to start watching." translation="[510,360]" width="900"
             horizAlign="center" color="0xA1A1AAFF" />
 
         <!-- Chooser -->

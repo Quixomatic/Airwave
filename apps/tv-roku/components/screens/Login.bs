@@ -24,7 +24,6 @@ sub init()
     m.serverLabel.text = "Server: " + ServerUrl.get()
 
     ' Fonts via the mutation path (custom TTFs render blank via <Font role> / new Font node on Roku).
-    Theme.setFont(m.top.findNode("title"), Theme.FONT_BOLD, 48)
     Theme.setFont(m.top.findNode("subtitle"), Theme.FONT_REG, 18)
     Theme.setFont(m.pHeading, Theme.FONT_SEMI, 26)
     Theme.setFont(m.pInstruction, Theme.FONT_REG, 18)

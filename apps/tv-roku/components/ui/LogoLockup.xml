@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  LogoLockup — the Airwave brand lockup (mark + "Airwave" wordmark) with the entrance animation, shared by
+  BootSplash (big, centered, then fades out) and Login (smaller header). Port of tv-web <Logo animate> /
+  tv-native boot-splash: the mark fades + scales in, then each letter slides up (translateY 16->0) and fades
+  in, staggered. Fires `introDone` when the cascade completes. `markWidth` + `centerY` set via XML.
+  Centers itself horizontally within 1920; vertical center at `centerY`.
+-->
+<component name="LogoLockup" extends="Group">
+    <interface>
+        <field id="markWidth" type="integer" value="200" />
+        <field id="centerY" type="integer" value="540" />
+        <field id="animate" type="boolean" value="true" />
+        <field id="introDone" type="boolean" value="false" alwaysNotify="true" />
+    </interface>
+    <children>
+        <Poster id="mark" />
+        <Group id="letters" />
+    </children>
+</component>

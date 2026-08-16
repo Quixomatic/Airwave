@@ -99,29 +99,46 @@ end sub
 
 ' ---- manual entry -------------------------------------------------------------
 
+' The keyboard only CAPTURES the address into the field — it never submits. The user then presses the
+' big Connect button. Whatever was typed is kept even on Cancel / Back, so nothing is lost.
 sub openKeyboard()
     dlg = CreateObject("roSGNode", "StandardKeyboardDialog")
     dlg.title = "Enter your server's address"
-    dlg.buttons = ["Connect", "Cancel"]
+    dlg.buttons = ["OK", "Cancel"]
     if m.url <> "" then dlg.text = m.url
     dlg.palette = CreateObject("roSGNode", "RSGPalette")
     m.kbd = dlg
     dlg.observeField("buttonSelected", "onKbdButton")
+    dlg.observeField("wasClosed", "onKbdClosed")   ' catch a raw Back-dismiss too
     m.top.getScene().dialog = dlg
 end sub
 
 sub onKbdButton()
     if m.kbd = invalid then return
-    idx = m.kbd.buttonSelected
-    text = m.kbd.text
-    m.kbd.close = true
+    okPressed = (m.kbd.buttonSelected = 0)
+    captureAddress(m.kbd.text)
+    closeKeyboard()
+    ' On OK, tee up the big Connect button so the user just presses OK again to submit.
+    if okPressed then setSel(1)
+end sub
+
+sub onKbdClosed()
+    if m.kbd = invalid then return   ' already handled by the button press
+    captureAddress(m.kbd.text)
+    closeKeyboard()
+end sub
+
+sub captureAddress(text as string)
+    if text <> ""
+        m.url = text
+        m.addr.text = text
+    end if
+end sub
+
+sub closeKeyboard()
+    if m.kbd <> invalid then m.kbd.close = true
     m.kbd = invalid
     m.top.setFocus(true)
-    if idx = 0
-        m.url = text
-        if m.url <> "" then m.addr.text = m.url
-        connect()
-    end if
 end sub
 
 sub connect()

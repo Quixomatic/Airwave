@@ -1,0 +1,42 @@
+' BootSplash — plays the LogoLockup intro, holds, fades the lockup out, then fires `done`.
+const HOLD_MS = 0.45
+const OUT_MS = 0.38
+
+sub init()
+    m.logo = m.top.findNode("logo")
+    m.logo.observeField("introDone", "onIntroDone")
+end sub
+
+sub onIntroDone()
+    m.holdTimer = makeTimer(HOLD_MS, false, "onHold")
+end sub
+
+sub onHold()
+    m.holdTimer.control = "stop"
+    fade = CreateObject("roSGNode", "Animation")
+    fade.duration = OUT_MS
+    fade.easeFunction = "outExpo"
+    ip = CreateObject("roSGNode", "FloatFieldInterpolator")
+    ip.fieldToInterp = "logo.opacity"
+    ip.key = [0.0, 1.0]
+    ip.keyValue = [1.0, 0.0]
+    fade.appendChild(ip)
+    m.top.appendChild(fade)
+    fade.control = "start"
+    m.doneTimer = makeTimer(OUT_MS + 0.05, false, "onDone")
+end sub
+
+sub onDone()
+    m.doneTimer.control = "stop"
+    m.top.done = true
+end sub
+
+function makeTimer(dur as float, rep as boolean, cb as string) as object
+    t = CreateObject("roSGNode", "Timer")
+    t.duration = dur
+    t.repeat = rep
+    m.top.appendChild(t)
+    t.observeField("fire", cb)
+    t.control = "start"
+    return t
+end function

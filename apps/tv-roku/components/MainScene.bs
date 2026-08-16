@@ -8,6 +8,19 @@ import "pkg:/source/lib/log.bs"
 sub init()
     Log.info("MainScene init")
     m.screen = invalid
+    showBootSplash()
+end sub
+
+sub showBootSplash()
+    s = CreateObject("roSGNode", "BootSplash")
+    m.top.appendChild(s)
+    s.observeField("done", "onBootDone")
+    s.setFocus(true)
+    m.screen = s
+end sub
+
+sub onBootDone()
+    Log.info("boot splash done -> routing")
     route()
 end sub
 

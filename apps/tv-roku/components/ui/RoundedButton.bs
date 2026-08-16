@@ -35,7 +35,7 @@ sub render()
     ' Focus ring — an accent outline offset OUTSIDE the button with a visible gap (tv-web's
     ' outline + outline-offset), so it reads as a ring, not just a bigger button.
     gap = 9
-    m.ring.visible = focused and not m.top.outlined
+    m.ring.visible = focused
     m.ring.uri = Theme.npBorder(r)
     m.ring.blendColor = Theme.ACCENT   ' focus ring is always accent (tv-web's outline color)
     m.ring.width = w + gap * 2

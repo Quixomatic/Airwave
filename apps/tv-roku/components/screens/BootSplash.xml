@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  BootSplash — the full-screen load-up: plays the shared LogoLockup entrance animation (mark scale/fade +
+  letter cascade), holds, then fades the lockup out and fires `done` so MainScene routes into the app.
+-->
+<component name="BootSplash" extends="Group">
+    <interface>
+        <field id="done" type="boolean" alwaysNotify="true" />
+    </interface>
+    <children>
+        <Rectangle id="bg" width="1920" height="1080" color="0x060A14FF" />
+        <LogoLockup id="logo" markWidth="200" centerY="540" />
+    </children>
+</component>

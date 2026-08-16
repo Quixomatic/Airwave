@@ -1,0 +1,144 @@
+import "pkg:/source/theme.bs"
+
+const LETTER_START = 0.35
+const LETTER_STEP = 0.055
+const LETTER_MS = 0.4
+const MARK_MS = 0.5
+const RISE = 16
+const EASE = "outExpo"
+
+sub init()
+    m.chars = ["A", "i", "r", "w", "a", "v", "e"]
+    m.mw = m.top.markWidth
+    m.markH = Int(m.mw * 517 / 715)
+
+    m.mark = m.top.findNode("mark")
+    m.mark.uri = "pkg:/images/logo.png"
+    m.mark.width = m.mw
+    m.mark.height = m.markH
+    m.mark.scaleRotateCenter = [Int(m.mw / 2), Int(m.markH / 2)]
+    m.mark.opacity = 0
+
+    letters = m.top.findNode("letters")
+    fontSize = Int(m.mw * 0.66)
+    m.letterNodes = []
+    for i = 0 to m.chars.count() - 1
+        lbl = letters.createChild("Label")
+        lbl.id = "L" + i.toStr()
+        lbl.text = m.chars[i]
+        lbl.color = "0xFFFFFFFF"
+        Theme.setFont(lbl, Theme.FONT_BOLD, fontSize)
+        lbl.opacity = 0
+        m.letterNodes.push(lbl)
+    end for
+
+    ' Let the Labels render a frame so boundingRect() is real, then lay out + animate.
+    m.readyTimer = makeTimer(0.03, false, "onReady")
+end sub
+
+sub onReady()
+    m.readyTimer.control = "stop"
+    gap = Int(m.mw * 0.1)
+
+    widths = []
+    totalW = 0
+    for each n in m.letterNodes
+        w = n.boundingRect().width
+        widths.push(w)
+        totalW = totalW + w
+    end for
+    lh = m.letterNodes[0].boundingRect().height
+    lockupW = m.mw + gap + totalW
+    x0 = Int((1920 - lockupW) / 2)
+    yc = m.top.centerY
+
+    m.mark.translation = [x0, yc - Int(m.markH / 2)]
+    ly = yc - Int(lh / 2)
+    lx = x0 + m.mw + gap
+
+    if m.top.animate
+        m.mark.scale = [0.82, 0.82]
+        m.letterAnims = []
+        for i = 0 to m.letterNodes.count() - 1
+            m.letterNodes[i].translation = [lx, ly + RISE]
+            m.letterAnims.push(makeLetterAnim("L" + i.toStr(), lx, ly))
+            lx = lx + widths[i]
+        end for
+        makeMarkAnim().control = "start"
+        m.idx = 0
+        m.startTimer = makeTimer(LETTER_START, false, "onStartCascade")
+    else
+        ' static (login header) — no entrance animation, matches tv-native's <Logo>.
+        m.mark.opacity = 1
+        m.mark.scale = [1.0, 1.0]
+        for i = 0 to m.letterNodes.count() - 1
+            m.letterNodes[i].translation = [lx, ly]
+            m.letterNodes[i].opacity = 1
+            lx = lx + widths[i]
+        end for
+        m.top.introDone = true
+    end if
+end sub
+
+function makeMarkAnim() as object
+    a = CreateObject("roSGNode", "Animation")
+    a.duration = MARK_MS
+    a.easeFunction = EASE
+    a.appendChild(floatInterp("mark.opacity", 0.0, 1.0))
+    a.appendChild(vec2Interp("mark.scale", [0.82, 0.82], [1.0, 1.0]))
+    m.top.appendChild(a)
+    return a
+end function
+
+function makeLetterAnim(id as string, x as integer, y as integer) as object
+    a = CreateObject("roSGNode", "Animation")
+    a.duration = LETTER_MS
+    a.easeFunction = EASE
+    a.appendChild(floatInterp(id + ".opacity", 0.0, 1.0))
+    a.appendChild(vec2Interp(id + ".translation", [x, y + RISE], [x, y]))
+    m.top.appendChild(a)
+    return a
+end function
+
+function floatInterp(field as string, fromV as float, toV as float) as object
+    ip = CreateObject("roSGNode", "FloatFieldInterpolator")
+    ip.fieldToInterp = field
+    ip.key = [0.0, 1.0]
+    ip.keyValue = [fromV, toV]
+    return ip
+end function
+
+function vec2Interp(field as string, fromV as object, toV as object) as object
+    ip = CreateObject("roSGNode", "Vector2DFieldInterpolator")
+    ip.fieldToInterp = field
+    ip.key = [0.0, 1.0]
+    ip.keyValue = [fromV, toV]
+    return ip
+end function
+
+function makeTimer(dur as float, rep as boolean, cb as string) as object
+    t = CreateObject("roSGNode", "Timer")
+    t.duration = dur
+    t.repeat = rep
+    m.top.appendChild(t)
+    t.observeField("fire", cb)
+    t.control = "start"
+    return t
+end function
+
+sub onStartCascade()
+    m.startTimer.control = "stop"
+    m.idx = 0
+    m.cascadeTimer = makeTimer(LETTER_STEP, true, "onCascadeTick")
+    onCascadeTick()
+end sub
+
+sub onCascadeTick()
+    if m.idx >= m.letterAnims.count()
+        m.cascadeTimer.control = "stop"
+        m.top.introDone = true
+        return
+    end if
+    m.letterAnims[m.idx].control = "start"
+    m.idx = m.idx + 1
+end sub

@@ -2,6 +2,36 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.22] - 2026-08-16
+
+Roku polish + the animated brand lockup, all verified on the Ultra via on-device screenshots.
+
+### Added
+
+- **Animated boot-splash logo.** A shared `LogoLockup` component (mark + "Airwave" wordmark) ports tv-web's
+  `<Logo animate>` / tv-native's boot-splash: the mark fades + scales in, then each letter slides up
+  (translateY 16→0) AND fades in, staggered; `BootSplash` then holds and fades the lockup out into the app.
+  Built on SceneGraph `Animation` + interpolators; letters positioned from their measured `boundingRect`
+  (render-thread-safe). The **login header** uses the same lockup but **static** (`animate=false`), matching
+  tv-native. Bundled `images/logo.png` (the mark).
+
+### Fixed
+
+- **LAN scan wasn't finding servers.** The concurrent sweep leaked cancelled-transfer events between batches
+  (identity mismatches, starving live hosts). Rewrote it: each probe self-times-out (`SetMinimumTransferRate`)
+  and a batch is collected within a time budget — no cancel, clean identity mapping. Verified it finds a server.
+- **Outlined buttons ("Log in with a code", "Scan for servers") had no focus ring** — the ring was excluded for
+  `outlined` buttons. All buttons now get the accent focus ring.
+- **Focus ring polish** — 9px offset gap + always accent (was tinted with the button's focus fill, invisible on
+  the card input).
+- **Keyboard flow** — the on-screen keyboard now only CAPTURES the address into the field (keeps text even on
+  Back) instead of auto-submitting; the big Connect button is the real submit (OK tees it up).
+
+### Notes
+
+- Gotcha recorded: `roFontRegistry` is MAIN/TASK-thread only — creating it on the render thread crashes; measure
+  text via `boundingRect` there instead.
+
 ## [0.10.21] - 2026-08-16
 
 Roku **on-device parity** — custom fonts now render on a real Roku Ultra, and ServerSetup gets the full
