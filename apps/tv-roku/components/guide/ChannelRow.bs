@@ -34,23 +34,17 @@ sub init()
 
     circle = GuideLayout.vw(64 * GuideLayout.FEATURE_SCALE)
     m.circleXY = [GuideLayout.vw(20), GuideLayout.vw(18)]
-    ' loadWidth/loadHeight = the render size, so Roku DECODES each icon at that size (high-quality CPU resize)
-    ' instead of GPU-downscaling the big source at render time — which aliases/pixelates. (Raster posters
-    ' only; the 9-patch cell fills are NOT given loadWidth — they're meant to stretch.)
+    ' Purpose-sized circle assets (36px) render 1:1 — crisp, no GPU downscale of an oversized source.
     m.iconCircle = m.top.createChild("Poster")
-    m.iconCircle.uri = "pkg:/images/circle.png"
+    m.iconCircle.uri = "pkg:/images/circle-36.png"
     m.iconCircle.width = circle
     m.iconCircle.height = circle
-    m.iconCircle.loadWidth = circle
-    m.iconCircle.loadHeight = circle
     m.iconCircle.translation = m.circleXY
 
     m.iconRing = m.top.createChild("Poster")
-    m.iconRing.uri = "pkg:/images/circle-ring.png"
+    m.iconRing.uri = "pkg:/images/ring-36.png"
     m.iconRing.width = circle
     m.iconRing.height = circle
-    m.iconRing.loadWidth = circle
-    m.iconRing.loadHeight = circle
     m.iconRing.translation = m.circleXY
 
     gl = Int(circle * 0.56)

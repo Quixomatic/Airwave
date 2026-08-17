@@ -13,8 +13,8 @@
         <field id="rightReserve" type="float" onChange="onReserve" />
     </interface>
     <children>
-        <Poster id="circle" uri="pkg:/images/circle.png" />
-        <Poster id="ring" uri="pkg:/images/circle-ring.png" />
+        <Poster id="circle" uri="pkg:/images/circle-36.png" />
+        <Poster id="ring" uri="pkg:/images/ring-36.png" />
         <Label id="glyph" />
         <Label id="chNum" />
         <Label id="chName" />

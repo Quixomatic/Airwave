@@ -8,13 +8,7 @@ import "pkg:/source/lib/icon.bs"
 
 sub init()
     ' (m.<id> for every XML node is auto-injected by bsc-plugin-auto-findnode.)
-    ' Load the raster circle/ring at their render size for a crisp decode (no GPU downscale). The glyph is a
-    ' Label (icon font), so no loadWidth — width/height/glyphSize are set in relayout.
-    isz = GuideLayout.fv(64)
-    m.circle.loadWidth = isz
-    m.circle.loadHeight = isz
-    m.ring.loadWidth = isz
-    m.ring.loadHeight = isz
+    ' The circle/ring are purpose-sized 36px assets (render 1:1). The glyph is a Label (icon font).
     relayout()
 end sub
 

@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.40] - 2026-08-17
+
+### Changed
+
+- **Crisp Roku circles** — the tinted channel-icon circles (rail + featured), the sidebar glass buttons, and
+  the focus rings now use **purpose-sized, anti-aliased PNG masters** rendered 1:1 (36 / 54 / 62 / 96px)
+  instead of downscaling one oversized master (which aliased the edges + thin rings). A committed generator
+  (`apps/tv-roku/scripts/gen-circles.py`, documented with the size→consumer map) produces them; add a size
+  there and re-run when a new circle is needed. Removed the old 192px `circle.png` / `circle-ring.png`.
+
 ## [0.10.39] - 2026-08-17
 
 Roku sidebar animations + guide-rail polish.

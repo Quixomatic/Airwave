@@ -24,7 +24,7 @@
         <!-- Done: accent check disc centered in the box (hidden until the run finishes). Springs in
              (scale 0.6→1 + fade) via outBack, matching tv-web's spring / tv-native's ZoomIn. -->
         <Group id="doneMark" translation="[912,292]" scaleRotateCenter="[48,48]" opacity="0" visible="false">
-            <Poster id="doneDisc" width="96" height="96" uri="pkg:/images/circle.png" blendColor="0x4A9FE0FF" />
+            <Poster id="doneDisc" width="96" height="96" uri="pkg:/images/circle-96.png" blendColor="0x4A9FE0FF" />
             <Label id="doneCheck" text="✓" translation="[0,4]" width="96" height="96" horizAlign="center"
                 vertAlign="center" color="0x04060CFF" />
             <Animation id="doneAnim" duration="0.42" easeFunction="outBack">

@@ -13,31 +13,26 @@ const GB_LABEL_W = 196      ' label column width when expanded
 sub init()
     s = GB_SIZE
 
+    ' Purpose-sized assets (54px circle/border, 62px focus ring) render 1:1 — crisp, no downscale.
     ' Focus ring (behind, larger) — accent@0.7, only when focused.
     m.ring = m.top.createChild("Poster")
-    m.ring.uri = "pkg:/images/circle-ring.png"
+    m.ring.uri = "pkg:/images/ring-62.png"
     m.ring.width = s + GB_RING
     m.ring.height = s + GB_RING
-    m.ring.loadWidth = s + GB_RING
-    m.ring.loadHeight = s + GB_RING
     m.ring.translation = [-GB_RING / 2, -GB_RING / 2]
     m.ring.visible = false
 
     ' Glass fill.
     m.circle = m.top.createChild("Poster")
-    m.circle.uri = "pkg:/images/circle.png"
+    m.circle.uri = "pkg:/images/circle-54.png"
     m.circle.width = s
     m.circle.height = s
-    m.circle.loadWidth = s
-    m.circle.loadHeight = s
 
     ' Circle border.
     m.border = m.top.createChild("Poster")
-    m.border.uri = "pkg:/images/circle-ring.png"
+    m.border.uri = "pkg:/images/ring-54.png"
     m.border.width = s
     m.border.height = s
-    m.border.loadWidth = s
-    m.border.loadHeight = s
 
     ' Icon glyph (icon font), centered in the circle.
     m.icon = m.top.createChild("Label")
