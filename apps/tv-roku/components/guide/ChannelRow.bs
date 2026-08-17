@@ -76,7 +76,7 @@ end sub
 sub onFocusChange()
     if m.accentHex = invalid then return
     f = (m.top.focusPercent > 0.5)
-    m.rowBg.color = f ? GuideLayout.argb(m.accentHex, 0.06) : "0x00000000"
+    ' Only the RAIL gets the tint highlight (accent@0.12) — NOT the whole row (tv-web/native parity).
     m.railBg.color = f ? GuideLayout.argb(m.accentHex, 0.12) : "0x00000000"
     m.railBar.visible = f
     m.numLabel.color = f ? "0xE6EAF1FF" : "0x94A3B8FF"

@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.30] - 2026-08-17
+
+### Fixed
+
+- **Roku guide: only the focused channel's RAIL gets the tint highlight** (accent@0.12), not the whole
+  row — matching tv-web/tv-native (the row itself stays untinted).
+
 ## [0.10.29] - 2026-08-17
 
 Roku guide — the real root-cause fixes for program positioning and channel tints.
