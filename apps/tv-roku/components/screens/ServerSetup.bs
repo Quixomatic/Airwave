@@ -8,21 +8,13 @@ import "pkg:/source/theme.bs"
 ' Focusables (dynamic): [address, Connect] + (idle:[Scan]) or (scanned:[found…, Scan again]).
 
 sub init()
-    m.addr = m.top.findNode("addr")
-    m.connect = m.top.findNode("connect")
-    m.status = m.top.findNode("status")
-    m.scanBtn = m.top.findNode("scanBtn")
-    m.progressGroup = m.top.findNode("progressGroup")
-    m.progFill = m.top.findNode("progFill")
-    m.progLabel = m.top.findNode("progLabel")
-    m.foundGroup = m.top.findNode("foundGroup")
 
     ' Fonts via the mutation path (custom TTFs render blank via <Font role> / new Font node on Roku).
-    Theme.setFont(m.top.findNode("title"), Theme.FONT_BOLD, 34)
-    Theme.setFont(m.top.findNode("subtitle"), Theme.FONT_REG, 18)
-    Theme.setFont(m.top.findNode("hint"), Theme.FONT_REG, 14)
+    Theme.setFont(m.title, Theme.FONT_BOLD, 34)
+    Theme.setFont(m.subtitle, Theme.FONT_REG, 18)
+    Theme.setFont(m.hint, Theme.FONT_REG, 14)
     Theme.setFont(m.status, Theme.FONT_MED, 16)
-    Theme.setFont(m.top.findNode("orLabel"), Theme.FONT_SEMI, 13)
+    Theme.setFont(m.orLabel, Theme.FONT_SEMI, 13)
     Theme.setFont(m.progLabel, Theme.FONT_REG, 15)
 
     m.url = ""

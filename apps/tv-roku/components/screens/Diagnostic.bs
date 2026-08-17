@@ -12,30 +12,13 @@ import "pkg:/source/theme.bs"
 ' playback is event-based and BrightScript has no promises for node events).
 
 sub init()
-    m.clip = m.top.findNode("clip")
-    m.title = m.top.findNode("title")
-    m.subtitle = m.top.findNode("subtitle")
-    m.diag = m.top.findNode("diag")
-    m.chips = m.top.findNode("chips")
-    m.testGroup = m.top.findNode("testGroup")
-    m.testAnim = m.top.findNode("testAnim")
-    m.progFill = m.top.findNode("progFill")
-    m.countLeft = m.top.findNode("countLeft")
-    m.countRight = m.top.findNode("countRight")
-    m.continueBtn = m.top.findNode("continueBtn")
-    m.doneMark = m.top.findNode("doneMark")
-    m.doneAnim = m.top.findNode("doneAnim")
-    m.continueAnim = m.top.findNode("continueAnim")
-    m.continueDelay = m.top.findNode("continueDelay")
-    m.settle = m.top.findNode("settle")
-    m.hardCap = m.top.findNode("hardCap")
 
     Theme.setFont(m.title, Theme.FONT_BOLD, 34)
     Theme.setFont(m.subtitle, Theme.FONT_REG, 18)
     Theme.setFont(m.diag, Theme.FONT_SEMI, 22)
     Theme.setFont(m.countLeft, Theme.FONT_REG, 14)
     Theme.setFont(m.countRight, Theme.FONT_REG, 14)
-    Theme.setFont(m.top.findNode("doneCheck"), Theme.FONT_BOLD, 60)
+    Theme.setFont(m.doneCheck, Theme.FONT_BOLD, 60)
 
     m.tests = invalid
     m.idx = 0

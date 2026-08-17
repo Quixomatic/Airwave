@@ -2,7 +2,6 @@
 ' the modulo-slot recycling. The owner sets content + geometry + focusIndex/focusProgramIndex/zone.
 
 sub init()
-    m.viewport = m.top.findNode("viewport")
     m.rows = []          ' the pooled row nodes (index = slot)
     m.rowAbs = []        ' the absolute channel index currently bound to each slot (-1 = unbound)
     m.scrollY = 0.0

@@ -3,7 +3,6 @@ const HOLD_MS = 0.45
 const OUT_MS = 0.38
 
 sub init()
-    m.logo = m.top.findNode("logo")
     m.logo.observeField("introDone", "onIntroDone")
 end sub
 

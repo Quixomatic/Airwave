@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.35] - 2026-08-17
+
+### Changed
+
+- **Roku: removed ~60 redundant `m.top.findNode(...)` calls** across the guide, screens, and UI components
+  now that `bsc-plugin-auto-findnode` auto-wires `m.<id>` from the XML — a clean build with no
+  "Unnecessary call" warnings.
+
 ## [0.10.34] - 2026-08-17
 
 Roku guide **6c — the zone machine**: custom virtualization, grid ↔ rail navigation, focus ring, rail

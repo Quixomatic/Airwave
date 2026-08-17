@@ -12,14 +12,13 @@ sub init()
     m.mw = m.top.markWidth
     m.markH = Int(m.mw * 517 / 715)
 
-    m.mark = m.top.findNode("mark")
     m.mark.uri = "pkg:/images/logo.png"
     m.mark.width = m.mw
     m.mark.height = m.markH
     m.mark.scaleRotateCenter = [Int(m.mw / 2), Int(m.markH / 2)]
     m.mark.opacity = 0
 
-    letters = m.top.findNode("letters")
+    letters = m.letters
     fontSize = Int(m.mw * 0.66)
     m.letterNodes = []
     for i = 0 to m.chars.count() - 1

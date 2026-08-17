@@ -43,26 +43,22 @@ sub relayout()
     m.ring.translation = [padx, pady]
 
     gl = Int(circleSize * 0.56)
-    m.glyph = m.top.findNode("glyph")
     m.glyph.width = gl
     m.glyph.height = gl
     m.glyph.translation = [padx + Int((circleSize - gl) / 2), pady + Int((circleSize - gl) / 2)]
 
     numX = padx + circleSize + GuideLayout.fv(22)
     lineMidY = pady + Int((circleSize - GuideLayout.fv(44)) / 2)
-    m.chNum = m.top.findNode("chNum")
     m.chNum.translation = [numX, lineMidY]
     m.chNum.width = GuideLayout.fv(120)
     Theme.setFont(m.chNum, Theme.FONT_BOLD, GuideLayout.fv(44))
 
-    m.chName = m.top.findNode("chName")
     m.chName.translation = [numX + GuideLayout.fv(120) + GuideLayout.fv(16), lineMidY]
     m.chName.width = m.leftW - (numX - padx) - GuideLayout.fv(140)
     m.chName.truncate = true
     Theme.setFont(m.chName, Theme.FONT_BOLD, GuideLayout.fv(44))
 
     genreY = pady + circleSize + GuideLayout.fv(14)
-    m.genre = m.top.findNode("genre")
     m.genre.translation = [padx, genreY]
     m.genre.width = m.leftW
     m.genre.truncate = true
@@ -70,7 +66,6 @@ sub relayout()
     Theme.setFont(m.genre, Theme.FONT_REG, GuideLayout.fv(30))
 
     dividerY = genreY + GuideLayout.lh(30) + GuideLayout.fv(22)
-    m.divider = m.top.findNode("divider")
     m.divider.translation = [padx, dividerY]
     m.divider.width = m.leftW
 
@@ -78,7 +73,6 @@ sub relayout()
     ' The title sits top-aligned at titleY (breathing room fv(26) below the divider). Its line box is lh(60);
     ' the badges are centered against that same box (badgesY in onContent) so they align with the title text.
     m.titleBoxH = GuideLayout.lh(60)
-    m.title = m.top.findNode("title")
     m.title.translation = [padx, m.titleY]
     m.title.width = m.leftW - GuideLayout.fv(420)
     m.title.height = m.titleBoxH
@@ -90,17 +84,14 @@ sub relayout()
     ' buildBadges; the whole Group is right-aligned + centered on the title's line box in onContent.
     m.badgeH = GuideLayout.fv(30) + 2 * GuideLayout.fv(12)
     m.badgeGap = GuideLayout.fv(14)
-    m.badges = m.top.findNode("badges")
 
     metaY = m.titleY + GuideLayout.lh(60) + GuideLayout.fv(22)
-    m.meta = m.top.findNode("meta")
     m.meta.translation = [padx, metaY]
     m.meta.width = m.leftW
     m.meta.color = "0xC3C9D4FF"
     Theme.setFont(m.meta, Theme.FONT_REG, GuideLayout.fv(34))
 
     summaryY = metaY + GuideLayout.lh(34) + GuideLayout.fv(22)
-    m.summary = m.top.findNode("summary")
     m.summary.translation = [padx, summaryY]
     m.summary.width = m.leftW
     ' Reserve 2 lines for the layout advance (statusY/featuredHeight use fv(36)*1.4*2), but give the Label
@@ -112,13 +103,11 @@ sub relayout()
     Theme.setFont(m.summary, Theme.FONT_REG, GuideLayout.fv(36))
 
     statusY = summaryY + Int(GuideLayout.fv(36) * 1.4 * 2) + GuideLayout.fv(26)
-    m.timeRange = m.top.findNode("timeRange")
     m.timeRange.translation = [padx, statusY]
     m.timeRange.width = GuideLayout.fv(600)
     m.timeRange.color = "0xC3C9D4FF"
     Theme.setFont(m.timeRange, Theme.FONT_REG, GuideLayout.fv(34))
 
-    m.status = m.top.findNode("status")
     m.status.translation = [padx + m.leftW - GuideLayout.fv(600), statusY]
     m.status.width = GuideLayout.fv(600)
     m.status.color = "0xE6EAF1FF"
@@ -126,11 +115,9 @@ sub relayout()
 
     progY = statusY + GuideLayout.lh(34) + GuideLayout.fv(16)
     m.progH = GuideLayout.fv(8)
-    m.progTrack = m.top.findNode("progTrack")
     m.progTrack.translation = [padx, progY]
     m.progTrack.width = m.leftW
     m.progTrack.height = m.progH
-    m.progFill = m.top.findNode("progFill")
     m.progFill.translation = [padx, progY]
     m.progFill.height = m.progH
 end sub
