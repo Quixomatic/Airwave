@@ -1,10 +1,10 @@
 title=Airwave
 subtitle=Live TV from your library
 
-# Version — kept in lockstep with the other apps/* (see /version-bump). Mirrors package.json 0.10.49.
+# Version — kept in lockstep with the other apps/* (see /version-bump). Mirrors package.json 0.10.50.
 major_version=0
 minor_version=10
-build_version=49
+build_version=50
 
 # Icons + splash (placeholder solid-navy assets for now — replace with real branded art).
 mm_icon_focus_hd=pkg:/images/icon_focus_hd.png

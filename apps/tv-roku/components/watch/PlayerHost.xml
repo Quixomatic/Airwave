@@ -23,6 +23,7 @@
     </interface>
     <children>
         <Rectangle id="bg" width="1920" height="1080" color="0x000000FF" />
+        <!-- ONE media pipeline: this Video node plays the program AND (audio-only) the bumper-music bed. -->
         <Video id="video" width="1920" height="1080" />
         <!-- Debug readout (bottom) — the clock's state/position/rollover while chrome-less (Incr A). -->
         <Label id="status" translation="[80,984]" width="1760" color="0x94A3B8FF" />

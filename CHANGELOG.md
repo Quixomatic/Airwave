@@ -2,6 +2,27 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.50] - 2026-08-17
+
+Roku **BumperCard — the "Coming up next" interstitial (Increment E1)**.
+
+### Added
+
+- **`BumperCard`** — shown over the held frame during a bumper: ambient program art (dimmed) + dark scrim,
+  "COMING UP NEXT", the upcoming program title/episode, and a **draining countdown donut** (pre-rendered
+  accent-ring frames, one per percent — Roku has no SVG) with the seconds centered. Runs on a local smooth
+  clock seeded by the player's `remaining`/`total`, freezes when paused, and re-syncs on a DVR scrub.
+  Generator: `scripts/gen-donut.py`.
+
+### Notes
+
+- **Bumper music is deferred.** Roku has a single media pipeline (the same constraint the tvOS mpv-hybrid
+  was built for — two engines can't both hold the audio), so a separate Audio node can't play alongside the
+  loaded Video. The correct approach is the tv-native pattern: the ONE Video node plays the audio-only bed
+  and swaps back to the program. Revisit later. The bumper keeps the program paused-and-held meanwhile.
+- The donut currently swaps Poster frames (a slight flash on each frame load) — a `roImageCanvas`-drawn arc
+  or preloaded frames would remove it; left as-is for now.
+
 ## [0.10.49] - 2026-08-17
 
 Roku **player chrome — Info view + track/quality pickers (Increment C2)**.

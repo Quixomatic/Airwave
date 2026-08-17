@@ -52,6 +52,9 @@ sub init()
     m.quality = "original"
     m.audioStreamId = invalid
     m.subtitleStreamId = invalid
+    ' The "Coming up next" bumper interstitial — created BELOW the chrome (over the video), shown on a bumper.
+    m.bumper = CreateObject("roSGNode", "BumperCard")
+    m.top.appendChild(m.bumper)
     ' The full-screen chrome (channel chip + DVR scrubber + controls) — created once, fed the clock's status.
     m.chrome = CreateObject("roSGNode", "PlayerChrome")
     m.top.appendChild(m.chrome)
@@ -275,6 +278,10 @@ sub seekTo(target as double, forceHls as boolean, audioCandidate as integer)
         m.current = { index: idx, kind: "BUMPER", startS: entry.startS, endS: entry.endS, ratingKey: invalid, guide: entry.guide, mode: invalid, session: invalid, offset: 0, playStartCurrentTime: 0.0, baselineReady: true, retried: false, delivery: invalid }
         m.bumperEff = clamped#
         m.paused = false
+        ' Pause-and-HOLD the program (keep it loaded — a DVR seek-back resumes in place; the BumperCard covers
+        ' the frozen frame). Bumper music is DEFERRED: Roku has ONE media pipeline (same lesson as the tvOS
+        ' mpv-hybrid — two engines can't both hold the audio); revisit later via the video node playing the
+        ' audio-only bed and swapping back to the program.
         m.video.control = "pause"
         m.transitioning = false
         return
@@ -630,6 +637,22 @@ sub publishStatus(cur as object, effective as double, t as double)
         status.bumperRemaining = rr
     end if
     if cur.delivery <> invalid then status.delivery = cur.delivery
+
+    ' Drive the "Coming up next" bumper card (shown over the frozen held frame during a bumper slot).
+    if m.bumper <> invalid
+        if isBumper
+            m.bumper.channelId = m.top.channelId
+            m.bumper.guide = cur.guide
+            m.bumper.accent = m.top.accent
+            m.bumper.total = Int(cur.endS - cur.startS)
+            m.bumper.paused = m.paused
+            m.bumper.remaining = status.bumperRemaining
+            if not m.bumper.active then m.bumper.active = true
+        else if m.bumper.active
+            m.bumper.active = false
+        end if
+    end if
+
     m.chrome.playerStatus = status
 end sub
 

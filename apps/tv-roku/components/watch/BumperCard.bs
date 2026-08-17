@@ -1,0 +1,165 @@
+import "pkg:/source/lib/api.bs"
+import "pkg:/source/theme.bs"
+
+' BumperCard code-behind — see the .xml header. A local smooth countdown clock drives the seconds + the
+' draining donut frame; PlayerHost pushes guide/remaining/total/accent + toggles `active`.
+
+const D_SIZE = 190
+const D_STEPS = 100
+
+sub init()
+    m.tick.observeField("fire", "onTick")
+    buildCard()
+    m.top.visible = false
+end sub
+
+sub buildCard()
+    base = m.top.createChild("Rectangle")   ' opaque base so the frozen program frame behind never shows through
+    base.width = 1920
+    base.height = 1080
+    base.color = "0x04060CFF"
+
+    bg = m.top.createChild("Poster")
+    bg.width = 1920
+    bg.height = 1080
+    bg.opacity = 0.5
+    bg.loadDisplayMode = "scaleToZoom"       ' cover-fill the ambient art
+    m.bg = bg
+
+    scrim = m.top.createChild("Rectangle")
+    scrim.width = 1920
+    scrim.height = 1080
+    scrim.color = "0x04060CC2"
+
+    kicker = m.top.createChild("Label")
+    Theme.setFont(kicker, Theme.FONT_BOLD, 22)
+    kicker.horizAlign = "center"
+    kicker.width = 1920
+    kicker.translation = [0, 366]
+    kicker.text = "COMING UP NEXT"
+    m.kicker = kicker
+
+    title = m.top.createChild("Label")
+    Theme.setFont(title, Theme.FONT_BOLD, 64)
+    title.horizAlign = "center"
+    title.width = 1600
+    title.translation = [160, 414]
+    title.color = "0xF1F5F9FF"
+    title.wrap = true
+    title.maxLines = 2
+    m.title = title
+
+    ep = m.top.createChild("Label")
+    Theme.setFont(ep, Theme.FONT_REG, 28)
+    ep.horizAlign = "center"
+    ep.width = 1920
+    ep.translation = [0, 556]
+    ep.color = "0xC3C9D4FF"
+    m.ep = ep
+
+    dx = Int((1920 - D_SIZE) / 2)
+    dtrack = m.top.createChild("Poster")
+    dtrack.uri = "pkg:/images/donut-track.png"
+    dtrack.width = D_SIZE
+    dtrack.height = D_SIZE
+    dtrack.blendColor = "0xFFFFFF24"
+    dtrack.translation = [dx, 622]
+    m.dtrack = dtrack
+
+    darc = m.top.createChild("Poster")
+    darc.width = D_SIZE
+    darc.height = D_SIZE
+    darc.translation = [dx, 622]
+    m.darc = darc
+
+    secs = m.top.createChild("Label")
+    Theme.setFont(secs, Theme.FONT_BOLD, 88)
+    secs.horizAlign = "center"
+    secs.vertAlign = "center"
+    secs.width = D_SIZE
+    secs.height = D_SIZE
+    secs.translation = [dx, 622]
+    secs.color = "0xFFFFFFFF"
+    m.secs = secs
+end sub
+
+' Local wall-clock ms (double).
+function wallMs() as double
+    dt = CreateObject("roDateTime")
+    ms# = dt.AsSeconds()
+    return ms# * 1000.0 + dt.GetMilliseconds()
+end function
+
+sub onActive()
+    if m.top.active
+        g = m.top.guide
+        art = ""
+        if g <> invalid
+            a = g.art
+            if a = invalid then a = g.thumb
+            if a <> invalid and a <> "" and m.top.channelId <> "" then art = Api.imageUrl(m.top.channelId, a, 1280)
+        end if
+        m.bg.uri = art
+        renderText()
+        m.totalRef = m.top.total
+        if m.totalRef < 1 then m.totalRef = m.top.remaining
+        if m.totalRef < 1 then m.totalRef = 1
+        m.endMs = wallMs() + m.top.remaining * 1000.0
+        m.held = 0.0
+        m.top.visible = true
+        m.tick.control = "start"
+        onTick()
+    else
+        m.top.visible = false
+        m.tick.control = "stop"
+    end if
+end sub
+
+' PlayerHost pushed a fresh remaining (each 500ms tick) — reconcile the local clock on real drift + refresh
+' the (possibly new) upcoming-program text.
+sub onRemaining()
+    if not m.top.active then return
+    localRem# = (m.endMs - wallMs()) / 1000.0
+    if Abs(localRem# - m.top.remaining) > 1.0 then m.endMs = wallMs() + m.top.remaining * 1000.0
+    if m.top.total > 0 then m.totalRef = m.top.total
+    renderText()
+end sub
+
+sub onPaused()
+    if m.top.paused then m.held = m.endMs - wallMs()
+end sub
+
+sub onTick()
+    if not m.top.active then return
+    now# = wallMs()
+    if m.top.paused then m.endMs = now# + m.held   ' freeze the countdown while paused
+    remS# = (m.endMs - now#) / 1000.0
+    if remS# < 0 then remS# = 0
+    sec = Int(remS# + 0.999)
+    frac = 0.0
+    if m.totalRef > 0 then frac = remS# / m.totalRef
+    if frac > 1.0 then frac = 1.0
+    idx = Int(frac * D_STEPS + 0.5)
+    if idx < 0 then idx = 0
+    if idx > D_STEPS then idx = D_STEPS
+    m.darc.uri = "pkg:/images/donut-" + Str(idx).Trim() + ".png"
+    m.darc.blendColor = m.top.accent
+    m.secs.text = Str(sec).Trim()
+end sub
+
+sub renderText()
+    g = m.top.guide
+    if g = invalid then return
+    m.kicker.color = m.top.accent
+    isEp = (g.showTitle <> invalid and g.showTitle <> "" and g.season <> invalid and g.episode <> invalid)
+    if isEp
+        m.title.text = g.showTitle
+        e = "S" + Str(g.season).Trim() + " · E" + Str(g.episode).Trim()
+        if g.title <> invalid and g.title <> "" then e = e + " — " + g.title
+        m.ep.text = e
+        m.ep.visible = true
+    else
+        if g.title <> invalid then m.title.text = g.title else m.title.text = ""
+        m.ep.visible = false
+    end if
+end sub

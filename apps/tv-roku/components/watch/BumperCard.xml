@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  BumperCard — the between-programs "Coming up next" interstitial (port of tv-web/tv-native bumper-card).
+  Shown by PlayerHost whenever the clock is in a BUMPER slot (over the frozen held program frame). A
+  full-screen ambient art bg + dark scrim, "COMING UP NEXT", the upcoming program title/episode, and a
+  countdown DONUT (a draining accent ring — pre-rendered frames, Roku has no SVG) with the seconds centered.
+  Driven off a LOCAL 0.2s clock seeded by `remaining`/`total` (smooth + survives DVR scrub), reconciled when
+  PlayerHost pushes a new `remaining`; freezes when `paused`.
+-->
+<component name="BumperCard" extends="Group">
+    <interface>
+        <field id="channelId" type="string" />
+        <field id="guide" type="assocarray" />
+        <field id="remaining" type="integer" value="-1" onChange="onRemaining" />
+        <field id="total" type="integer" value="-1" />
+        <field id="accent" type="string" value="0x3B82F6FF" />
+        <field id="paused" type="boolean" onChange="onPaused" />
+        <field id="active" type="boolean" alwaysNotify="true" onChange="onActive" />
+    </interface>
+    <children>
+        <Timer id="tick" repeat="true" duration="0.2" />
+    </children>
+</component>
