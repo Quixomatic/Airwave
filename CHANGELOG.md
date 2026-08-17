@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.38] - 2026-08-17
+
+### Added
+
+- **Roku guide auto-refresh** — the guide now re-fetches every 60s (matching tv-web/native's
+  `refetchInterval`), so the now-caret, "Xm left", on-now progress, and program list advance as time
+  moves forward. The refresh preserves the user's focused channel/program (fc/fp) rather than resetting to
+  the top, and is skipped while the sidebar is open.
+
 ## [0.10.37] - 2026-08-17
 
 Roku guide **6c — the sidebar** (lens filtering) + the completed grid↔rail↔sidebar zone machine.

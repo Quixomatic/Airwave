@@ -15,6 +15,8 @@ import "pkg:/source/input/keys.bs"
 sub init()
     ' (m.<id> for every XML node is auto-injected by bsc-plugin-auto-findnode.)
     m.soundSeq = 0
+    m.refreshStarted = false
+    m.refreshTimer.observeField("fire", "onRefreshTick")
 
     Theme.setFont(m.dayLabel, Theme.FONT_SEMI, GuideLayout.vw(32))
     Theme.setFont(m.msg, Theme.FONT_REG, 26)
@@ -85,16 +87,20 @@ sub onFavorites(data as object, _ctx as object)
     m.list.favVersion = m.list.favVersion + 1
 end sub
 
-sub onGuide(data as object, _ctx as object)
+' Shared guide processing. resetFocus=true on first load / lens change (fc→0); false on the 60s refresh
+' (preserve the user's fc/fp). Returns false if the payload was unusable.
+function processGuide(data as object, resetFocus as boolean) as boolean
     if data = invalid or data.channels = invalid
-        onGuideErr({ message: "empty" }, invalid)
-        return
+        if resetFocus then onGuideErr({ message: "empty" }, invalid)
+        return false
     end if
     raw = data.channels
     if raw.count() = 0
-        m.msg.visible = true
-        m.msg.text = "No channels yet."
-        return
+        if resetFocus
+            m.msg.visible = true
+            m.msg.text = "No channels yet."
+        end if
+        return false
     end if
     m.msg.visible = false
 
@@ -139,14 +145,37 @@ sub onGuide(data as object, _ctx as object)
 
     buildTicks()
     drawNowCaret()
-    m.zone = "grid"
-    applyLens()
+    if resetFocus then m.zone = "grid"
+    applyLens(resetFocus)
+    return true
+end function
+
+' First-load callback: process, take focus, and start the 60s refresh timer.
+sub onGuide(data as object, _ctx as object)
+    if not processGuide(data, true) then return
     m.top.setFocus(true)
+    if not m.refreshStarted
+        m.refreshStarted = true
+        m.refreshTimer.control = "start"
+    end if
     Log.info("[guide] " + Str(m.allChannels.count()).Trim() + " channels loaded")
 end sub
 
-' Filter the (culled) channel list by the active lens → the rendered channels, then rebuild + reset focus.
-sub applyLens()
+' 60s periodic re-fetch (tv-web/native refetchInterval) — advances now/on-now/progress, preserving fc/fp.
+' Skipped while the sidebar is open (the grid is covered).
+sub onRefreshTick()
+    if m.zone = "sidebar" then return
+    p = Api.guide(180)
+    onThen(p, onGuideRefresh, m)
+end sub
+
+sub onGuideRefresh(data as object, _ctx as object)
+    processGuide(data, false)
+end sub
+
+' Filter the (culled) channel list by the active lens → the rendered channels, then rebuild. resetFocus=true
+' resets fc/fp to the top/on-now (first load, lens change); false preserves them (60s refresh).
+sub applyLens(resetFocus = true as boolean)
     m.channels = []
     favs = m.global.guideFavorites
     for each ch in m.allChannels
@@ -165,11 +194,22 @@ sub applyLens()
     end for
 
     buildContent()
-    m.fc = 0
-    if m.channels.count() > 0
+    if resetFocus then m.fc = 0
+    n = m.channels.count()
+    if n > 0
         m.msg.visible = false
-        m.fp = GuideLayout.liveProgramIndex(m.channels[0].programs, m.nowMs)
+        if m.fc > n - 1 then m.fc = n - 1
+        if m.fc < 0 then m.fc = 0
+        if resetFocus
+            m.fp = GuideLayout.liveProgramIndex(m.channels[m.fc].programs, m.nowMs)
+        else
+            ' Refresh: keep the user's fp, clamped to the (re-culled) focused channel's program count.
+            pc = m.channels[m.fc].programs.count()
+            if m.fp > pc - 1 then m.fp = pc - 1
+            if m.fp < 0 then m.fp = 0
+        end if
     else
+        m.fc = 0
         m.fp = 0
         m.msg.visible = true
         m.msg.text = lensEmptyText()

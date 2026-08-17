@@ -36,6 +36,9 @@
         <Label id="msg" translation="[510,500]" width="900" horizAlign="center" color="0x94A3B8FF"
             text="Loading…" />
 
+        <!-- 60s guide re-fetch (tv-web/native refetchInterval) — advances now/on-now/progress. -->
+        <Timer id="refreshTimer" repeat="true" duration="60" />
+
         <!-- Left sidebar — overlays the grid's left edge (grid always reserves the 92px sliver). Last child
              = highest z, so the expanded overlay draws above the featured panel + grid. -->
         <GuideSidebar id="sidebar" />
