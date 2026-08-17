@@ -75,13 +75,13 @@ sub onGuideTune()
         m.top.appendChild(m.player)
         m.player.observeField("done", "onPlayerDone")
     end if
+    ' The effectiveTime clock derives the on-now from the channel timeline (join-live / resume), so tuning
+    ' only needs the channel id — the selected program can't seed playback (no future seek).
     m.player.channelId = g.tuneChannelId
-    m.player.ratingKey = g.tuneRatingKey
-    m.player.offset = g.tuneOffset
     m.player.visible = true
     m.player.setFocus(true)
     m.player.go = m.player.go + 1
-    Log.info("guide tune -> " + g.tuneChannelId + " rk=" + g.tuneRatingKey + " off=" + Str(g.tuneOffset).Trim())
+    Log.info("guide tune -> " + g.tuneChannelId)
 end sub
 
 sub onPlayerDone()

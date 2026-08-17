@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!--
-  PlayerHost — Phase 7 first slice: a single, never-unmounted full-screen Video node. The owner (MainScene)
-  sets channelId/ratingKey/offset then bumps `go` to tune; PlayerHost resolves /media and plays. Back →
-  stop + set `done` (MainScene returns to the guide). The effectiveTime DVR clock / rollover / chrome are
-  Phase 8/9 — this slice just proves the Video node + direct-play/HDR on the real library.
+  PlayerHost — the effectiveTime DVR clock (Phase 8 core), ported from tv-web/tv-native `use-tv-player`.
+  ONE persistent Video node driven by a single clock over the whole channel timeline: derive the current
+  slot + offset from real playback position, roll at boundaries (program → bumper → next), never seek past
+  live, and rewind OUT of the current program through the bumper into the previous one (goTo(anyTime) →
+  (ratingKey, offset)). MainScene sets `channelId` then bumps `go` to tune; the clock bootstraps at
+  resume-or-live. Back → teardown + `done` (MainScene returns to the guide).
+
+  Increment A = the clock only (full-screen, chrome-less). Media remote keys (Play/Rewind/FF/Replay) drive
+  the DVR so it's testable before the FeaturePanel chrome (Increment C). Layout modes (mini/full) = Incr B.
 -->
 <component name="PlayerHost" extends="Group">
     <interface>
         <field id="channelId" type="string" />
-        <field id="ratingKey" type="string" />
-        <field id="offset" type="integer" />
         <field id="go" type="integer" value="0" alwaysNotify="true" onChange="onGo" />
         <!-- MainScene observes this to hide the player + refocus the guide. -->
         <field id="done" type="boolean" alwaysNotify="true" />
@@ -17,7 +20,11 @@
     <children>
         <Rectangle id="bg" width="1920" height="1080" color="0x000000FF" />
         <Video id="video" width="1920" height="1080" />
-        <!-- Debug readout (bottom) — mode/format while tuning; cleared once playing. -->
+        <!-- Debug readout (bottom) — the clock's state/position/rollover while chrome-less (Incr A). -->
         <Label id="status" translation="[80,984]" width="1760" color="0x94A3B8FF" />
+        <!-- The effectiveTime tick (rollover + status), the session heartbeat, and the 120s timeline refetch. -->
+        <Timer id="tickTimer" repeat="true" duration="0.5" />
+        <Timer id="heartbeatTimer" repeat="true" duration="10" />
+        <Timer id="timelineTimer" repeat="true" duration="120" />
     </children>
 </component>

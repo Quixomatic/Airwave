@@ -2,6 +2,33 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.46] - 2026-08-17
+
+Roku **Phase 7/8 — the effectiveTime DVR clock (Increment A)**.
+
+### Added
+
+- **`PlayerHost` now runs the full effectiveTime state machine**, ported from tv-web/tv-native
+  `use-tv-player`: one clock over the whole channel timeline (`/timeline`, refetched 120s) with a
+  server-synced offset; `seekTo(instant)` → the containing slot → `(ratingKey, offset)` → `/media` →
+  the Video node; a 500ms tick that derives the effective time and **rolls over at boundaries
+  (program → bumper → next program)**; a **no-future-seek** clamp `[firstSlotStart, now]`; DVR rewind
+  back out of a program, through the bumper, into the previous one; resume (`cg-tv-resume`, seconds
+  shape to dodge the 32-bit epoch-ms trap); a 10s session heartbeat + end-session/stop on teardown;
+  a native→HLS safety-catch on a decode error; and an EOF rollover backstop. The tune contract is now
+  just `channelId` (the clock joins live / resumes; a selected future program can't seed playback).
+- **Media remote keys drive the DVR** ahead of the chrome (Increment C): Play/Pause, Rewind (−60s),
+  Fast-Forward (+60s, clamped at live), Instant Replay (restart the program), Back (→ guide). Roku's
+  built-in trick-play bar is suppressed (`enableTrickPlay = false`; focus stays on the group) so our
+  own chrome owns the transport keys.
+
+### Notes
+
+- Verified on the Ultra: bumper rollover works. A bottom debug line shows the clock state (title /
+  elapsed·total / LIVE-or-behind, or `BUMPER Xs`) until the FeaturePanel chrome (Increment C) lands.
+- Reserved-word/`collision` traps hit + fixed: `goTo`→`seekTo` (folds to `goto`), `rem`→`remS` (the
+  REM comment keyword), `nowMs`→`wallMs` (collided with a `GuideLayout` param).
+
 ## [0.10.45] - 2026-08-17
 
 ### Fixed

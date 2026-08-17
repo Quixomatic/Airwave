@@ -2,77 +2,546 @@ import "pkg:/source/lib/api.bs"
 import "pkg:/source/lib/device.bs"
 import "pkg:/source/lib/log.bs"
 import "pkg:/source/theme.bs"
+import "pkg:/source/lib/registry.bs"
+import "pkg:/source/lib/guideLayout.bs"
 import "pkg:/source/input/keys.bs"
+' NOTE: the clock's core is named `seekTo` (not `goTo`) — `goTo` case-folds to the reserved `goto` keyword.
+' Wall-clock/server-clock helpers are `wallMs`/`clockSec` — a plain `nowMs` collides with GuideLayout's param.
 
-' PlayerHost code-behind — see the .xml header. Phase 7 first slice: tune → /media → play a fullscreen Video.
+' PlayerHost code-behind — THE effectiveTime DVR clock, ported EXACTLY from tv-web/tv-native
+' `use-tv-player.ts`. See the .xml header. One clock over the channel timeline drives the Video node:
+' `seekTo(target)` maps any instant → the containing slot → (ratingKey, offset) → /media → play; a 500ms
+' tick derives the effective time and rolls at boundaries (program → bumper → next); no future seek;
+' rewind runs back OUT of the program, through the bumper, into the previous one. Resume + heartbeat.
+'
+' ⚠️ Roku translations of the web model:
+'   • `videoPos` = the Video node's `position` field (seconds); baseline anchored on Video state="playing".
+'   • NO hls.js — the Video node plays HLS natively (streamFormat="hls").
+'   • Resume shape uses SECONDS (positionAtSec/savedAtSec), not tv-web's ms — epoch-ms overflows a 32-bit
+'     BrightScript Integer (the parseIso trap); resume is device-local so the shape needn't match tv-web.
+'   • `sameMedia` (same resolved URL) = a DVR seek within the loaded file / roll-back into a paused program,
+'     NOT a reload (tv-native's lesson) — direct seeks in place; a transcode's offset is baked so a new
+'     offset yields a new URL → a fresh load anyway.
+
+const LIVE_THRESHOLD = 5.0
+const RESUME_MAX_AGE_S = 21600.0   ' 6h
 
 sub init()
+    ' Suppress Roku's BUILT-IN trick-play UI (the native progress bar that pops up on rewind/ff/play). We
+    ' draw our own chrome (Incr C), and focus lives on the PlayerHost Group — never the Video node — so the
+    ' transport keys reach onKeyEvent instead of the Video's own trick-play handler.
+    m.video.enableTrickPlay = false
     m.video.observeField("state", "onVideoState")
+    m.tickTimer.observeField("fire", "onTick")
+    m.heartbeatTimer.observeField("fire", "onHeartbeat")
+    m.timelineTimer.observeField("fire", "onTimelineRefresh")
     Theme.setFont(m.status, Theme.FONT_REG, 22)
+    resetClock()
 end sub
 
-' MainScene set channelId/ratingKey/offset then bumped `go`.
+' ---- clock ------------------------------------------------------------------
+
+sub resetClock()
+    ' Stop any running timers (a re-tune re-enters onGo without a Back/teardown in between — Incr B).
+    m.tickTimer.control = "stop"
+    m.heartbeatTimer.control = "stop"
+    m.timelineTimer.control = "stop"
+    m.clockOffset = 0.0        ' serverMs − localMs (double)
+    m.slots = []               ' [{ kind, ratingKey, guide, startS, endS }] (seconds)
+    m.current = invalid        ' the playing slot (see seekTo)
+    m.bumperEff = 0.0          ' the bumper's effective time (wall-advanced)
+    m.paused = false
+    m.lastTickMs = wallMs()
+    m.gen = 0                  ' aborts a stale async /media resolve
+    m.transitioning = false    ' re-entrancy guard across the async resolve
+    m.currentUrl = ""          ' last loaded URL — same-URL seekTo = seek-in-place
+    m.pending = invalid        ' stashed load context for onMedia
+    m.pendingBootstrap = false
+    m.logCtx = invalid
+end sub
+
+' Local wall-clock epoch ms (double — force past the 32-bit float quantization, the parseIso trap).
+function wallMs() as double
+    dt = CreateObject("roDateTime")
+    ms# = dt.AsSeconds()
+    ms# = ms# * 1000.0 + dt.GetMilliseconds()
+    return ms#
+end function
+
+' The server-synced clock, in seconds.
+function clockSec() as double
+    return (wallMs() + m.clockOffset) / 1000.0
+end function
+
+' ---- tune / timeline --------------------------------------------------------
+
+' MainScene set channelId then bumped `go`.
 sub onGo()
-    if m.top.ratingKey = invalid or m.top.ratingKey = "" then return
+    if m.top.channelId = invalid or m.top.channelId = "" then return
+    resetClock()
     m.status.text = "Tuning…"
-    m.video.control = "stop"
-    p = Api.media(m.top.channelId, m.top.ratingKey, m.top.offset, { deviceId: Device.id() })
+    m.top.setFocus(true)   ' the Group holds focus (NOT the Video) → no native trick-play bar
+    m.pendingBootstrap = true
+    loadTimeline()
+end sub
+
+sub loadTimeline()
+    p = Api.timeline(m.top.channelId, 360, 180)
+    onThen(p, onTimeline, m)
+    onCatch(p, onTimelineErr, m)
+end sub
+
+sub onTimeline(data as object, _m as object)
+    if data = invalid then return
+    m.clockOffset = GuideLayout.parseIso(data.serverTime) - wallMs()
+    slots = []
+    if data.slots <> invalid
+        for each s in data.slots
+            startS# = GuideLayout.parseIso(s.startsAt) / 1000.0
+            slots.push({ kind: s.kind, ratingKey: s.ratingKey, guide: s.guide, startS: startS#, endS: startS# + s.durationSeconds })
+        end for
+    end if
+    m.slots = slots
+    m.timelineTimer.control = "start"
+
+    if m.pendingBootstrap and m.current = invalid and slots.count() > 0
+        m.pendingBootstrap = false
+        m.tickTimer.control = "start"
+        m.heartbeatTimer.control = "start"
+        seekTo(resumePosition(), false, 0)
+    else if m.current <> invalid
+        reconcileCurrentIndex()   ' a refresh may have shifted slot indices
+    end if
+end sub
+
+sub onTimelineErr(err as object, _m as object)
+    m.status.text = "Timeline failed."
+    Log.warn("[player] timeline error: " + Log.trunc(err))
+end sub
+
+sub onTimelineRefresh()
+    m.pendingBootstrap = false
+    loadTimeline()
+end sub
+
+' After a 120s refetch, re-point m.current.index at the slot it still represents (by start time).
+sub reconcileCurrentIndex()
+    i = 0
+    for each s in m.slots
+        if Abs(s.startS - m.current.startS) < 1.0
+            m.current.index = i
+            return
+        end if
+        i = i + 1
+    end for
+end sub
+
+' The resume position for THIS channel: the saved spot IF same channel, not at live, fresh (<6h), and in
+' range; else live. (cg-tv-resume, seconds shape — see the header.)
+function resumePosition() as double
+    live# = clockSec()
+    raw = Registry.read(RegKey.RESUME)
+    if raw = "" then return live#
+    r = ParseJson(raw)
+    if r = invalid then return live#
+    if r.channelId <> m.top.channelId then return live#
+    if r.atLiveEdge = true then return live#
+    savedAt# = 0.0
+    if r.savedAtSec <> invalid then savedAt# = r.savedAtSec
+    if (wallMs() / 1000.0) - savedAt# >= RESUME_MAX_AGE_S then return live#
+    pos# = 0.0
+    if r.positionAtSec <> invalid then pos# = r.positionAtSec
+    earliest# = m.slots[0].startS
+    if pos# >= earliest# and pos# < live# then return pos#
+    return live#
+end function
+
+' ---- seekTo — the core --------------------------------------------------------
+
+sub seekTo(target as double, forceHls as boolean, audioCandidate as integer)
+    if m.slots.count() = 0 then return
+    if m.transitioning then return
+    m.transitioning = true
+
+    ' clamp to [firstSlotStart, now] — NEVER seek past live.
+    clamped# = target
+    minT# = m.slots[0].startS
+    if clamped# < minT# then clamped# = minT#
+    live# = clockSec()
+    if clamped# > live# then clamped# = live#
+
+    idx = findSlot(clamped#)
+    prevSession = invalid
+    if m.current <> invalid then prevSession = m.current.session
+
+    ' off air — no slot contains this instant.
+    if idx < 0
+        m.gen = m.gen + 1
+        stopSession(prevSession)
+        stopMedia()
+        m.current = invalid
+        m.status.text = "Off air"
+        m.transitioning = false
+        return
+    end if
+
+    entry = m.slots[idx]
+
+    ' No-op guard: already playing this exact program near this position (skip on a forced-hls retry).
+    if not forceHls and audioCandidate = 0 and entry.kind = "PROGRAM" and entry.ratingKey <> invalid and m.current <> invalid and m.current.kind = "PROGRAM"
+        curEff# = currentEffective()
+        if m.current.index = idx and Abs(clamped# - curEff#) < 2.0
+            m.transitioning = false
+            return
+        end if
+    end if
+
+    ' BUMPER (or a program with no ratingKey) — no media. Pause-and-hold the program (keep it loaded so a
+    ' DVR seek-back resolves sameMedia → resume-in-place); the BumperCard covers the frozen frame (Incr E).
+    if entry.kind = "BUMPER" or entry.ratingKey = invalid
+        m.gen = m.gen + 1
+        m.current = { index: idx, kind: "BUMPER", startS: entry.startS, endS: entry.endS, ratingKey: invalid, guide: entry.guide, mode: invalid, session: invalid, offset: 0, playStartCurrentTime: 0.0, baselineReady: true, retried: false, delivery: invalid }
+        m.bumperEff = clamped#
+        m.paused = false
+        m.video.control = "pause"
+        m.transitioning = false
+        return
+    end if
+
+    ' PROGRAM — resolve the playable URL (async). Stash the context; onMedia finishes + clears transitioning.
+    m.gen = m.gen + 1
+    offset = Int(clamped# - entry.startS)
+    if offset < 0 then offset = 0
+    m.status.text = "Loading…"
+    m.pending = { gen: m.gen, idx: idx, entry: entry, offset: offset, forceHls: forceHls, prevSession: prevSession }
+    p = Api.media(m.top.channelId, entry.ratingKey, offset, { deviceId: Device.id(), forceHls: forceHls })
     onThen(p, onMedia, m)
     onCatch(p, onMediaErr, m)
 end sub
 
-sub onMedia(info as object, _ctx as object)
-    if info = invalid or info.url = invalid
-        m.status.text = "No playable media."
+sub onMedia(info as object, _m as object)
+    pend = m.pending
+    if pend = invalid
+        m.transitioning = false
         return
     end if
+    if pend.gen <> m.gen        ' a newer seekTo superseded this load
+        m.transitioning = false
+        return
+    end if
+    if info = invalid or info.url = invalid
+        m.status.text = "No playable media."
+        m.transitioning = false
+        return
+    end if
+
+    entry = pend.entry
+    offset = pend.offset
     fmt = mapFormat(info.mode, info.container)
-    node = CreateObject("roSGNode", "ContentNode")
-    node.url = info.url
-    node.streamFormat = fmt
-    ' Direct-play = a RAW file → seek client-side (PlayStart); transcode (http/hls) bakes the offset server-side.
-    if info.mode = "direct" and m.top.offset > 0 then node.PlayStart = m.top.offset
-    m.video.content = node
-    m.video.control = "play"
-    m.video.setFocus(true)
-    m.status.text = "mode=" + info.mode + "  fmt=" + fmt + "  off=" + Str(m.top.offset).Trim() + "  vcodec=" + strOr(info.videoCodec)
-    Log.info("[player] tune " + m.top.channelId + " mode=" + info.mode + " fmt=" + fmt + " url=" + Log.trunc(info.url))
+
+    if pend.prevSession <> invalid and pend.prevSession <> info.session then stopSession(pend.prevSession)
+
+    m.current = {
+        index: pend.idx, kind: "PROGRAM", startS: entry.startS, endS: entry.endS,
+        ratingKey: entry.ratingKey, guide: entry.guide, mode: info.mode, session: info.session,
+        offset: offset, playStartCurrentTime: 0.0, baselineReady: false, retried: pend.forceHls,
+        delivery: buildDelivery(info)
+    }
+    m.paused = false
+
+    sameMedia = (info.url = m.currentUrl)
+    m.currentUrl = info.url
+
+    if sameMedia
+        ' DVR seek within the already-loaded file / roll-back into the program we paused for a bumper.
+        if info.mode = "direct"
+            ' A raw file's URL is offset-independent → seek to the new spot; its position IS the media
+            ' offset, so the baseline can be anchored inline.
+            m.current.playStartCurrentTime = offset
+            m.current.baselineReady = true
+            m.video.seek = offset
+        end if
+        m.video.control = "resume"
+    else
+        node = CreateObject("roSGNode", "ContentNode")
+        node.url = info.url
+        node.streamFormat = fmt
+        ' direct (raw file) opens AT the offset; a transcode (http/hls) bakes the offset server-side → from 0.
+        if info.mode = "direct" and offset > 0 then node.PlayStart = offset
+        m.video.content = node
+        m.video.control = "play"
+    end if
+
+    m.status.text = "mode=" + info.mode + " fmt=" + fmt + " off=" + Str(offset).Trim()
+    Log.info("[player] seekTo slot=" + Str(pend.idx).Trim() + " off=" + Str(offset).Trim() + " mode=" + info.mode + " same=" + sameMedia.toStr() + " url=" + Log.trunc(info.url))
+    m.transitioning = false
 end sub
 
-sub onMediaErr(err as object, _ctx as object)
+sub onMediaErr(err as object, _m as object)
     m.status.text = "Playback failed."
     Log.warn("[player] media error: " + Log.trunc(err))
+    m.transitioning = false
 end sub
+
+' Where we are on the timeline right now. PROGRAM: startS + offset + (videoPos − baseline); before the
+' baseline is anchored (first "playing"), the target itself. BUMPER: the wall-advanced bumper clock.
+function currentEffective() as double
+    cur = m.current
+    if cur = invalid then return clockSec()
+    if cur.kind = "PROGRAM"
+        if not cur.baselineReady then return cur.startS + cur.offset
+        pos# = m.video.position
+        return cur.startS + cur.offset + (pos# - cur.playStartCurrentTime)
+    end if
+    return m.bumperEff
+end function
+
+' ---- the 500ms tick — derive effective, roll at boundaries, publish -----------
+
+sub onTick()
+    t# = clockSec()
+    nowWall# = wallMs()
+    wallDt# = (nowWall# - m.lastTickMs) / 1000.0
+    m.lastTickMs = nowWall#
+    cur = m.current
+    if cur = invalid then return
+
+    effective# = 0.0
+    if cur.kind = "PROGRAM"
+        effective# = currentEffective()
+        if effective# >= cur.endS - 0.25
+            seekTo(cur.endS, false, 0)   ' ROLLOVER → next slot (may be a bumper → then next program)
+            return
+        end if
+    else
+        if not m.paused then m.bumperEff = m.bumperEff + wallDt#
+        effective# = m.bumperEff
+        if effective# >= cur.endS
+            seekTo(cur.endS, false, 0)
+            return
+        end if
+    end if
+
+    publishStatus(cur, effective#, t#)
+end sub
+
+' ---- heartbeat + resume (10s) ------------------------------------------------
+
+sub onHeartbeat()
+    cur = m.current
+    if cur = invalid then return
+    eff# = currentEffective()
+    t# = clockSec()
+    saveResume(eff#, t#)   ' on the 10s cadence, not the 500ms tick — registry writes hit flash
+
+    st = "program"
+    if cur.kind = "BUMPER" then st = "bumper"
+    delay# = t# - eff#
+    if delay# < 0 then delay# = 0
+    Api.heartbeat([
+        ["channelId", m.top.channelId],
+        ["state", st],
+        ["ratingKey", cur.ratingKey],
+        ["title", titleOf(cur.guide)],
+        ["delaySeconds", Int(delay#)],
+        ["positionAt", isoOf(eff#)],
+        ["transcodeSession", cur.session]
+    ])
+end sub
+
+sub saveResume(effective as double, t as double)
+    if m.current = invalid then return
+    delay# = t - effective
+    b = Api.obj()
+    b.channelId = m.top.channelId
+    b.positionAtSec = Int(effective)
+    b.atLiveEdge = (delay# < LIVE_THRESHOLD)
+    b.savedAtSec = Int(wallMs() / 1000.0)
+    Registry.write(RegKey.RESUME, FormatJson(b))
+end sub
+
+' ---- Video node events -------------------------------------------------------
 
 sub onVideoState()
     st = m.video.state
     Log.info("[player] video state=" + st)
-    if st = "error"
-        m.status.text = "Video error: " + Log.trunc(m.video.errorMsg)
-    else if st = "playing"
+    cur = m.current
+    if st = "playing"
         m.status.text = ""
+        ' Anchor the baseline on the first real playback of a fresh program load (the same-media seek path
+        ' already anchored inline, guarded here by baselineReady).
+        if cur <> invalid and cur.kind = "PROGRAM" and not cur.baselineReady
+            cur.playStartCurrentTime = m.video.position
+            cur.baselineReady = true
+        end if
+    else if st = "finished"
+        ' keep-open EOF backstop: mpv/Video can stall on the last frame just shy of the slot boundary and
+        ' never cross the 0.25s rollover threshold — roll to the next slot on EOF within 2s of the end.
+        if cur <> invalid and cur.kind = "PROGRAM" and currentEffective() >= cur.endS - 2.0 then seekTo(cur.endS, false, 0)
+    else if st = "error"
+        m.status.text = "Video error"
+        ' native-first safety-catch: a decode error on a non-hls program → force an HLS transcode retry.
+        if cur <> invalid and cur.kind = "PROGRAM" and cur.mode <> "hls" and not cur.retried then seekTo(currentEffective(), true, 0)
     end if
 end sub
 
-' /media mode + container → Roku Video streamFormat. Transcode = hls; direct/http = the raw container as the
-' streamFormat (jellyfin's approach: `content.streamFormat = mediaSource.container` — Roku accepts mkv/mp4/mov/…).
+' ---- controls (media remote keys in Incr A; the FeaturePanel drives these in Incr C) -----
+
+sub togglePause()
+    cur = m.current
+    if cur = invalid then return
+    if cur.kind = "PROGRAM"
+        if m.paused
+            m.video.control = "resume"
+            m.paused = false
+        else
+            m.video.control = "pause"
+            m.paused = true
+        end if
+    else
+        m.paused = not m.paused
+    end if
+end sub
+
+sub seekBy(seconds as double)
+    seekTo(currentEffective() + seconds, false, 0)
+end sub
+
+sub jumpToLive()
+    seekTo(clockSec(), false, 0)
+end sub
+
+sub restart()
+    cur = m.current
+    if cur = invalid then return
+    if cur.kind = "BUMPER" then seekTo(clockSec(), false, 0) else seekTo(cur.startS, false, 0)
+end sub
+
+' ---- teardown ---------------------------------------------------------------
+
+sub teardown()
+    m.tickTimer.control = "stop"
+    m.heartbeatTimer.control = "stop"
+    m.timelineTimer.control = "stop"
+    if m.current <> invalid
+        saveResume(currentEffective(), clockSec())
+        stopSession(m.current.session)
+    end if
+    Api.endSession()
+    stopMedia()
+end sub
+
+' ---- helpers ----------------------------------------------------------------
+
+function findSlot(t as double) as integer
+    i = 0
+    for each s in m.slots
+        if t >= s.startS and t < s.endS then return i
+        i = i + 1
+    end for
+    return -1
+end function
+
+sub stopMedia()
+    m.video.control = "stop"
+    m.video.content = invalid
+    m.currentUrl = ""
+end sub
+
+sub stopSession(session as dynamic)
+    if session <> invalid and session <> "" then Api.stop(m.top.channelId, session)
+end sub
+
+' /media mode + container → Roku Video streamFormat (jellyfin's approach: transcode → hls; direct/http →
+' the raw container, which Roku accepts as a streamFormat: mkv/mp4/mov/…).
 function mapFormat(mode as string, container as dynamic) as string
     if mode = "hls" then return "hls"
     if container <> invalid and container <> "" then return LCase(container)
     return "mp4"
 end function
 
-function strOr(v as dynamic) as string
-    if v = invalid then return "?"
-    return v
+' The delivery readout (mode / container / codecs / connection) for the Info view (consumed in Incr C).
+function buildDelivery(info as object) as object
+    cont = invalid
+    if info.decision <> invalid and info.decision.container <> invalid then cont = info.decision.container else cont = info.container
+    vcodec = info.videoCodec
+    if vcodec = invalid and info.decision <> invalid then vcodec = info.decision.videoCodec
+    acodec = info.audioCodec
+    if acodec = invalid and info.decision <> invalid then acodec = info.decision.audioCodec
+    vdec = invalid
+    adec = invalid
+    if info.decision <> invalid
+        vdec = info.decision.videoDecision
+        adec = info.decision.audioDecision
+    end if
+    return { mode: info.mode, container: cont, videoCodec: vcodec, audioCodec: acodec, videoDecision: vdec, audioDecision: adec, connection: info.connection }
 end function
+
+function titleOf(g as dynamic) as string
+    if g = invalid then return ""
+    if g.showTitle <> invalid and g.showTitle <> "" then return g.showTitle + " — " + g.title
+    if g.title = invalid then return ""
+    return g.title
+end function
+
+function isoOf(sec as double) as string
+    d = CreateObject("roDateTime")
+    d.FromSeconds(Int(sec))
+    return d.ToISOString()
+end function
+
+' m:ss (or h:mm:ss) from a seconds duration.
+function fmtDur(total as double) as string
+    s = Int(total)
+    if s < 0 then s = 0
+    h = s \ 3600
+    mn = (s mod 3600) \ 60
+    sec = s mod 60
+    ss = sec.toStr()
+    if sec < 10 then ss = "0" + ss
+    if h > 0
+        mm = mn.toStr()
+        if mn < 10 then mm = "0" + mm
+        return h.toStr() + ":" + mm + ":" + ss
+    end if
+    return mn.toStr() + ":" + ss
+end function
+
+' Increment A: drive the debug label so the clock/rollover is verifiable via screenshots. The FeaturePanel
+' (Incr C) reads real status fields instead.
+sub publishStatus(cur as object, effective as double, t as double)
+    behind# = t - effective
+    if behind# < 0 then behind# = 0
+    if cur.kind = "BUMPER"
+        remS = Int(cur.endS - effective + 0.999)   ' NB: `rem` is the reserved REM comment keyword
+        if remS < 0 then remS = 0
+        m.status.text = "BUMPER  " + Str(remS).Trim() + "s   up next: " + titleOf(cur.guide)
+    else
+        live = "LIVE"
+        if behind# >= LIVE_THRESHOLD then live = "-" + fmtDur(behind#)
+        m.status.text = titleOf(cur.guide) + "    " + fmtDur(effective - cur.startS) + " / " + fmtDur(cur.endS - cur.startS) + "    " + live
+    end if
+end sub
+
+' ---- keys (Incr A: media remote drives the DVR before the chrome exists) -----
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
     if key = Keys.BACK
-        m.video.control = "stop"
-        m.video.content = invalid
+        teardown()
         m.top.done = true
+        return true
+    else if key = Keys.PLAY
+        togglePause()
+        return true
+    else if key = Keys.REWIND
+        seekBy(-60.0)
+        return true
+    else if key = Keys.FORWARD
+        seekBy(60.0)
+        return true
+    else if key = Keys.REPLAY
+        restart()
         return true
     end if
     return false
