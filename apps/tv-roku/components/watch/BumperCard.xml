@@ -15,9 +15,15 @@
         <field id="total" type="integer" value="-1" />
         <field id="accent" type="string" value="0x3B82F6FF" />
         <field id="paused" type="boolean" onChange="onPaused" />
+        <!-- compact = the mini-dock variant (small: countdown number + "Up next" + title, no donut). -->
+        <field id="compact" type="boolean" onChange="onCompact" />
+        <field id="dockX" type="integer" />
+        <field id="dockY" type="integer" />
+        <field id="dockW" type="integer" />
+        <field id="dockH" type="integer" />
         <field id="active" type="boolean" alwaysNotify="true" onChange="onActive" />
     </interface>
     <children>
-        <Timer id="tick" repeat="true" duration="0.2" />
+        <Timer id="tick" repeat="true" duration="0.05" />   <!-- 20fps so the progress bar drains smoothly -->
     </children>
 </component>

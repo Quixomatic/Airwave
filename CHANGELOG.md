@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.52] - 2026-08-17
+
+Roku **bumper card — progress bar + compact mini variant (Increment B2/E polish)**.
+
+### Changed
+
+- **The bumper countdown is now a smooth top progress bar** instead of the donut (YouTube-ad style): a
+  tinted accent bar across the top of the card that fills left→right as the bumper elapses, 20fps, with
+  the seconds centered below the title. This removes the donut's per-frame Poster-reload flash and the
+  ~400KB of donut frames. It's driven by the same local clock, so a DVR scrub re-syncs it and pausing
+  freezes it.
+- **The mini feed now shows a compact BumperCard while docked** — during a bumper the dock shows a small
+  overlay (countdown number + "UP NEXT" + the upcoming title + its own top progress bar) instead of the
+  frozen frame, matching tv-web/native's compact card. It switches variant live if you go full↔mini
+  mid-bumper.
+
 ## [0.10.51] - 2026-08-17
 
 Roku **mini player — persist the channel while browsing the guide (Increment B1)**.

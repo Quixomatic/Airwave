@@ -1,37 +1,39 @@
 import "pkg:/source/lib/api.bs"
 import "pkg:/source/theme.bs"
 
-' BumperCard code-behind — see the .xml header. A local smooth countdown clock drives the seconds + the
-' draining donut frame; PlayerHost pushes guide/remaining/total/accent + toggles `active`.
-
-const D_SIZE = 190
-const D_STEPS = 100
+' BumperCard code-behind — see the .xml header. A local smooth countdown clock drives the seconds + a top
+' progress bar (fills as the bumper elapses); PlayerHost pushes guide/remaining/total/accent + toggles
+' `active`. The clock re-syncs on a DVR scrub (onRemaining drift) and freezes when paused, so the bar does too.
 
 sub init()
     m.tick.observeField("fire", "onTick")
     buildCard()
+    buildCompact()
     m.top.visible = false
 end sub
 
 sub buildCard()
-    base = m.top.createChild("Rectangle")   ' opaque base so the frozen program frame behind never shows through
+    fg = m.top.createChild("Group")
+    m.fullGroup = fg
+
+    base = fg.createChild("Rectangle")   ' opaque base so the frozen program frame behind never shows through
     base.width = 1920
     base.height = 1080
     base.color = "0x04060CFF"
 
-    bg = m.top.createChild("Poster")
+    bg = fg.createChild("Poster")
     bg.width = 1920
     bg.height = 1080
     bg.opacity = 0.5
     bg.loadDisplayMode = "scaleToZoom"       ' cover-fill the ambient art
     m.bg = bg
 
-    scrim = m.top.createChild("Rectangle")
+    scrim = fg.createChild("Rectangle")
     scrim.width = 1920
     scrim.height = 1080
     scrim.color = "0x04060CC2"
 
-    kicker = m.top.createChild("Label")
+    kicker = fg.createChild("Label")
     Theme.setFont(kicker, Theme.FONT_BOLD, 22)
     kicker.horizAlign = "center"
     kicker.width = 1920
@@ -39,7 +41,7 @@ sub buildCard()
     kicker.text = "COMING UP NEXT"
     m.kicker = kicker
 
-    title = m.top.createChild("Label")
+    title = fg.createChild("Label")
     Theme.setFont(title, Theme.FONT_BOLD, 64)
     title.horizAlign = "center"
     title.width = 1600
@@ -49,7 +51,7 @@ sub buildCard()
     title.maxLines = 2
     m.title = title
 
-    ep = m.top.createChild("Label")
+    ep = fg.createChild("Label")
     Theme.setFont(ep, Theme.FONT_REG, 28)
     ep.horizAlign = "center"
     ep.width = 1920
@@ -57,30 +59,82 @@ sub buildCard()
     ep.color = "0xC3C9D4FF"
     m.ep = ep
 
-    dx = Int((1920 - D_SIZE) / 2)
-    dtrack = m.top.createChild("Poster")
-    dtrack.uri = "pkg:/images/donut-track.png"
-    dtrack.width = D_SIZE
-    dtrack.height = D_SIZE
-    dtrack.blendColor = "0xFFFFFF24"
-    dtrack.translation = [dx, 622]
-    m.dtrack = dtrack
+    ' Top countdown progress bar — fills left→right as the bumper elapses (YouTube-ad style; replaces the
+    ' donut, and no per-frame Poster reload so it doesn't flash).
+    bt = fg.createChild("Rectangle")
+    bt.width = 1920
+    bt.height = 6
+    bt.color = "0xFFFFFF1F"
+    m.barTrack = bt
+    bf = fg.createChild("Rectangle")
+    bf.height = 6
+    m.barFill = bf
 
-    darc = m.top.createChild("Poster")
-    darc.width = D_SIZE
-    darc.height = D_SIZE
-    darc.translation = [dx, 622]
-    m.darc = darc
-
-    secs = m.top.createChild("Label")
-    Theme.setFont(secs, Theme.FONT_BOLD, 88)
+    secs = fg.createChild("Label")
+    Theme.setFont(secs, Theme.FONT_BOLD, 84)
     secs.horizAlign = "center"
-    secs.vertAlign = "center"
-    secs.width = D_SIZE
-    secs.height = D_SIZE
-    secs.translation = [dx, 622]
+    secs.width = 1920
+    secs.translation = [0, 632]
     secs.color = "0xFFFFFFFF"
     m.secs = secs
+end sub
+
+' The COMPACT (mini-dock) variant — a small overlay covering the dock: countdown seconds + "Up next" + the
+' upcoming title (tv-web/native compact card, minus the donut). Positioned/sized to the dock rect in onActive.
+sub buildCompact()
+    cg = m.top.createChild("Group")
+    cg.visible = false
+    m.compactGroup = cg
+
+    cbg = cg.createChild("Rectangle")
+    cbg.color = "0x04060CF2"
+    m.compactBg = cbg
+
+    cbt = cg.createChild("Rectangle")
+    cbt.height = 5
+    cbt.color = "0xFFFFFF1F"
+    m.compactBarTrack = cbt
+    cbf = cg.createChild("Rectangle")
+    cbf.height = 5
+    m.compactBarFill = cbf
+
+    csecs = cg.createChild("Label")
+    Theme.setFont(csecs, Theme.FONT_BOLD, 46)
+    csecs.vertAlign = "center"
+    csecs.horizAlign = "center"
+    csecs.color = "0xFFFFFFFF"
+    m.compactSecs = csecs
+
+    cup = cg.createChild("Label")
+    Theme.setFont(cup, Theme.FONT_BOLD, 13)
+    m.compactUp = cup
+
+    ctitle = cg.createChild("Label")
+    Theme.setFont(ctitle, Theme.FONT_SEMI, 20)
+    ctitle.color = "0xF1F5F9FF"
+    ctitle.maxLines = 1
+    m.compactTitle = ctitle
+end sub
+
+' Size + place the compact variant within the dock rect.
+sub layoutCompact()
+    dw = m.top.dockW
+    dh = m.top.dockH
+    m.compactGroup.translation = [m.top.dockX, m.top.dockY]
+    m.compactBg.width = dw
+    m.compactBg.height = dh
+    m.compactBarTrack.width = dw
+    m.compactBarFill.width = 0
+    pad = 30
+    cy = Int(dh / 2)
+    m.compactSecs.width = 80
+    m.compactSecs.height = 56
+    m.compactSecs.translation = [pad, cy - 28]
+    tx = pad + 80 + 18
+    m.compactUp.translation = [tx, cy - 26]
+    m.compactUp.width = dw - tx - pad
+    m.compactTitle.translation = [tx, cy - 4]
+    m.compactTitle.width = dw - tx - pad
 end sub
 
 ' Local wall-clock ms (double).
@@ -92,20 +146,30 @@ end function
 
 sub onActive()
     if m.top.active
-        g = m.top.guide
-        art = ""
-        if g <> invalid
-            a = g.art
-            if a = invalid then a = g.thumb
-            if a <> invalid and a <> "" and m.top.channelId <> "" then art = Api.imageUrl(m.top.channelId, a, 1280)
+        m.isCompact = m.top.compact
+        if m.isCompact
+            m.fullGroup.visible = false
+            m.compactGroup.visible = true
+            layoutCompact()
+        else
+            m.compactGroup.visible = false
+            m.fullGroup.visible = true
+            g = m.top.guide
+            art = ""
+            if g <> invalid
+                a = g.art
+                if a = invalid then a = g.thumb
+                if a <> invalid and a <> "" and m.top.channelId <> "" then art = Api.imageUrl(m.top.channelId, a, 1280)
+            end if
+            m.bg.uri = art
         end if
-        m.bg.uri = art
         renderText()
         m.totalRef = m.top.total
         if m.totalRef < 1 then m.totalRef = m.top.remaining
         if m.totalRef < 1 then m.totalRef = 1
         m.endMs = wallMs() + m.top.remaining * 1000.0
         m.held = 0.0
+        m.lastSec = -1
         m.top.visible = true
         m.tick.control = "start"
         onTick()
@@ -129,6 +193,22 @@ sub onPaused()
     if m.top.paused then m.held = m.endMs - wallMs()
 end sub
 
+' The dock layout flipped full↔mini mid-bumper — switch the variant without re-seeding the clock.
+sub onCompact()
+    if not m.top.active then return
+    m.isCompact = m.top.compact
+    if m.isCompact
+        m.fullGroup.visible = false
+        m.compactGroup.visible = true
+        layoutCompact()
+    else
+        m.compactGroup.visible = false
+        m.fullGroup.visible = true
+    end if
+    m.lastSec = -1
+    renderText()
+end sub
+
 sub onTick()
     if not m.top.active then return
     now# = wallMs()
@@ -139,19 +219,36 @@ sub onTick()
     frac = 0.0
     if m.totalRef > 0 then frac = remS# / m.totalRef
     if frac > 1.0 then frac = 1.0
-    idx = Int(frac * D_STEPS + 0.5)
-    if idx < 0 then idx = 0
-    if idx > D_STEPS then idx = D_STEPS
-    m.darc.uri = "pkg:/images/donut-" + Str(idx).Trim() + ".png"
-    m.darc.blendColor = m.top.accent
-    m.secs.text = Str(sec).Trim()
+    progress# = 1.0 - frac   ' fills left→right as the bumper elapses
+    if progress# < 0.0 then progress# = 0.0
+    setText = (sec <> m.lastSec)   ' the number only changes ~1×/s; the bar updates every 20fps tick
+    m.lastSec = sec
+    if m.isCompact
+        if setText then m.compactSecs.text = Str(sec).Trim()
+        m.compactBarFill.width = Int(progress# * m.top.dockW)
+        m.compactBarFill.color = m.top.accent
+    else
+        if setText then m.secs.text = Str(sec).Trim()
+        m.barFill.width = Int(progress# * 1920)
+        m.barFill.color = m.top.accent
+    end if
 end sub
 
 sub renderText()
     g = m.top.guide
     if g = invalid then return
-    m.kicker.color = m.top.accent
     isEp = (g.showTitle <> invalid and g.showTitle <> "" and g.season <> invalid and g.episode <> invalid)
+    heading = ""
+    if isEp then heading = g.showTitle else if g.title <> invalid then heading = g.title
+
+    if m.isCompact
+        m.compactUp.color = m.top.accent
+        m.compactUp.text = "UP NEXT"
+        m.compactTitle.text = heading
+        return
+    end if
+
+    m.kicker.color = m.top.accent
     if isEp
         m.title.text = g.showTitle
         e = "S" + Str(g.season).Trim() + " · E" + Str(g.episode).Trim()
@@ -159,7 +256,7 @@ sub renderText()
         m.ep.text = e
         m.ep.visible = true
     else
-        if g.title <> invalid then m.title.text = g.title else m.title.text = ""
+        m.title.text = heading
         m.ep.visible = false
     end if
 end sub

@@ -769,12 +769,19 @@ sub publishStatus(cur as object, effective as double, t as double)
 
     ' Drive the "Coming up next" bumper card (shown over the frozen held frame during a bumper slot).
     if m.bumper <> invalid
-        if isBumper and m.top.layout = "full"
+        if isBumper and (m.top.layout = "full" or m.top.layout = "mini")
             m.bumper.channelId = m.top.channelId
             m.bumper.guide = cur.guide
             m.bumper.accent = m.top.accent
             m.bumper.total = Int(cur.endS - cur.startS)
             m.bumper.paused = m.paused
+            m.bumper.compact = (m.top.layout = "mini")   ' compact variant when docked
+            if m.top.layout = "mini"
+                m.bumper.dockX = m.top.dockX
+                m.bumper.dockY = m.top.dockY
+                m.bumper.dockW = m.top.dockW
+                m.bumper.dockH = m.top.dockH
+            end if
             m.bumper.remaining = status.bumperRemaining
             if not m.bumper.active then m.bumper.active = true
         else if m.bumper.active
