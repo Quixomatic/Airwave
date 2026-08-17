@@ -2,6 +2,23 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.29] - 2026-08-17
+
+Roku guide — the real root-cause fixes for program positioning and channel tints.
+
+### Fixed
+
+- **Program positioning (the overlap) — a 32-bit-float precision bug in `parseIso`.** `AsSeconds() *
+  1000.0` computed epoch-ms (~1.79e12) in single-precision float (7 sig digits), quantizing every
+  timestamp to ~131-second buckets — which shifted program starts and made them appear to overlap. Now
+  forced to 64-bit **double** math. With timestamps exact, the guide tiles perfectly using the
+  **identical `durationSeconds` positioning math as tv-web/tv-native** (the earlier client-side "tile to
+  next start" workaround is removed).
+- **Channel tints were index-based, not the channel's real tint.** Ported `lib/tint.ts` +
+  `accent-palette.ts` to `source/lib/tint.bs`: a channel's accent is its own `tint` key → its package's
+  → an index-derived fallback (`Tint.forChannel`), mapping the stored key (`green`/`blue`/…) to its muted
+  hex. Channels now show their actual colors.
+
 ## [0.10.28] - 2026-08-17
 
 Roku guide 6a render-parity fixes (all on the Ultra).

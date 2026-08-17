@@ -1,0 +1,58 @@
+' Tint — channel accent resolution, ported from tv-web/tv-native lib/tint.ts + accent-palette.ts.
+' A channel's accent is its own tint key → its package's → an index-derived fallback (never collapse
+' every untinted channel onto one color). Values are hex without '#' (for GuideLayout.argb()).
+namespace Tint
+
+    ' MUTED accent per palette key (large guide surfaces: rail/cell fill, icons). "store vivid, present
+    ' muted" — these are the `tint` column from accent-palette.ts.
+    function mutedOf(key as string) as string
+        s = {
+            purple: "b06cd8", violet: "7c6fd6", indigo: "7f88e0", blue: "5b8fd6",
+            sky: "4a9fe0", cyan: "3aa0b8", teal: "3fb1a0", mint: "3fa66a",
+            green: "5cc98a", yellow: "d9b544", amber: "c99138", orange: "d08b2f",
+            red: "d05a52", rose: "d0587e", pink: "c96591", slate: "7c8aa3"
+        }
+        if s[key] <> invalid then return s[key]
+        return ""
+    end function
+
+    ' VIVID accent per palette key (small chrome over black video — player chip, scrubber). Reserved for
+    ' the player (Phase 7).
+    function vividOf(key as string) as string
+        s = {
+            purple: "d946ef", violet: "8b5cf6", indigo: "6366f1", blue: "3b82f6",
+            sky: "0ea5e9", cyan: "06b6d4", teal: "22d3ee", mint: "10b981",
+            green: "86efac", yellow: "facc15", amber: "f59e0b", orange: "f97316",
+            red: "ef4444", rose: "f43f5e", pink: "ec4899", slate: "94a3b8"
+        }
+        if s[key] <> invalid then return s[key]
+        return ""
+    end function
+
+    ' A channel's key = its own tint ?? its package's tint. "" when neither is set.
+    function keyOf(channel as object) as string
+        if channel.tint <> invalid and channel.tint <> "" then return channel.tint
+        if channel.package <> invalid and channel.package.tint <> invalid and channel.package.tint <> "" then return channel.package.tint
+        return ""
+    end function
+
+    ' MUTED accent for a channel, or "" (caller falls back to accentOf(index)).
+    function channelTint(channel as object) as string
+        key = Tint.keyOf(channel)
+        if key = "" then return ""
+        return Tint.mutedOf(key)
+    end function
+
+    ' Index-derived fallback palette (tv-web/native accentOf) — for channels with NO tint key.
+    function accentOf(index as integer) as string
+        f = ["5b8fd6", "7c6fd6", "3fa66a", "d08b2f", "d0587e", "3aa0b8", "c99138", "b06cd8"]
+        return f[index mod f.count()]
+    end function
+
+    ' The resolved MUTED accent hex for a channel at a row index: its own tint, else the fallback.
+    function forChannel(channel as object, index as integer) as string
+        t = Tint.channelTint(channel)
+        if t <> "" then return t
+        return Tint.accentOf(index)
+    end function
+end namespace

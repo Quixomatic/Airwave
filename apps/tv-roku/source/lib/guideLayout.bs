@@ -91,10 +91,14 @@ namespace GuideLayout
     end function
 
     ' ISO-8601 timestamp → epoch milliseconds (Double, UTC). Positioning math uses UTC consistently.
+    ' ⚠️ `AsSeconds() * 1000.0` computes in 32-bit FLOAT (7 sig digits) → epoch-ms (~1.79e12) quantizes
+    ' to ~131s buckets, which corrupts every program's position. Force DOUBLE (64-bit, exact to 2^53) by
+    ' storing AsSeconds in a `#`-suffixed (Double) variable first.
     function parseIso(s as string) as double
         dt = CreateObject("roDateTime")
         dt.FromISO8601String(s)
-        return dt.AsSeconds() * 1000.0
+        seconds# = dt.AsSeconds()
+        return seconds# * 1000.0
     end function
 
     ' UTC ms → LOCAL "h:MM AM/PM" (server sends UTC; the guide shows the viewer's local time, like tv-web).

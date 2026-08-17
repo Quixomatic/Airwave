@@ -1,5 +1,6 @@
 import "pkg:/source/lib/guideLayout.bs"
 import "pkg:/source/theme.bs"
+import "pkg:/source/lib/tint.bs"
 import "pkg:/source/lib/api.bs"
 import "pkg:/source/lib/log.bs"
 import "pkg:/source/input/keys.bs"
@@ -122,7 +123,7 @@ sub buildContent(channels as object)
     i = 0
     for each ch in channels
         node = content.createChild("ContentNode")
-        node.addFields({ channel: ch, accentHex: GuideLayout.accentOf(i) })
+        node.addFields({ channel: ch, accentHex: Tint.forChannel(ch, i) })
         i = i + 1
     end for
     m.list.content = content
