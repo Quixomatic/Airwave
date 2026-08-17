@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  FeaturedPanel — the now/next detail panel above the guide grid (port of tv-native aurora-grid
+  FeaturedPanel, left text column; the right side is the mini-player dock in Phase 7). Shows the
+  focused channel + program. Driven by `content` = a ContentNode carrying { channel, program,
+  accentHex }. All sizes are fv() (FEATURE_SCALE 0.76). Fonts + positions applied in code.
+-->
+<component name="FeaturedPanel" extends="Group">
+    <interface>
+        <field id="content" type="node" onChange="onContent" />
+        <!-- Width reserved on the RIGHT for the mini-player dock (Phase 7). 0 = text column uses the
+             full width; when the mini docks, the text column shrinks by this much (tv-native flex:1). -->
+        <field id="rightReserve" type="float" onChange="onReserve" />
+    </interface>
+    <children>
+        <Poster id="circle" uri="pkg:/images/circle.png" />
+        <Poster id="ring" uri="pkg:/images/circle-ring.png" />
+        <Poster id="glyph" uri="pkg:/images/ic-channel.png" />
+        <Label id="chNum" />
+        <Label id="chName" />
+        <Label id="genre" />
+        <Rectangle id="divider" color="0x94A3B824" height="1" />
+        <Label id="title" />
+        <LayoutGroup id="badges" layoutDirection="horiz" itemSpacings="[8]" vertAlignment="center" />
+        <Label id="meta" />
+        <Label id="summary" wrap="true" maxLines="2" />
+        <Label id="timeRange" />
+        <Label id="status" horizAlign="right" />
+        <Poster id="progTrack" uri="pkg:/images/np/fill-8.9.png" blendColor="0x94A3B82E" />
+        <Poster id="progFill" uri="pkg:/images/np/fill-8.9.png" blendColor="0x3B82F6FF" />
+    </children>
+</component>

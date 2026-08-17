@@ -37,6 +37,13 @@ sub init()
     m.iconCircle.height = circle
     m.iconCircle.translation = [GuideLayout.vw(20), GuideLayout.vw(18)]
 
+    ' Tinted border ring around the icon circle (accent@0.35, like tv-web/native).
+    m.iconRing = m.top.createChild("Poster")
+    m.iconRing.uri = "pkg:/images/circle-ring.png"
+    m.iconRing.width = circle
+    m.iconRing.height = circle
+    m.iconRing.translation = [GuideLayout.vw(20), GuideLayout.vw(18)]
+
     gl = Int(circle * 0.56)
     m.iconGlyph = m.top.createChild("Poster")
     m.iconGlyph.uri = "pkg:/images/ic-channel.png"
@@ -89,6 +96,7 @@ sub render()
 
     m.railBar.color = GuideLayout.argb(accent, 1.0)
     m.iconCircle.blendColor = GuideLayout.argb(accent, 0.2)
+    m.iconRing.blendColor = GuideLayout.argb(accent, 0.35)
     m.iconGlyph.blendColor = GuideLayout.argb(accent, 1.0)
     m.numLabel.text = GuideLayout.numStr(ch.number)
     m.nameLabel.text = ch.name

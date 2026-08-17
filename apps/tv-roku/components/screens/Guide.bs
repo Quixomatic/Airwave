@@ -14,6 +14,7 @@ sub init()
     m.ticks = m.top.findNode("ticks")
     m.gridClip = m.top.findNode("gridClip")
     m.list = m.top.findNode("list")
+    m.featured = m.top.findNode("featured")
     m.nowCaret = m.top.findNode("nowCaret")
     m.caretPulse = m.top.findNode("caretPulse")
     m.msg = m.top.findNode("msg")
@@ -27,6 +28,7 @@ sub init()
     m.list.itemSize = [GuideLayout.colW(), GuideLayout.rowPx()]
     m.list.numColumns = 1
     m.list.observeField("itemSelected", "onItemSelected")
+    m.list.observeField("itemFocused", "onRowFocus")
 
     ' Times travel to the rows as ISO strings on m.global (float fields can't hold epoch-ms).
     if not m.global.hasField("guideServerTime")
@@ -70,6 +72,7 @@ sub onGuide(data as object, _ctx as object)
     buildTicks()
     buildContent(channels)
     drawNowCaret()
+    updateFeatured(0)
     m.list.setFocus(true)
     Log.info("[guide] " + Str(channels.count()).Trim() + " channels rendered")
 end sub
@@ -155,3 +158,31 @@ sub onItemSelected()
     Log.info("[guide] tune -> " + node.channel.id)
     m.top.tuneChannelId = node.channel.id
 end sub
+
+' The focused channel changed → the featured panel follows it (showing its on-now program). fp-driven
+' left/right selection comes with the zone machine (6c).
+sub onRowFocus()
+    updateFeatured(m.list.itemFocused)
+end sub
+
+sub updateFeatured(idx as integer)
+    content = m.list.content
+    if content = invalid then return
+    node = content.getChild(idx)
+    if node = invalid or node.channel = invalid then return
+    prog = onNowProgram(node.channel)
+    if prog = invalid then return
+    fc = CreateObject("roSGNode", "ContentNode")
+    fc.addFields({ channel: node.channel, program: prog, accentHex: node.accentHex })
+    m.featured.content = fc
+end sub
+
+' The program airing now on a channel (else its first program).
+function onNowProgram(ch as object) as object
+    if ch.programs = invalid or ch.programs.count() = 0 then return invalid
+    for each p in ch.programs
+        s = GuideLayout.parseIso(p.startsAt)
+        if m.nowMs >= s and m.nowMs < s + p.durationSeconds * 1000.0 then return p
+    end for
+    return ch.programs[0]
+end function

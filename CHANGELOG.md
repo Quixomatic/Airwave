@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.31] - 2026-08-17
+
+Roku guide 6b — the featured now/next panel + the tinted icon ring.
+
+### Added
+
+- **`apps/tv-roku` featured now/next panel** (`components/guide/FeaturedPanel.{xml,bs}`), a port of
+  tv-native aurora-grid's FeaturedPanel (left text column). Shows the focused channel + its on-now
+  program: channel line (ring-bordered tinted icon + number + name), genre · tagline, divider, title +
+  SxxEyy · episode, HD/4K + HDR/DV + audio + Atmos badges, year · rating · ★, a 2-line summary, the
+  time range + status ("Xm left"/"Starts"/"Ended"), and a progress bar. Wired to the guide's focused row
+  (`itemFocused`). The text column's width derives from a `rightReserve` field so it shrinks when the
+  Phase-7 mini-player docks (tv-native flex:1). Verified on the Ultra.
+- **Tinted icon ring** on the rail + featured circles (accent@0.35 border, `images/circle-ring.png`) —
+  matching tv-web/tv-native.
+
 ## [0.10.30] - 2026-08-17
 
 ### Fixed

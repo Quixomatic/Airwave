@@ -1,0 +1,240 @@
+import "pkg:/source/lib/guideLayout.bs"
+import "pkg:/source/theme.bs"
+
+' Featured now/next panel — port of tv-native aurora-grid FeaturedPanel (left text column). Shows the
+' focused channel + program. Sizes are fv() (FEATURE_SCALE 0.76). The panel is placed by Guide at the
+' guide-column origin; internal layout starts from fv(64) padding.
+
+sub init()
+    m.circle = m.top.findNode("circle")
+    m.ring = m.top.findNode("ring")
+    m.glyph = m.top.findNode("glyph")
+    m.chNum = m.top.findNode("chNum")
+    m.chName = m.top.findNode("chName")
+    m.genre = m.top.findNode("genre")
+    m.divider = m.top.findNode("divider")
+    m.title = m.top.findNode("title")
+    m.badges = m.top.findNode("badges")
+    m.meta = m.top.findNode("meta")
+    m.summary = m.top.findNode("summary")
+    m.timeRange = m.top.findNode("timeRange")
+    m.status = m.top.findNode("status")
+    m.progTrack = m.top.findNode("progTrack")
+    m.progFill = m.top.findNode("progFill")
+    relayout()
+end sub
+
+' Re-run when the mini-player dock reserves/frees right-side width (tv-native flex:1 text column).
+sub onReserve()
+    relayout()
+    onContent()
+end sub
+
+sub relayout()
+    padx = GuideLayout.fv(64)
+    pady = GuideLayout.fv(40)
+    colW = GuideLayout.colW()
+    ' The text column takes the full width, MINUS whatever the mini-player dock reserves on the right.
+    m.leftW = colW - 2 * padx - m.top.rightReserve
+
+    circleSize = GuideLayout.fv(64)
+    m.circle.width = circleSize
+    m.circle.height = circleSize
+    m.circle.translation = [padx, pady]
+    m.ring.width = circleSize
+    m.ring.height = circleSize
+    m.ring.translation = [padx, pady]
+
+    gl = Int(circleSize * 0.56)
+    m.glyph = m.top.findNode("glyph")
+    m.glyph.width = gl
+    m.glyph.height = gl
+    m.glyph.translation = [padx + Int((circleSize - gl) / 2), pady + Int((circleSize - gl) / 2)]
+
+    numX = padx + circleSize + GuideLayout.fv(22)
+    lineMidY = pady + Int((circleSize - GuideLayout.fv(44)) / 2)
+    m.chNum = m.top.findNode("chNum")
+    m.chNum.translation = [numX, lineMidY]
+    m.chNum.width = GuideLayout.fv(120)
+    Theme.setFont(m.chNum, Theme.FONT_BOLD, GuideLayout.fv(44))
+
+    m.chName = m.top.findNode("chName")
+    m.chName.translation = [numX + GuideLayout.fv(120) + GuideLayout.fv(16), lineMidY]
+    m.chName.width = m.leftW - (numX - padx) - GuideLayout.fv(140)
+    m.chName.truncate = true
+    Theme.setFont(m.chName, Theme.FONT_BOLD, GuideLayout.fv(44))
+
+    genreY = pady + circleSize + GuideLayout.fv(14)
+    m.genre = m.top.findNode("genre")
+    m.genre.translation = [padx, genreY]
+    m.genre.width = m.leftW
+    m.genre.truncate = true
+    m.genre.color = "0x64748BFF"
+    Theme.setFont(m.genre, Theme.FONT_REG, GuideLayout.fv(30))
+
+    dividerY = genreY + GuideLayout.fv(30) + GuideLayout.fv(22)
+    m.divider = m.top.findNode("divider")
+    m.divider.translation = [padx, dividerY]
+    m.divider.width = m.leftW
+
+    m.titleY = dividerY + 1 + GuideLayout.fv(26)
+    m.title = m.top.findNode("title")
+    m.title.translation = [padx, m.titleY]
+    m.title.width = m.leftW - GuideLayout.fv(420)
+    m.title.truncate = true
+    m.title.color = "0xF1F5F9FF"
+    Theme.setFont(m.title, Theme.FONT_BOLD, GuideLayout.fv(60))
+
+    m.badges = m.top.findNode("badges")
+    m.badges.translation = [padx + m.leftW - GuideLayout.fv(400), m.titleY + GuideLayout.fv(10)]
+
+    metaY = m.titleY + GuideLayout.fv(60) + GuideLayout.fv(22)
+    m.meta = m.top.findNode("meta")
+    m.meta.translation = [padx, metaY]
+    m.meta.width = m.leftW
+    m.meta.color = "0xC3C9D4FF"
+    Theme.setFont(m.meta, Theme.FONT_REG, GuideLayout.fv(34))
+
+    summaryY = metaY + GuideLayout.fv(34) + GuideLayout.fv(22)
+    m.summary = m.top.findNode("summary")
+    m.summary.translation = [padx, summaryY]
+    m.summary.width = m.leftW
+    m.summary.height = Int(GuideLayout.fv(36) * 1.4 * 2)
+    m.summary.lineSpacing = Int(GuideLayout.fv(36) * 0.4)
+    m.summary.color = "0xC9CFDAFF"
+    Theme.setFont(m.summary, Theme.FONT_REG, GuideLayout.fv(36))
+
+    statusY = summaryY + Int(GuideLayout.fv(36) * 1.4 * 2) + GuideLayout.fv(26)
+    m.timeRange = m.top.findNode("timeRange")
+    m.timeRange.translation = [padx, statusY]
+    m.timeRange.width = GuideLayout.fv(600)
+    m.timeRange.color = "0xC3C9D4FF"
+    Theme.setFont(m.timeRange, Theme.FONT_REG, GuideLayout.fv(34))
+
+    m.status = m.top.findNode("status")
+    m.status.translation = [padx + m.leftW - GuideLayout.fv(600), statusY]
+    m.status.width = GuideLayout.fv(600)
+    m.status.color = "0xE6EAF1FF"
+    Theme.setFont(m.status, Theme.FONT_REG, GuideLayout.fv(34))
+
+    progY = statusY + GuideLayout.fv(34) + GuideLayout.fv(16)
+    m.progH = GuideLayout.fv(8)
+    m.progTrack = m.top.findNode("progTrack")
+    m.progTrack.translation = [padx, progY]
+    m.progTrack.width = m.leftW
+    m.progTrack.height = m.progH
+    m.progFill = m.top.findNode("progFill")
+    m.progFill.translation = [padx, progY]
+    m.progFill.height = m.progH
+end sub
+
+sub onContent()
+    c = m.top.content
+    if c = invalid or c.channel = invalid or c.program = invalid then return
+    ch = c.channel
+    p = c.program
+    g = p.guide
+    accent = c.accentHex
+    accentArgb = GuideLayout.argb(accent, 1.0)
+
+    m.circle.blendColor = GuideLayout.argb(accent, 0.2)
+    m.ring.blendColor = GuideLayout.argb(accent, 0.35)
+    m.glyph.blendColor = accentArgb
+    m.chNum.text = GuideLayout.numStr(ch.number)
+    m.chNum.color = GuideLayout.argb(accent, 0.75)
+    m.chName.text = ch.name
+    m.chName.color = accentArgb
+
+    ' genre · tagline
+    parts = []
+    if g.genres <> invalid and g.genres.count() > 0
+        gp = []
+        for each gn in g.genres
+            gp.push(gn)
+            if gp.count() >= 2 then exit for
+        end for
+        parts.push(GuideLayout.join(gp, " · "))
+    end if
+    if g.tagline <> invalid and g.tagline <> "" then parts.push(g.tagline)
+    m.genre.text = GuideLayout.join(parts, " · ")
+
+    ' title (+ SxxEyy · episode title for episodes)
+    isEp = (g.showTitle <> invalid and g.showTitle <> "" and g.season <> invalid and g.episode <> invalid)
+    if isEp
+        t = g.showTitle + "  S" + GuideLayout.numStr(g.season) + ", E" + GuideLayout.numStr(g.episode)
+        if g.title <> invalid and g.title <> "" then t = t + " · " + g.title
+        m.title.text = t
+    else
+        m.title.text = g.title
+    end if
+
+    buildBadges(g)
+
+    ' meta: year · rating · ★score
+    mparts = []
+    if g.year <> invalid then mparts.push(GuideLayout.numStr(g.year))
+    if g.contentRating <> invalid and g.contentRating <> "" then mparts.push(g.contentRating)
+    if g.criticRating <> invalid then mparts.push("★ " + Str(g.criticRating).Trim())
+    m.meta.text = GuideLayout.join(mparts, "  ·  ")
+
+    if g.summary <> invalid then m.summary.text = g.summary else m.summary.text = ""
+
+    ' time range + status + progress
+    startMs = GuideLayout.parseIso(p.startsAt)
+    endMs = startMs + p.durationSeconds * 1000.0
+    nowMs = GuideLayout.parseIso(m.global.guideServerTime)
+    m.timeRange.text = GuideLayout.fmtTime(startMs) + " - " + GuideLayout.fmtTime(endMs)
+
+    pct = 0.0
+    if nowMs < startMs
+        m.status.text = "Starts " + GuideLayout.fmtTime(startMs)
+    else if nowMs >= endMs
+        m.status.text = "Ended"
+        pct = 1.0
+    else
+        m.status.text = Str(Int((endMs - nowMs) / 60000.0 + 0.5)).Trim() + "m left"
+        pct = (nowMs - startMs) / (endMs - startMs)
+    end if
+    m.progFill.blendColor = accentArgb
+    m.progFill.width = Int(m.leftW * pct)
+    m.progFill.visible = (pct > 0)
+end sub
+
+' 4K/HD (cyan), HDR/DV (gold), audio + Atmos (slate) — solid pills (gradient approximated).
+sub buildBadges(g as object)
+    b = m.badges
+    while b.getChildCount() > 0
+        b.removeChildIndex(0)
+    end while
+    res = ""
+    if g.resolution = "4k" then res = "4K" else if g.resolution <> invalid and g.resolution <> "sd" and g.resolution <> "480" then res = "HD"
+    if res <> "" then addBadge(res, "0x7FD6DEFF", "0x06222AFF")
+    if g.hdr <> invalid and g.hdr <> ""
+        if g.hdr = "Dolby Vision" then addBadge("DV", "0xF0C14BFF", "0x2A1E00FF") else addBadge("HDR", "0xF0C14BFF", "0x2A1E00FF")
+    end if
+    audio = GuideLayout.audioBadge(g.audioChannels)
+    if audio <> "" then addBadge(audio, "0x1E293BFF", "0xDFE4ECFF")
+    if g.dynamicAudio <> invalid and g.dynamicAudio <> ""
+        if g.dynamicAudio = "Atmos" then addBadge("ATMOS", "0x1E293BFF", "0xDFE4ECFF") else addBadge(g.dynamicAudio, "0x1E293BFF", "0xDFE4ECFF")
+    end if
+end sub
+
+sub addBadge(text as string, bg as string, ink as string)
+    fs = GuideLayout.fv(30)
+    w = Len(text) * Int(fs * 0.62) + GuideLayout.fv(32)
+    h = fs + GuideLayout.fv(12)
+    g = m.badges.createChild("Group")
+    p = g.createChild("Poster")
+    p.uri = Theme.npFill(8)
+    p.width = w
+    p.height = h
+    p.blendColor = bg
+    lbl = g.createChild("Label")
+    lbl.text = text
+    lbl.width = w
+    lbl.height = h
+    lbl.horizAlign = "center"
+    lbl.vertAlign = "center"
+    lbl.color = ink
+    Theme.setFont(lbl, Theme.FONT_BOLD, fs)
+end sub

@@ -14,6 +14,9 @@
     <children>
         <Rectangle id="bg" width="1920" height="1080" color="0x060A14FF" />
 
+        <!-- Featured now/next panel for the focused channel (the top area above the grid). -->
+        <FeaturedPanel id="featured" translation="[92,0]" />
+
         <!-- Time header -->
         <Label id="dayLabel" translation="[122,498]" color="0xE6EAF1FF" />
         <Group id="ticks" translation="[243,492]" />
