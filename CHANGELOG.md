@@ -2,6 +2,36 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.47] - 2026-08-17
+
+Roku **Phase 7/8 — the player chrome (Increment C1)**.
+
+### Added
+
+- **`PlayerChrome`** — the full-screen player chrome over the DVR clock, a SceneGraph re-expression of
+  tv-web/tv-native `FullChrome` + `FeaturePanel`. On OK it slides up: a **channel chip** (number + name +
+  vivid accent), the program **title/episode**, the **multi-segment DVR scrubber** (a bar per
+  program/bumper slot, an accent fill to the thumb, a red LIVE marker, position + LIVE/-behind labels),
+  and a **control row** (Pause · Restart · Channel Surf · Info · Jump-to-Live + Audio/Subs/Quality). D-pad
+  nav: row 0 scrubber (◄► seek ±10s, OK pause, ▼ controls), row 1 controls (◄► move, OK activate, ▲
+  scrubber); Back closes the panel then returns to the guide; auto-hides after 8s.
+- **The clock publishes a status object** each tick (state / guide / paused / canRestart / scrubber /
+  delivery) that the chrome renders from, plus `buildScrubber` — the expanded-focus multi-segment view
+  (the focus program is the wide middle; ±6min compresses into fixed left/right peeks) ported exactly
+  from tv-web. Per-channel quality/audio/subtitle opts thread through `/media` (the pickers drive them in
+  C2). Channel identity (number / name / vivid accent) is wired guide → player.
+
+### Fixed
+
+- Roku `onKeyEvent` instant-replay key name (`instantreplay` → `replay`).
+
+### Notes
+
+- **Functional parity is done** (verified on the Ultra: scrubber, chip, controls all work). **Visual
+  parity** — the glass/blur treatment, rounded pills + scrubber bars, the gradient scrim, the circular
+  thumb + focus ring, and the chip's icon circle — is the next pass, along with the Info view + pickers
+  (C2), ChannelSurf (D), the mini-player (B), and the BumperCard + music (E).
+
 ## [0.10.46] - 2026-08-17
 
 Roku **Phase 7/8 — the effectiveTime DVR clock (Increment A)**.

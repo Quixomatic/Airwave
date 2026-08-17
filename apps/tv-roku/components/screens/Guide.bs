@@ -525,6 +525,20 @@ sub tune()
     end if
     m.top.tuneRatingKey = rk
     m.top.tuneOffset = off
+    ' Channel identity for the player chrome — number, name, and the VIVID accent (own tint → package →
+    ' index fallback), as ARGB for the chip + scrubber over black video.
+    key = Tint.keyOf(ch)
+    vivid = ""
+    if key <> "" then vivid = Tint.vividOf(key)
+    if vivid = ""
+        fb = ["2f9e8f", "4a9fe0", "3b82f6", "8b5cf6", "3fa66a", "d08b2f", "d0587e", "7c8aa3"]
+        idx = 0
+        if ch.number <> invalid then idx = ch.number
+        vivid = fb[idx mod fb.count()]
+    end if
+    m.top.tuneAccent = "0x" + vivid + "FF"
+    if ch.number <> invalid then m.top.tuneChannelNumber = ch.number
+    if ch.name <> invalid then m.top.tuneChannelName = ch.name
     Log.info("[guide] tune -> " + ch.id + " rk=" + rk + " off=" + Str(off).Trim())
     m.top.tuneChannelId = ch.id
 end sub

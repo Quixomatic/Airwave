@@ -13,6 +13,10 @@
 <component name="PlayerHost" extends="Group">
     <interface>
         <field id="channelId" type="string" />
+        <!-- Channel identity for the chrome's channel chip (set by MainScene from the guide). -->
+        <field id="channelNumber" type="integer" />
+        <field id="channelName" type="string" />
+        <field id="accent" type="string" value="0x3B82F6FF" />
         <field id="go" type="integer" value="0" alwaysNotify="true" onChange="onGo" />
         <!-- MainScene observes this to hide the player + refocus the guide. -->
         <field id="done" type="boolean" alwaysNotify="true" />

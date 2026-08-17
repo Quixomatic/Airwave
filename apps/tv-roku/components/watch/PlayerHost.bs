@@ -25,6 +25,12 @@ import "pkg:/source/input/keys.bs"
 
 const LIVE_THRESHOLD = 5.0
 const RESUME_MAX_AGE_S = 21600.0   ' 6h
+' Scrubber layout (tv-web parity): the focus program is the expanded middle; a fixed sliver of timeline
+' before/after it is compressed into the left/right "peeks" so the thumb never collides with the LIVE edge.
+const PEEK_L = 0.14
+const PEEK_R = 0.14
+const LOOKBACK_S = 360.0
+const LOOKAHEAD_S = 360.0
 
 sub init()
     ' Suppress Roku's BUILT-IN trick-play UI (the native progress bar that pops up on rewind/ff/play). We
@@ -36,7 +42,58 @@ sub init()
     m.heartbeatTimer.observeField("fire", "onHeartbeat")
     m.timelineTimer.observeField("fire", "onTimelineRefresh")
     Theme.setFont(m.status, Theme.FONT_REG, 22)
+    ' Per-channel playback options (the pickers drive these in Incr C2).
+    m.quality = "original"
+    m.audioStreamId = invalid
+    m.subtitleStreamId = invalid
+    ' The full-screen chrome (channel chip + DVR scrubber + controls) — created once, fed the clock's status.
+    m.chrome = CreateObject("roSGNode", "PlayerChrome")
+    m.top.appendChild(m.chrome)
+    m.chrome.observeField("command", "onChromeCommand")
+    onThen(Api.qualities(), onQualities, m)
     resetClock()
+end sub
+
+sub onQualities(data as object, _m as object)
+    if data <> invalid and data.qualities <> invalid and m.chrome <> invalid then m.chrome.qualities = data.qualities
+end sub
+
+' The chrome fires a one-word command (+ commandArg for the pickers); dispatch it to the clock.
+sub onChromeCommand()
+    cmd = m.chrome.command
+    if cmd = "" then return
+    if cmd = "seekBack"
+        seekBy(-10.0)
+    else if cmd = "seekFwd"
+        seekBy(10.0)
+    else if cmd = "pause"
+        togglePause()
+    else if cmd = "live"
+        jumpToLive()
+    else if cmd = "restart"
+        restart()
+    else if cmd = "back"
+        teardown()
+        m.top.done = true
+    else if cmd = "surf"
+        Log.info("[player] channel surf (Incr D)")
+    else if cmd = "selectQuality"
+        m.quality = m.chrome.commandArg
+        reResolve()
+    else if cmd = "selectAudio"
+        a = m.chrome.commandArg
+        if a = "" then m.audioStreamId = invalid else m.audioStreamId = a
+        reResolve()
+    else if cmd = "selectSub"
+        s = m.chrome.commandArg
+        if s = "" or s = "off" then m.subtitleStreamId = invalid else m.subtitleStreamId = s
+        reResolve()
+    end if
+end sub
+
+' Re-resolve the current program at the same spot (a quality/audio/sub change).
+sub reResolve()
+    if m.current <> invalid and m.current.kind = "PROGRAM" then seekTo(currentEffective(), false, 0)
 end sub
 
 ' ---- clock ------------------------------------------------------------------
@@ -80,7 +137,15 @@ sub onGo()
     if m.top.channelId = invalid or m.top.channelId = "" then return
     resetClock()
     m.status.text = "Tuning…"
-    m.top.setFocus(true)   ' the Group holds focus (NOT the Video) → no native trick-play bar
+    ' Feed the chrome this channel's identity + hand it focus (it owns the player keys; the Video node never
+    ' holds focus → no native trick-play bar). The chrome opens on OK.
+    if m.chrome <> invalid
+        m.chrome.accent = m.top.accent
+        m.chrome.channelNumber = m.top.channelNumber
+        m.chrome.channelName = m.top.channelName
+        m.chrome.active = true
+        m.chrome.setFocus(true)
+    end if
     m.pendingBootstrap = true
     loadTimeline()
 end sub
@@ -214,7 +279,7 @@ sub seekTo(target as double, forceHls as boolean, audioCandidate as integer)
     if offset < 0 then offset = 0
     m.status.text = "Loading…"
     m.pending = { gen: m.gen, idx: idx, entry: entry, offset: offset, forceHls: forceHls, prevSession: prevSession }
-    p = Api.media(m.top.channelId, entry.ratingKey, offset, { deviceId: Device.id(), forceHls: forceHls })
+    p = Api.media(m.top.channelId, entry.ratingKey, offset, { deviceId: Device.id(), forceHls: forceHls, quality: m.quality, audioStreamId: m.audioStreamId, subtitleStreamId: m.subtitleStreamId })
     onThen(p, onMedia, m)
     onCatch(p, onMediaErr, m)
 end sub
@@ -248,6 +313,13 @@ sub onMedia(info as object, _m as object)
         delivery: buildDelivery(info)
     }
     m.paused = false
+    if m.chrome <> invalid
+        atracks = info.audioTracks
+        if atracks = invalid then atracks = []
+        stracks = info.subtitleTracks
+        if stracks = invalid then stracks = []
+        m.chrome.tracks = { audio: atracks, subtitle: stracks }
+    end if
 
     sameMedia = (info.url = m.currentUrl)
     m.currentUrl = info.url
@@ -507,21 +579,130 @@ function fmtDur(total as double) as string
     return mn.toStr() + ":" + ss
 end function
 
-' Increment A: drive the debug label so the clock/rollover is verifiable via screenshots. The FeaturePanel
-' (Incr C) reads real status fields instead.
+' Build the status object the chrome renders from + push it to PlayerChrome (Incr C). Also drives a debug
+' label (covered by the panel) while iterating.
 sub publishStatus(cur as object, effective as double, t as double)
     behind# = t - effective
     if behind# < 0 then behind# = 0
-    if cur.kind = "BUMPER"
+    isBumper = (cur.kind = "BUMPER")
+
+    live = "LIVE"
+    if behind# >= LIVE_THRESHOLD then live = "-" + fmtDur(behind#)
+    if isBumper
         remS = Int(cur.endS - effective + 0.999)   ' NB: `rem` is the reserved REM comment keyword
         if remS < 0 then remS = 0
         m.status.text = "BUMPER  " + Str(remS).Trim() + "s   up next: " + titleOf(cur.guide)
     else
-        live = "LIVE"
-        if behind# >= LIVE_THRESHOLD then live = "-" + fmtDur(behind#)
-        m.status.text = titleOf(cur.guide) + "    " + fmtDur(effective - cur.startS) + " / " + fmtDur(cur.endS - cur.startS) + "    " + live
+        m.status.text = titleOf(cur.guide) + "    " + fmtDur(effective - cur.startS) + "    " + live
     end if
+
+    if m.chrome = invalid then return
+    st = "program"
+    if isBumper then st = "bumper"
+    status = {
+        state: st,
+        guide: cur.guide,
+        paused: m.paused,
+        canRestart: (cur.kind = "PROGRAM"),
+        loading: false,
+        bumperRemaining: -1,
+        scrubber: buildScrubber(effective, t)
+    }
+    if isBumper
+        rr = Int(cur.endS - effective + 0.999)
+        if rr < 0 then rr = 0
+        status.bumperRemaining = rr
+    end if
+    if cur.delivery <> invalid then status.delivery = cur.delivery
+    m.chrome.playerStatus = status
 end sub
+
+' Map a timeline instant → a bar percentage (0–100): the focus program fills the wide middle; timeline
+' before/after compresses into the fixed left/right peeks. Ported from tv-web buildScrubber's mapT.
+function mapT(t as double, fStart as double, fEnd as double, fDur as double) as double
+    f# = 0.0
+    if t < fStart
+        d# = (fStart - t) / LOOKBACK_S
+        if d# > 1.0 then d# = 1.0
+        f# = PEEK_L * (1.0 - d#)
+    else if t > fEnd
+        d# = (t - fEnd) / LOOKAHEAD_S
+        if d# > 1.0 then d# = 1.0
+        f# = 1.0 - PEEK_R + d# * PEEK_R
+    else
+        f# = PEEK_L + ((t - fStart) / fDur) * (1.0 - PEEK_L - PEEK_R)
+    end if
+    p# = f# * 100.0
+    if p# < 0.0 then p# = 0.0
+    if p# > 100.0 then p# = 100.0
+    return p#
+end function
+
+' The multi-segment scrubber view — the PROGRAM you're in is the expanded middle, flanked by fixed
+' left/right peeks (prev tail + bumper, upcoming bumper + next head). Ported EXACTLY from tv-web.
+function buildScrubber(effective as double, nowS as double) as object
+    slots = m.slots
+    behind# = nowS - effective
+    if behind# < 0 then behind# = 0
+    atLive = (behind# < LIVE_THRESHOLD)
+    curIdx = findSlot(effective)
+    if curIdx < 0 then return { segments: [], thumbPct: 0.0, livePct: 100.0, liveVisible: false, slotPositionS: 0.0, atLive: atLive, behindS: behind# }
+    cur = slots[curIdx]
+
+    ' Focus = the program you're in; if in a bumper, the nearest program (prev, else next).
+    focus = cur
+    if cur.kind = "BUMPER"
+        j = curIdx - 1
+        while j >= 0 and slots[j].kind <> "PROGRAM"
+            j = j - 1
+        end while
+        if j >= 0
+            focus = slots[j]
+        else
+            k = curIdx + 1
+            while k < slots.count() and slots[k].kind <> "PROGRAM"
+                k = k + 1
+            end while
+            if k < slots.count() then focus = slots[k]
+        end if
+    end if
+
+    fStart# = focus.startS
+    fEnd# = focus.endS
+    fDur# = fEnd# - fStart#
+    if fDur# < 1.0 then fDur# = 1.0
+    peekStart# = fStart# - LOOKBACK_S
+    peekEnd# = fEnd# + LOOKAHEAD_S
+
+    thumbPct# = mapT(effective, fStart#, fEnd#, fDur#)
+    liveVisible = (nowS >= peekStart# and nowS <= peekEnd#)
+    livePct# = 100.0
+    if liveVisible then livePct# = mapT(nowS, fStart#, fEnd#, fDur#)
+
+    segments = []
+    for each s in slots
+        if s.endS > peekStart# and s.startS < peekEnd#
+            ls# = s.startS
+            if ls# < peekStart# then ls# = peekStart#
+            rs# = s.endS
+            if rs# > peekEnd# then rs# = peekEnd#
+            l# = mapT(ls#, fStart#, fEnd#, fDur#)
+            r# = mapT(rs#, fStart#, fEnd#, fDur#)
+            w# = r# - l#
+            if w# > 0.05
+                isFocus = (s.startS = focus.startS and s.endS = focus.endS)
+                fill# = 0.0
+                if isFocus and thumbPct# > l#
+                    fill# = ((thumbPct# - l#) / w#) * 100.0
+                    if fill# > 100.0 then fill# = 100.0
+                end if
+                segments.push({ kind: s.kind, leftPct: l#, widthPct: w#, current: isFocus, fillPct: fill# })
+            end if
+        end if
+    end for
+
+    return { segments: segments, thumbPct: thumbPct#, livePct: livePct#, liveVisible: liveVisible, slotPositionS: effective - cur.startS, atLive: atLive, behindS: behind# }
+end function
 
 ' ---- keys (Incr A: media remote drives the DVR before the chrome exists) -----
 

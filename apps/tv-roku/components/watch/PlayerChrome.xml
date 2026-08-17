@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  PlayerChrome — the full-screen player CHROME (channel chip + DVR scrubber + control row), a SceneGraph
+  re-expression of tv-web/tv-native FullChrome+FeaturePanel. PlayerHost owns the effectiveTime clock and
+  pushes its status here each tick (`playerStatus`); this component renders it and, on a key, fires a
+  one-word `command` (+ `commandArg`) back to PlayerHost. It owns the player keys while `active`:
+  closed → OK/▲/▼ opens the panel, Back → guide, ◄► → surf; open → row 0 scrubber (◄► seek, OK pause,
+  ▼ controls), row 1 controls (◄► move, OK activate, ▲ scrubber). Auto-hides after 8s. Nothing static is
+  drawn on the live video (burn-in). Nodes are built in code (init) rather than XML — the scrubber is a
+  variable-length pool. Increment C1: chip + scrubber + controls + nav; Info view + pickers = C2.
+-->
+<component name="PlayerChrome" extends="Group">
+    <interface>
+        <!-- IN: the clock's status each tick, channel identity, tracks/qualities for the pickers. -->
+        <field id="playerStatus" type="assocarray" alwaysNotify="true" onChange="onStatus" />
+        <field id="accent" type="string" value="0x3B82F6FF" />
+        <field id="channelNumber" type="integer" />
+        <field id="channelName" type="string" />
+        <field id="tracks" type="assocarray" />
+        <field id="qualities" type="array" />
+        <field id="active" type="boolean" onChange="onActive" />
+        <!-- OUT: a control command (+ arg for the pickers) PlayerHost dispatches to the clock. -->
+        <field id="command" type="string" alwaysNotify="true" />
+        <field id="commandArg" type="string" />
+    </interface>
+    <children>
+        <Timer id="hideTimer" duration="8" repeat="false" />
+    </children>
+</component>

@@ -16,6 +16,6 @@ namespace Keys
     const PLAY = "play"
     const REWIND = "rewind"
     const FORWARD = "fastforward"
-    const REPLAY = "instantreplay"
+    const REPLAY = "replay"
     const OPTIONS = "options"
 end namespace

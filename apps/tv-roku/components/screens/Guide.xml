@@ -10,6 +10,10 @@
         <!-- Tune payload: set tuneRatingKey/tuneOffset FIRST, then tuneChannelId (the trigger MainScene observes). -->
         <field id="tuneRatingKey" type="string" />
         <field id="tuneOffset" type="integer" />
+        <!-- Channel identity for the player's chrome (chip + vivid accent). Set before tuneChannelId. -->
+        <field id="tuneChannelNumber" type="integer" />
+        <field id="tuneChannelName" type="string" />
+        <field id="tuneAccent" type="string" />
         <field id="tuneChannelId" type="string" alwaysNotify="true" />
         <field id="done" type="boolean" alwaysNotify="true" />
     </interface>

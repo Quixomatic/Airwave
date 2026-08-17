@@ -76,8 +76,12 @@ sub onGuideTune()
         m.player.observeField("done", "onPlayerDone")
     end if
     ' The effectiveTime clock derives the on-now from the channel timeline (join-live / resume), so tuning
-    ' only needs the channel id — the selected program can't seed playback (no future seek).
+    ' only needs the channel id — the selected program can't seed playback (no future seek). The chrome also
+    ' needs the channel's identity (chip + accent).
     m.player.channelId = g.tuneChannelId
+    m.player.channelNumber = g.tuneChannelNumber
+    m.player.channelName = g.tuneChannelName
+    m.player.accent = g.tuneAccent
     m.player.visible = true
     m.player.setFocus(true)
     m.player.go = m.player.go + 1
