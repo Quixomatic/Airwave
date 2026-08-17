@@ -1,0 +1,170 @@
+import "pkg:/source/lib/guideLayout.bs"
+import "pkg:/source/lib/tint.bs"
+
+' GuideSidebar code-behind. See the .xml header. Builds the action circles (fixed) + a filter list (from the
+' packages + lenses), handles the collapsed↔expanded swap, D-pad focus rings, and the filter-list snap-scroll.
+' (m.<id> auto-injected: bg, rightBorder, actions, divider, collapsedFilter, filterClip, filters.)
+
+const SB_SLIVER = 92
+const SB_EXPANDED = 300
+const SB_PADH = 18
+const SB_PADV = 24
+const SB_GAP = 14
+const SB_CIRCLE = 54
+
+sub init()
+    m.actionKeys = ["all", "settings", "account"]
+    m.actionBtns = []
+    m.filterBtns = []
+    m.items = []
+    m.filterScrollY = 0
+
+    ' Action circles (fixed): Guide (= the "all" lens), Settings, Account.
+    defs = [{ label: "Guide", icon: "lucide:Menu" }, { label: "Settings", icon: "lucide:Settings" }, { label: "Account", icon: "lucide:User" }]
+    y = SB_PADV
+    for each d in defs
+        b = m.actions.createChild("GlassCircleButton")
+        b.translation = [SB_PADH, y]
+        b.iconId = d.icon
+        b.label = d.label
+        m.actionBtns.push(b)
+        y = y + SB_CIRCLE + SB_GAP
+    end for
+    m.dividerY = y - SB_GAP + 12
+    m.divider.translation = [SB_PADH, m.dividerY]
+
+    ' Collapsed: a single Filters circle. Expanded: the filter list in filterClip.
+    m.filtersCircle = m.collapsedFilter.createChild("GlassCircleButton")
+    m.filtersCircle.translation = [SB_PADH, m.dividerY + 12]
+    m.filtersCircle.iconId = "lucide:ListFilter"
+
+    m.filterTop = m.dividerY + 12
+    m.filterClip.translation = [SB_PADH, m.filterTop]
+    m.vpH = GuideLayout.STAGE_H - m.filterTop - SB_PADV
+    m.filterClip.clippingRect = [0, 0, SB_EXPANDED - SB_PADH, m.vpH]
+
+    refresh()
+end sub
+
+' Packages or lens changed → rebuild the filter list (Show All appears only when a filter is applied).
+sub rebuild()
+    while m.filters.getChildCount() > 0
+        m.filters.removeChildIndex(0)
+    end while
+    m.filterBtns = []
+    m.items = []
+    for i = 0 to m.actionBtns.count() - 1
+        m.items.push({ key: m.actionKeys[i], group: "action" })
+    end for
+
+    filtered = (m.top.lens <> "all" and m.top.lens <> "")
+    fdefs = []
+    if filtered then fdefs.push({ key: "all", label: "Show All", icon: "lucide:LayoutGrid", sub: invalid, accent: invalid })
+    fdefs.push({ key: "favorites", label: "Favorites", icon: "lucide:Star", sub: invalid, accent: invalid })
+    fdefs.push({ key: "recents", label: "Recents", icon: "lucide:History", sub: invalid, accent: invalid })
+    pkgs = m.top.packages
+    if pkgs <> invalid
+        for each p in pkgs
+            icon = p.icon
+            if icon = invalid or icon = "" then icon = "lucide:Folder"
+            cnt = p.channelCount
+            if cnt = invalid then cnt = 0
+            unit = " channels"
+            if cnt = 1 then unit = " channel"
+            accent = "0x3B82F6FF"
+            if p.tint <> invalid and p.tint <> ""
+                vivid = Tint.vividOf(p.tint)
+                if vivid <> "" then accent = "0x" + vivid + "FF"
+            end if
+            fdefs.push({ key: "pkg:" + p.id, label: p.name, icon: icon, sub: Str(cnt).Trim() + unit, accent: accent })
+        end for
+    end if
+
+    y = 0
+    for each d in fdefs
+        b = m.filters.createChild("GlassCircleButton")
+        b.translation = [0, y]
+        b.iconId = d.icon
+        b.label = d.label
+        if d.sub <> invalid then b.sublabel = d.sub
+        if d.accent <> invalid then b.accent = d.accent
+        m.filterBtns.push(b)
+        m.items.push({ key: d.key, group: "filter" })
+        y = y + SB_CIRCLE + SB_GAP
+    end for
+
+    m.top.itemCount = m.items.count()
+    refresh()
+end sub
+
+sub onLens()
+    rebuild()
+end sub
+
+sub onExpand()
+    refresh()
+end sub
+
+sub onFocus()
+    scrollFilters()
+    refresh()
+end sub
+
+sub onSel()
+    scrollFilters()
+    refresh()
+end sub
+
+sub onActivate()
+    if m.top.sel < 0 or m.top.sel >= m.items.count() then return
+    m.top.activated = m.items[m.top.sel].key
+end sub
+
+' Apply expanded / active / focus state to every button + the collapsed swap.
+sub refresh()
+    ex = m.top.expanded
+    lens = m.top.lens
+    focused = m.top.focused
+    sel = m.top.sel
+
+    for i = 0 to m.actionBtns.count() - 1
+        b = m.actionBtns[i]
+        b.expanded = ex
+        b.active = (m.actionKeys[i] = lens)
+        b.focused = (focused and sel = i)
+    end for
+    base = m.actionBtns.count()
+    for i = 0 to m.filterBtns.count() - 1
+        b = m.filterBtns[i]
+        b.expanded = ex
+        b.active = (base + i < m.items.count() and m.items[base + i].key = lens)
+        b.focused = (focused and sel = base + i)
+    end for
+
+    m.collapsedFilter.visible = not ex
+    m.filterClip.visible = ex
+    m.filtersCircle.active = (lens <> "all" and lens <> "")
+
+    w = ex ? SB_EXPANDED : SB_SLIVER
+    m.bg.width = w
+    m.rightBorder.translation = [w, 0]
+    m.divider.width = w - 2 * SB_PADH
+end sub
+
+' Snap-scroll the filter list so the selected filter circle stays on-screen (grid parity).
+sub scrollFilters()
+    if not m.top.focused then return
+    base = m.actionBtns.count()
+    fi = m.top.sel - base
+    if fi < 0 then return
+    rowH = SB_CIRCLE + SB_GAP
+    top = fi * rowH
+    bottom = top + SB_CIRCLE
+    if top < m.filterScrollY
+        m.filterScrollY = top
+    else if bottom > m.filterScrollY + m.vpH
+        m.filterScrollY = bottom - m.vpH
+    end if
+    if m.filterScrollY < 0 then m.filterScrollY = 0
+    m.filters.translation = [0, -m.filterScrollY]
+end sub

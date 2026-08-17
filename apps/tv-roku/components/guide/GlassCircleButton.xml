@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  GlassCircleButton — the sidebar's glass circle button (port of tv-web/tv-native glass-button.tsx). A
+  translucent tinted circle with an icon-font glyph, a D-pad focus ring, and a lit (focused|active) state.
+  When `expanded`, a label (+ optional sublabel) sits beside the circle. Nodes built in code; driven by the
+  interface fields.
+-->
+<component name="GlassCircleButton" extends="Group">
+    <interface>
+        <field id="iconId" type="string" onChange="rerender" />
+        <field id="label" type="string" onChange="rerender" />
+        <field id="sublabel" type="string" onChange="rerender" />
+        <field id="expanded" type="boolean" onChange="rerender" />
+        <field id="focused" type="boolean" onChange="rerender" />
+        <field id="active" type="boolean" onChange="rerender" />
+        <field id="accent" type="string" value="0x3B82F6FF" onChange="rerender" />
+    </interface>
+</component>

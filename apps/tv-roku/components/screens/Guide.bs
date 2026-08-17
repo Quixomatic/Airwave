@@ -37,7 +37,14 @@ sub init()
     m.fc = 0
     m.fp = 0
     m.channels = []
+    m.allChannels = []
     m.accents = []
+
+    ' Sidebar (lens filtering + actions). Collapsed by default; the zone machine expands it on left-from-rail.
+    m.lens = "all"
+    m.sidebarSel = 0
+    m.sidebar.lens = "all"
+    m.sidebar.observeField("activated", "onSidebarActivated")
 
     ' Times travel to the rows as ISO strings on m.global (float fields can't hold epoch-ms); favorites as
     ' an assoc-array of channelId → true.
@@ -58,6 +65,14 @@ sub load()
     ' Favorites (for the rail heart) — best-effort, parallel.
     fp = Api.favorites()
     onThen(fp, onFavorites, m)
+    ' Packages (for the sidebar lens list) — best-effort, parallel.
+    pk = Api.packages()
+    onThen(pk, onPackages, m)
+end sub
+
+sub onPackages(data as object, _ctx as object)
+    if data = invalid or data.packages = invalid then return
+    m.sidebar.packages = data.packages
 end sub
 
 sub onFavorites(data as object, _ctx as object)
@@ -98,7 +113,7 @@ sub onGuide(data as object, _ctx as object)
     gap = GuideLayout.vw(6)
     winMin = GuideLayout.WINDOW_MIN
     minSliver = laneW * 0.02
-    m.channels = []
+    m.allChannels = []
     for each ch in raw
         culled = []
         if ch.programs <> invalid
@@ -119,20 +134,55 @@ sub onGuide(data as object, _ctx as object)
             end for
         end if
         ch.programs = culled
-        m.channels.push(ch)
+        m.allChannels.push(ch)
     end for
 
     buildTicks()
-    buildContent()
     drawNowCaret()
-
-    m.fc = 0
     m.zone = "grid"
-    m.fp = GuideLayout.liveProgramIndex(m.channels[0].programs, m.nowMs)
-    applyFocus()
+    applyLens()
     m.top.setFocus(true)
-    Log.info("[guide] " + Str(m.channels.count()).Trim() + " channels rendered")
+    Log.info("[guide] " + Str(m.allChannels.count()).Trim() + " channels loaded")
 end sub
+
+' Filter the (culled) channel list by the active lens → the rendered channels, then rebuild + reset focus.
+sub applyLens()
+    m.channels = []
+    favs = m.global.guideFavorites
+    for each ch in m.allChannels
+        keep = false
+        if m.lens = "all"
+            keep = true
+        else if m.lens = "favorites"
+            keep = (favs <> invalid and favs.doesExist(ch.id))
+        else if m.lens = "recents"
+            keep = true   ' recents are server-side; kept simple (matches tv-web/native)
+        else if Left(m.lens, 4) = "pkg:"
+            pid = Mid(m.lens, 5)
+            keep = (ch.package <> invalid and ch.package.id = pid)
+        end if
+        if keep then m.channels.push(ch)
+    end for
+
+    buildContent()
+    m.fc = 0
+    if m.channels.count() > 0
+        m.msg.visible = false
+        m.fp = GuideLayout.liveProgramIndex(m.channels[0].programs, m.nowMs)
+    else
+        m.fp = 0
+        m.msg.visible = true
+        m.msg.text = lensEmptyText()
+        m.featured.content = invalid
+    end if
+    applyFocus()
+end sub
+
+function lensEmptyText() as string
+    if m.lens = "favorites" then return "No favorites yet"
+    if Left(m.lens, 4) = "pkg:" then return "No channels in this filter"
+    return "No channels yet."
+end function
 
 sub onGuideErr(err as object, _ctx as object)
     m.msg.visible = true
@@ -212,23 +262,52 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
-    if m.channels = invalid or m.channels.count() = 0 then return false
-    n = m.channels.count()
 
-    ' Sidebar zone (the UI lands in the next task) — allow escaping back to the grid; swallow the rest.
+    ' Sidebar zone — up/down move the selection, OK activates, right/back returns to the grid.
     if m.zone = "sidebar"
-        if key = Keys.RIGHT or key = Keys.BACK
-            setZone("grid")
+        n = m.sidebar.itemCount
+        if key = Keys.UP
+            if m.sidebarSel > 0
+                m.sidebarSel = m.sidebarSel - 1
+                m.sidebar.sel = m.sidebarSel
+                playNav()
+            else
+                playDead()
+            end if
+        else if key = Keys.DOWN
+            if m.sidebarSel < n - 1
+                m.sidebarSel = m.sidebarSel + 1
+                m.sidebar.sel = m.sidebarSel
+                playNav()
+            else
+                playDead()
+            end if
+        else if key = Keys.OK
+            m.sidebar.activate = m.sidebar.activate + 1
+            playSelect()
+        else if key = Keys.RIGHT or key = Keys.BACK
+            exitSidebar()
             playNav()
         end if
         return true
     end if
 
-    ' Rail zone — favorite the channel; up/down still change channel; left → sidebar (seam); right/back → grid.
+    ' From here on the keys act on channels. If the current lens filtered to nothing, only left (→ sidebar,
+    ' to change the filter) does anything.
+    if m.channels = invalid or m.channels.count() = 0
+        if key = Keys.LEFT
+            enterSidebar()
+            playNav()
+        end if
+        return true
+    end if
+    n = m.channels.count()
+
+    ' Rail zone — favorite the channel; up/down still change channel; left → sidebar; right/back → grid.
     if m.zone = "rail"
         if key = Keys.LEFT
-            ' TODO: setZone("sidebar") once the sidebar exists; for now it's a soft edge.
-            playDead()
+            enterSidebar()
+            playNav()
         else if key = Keys.RIGHT or key = Keys.BACK
             setZone("grid")
             playNav()
@@ -301,6 +380,45 @@ end sub
 sub setZone(z as string)
     m.zone = z
     applyFocus()
+end sub
+
+' Enter the sidebar: expand + focus it, selection at the top. The grid never reflows (it always reserves the
+' sliver); the expanded sidebar overlays it. applyFocus() clears the rail/program highlight (zone != grid/rail).
+sub enterSidebar()
+    m.zone = "sidebar"
+    m.sidebarSel = 0
+    m.sidebar.lens = m.lens
+    m.sidebar.sel = 0
+    m.sidebar.expanded = true
+    m.sidebar.focused = true
+    applyFocus()
+end sub
+
+sub exitSidebar()
+    m.zone = "grid"
+    m.sidebar.expanded = false
+    m.sidebar.focused = false
+    applyFocus()
+end sub
+
+' The sidebar emitted an activated item — apply the lens (toggling an active filter off → all), or run the
+' Settings/Account action (stubbed until those screens exist). Then collapse back to the grid.
+sub onSidebarActivated()
+    key = m.sidebar.activated
+    if key = invalid or key = "" then return
+    if key = "settings" or key = "account"
+        Log.info("[guide] sidebar action (todo): " + key)
+        exitSidebar()
+        return
+    end if
+    if key = m.lens and key <> "all"
+        m.lens = "all"
+    else
+        m.lens = key
+    end if
+    m.sidebar.lens = m.lens
+    applyLens()
+    exitSidebar()
 end sub
 
 ' Push fc/fp/zone into the list (which scrolls + re-lays-out rows) and refresh the featured panel.

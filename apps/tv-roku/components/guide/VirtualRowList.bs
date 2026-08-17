@@ -113,7 +113,8 @@ sub applyFocus(row as object, abso as integer)
     isF = (abso = fc)
     row.focused = isF
     row.railFocused = (isF and m.top.zone = "rail")
-    if isF then row.focusProgramIndex = m.top.focusProgramIndex else row.focusProgramIndex = -1
+    ' The program focus ring shows ONLY in the grid zone — moving onto the rail (or sidebar) clears it.
+    if isF and m.top.zone = "grid" then row.focusProgramIndex = m.top.focusProgramIndex else row.focusProgramIndex = -1
 
     fav = false
     favs = m.global.guideFavorites

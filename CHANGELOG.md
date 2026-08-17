@@ -2,6 +2,30 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.37] - 2026-08-17
+
+Roku guide **6c — the sidebar** (lens filtering) + the completed grid↔rail↔sidebar zone machine.
+
+### Added
+
+- **The guide sidebar** (`GuideSidebar` + `GlassCircleButton`), a port of tv-web/tv-native `guide-sidebar`:
+  a collapsed 92px sliver of glass-circle buttons (Guide / Settings / Account + a Filters circle) that
+  expands to a 300px **overlay** (the grid never reflows) revealing the lens list — Show All / Favorites /
+  Recents / each package (with its tint + icon + channel count). D-pad `left` from the rail enters it;
+  up/down move the selection (snap-scrolling the list when off-screen), OK applies the lens (toggling an
+  active filter back to All), right/back returns to the grid. **Lens filtering** re-filters the channel
+  list (all / favorites / package). Packages load from `GET /packages`.
+
+### Fixed
+
+- **Moving onto the rail clears the focused program's ring** — the program focus ring now shows only in the
+  grid zone (matching tv-web/native), instead of leaving the last-selected program highlighted.
+
+### Notes
+
+- Settings/Account sidebar actions are stubbed until those screens exist. The empty-lens state shows a
+  message for now; a parity `GuideGhost` is a follow-up. Guide auto-refresh (polling) is also pending.
+
 ## [0.10.36] - 2026-08-17
 
 Roku icons — real lucide + phosphor icons via bundled icon FONTS (not rasters).

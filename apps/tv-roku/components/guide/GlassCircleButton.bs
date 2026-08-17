@@ -1,0 +1,97 @@
+import "pkg:/source/lib/guideLayout.bs"
+import "pkg:/source/lib/icon.bs"
+import "pkg:/source/theme.bs"
+
+' GlassCircleButton — see the .xml header. A tinted glass circle + icon-font glyph + focus ring + label.
+
+const GB_SIZE = 54          ' circle diameter
+const GB_RING = 8           ' focus-ring extends GB_RING/2 outside the circle
+const GB_ICON = 24          ' icon glyph font size
+const GB_GAP = 14           ' circle → label gap
+const GB_LABEL_W = 196      ' label column width when expanded
+
+sub init()
+    s = GB_SIZE
+
+    ' Focus ring (behind, larger) — accent@0.7, only when focused.
+    m.ring = m.top.createChild("Poster")
+    m.ring.uri = "pkg:/images/circle-ring.png"
+    m.ring.width = s + GB_RING
+    m.ring.height = s + GB_RING
+    m.ring.loadWidth = s + GB_RING
+    m.ring.loadHeight = s + GB_RING
+    m.ring.translation = [-GB_RING / 2, -GB_RING / 2]
+    m.ring.visible = false
+
+    ' Glass fill.
+    m.circle = m.top.createChild("Poster")
+    m.circle.uri = "pkg:/images/circle.png"
+    m.circle.width = s
+    m.circle.height = s
+    m.circle.loadWidth = s
+    m.circle.loadHeight = s
+
+    ' Circle border.
+    m.border = m.top.createChild("Poster")
+    m.border.uri = "pkg:/images/circle-ring.png"
+    m.border.width = s
+    m.border.height = s
+    m.border.loadWidth = s
+    m.border.loadHeight = s
+
+    ' Icon glyph (icon font), centered in the circle.
+    m.icon = m.top.createChild("Label")
+    m.icon.width = s
+    m.icon.height = s
+    m.icon.horizAlign = "center"
+    m.icon.vertAlign = "center"
+
+    ' Label + sublabel beside the circle (shown when expanded).
+    m.label = m.top.createChild("Label")
+    m.label.width = GB_LABEL_W
+    m.label.truncate = true
+    m.label.translation = [s + GB_GAP, 0]
+
+    m.sub = m.top.createChild("Label")
+    m.sub.width = GB_LABEL_W
+    m.sub.truncate = true
+    m.sub.translation = [s + GB_GAP, 0]
+end sub
+
+sub rerender()
+    accent = m.top.accent
+    lit = (m.top.focused or m.top.active)
+
+    m.circle.blendColor = lit ? withAlpha(accent, 0.28) : "0x1218268C"       ' rgba(18,24,38,0.55)
+    m.border.blendColor = lit ? withAlpha(accent, 0.4) : "0xFFFFFF1F"        ' rgba(255,255,255,0.12)
+    m.ring.blendColor = withAlpha(accent, 0.7)
+    m.ring.visible = m.top.focused
+
+    Icon.apply(m.icon, m.top.iconId, GB_ICON, "0xF1F5F9FF")
+
+    hasLabel = (m.top.expanded and m.top.label <> invalid and m.top.label <> "")
+    hasSub = (hasLabel and m.top.sublabel <> invalid and m.top.sublabel <> "")
+    m.label.visible = hasLabel
+    m.sub.visible = hasSub
+    if hasLabel
+        m.label.text = m.top.label
+        m.label.color = lit ? "0xF8FAFCFF" : "0xC3C9D4FF"
+        Theme.setFont(m.label, Theme.FONT_SEMI, 17)
+        m.sub.text = hasSub ? m.top.sublabel : ""
+        m.sub.color = "0x64748BFF"
+        Theme.setFont(m.sub, Theme.FONT_REG, 13)
+        ' Vertically center the label block against the 54px circle.
+        if hasSub
+            m.label.translation = [GB_SIZE + GB_GAP, 7]
+            m.sub.translation = [GB_SIZE + GB_GAP, 31]
+        else
+            m.label.translation = [GB_SIZE + GB_GAP, 16]
+        end if
+    end if
+end sub
+
+' "0xRRGGBBAA" accent → same RGB at a new alpha.
+function withAlpha(argb as string, alpha as float) as string
+    rgb = Mid(argb, 3, 6)
+    return GuideLayout.argb(rgb, alpha)
+end function

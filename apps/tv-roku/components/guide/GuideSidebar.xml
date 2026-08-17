@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  GuideSidebar — the guide's left sidebar (port of tv-web/tv-native guide-sidebar.tsx). A collapsed 92px
+  sliver of glass-circle buttons (Guide / Settings / Account actions + a single Filters circle) that expands
+  to a 300px OVERLAY (the grid never reflows — it always reserves only the sliver) revealing the lens list
+  (Show All / Favorites / Recents / each package). Driven by the guide's zone machine: `expanded`/`focused`/
+  `sel` come in; `activated` (the chosen item's key) goes out.
+-->
+<component name="GuideSidebar" extends="Group">
+    <interface>
+        <!-- Inputs from Guide. -->
+        <field id="packages" type="array" onChange="rebuild" />
+        <field id="lens" type="string" value="all" onChange="onLens" />
+        <field id="expanded" type="boolean" onChange="onExpand" />
+        <field id="focused" type="boolean" onChange="onFocus" />
+        <field id="sel" type="integer" value="0" onChange="onSel" />
+        <!-- Guide bumps `activate` to activate the current `sel`; the sidebar emits the item key on `activated`. -->
+        <field id="activate" type="integer" value="0" alwaysNotify="true" onChange="onActivate" />
+        <field id="activated" type="string" alwaysNotify="true" />
+        <!-- Output: total selectable items (actions + filters) so Guide clamps sel. -->
+        <field id="itemCount" type="integer" value="3" />
+    </interface>
+    <children>
+        <Rectangle id="bg" color="0x0B1120F2" width="92" height="1080" />
+        <Rectangle id="rightBorder" color="0x94A3B840" width="1" height="1080" translation="[92,0]" />
+        <Group id="actions" />
+        <Rectangle id="divider" color="0xFFFFFF14" height="1" />
+        <!-- Collapsed: one Filters circle. Expanded: the scrollable filter list (in filterClip). -->
+        <Group id="collapsedFilter" />
+        <Group id="filterClip">
+            <Group id="filters" />
+        </Group>
+    </children>
+</component>
