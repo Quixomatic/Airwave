@@ -126,43 +126,47 @@ sub buildLane(ch as object)
             cw = rawRight - left
             if cw >= 8
                 live = (nowMs >= startMs and nowMs < startMs + p.durationSeconds * 1000)
-                buildCell(lane, p, Int(left), Int(cw), cellH, accent, live, t0, ppm, nowMs)
+                ' Exact FLOAT positions (no per-cell Int() rounding — that drifted gaps ±1px vs tv-native).
+                buildCell(lane, p, left, cw, cellH, accent, live, t0, ppm, nowMs)
             end if
         end if
     end for
 end sub
 
-sub buildCell(lane as object, p as object, left as integer, cw as integer, cellH as integer, accent as string, live as boolean, t0 as double, ppm as float, nowMs as double)
+sub buildCell(lane as object, p as object, left as float, cw as float, cellH as integer, accent as string, live as boolean, t0 as double, ppm as float, nowMs as double)
     cell = lane.createChild("Group")
     cell.translation = [left, GuideLayout.vw(6)]
-    cell.clippingRect = [0, 0, cw, cellH]
 
+    ' Rounded base fill (fill-8 9-patch → real border-radius, no sharp corners). For a live program it's
+    ' the "remaining" tone (accent@0.1); the elapsed portion is overlaid, clipped to the left.
+    base = cell.createChild("Poster")
+    base.uri = Theme.npFill(8)
+    base.width = cw
+    base.height = cellH
     if live
+        base.blendColor = GuideLayout.argb(accent, 0.1)
         fillPct = ((nowMs - t0) / 60000.0 * ppm - left) / cw
         if fillPct < 0 then fillPct = 0
         if fillPct > 1 then fillPct = 1
-        elapsed = cell.createChild("Rectangle")
-        elapsed.width = Int(cw * fillPct)
-        elapsed.height = cellH
-        elapsed.color = GuideLayout.argb(accent, 0.32)
-        remain = cell.createChild("Rectangle")
-        remain.translation = [Int(cw * fillPct), 0]
-        remain.width = Int(cw * (1 - fillPct)) + 1
-        remain.height = cellH
-        remain.color = GuideLayout.argb(accent, 0.1)
+        ' Elapsed overlay: same rounded fill @0.32, clipped to the elapsed width. Its rounded LEFT corners
+        ' show; the hard right edge IS the elapsed/remaining split.
+        clip = cell.createChild("Group")
+        clip.clippingRect = [0, 0, cw * fillPct, cellH]
+        el = clip.createChild("Poster")
+        el.uri = Theme.npFill(8)
+        el.width = cw
+        el.height = cellH
+        el.blendColor = GuideLayout.argb(accent, 0.32)
         bar = cell.createChild("Rectangle")
         bar.translation = [3, GuideLayout.vw(10)]
         bar.width = 3
         bar.height = cellH - GuideLayout.vw(20)
         bar.color = GuideLayout.argb(accent, 1.0)
     else
-        bg = cell.createChild("Rectangle")
-        bg.width = cw
-        bg.height = cellH
-        bg.color = "0x94A3B80D"   ' rgba(148,163,184,0.05)
+        base.blendColor = "0x94A3B80D"   ' rgba(148,163,184,0.05)
     end if
 
-    ' Rounded border over the (square) fill — approximates radius 8 (like the diagnostic box).
+    ' Rounded border (border-8 9-patch → matches the fill's radius), tinted cellBorder.
     frame = cell.createChild("Poster")
     frame.uri = Theme.npBorder(8)
     frame.width = cw

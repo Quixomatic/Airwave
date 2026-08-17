@@ -42,7 +42,8 @@ namespace Theme
 
     function npBorder(radius as integer) as string
         if radius >= 16 then return "pkg:/images/np/border-16.9.png"
-        return "pkg:/images/np/border-12.9.png"
+        if radius >= 12 then return "pkg:/images/np/border-12.9.png"
+        return "pkg:/images/np/border-8.9.png"
     end function
 
     ' Apply a custom font by MUTATING the node's existing font object (jellyfin's pattern:

@@ -13,8 +13,8 @@ sub init()
     m.ticks = m.top.findNode("ticks")
     m.gridClip = m.top.findNode("gridClip")
     m.list = m.top.findNode("list")
-    m.nowLine = m.top.findNode("nowLine")
-    m.nowDot = m.top.findNode("nowDot")
+    m.nowCaret = m.top.findNode("nowCaret")
+    m.caretPulse = m.top.findNode("caretPulse")
     m.msg = m.top.findNode("msg")
 
     Theme.setFont(m.dayLabel, Theme.FONT_SEMI, GuideLayout.vw(32))
@@ -68,7 +68,7 @@ sub onGuide(data as object, _ctx as object)
 
     buildTicks()
     buildContent(channels)
-    drawNowLine()
+    drawNowCaret()
     m.list.setFocus(true)
     Log.info("[guide] " + Str(channels.count()).Trim() + " channels rendered")
 end sub
@@ -128,18 +128,21 @@ sub buildContent(channels as object)
     m.list.content = content
 end sub
 
-sub drawNowLine()
+' Only the pulsing red caret marks "now" (the vertical line stays hidden) — matches tv-web/native.
+sub drawNowCaret()
     nowMin = (m.nowMs - m.t0Ms) / 60000.0
     if nowMin < 0 or nowMin > GuideLayout.WINDOW_MIN
-        m.nowLine.visible = false
-        m.nowDot.visible = false
+        m.nowCaret.visible = false
         return
     end if
-    x = 92 + GuideLayout.railPx() + Int(nowMin * GuideLayout.ppm())
-    m.nowLine.translation = [x, 546]
-    m.nowLine.visible = true
-    m.nowDot.translation = [x - 6, 538]
-    m.nowDot.visible = true
+    cw = GuideLayout.vw(20)
+    chH = GuideLayout.vw(16)
+    x = 92 + GuideLayout.railPx() + Int(nowMin * GuideLayout.ppm()) - Int(cw / 2)
+    m.nowCaret.width = cw
+    m.nowCaret.height = chH
+    m.nowCaret.translation = [x, 546 - chH]
+    m.nowCaret.visible = true
+    m.caretPulse.control = "start"
 end sub
 
 sub onItemSelected()

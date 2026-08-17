@@ -18,16 +18,20 @@
         <Label id="dayLabel" translation="[122,498]" color="0xE6EAF1FF" />
         <Group id="ticks" translation="[243,492]" />
 
-        <!-- Grid viewport -->
+        <!-- Grid viewport. floatingFocus = the focus moves through the visible rows and only
+             snap-scrolls when the focused row would fall off the top/bottom edge (tv-web/native feel). -->
         <Group id="gridClip" translation="[92,546]">
             <MarkupList id="list" translation="[0,0]" drawFocusFeedback="false"
                 vertFocusAnimationStyle="fixedFocusWrap" />
         </Group>
 
-        <!-- Now-line -->
-        <Rectangle id="nowLine" width="3" height="534" color="0xEF4444FF" visible="false" />
-        <Poster id="nowDot" width="16" height="16" uri="pkg:/images/circle.png" blendColor="0xEF4444FF"
-            visible="false" />
+        <!-- Now-marker: only the pulsing red caret shows (the vertical line stays hidden), matching
+             tv-web/tv-native. -->
+        <Poster id="nowCaret" uri="pkg:/images/caret-down.png" blendColor="0xEF4444FF" visible="false" />
+        <Animation id="caretPulse" duration="2" repeat="true" easeFunction="linear">
+            <FloatFieldInterpolator key="[0.0,0.5,1.0]" keyValue="[1.0,0.55,1.0]"
+                fieldToInterp="nowCaret.opacity" />
+        </Animation>
 
         <Label id="msg" translation="[510,500]" width="900" horizAlign="center" color="0x94A3B8FF"
             text="Loading…" />

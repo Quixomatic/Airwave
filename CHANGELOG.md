@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.28] - 2026-08-17
+
+Roku guide 6a render-parity fixes (all on the Ultra).
+
+### Fixed
+
+- **Now-marker** — the red vertical line is hidden; only a **pulsing red caret** marks the current time
+  (matches tv-web/tv-native). New `images/caret-down.png`.
+- **Program cells now have real rounded corners** (a matching `border-8` 9-patch), and the **2-tone
+  on-now cell rounds its corners too** — rebuilt as a rounded `fill-8` base (`accent@0.1`) with the
+  elapsed portion (`accent@0.32`) overlaid + clipped to the left, so the outer corners round and the
+  elapsed/remaining split stays a hard edge.
+- **Program positioning** — removed the per-cell `Int()` rounding that drifted gaps ±1px vs tv-native;
+  cells now use exact float left/width, so spacing is pixel-identical.
+
+### Notes
+
+- Scroll is on the working list mode for now; the proper float-then-snap scroll + the full zone machine
+  (land-on-on-now, D-pad left/right through programs, D-pad to the rail to favorite, sidebar, no-layout
+  focus ring) + the bundled lucide/phosphor icons are the 6c pass. A minor time-tick snap (~1 min) is
+  still pending.
+
 ## [0.10.27] - 2026-08-17
 
 Roku **Phase 6a — the Aurora guide grid foundation**, rendering real guide data on a real Ultra.
