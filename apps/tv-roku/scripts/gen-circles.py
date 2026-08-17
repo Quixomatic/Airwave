@@ -24,7 +24,9 @@ S = 4  # supersample factor
 WHITE = (255, 255, 255, 255)
 
 # Solid fill discs: diameter px.
-FILLS = [36, 54, 96]
+#   16 / 24 → the player scrubber thumb (unfocused / focused), white.
+#   34      → the scrubber thumb's focus HALO (24 + 2*5px), tinted accent@0.4 (tv-web boxShadow ring).
+FILLS = [16, 24, 34, 36, 54, 96]
 # Rings: (diameter px, stroke px at the target size). Borders are 1px (matches tv-web/native borderWidth:1);
 # the glass focus ring is 2px so it reads as a distinct ring outside the button's own border.
 RINGS = [(36, 1), (54, 1), (62, 2)]

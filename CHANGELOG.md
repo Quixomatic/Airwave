@@ -2,6 +2,39 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.48] - 2026-08-17
+
+Roku **player chrome — visual parity + playback fixes (Increment C1-visual)**.
+
+### Added
+
+- **Player-chrome assets + glass styling** — the chrome now matches tv-web/tv-native: real rounded
+  **glass pills** (9-patch `pill-fill`/`pill-ring`/`pill-focus`, tinted via `blendColor`), the bottom
+  **gradient scrim** (`scrim-player.png`, tv-web's `to top` stops), a **circular thumb** that grows +
+  gets an accent **focus halo** on the scrubber row, the LIVE dot, and the chip's **Tv-icon circle**.
+  Two committed generators produce them: `gen-circles.py` (adds 16/24/34 thumb discs) and the new
+  `gen-player-assets.py` (pill 9-patches + scrim).
+- **Slide/fade animations** — the chip drops in from the top and the panel rises from the bottom on
+  open, and both reverse on close (SceneGraph `Animation` + interpolators), matching tv-web's framer /
+  tv-native's reanimated transitions.
+- **Panel opens on tune** and stays open until playback starts, then begins the 8s auto-hide (parity).
+- **Pills + chip size to their measured text** (`boundingRect`) instead of a char-count estimate — no
+  more dead space past the label.
+
+### Fixed
+
+- **Scrubber ran ahead of live after a resume** — the effectiveTime baseline was anchored to a
+  premature Video `position` (0, before the direct-play seek settled), so the clock drifted ~offset
+  ahead of live (invisible at a live join, obvious on a large resume). Direct-play now anchors the
+  baseline to the known offset immediately.
+- **Subtitles auto-enabled on seek** — the Video re-selected an embedded sub track per the system
+  caption setting; now forced off via `globalCaptionMode = "Off"` (+ `subtitleTrack = ""`) on load and
+  every `playing`, since our subs are server-burn-in.
+- **Stale-channel `/media` load could settle into the new channel** — each load now carries its own
+  generation as the promise ctx (not a shared field), so a superseded load aborts; and the chrome
+  resets on every tune (no leftover scrubber from the previous channel).
+- The leftover PlayerHost debug line is hidden; the chip number/name are vertically centered.
+
 ## [0.10.47] - 2026-08-17
 
 Roku **Phase 7/8 — the player chrome (Increment C1)**.

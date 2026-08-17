@@ -37,11 +37,17 @@ sub init()
     ' draw our own chrome (Incr C), and focus lives on the PlayerHost Group — never the Video node — so the
     ' transport keys reach onKeyEvent instead of the Video's own trick-play handler.
     m.video.enableTrickPlay = false
+    ' Our subs are server-burn-in; the Video must never render its own text track. `globalCaptionMode = "Off"`
+    ' is the app-level override (jellyfin's method) that beats the SYSTEM caption setting; subtitleTrack="" alone
+    ' doesn't — the Video re-selects an embedded track on load/seek per the global caption mode.
+    m.video.globalCaptionMode = "Off"
+    m.video.subtitleTrack = ""
     m.video.observeField("state", "onVideoState")
     m.tickTimer.observeField("fire", "onTick")
     m.heartbeatTimer.observeField("fire", "onHeartbeat")
     m.timelineTimer.observeField("fire", "onTimelineRefresh")
     Theme.setFont(m.status, Theme.FONT_REG, 22)
+    m.status.visible = false   ' the chrome renders real state now; keep the label only as a silent scratch
     ' Per-channel playback options (the pickers drive these in Incr C2).
     m.quality = "original"
     m.audioStreamId = invalid
@@ -74,6 +80,7 @@ sub onChromeCommand()
         restart()
     else if cmd = "back"
         teardown()
+        m.chrome.active = false   ' so the NEXT tune re-fires onActive → the chrome resets (no stale scrubber)
         m.top.done = true
     else if cmd = "surf"
         Log.info("[player] channel surf (Incr D)")
@@ -109,7 +116,7 @@ sub resetClock()
     m.bumperEff = 0.0          ' the bumper's effective time (wall-advanced)
     m.paused = false
     m.lastTickMs = wallMs()
-    m.gen = 0                  ' aborts a stale async /media resolve
+    if m.gen = invalid then m.gen = 0   ' monotonic across re-tunes (a stale load's captured gen must not match)
     m.transitioning = false    ' re-entrancy guard across the async resolve
     m.currentUrl = ""          ' last loaded URL — same-URL seekTo = seek-in-place
     m.pending = invalid        ' stashed load context for onMedia
@@ -278,14 +285,13 @@ sub seekTo(target as double, forceHls as boolean, audioCandidate as integer)
     offset = Int(clamped# - entry.startS)
     if offset < 0 then offset = 0
     m.status.text = "Loading…"
-    m.pending = { gen: m.gen, idx: idx, entry: entry, offset: offset, forceHls: forceHls, prevSession: prevSession }
+    pending = { gen: m.gen, idx: idx, entry: entry, offset: offset, forceHls: forceHls, prevSession: prevSession }
     p = Api.media(m.top.channelId, entry.ratingKey, offset, { deviceId: Device.id(), forceHls: forceHls, quality: m.quality, audioStreamId: m.audioStreamId, subtitleStreamId: m.subtitleStreamId })
-    onThen(p, onMedia, m)
-    onCatch(p, onMediaErr, m)
+    onThen(p, onMedia, pending)
+    onCatch(p, onMediaErr, pending)
 end sub
 
-sub onMedia(info as object, _m as object)
-    pend = m.pending
+sub onMedia(info as object, pend as object)
     if pend = invalid
         m.transitioning = false
         return
@@ -342,6 +348,14 @@ sub onMedia(info as object, _m as object)
         if info.mode = "direct" and offset > 0 then node.PlayStart = offset
         m.video.content = node
         m.video.control = "play"
+        ' Anchor the baseline to the KNOWN offset immediately for direct-play (its position IS absolute media
+        ' time — the same anchor the proven seek path uses). Anchoring on "playing" instead let a premature
+        ' position (0, before the PlayStart seek settled) stick, then the position jumped to the offset → the
+        ' clock ran ~offset AHEAD of live (invisible at a live join, obvious on a large resume offset).
+        if info.mode = "direct"
+            m.current.playStartCurrentTime = offset
+            m.current.baselineReady = true
+        end if
     end if
 
     m.status.text = "mode=" + info.mode + " fmt=" + fmt + " off=" + Str(offset).Trim()
@@ -440,6 +454,8 @@ sub onVideoState()
     cur = m.current
     if st = "playing"
         m.status.text = ""
+        m.video.globalCaptionMode = "Off"   ' the Video re-selects a sub track on load/seek — force captions off
+        m.video.subtitleTrack = ""
         ' Anchor the baseline on the first real playback of a fresh program load (the same-media seek path
         ' already anchored inline, guarded here by baselineReady).
         if cur <> invalid and cur.kind = "PROGRAM" and not cur.baselineReady

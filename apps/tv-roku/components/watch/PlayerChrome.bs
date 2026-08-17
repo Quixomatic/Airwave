@@ -3,26 +3,48 @@ import "pkg:/source/lib/icon.bs"
 import "pkg:/source/lib/log.bs"
 import "pkg:/source/input/keys.bs"
 
-' PlayerChrome code-behind — see the .xml header. Builds the chip + panel + scrubber + control row in code,
-' renders from the pushed `playerStatus`, and drives the player via the `command` output field.
+' PlayerChrome code-behind — see the .xml header. Builds the chip + panel + scrubber + control row from
+' 9-patch/circle assets (tinted white masters), renders from the pushed `playerStatus`, animates in
+' (chip drops from the top, panel rises from the bottom — tv-web parity), and drives the player via the
+' `command` output field.
 
-' Layout (FHD, ~1:1 with tv-web's watch chrome at 1920). Panel occupies the bottom band.
+' Layout (FHD, ~1:1 with tv-web's 1920 watch chrome).
 const PANEL_TOP = 700
 const PAD_X = 56
-const SCRUB_W = 1808          ' 1920 − 2*PAD_X
-const SCRUB_Y = 876           ' bar centreline within the panel
+const SCRUB_W = 1808
+const SCRUB_Y = 878
 const CTL_Y = 928
 const CTL_H = 54
+
 const SEG_POOL = 24
 
-' Colors (ARGB).
+' Assets.
+const A_PILL = "pkg:/images/pill-fill.9.png"
+const A_PILL_RING = "pkg:/images/pill-ring.9.png"
+const A_PILL_FOCUS = "pkg:/images/pill-focus.9.png"
+const A_BAR = "pkg:/images/bar-fill.9.png"
+const A_SCRIM = "pkg:/images/scrim-player.png"
+const A_C36 = "pkg:/images/circle-36.png"
+const A_C54 = "pkg:/images/circle-54.png"
+const A_RING54 = "pkg:/images/ring-54.png"
+const A_RING62 = "pkg:/images/ring-62.png"
+const A_THUMB = "pkg:/images/circle-24.png"
+const A_THUMB_SM = "pkg:/images/circle-16.png"
+const A_HALO = "pkg:/images/circle-34.png"
+
+' Colors (ARGB) — the control-row FOCUS is a fixed blue (tv-web), NOT the channel accent; the accent is for
+' the scrubber fill/thumb-halo + the chip.
+const BLUE = "0x3B82F6"
 const C_TEXT = "0xF1F5F9FF"
 const C_SUB = "0xC3C9D4FF"
-const C_PANEL = "0x060A14E6"
-const C_GLASS = "0x121826A6"      ' rgba(18,24,38,0.65)
-const C_GLASS_BORDER = "0xFFFFFF1F"
-const C_SEG_PROG = "0xFFFFFF2E"   ' rgba(255,255,255,0.18)
-const C_SEG_BUMP = "0x94A3B84D"   ' rgba(148,163,184,0.30)
+const C_NAME = "0xE6EAF1FF"
+const C_GLASS = "0x121826D9"        ' rgba(18,24,38,0.55)-ish bg fill (blendColor a white pill)
+const C_BORDER = "0xFFFFFF1F"       ' white @0.12
+const C_BORDER_FOCUS = "0xFFFFFF66" ' white @0.4
+const C_FOCUS_BG = "0x3B82F647"     ' blue @0.28
+const C_FOCUS_RING = "0x3B82F6B3"   ' blue @0.7
+const C_SEG_PROG = "0xFFFFFF2E"     ' white @0.18
+const C_SEG_BUMP = "0x94A3B84D"     ' slate @0.30
 const C_LIVE = "0xEF4444FF"
 const C_MUTED = "0x94A3B8FF"
 
@@ -34,50 +56,65 @@ sub init()
     m.hideTimer.observeField("fire", "onHideFire")
     buildChip()
     buildPanel()
+    buildAnims()
     m.top.visible = false
 end sub
 
 ' ---- build (once) -----------------------------------------------------------
 
 sub buildChip()
-    g = m.top.createChild("Group")
-    g.id = "chip"
-    g.visible = false
-    bg = g.createChild("Rectangle")
-    bg.id = "chipBg"
-    bg.color = C_GLASS
+    wrap = m.top.createChild("Group")   ' positioned by renderChip (right-aligned)
+    inner = wrap.createChild("Group")   ' the animated one (slide + fade)
+    inner.id = "chipInner"
+
+    bg = inner.createChild("Poster")
+    bg.uri = A_PILL
+    bg.blendColor = C_GLASS
     bg.height = 56
-    bg.translation = [0, 0]
-    num = g.createChild("Label")
-    num.id = "chipNum"
+    ring = inner.createChild("Poster")
+    ring.uri = A_PILL_RING
+    ring.blendColor = C_BORDER
+    ring.height = 56
+
+    iconC = inner.createChild("Poster")
+    iconC.uri = A_C36
+    iconC.width = 36
+    iconC.height = 36
+    iconC.translation = [10, 10]
+    iconG = inner.createChild("Label")
+    Icon.apply(iconG, "lucide:Tv", 20, C_TEXT)
+    iconG.translation = [18, 15]
+
+    num = inner.createChild("Label")
     Theme.setFont(num, Theme.FONT_BOLD, 22)
-    num.translation = [18, 14]
-    nm = g.createChild("Label")
-    nm.id = "chipName"
+    nm = inner.createChild("Label")
     Theme.setFont(nm, Theme.FONT_SEMI, 22)
-    nm.color = C_TEXT
-    nm.translation = [0, 14]
-    m.chip = g
+    nm.color = C_NAME
+
+    m.chipWrap = wrap
+    m.chipInner = inner
     m.chipBg = bg
+    m.chipRing = ring
+    m.chipIconC = iconC
+    m.chipIconG = iconG
     m.chipNum = num
     m.chipName = nm
 end sub
 
 sub buildPanel()
     p = m.top.createChild("Group")
-    p.id = "panel"
-    p.visible = false
+    p.id = "panelGrp"
 
-    bg = p.createChild("Rectangle")
-    bg.color = C_PANEL
-    bg.width = 1920
-    bg.height = 1080 - PANEL_TOP
-    bg.translation = [0, PANEL_TOP]
+    scrim = p.createChild("Poster")
+    scrim.uri = A_SCRIM
+    scrim.width = 1920
+    scrim.height = 1080 - PANEL_TOP
+    scrim.translation = [0, PANEL_TOP]
 
     title = p.createChild("Label")
     Theme.setFont(title, Theme.FONT_BOLD, 40)
     title.color = C_TEXT
-    title.translation = [PAD_X, 740]
+    title.translation = [PAD_X, 744]
     title.width = 1500
     title.maxLines = 1
     m.title = title
@@ -85,25 +122,25 @@ sub buildPanel()
     subLbl = p.createChild("Label")
     Theme.setFont(subLbl, Theme.FONT_REG, 20)
     subLbl.color = C_SUB
-    subLbl.translation = [PAD_X, 792]
+    subLbl.translation = [PAD_X, 796]
     subLbl.width = 1500
     m.subTitle = subLbl
 
-    ' Scrubber — a pool of segment bars (+ per-segment accent fill), a thumb, a live marker, and the
-    ' position / LIVE labels. All positioned in renderScrubber.
+    ' Scrubber pool — rounded bar posters (bg + accent fill), a circular thumb + focus halo, a live marker.
     scrub = p.createChild("Group")
     scrub.translation = [PAD_X, SCRUB_Y]
     m.segBg = []
     m.segFill = []
     for i = 0 to SEG_POOL - 1
-        b = scrub.createChild("Rectangle")
+        b = scrub.createChild("Poster")
+        b.uri = A_BAR
         b.height = 8
-        b.color = C_SEG_PROG
         b.visible = false
         m.segBg.push(b)
-        f = scrub.createChild("Rectangle")
+        f = scrub.createChild("Poster")
+        f.uri = A_BAR
         f.height = 8
-        f.color = m.top.accent
+        f.blendColor = m.top.accent
         f.visible = false
         m.segFill.push(f)
     end for
@@ -114,23 +151,34 @@ sub buildPanel()
     live.translation = [0, -4]
     live.visible = false
     m.liveMark = live
-    thumb = scrub.createChild("Rectangle")
+    halo = scrub.createChild("Poster")
+    halo.uri = A_HALO
+    halo.width = 34
+    halo.height = 34
+    halo.visible = false
+    m.thumbHalo = halo
+    thumb = scrub.createChild("Poster")
+    thumb.uri = A_THUMB
     thumb.width = 16
     thumb.height = 16
-    thumb.color = "0xFFFFFFFF"
-    thumb.translation = [0, -4]
+    thumb.blendColor = "0xFFFFFFFF"
     m.thumb = thumb
 
     posLbl = p.createChild("Label")
     Theme.setFont(posLbl, Theme.FONT_MED, 17)
     posLbl.color = C_SUB
-    posLbl.translation = [PAD_X, SCRUB_Y + 20]
     m.posLbl = posLbl
 
+    liveDot = p.createChild("Poster")
+    liveDot.uri = A_THUMB_SM
+    liveDot.width = 9
+    liveDot.height = 9
+    liveDot.blendColor = C_LIVE
+    m.liveDot = liveDot
     liveLbl = p.createChild("Label")
     Theme.setFont(liveLbl, Theme.FONT_BOLD, 15)
     liveLbl.horizAlign = "right"
-    liveLbl.width = SCRUB_W
+    liveLbl.width = SCRUB_W - 20
     liveLbl.translation = [PAD_X, SCRUB_Y + 20]
     m.liveLbl = liveLbl
 
@@ -138,8 +186,6 @@ sub buildPanel()
     m.panel = p
 end sub
 
-' Controls: 5 text pills (Pause/Restart/Surf/Info/Live) left-aligned, then 3 circle selectors right-aligned.
-' Fixed pill widths (labels are known) — exact text-fit is a later polish pass.
 sub buildControls(parent as object)
     m.ctl = []
     m.ctlMeta = [
@@ -147,23 +193,19 @@ sub buildControls(parent as object)
         { icon: "lucide:RotateCcw", label: "Restart", w: 150, circle: false },
         { icon: "lucide:Tv", label: "Channel Surf", w: 205, circle: false },
         { icon: "lucide:Info", label: "Info", w: 120, circle: false },
-        { icon: "lucide:Radio", label: "Jump to Live", w: 210, circle: false },
+        { icon: "lucide:Radio", label: "Jump to Live", w: 215, circle: false },
         { icon: "lucide:AudioLines", label: "", w: 54, circle: true },
         { icon: "lucide:Captions", label: "", w: 54, circle: true },
         { icon: "lucide:SlidersHorizontal", label: "", w: 54, circle: true }
     ]
-    ' left cluster (pills)
     x = PAD_X
     for i = 0 to 4
-        meta = m.ctlMeta[i]
-        m.ctl.push(buildButton(parent, meta, x))
-        x = x + meta.w + 12
+        m.ctl.push(buildButton(parent, m.ctlMeta[i], x))
+        x = x + m.ctlMeta[i].w + 12
     end for
-    ' right cluster (circles), right-aligned at the panel's right padding
     rx = 1920 - PAD_X - (54 * 3 + 12 * 2)
     for i = 5 to 7
-        meta = m.ctlMeta[i]
-        m.ctl.push(buildButton(parent, meta, rx))
+        m.ctl.push(buildButton(parent, m.ctlMeta[i], rx))
         rx = rx + 54 + 12
     end for
 end sub
@@ -171,55 +213,133 @@ end sub
 function buildButton(parent as object, meta as object, x as integer) as object
     g = parent.createChild("Group")
     g.translation = [x, CTL_Y]
-    bg = g.createChild("Rectangle")
+    if meta.circle
+        focusRing = g.createChild("Poster")
+        focusRing.uri = A_RING62
+        focusRing.width = 62
+        focusRing.height = 62
+        focusRing.translation = [-4, -4]
+        focusRing.blendColor = C_FOCUS_RING
+        focusRing.visible = false
+        bg = g.createChild("Poster")
+        bg.uri = A_C54
+        bg.width = 54
+        bg.height = 54
+        bg.blendColor = C_GLASS
+        ring = g.createChild("Poster")
+        ring.uri = A_RING54
+        ring.width = 54
+        ring.height = 54
+        ring.blendColor = C_BORDER
+        iconLbl = g.createChild("Label")
+        Icon.apply(iconLbl, meta.icon, 22, C_TEXT)
+        iconLbl.translation = [16, 14]
+        return { group: g, bg: bg, ring: ring, focusRing: focusRing, icon: iconLbl, meta: meta }
+    end if
+    focusRing = g.createChild("Poster")
+    focusRing.uri = A_PILL_FOCUS
+    focusRing.height = CTL_H + 4
+    focusRing.width = meta.w + 4
+    focusRing.translation = [-2, -2]
+    focusRing.blendColor = C_FOCUS_RING
+    focusRing.visible = false
+    bg = g.createChild("Poster")
+    bg.uri = A_PILL
     bg.width = meta.w
     bg.height = CTL_H
-    bg.color = C_GLASS
+    bg.blendColor = C_GLASS
+    ring = g.createChild("Poster")
+    ring.uri = A_PILL_RING
+    ring.width = meta.w
+    ring.height = CTL_H
+    ring.blendColor = C_BORDER
     iconLbl = g.createChild("Label")
-    iconSize = 22
-    if meta.circle
-        Icon.apply(iconLbl, meta.icon, iconSize, C_TEXT)
-        iconLbl.translation = [Int(meta.w / 2) - 11, Int((CTL_H - 26) / 2)]
-    else
-        Icon.apply(iconLbl, meta.icon, iconSize, C_TEXT)
-        iconLbl.translation = [20, Int((CTL_H - 26) / 2)]
-        txt = g.createChild("Label")
-        Theme.setFont(txt, Theme.FONT_SEMI, 17)
-        txt.color = C_TEXT
-        txt.text = meta.label
-        txt.translation = [52, Int((CTL_H - 22) / 2)]
-    end if
-    return { group: g, bg: bg, icon: iconLbl, meta: meta }
+    Icon.apply(iconLbl, meta.icon, 22, C_TEXT)
+    iconLbl.translation = [20, 14]
+    txt = g.createChild("Label")
+    Theme.setFont(txt, Theme.FONT_SEMI, 17)
+    txt.color = C_TEXT
+    txt.text = meta.label
+    txt.translation = [52, 16]
+    return { group: g, bg: bg, ring: ring, focusRing: focusRing, icon: iconLbl, txt: txt, meta: meta }
 end function
+
+' In: chip drops from the top (y −30 → 0 + fade), panel rises from the bottom (y 48 → 0 + fade). Out: the
+' reverse (tv-web's exit transition). On the out-animation finishing, the nodes are hidden.
+sub buildAnims()
+    m.chipIn = mkAnim("chipInner", [0, -30], [0, 0], 0.0, 1.0)
+    m.chipOut = mkAnim("chipInner", [0, 0], [0, -30], 1.0, 0.0)
+    m.panelIn = mkAnim("panelGrp", [0, 48], [0, 0], 0.0, 1.0)
+    m.panelOut = mkAnim("panelGrp", [0, 0], [0, 48], 1.0, 0.0)
+    m.panelOut.observeField("state", "onOutDone")
+end sub
+
+function mkAnim(nodeId as string, fromXY as object, toXY as object, fromO as double, toO as double) as object
+    a = m.top.createChild("Animation")
+    a.duration = 0.22
+    a.easeFunction = "outQuad"
+    v = a.createChild("Vector2DFieldInterpolator")
+    v.fieldToInterp = nodeId + ".translation"
+    v.key = [0.0, 1.0]
+    v.keyValue = [fromXY, toXY]
+    o = a.createChild("FloatFieldInterpolator")
+    o.fieldToInterp = nodeId + ".opacity"
+    o.key = [0.0, 1.0]
+    o.keyValue = [fromO, toO]
+    return a
+end function
+
+' The out-animation finished → hide the panel/chip (unless a reopen already happened).
+sub onOutDone()
+    if m.panelOut.state = "stopped" and not m.open
+        m.panel.visible = false
+        m.chipWrap.visible = false
+    end if
+end sub
 
 ' ---- activation / focus ------------------------------------------------------
 
 sub onActive()
     if m.top.active
-        m.open = false
-        m.row = 0
-        m.col = 0
         m.top.visible = true
-        showPanel(false)
+        openPanel(true)   ' open on tune; the hide timer waits for playback (below), then the 8s timeout runs
         m.top.setFocus(true)
     else
         m.top.visible = false
+        m.open = false
         m.hideTimer.control = "stop"
     end if
 end sub
 
-sub showPanel(vis as boolean)
-    m.open = vis
-    m.panel.visible = vis
-    m.chip.visible = vis
-    if vis
-        m.row = 0
-        m.col = 0
-        armHide()
-        render()
-    else
-        m.hideTimer.control = "stop"
+' Open the panel + play the in-animation. `loading` = opened at tune-time (before playback) → the 8s
+' auto-hide waits until the first real status arrives (onStatus), matching tv-web/native.
+sub openPanel(loading as boolean)
+    m.open = true
+    m.row = 0
+    m.col = 0
+    m.awaitingPlay = loading
+    m.panel.visible = true
+    m.chipWrap.visible = true
+    if loading
+        m.status = invalid       ' drop any stale (previous-channel) status so no old thumb/scrubber shows
+        clearScrubber()
     end if
+    render()
+    if loading then m.title.text = "Tuning…"
+    m.chipOut.control = "stop"
+    m.panelOut.control = "stop"
+    m.chipIn.control = "start"
+    m.panelIn.control = "start"
+    if not loading then armHide()
+end sub
+
+sub closePanel()
+    m.open = false
+    m.hideTimer.control = "stop"
+    m.chipIn.control = "stop"
+    m.panelIn.control = "stop"
+    m.chipOut.control = "start"
+    m.panelOut.control = "start"
 end sub
 
 sub armHide()
@@ -228,20 +348,26 @@ sub armHide()
 end sub
 
 sub onHideFire()
-    showPanel(false)
+    closePanel()
 end sub
 
 ' ---- render ------------------------------------------------------------------
 
 sub onStatus()
     m.status = m.top.playerStatus
-    if m.open then render()
+    if not m.open then return
+    render()
+    ' First real status after a tune → playback has started → begin the 8s auto-hide (tv-web parity).
+    if m.awaitingPlay and m.status <> invalid and m.status.state <> "off" and m.status.loading <> true
+        m.awaitingPlay = false
+        armHide()
+    end if
 end sub
 
 sub render()
+    renderChip()   ' the chip only needs channel identity — render it even while still loading
     st = m.status
     if st = invalid then return
-    renderChip()
 
     g = st.guide
     isEpisode = (g <> invalid and g.showTitle <> invalid and g.showTitle <> "" and g.season <> invalid and g.episode <> invalid)
@@ -261,31 +387,49 @@ sub render()
 end sub
 
 sub renderChip()
+    m.chipIconC.blendColor = withAlpha(m.top.accent, 0.2)
+    Icon.apply(m.chipIconG, "lucide:Tv", 20, m.top.accent)
     m.chipNum.color = m.top.accent
     m.chipNum.text = Str(m.top.channelNumber).Trim()
     m.chipName.text = m.top.channelName
-    ' width = number + gap + name + padding; right-align the whole chip at x = 1880.
-    numW = Len(m.chipNum.text) * 15
-    nameW = Len(m.chipName.text) * 13
-    w = 18 + numW + 12 + nameW + 22
-    m.chipNum.translation = [18, 14]
-    m.chipName.translation = [18 + numW + 12, 14]
-    m.chipBg.width = w
-    m.chip.translation = [1880 - w, 28]
+    ' widths: icon circle (36 + 10 left) → number → name → right pad
+    numX = 56
+    m.chipNum.translation = [numX, 14]   ' vertically centred in the 56px chip (was sitting low)
+    numW = measureW(m.chipNum, Len(m.chipNum.text) * 15)
+    nameX = numX + numW + 12
+    m.chipName.translation = [nameX, 14]
+    nameW = measureW(m.chipName, Len(m.chipName.text) * 13)
+    total = nameX + nameW + 22
+    m.chipBg.width = total
+    m.chipRing.width = total
+    m.chipWrap.translation = [1880 - total, 28]
+end sub
+
+' Hide the whole scrubber (used while a tune is loading, so no previous-channel thumb/segments linger).
+sub clearScrubber()
+    for each b in m.segBg
+        b.visible = false
+    end for
+    for each f in m.segFill
+        f.visible = false
+    end for
+    m.thumb.visible = false
+    m.thumbHalo.visible = false
+    m.liveMark.visible = false
+    m.liveDot.visible = false
+    m.posLbl.text = ""
+    m.liveLbl.text = ""
 end sub
 
 sub renderScrubber()
     sc = m.status.scrubber
     scrubFocused = (m.row = 0)
     if sc = invalid
-        for each b in m.segBg
-            b.visible = false
-        end for
-        for each f in m.segFill
-            f.visible = false
-        end for
+        clearScrubber()
         return
     end if
+    m.thumb.visible = true
+    m.liveDot.visible = true
     segs = sc.segments
     n = segs.count()
     for i = 0 to SEG_POOL - 1
@@ -293,17 +437,19 @@ sub renderScrubber()
             seg = segs[i]
             left = Int(seg.leftPct / 100.0 * SCRUB_W) + 2
             wide = Int(seg.widthPct / 100.0 * SCRUB_W) - 4
-            if wide < 1 then wide = 1
+            if wide < 2 then wide = 2
             b = m.segBg[i]
             b.translation = [left, 0]
             b.width = wide
-            if seg.kind = "BUMPER" then b.color = C_SEG_BUMP else b.color = C_SEG_PROG
+            if seg.kind = "BUMPER" then b.blendColor = C_SEG_BUMP else b.blendColor = C_SEG_PROG
             b.visible = true
             f = m.segFill[i]
             if seg.fillPct > 0
+                fw = Int(seg.fillPct / 100.0 * wide)
+                if fw < 2 then fw = 2
                 f.translation = [left, 0]
-                f.width = Int(seg.fillPct / 100.0 * wide)
-                f.color = m.top.accent
+                f.width = fw
+                f.blendColor = m.top.accent
                 f.visible = true
             else
                 f.visible = false
@@ -314,15 +460,24 @@ sub renderScrubber()
         end if
     end for
 
-    ' thumb
+    ' circular thumb (+ focus halo)
     tx = Int(sc.thumbPct / 100.0 * SCRUB_W)
-    sz = 16
-    if scrubFocused then sz = 24
-    m.thumb.width = sz
-    m.thumb.height = sz
-    m.thumb.translation = [tx - Int(sz / 2), 4 - Int(sz / 2)]
+    if scrubFocused
+        m.thumb.uri = A_THUMB
+        m.thumb.width = 24
+        m.thumb.height = 24
+        m.thumb.translation = [tx - 12, 4 - 12]
+        m.thumbHalo.translation = [tx - 17, 4 - 17]
+        m.thumbHalo.blendColor = withAlpha(m.top.accent, 0.4)
+        m.thumbHalo.visible = true
+    else
+        m.thumb.uri = A_THUMB_SM
+        m.thumb.width = 16
+        m.thumb.height = 16
+        m.thumb.translation = [tx - 8, 4 - 8]
+        m.thumbHalo.visible = false
+    end if
 
-    ' live marker
     if sc.liveVisible
         m.liveMark.translation = [Int(sc.livePct / 100.0 * SCRUB_W) - 1, -4]
         m.liveMark.visible = true
@@ -330,17 +485,23 @@ sub renderScrubber()
         m.liveMark.visible = false
     end if
 
-    ' position + LIVE labels
     m.posLbl.text = fmtDur(sc.slotPositionS)
     m.posLbl.translation = [PAD_X + tx - 20, SCRUB_Y + 20]
     if scrubFocused then m.posLbl.color = C_TEXT else m.posLbl.color = C_SUB
+
+    ' LIVE dot + label, right-aligned
     if sc.atLive
-        m.liveLbl.text = "● LIVE"
+        m.liveLbl.text = "LIVE"
         m.liveLbl.color = C_LIVE
+        m.liveDot.blendColor = C_LIVE
     else
         m.liveLbl.text = "-" + fmtDur(sc.behindS)
         m.liveLbl.color = C_MUTED
+        m.liveDot.blendColor = "0x64748BFF"
     end if
+    ' dot sits just left of the right-aligned label
+    lblW = Len(m.liveLbl.text) * 10
+    m.liveDot.translation = [PAD_X + SCRUB_W - 20 - lblW - 16, SCRUB_Y + 24]
 end sub
 
 sub renderControls()
@@ -349,27 +510,53 @@ sub renderControls()
     atLive = true
     if st.scrubber <> invalid then atLive = st.scrubber.atLive
 
-    ' focus fill
     for i = 0 to m.ctl.count() - 1
-        if m.open and m.row = 1 and m.col = i
-            m.ctl[i].bg.color = withAlpha(m.top.accent, 0.28)
+        btn = m.ctl[i]
+        focused = (m.open and m.row = 1 and m.col = i)
+        if focused
+            btn.bg.blendColor = C_FOCUS_BG
+            btn.ring.blendColor = C_BORDER_FOCUS
+            btn.focusRing.visible = true
         else
-            m.ctl[i].bg.color = C_GLASS
+            btn.bg.blendColor = C_GLASS
+            btn.ring.blendColor = C_BORDER
+            btn.focusRing.visible = false
         end if
     end for
 
-    ' Pause⇄Play (icon + label)
     if paused then Icon.apply(m.ctl[0].icon, "lucide:Play", 22, C_TEXT) else Icon.apply(m.ctl[0].icon, "lucide:Pause", 22, C_TEXT)
     setPillText(0, paused ? "Play" : "Pause")
-    ' Live⇄Continue (icon + label)
     if atLive then Icon.apply(m.ctl[4].icon, "lucide:Clapperboard", 22, C_TEXT) else Icon.apply(m.ctl[4].icon, "lucide:Radio", 22, C_TEXT)
     setPillText(4, atLive ? "Jump to Live" : "Continue Watching")
+    relayoutControls()
 end sub
 
-' Update a pill's text child (group children: bg=0, icon=1, text=2).
+' Size each text pill to fit its actual rendered text (icon + gap + text + padding), and reflow the left
+' cluster. The circle selectors (right cluster) are fixed at 54. Measured, not char-count-estimated.
+sub relayoutControls()
+    x = PAD_X
+    for i = 0 to 4
+        btn = m.ctl[i]
+        tw = measureW(btn.txt, btn.meta.w - 72)
+        pw = 52 + tw + 20
+        btn.bg.width = pw
+        btn.ring.width = pw
+        btn.focusRing.width = pw + 4
+        btn.group.translation = [x, CTL_Y]
+        x = x + pw + 12
+    end for
+end sub
+
+' Real rendered text width via boundingRect (valid after first render); fall back to an estimate on frame 0.
+function measureW(lbl as object, fallback as integer) as integer
+    r = lbl.boundingRect()
+    if r <> invalid and r.width > 0 then return Int(r.width)
+    return fallback
+end function
+
 sub setPillText(idx as integer, label as string)
-    g = m.ctl[idx].group
-    if g.getChildCount() >= 3 then g.getChild(2).text = label
+    btn = m.ctl[idx]
+    if btn.txt <> invalid then btn.txt.text = label
 end sub
 
 ' ---- keys --------------------------------------------------------------------
@@ -379,9 +566,8 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if not m.top.active then return false
 
     if not m.open
-        ' Panel closed: OK/▲/▼ opens it; Back → guide; ◄► → surf (Incr D).
         if key = Keys.OK or key = Keys.UP or key = Keys.DOWN
-            showPanel(true)
+            openPanel(false)
             return true
         else if key = Keys.BACK
             fire("back", "")
@@ -393,10 +579,9 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return false
     end if
 
-    ' Panel open.
     armHide()
     if key = Keys.BACK
-        showPanel(false)
+        closePanel()
         return true
     end if
     if m.row = 0
@@ -414,7 +599,6 @@ function onKeyEvent(key as string, press as boolean) as boolean
         end if
         return true
     end if
-    ' row 1 — controls
     if key = Keys.LEFT
         if m.col > 0 then m.col = m.col - 1
         renderControls()
@@ -454,16 +638,13 @@ end sub
 
 ' ---- helpers ----------------------------------------------------------------
 
-' "0xRRGGBBAA" + alpha(0–1) → "0xRRGGBB" + alpha byte.
 function withAlpha(argb as string, a as double) as string
-    base = Left(argb, 8)   ' "0xRRGGBB"
+    base = Left(argb, 8)
     v = Int(a * 255.0)
     if v < 0 then v = 0
     if v > 255 then v = 255
     hexd = "0123456789ABCDEF"
-    hi = Mid(hexd, (v \ 16) + 1, 1)
-    lo = Mid(hexd, (v mod 16) + 1, 1)
-    return base + hi + lo
+    return base + Mid(hexd, (v \ 16) + 1, 1) + Mid(hexd, (v mod 16) + 1, 1)
 end function
 
 function fmtDur(total as double) as string
