@@ -197,7 +197,7 @@ sub applyLens(resetFocus = true as boolean)
     if resetFocus then m.fc = 0
     n = m.channels.count()
     if n > 0
-        m.msg.visible = false
+        showEmpty(false)
         if m.fc > n - 1 then m.fc = n - 1
         if m.fc < 0 then m.fc = 0
         if resetFocus
@@ -211,17 +211,39 @@ sub applyLens(resetFocus = true as boolean)
     else
         m.fc = 0
         m.fp = 0
-        m.msg.visible = true
-        m.msg.text = lensEmptyText()
+        m.ghost.message = lensEmptyTitle()
+        m.ghost.sub = lensEmptySub()
+        showEmpty(true)
         m.featured.content = invalid
     end if
     applyFocus()
 end sub
 
-function lensEmptyText() as string
+' Toggle the empty-lens ghost vs the real guide chrome (featured + grid + header + now-caret).
+sub showEmpty(empty as boolean)
+    m.msg.visible = false
+    m.ghost.visible = empty
+    m.featured.visible = not empty
+    m.gridClip.visible = not empty
+    m.dayLabel.visible = not empty
+    m.ticks.visible = not empty
+    if empty
+        m.nowCaret.visible = false
+    else
+        drawNowCaret()
+    end if
+end sub
+
+function lensEmptyTitle() as string
     if m.lens = "favorites" then return "No favorites yet"
     if Left(m.lens, 4) = "pkg:" then return "No channels in this filter"
-    return "No channels yet."
+    return "No channels yet"
+end function
+
+function lensEmptySub() as string
+    if m.lens = "favorites" then return "Highlight a channel and add it to your favorites."
+    if Left(m.lens, 4) = "pkg:" then return "Try another filter, or open the sidebar to clear it."
+    return "Once channels are set up on your server, they'll appear here."
 end function
 
 sub onGuideErr(err as object, _ctx as object)

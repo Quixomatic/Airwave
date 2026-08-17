@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.42] - 2026-08-17
+
+### Added
+
+- **Roku guide empty-state (GuideGhost)** — an empty lens (no favorites / an empty package filter) now shows
+  the guide's own structure as a faint skeleton (featured panel + channel rows) behind a centered message +
+  sub, matching tv-web/native, instead of a plain line of text.
+
 ## [0.10.41] - 2026-08-17
 
 ### Changed

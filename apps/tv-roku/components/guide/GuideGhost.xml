@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  GuideGhost — the guide's own structure as faint static skeletons behind a centered message (port of
+  tv-web/tv-native GuideGhost). Shown when the (filtered) channel list is empty (fresh install, or an
+  empty favorites/package lens) so the screen reads as "the guide, but empty" rather than a blank.
+-->
+<component name="GuideGhost" extends="Group">
+    <interface>
+        <field id="message" type="string" onChange="onText" />
+        <field id="sub" type="string" onChange="onText" />
+    </interface>
+    <children>
+        <Group id="skeleton" opacity="0.55" />
+        <Label id="msg" />
+        <Label id="submsg" />
+    </children>
+</component>

@@ -1,0 +1,93 @@
+import "pkg:/source/lib/guideLayout.bs"
+import "pkg:/source/theme.bs"
+
+' GuideGhost code-behind — see the .xml header. Builds a faint skeleton of the guide (a featured-panel ghost
+' + 6 channel-row ghosts) behind a centered message. Sizes via vw() so it matches the real guide's geometry.
+
+const GHOST = "0x94A3B817"   ' rgba(148,163,184,0.09)
+
+' Lane block width fractions per ghost row (of laneW) — matches tv-web/native GHOST_ROWS.
+function ghostRows() as object
+    return [[0.3, 0.32, 0.28], [0.46, 0.26, 0.22], [0.22, 0.5, 0.24], [0.36, 0.3, 0.28], [0.5, 0.24, 0.2], [0.26, 0.38, 0.3]]
+end function
+
+sub init()
+    sk = m.skeleton
+    railPx = GuideLayout.railPx()
+    laneW = GuideLayout.laneW()
+    rowPx = GuideLayout.rowPx()
+
+    ' --- featured-panel ghost ---
+    padx = GuideLayout.vw(48)
+    pady = GuideLayout.vw(44)
+    circleBlock(sk, padx, pady, GuideLayout.vw(64))
+    tx = padx + GuideLayout.vw(64) + GuideLayout.vw(30)
+    y = pady
+    block(sk, tx, y, GuideLayout.vw(560), GuideLayout.vw(58))
+    y = y + GuideLayout.vw(58) + GuideLayout.vw(18)
+    block(sk, tx, y, GuideLayout.vw(320), GuideLayout.vw(34))
+    y = y + GuideLayout.vw(34) + GuideLayout.vw(18) + GuideLayout.vw(14)
+    block(sk, tx, y, GuideLayout.vw(820), GuideLayout.vw(30))
+    y = y + GuideLayout.vw(30) + GuideLayout.vw(18)
+    block(sk, tx, y, GuideLayout.vw(700), GuideLayout.vw(30))
+
+    ' --- channel-row ghosts ---
+    rowsY = GuideLayout.vw(520)
+    railX = GuideLayout.vw(16)
+    laneX0 = railX + railPx + GuideLayout.vw(12)
+    laneH = GuideLayout.vw(90)
+    i = 0
+    for each pat in ghostRows()
+        rowY = rowsY + i * rowPx
+        circleBlock(sk, railX, rowY + Int((rowPx - GuideLayout.vw(60)) / 2), GuideLayout.vw(60))
+        block(sk, railX + GuideLayout.vw(60) + GuideLayout.vw(14), rowY + Int((rowPx - GuideLayout.vw(38)) / 2), GuideLayout.vw(52), GuideLayout.vw(38))
+        x = laneX0
+        cellY = rowY + Int((rowPx - laneH) / 2)
+        for each f in pat
+            w = Int(laneW * f)
+            block(sk, x, cellY, w, laneH)
+            x = x + w + GuideLayout.vw(12)
+        end for
+        i = i + 1
+    end for
+
+    ' --- centered message (centered within the guide column, since the ghost sits at the column origin) ---
+    colW = GuideLayout.colW()
+    m.msg.width = colW
+    m.msg.horizAlign = "center"
+    m.msg.translation = [0, Int(GuideLayout.STAGE_H / 2) - GuideLayout.vw(72)]
+    m.msg.color = "0xE2E8F0FF"
+    Theme.setFont(m.msg, Theme.FONT_BOLD, GuideLayout.vw(56))
+
+    subW = GuideLayout.vw(1200)
+    m.submsg.width = subW
+    m.submsg.horizAlign = "center"
+    m.submsg.wrap = true
+    m.submsg.translation = [Int((colW - subW) / 2), Int(GuideLayout.STAGE_H / 2) + GuideLayout.vw(6)]
+    m.submsg.color = "0x94A3B8FF"
+    Theme.setFont(m.submsg, Theme.FONT_REG, GuideLayout.vw(30))
+end sub
+
+sub onText()
+    m.msg.text = m.top.message
+    hasSub = (m.top.sub <> invalid and m.top.sub <> "")
+    m.submsg.visible = hasSub
+    if hasSub then m.submsg.text = m.top.sub else m.submsg.text = ""
+end sub
+
+sub block(parent as object, x as integer, y as integer, w as integer, h as integer)
+    r = parent.createChild("Rectangle")
+    r.color = GHOST
+    r.width = w
+    r.height = h
+    r.translation = [x, y]
+end sub
+
+sub circleBlock(parent as object, x as integer, y as integer, d as integer)
+    p = parent.createChild("Poster")
+    p.uri = "pkg:/images/circle-54.png"
+    p.width = d
+    p.height = d
+    p.blendColor = GHOST
+    p.translation = [x, y]
+end sub
