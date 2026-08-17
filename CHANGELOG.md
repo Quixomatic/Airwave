@@ -2,6 +2,25 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.36] - 2026-08-17
+
+Roku icons — real lucide + phosphor icons via bundled icon FONTS (not rasters).
+
+### Added
+
+- **Icon fonts** for the Roku guide. `scripts/gen-icons.mjs` copies `lucide.ttf` + the Phosphor **Fill**
+  TTF from `lucide-static` / `@phosphor-icons/web` and emits id→codepoint maps
+  (`images/icons-{lucide,phosphor}.json`, keyed by the same `lucide:Name` / `phosphor:Name` ids the admin
+  stores — 2041 lucide + 1512 phosphor glyphs). `source/lib/icon.bs` renders an icon as a `Label` (text =
+  the glyph, tinted via `color`, sized via the font size — crisp at any size, via the font mutation path).
+- The guide's **channel/package glyphs** (rail + featured panel) now show their **real** lucide/phosphor
+  icon instead of a single fallback, and the rail **favorite heart** uses the icon font (phosphor fill when
+  favorited, lucide outline otherwise) — matching tv-web/tv-native.
+
+### Removed
+
+- The placeholder raster glyph + heart PNGs (`ic-channel.png`, `heart-*.png`) — replaced by the icon fonts.
+
 ## [0.10.35] - 2026-08-17
 
 ### Changed

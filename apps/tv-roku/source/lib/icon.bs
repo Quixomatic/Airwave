@@ -1,0 +1,60 @@
+' Icon — renders lucide / phosphor icons from bundled icon FONTS (not rasters). An icon id ("lucide:Name"
+' / "phosphor:Name", the same the admin stores) resolves to a codepoint in the id→codepoint maps generated
+' by scripts/gen-icons.mjs, and the glyph renders as a Label (text = Chr(codepoint), tinted via color, sized
+' via the font size — crisp at any size). Fonts applied via the mutation path (see Theme.setFont).
+
+namespace Icon
+    const FONT_LUCIDE = "pkg:/fonts/lucide.ttf"
+    const FONT_PHOSPHOR = "pkg:/fonts/phosphor-fill.ttf"
+
+    ' Preload the id→codepoint maps onto m.global (once). Call from MainScene.init.
+    sub load()
+        if m.global.hasField("iconLucide") then return
+        m.global.addFields({
+            iconLucide: Icon.readMap("pkg:/images/icons-lucide.json"),
+            iconPhosphor: Icon.readMap("pkg:/images/icons-phosphor.json")
+        })
+    end sub
+
+    function readMap(path as string) as object
+        s = ReadAsciiFile(path)
+        if s = invalid or s = "" then return {}
+        o = ParseJson(s)
+        if o = invalid then return {}
+        return o
+    end function
+
+    ' Resolve an icon id → { font, glyph } (glyph = the unicode char). Falls back to lucide Tv.
+    function resolve(id as dynamic) as object
+        if id <> invalid and id <> ""
+            colon = Instr(1, id, ":")
+            if colon > 0
+                lib = Left(id, colon - 1)
+                name = Mid(id, colon + 1)
+                if lib = "lucide"
+                    cp = m.global.iconLucide[name]
+                    if cp <> invalid then return { font: Icon.FONT_LUCIDE, glyph: Chr(cp) }
+                else if lib = "phosphor"
+                    cp = m.global.iconPhosphor[name]
+                    if cp <> invalid then return { font: Icon.FONT_PHOSPHOR, glyph: Chr(cp) }
+                end if
+            end if
+        end if
+        fb = m.global.iconLucide["Tv"]
+        if fb = invalid then fb = m.global.iconLucide["Radio"]
+        if fb <> invalid then return { font: Icon.FONT_LUCIDE, glyph: Chr(fb) }
+        return { font: Icon.FONT_LUCIDE, glyph: "" }
+    end function
+
+    ' Apply an icon to a Label: glyph text + font (mutation path) + size + color. The Label should be sized
+    ' to the target box with center alignment; the font size controls the glyph size.
+    sub apply(label as object, id as dynamic, size as integer, color as string)
+        r = Icon.resolve(id)
+        label.font.uri = r.font
+        label.font.size = size
+        label.color = color
+        label.horizAlign = "center"
+        label.vertAlign = "center"
+        label.text = r.glyph
+    end sub
+end namespace

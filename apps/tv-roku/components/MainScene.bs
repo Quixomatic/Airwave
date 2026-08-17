@@ -5,6 +5,7 @@ import "pkg:/source/lib/api.bs"
 import "pkg:/source/lib/dev.bs"
 import "pkg:/source/lib/device.bs"
 import "pkg:/source/lib/registry.bs"
+import "pkg:/source/lib/icon.bs"
 
 ' MainScene — app host + entry gate (port of tv-native app/index.tsx routing).
 ' no server -> ServerSetup; no token -> Login; caps not done for this server -> Diagnostic;
@@ -14,6 +15,7 @@ sub init()
     Log.info("MainScene init")
     m.screen = invalid
     m.probeStarted = false
+    Icon.load()   ' preload the lucide/phosphor id→codepoint maps (icon fonts)
     showBootSplash()
 end sub
 

@@ -1,5 +1,6 @@
 import "pkg:/source/lib/guideLayout.bs"
 import "pkg:/source/theme.bs"
+import "pkg:/source/lib/icon.bs"
 
 ' Row layout mirrors tv-web/tv-native aurora-grid Row: a fixed-width rail + a program lane. Driven by
 ' VirtualRowList: itemContent carries { channel, accentHex }; focused/railFocused/favorited/focusProgramIndex
@@ -54,32 +55,34 @@ sub init()
 
     gl = Int(circle * 0.56)
     glXY = [m.circleXY[0] + Int((circle - gl) / 2), m.circleXY[1] + Int((circle - gl) / 2)]
-    m.iconGlyph = m.top.createChild("Poster")
-    m.iconGlyph.uri = "pkg:/images/ic-channel.png"
-    m.iconGlyph.width = gl
-    m.iconGlyph.height = gl
-    m.iconGlyph.loadWidth = gl
-    m.iconGlyph.loadHeight = gl
-    m.iconGlyph.translation = glXY
+    m.glyphSize = gl
+    ' Channel/package icon — a Label rendering the lucide/phosphor glyph (icon font), centered in the circle.
+    m.iconGlyph = m.top.createChild("Label")
+    m.iconGlyph.width = circle
+    m.iconGlyph.height = circle
+    m.iconGlyph.horizAlign = "center"
+    m.iconGlyph.vertAlign = "center"
+    m.iconGlyph.translation = m.circleXY
 
-    ' Heart shown INSIDE the circle when the rail is focused (favorite toggle affordance).
-    m.iconHeart = m.top.createChild("Poster")
-    m.iconHeart.width = gl
-    m.iconHeart.height = gl
-    m.iconHeart.loadWidth = gl
-    m.iconHeart.loadHeight = gl
-    m.iconHeart.translation = glXY
+    ' Heart shown INSIDE the circle when the rail is focused — the icon-font Heart (lucide outline / phosphor
+    ' fill), centered in the circle like the glyph. font/glyph/color set in onRailState.
+    m.heartSize = gl
+    m.iconHeart = m.top.createChild("Label")
+    m.iconHeart.width = circle
+    m.iconHeart.height = circle
+    m.iconHeart.horizAlign = "center"
+    m.iconHeart.vertAlign = "center"
+    m.iconHeart.translation = m.circleXY
     m.iconHeart.visible = false
 
     ' Small filled heart badge on the circle's bottom-right when favorited (and not rail-focused).
     badge = GuideLayout.vw(22 * GuideLayout.FEATURE_SCALE)
-    m.favBadge = m.top.createChild("Poster")
-    m.favBadge.uri = "pkg:/images/heart-filled.png"
-    m.favBadge.blendColor = C_FAV
+    m.badgeSize = badge
+    m.favBadge = m.top.createChild("Label")
     m.favBadge.width = badge
     m.favBadge.height = badge
-    m.favBadge.loadWidth = badge
-    m.favBadge.loadHeight = badge
+    m.favBadge.horizAlign = "center"
+    m.favBadge.vertAlign = "center"
     m.favBadge.translation = [m.circleXY[0] + circle - badge + GuideLayout.vw(2), m.circleXY[1] + circle - badge + GuideLayout.vw(2)]
     m.favBadge.visible = false
 
@@ -128,16 +131,14 @@ sub onRailState()
     m.numLabel.color = f ? "0xE6EAF1FF" : "0x94A3B8FF"
 
     if rf
-        ' Rail-focused: the circle becomes the favorite heart (filled red if favorited, else grey outline)
-        ' and the ring turns blue.
+        ' Rail-focused: the circle becomes the favorite heart (phosphor fill if favorited, else lucide
+        ' outline) and the ring turns blue.
         m.iconGlyph.visible = false
         m.iconHeart.visible = true
         if fav
-            m.iconHeart.uri = "pkg:/images/heart-filled.png"
-            m.iconHeart.blendColor = C_FAV
+            Icon.apply(m.iconHeart, "phosphor:Heart", m.heartSize, C_FAV)
         else
-            m.iconHeart.uri = "pkg:/images/heart-outline.png"
-            m.iconHeart.blendColor = "0xC3C9D4FF"
+            Icon.apply(m.iconHeart, "lucide:Heart", m.heartSize, "0xC3C9D4FF")
         end if
         m.iconRing.blendColor = RING
         m.favBadge.visible = false
@@ -171,7 +172,10 @@ sub render()
     m.railBar.color = GuideLayout.argb(accent, 1.0)
     m.iconCircle.blendColor = GuideLayout.argb(accent, 0.2)
     m.iconRing.blendColor = GuideLayout.argb(accent, 0.35)
-    m.iconGlyph.blendColor = GuideLayout.argb(accent, 1.0)
+    iconId = ch.icon
+    if (iconId = invalid or iconId = "") and ch.package <> invalid then iconId = ch.package.icon
+    Icon.apply(m.iconGlyph, iconId, m.glyphSize, GuideLayout.argb(accent, 1.0))
+    Icon.apply(m.favBadge, "phosphor:Heart", m.badgeSize, C_FAV)
     m.numLabel.text = GuideLayout.numStr(ch.number)
     m.nameLabel.text = ch.name
 

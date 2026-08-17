@@ -1,5 +1,6 @@
 import "pkg:/source/lib/guideLayout.bs"
 import "pkg:/source/theme.bs"
+import "pkg:/source/lib/icon.bs"
 
 ' Featured now/next panel — port of tv-native aurora-grid FeaturedPanel (left text column). Shows the
 ' focused channel + program. Sizes are fv() (FEATURE_SCALE 0.76). The panel is placed by Guide at the
@@ -7,16 +8,13 @@ import "pkg:/source/theme.bs"
 
 sub init()
     ' (m.<id> for every XML node is auto-injected by bsc-plugin-auto-findnode.)
-    ' Load the raster icons at their render size for a crisp decode (no GPU downscale). loadWidth is set
-    ' here since it's constant; width/height are (re)set in relayout.
+    ' Load the raster circle/ring at their render size for a crisp decode (no GPU downscale). The glyph is a
+    ' Label (icon font), so no loadWidth — width/height/glyphSize are set in relayout.
     isz = GuideLayout.fv(64)
-    igl = Int(isz * 0.56)
     m.circle.loadWidth = isz
     m.circle.loadHeight = isz
     m.ring.loadWidth = isz
     m.ring.loadHeight = isz
-    m.glyph.loadWidth = igl
-    m.glyph.loadHeight = igl
     relayout()
 end sub
 
@@ -42,10 +40,12 @@ sub relayout()
     m.ring.height = circleSize
     m.ring.translation = [padx, pady]
 
-    gl = Int(circleSize * 0.56)
-    m.glyph.width = gl
-    m.glyph.height = gl
-    m.glyph.translation = [padx + Int((circleSize - gl) / 2), pady + Int((circleSize - gl) / 2)]
+    m.glyphSize = Int(circleSize * 0.56)
+    m.glyph.width = circleSize
+    m.glyph.height = circleSize
+    m.glyph.horizAlign = "center"
+    m.glyph.vertAlign = "center"
+    m.glyph.translation = [padx, pady]
 
     numX = padx + circleSize + GuideLayout.fv(22)
     lineMidY = pady + Int((circleSize - GuideLayout.fv(44)) / 2)
@@ -133,7 +133,9 @@ sub onContent()
 
     m.circle.blendColor = GuideLayout.argb(accent, 0.2)
     m.ring.blendColor = GuideLayout.argb(accent, 0.35)
-    m.glyph.blendColor = accentArgb
+    iconId = ch.icon
+    if (iconId = invalid or iconId = "") and ch.package <> invalid then iconId = ch.package.icon
+    Icon.apply(m.glyph, iconId, m.glyphSize, accentArgb)
     m.chNum.text = GuideLayout.numStr(ch.number)
     m.chNum.color = GuideLayout.argb(accent, 0.75)
     m.chName.text = ch.name
