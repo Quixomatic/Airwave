@@ -337,7 +337,12 @@ end sub
 
 ' Open the panel + play the in-animation. `loading` = opened at tune-time (before playback) → the 8s
 ' auto-hide waits until the first real status arrives (onStatus), matching tv-web/native.
+sub onRetune()
+    if m.top.active then openPanel(true)   ' a (re)tune resets the panel (clear scrubber, show Tuning)
+end sub
+
 sub openPanel(loading as boolean)
+    wasOpen = m.open
     m.open = true
     m.row = 0
     m.col = 0
@@ -362,10 +367,12 @@ sub openPanel(loading as boolean)
     end if
     render()
     if loading then m.title.text = "Tuning…"
-    m.chipOut.control = "stop"
-    m.panelOut.control = "stop"
-    m.chipIn.control = "start"
-    m.panelIn.control = "start"
+    if not wasOpen   ' only (re)play the slide-in when the panel wasn't already open (re-tune keeps it up)
+        m.chipOut.control = "stop"
+        m.panelOut.control = "stop"
+        m.chipIn.control = "start"
+        m.panelIn.control = "start"
+    end if
     if not loading then armHide()
 end sub
 
@@ -1076,6 +1083,7 @@ sub activate(col as integer)
     else if col = 1
         fire("restart", "")
     else if col = 2
+        closePanel()
         fire("surf", "")
     else if col = 3
         setInfoMode(true)

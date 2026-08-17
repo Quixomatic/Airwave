@@ -1,0 +1,412 @@
+import "pkg:/source/lib/api.bs"
+import "pkg:/source/theme.bs"
+import "pkg:/source/lib/icon.bs"
+import "pkg:/source/lib/tint.bs"
+import "pkg:/source/lib/guideLayout.bs"
+import "pkg:/source/input/keys.bs"
+
+' ChannelSurf code-behind — see the .xml header. A centred carousel: the focused channel is centred on
+' screen, neighbours flank it; ◄/► shift the window (wrapping), a pool of tiles is re-bound each move.
+
+const TILE_W = 300
+const GAP = 22
+const ART_H = 169          ' 300 * 9/16
+const POOL = 7             ' centre + 3 each side (edges run off-screen as buffer)
+const HALF = 3
+const OVERLAY_H = 448
+const OVERLAY_Y = 1080 - OVERLAY_H
+const TILE_Y = 74          ' within the overlay content group
+const CENTER_X = 960
+
+sub init()
+    m.channels = []
+    m.focused = 0
+    m.clockOffset = 0.0
+    m.hideTimer.observeField("fire", "onHideFire")
+    build()
+    m.top.visible = false
+end sub
+
+sub build()
+    ' The whole overlay slides/fades via this inner group (animated); children sit at absolute offsets.
+    inner = m.top.createChild("Group")
+    inner.id = "surfInner"
+    m.inner = inner
+
+    scrim = inner.createChild("Poster")
+    scrim.uri = "pkg:/images/scrim-player.png"
+    scrim.width = 1920
+    scrim.height = OVERLAY_H
+    scrim.translation = [0, OVERLAY_Y]
+
+    title = inner.createChild("Label")
+    Theme.setFont(title, Theme.FONT_BOLD, 16)
+    title.color = "0xFFFFFFB3"
+    title.horizAlign = "center"
+    title.width = 1920
+    title.translation = [0, OVERLAY_Y + 20]
+    title.text = "CHANNEL SURF"
+
+    ' tile pool
+    strip = inner.createChild("Group")
+    strip.translation = [0, OVERLAY_Y + TILE_Y]
+    m.tiles = []
+    for i = 0 to POOL - 1
+        m.tiles.push(buildTile(strip))
+    end for
+
+    buildAnims()
+end sub
+
+function buildTile(parent as object) as object
+    g = parent.createChild("Group")
+    g.scaleRotateCenter = [TILE_W / 2, (ART_H + 100) / 2]
+
+    ' "Watching" flag (fixed-height slot so art aligns whether shown or not)
+    flag = g.createChild("Group")
+    flagBg = flag.createChild("Poster")
+    flagBg.uri = "pkg:/images/pill-sm.9.png"   ' small fully-rounded pill (matches tv-web borderRadius:999)
+    flagBg.blendColor = "0xFFFFFF21"
+    flagBg.height = 22
+    flagDot = flag.createChild("Poster")
+    flagDot.uri = "pkg:/images/circle-16.png"
+    flagDot.width = 7
+    flagDot.height = 7
+    flagDot.translation = [12, 8]
+    flagTxt = flag.createChild("Label")
+    Theme.setFont(flagTxt, Theme.FONT_BOLD, 11)
+    flagTxt.color = "0xFFFFFFE6"
+    flagTxt.text = "WATCHING"
+    flagTxt.translation = [24, 4]
+
+    art = g.createChild("Poster")
+    art.width = TILE_W
+    art.height = ART_H
+    art.translation = [0, 28]
+    art.loadDisplayMode = "scaleToZoom"
+
+    artBorder = g.createChild("Poster")
+    artBorder.uri = "pkg:/images/pill-ring.9.png"   ' a thin frame; blendColor accent on focus
+    artBorder.width = TILE_W
+    artBorder.height = ART_H
+    artBorder.translation = [0, 28]
+    artBorder.visible = false
+
+    fallGlyph = g.createChild("Label")   ' shown when there's no art
+    fallGlyph.horizAlign = "center"
+    fallGlyph.vertAlign = "center"
+    fallGlyph.width = TILE_W
+    fallGlyph.height = ART_H
+    fallGlyph.translation = [0, 28]
+
+    progTrack = g.createChild("Rectangle")
+    progTrack.width = TILE_W
+    progTrack.height = 4
+    progTrack.color = "0xFFFFFF2E"
+    progTrack.translation = [0, 28 + ART_H + 8]
+    progFill = g.createChild("Rectangle")
+    progFill.height = 4
+    progFill.translation = [0, 28 + ART_H + 8]
+
+    rowY = 28 + ART_H + 22
+    iconCirc = g.createChild("Poster")
+    iconCirc.uri = "pkg:/images/circle-36.png"
+    iconCirc.width = 26
+    iconCirc.height = 26
+    iconCirc.translation = [0, rowY]
+    iconGlyph = g.createChild("Label")
+    iconGlyph.horizAlign = "center"
+    iconGlyph.vertAlign = "center"
+    iconGlyph.width = 26
+    iconGlyph.height = 26
+    iconGlyph.translation = [0, rowY]
+    num = g.createChild("Label")
+    Theme.setFont(num, Theme.FONT_BOLD, 17)
+    num.translation = [34, rowY + 2]
+    name = g.createChild("Label")
+    Theme.setFont(name, Theme.FONT_SEMI, 16)
+    name.color = "0xE6EAF1FF"
+    name.maxLines = 1
+    prog = g.createChild("Label")
+    Theme.setFont(prog, Theme.FONT_REG, 15)
+    prog.color = "0xF1F5F9FF"
+    prog.maxLines = 1
+    prog.width = TILE_W
+    prog.translation = [0, rowY + 34]
+    subLbl = g.createChild("Label")
+    Theme.setFont(subLbl, Theme.FONT_REG, 13)
+    subLbl.color = "0x94A3B8FF"
+    subLbl.maxLines = 1
+    subLbl.width = TILE_W
+    subLbl.translation = [0, rowY + 58]
+
+    return { group: g, flag: flag, flagBg: flagBg, flagDot: flagDot, art: art, artBorder: artBorder, fall: fallGlyph, progFill: progFill, iconCirc: iconCirc, iconGlyph: iconGlyph, num: num, name: name, prog: prog, sub: subLbl }
+end function
+
+sub buildAnims()
+    m.animIn = mkAnim([0, OVERLAY_H], [0, 0], 0.0, 1.0)
+    m.animOut = mkAnim([0, 0], [0, OVERLAY_H], 1.0, 0.0)
+    m.animOut.observeField("state", "onOutDone")
+end sub
+
+function mkAnim(fromXY as object, toXY as object, fromO as double, toO as double) as object
+    a = m.top.createChild("Animation")
+    a.duration = 0.24
+    a.easeFunction = "outQuad"
+    v = a.createChild("Vector2DFieldInterpolator")
+    v.fieldToInterp = "surfInner.translation"
+    v.key = [0.0, 1.0]
+    v.keyValue = [fromXY, toXY]
+    o = a.createChild("FloatFieldInterpolator")
+    o.fieldToInterp = "surfInner.opacity"
+    o.key = [0.0, 1.0]
+    o.keyValue = [fromO, toO]
+    return a
+end function
+
+sub onOutDone()
+    if m.animOut.state = "stopped" and not m.top.open then m.top.visible = false
+end sub
+
+' ---- open / data ------------------------------------------------------------
+
+sub onOpen()
+    if m.top.open
+        m.top.visible = true
+        m.animOut.control = "stop"
+        m.animIn.control = "start"
+        m.hideTimer.control = "start"
+        m.top.setFocus(true)
+        onThen(Api.guide(180), onGuide, m)
+    else
+        m.hideTimer.control = "stop"
+        m.animIn.control = "stop"
+        m.animOut.control = "start"
+    end if
+end sub
+
+sub onGuide(data as object, _m as object)
+    if data = invalid or data.channels = invalid then return
+    m.channels = sortByNumber(data.channels)
+    if data.serverTime <> invalid then m.clockOffset = GuideLayout.parseIso(data.serverTime) - wallMs()
+    m.focused = indexOfChannel(m.top.currentChannelId)
+    render()
+end sub
+
+function sortByNumber(chs as object) as object
+    arr = []
+    for each c in chs
+        arr.push(c)
+    end for
+    ' simple insertion sort by number (channel counts are small)
+    for i = 1 to arr.count() - 1
+        j = i
+        while j > 0 and numOf(arr[j - 1]) > numOf(arr[j])
+            t = arr[j] : arr[j] = arr[j - 1] : arr[j - 1] = t
+            j = j - 1
+        end while
+    end for
+    return arr
+end function
+
+function numOf(c as object) as integer
+    if c.number <> invalid then return c.number
+    return 0
+end function
+
+function indexOfChannel(id as string) as integer
+    i = 0
+    for each c in m.channels
+        if c.id = id then return i
+        i = i + 1
+    end for
+    return 0
+end function
+
+' ---- render -----------------------------------------------------------------
+
+sub render()
+    n = m.channels.count()
+    if n = 0 then return
+    nowMs# = wallMs() + m.clockOffset
+    for k = 0 to POOL - 1
+        tile = m.tiles[k]
+        idx = ((m.focused + (k - HALF)) mod n + n) mod n
+        ch = m.channels[idx]
+        isFocus = (k = HALF)
+        x = CENTER_X - Int(TILE_W / 2) + (k - HALF) * (TILE_W + GAP)
+        tile.group.translation = [x, 0]
+        if isFocus
+            tile.group.scale = [1.06, 1.06]
+            tile.group.opacity = 1.0
+        else
+            tile.group.scale = [1.0, 1.0]
+            tile.group.opacity = 0.5
+        end if
+        bindTile(tile, ch, nowMs#)
+    end for
+end sub
+
+sub bindTile(tile as object, ch as object, nowMs as double)
+    accent = accentOf(ch)
+    isCur = (ch.id = m.top.currentChannelId)
+    tile.flag.visible = isCur
+    if isCur
+        tile.flagBg.blendColor = "0xFFFFFF21"
+        tile.flagDot.blendColor = accent
+        ' size the pill to the text
+        w = 24 + 78 + 12
+        tile.flagBg.width = w
+        tile.flag.translation = [Int((TILE_W - w) / 2), 0]
+    end if
+
+    ' program
+    prog = invalid
+    if ch.programs <> invalid and ch.programs.count() > 0
+        li = GuideLayout.liveProgramIndex(ch.programs, nowMs)
+        if ch.programs.count() > li then prog = ch.programs[li]
+    end if
+    g = invalid
+    if prog <> invalid then g = prog.guide
+
+    ' art
+    artUri = ""
+    if g <> invalid
+        a = g.art
+        if a = invalid then a = g.thumb
+        if a <> invalid and a <> "" then artUri = Api.imageUrl(ch.id, a, 480)
+    end if
+    tile.art.uri = artUri
+    tile.art.blendColor = "0xFFFFFFFF"
+    if artUri = ""
+        tile.art.blendColor = withAlpha(accent, 0.13)
+        Icon.apply(tile.fall, iconIdOf(ch), 44, accent)
+        tile.fall.visible = true
+    else
+        tile.fall.visible = false
+    end if
+    tile.artBorder.blendColor = accent
+
+    ' progress
+    pct = 0.0
+    if prog <> invalid
+        s# = GuideLayout.parseIso(prog.startsAt)
+        dur# = prog.durationSeconds * 1000.0
+        if dur# > 0 then pct = (nowMs - s#) / dur#
+        if pct < 0 then pct = 0
+        if pct > 1 then pct = 1
+    end if
+    tile.progFill.width = Int(pct * TILE_W)
+    tile.progFill.color = accent
+
+    ' channel row
+    tile.iconCirc.blendColor = withAlpha(accent, 0.2)
+    Icon.apply(tile.iconGlyph, iconIdOf(ch), 15, accent)
+    tile.num.color = accent
+    if ch.number <> invalid then tile.num.text = Str(ch.number).Trim() else tile.num.text = ""
+    numW = Len(tile.num.text) * 12
+    tile.name.translation = [34 + numW + 10, tile.num.translation[1]]
+    tile.name.width = TILE_W - (34 + numW + 10)
+    if ch.name <> invalid then tile.name.text = ch.name else tile.name.text = ""
+
+    ' program title + sub
+    if g <> invalid
+        isEp = (g.showTitle <> invalid and g.showTitle <> "" and g.season <> invalid and g.episode <> invalid)
+        if isEp
+            tile.prog.text = g.showTitle
+            tile.sub.text = "S" + Str(g.season).Trim() + " E" + Str(g.episode).Trim()
+            tile.sub.visible = true
+        else
+            if g.title <> invalid then tile.prog.text = g.title else tile.prog.text = ""
+            tile.sub.visible = false
+        end if
+    else
+        tile.prog.text = "—"
+        tile.sub.visible = false
+    end if
+end sub
+
+' ---- keys -------------------------------------------------------------------
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+    if not m.top.open then return false
+    if key = Keys.LEFT
+        move(-1)
+        return true
+    else if key = Keys.RIGHT
+        move(1)
+        return true
+    else if key = Keys.OK
+        commitTune()
+        return true
+    else if key = Keys.BACK
+        m.top.closed = true
+        return true
+    end if
+    return true
+end function
+
+sub move(dir as integer)
+    n = m.channels.count()
+    if n = 0 then return
+    m.focused = ((m.focused + dir) mod n + n) mod n
+    m.hideTimer.control = "stop"
+    m.hideTimer.control = "start"
+    render()
+end sub
+
+sub commitTune()
+    n = m.channels.count()
+    if n = 0 then return
+    ch = m.channels[m.focused]
+    if ch.id <> m.top.currentChannelId
+        m.top.tuned = { id: ch.id, number: numOf(ch), name: nameOf(ch), accent: accentOf(ch) }
+    else
+        m.top.closed = true
+    end if
+end sub
+
+sub onHideFire()
+    m.top.closed = true
+end sub
+
+' ---- helpers ----------------------------------------------------------------
+
+function wallMs() as double
+    dt = CreateObject("roDateTime")
+    ms# = dt.AsSeconds()
+    return ms# * 1000.0 + dt.GetMilliseconds()
+end function
+
+function nameOf(c as object) as string
+    if c.name <> invalid then return c.name
+    return ""
+end function
+
+function iconIdOf(ch as object) as string
+    if ch.icon <> invalid and ch.icon <> "" then return ch.icon
+    if ch.package <> invalid and ch.package.icon <> invalid and ch.package.icon <> "" then return ch.package.icon
+    return "lucide:Tv"
+end function
+
+function accentOf(ch as object) as string
+    key = Tint.keyOf(ch)
+    vivid = ""
+    if key <> "" then vivid = Tint.vividOf(key)
+    if vivid = ""
+        fb = ["2f9e8f", "4a9fe0", "3b82f6", "8b5cf6", "3fa66a", "d08b2f", "d0587e", "7c8aa3"]
+        idx = numOf(ch)
+        vivid = fb[idx mod fb.count()]
+    end if
+    return "0x" + vivid + "FF"
+end function
+
+function withAlpha(argb as string, a as double) as string
+    base = Left(argb, 8)
+    v = Int(a * 255.0)
+    if v < 0 then v = 0
+    if v > 255 then v = 255
+    hexd = "0123456789ABCDEF"
+    return base + Mid(hexd, (v \ 16) + 1, 1) + Mid(hexd, (v mod 16) + 1, 1)
+end function

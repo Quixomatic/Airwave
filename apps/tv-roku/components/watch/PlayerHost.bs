@@ -217,7 +217,7 @@ sub onChromeCommand()
     else if cmd = "back"
         fireCmd("goMini")   ' Back from full → drop to the mini feed (keep playing); MainScene refocuses the guide
     else if cmd = "surf"
-        Log.info("[player] channel surf (Incr D)")
+        openSurf()
     else if cmd = "selectQuality"
         m.quality = m.chrome.commandArg
         reResolve()
@@ -235,6 +235,41 @@ end sub
 ' Re-resolve the current program at the same spot (a quality/audio/sub change).
 sub reResolve()
     if m.current <> invalid and m.current.kind = "PROGRAM" then seekTo(currentEffective(), false, 0)
+end sub
+
+' ---- channel surf -----------------------------------------------------------
+
+sub openSurf()
+    if m.surf = invalid
+        m.surf = CreateObject("roSGNode", "ChannelSurf")
+        m.top.appendChild(m.surf)
+        m.surf.observeField("tuned", "onSurfTuned")
+        m.surf.observeField("closed", "onSurfClosed")
+    end if
+    m.surf.currentChannelId = m.top.channelId
+    m.surf.open = true
+end sub
+
+sub onSurfTuned()
+    t = m.surf.tuned
+    m.surf.open = false
+    if t <> invalid and t.id <> invalid then reTune(t)
+    if m.chrome <> invalid then m.chrome.setFocus(true)
+end sub
+
+sub onSurfClosed()
+    m.surf.open = false
+    if m.chrome <> invalid then m.chrome.setFocus(true)
+end sub
+
+' Re-tune the (full) player to a new channel from surf: swap identity + re-run the clock; the chrome resets
+' via onGo's retune bump.
+sub reTune(t as object)
+    m.top.channelId = t.id
+    m.top.channelNumber = t.number
+    m.top.channelName = t.name
+    m.top.accent = t.accent
+    m.top.go = m.top.go + 1
 end sub
 
 ' ---- clock ------------------------------------------------------------------
@@ -284,6 +319,7 @@ sub onGo()
         m.chrome.accent = m.top.accent
         m.chrome.channelNumber = m.top.channelNumber
         m.chrome.channelName = m.top.channelName
+        m.chrome.retune = m.chrome.retune + 1   ' reset the chrome (clear old scrubber, show Tuning) on (re)tune
     end if
     m.pendingBootstrap = true
     loadTimeline()

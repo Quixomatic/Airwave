@@ -73,6 +73,7 @@ def main():
     make_9patch(pill_content(8, 4)).save(os.path.join(OUT, "bar-fill.9.png"))
     make_9patch(pill_content(48, 22)).save(os.path.join(OUT, "card.9.png"))   # rounded rect (2D-stretch)
     make_9patch(pill_content(28, 6)).save(os.path.join(OUT, "chip.9.png"))    # small r6 badge (meta/delivery)
+    make_9patch(pill_content(22, 11)).save(os.path.join(OUT, "pill-sm.9.png"))  # small fully-rounded pill (badges)
     scrim().save(os.path.join(OUT, "scrim-player.png"))
     print("wrote pill-fill.9 / pill-ring.9 / pill-focus.9 / bar-fill.9 / card.9 / scrim-player.png")
 

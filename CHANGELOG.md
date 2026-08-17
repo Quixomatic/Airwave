@@ -2,6 +2,30 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.53] - 2026-08-17
+
+Roku **ChannelSurf carousel + mini idle→full (Increment D + B2)**.
+
+### Added
+
+- **`ChannelSurf`** — with the player chrome closed, ◄/► (or the Channel Surf button) slides up a
+  horizontal channel carousel (gradient bg + slide/fade), centered on the channel you're watching (a
+  "Watching" badge). Each tile: cover art, on-now progress, channel icon/number/name, program title/sub;
+  the focused tile is centered + scaled, neighbors dimmed. ◄/► move (**wrapping**), OK re-tunes the
+  player to that channel, Back closes, ~12s of no input auto-hides. **Virtualized** — a pool of 7 tiles
+  re-bound to the window around the focused index (channel count doesn't matter).
+- **Re-tune while full** — surf/OK swaps the player's channel identity + re-runs the effectiveTime clock,
+  and the chrome resets (new chip + "Tuning…") via a `retune` bump (decoupled from show/hide so it doesn't
+  re-play the slide when the panel's already up).
+- **Mini idle→full** — while a mini feed is docked, 60s of no input auto-expands to full-screen (beats the
+  TV screensaver). Any key resets it, via a global `inputPing` the guide bumps (we're on focus routing,
+  not a central dispatcher).
+
+### Fixed
+
+- The surf "Watching" badge uses a proper small fully-rounded pill 9-patch (`pill-sm.9`) with an accent
+  dot, instead of the height-54 pill stretched down (squished caps).
+
 ## [0.10.52] - 2026-08-17
 
 Roku **bumper card — progress bar + compact mini variant (Increment B2/E polish)**.

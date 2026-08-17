@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  ChannelSurf — the ◄/► channel carousel (port of tv-web/tv-native channel-surf). With the player chrome
+  closed, ◄/► (or the Channel Surf button) slides up a horizontal carousel of channel tiles (cover art +
+  progress + channel + on-now), centred on the channel you're watching (a "Watching" flag). ◄/► move
+  (WRAPPING), OK tunes the highlighted channel, Back closes, ~12s of no input auto-hides. Slides up + fades
+  in like the feature panel. PlayerHost owns it: sets `currentChannelId` + `open`, observes `tuned` / `closed`.
+-->
+<component name="ChannelSurf" extends="Group">
+    <interface>
+        <field id="currentChannelId" type="string" />
+        <field id="open" type="boolean" onChange="onOpen" />
+        <!-- OUT: {id,number,name,accent} on OK; `closed` on Back / auto-hide. -->
+        <field id="tuned" type="assocarray" alwaysNotify="true" />
+        <field id="closed" type="boolean" alwaysNotify="true" />
+    </interface>
+    <children>
+        <Timer id="hideTimer" duration="12" repeat="false" />
+    </children>
+</component>

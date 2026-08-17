@@ -19,6 +19,8 @@
         <field id="tracks" type="assocarray" />
         <field id="qualities" type="array" />
         <field id="active" type="boolean" onChange="onActive" />
+        <!-- Bumped by PlayerHost on every (re)tune → reset the panel (clear scrubber, show Tuning). -->
+        <field id="retune" type="integer" value="0" alwaysNotify="true" onChange="onRetune" />
         <!-- OUT: a control command (+ arg for the pickers) PlayerHost dispatches to the clock. -->
         <field id="command" type="string" alwaysNotify="true" />
         <field id="commandArg" type="string" />

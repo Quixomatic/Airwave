@@ -17,7 +17,28 @@ sub init()
     m.player = invalid
     m.probeStarted = false
     Icon.load()   ' preload the lucide/phosphor id→codepoint maps (icon fonts)
+    ' Idle→full: while a mini feed is docked, auto-expand to full-screen after 60s of no input (beats the
+    ' TV screensaver blanking everything but the tiny video). Any key bumps a global inputPing (the guide/
+    ' player do it) → the timer restarts; when it fires while still in mini we go full.
+    m.global.addFields({ inputPing: 0 })
+    m.global.observeField("inputPing", "onInputPing")
+    m.idleTimer = CreateObject("roSGNode", "Timer")
+    m.idleTimer.duration = 60
+    m.idleTimer.repeat = false
+    m.idleTimer.observeField("fire", "onIdleFire")
+    m.top.appendChild(m.idleTimer)
     showBootSplash()
+end sub
+
+sub onInputPing()
+    if m.player <> invalid and m.player.layout = "mini"
+        m.idleTimer.control = "stop"
+        m.idleTimer.control = "start"
+    end if
+end sub
+
+sub onIdleFire()
+    if m.player <> invalid and m.player.layout = "mini" then goFullPlayer()
 end sub
 
 sub showBootSplash()
@@ -115,12 +136,14 @@ sub dockMini()
     end if
     m.player.miniFocused = false
     m.player.layout = "mini"
+    m.idleTimer.control = "start"   ' arm the 60s idle→full
 end sub
 
 sub goFullPlayer()
     if m.screen <> invalid then m.screen.miniActive = false
     m.player.miniFocused = false
     m.player.layout = "full"
+    m.idleTimer.control = "stop"
 end sub
 
 sub closePlayer()
@@ -129,6 +152,7 @@ sub closePlayer()
         m.screen.setFocus(true)
     end if
     m.player.layout = "off"   ' → PlayerHost onLayout(off) tears down the session
+    m.idleTimer.control = "stop"
 end sub
 
 sub showDiagnostic()

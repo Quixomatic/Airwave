@@ -330,6 +330,7 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    if m.global <> invalid then m.global.inputPing = m.global.inputPing + 1   ' resets the mini idle→full timer
 
     ' Sidebar zone — up/down move the selection, OK activates, right/back returns to the grid.
     if m.zone = "sidebar"
