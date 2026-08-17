@@ -33,6 +33,7 @@ end sub
 sub relayout()
     padx = GuideLayout.fv(64)
     pady = GuideLayout.fv(40)
+    m.padx = padx
     colW = GuideLayout.colW()
     ' The text column takes the full width, MINUS whatever the mini-player dock reserves on the right.
     m.leftW = colW - 2 * padx - m.top.rightReserve
@@ -72,35 +73,45 @@ sub relayout()
     m.genre.color = "0x64748BFF"
     Theme.setFont(m.genre, Theme.FONT_REG, GuideLayout.fv(30))
 
-    dividerY = genreY + GuideLayout.fv(30) + GuideLayout.fv(22)
+    dividerY = genreY + GuideLayout.lh(30) + GuideLayout.fv(22)
     m.divider = m.top.findNode("divider")
     m.divider.translation = [padx, dividerY]
     m.divider.width = m.leftW
 
     m.titleY = dividerY + 1 + GuideLayout.fv(26)
+    ' The title sits top-aligned at titleY (breathing room fv(26) below the divider). Its line box is lh(60);
+    ' the badges are centered against that same box (badgesY in onContent) so they align with the title text.
+    m.titleBoxH = GuideLayout.lh(60)
     m.title = m.top.findNode("title")
     m.title.translation = [padx, m.titleY]
     m.title.width = m.leftW - GuideLayout.fv(420)
+    m.title.height = m.titleBoxH
     m.title.truncate = true
     m.title.color = "0xF1F5F9FF"
     Theme.setFont(m.title, Theme.FONT_BOLD, GuideLayout.fv(60))
 
+    ' Badges: pill height = font + generous vertical padding; inter-badge gap fv(14). Laid out by hand in
+    ' buildBadges; the whole Group is right-aligned + centered on the title's line box in onContent.
+    m.badgeH = GuideLayout.fv(30) + 2 * GuideLayout.fv(12)
+    m.badgeGap = GuideLayout.fv(14)
     m.badges = m.top.findNode("badges")
-    m.badges.translation = [padx + m.leftW - GuideLayout.fv(400), m.titleY + GuideLayout.fv(10)]
 
-    metaY = m.titleY + GuideLayout.fv(60) + GuideLayout.fv(22)
+    metaY = m.titleY + GuideLayout.lh(60) + GuideLayout.fv(22)
     m.meta = m.top.findNode("meta")
     m.meta.translation = [padx, metaY]
     m.meta.width = m.leftW
     m.meta.color = "0xC3C9D4FF"
     Theme.setFont(m.meta, Theme.FONT_REG, GuideLayout.fv(34))
 
-    summaryY = metaY + GuideLayout.fv(34) + GuideLayout.fv(22)
+    summaryY = metaY + GuideLayout.lh(34) + GuideLayout.fv(22)
     m.summary = m.top.findNode("summary")
     m.summary.translation = [padx, summaryY]
     m.summary.width = m.leftW
-    m.summary.height = Int(GuideLayout.fv(36) * 1.4 * 2)
-    m.summary.lineSpacing = Int(GuideLayout.fv(36) * 0.4)
+    ' Reserve 2 lines for the layout advance (statusY/featuredHeight use fv(36)*1.4*2), but give the Label
+    ' box a little slack so a full 2-line summary never clips to 1 line + "…". lineSpacing = 0.2× (the font's
+    ' own box is ~1.2×, so total line pitch ≈ 1.4× → matches tv-web/native's lineHeight:1.4). maxLines=2 (XML).
+    m.summary.height = Int(GuideLayout.fv(36) * 1.4 * 2) + GuideLayout.fv(12)
+    m.summary.lineSpacing = Int(GuideLayout.fv(36) * 0.2)
     m.summary.color = "0xC9CFDAFF"
     Theme.setFont(m.summary, Theme.FONT_REG, GuideLayout.fv(36))
 
@@ -117,7 +128,7 @@ sub relayout()
     m.status.color = "0xE6EAF1FF"
     Theme.setFont(m.status, Theme.FONT_REG, GuideLayout.fv(34))
 
-    progY = statusY + GuideLayout.fv(34) + GuideLayout.fv(16)
+    progY = statusY + GuideLayout.lh(34) + GuideLayout.fv(16)
     m.progH = GuideLayout.fv(8)
     m.progTrack = m.top.findNode("progTrack")
     m.progTrack.translation = [padx, progY]
@@ -168,7 +179,11 @@ sub onContent()
         m.title.text = g.title
     end if
 
-    buildBadges(g)
+    ' Build the badges, then right-align them flush to the text column's right edge and vertically center
+    ' them on the title's line box: top margin = (titleLineBox − badgeHeight) / 2 (all deterministic fv()).
+    totalW = buildBadges(g)
+    badgesY = m.titleY + Int((m.titleBoxH - m.badgeH) / 2)
+    m.badges.translation = [m.padx + m.leftW - totalW, badgesY]
 
     ' meta: year · rating · ★score
     mparts = []
@@ -200,12 +215,15 @@ sub onContent()
     m.progFill.visible = (pct > 0)
 end sub
 
-' 4K/HD (cyan), HDR/DV (gold), audio + Atmos (slate) — solid pills (gradient approximated).
-sub buildBadges(g as object)
+' 4K/HD (cyan), HDR/DV (gold), audio + Atmos (slate) — solid pills (gradient approximated). Lays the pills
+' out left-to-right inside the badges Group (each at a running x, y=0) and returns the total row width so
+' the caller can right-align the Group.
+function buildBadges(g as object) as integer
     b = m.badges
     while b.getChildCount() > 0
         b.removeChildIndex(0)
     end while
+    m.badgeX = 0
     res = ""
     if g.resolution = "4k" then res = "4K" else if g.resolution <> invalid and g.resolution <> "sd" and g.resolution <> "480" then res = "HD"
     if res <> "" then addBadge(res, "0x7FD6DEFF", "0x06222AFF")
@@ -217,13 +235,16 @@ sub buildBadges(g as object)
     if g.dynamicAudio <> invalid and g.dynamicAudio <> ""
         if g.dynamicAudio = "Atmos" then addBadge("ATMOS", "0x1E293BFF", "0xDFE4ECFF") else addBadge(g.dynamicAudio, "0x1E293BFF", "0xDFE4ECFF")
     end if
-end sub
+    if m.badgeX > 0 then return m.badgeX - m.badgeGap   ' drop the trailing gap after the last pill
+    return 0
+end function
 
 sub addBadge(text as string, bg as string, ink as string)
     fs = GuideLayout.fv(30)
+    h = m.badgeH
     w = Len(text) * Int(fs * 0.62) + GuideLayout.fv(32)
-    h = fs + GuideLayout.fv(12)
     g = m.badges.createChild("Group")
+    g.translation = [m.badgeX, 0]
     p = g.createChild("Poster")
     p.uri = Theme.npFill(8)
     p.width = w
@@ -237,4 +258,5 @@ sub addBadge(text as string, bg as string, ink as string)
     lbl.vertAlign = "center"
     lbl.color = ink
     Theme.setFont(lbl, Theme.FONT_BOLD, fs)
+    m.badgeX = m.badgeX + w + m.badgeGap
 end sub

@@ -2,6 +2,26 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.33] - 2026-08-17
+
+Roku featured-panel parity polish — badge alignment, the progress bar, the row gaps, and the 2-line summary.
+
+### Fixed
+
+- **The HD/4K/HDR/audio badges are vertically centered with the program title** and right-aligned flush to
+  the text column. They're laid out in a plain `Group` (not a `LayoutGroup`, which re-centered them within
+  bounds it computed itself) and centered on the title's line box — matching tv-web/native's
+  `alignItems:center` title row. The pills also got a little more vertical padding.
+- **The progress bar has proper rounded (pill) ends** via a new `fill-2` 9-patch (2px radius = half the
+  ~4px bar height); `fill-8`'s 8px radius collapsed on such a thin bar. It also sits flush with the panel's
+  bottom edge now (removed a phantom bottom pad), so the grid flows directly below — matching the
+  reference's zero-bottom-padding panel.
+- **The vertical gaps between the title / year / summary rows match tv-web/native.** The stack advances by
+  each line's rendered line height (~1.2×, via `GuideLayout.lh()`) instead of the raw font size, so the rows
+  are no longer a touch tight.
+- **A full 2-line summary no longer clips to one line + "…".** The line spacing is tuned to a 1.4× line
+  pitch (parity) and the Label box has slack so both lines render.
+
 ## [0.10.32] - 2026-08-17
 
 ### Fixed

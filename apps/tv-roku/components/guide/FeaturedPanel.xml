@@ -21,12 +21,17 @@
         <Label id="genre" />
         <Rectangle id="divider" color="0x94A3B824" height="1" />
         <Label id="title" />
-        <LayoutGroup id="badges" layoutDirection="horiz" itemSpacings="[8]" vertAlignment="center" />
+        <!-- Plain Group (NOT LayoutGroup): the badge pills are positioned by hand so their height +
+             vertical center are exactly what we set — a LayoutGroup re-centers children within bounds it
+             computes itself, which threw the pills off (same fix as the diagnostic chips). -->
+        <Group id="badges" />
         <Label id="meta" />
         <Label id="summary" wrap="true" maxLines="2" />
         <Label id="timeRange" />
         <Label id="status" horizAlign="right" />
-        <Poster id="progTrack" uri="pkg:/images/np/fill-8.9.png" blendColor="0x94A3B82E" />
-        <Poster id="progFill" uri="pkg:/images/np/fill-8.9.png" blendColor="0x3B82F6FF" />
+        <!-- Progress bar = a thin (~4px) pill. fill-2 (2px radius = half the bar height) gives clean
+             rounded ends; fill-8's 8px radius collapsed on a 4px bar. Matches tv-web/native borderRadius:999. -->
+        <Poster id="progTrack" uri="pkg:/images/np/fill-2.9.png" blendColor="0x94A3B82E" />
+        <Poster id="progFill" uri="pkg:/images/np/fill-2.9.png" blendColor="0x3B82F6FF" />
     </children>
 </component>

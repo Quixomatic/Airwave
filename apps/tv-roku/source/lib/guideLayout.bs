@@ -23,6 +23,14 @@ namespace GuideLayout
         return GuideLayout.vw(px * GuideLayout.FEATURE_SCALE)
     end function
 
+    ' Rendered LINE HEIGHT of a featured-panel text line. A font's text box is ~1.2× its size (ascent +
+    ' descent + leading), so tv-web/native's vertical gaps (marginTop between the title / meta / summary
+    ' rows) are measured from that taller box — NOT the raw glyph size. Advance the vertical stack by lh()
+    ' so our gaps match theirs, and use it as the title row's height so the badges center against it.
+    function lh(px as float) as integer
+        return Int(GuideLayout.fv(px) * 1.2)
+    end function
+
     ' Derived grid geometry (all FHD px).
     function colW() as integer
         return GuideLayout.STAGE_W - GuideLayout.SLIVER          ' 1828
@@ -41,18 +49,20 @@ namespace GuideLayout
     end function
 
     ' The featured panel's content height (deterministic — mirrors FeaturedPanel.relayout's vertical stack,
-    ' 2-line summary) + bottom padding. The time header + grid flow right below this (not a fixed y).
+    ' 2-line summary). The progress bar is the LAST element and the panel has NO bottom padding (parity with
+    ' tv-web/native `padding: fv(40) fv(64) 0`), so this ends exactly at the progress bar's bottom edge — the
+    ' bar is flush with the panel bottom. The time header + grid flow right below this (not a fixed y).
     function featuredHeight() as integer
         pady = GuideLayout.fv(40)
         circleSize = GuideLayout.fv(64)
         genreY = pady + circleSize + GuideLayout.fv(14)
-        dividerY = genreY + GuideLayout.fv(30) + GuideLayout.fv(22)
+        dividerY = genreY + GuideLayout.lh(30) + GuideLayout.fv(22)
         titleY = dividerY + 1 + GuideLayout.fv(26)
-        metaY = titleY + GuideLayout.fv(60) + GuideLayout.fv(22)
-        summaryY = metaY + GuideLayout.fv(34) + GuideLayout.fv(22)
+        metaY = titleY + GuideLayout.lh(60) + GuideLayout.fv(22)
+        summaryY = metaY + GuideLayout.lh(34) + GuideLayout.fv(22)
         statusY = summaryY + Int(GuideLayout.fv(36) * 1.4 * 2) + GuideLayout.fv(26)
-        progY = statusY + GuideLayout.fv(34) + GuideLayout.fv(16)
-        return progY + GuideLayout.fv(8) + GuideLayout.fv(40)
+        progY = statusY + GuideLayout.lh(34) + GuideLayout.fv(16)
+        return progY + GuideLayout.fv(8)
     end function
 
     ' The grid viewport top y (below the featured panel + the time header).
