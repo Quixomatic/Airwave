@@ -5,24 +5,21 @@ import "pkg:/source/lib/api.bs"
 import "pkg:/source/lib/log.bs"
 import "pkg:/source/input/keys.bs"
 
-' Guide scene (6a): fetch the cross-channel grid, render the time header + a MarkupList of ChannelRow
-' (each row = rail + program lane with the 2-tone on-now cell) + the now-line. Featured panel + sidebar
-' + full zone machine are 6b/6c.
+' Guide scene — the Aurora grid + the zone machine (grid ↔ rail ↔ sidebar), ported from tv-web/tv-native
+' aurora-grid. The scene holds focus and owns ALL navigation (onKeyEvent); the VirtualRowList + rows never
+' take focus — we drive fc/fp/zone into them. Nav clicks come from the SoundEffect nodes (m.navSound etc.),
+' since our custom focus loses MarkupList's built-in feedback.
+'
+' (m.<id> for every XML node is auto-injected by bsc-plugin-auto-findnode.)
 
 sub init()
-    m.dayLabel = m.top.findNode("dayLabel")
-    m.ticks = m.top.findNode("ticks")
-    m.gridClip = m.top.findNode("gridClip")
-    m.list = m.top.findNode("list")
-    m.featured = m.top.findNode("featured")
-    m.nowCaret = m.top.findNode("nowCaret")
-    m.caretPulse = m.top.findNode("caretPulse")
-    m.msg = m.top.findNode("msg")
+    ' (m.<id> for every XML node is auto-injected by bsc-plugin-auto-findnode.)
+    m.soundSeq = 0
 
     Theme.setFont(m.dayLabel, Theme.FONT_SEMI, GuideLayout.vw(32))
     Theme.setFont(m.msg, Theme.FONT_REG, 26)
 
-    ' Flow the header + grid right below the featured panel (was a fixed y=546, leaving a big gap).
+    ' Flow the header + grid right below the featured panel (dynamic — the panel's height varies).
     m.gridTop = GuideLayout.gridTop()
     headerTop = GuideLayout.headerTop()
     m.dayLabel.translation = [92 + GuideLayout.vw(40), headerTop + GuideLayout.vw(6)]
@@ -30,15 +27,22 @@ sub init()
     m.gridClip.translation = [92, m.gridTop]
     m.gridClip.clippingRect = [0, 0, GuideLayout.colW(), GuideLayout.STAGE_H - m.gridTop]
 
-    m.list.itemComponentName = "ChannelRow"
-    m.list.itemSize = [GuideLayout.colW(), GuideLayout.rowPx()]
-    m.list.numColumns = 1
-    m.list.observeField("itemSelected", "onItemSelected")
-    m.list.observeField("itemFocused", "onRowFocus")
+    ' Configure the virtualized list (geometry known now; content arrives in onGuide).
+    m.list.rowHeight = GuideLayout.rowPx()
+    m.list.viewportHeight = GuideLayout.STAGE_H - m.gridTop
+    m.list.clipWidth = GuideLayout.colW()
 
-    ' Times travel to the rows as ISO strings on m.global (float fields can't hold epoch-ms).
+    ' Zone state.
+    m.zone = "grid"
+    m.fc = 0
+    m.fp = 0
+    m.channels = []
+    m.accents = []
+
+    ' Times travel to the rows as ISO strings on m.global (float fields can't hold epoch-ms); favorites as
+    ' an assoc-array of channelId → true.
     if not m.global.hasField("guideServerTime")
-        m.global.addFields({ guideServerTime: "", guideT0Iso: "" })
+        m.global.addFields({ guideServerTime: "", guideT0Iso: "", guideFavorites: {} })
     end if
 
     load()
@@ -51,6 +55,19 @@ sub load()
     p = Api.guide(180)
     onThen(p, onGuide, m)
     onCatch(p, onGuideErr, m)
+    ' Favorites (for the rail heart) — best-effort, parallel.
+    fp = Api.favorites()
+    onThen(fp, onFavorites, m)
+end sub
+
+sub onFavorites(data as object, _ctx as object)
+    if data = invalid or data.channelIds = invalid then return
+    favs = {}
+    for each id in data.channelIds
+        favs[id] = true
+    end for
+    m.global.guideFavorites = favs
+    m.list.favVersion = m.list.favVersion + 1
 end sub
 
 sub onGuide(data as object, _ctx as object)
@@ -58,8 +75,8 @@ sub onGuide(data as object, _ctx as object)
         onGuideErr({ message: "empty" }, invalid)
         return
     end if
-    channels = data.channels
-    if channels.count() = 0
+    raw = data.channels
+    if raw.count() = 0
         m.msg.visible = true
         m.msg.text = "No channels yet."
         return
@@ -70,17 +87,51 @@ sub onGuide(data as object, _ctx as object)
     m.nowMs = GuideLayout.parseIso(serverTime)
     t0Iso = computeT0Iso(m.nowMs)
     m.t0Ms = GuideLayout.parseIso(t0Iso)
-
-    ' Publish times for the rows.
     m.global.guideServerTime = serverTime
     m.global.guideT0Iso = t0Iso
 
+    ' Cull each channel's programs to the visible window ONCE (matches tv-web/native) so fp indexes exactly
+    ' the cells ChannelRow renders. Inline math (same predicate as ChannelRow.buildLane); the grid constants
+    ' are computed ONCE here, not per-program.
+    ppm = GuideLayout.ppm()
+    laneW = GuideLayout.laneW()
+    gap = GuideLayout.vw(6)
+    winMin = GuideLayout.WINDOW_MIN
+    minSliver = laneW * 0.02
+    m.channels = []
+    for each ch in raw
+        culled = []
+        if ch.programs <> invalid
+            for each p in ch.programs
+                startMin = (GuideLayout.parseIso(p.startsAt) - m.t0Ms) / 60000.0
+                durMin = p.durationSeconds / 60.0
+                endMin = startMin + durMin
+                if endMin > 0 and startMin < winMin
+                    w = minSliver
+                    dw = durMin * ppm
+                    if dw > w then w = dw
+                    rawLeft = startMin * ppm
+                    rawRight = rawLeft + w - gap
+                    left = rawLeft
+                    if left < 0 then left = gap
+                    if (rawRight - left) >= 8 then culled.push(p)
+                end if
+            end for
+        end if
+        ch.programs = culled
+        m.channels.push(ch)
+    end for
+
     buildTicks()
-    buildContent(channels)
+    buildContent()
     drawNowCaret()
-    updateFeatured(0)
-    m.list.setFocus(true)
-    Log.info("[guide] " + Str(channels.count()).Trim() + " channels rendered")
+
+    m.fc = 0
+    m.zone = "grid"
+    m.fp = GuideLayout.liveProgramIndex(m.channels[0].programs, m.nowMs)
+    applyFocus()
+    m.top.setFocus(true)
+    Log.info("[guide] " + Str(m.channels.count()).Trim() + " channels rendered")
 end sub
 
 sub onGuideErr(err as object, _ctx as object)
@@ -90,7 +141,6 @@ sub onGuideErr(err as object, _ctx as object)
 end sub
 
 ' T0 = now − 30min, snapped back to the nearest :31 / :01 half-hour boundary (matches tv-web/native).
-' Returned as an ISO string (parsed to a precise double by callers).
 function computeT0Iso(nowMs as double) as string
     baseSecs = Int(nowMs / 1000) - GuideLayout.LEAD_MIN * 60
     d = CreateObject("roDateTime")
@@ -127,12 +177,15 @@ sub buildTicks()
     end for
 end sub
 
-sub buildContent(channels as object)
+sub buildContent()
     content = CreateObject("roSGNode", "ContentNode")
+    m.accents = []
     i = 0
-    for each ch in channels
+    for each ch in m.channels
+        accent = Tint.forChannel(ch, i)
+        m.accents.push(accent)
         node = content.createChild("ContentNode")
-        node.addFields({ channel: ch, accentHex: Tint.forChannel(ch, i) })
+        node.addFields({ channel: ch, accentHex: accent })
         i = i + 1
     end for
     m.list.content = content
@@ -155,40 +208,170 @@ sub drawNowCaret()
     m.caretPulse.control = "start"
 end sub
 
-sub onItemSelected()
-    idx = m.list.itemSelected
-    content = m.list.content
-    if content = invalid then return
-    node = content.getChild(idx)
-    if node = invalid or node.channel = invalid then return
-    Log.info("[guide] tune -> " + node.channel.id)
-    m.top.tuneChannelId = node.channel.id
+' ---- the zone machine ------------------------------------------------------------------------------
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+    if m.channels = invalid or m.channels.count() = 0 then return false
+    n = m.channels.count()
+
+    ' Sidebar zone (the UI lands in the next task) — allow escaping back to the grid; swallow the rest.
+    if m.zone = "sidebar"
+        if key = Keys.RIGHT or key = Keys.BACK
+            setZone("grid")
+            playNav()
+        end if
+        return true
+    end if
+
+    ' Rail zone — favorite the channel; up/down still change channel; left → sidebar (seam); right/back → grid.
+    if m.zone = "rail"
+        if key = Keys.LEFT
+            ' TODO: setZone("sidebar") once the sidebar exists; for now it's a soft edge.
+            playDead()
+        else if key = Keys.RIGHT or key = Keys.BACK
+            setZone("grid")
+            playNav()
+        else if key = Keys.UP
+            moveChannel(-1)
+        else if key = Keys.DOWN
+            moveChannel(1)
+        else if key = Keys.OK
+            toggleFavorite()
+        end if
+        return true
+    end if
+
+    ' Grid zone.
+    if key = Keys.RIGHT
+        maxP = focusedPrograms().count() - 1
+        if m.fp < maxP
+            m.fp = m.fp + 1
+            applyFocus()
+            playNav()
+        else
+            playDead()
+        end if
+        return true
+    else if key = Keys.LEFT
+        if m.fp = 0
+            setZone("rail")
+            playNav()
+        else
+            m.fp = m.fp - 1
+            applyFocus()
+            playNav()
+        end if
+        return true
+    else if key = Keys.DOWN
+        moveChannel(1)
+        return true
+    else if key = Keys.UP
+        moveChannel(-1)
+        return true
+    else if key = Keys.OK
+        tune()
+        return true
+    end if
+    return false
+end function
+
+function focusedPrograms() as object
+    ch = m.channels[m.fc]
+    if ch = invalid or ch.programs = invalid then return []
+    return ch.programs
+end function
+
+sub moveChannel(delta as integer)
+    n = m.channels.count()
+    nc = m.fc + delta
+    if nc < 0 then nc = 0
+    if nc > n - 1 then nc = n - 1
+    if nc = m.fc
+        playDead()
+        return
+    end if
+    m.fc = nc
+    ' Land fp on the on-now program of the new channel (tv-web/native).
+    m.fp = GuideLayout.liveProgramIndex(m.channels[nc].programs, m.nowMs)
+    applyFocus()
+    playNav()
 end sub
 
-' The focused channel changed → the featured panel follows it (showing its on-now program). fp-driven
-' left/right selection comes with the zone machine (6c).
-sub onRowFocus()
-    updateFeatured(m.list.itemFocused)
+sub setZone(z as string)
+    m.zone = z
+    applyFocus()
 end sub
 
-sub updateFeatured(idx as integer)
-    content = m.list.content
-    if content = invalid then return
-    node = content.getChild(idx)
-    if node = invalid or node.channel = invalid then return
-    prog = onNowProgram(node.channel)
-    if prog = invalid then return
+' Push fc/fp/zone into the list (which scrolls + re-lays-out rows) and refresh the featured panel.
+sub applyFocus()
+    m.list.zone = m.zone
+    m.list.focusProgramIndex = m.fp
+    m.list.focusIndex = m.fc
+    updateFeatured()
+end sub
+
+sub updateFeatured()
+    ch = m.channels[m.fc]
+    if ch = invalid then return
+    progs = ch.programs
+    if progs = invalid or progs.count() = 0 then return
+    fpi = m.fp
+    if fpi < 0 then fpi = 0
+    if fpi > progs.count() - 1 then fpi = progs.count() - 1
     fc = CreateObject("roSGNode", "ContentNode")
-    fc.addFields({ channel: node.channel, program: prog, accentHex: node.accentHex })
+    fc.addFields({ channel: ch, program: progs[fpi], accentHex: m.accents[m.fc] })
     m.featured.content = fc
 end sub
 
-' The program airing now on a channel (else its first program).
-function onNowProgram(ch as object) as object
-    if ch.programs = invalid or ch.programs.count() = 0 then return invalid
-    for each p in ch.programs
-        s = GuideLayout.parseIso(p.startsAt)
-        if m.nowMs >= s and m.nowMs < s + p.durationSeconds * 1000.0 then return p
-    end for
-    return ch.programs[0]
-end function
+sub tune()
+    ch = m.channels[m.fc]
+    if ch = invalid then return
+    playSelect()
+    Log.info("[guide] tune -> " + ch.id)
+    m.top.tuneChannelId = ch.id
+end sub
+
+sub toggleFavorite()
+    ch = m.channels[m.fc]
+    if ch = invalid then return
+    favs = m.global.guideFavorites
+    if favs = invalid then favs = {}
+    id = ch.id
+    desired = not favs.doesExist(id)
+    if desired
+        favs[id] = true
+    else
+        favs.delete(id)
+    end if
+    m.global.guideFavorites = favs
+    m.list.favVersion = m.list.favVersion + 1
+    p = Api.setFavorite(id, desired)
+    onCatch(p, onFavoriteErr, m)
+    playSelect()
+end sub
+
+sub onFavoriteErr(err as object, _ctx as object)
+    Log.warn("[guide] setFavorite error: " + Log.trunc(err))
+end sub
+
+' ---- nav sounds ------------------------------------------------------------------------------------
+
+' Nav sounds run on the main thread (roAudioResource is main-thread-only) — see main.bs. We trigger by
+' setting the global `uiSound` to "<name>|<seq>"; the seq makes each write unique so repeats still fire.
+sub playNav()
+    triggerSound("nav")
+end sub
+
+sub playSelect()
+    triggerSound("select")
+end sub
+
+sub playDead()
+    triggerSound("dead")
+end sub
+
+sub triggerSound(name as string)
+    m.soundSeq = m.soundSeq + 1
+    m.global.uiSound = name + "|" + Str(m.soundSeq).Trim()
+end sub

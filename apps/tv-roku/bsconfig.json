@@ -13,7 +13,7 @@
   "createPackage": false,
   "autoImportComponentScript": true,
   "sourceMap": true,
-  "plugins": ["@rokucommunity/bslint"],
+  "plugins": ["@rokucommunity/bslint", "bsc-plugin-auto-findnode"],
   "diagnosticFilters": [
     { "src": "source/vendor/**/*" },
     { "src": "components/vendor/**/*" }

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  VirtualRowList — a purpose-built virtualized vertical list for the guide grid. Replaces MarkupList so
+  the guide can own its scroll + focus exactly like tv-web/tv-native (MarkupList's fixedFocusWrap always
+  scrolls, floatingFocus never does, and it can't express the 2-D fc/fp focus). It keeps a small pool of
+  row components (ceil(viewportHeight/rowHeight)+2), recycled by modulo slot so a 1-row scroll only
+  re-binds ONE row. The owner (Guide) drives it via focusIndex/focusProgramIndex/zone and the scroll
+  "float-then-snap" happens here (only scroll when the focused row would fall off the top/bottom edge).
+-->
+<component name="VirtualRowList" extends="Group">
+    <interface>
+        <field id="content" type="node" onChange="onContentChange" />
+        <field id="rowHeight" type="float" onChange="onGeom" />
+        <field id="viewportHeight" type="float" onChange="onGeom" />
+        <field id="clipWidth" type="float" onChange="onGeom" />
+        <field id="itemComponent" type="string" onChange="onGeom" />
+        <!-- Focused channel index (fc). Setting it scrolls (if off-screen) + re-applies row focus. -->
+        <field id="focusIndex" type="integer" value="0" onChange="onFocusIndex" />
+        <!-- Focused program index (fp) forwarded to the focused row; zone drives the rail-heart state. -->
+        <field id="focusProgramIndex" type="integer" value="-1" onChange="forwardFocus" />
+        <field id="zone" type="string" value="grid" onChange="forwardFocus" />
+        <!-- Bump to make rows re-read favorites (m.global.guideFavorites) after a toggle. -->
+        <field id="favVersion" type="integer" value="0" onChange="forwardFocus" />
+    </interface>
+    <children>
+        <Group id="viewport" />
+    </children>
+</component>

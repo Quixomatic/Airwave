@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!--
-  Guide — the Aurora guide grid (6a foundation: time header + channel rows + 2-tone on-now cells +
-  now-line). Fetches the cross-channel grid via Api.guide and renders a MarkupList of ChannelRow.
-  Featured panel (top reserve), sidebar, and the full zone machine land in 6b/6c. Ported from
-  tv-web/tv-native features/guide.
+  Guide — the Aurora guide grid. Featured now/next panel (top) + a virtualized channel grid + the zone
+  machine (grid ↔ rail ↔ sidebar). The Guide scene holds focus and owns all navigation in onKeyEvent
+  (VirtualRowList/rows never take focus) — the port of tv-web/tv-native aurora-grid. Nav sounds via the
+  SoundEffect nodes (the click we lose by not using MarkupList's built-in focus).
 -->
 <component name="Guide" extends="Group">
     <interface>
@@ -14,22 +14,19 @@
     <children>
         <Rectangle id="bg" width="1920" height="1080" color="0x060A14FF" />
 
-        <!-- Featured now/next panel for the focused channel (the top area above the grid). -->
+        <!-- Featured now/next panel for the focused channel + program (fc/fp). -->
         <FeaturedPanel id="featured" translation="[92,0]" />
 
         <!-- Time header -->
         <Label id="dayLabel" translation="[122,498]" color="0xE6EAF1FF" />
         <Group id="ticks" translation="[243,492]" />
 
-        <!-- Grid viewport. floatingFocus = the focus moves through the visible rows and only
-             snap-scrolls when the focused row would fall off the top/bottom edge (tv-web/native feel). -->
+        <!-- Grid viewport — our own virtualized list, scrolled + focused by the zone machine. -->
         <Group id="gridClip" translation="[92,546]">
-            <MarkupList id="list" translation="[0,0]" drawFocusFeedback="false"
-                vertFocusAnimationStyle="fixedFocusWrap" />
+            <VirtualRowList id="list" itemComponent="ChannelRow" />
         </Group>
 
-        <!-- Now-marker: only the pulsing red caret shows (the vertical line stays hidden), matching
-             tv-web/tv-native. -->
+        <!-- Now-marker: only the pulsing red caret shows (the vertical line stays hidden). -->
         <Poster id="nowCaret" uri="pkg:/images/caret-down.png" blendColor="0xEF4444FF" visible="false" />
         <Animation id="caretPulse" duration="2" repeat="true" easeFunction="linear">
             <FloatFieldInterpolator key="[0.0,0.5,1.0]" keyValue="[1.0,0.55,1.0]"

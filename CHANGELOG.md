@@ -2,6 +2,41 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.34] - 2026-08-17
+
+Roku guide **6c — the zone machine**: custom virtualization, grid ↔ rail navigation, focus ring, rail
+favoriting, and nav sounds. The port of tv-web/tv-native aurora-grid's focus model.
+
+### Added
+
+- **`VirtualRowList` component** — a purpose-built virtualized vertical list replacing `MarkupList` for the
+  guide grid, so the guide owns its own scroll + 2-D focus (which `MarkupList` can't express). A small pool
+  of recycled `ChannelRow` nodes (modulo-slot mapping → one re-bind per scroll step) with the exact
+  tv-web/native **float-then-snap** scroll: it only scrolls when the focused row would fall off the top/bottom
+  edge, otherwise you travel through the visible rows.
+- **The zone machine** (`Guide.onKeyEvent`) — the Guide scene holds focus and drives all navigation: grid
+  (left/right through programs, up/down changes channel and lands on the on-now program, OK tunes), rail
+  (favorite the channel, up/down still change channel), with the sidebar transition stubbed for the next
+  task. `fc`/`fp`/`zone` are pushed into `VirtualRowList`, which forwards them to the focused row.
+- **`ChannelRow` focus state** — a blue **focus ring** on the selected program cell (no layout shift), the
+  rail circle becoming the **favorite heart** (filled rose if favorited, else outline) with a blue ring when
+  rail-focused, and a small heart badge when a channel is favorited. Favorites load from `GET /favorites`
+  and toggle via `POST /favorites` (optimistic).
+- **Navigation sounds** — the system click the native lists play, brought back for our custom focus.
+  `roAudioResource` is main-thread-only, so `main.bs` owns the resources and the zone machine triggers them
+  through a global field.
+
+### Fixed
+
+- **Crisp guide icons** — the tinted circle, ring, glyph, and heart posters now set `loadWidth`/`loadHeight`
+  to their render size, so Roku decodes them at that size (high-quality) instead of GPU-downscaling a large
+  source at render time (which pixelated them).
+
+### Notes
+
+- Programs are culled to the visible window once in `Guide` (inline math), so `fp` indexes exactly the cells
+  the row renders. Adopted `bsc-plugin-auto-findnode` (auto-wires `m.<id>` from XML). Next: the sidebar.
+
 ## [0.10.33] - 2026-08-17
 
 Roku featured-panel parity polish — badge alignment, the progress bar, the row gaps, and the 2-line summary.

@@ -1,22 +1,23 @@
 import "pkg:/source/lib/guideLayout.bs"
 import "pkg:/source/theme.bs"
-import "pkg:/source/lib/log.bs"
 
-' Row layout mirrors tv-web/tv-native aurora-grid Row: a fixed-width rail + a program lane. Data comes
-' in on itemContent (channel AA, accentHex); nowMs/T0Ms live on m.global (set by the Guide scene).
+' Row layout mirrors tv-web/tv-native aurora-grid Row: a fixed-width rail + a program lane. Driven by
+' VirtualRowList: itemContent carries { channel, accentHex }; focused/railFocused/favorited/focusProgramIndex
+' are set explicitly by the zone machine. nowMs/T0Ms live on m.global (set by the Guide scene). The channel's
+' programs are ALREADY culled to the visible window by Guide, so program index == cell index (fp alignment).
+
+' Palette (from tv-native theme.ts): the focus ring + favorite heart + cell border.
+const RING = "0x3B82F6FF"        ' C.ring
+const C_FAV = "0xFB7185FF"         ' C.fav
+const CELL_BORDER = "0x94A3B81A" ' rgba(148,163,184,.10)
 
 sub init()
     rail = GuideLayout.railPx()
     row = GuideLayout.rowPx()
 
-    ' z-order: full-row tint (behind) → top border → rail tint → accent bar → icon → labels → lane.
-    m.rowBg = m.top.createChild("Rectangle")
-    m.rowBg.color = "0x00000000"
-    m.rowBg.width = GuideLayout.STAGE_W
-    m.rowBg.height = row
-
+    ' z-order: top border → rail tint → accent bar → icon circle/ring/glyph/heart → fav badge → labels → lane.
     m.topBorder = m.top.createChild("Rectangle")
-    m.topBorder.color = "0x94A3B81F"   ' rgba(148,163,184,.12)
+    m.topBorder.color = "0x94A3B81F"   ' rgba(148,163,184,.12) rowBorder
     m.topBorder.width = GuideLayout.STAGE_W
     m.topBorder.height = 1
 
@@ -31,25 +32,56 @@ sub init()
     m.railBar.visible = false
 
     circle = GuideLayout.vw(64 * GuideLayout.FEATURE_SCALE)
+    m.circleXY = [GuideLayout.vw(20), GuideLayout.vw(18)]
+    ' loadWidth/loadHeight = the render size, so Roku DECODES each icon at that size (high-quality CPU resize)
+    ' instead of GPU-downscaling the big source at render time — which aliases/pixelates. (Raster posters
+    ' only; the 9-patch cell fills are NOT given loadWidth — they're meant to stretch.)
     m.iconCircle = m.top.createChild("Poster")
     m.iconCircle.uri = "pkg:/images/circle.png"
     m.iconCircle.width = circle
     m.iconCircle.height = circle
-    m.iconCircle.translation = [GuideLayout.vw(20), GuideLayout.vw(18)]
+    m.iconCircle.loadWidth = circle
+    m.iconCircle.loadHeight = circle
+    m.iconCircle.translation = m.circleXY
 
-    ' Tinted border ring around the icon circle (accent@0.35, like tv-web/native).
     m.iconRing = m.top.createChild("Poster")
     m.iconRing.uri = "pkg:/images/circle-ring.png"
     m.iconRing.width = circle
     m.iconRing.height = circle
-    m.iconRing.translation = [GuideLayout.vw(20), GuideLayout.vw(18)]
+    m.iconRing.loadWidth = circle
+    m.iconRing.loadHeight = circle
+    m.iconRing.translation = m.circleXY
 
     gl = Int(circle * 0.56)
+    glXY = [m.circleXY[0] + Int((circle - gl) / 2), m.circleXY[1] + Int((circle - gl) / 2)]
     m.iconGlyph = m.top.createChild("Poster")
     m.iconGlyph.uri = "pkg:/images/ic-channel.png"
     m.iconGlyph.width = gl
     m.iconGlyph.height = gl
-    m.iconGlyph.translation = [GuideLayout.vw(20) + Int((circle - gl) / 2), GuideLayout.vw(18) + Int((circle - gl) / 2)]
+    m.iconGlyph.loadWidth = gl
+    m.iconGlyph.loadHeight = gl
+    m.iconGlyph.translation = glXY
+
+    ' Heart shown INSIDE the circle when the rail is focused (favorite toggle affordance).
+    m.iconHeart = m.top.createChild("Poster")
+    m.iconHeart.width = gl
+    m.iconHeart.height = gl
+    m.iconHeart.loadWidth = gl
+    m.iconHeart.loadHeight = gl
+    m.iconHeart.translation = glXY
+    m.iconHeart.visible = false
+
+    ' Small filled heart badge on the circle's bottom-right when favorited (and not rail-focused).
+    badge = GuideLayout.vw(22 * GuideLayout.FEATURE_SCALE)
+    m.favBadge = m.top.createChild("Poster")
+    m.favBadge.uri = "pkg:/images/heart-filled.png"
+    m.favBadge.blendColor = C_FAV
+    m.favBadge.width = badge
+    m.favBadge.height = badge
+    m.favBadge.loadWidth = badge
+    m.favBadge.loadHeight = badge
+    m.favBadge.translation = [m.circleXY[0] + circle - badge + GuideLayout.vw(2), m.circleXY[1] + circle - badge + GuideLayout.vw(2)]
+    m.favBadge.visible = false
 
     m.numLabel = m.top.createChild("Label")
     m.numLabel.width = GuideLayout.vw(60)
@@ -70,6 +102,9 @@ sub init()
     m.lane = m.top.createChild("Group")
     m.lane.translation = [rail, 0]
     m.lane.clippingRect = [0, 0, GuideLayout.laneW(), row]
+
+    m.cells = []       ' per-program cell frames (index = program index) for the fp focus ring
+    m.hiIndex = -1     ' currently ringed program index
 end sub
 
 sub onContent()
@@ -80,13 +115,52 @@ sub onContent()
     render()
 end sub
 
-sub onFocusChange()
+' fc / rail zone / favorited state → the rail visuals (tint + bar + heart + ring + badge).
+sub onRailState()
     if m.accentHex = invalid then return
-    f = (m.top.focusPercent > 0.5)
-    ' Only the RAIL gets the tint highlight (accent@0.12) — NOT the whole row (tv-web/native parity).
-    m.railBg.color = f ? GuideLayout.argb(m.accentHex, 0.12) : "0x00000000"
+    f = m.top.focused
+    rf = m.top.railFocused
+    fav = m.top.favorited
+    accent = m.accentHex
+
+    m.railBg.color = f ? GuideLayout.argb(accent, 0.12) : "0x00000000"
     m.railBar.visible = f
     m.numLabel.color = f ? "0xE6EAF1FF" : "0x94A3B8FF"
+
+    if rf
+        ' Rail-focused: the circle becomes the favorite heart (filled red if favorited, else grey outline)
+        ' and the ring turns blue.
+        m.iconGlyph.visible = false
+        m.iconHeart.visible = true
+        if fav
+            m.iconHeart.uri = "pkg:/images/heart-filled.png"
+            m.iconHeart.blendColor = C_FAV
+        else
+            m.iconHeart.uri = "pkg:/images/heart-outline.png"
+            m.iconHeart.blendColor = "0xC3C9D4FF"
+        end if
+        m.iconRing.blendColor = RING
+        m.favBadge.visible = false
+    else
+        m.iconGlyph.visible = true
+        m.iconHeart.visible = false
+        m.iconRing.blendColor = GuideLayout.argb(accent, 0.35)
+        m.favBadge.visible = fav
+    end if
+end sub
+
+' The focused program cell (fp) gets the blue ring; -1 clears it. Incremental recolor (no lane rebuild).
+sub onProgramFocus()
+    idx = m.top.focusProgramIndex
+    if m.hiIndex >= 0 and m.hiIndex < m.cells.count()
+        m.cells[m.hiIndex].blendColor = CELL_BORDER
+    end if
+    if idx >= 0 and idx < m.cells.count()
+        m.cells[idx].blendColor = RING
+        m.hiIndex = idx
+    else
+        m.hiIndex = -1
+    end if
 end sub
 
 sub render()
@@ -102,6 +176,9 @@ sub render()
     m.nameLabel.text = ch.name
 
     buildLane(ch)
+    ' Re-apply the current focus state after a (re)build (recycled rows + the focused row's own refresh).
+    onRailState()
+    onProgramFocus()
 end sub
 
 sub buildLane(ch as object)
@@ -109,46 +186,42 @@ sub buildLane(ch as object)
     while lane.getChildCount() > 0
         lane.removeChildIndex(0)
     end while
+    m.cells = []
+    m.hiIndex = -1
     if ch.programs = invalid then return
 
     accent = m.accentHex
     row = GuideLayout.rowPx()
     ppm = GuideLayout.ppm()
     laneW = GuideLayout.laneW()
-    ' Times come in as ISO strings (node fields are 32-bit float — can't hold epoch-ms precisely) and are
-    ' parsed to doubles here.
+    ' Times come in as ISO strings (node fields are 32-bit float — can't hold epoch-ms) and parse to doubles.
     t0 = GuideLayout.parseIso(m.global.guideT0Iso)
     nowMs = GuideLayout.parseIso(m.global.guideServerTime)
     cellH = row - GuideLayout.vw(12)
 
-    ' Positioning is byte-identical to tv-web/tv-native aurora-grid Row (width from durationSeconds; the
-    ' server already tiles it edge-to-edge). Exact float positions (no Int() rounding).
+    ' Programs are pre-culled by Guide, so we build EVERY program and the index == fp (no re-cull here).
+    ' Positioning is byte-identical to tv-web/tv-native aurora-grid Row (width from durationSeconds).
     for each p in ch.programs
         startMs = GuideLayout.parseIso(p.startsAt)
         durMin = p.durationSeconds / 60.0
         startMin = (startMs - t0) / 60000.0
-        endMin = startMin + durMin
-        if endMin > 0 and startMin < GuideLayout.WINDOW_MIN
-            gap = GuideLayout.vw(6)
-            rawLeft = startMin * ppm
-            rawRight = rawLeft + fixMax(laneW * 0.02, durMin * ppm) - gap
-            left = rawLeft
-            if left < 0 then left = gap
-            cw = rawRight - left
-            if cw >= 8
-                live = (nowMs >= startMs and nowMs < startMs + p.durationSeconds * 1000)
-                buildCell(lane, p, left, cw, cellH, accent, live, t0, ppm, nowMs)
-            end if
-        end if
+        gap = GuideLayout.vw(6)
+        rawLeft = startMin * ppm
+        rawRight = rawLeft + GuideLayout.fixMax(laneW * 0.02, durMin * ppm) - gap
+        left = rawLeft
+        if left < 0 then left = gap
+        cw = rawRight - left
+        live = (nowMs >= startMs and nowMs < startMs + p.durationSeconds * 1000)
+        frame = buildCell(lane, p, left, cw, cellH, accent, live, t0, ppm, nowMs)
+        m.cells.push(frame)
     end for
 end sub
 
-sub buildCell(lane as object, p as object, left as float, cw as float, cellH as integer, accent as string, live as boolean, t0 as double, ppm as float, nowMs as double)
+' Builds one program cell; returns its border frame Poster (so the fp ring can recolor it).
+function buildCell(lane as object, p as object, left as float, cw as float, cellH as integer, accent as string, live as boolean, t0 as double, ppm as float, nowMs as double) as object
     cell = lane.createChild("Group")
     cell.translation = [left, GuideLayout.vw(6)]
 
-    ' Rounded base fill (fill-8 9-patch → real border-radius, no sharp corners). For a live program it's
-    ' the "remaining" tone (accent@0.1); the elapsed portion is overlaid, clipped to the left.
     base = cell.createChild("Poster")
     base.uri = Theme.npFill(8)
     base.width = cw
@@ -158,8 +231,6 @@ sub buildCell(lane as object, p as object, left as float, cw as float, cellH as 
         fillPct = ((nowMs - t0) / 60000.0 * ppm - left) / cw
         if fillPct < 0 then fillPct = 0
         if fillPct > 1 then fillPct = 1
-        ' Elapsed overlay: same rounded fill @0.32, clipped to the elapsed width. Its rounded LEFT corners
-        ' show; the hard right edge IS the elapsed/remaining split.
         clip = cell.createChild("Group")
         clip.clippingRect = [0, 0, cw * fillPct, cellH]
         el = clip.createChild("Poster")
@@ -176,12 +247,11 @@ sub buildCell(lane as object, p as object, left as float, cw as float, cellH as 
         base.blendColor = "0x94A3B80D"   ' rgba(148,163,184,0.05)
     end if
 
-    ' Rounded border (border-8 9-patch → matches the fill's radius), tinted cellBorder.
     frame = cell.createChild("Poster")
     frame.uri = Theme.npBorder(8)
     frame.width = cw
     frame.height = cellH
-    frame.blendColor = "0x94A3B81A"   ' rgba(148,163,184,.10) cellBorder
+    frame.blendColor = CELL_BORDER
 
     title = cell.createChild("Label")
     title.translation = [GuideLayout.vw(20), GuideLayout.vw(20)]
@@ -202,9 +272,6 @@ sub buildCell(lane as object, p as object, left as float, cw as float, cellH as 
     subLbl.color = "0x94A3B8FF"
     Theme.setFont(subLbl, Theme.FONT_REG, GuideLayout.vw(26))
     subLbl.text = GuideLayout.subLine(p.guide)
-end sub
 
-function fixMax(a as float, b as float) as float
-    if a > b then return a
-    return b
+    return frame
 end function

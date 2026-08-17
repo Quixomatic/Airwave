@@ -6,21 +6,17 @@ import "pkg:/source/theme.bs"
 ' guide-column origin; internal layout starts from fv(64) padding.
 
 sub init()
-    m.circle = m.top.findNode("circle")
-    m.ring = m.top.findNode("ring")
-    m.glyph = m.top.findNode("glyph")
-    m.chNum = m.top.findNode("chNum")
-    m.chName = m.top.findNode("chName")
-    m.genre = m.top.findNode("genre")
-    m.divider = m.top.findNode("divider")
-    m.title = m.top.findNode("title")
-    m.badges = m.top.findNode("badges")
-    m.meta = m.top.findNode("meta")
-    m.summary = m.top.findNode("summary")
-    m.timeRange = m.top.findNode("timeRange")
-    m.status = m.top.findNode("status")
-    m.progTrack = m.top.findNode("progTrack")
-    m.progFill = m.top.findNode("progFill")
+    ' (m.<id> for every XML node is auto-injected by bsc-plugin-auto-findnode.)
+    ' Load the raster icons at their render size for a crisp decode (no GPU downscale). loadWidth is set
+    ' here since it's constant; width/height are (re)set in relayout.
+    isz = GuideLayout.fv(64)
+    igl = Int(isz * 0.56)
+    m.circle.loadWidth = isz
+    m.circle.loadHeight = isz
+    m.ring.loadWidth = isz
+    m.ring.loadHeight = isz
+    m.glyph.loadWidth = igl
+    m.glyph.loadHeight = igl
     relayout()
 end sub
 

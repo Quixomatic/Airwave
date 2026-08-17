@@ -416,6 +416,9 @@ importers:
       brighterscript-formatter:
         specifier: ^1.8.1
         version: 1.8.1
+      bsc-plugin-auto-findnode:
+        specifier: ^0.1.6
+        version: 0.1.6
       rimraf:
         specifier: ^6.0.1
         version: 6.1.3
@@ -5378,6 +5381,9 @@ packages:
     resolution: {integrity: sha512-FQBYNK15VMslhLHpA7+n+n1GOlF1kId2xcCg7/j95f24AOF6VDYMNH4mFxF7KuaTdv627faazpOAjFzMrfJOUw==}
     engines: {node: ^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7}
     hasBin: true
+
+  bsc-plugin-auto-findnode@0.1.6:
+    resolution: {integrity: sha512-pNuY1szTC5/3LxpENmJV9RJdxlUvoidiUWB7V0unPaNerTG3P6OZwdTULvoemMHFlqLJjYSRIMsu0AWJay7D0g==}
 
   bser@2.1.1:
     resolution: {integrity: sha512-gQxTNE/GAfIIrmHLUE3oJyp5FO6HRBfhjnw4/wMmA63ZGDJnWBmgY/lyQBpnDUkGmAhbSe39tx2d/iTOAfglwQ==}
@@ -16113,6 +16119,8 @@ snapshots:
       electron-to-chromium: 1.5.389
       node-releases: 2.0.51
       update-browserslist-db: 1.2.3(browserslist@4.28.6)
+
+  bsc-plugin-auto-findnode@0.1.6: {}
 
   bser@2.1.1:
     dependencies:

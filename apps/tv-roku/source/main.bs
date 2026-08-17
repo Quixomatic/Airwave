@@ -11,14 +11,39 @@ sub Main()
     m.port = CreateObject("roMessagePort")
     screen.setMessagePort(m.port)
 
+    ' UI navigation sounds. roAudioResource is a MAIN-thread-only object (it can't be created on the render
+    ' or task threads), so we own the resources HERE and let the UI trigger them through a global field:
+    ' the zone machine sets `uiSound` to "<name>|<seq>" (the seq makes every value unique so repeats fire),
+    ' and we Trigger the matching system sound. A sound the device lacks is a silent no-op. Set up the global
+    ' field BEFORE CreateScene (the scene reads m.global; the node is available now).
+    gnode = screen.getGlobalNode()
+    gnode.addFields({ uiSound: "" })
+    gnode.observeField("uiSound", m.port)
+    sfx = {
+        nav: CreateObject("roAudioResource", "navsingle"),
+        select: CreateObject("roAudioResource", "select"),
+        dead: CreateObject("roAudioResource", "deadend")
+    }
+
     screen.CreateScene("MainScene")
     screen.show()
 
     ' Standard SceneGraph render loop — exit when the screen closes.
     while true
         msg = wait(0, m.port)
-        if type(msg) = "roSGScreenEvent"
+        mt = type(msg)
+        if mt = "roSGScreenEvent"
             if msg.isScreenClosed() then return
+        else if mt = "roSGNodeEvent"
+            if msg.getField() = "uiSound"
+                val = msg.getData()
+                sep = Instr(1, val, "|")
+                if sep > 1
+                    name = Left(val, sep - 1)
+                    snd = sfx[name]
+                    if snd <> invalid then snd.Trigger(50)
+                end if
+            end if
         end if
     end while
 end sub

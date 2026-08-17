@@ -161,6 +161,42 @@ namespace GuideLayout
         return days[d.GetDayOfWeek()] + " " + d.GetMonth().toStr() + "/" + d.GetDayOfMonth().toStr()
     end function
 
+    ' The index of the program airing now (nowMs), else 0 — matches tv-web/native liveProgramIndex. Used to
+    ' land fp on the on-now program when the focused channel changes.
+    function liveProgramIndex(programs as object, nowMs as double) as integer
+        if programs = invalid then return 0
+        i = 0
+        for each p in programs
+            s = GuideLayout.parseIso(p.startsAt)
+            if nowMs >= s and nowMs < s + p.durationSeconds * 1000.0 then return i
+            i = i + 1
+        end for
+        return 0
+    end function
+
+    ' Whether a program renders on the visible grid — within the window AND wide enough (not a rail-edge
+    ' sliver). IDENTICAL predicate to the tv-web/native aurora-grid `visible()` cull + the Row's `cw < 8`
+    ' guard. Culling at the SOURCE (once, in Guide) means fp indexes exactly the cells ChannelRow renders.
+    function isProgramVisible(p as object, t0Ms as double) as boolean
+        ppm = GuideLayout.ppm()
+        laneW = GuideLayout.laneW()
+        startMin = (GuideLayout.parseIso(p.startsAt) - t0Ms) / 60000.0
+        durMin = p.durationSeconds / 60.0
+        endMin = startMin + durMin
+        if not (endMin > 0 and startMin < GuideLayout.WINDOW_MIN) then return false
+        gap = GuideLayout.vw(6)
+        rawLeft = startMin * ppm
+        rawRight = rawLeft + GuideLayout.fixMax(laneW * 0.02, durMin * ppm) - gap
+        left = rawLeft
+        if left < 0 then left = gap
+        return (rawRight - left) >= 8
+    end function
+
+    function fixMax(a as float, b as float) as float
+        if a > b then return a
+        return b
+    end function
+
     function join(arr as object, sep as string) as string
         out = ""
         first = true
