@@ -2,6 +2,26 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.39] - 2026-08-17
+
+Roku sidebar animations + guide-rail polish.
+
+### Added
+
+- **Sidebar expand/collapse animation** — the surface width, right border, divider, and a dim scrim
+  (`rgba(6,10,20,0.55)`) animate together on open/close, and the filter circles **stagger** in (fade +
+  rise), matching tv-web/native.
+
+### Fixed
+
+- **Sidebar focus rings no longer clip** in the scrollable lens list (left edge, and top/bottom for the
+  first/last circle) — the clip is extended by a ring-room margin.
+- **Guide rail**: 4-digit channel numbers (e.g. 1001) show fully instead of ellipsizing to "1…"; the
+  channel name is bottom-anchored and wraps to a real 2nd line (grows upward) instead of clipping to one
+  line.
+- **Featured panel**: the gap between the channel number and name now follows the number's actual width, so
+  a single-digit channel no longer leaves a huge static gap.
+
 ## [0.10.38] - 2026-08-17
 
 ### Added

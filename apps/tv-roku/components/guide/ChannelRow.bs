@@ -86,19 +86,29 @@ sub init()
     m.favBadge.translation = [m.circleXY[0] + circle - badge + GuideLayout.vw(2), m.circleXY[1] + circle - badge + GuideLayout.vw(2)]
     m.favBadge.visible = false
 
+    ' Channel number — right-aligned at the top of the rail. Wide enough for 4-digit numbers (e.g. 1001)
+    ' so they don't ellipsize to "1…".
+    numW = GuideLayout.vw(120)
     m.numLabel = m.top.createChild("Label")
-    m.numLabel.width = GuideLayout.vw(60)
+    m.numLabel.width = numW
     m.numLabel.horizAlign = "right"
-    m.numLabel.translation = [rail - GuideLayout.vw(20) - GuideLayout.vw(60), GuideLayout.vw(20)]
+    m.numLabel.translation = [rail - GuideLayout.vw(20) - numW, GuideLayout.vw(20)]
     m.numLabel.color = "0x94A3B8FF"
     Theme.setFont(m.numLabel, Theme.FONT_BOLD, GuideLayout.vw(34))
 
+    ' Channel name — bottom-anchored (clamps to the rail bottom and grows UP into the 2nd line). vertAlign
+    ' bottom + a 1.4× line-height box with slack + lineSpacing so a full 2-line name actually wraps instead
+    ' of clipping to 1 line + "…" (same recipe as the featured summary).
+    lineH = Int(GuideLayout.vw(23) * 1.4)
+    nameBoxH = lineH * 2 + GuideLayout.vw(8)
     m.nameLabel = m.top.createChild("Label")
     m.nameLabel.width = rail - GuideLayout.vw(40)
-    m.nameLabel.height = GuideLayout.vw(23) * 2 + 4
+    m.nameLabel.height = nameBoxH
     m.nameLabel.wrap = true
     m.nameLabel.maxLines = 2
-    m.nameLabel.translation = [GuideLayout.vw(20), row - GuideLayout.vw(18) - GuideLayout.vw(23) * 2]
+    m.nameLabel.lineSpacing = Int(GuideLayout.vw(23) * 0.2)
+    m.nameLabel.vertAlign = "bottom"
+    m.nameLabel.translation = [GuideLayout.vw(20), row - GuideLayout.vw(18) - nameBoxH]
     m.nameLabel.color = "0x94A3B8FF"
     Theme.setFont(m.nameLabel, Theme.FONT_REG, GuideLayout.vw(23))
 

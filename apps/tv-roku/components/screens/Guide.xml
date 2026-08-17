@@ -40,7 +40,8 @@
         <Timer id="refreshTimer" repeat="true" duration="60" />
 
         <!-- Left sidebar — overlays the grid's left edge (grid always reserves the 92px sliver). Last child
-             = highest z, so the expanded overlay draws above the featured panel + grid. -->
+             = highest z, so the expanded overlay draws above the featured panel + grid. Owns its own dim
+             scrim (first child) so the expand/collapse slide + scrim fade animate together. -->
         <GuideSidebar id="sidebar" />
     </children>
 </component>

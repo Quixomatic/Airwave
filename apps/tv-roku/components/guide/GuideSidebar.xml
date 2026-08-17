@@ -21,14 +21,26 @@
         <field id="itemCount" type="integer" value="3" />
     </interface>
     <children>
+        <!-- Dim scrim over the whole guide (first child = below the sidebar surface, above the grid). Fades
+             0→0.55 with the expand. -->
+        <Rectangle id="scrim" color="0x060A14FF" width="1920" height="1080" opacity="0" />
         <Rectangle id="bg" color="0x0B1120F2" width="92" height="1080" />
         <Rectangle id="rightBorder" color="0x94A3B840" width="1" height="1080" translation="[92,0]" />
         <Group id="actions" />
-        <Rectangle id="divider" color="0xFFFFFF14" height="1" />
+        <Rectangle id="divider" color="0xFFFFFF14" height="1" width="56" />
         <!-- Collapsed: one Filters circle. Expanded: the scrollable filter list (in filterClip). -->
         <Group id="collapsedFilter" />
         <Group id="filterClip">
             <Group id="filters" />
         </Group>
+        <!-- Expand/collapse slide: the surface width + right border + scrim + divider animate together. -->
+        <Animation id="expandAnim" duration="0.22" easeFunction="outCubic">
+            <FloatFieldInterpolator id="widthI" key="[0,1]" keyValue="[92,300]" fieldToInterp="bg.width" />
+            <Vector2DFieldInterpolator id="borderI" key="[0,1]" keyValue="[[92,0],[300,0]]" fieldToInterp="rightBorder.translation" />
+            <FloatFieldInterpolator id="scrimI" key="[0,1]" keyValue="[0,0.55]" fieldToInterp="scrim.opacity" />
+            <FloatFieldInterpolator id="dividerI" key="[0,1]" keyValue="[56,264]" fieldToInterp="divider.width" />
+        </Animation>
+        <!-- Staggered reveal of the filter circles on open (interpolators added per button in code). -->
+        <Animation id="staggerAnim" easeFunction="outCubic" />
     </children>
 </component>

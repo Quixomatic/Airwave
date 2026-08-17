@@ -11,6 +11,7 @@ const SB_PADH = 18
 const SB_PADV = 24
 const SB_GAP = 14
 const SB_CIRCLE = 54
+const SB_RING_ROOM = 8    ' extra room inside the filter clip so focus rings aren't cut on the left/top/bottom
 
 sub init()
     m.actionKeys = ["all", "settings", "account"]
@@ -38,10 +39,14 @@ sub init()
     m.filtersCircle.translation = [SB_PADH, m.dividerY + 12]
     m.filtersCircle.iconId = "lucide:ListFilter"
 
+    ' The filter list clips to its viewport, but extend the clip outward by RING_ROOM on the left/top/bottom
+    ' (shift the clip origin, offset the content back) so the focus rings — drawn ~4px outside each circle —
+    ' aren't cut on the left, or top/bottom for the first/last circle (matches tv-web/native).
     m.filterTop = m.dividerY + 12
-    m.filterClip.translation = [SB_PADH, m.filterTop]
     m.vpH = GuideLayout.STAGE_H - m.filterTop - SB_PADV
-    m.filterClip.clippingRect = [0, 0, SB_EXPANDED - SB_PADH, m.vpH]
+    m.filterClip.translation = [SB_PADH - SB_RING_ROOM, m.filterTop - SB_RING_ROOM]
+    m.filterClip.clippingRect = [0, 0, SB_EXPANDED, m.vpH + 2 * SB_RING_ROOM]
+    m.filters.translation = [SB_RING_ROOM, SB_RING_ROOM]
 
     refresh()
 end sub
@@ -83,6 +88,7 @@ sub rebuild()
     y = 0
     for each d in fdefs
         b = m.filters.createChild("GlassCircleButton")
+        b.id = "fbtn" + Str(m.filterBtns.count()).Trim()   ' stable id so the stagger interpolators can target it
         b.translation = [0, y]
         b.iconId = d.icon
         b.label = d.label
@@ -102,7 +108,56 @@ sub onLens()
 end sub
 
 sub onExpand()
+    ex = m.top.expanded
+    if ex
+        m.widthI.keyValue = [SB_SLIVER, SB_EXPANDED]
+        m.borderI.keyValue = [[SB_SLIVER, 0], [SB_EXPANDED, 0]]
+        m.scrimI.keyValue = [0.0, 0.55]
+        m.dividerI.keyValue = [SB_SLIVER - 2 * SB_PADH, SB_EXPANDED - 2 * SB_PADH]
+    else
+        m.widthI.keyValue = [m.bg.width, SB_SLIVER]
+        m.borderI.keyValue = [[m.bg.width, 0], [SB_SLIVER, 0]]
+        m.scrimI.keyValue = [m.scrim.opacity, 0.0]
+        m.dividerI.keyValue = [m.divider.width, SB_SLIVER - 2 * SB_PADH]
+    end if
+    m.expandAnim.control = "start"
     refresh()
+    if ex then staggerFilters()
+end sub
+
+' Staggered reveal of the filter circles as the sidebar opens (tv-web/native): each fades in + slides up in
+' turn. One Animation with per-button interpolators (targeting each circle by its id, offset key timing).
+sub staggerFilters()
+    anim = m.staggerAnim
+    anim.control = "stop"
+    while anim.getChildCount() > 0
+        anim.removeChildIndex(0)
+    end while
+    n = m.filterBtns.count()
+    if n = 0 then return
+
+    stagger = 0.04                    ' seconds between successive circles
+    span = 0.3                        ' each circle's own fade/slide span
+    slide = GuideLayout.vw(10)        ' how far each circle rises into place
+    total = span + stagger * (n - 1)
+    anim.duration = total
+    for i = 0 to n - 1
+        b = m.filterBtns[i]
+        b.opacity = 0
+        t0 = (stagger * i) / total
+        t1 = (stagger * i + span) / total
+        if t1 > 1 then t1 = 1
+        yRest = i * (SB_CIRCLE + SB_GAP)
+        fade = anim.createChild("FloatFieldInterpolator")
+        fade.fieldToInterp = b.id + ".opacity"
+        fade.key = [t0, t1]
+        fade.keyValue = [0.0, 1.0]
+        rise = anim.createChild("Vector2DFieldInterpolator")
+        rise.fieldToInterp = b.id + ".translation"
+        rise.key = [t0, t1]
+        rise.keyValue = [[0, yRest + slide], [0, yRest]]
+    end for
+    anim.control = "start"
 end sub
 
 sub onFocus()
@@ -144,11 +199,7 @@ sub refresh()
     m.collapsedFilter.visible = not ex
     m.filterClip.visible = ex
     m.filtersCircle.active = (lens <> "all" and lens <> "")
-
-    w = ex ? SB_EXPANDED : SB_SLIVER
-    m.bg.width = w
-    m.rightBorder.translation = [w, 0]
-    m.divider.width = w - 2 * SB_PADH
+    ' bg.width / rightBorder / divider.width are owned by the expand animation (onExpand), not set here.
 end sub
 
 ' Snap-scroll the filter list so the selected filter circle stays on-screen (grid parity).
@@ -166,5 +217,5 @@ sub scrollFilters()
         m.filterScrollY = bottom - m.vpH
     end if
     if m.filterScrollY < 0 then m.filterScrollY = 0
-    m.filters.translation = [0, -m.filterScrollY]
+    m.filters.translation = [SB_RING_ROOM, SB_RING_ROOM - m.filterScrollY]
 end sub

@@ -47,14 +47,14 @@ sub relayout()
     m.glyph.vertAlign = "center"
     m.glyph.translation = [padx, pady]
 
-    numX = padx + circleSize + GuideLayout.fv(22)
-    lineMidY = pady + Int((circleSize - GuideLayout.fv(44)) / 2)
-    m.chNum.translation = [numX, lineMidY]
-    m.chNum.width = GuideLayout.fv(120)
+    m.numX = padx + circleSize + GuideLayout.fv(22)
+    m.lineMidY = pady + Int((circleSize - GuideLayout.fv(44)) / 2)
+    m.chNum.translation = [m.numX, m.lineMidY]
     Theme.setFont(m.chNum, Theme.FONT_BOLD, GuideLayout.fv(44))
 
-    m.chName.translation = [numX + GuideLayout.fv(120) + GuideLayout.fv(16), lineMidY]
-    m.chName.width = m.leftW - (numX - padx) - GuideLayout.fv(140)
+    ' chName's x follows the number's ACTUAL width (set in onContent) + a fixed gap — so a 1-digit number
+    ' doesn't leave a huge static gap before the name.
+    m.chName.translation = [m.numX, m.lineMidY]
     m.chName.truncate = true
     Theme.setFont(m.chName, Theme.FONT_BOLD, GuideLayout.fv(44))
 
@@ -136,8 +136,15 @@ sub onContent()
     iconId = ch.icon
     if (iconId = invalid or iconId = "") and ch.package <> invalid then iconId = ch.package.icon
     Icon.apply(m.glyph, iconId, m.glyphSize, accentArgb)
-    m.chNum.text = GuideLayout.numStr(ch.number)
+    numStr = GuideLayout.numStr(ch.number)
+    m.chNum.text = numStr
     m.chNum.color = GuideLayout.argb(accent, 0.75)
+    ' Position the name right after the number's rendered width (digits are ~tabular) + the fv(22) gap.
+    numW = Len(numStr) * Int(GuideLayout.fv(44) * 0.6)
+    m.chNum.width = numW
+    nameX = m.numX + numW + GuideLayout.fv(22)
+    m.chName.translation = [nameX, m.lineMidY]
+    m.chName.width = m.leftW - (nameX - m.padx)
     m.chName.text = ch.name
     m.chName.color = accentArgb
 
