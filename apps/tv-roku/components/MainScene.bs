@@ -73,27 +73,62 @@ sub onGuideTune()
     if m.player = invalid
         m.player = CreateObject("roSGNode", "PlayerHost")
         m.top.appendChild(m.player)
-        m.player.observeField("done", "onPlayerDone")
+        m.player.observeField("playerCmd", "onPlayerCmd")
     end if
     ' The effectiveTime clock derives the on-now from the channel timeline (join-live / resume), so tuning
     ' only needs the channel id — the selected program can't seed playback (no future seek). The chrome also
-    ' needs the channel's identity (chip + accent).
+    ' needs the channel's identity (chip + accent). layout=full → the player shows full-screen + takes focus.
     m.player.channelId = g.tuneChannelId
     m.player.channelNumber = g.tuneChannelNumber
     m.player.channelName = g.tuneChannelName
     m.player.accent = g.tuneAccent
-    m.player.visible = true
-    m.player.setFocus(true)
+    m.player.miniFocused = false
+    m.player.layout = "full"
     m.player.go = m.player.go + 1
     Log.info("guide tune -> " + g.tuneChannelId)
 end sub
 
-sub onPlayerDone()
-    if m.player <> invalid
-        m.player.visible = false
-        m.player.setFocus(false)
+' PlayerHost surface commands: Back from full → mini (keep playing); the mini Full/Close overlay → full / stop.
+sub onPlayerCmd()
+    cmd = m.player.playerCmd
+    if cmd = "goMini"
+        dockMini()
+    else if cmd = "goFull"
+        goFullPlayer()
+    else if cmd = "close"
+        closePlayer()
+    else if cmd = "blurMini"
+        m.player.miniFocused = false
+        if m.screen <> invalid then m.screen.setFocus(true)
     end if
-    if m.screen <> invalid then m.screen.setFocus(true)
+end sub
+
+' Dock the player into the guide's featured-panel slot (reserve the width so the panel's text shrinks to fit).
+sub dockMini()
+    if m.screen <> invalid
+        m.screen.miniActive = true
+        m.player.dockX = m.screen.miniDockX
+        m.player.dockY = m.screen.miniDockY
+        m.player.dockW = m.screen.miniDockW
+        m.player.dockH = m.screen.miniDockH
+        m.screen.setFocus(true)
+    end if
+    m.player.miniFocused = false
+    m.player.layout = "mini"
+end sub
+
+sub goFullPlayer()
+    if m.screen <> invalid then m.screen.miniActive = false
+    m.player.miniFocused = false
+    m.player.layout = "full"
+end sub
+
+sub closePlayer()
+    if m.screen <> invalid
+        m.screen.miniActive = false
+        m.screen.setFocus(true)
+    end if
+    m.player.layout = "off"   ' → PlayerHost onLayout(off) tears down the session
 end sub
 
 sub showDiagnostic()
@@ -209,11 +244,23 @@ end sub
 ' that the registry persists across sideloads — otherwise the diagnostic never re-runs once done.
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
-    if Dev.isDev() and key = "options" and Auth.hasToken()
-        Registry.delete(RegKey.CAPS_DONE)
-        Log.info("[dev] cleared caps-done -> re-running diagnostic")
-        route()
+    ' Back on the guide with a docked mini feed peels the mini (stops it) instead of exiting the app.
+    if key = "back" and m.player <> invalid and m.player.layout = "mini"
+        closePlayer()
         return true
+    end if
+    if key = "options"
+        ' ✱ focuses the docked mini feed (→ its Full/Close overlay); else the dev diagnostic re-run.
+        if m.player <> invalid and m.player.layout = "mini"
+            m.player.miniFocused = true
+            return true
+        end if
+        if Dev.isDev() and Auth.hasToken()
+            Registry.delete(RegKey.CAPS_DONE)
+            Log.info("[dev] cleared caps-done -> re-running diagnostic")
+            route()
+            return true
+        end if
     end if
     return false
 end function

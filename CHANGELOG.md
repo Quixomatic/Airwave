@@ -2,6 +2,26 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.51] - 2026-08-17
+
+Roku **mini player — persist the channel while browsing the guide (Increment B1)**.
+
+### Added
+
+- **The player now has three surface layouts (off / mini / full).** Back from full drops the channel to a
+  **mini feed that keeps playing, docked into the guide's featured-panel slot** — the panel reserves a
+  16:9 slot on its right (`rightReserve`, computed from `featuredHeight()`) so its text column shrinks to
+  fit, and focus returns to the guide so you can browse the grid while it plays. Re-tuning goes full again.
+- **Mini-feed focus (zoned nav)** — **✱** focuses the docked mini feed, revealing a **Full screen / Close**
+  overlay (◄► select, OK activates); **▼ Down** (or Back) drops focus back down to the guide. A footer
+  hint (**✱ to focus**) shows on the mini feed while it's unfocused.
+- **Back on the guide with a mini feed** now peels the mini (stops it) instead of exiting the app.
+
+### Notes
+
+- MainScene owns the surface state machine (dock/goFull/close/blur); PlayerHost fires `playerCmd` back to
+  it. Compact BumperCard in the dock + idle→full-after-60s are the remaining mini polish (B2).
+
 ## [0.10.50] - 2026-08-17
 
 Roku **BumperCard — the "Coming up next" interstitial (Increment E1)**.

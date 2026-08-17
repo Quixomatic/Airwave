@@ -16,6 +16,13 @@
         <field id="tuneAccent" type="string" />
         <field id="tuneChannelId" type="string" alwaysNotify="true" />
         <field id="done" type="boolean" alwaysNotify="true" />
+        <!-- Mini-player dock: MainScene sets miniActive → the featured panel reserves its right slot; the
+             computed slot rect (screen coords) is read back for the docked player. -->
+        <field id="miniActive" type="boolean" onChange="onMiniActive" />
+        <field id="miniDockX" type="integer" />
+        <field id="miniDockY" type="integer" />
+        <field id="miniDockW" type="integer" />
+        <field id="miniDockH" type="integer" />
     </interface>
 
     <children>

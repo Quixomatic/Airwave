@@ -21,6 +21,8 @@ sub init()
     Theme.setFont(m.dayLabel, Theme.FONT_SEMI, GuideLayout.vw(32))
     Theme.setFont(m.msg, Theme.FONT_REG, 26)
 
+    computeMiniDock()
+
     ' Flow the header + grid right below the featured panel (dynamic — the panel's height varies).
     m.gridTop = GuideLayout.gridTop()
     headerTop = GuideLayout.headerTop()
@@ -506,6 +508,25 @@ sub updateFeatured()
     fc = CreateObject("roSGNode", "ContentNode")
     fc.addFields({ channel: ch, program: progs[fpi], accentHex: m.accents[m.fc] })
     m.featured.content = fc
+end sub
+
+' The mini-player dock = a 16:9 slot on the RIGHT of the featured panel (screen coords). The panel reserves
+' this width via rightReserve so its text column shrinks to fit (tv-web/native: mini slots INTO the panel).
+sub computeMiniDock()
+    padx = GuideLayout.fv(64)
+    pady = GuideLayout.fv(40)
+    slotH = GuideLayout.featuredHeight() - 2 * pady
+    slotW = Int(slotH * 16 / 9)
+    m.top.miniDockX = 92 + GuideLayout.colW() - padx - slotW
+    m.top.miniDockY = pady
+    m.top.miniDockW = slotW
+    m.top.miniDockH = slotH
+    m.miniReserveW = slotW + GuideLayout.fv(40)
+end sub
+
+sub onMiniActive()
+    if m.featured = invalid then return
+    if m.top.miniActive then m.featured.rightReserve = m.miniReserveW else m.featured.rightReserve = 0
 end sub
 
 sub tune()

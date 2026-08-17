@@ -18,6 +18,16 @@
         <field id="channelName" type="string" />
         <field id="accent" type="string" value="0x3B82F6FF" />
         <field id="go" type="integer" value="0" alwaysNotify="true" onChange="onGo" />
+        <!-- Surface layout: off | mini (docked in the guide) | full. miniFocused shows the Full/Close overlay. -->
+        <field id="layout" type="string" value="off" onChange="onLayout" />
+        <field id="miniFocused" type="boolean" onChange="onLayout" />
+        <!-- The mini-feed dock rect (set by MainScene from the guide's featured-panel slot). -->
+        <field id="dockX" type="integer" value="1216" />
+        <field id="dockY" type="integer" value="96" />
+        <field id="dockW" type="integer" value="624" />
+        <field id="dockH" type="integer" value="351" />
+        <!-- PlayerHost → MainScene surface commands: goMini | goFull | close | blurMini. -->
+        <field id="playerCmd" type="string" alwaysNotify="true" />
         <!-- MainScene observes this to hide the player + refocus the guide. -->
         <field id="done" type="boolean" alwaysNotify="true" />
     </interface>

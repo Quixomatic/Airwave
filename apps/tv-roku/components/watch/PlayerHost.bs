@@ -4,6 +4,7 @@ import "pkg:/source/lib/log.bs"
 import "pkg:/source/theme.bs"
 import "pkg:/source/lib/registry.bs"
 import "pkg:/source/lib/guideLayout.bs"
+import "pkg:/source/lib/icon.bs"
 import "pkg:/source/input/keys.bs"
 ' NOTE: the clock's core is named `seekTo` (not `goTo`) — `goTo` case-folds to the reserved `goto` keyword.
 ' Wall-clock/server-clock helpers are `wallMs`/`clockSec` — a plain `nowMs` collides with GuideLayout's param.
@@ -33,6 +34,7 @@ const LOOKBACK_S = 360.0
 const LOOKAHEAD_S = 360.0
 
 sub init()
+    m.top.visible = false   ' hidden until the first tune sets layout=full
     ' Suppress Roku's BUILT-IN trick-play UI (the native progress bar that pops up on rewind/ff/play). We
     ' draw our own chrome (Incr C), and focus lives on the PlayerHost Group — never the Video node — so the
     ' transport keys reach onKeyEvent instead of the Video's own trick-play handler.
@@ -59,8 +61,139 @@ sub init()
     m.chrome = CreateObject("roSGNode", "PlayerChrome")
     m.top.appendChild(m.chrome)
     m.chrome.observeField("command", "onChromeCommand")
+    buildMiniOverlay()
     onThen(Api.qualities(), onQualities, m)
     resetClock()
+end sub
+
+' ---- surface layout: off | mini (docked in the guide) | full ----------------
+
+sub onLayout()
+    lay = m.top.layout
+    if lay = "full"
+        setVideoRect(0, 0, 1920, 1080)
+        m.chrome.active = true
+        m.chrome.setFocus(true)
+        m.miniOverlay.visible = false
+        m.top.visible = true
+    else if lay = "mini"
+        setVideoRect(m.top.dockX, m.top.dockY, m.top.dockW, m.top.dockH)
+        m.chrome.active = false
+        m.top.visible = true
+        if m.top.miniFocused then m.miniSel = 0
+        renderMiniOverlay()
+        if m.top.miniFocused then m.top.setFocus(true)
+    else
+        m.top.visible = false
+        m.chrome.active = false
+        teardown()
+    end if
+    renderMiniHint()
+end sub
+
+sub setVideoRect(x as integer, y as integer, w as integer, h as integer)
+    m.bg.translation = [x, y]
+    m.bg.width = w
+    m.bg.height = h
+    m.video.translation = [x, y]
+    m.video.width = w
+    m.video.height = h
+end sub
+
+sub buildMiniOverlay()
+    g = m.top.createChild("Group")
+    g.visible = false
+    dimBg = g.createChild("Rectangle")
+    dimBg.color = "0x060A148C"   ' rgba(6,10,20,0.55)
+    m.miniDim = dimBg
+    m.miniBtns = []
+    icons = ["lucide:Maximize2", "lucide:X"]
+    labels = ["Full screen", "Close"]
+    for i = 0 to 1
+        b = g.createChild("Group")
+        circ = b.createChild("Poster")
+        circ.uri = "pkg:/images/circle-54.png"
+        circ.width = 54
+        circ.height = 54
+        ico = b.createChild("Label")
+        Icon.apply(ico, icons[i], 26, "0x06121FFF")
+        ico.translation = [14, 12]
+        lbl = b.createChild("Label")
+        Theme.setFont(lbl, Theme.FONT_SEMI, 15)
+        lbl.horizAlign = "center"
+        lbl.width = 130
+        lbl.translation = [-38, 62]
+        lbl.text = labels[i]
+        m.miniBtns.push({ group: b, circ: circ, icon: ico, label: lbl, iconId: icons[i] })
+    end for
+    m.miniOverlay = g
+    m.miniSel = 0
+
+    ' Footer hint (shown when the mini feed is docked but NOT focused): ✱ focuses it.
+    hint = m.top.createChild("Group")
+    hint.visible = false
+    hbg = hint.createChild("Rectangle")
+    hbg.color = "0x060A14D9"
+    hico = hint.createChild("Label")
+    Icon.apply(hico, "lucide:Asterisk", 22, "0xF1F5F9FF")
+    htxt = hint.createChild("Label")
+    Theme.setFont(htxt, Theme.FONT_SEMI, 16)
+    htxt.color = "0xE6EAF1FF"
+    htxt.text = "to focus"
+    m.miniHint = hint
+    m.miniHintBg = hbg
+    m.miniHintIco = hico
+    m.miniHintTxt = htxt
+end sub
+
+sub renderMiniHint()
+    if m.top.layout <> "mini" or m.top.miniFocused
+        m.miniHint.visible = false
+        return
+    end if
+    dw = m.top.dockW
+    stripH = 36
+    m.miniHint.translation = [m.top.dockX, m.top.dockY + m.top.dockH - stripH]
+    m.miniHintBg.width = dw
+    m.miniHintBg.height = stripH
+    startX = Int(dw / 2) - 55
+    m.miniHintIco.translation = [startX, 6]
+    m.miniHintTxt.translation = [startX + 28, 8]
+    m.miniHint.visible = true
+end sub
+
+sub renderMiniOverlay()
+    if m.top.layout <> "mini" or not m.top.miniFocused
+        m.miniOverlay.visible = false
+        return
+    end if
+    dw = m.top.dockW
+    dh = m.top.dockH
+    m.miniOverlay.translation = [m.top.dockX, m.top.dockY]
+    m.miniDim.width = dw
+    m.miniDim.height = dh
+    gap = 44
+    totalW = 54 * 2 + gap
+    startX = Int((dw - totalW) / 2)
+    cy = Int((dh - 54) / 2) - 8
+    for i = 0 to 1
+        b = m.miniBtns[i]
+        b.group.translation = [startX + i * (54 + gap), cy]
+        if i = m.miniSel
+            b.circ.blendColor = m.top.accent
+            Icon.apply(b.icon, b.iconId, 26, "0x06121FFF")
+            b.label.color = "0xF1F5F9FF"
+        else
+            b.circ.blendColor = "0x1E293BD9"
+            Icon.apply(b.icon, b.iconId, 26, "0xDFE4ECFF")
+            b.label.color = "0x94A3B8FF"
+        end if
+    end for
+    m.miniOverlay.visible = true
+end sub
+
+sub fireCmd(cmd as string)
+    m.top.playerCmd = cmd
 end sub
 
 sub onQualities(data as object, _m as object)
@@ -82,9 +215,7 @@ sub onChromeCommand()
     else if cmd = "restart"
         restart()
     else if cmd = "back"
-        teardown()
-        m.chrome.active = false   ' so the NEXT tune re-fires onActive → the chrome resets (no stale scrubber)
-        m.top.done = true
+        fireCmd("goMini")   ' Back from full → drop to the mini feed (keep playing); MainScene refocuses the guide
     else if cmd = "surf"
         Log.info("[player] channel surf (Incr D)")
     else if cmd = "selectQuality"
@@ -153,8 +284,6 @@ sub onGo()
         m.chrome.accent = m.top.accent
         m.chrome.channelNumber = m.top.channelNumber
         m.chrome.channelName = m.top.channelName
-        m.chrome.active = true
-        m.chrome.setFocus(true)
     end if
     m.pendingBootstrap = true
     loadTimeline()
@@ -640,7 +769,7 @@ sub publishStatus(cur as object, effective as double, t as double)
 
     ' Drive the "Coming up next" bumper card (shown over the frozen held frame during a bumper slot).
     if m.bumper <> invalid
-        if isBumper
+        if isBumper and m.top.layout = "full"
             m.bumper.channelId = m.top.channelId
             m.bumper.guide = cur.guide
             m.bumper.accent = m.top.accent
@@ -747,21 +876,20 @@ end function
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
-    if key = Keys.BACK
-        teardown()
-        m.top.done = true
-        return true
-    else if key = Keys.PLAY
-        togglePause()
-        return true
-    else if key = Keys.REWIND
-        seekBy(-60.0)
-        return true
-    else if key = Keys.FORWARD
-        seekBy(60.0)
-        return true
-    else if key = Keys.REPLAY
-        restart()
+    ' PlayerHost only holds focus when the MINI feed is focused (full → the chrome has focus; mini-unfocused
+    ' → the guide does). The Full/Close overlay owns the keys here.
+    if m.top.layout = "mini" and m.top.miniFocused
+        if key = Keys.LEFT
+            m.miniSel = 0
+            renderMiniOverlay()
+        else if key = Keys.RIGHT
+            m.miniSel = 1
+            renderMiniOverlay()
+        else if key = Keys.OK
+            if m.miniSel = 0 then fireCmd("goFull") else fireCmd("close")
+        else if key = Keys.DOWN or key = Keys.BACK
+            fireCmd("blurMini")   ' ▼ (or Back) drops focus back down to the guide (zoned nav)
+        end if
         return true
     end if
     return false
