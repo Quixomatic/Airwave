@@ -2,6 +2,27 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.49] - 2026-08-17
+
+Roku **player chrome — Info view + track/quality pickers (Increment C2)**.
+
+### Added
+
+- **Audio / Subtitles / Quality pickers** — tv-native-style **centered glass modal dialogs** (rounded
+  `card.9` over a dim scrim): a scrollable list with the focused row accent-filled, the current choice
+  check-marked, up/down to move, OK to select, Back to cancel. Selecting re-resolves the current program
+  at the same spot with the new track/quality (subtitles are server-burn-in → a transcode bakes them in).
+- **Info view** (parity with tv-web/native) — Info now grows the panel **upward** (raised title + taller
+  scrim) and shows a **badge meta row** (year · content-rating chip · ★ critic · duration), the summary,
+  **Genres/Cast/Director/Studio columns**, and a **PLAYBACK delivery** readout as chips (mode in the accent
+  color, then container / video+audio codec / connection). It honors the 8s auto-hide like the scrubber
+  panel. New `chip.9`/`card.9` 9-patch assets (via `gen-player-assets.py`).
+
+### Fixed
+
+- The chrome no longer gets stuck after the Info view auto-hides — closing the panel clears the Info/picker
+  state so OK/▲ reopens the normal scrubber chrome.
+
 ## [0.10.48] - 2026-08-17
 
 Roku **player chrome — visual parity + playback fixes (Increment C1-visual)**.

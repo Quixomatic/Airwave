@@ -10,6 +10,7 @@ Consumers (keep in sync with PlayerChrome.bs):
   - pill-focus.9.png → the 2px focus ring (tinted blue@0.7) — tv-web's control boxShadow.
   - bar-fill.9.png   → the DVR scrubber segment bars + accent fill (height 8, radius 4).
   - scrim-player.png → the bottom gradient scrim (transparent top → rgba(6,10,20,0.92) bottom), stretched wide.
+  - card.9.png       → rounded-rect 9-patch (radius 22) for the picker modal card + its selected rows, tinted.
 """
 import os
 from PIL import Image, ImageDraw
@@ -70,8 +71,10 @@ def main():
     make_9patch(pill_content(54, 27, stroke=1)).save(os.path.join(OUT, "pill-ring.9.png"))
     make_9patch(pill_content(54, 27, stroke=2)).save(os.path.join(OUT, "pill-focus.9.png"))
     make_9patch(pill_content(8, 4)).save(os.path.join(OUT, "bar-fill.9.png"))
+    make_9patch(pill_content(48, 22)).save(os.path.join(OUT, "card.9.png"))   # rounded rect (2D-stretch)
+    make_9patch(pill_content(28, 6)).save(os.path.join(OUT, "chip.9.png"))    # small r6 badge (meta/delivery)
     scrim().save(os.path.join(OUT, "scrim-player.png"))
-    print("wrote pill-fill.9 / pill-ring.9 / pill-focus.9 / bar-fill.9 / scrim-player.png")
+    print("wrote pill-fill.9 / pill-ring.9 / pill-focus.9 / bar-fill.9 / card.9 / scrim-player.png")
 
 
 if __name__ == "__main__":
