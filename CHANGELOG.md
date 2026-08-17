@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.32] - 2026-08-17
+
+### Fixed
+
+- **Roku guide: the grid now flows right below the featured panel** instead of a fixed `y=546` that left a
+  big gap. `GuideLayout.featuredHeight()`/`gridTop()`/`headerTop()` derive the featured panel's content
+  bottom, and Guide positions the time header + grid + now-caret from it (≈1 more visible row).
+
 ## [0.10.31] - 2026-08-17
 
 Roku guide 6b — the featured now/next panel + the tinted icon ring.

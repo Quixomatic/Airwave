@@ -22,7 +22,13 @@ sub init()
     Theme.setFont(m.dayLabel, Theme.FONT_SEMI, GuideLayout.vw(32))
     Theme.setFont(m.msg, Theme.FONT_REG, 26)
 
-    m.gridClip.clippingRect = [0, 0, GuideLayout.colW(), 534]
+    ' Flow the header + grid right below the featured panel (was a fixed y=546, leaving a big gap).
+    m.gridTop = GuideLayout.gridTop()
+    headerTop = GuideLayout.headerTop()
+    m.dayLabel.translation = [92 + GuideLayout.vw(40), headerTop + GuideLayout.vw(6)]
+    m.ticks.translation = [92 + GuideLayout.railPx(), headerTop]
+    m.gridClip.translation = [92, m.gridTop]
+    m.gridClip.clippingRect = [0, 0, GuideLayout.colW(), GuideLayout.STAGE_H - m.gridTop]
 
     m.list.itemComponentName = "ChannelRow"
     m.list.itemSize = [GuideLayout.colW(), GuideLayout.rowPx()]
@@ -144,7 +150,7 @@ sub drawNowCaret()
     x = 92 + GuideLayout.railPx() + Int(nowMin * GuideLayout.ppm()) - Int(cw / 2)
     m.nowCaret.width = cw
     m.nowCaret.height = chH
-    m.nowCaret.translation = [x, 546 - chH]
+    m.nowCaret.translation = [x, m.gridTop - chH]
     m.nowCaret.visible = true
     m.caretPulse.control = "start"
 end sub

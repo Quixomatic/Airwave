@@ -40,6 +40,31 @@ namespace GuideLayout
         return GuideLayout.laneW() / GuideLayout.WINDOW_MIN           ' ≈9.32 px/min
     end function
 
+    ' The featured panel's content height (deterministic — mirrors FeaturedPanel.relayout's vertical stack,
+    ' 2-line summary) + bottom padding. The time header + grid flow right below this (not a fixed y).
+    function featuredHeight() as integer
+        pady = GuideLayout.fv(40)
+        circleSize = GuideLayout.fv(64)
+        genreY = pady + circleSize + GuideLayout.fv(14)
+        dividerY = genreY + GuideLayout.fv(30) + GuideLayout.fv(22)
+        titleY = dividerY + 1 + GuideLayout.fv(26)
+        metaY = titleY + GuideLayout.fv(60) + GuideLayout.fv(22)
+        summaryY = metaY + GuideLayout.fv(34) + GuideLayout.fv(22)
+        statusY = summaryY + Int(GuideLayout.fv(36) * 1.4 * 2) + GuideLayout.fv(26)
+        progY = statusY + GuideLayout.fv(34) + GuideLayout.fv(16)
+        return progY + GuideLayout.fv(8) + GuideLayout.fv(40)
+    end function
+
+    ' The grid viewport top y (below the featured panel + the time header).
+    function gridTop() as integer
+        return GuideLayout.featuredHeight() + GuideLayout.vw(56) + GuideLayout.vw(52) + GuideLayout.vw(20)
+    end function
+
+    ' The time-header top y.
+    function headerTop() as integer
+        return GuideLayout.featuredHeight() + GuideLayout.vw(56)
+    end function
+
     ' Genre accent palette (cell left-border + tinted fill). Hex, tinted via argb().
     function accents() as object
         return ["3b82f6", "4a9fe0", "2f9e8f", "8b5cf6", "3fa66a", "d08b2f", "d0587e", "7c8aa3"]
