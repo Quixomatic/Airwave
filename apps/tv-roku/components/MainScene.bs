@@ -14,6 +14,7 @@ import "pkg:/source/lib/icon.bs"
 sub init()
     Log.info("MainScene init")
     m.screen = invalid
+    m.player = invalid
     m.probeStarted = false
     Icon.load()   ' preload the lucide/phosphor id→codepoint maps (icon fonts)
     showBootSplash()
@@ -64,9 +65,31 @@ sub showGuide()
     m.screen = s
 end sub
 
+' OK on a channel → show the persistent PlayerHost (created once) and tune it. The player takes focus; on
+' Back it sets `done` and we refocus the guide.
 sub onGuideTune()
-    ' 6d wires this to the player; for now, log the tune intent.
-    if m.screen <> invalid then Log.info("guide tune -> " + m.screen.tuneChannelId)
+    g = m.screen
+    if g = invalid then return
+    if m.player = invalid
+        m.player = CreateObject("roSGNode", "PlayerHost")
+        m.top.appendChild(m.player)
+        m.player.observeField("done", "onPlayerDone")
+    end if
+    m.player.channelId = g.tuneChannelId
+    m.player.ratingKey = g.tuneRatingKey
+    m.player.offset = g.tuneOffset
+    m.player.visible = true
+    m.player.setFocus(true)
+    m.player.go = m.player.go + 1
+    Log.info("guide tune -> " + g.tuneChannelId + " rk=" + g.tuneRatingKey + " off=" + Str(g.tuneOffset).Trim())
+end sub
+
+sub onPlayerDone()
+    if m.player <> invalid
+        m.player.visible = false
+        m.player.setFocus(false)
+    end if
+    if m.screen <> invalid then m.screen.setFocus(true)
 end sub
 
 sub showDiagnostic()

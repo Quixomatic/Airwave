@@ -1,0 +1,79 @@
+import "pkg:/source/lib/api.bs"
+import "pkg:/source/lib/device.bs"
+import "pkg:/source/lib/log.bs"
+import "pkg:/source/theme.bs"
+import "pkg:/source/input/keys.bs"
+
+' PlayerHost code-behind — see the .xml header. Phase 7 first slice: tune → /media → play a fullscreen Video.
+
+sub init()
+    m.video.observeField("state", "onVideoState")
+    Theme.setFont(m.status, Theme.FONT_REG, 22)
+end sub
+
+' MainScene set channelId/ratingKey/offset then bumped `go`.
+sub onGo()
+    if m.top.ratingKey = invalid or m.top.ratingKey = "" then return
+    m.status.text = "Tuning…"
+    m.video.control = "stop"
+    p = Api.media(m.top.channelId, m.top.ratingKey, m.top.offset, { deviceId: Device.id() })
+    onThen(p, onMedia, m)
+    onCatch(p, onMediaErr, m)
+end sub
+
+sub onMedia(info as object, _ctx as object)
+    if info = invalid or info.url = invalid
+        m.status.text = "No playable media."
+        return
+    end if
+    fmt = mapFormat(info.mode, info.container)
+    node = CreateObject("roSGNode", "ContentNode")
+    node.url = info.url
+    node.streamFormat = fmt
+    ' Direct-play = a RAW file → seek client-side (PlayStart); transcode (http/hls) bakes the offset server-side.
+    if info.mode = "direct" and m.top.offset > 0 then node.PlayStart = m.top.offset
+    m.video.content = node
+    m.video.control = "play"
+    m.video.setFocus(true)
+    m.status.text = "mode=" + info.mode + "  fmt=" + fmt + "  off=" + Str(m.top.offset).Trim() + "  vcodec=" + strOr(info.videoCodec)
+    Log.info("[player] tune " + m.top.channelId + " mode=" + info.mode + " fmt=" + fmt + " url=" + Log.trunc(info.url))
+end sub
+
+sub onMediaErr(err as object, _ctx as object)
+    m.status.text = "Playback failed."
+    Log.warn("[player] media error: " + Log.trunc(err))
+end sub
+
+sub onVideoState()
+    st = m.video.state
+    Log.info("[player] video state=" + st)
+    if st = "error"
+        m.status.text = "Video error: " + Log.trunc(m.video.errorMsg)
+    else if st = "playing"
+        m.status.text = ""
+    end if
+end sub
+
+' /media mode + container → Roku Video streamFormat. Transcode = hls; direct/http = the raw container as the
+' streamFormat (jellyfin's approach: `content.streamFormat = mediaSource.container` — Roku accepts mkv/mp4/mov/…).
+function mapFormat(mode as string, container as dynamic) as string
+    if mode = "hls" then return "hls"
+    if container <> invalid and container <> "" then return LCase(container)
+    return "mp4"
+end function
+
+function strOr(v as dynamic) as string
+    if v = invalid then return "?"
+    return v
+end function
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+    if key = Keys.BACK
+        m.video.control = "stop"
+        m.video.content = invalid
+        m.top.done = true
+        return true
+    end if
+    return false
+end function

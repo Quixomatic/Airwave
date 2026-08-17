@@ -512,7 +512,20 @@ sub tune()
     ch = m.channels[m.fc]
     if ch = invalid then return
     playSelect()
-    Log.info("[guide] tune -> " + ch.id)
+    ' Tune to the channel's LIVE program (not the focused fp) — the on-now ratingKey + its live offset. The
+    ' effectiveTime clock (Phase 8) will own this; the first-slice player just plays it.
+    li = GuideLayout.liveProgramIndex(ch.programs, m.nowMs)
+    rk = ""
+    off = 0
+    if ch.programs <> invalid and ch.programs.count() > li
+        p = ch.programs[li]
+        if p.ratingKey <> invalid then rk = p.ratingKey
+        off = Int((m.nowMs - GuideLayout.parseIso(p.startsAt)) / 1000)
+        if off < 0 then off = 0
+    end if
+    m.top.tuneRatingKey = rk
+    m.top.tuneOffset = off
+    Log.info("[guide] tune -> " + ch.id + " rk=" + rk + " off=" + Str(off).Trim())
     m.top.tuneChannelId = ch.id
 end sub
 

@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.44] - 2026-08-17
+
+Roku **Phase 7 kickoff — the player (first slice)**.
+
+### Added
+
+- **`PlayerHost`** (`components/watch/PlayerHost.{xml,bs}`) — a single, never-unmounted full-screen `Video`
+  node. OK on a guide channel tunes it: Guide hands the on-now `(ratingKey, offset)`, MainScene shows the
+  persistent PlayerHost and it resolves `/media` → sets the Video `content` (url + `streamFormat` from
+  mode/container: transcode→hls, direct/http→the raw container) → plays; Back returns to the guide.
+  **Verified on the Ultra: a raw MKV DIRECT-PLAYS (mode=direct, streamFormat=mkv) — no transcode.** The
+  effectiveTime DVR clock, rollover, and player chrome are the next Phase 7/8/9 work.
+
 ## [0.10.43] - 2026-08-17
 
 ### Changed

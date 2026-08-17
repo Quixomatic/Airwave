@@ -7,6 +7,9 @@
 -->
 <component name="Guide" extends="Group">
     <interface>
+        <!-- Tune payload: set tuneRatingKey/tuneOffset FIRST, then tuneChannelId (the trigger MainScene observes). -->
+        <field id="tuneRatingKey" type="string" />
+        <field id="tuneOffset" type="integer" />
         <field id="tuneChannelId" type="string" alwaysNotify="true" />
         <field id="done" type="boolean" alwaysNotify="true" />
     </interface>
