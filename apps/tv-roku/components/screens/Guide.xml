@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  Guide — the Aurora guide grid (6a foundation: time header + channel rows + 2-tone on-now cells +
+  now-line). Fetches the cross-channel grid via Api.guide and renders a MarkupList of ChannelRow.
+  Featured panel (top reserve), sidebar, and the full zone machine land in 6b/6c. Ported from
+  tv-web/tv-native features/guide.
+-->
+<component name="Guide" extends="Group">
+    <interface>
+        <field id="tuneChannelId" type="string" alwaysNotify="true" />
+        <field id="done" type="boolean" alwaysNotify="true" />
+    </interface>
+
+    <children>
+        <Rectangle id="bg" width="1920" height="1080" color="0x060A14FF" />
+
+        <!-- Time header -->
+        <Label id="dayLabel" translation="[122,498]" color="0xE6EAF1FF" />
+        <Group id="ticks" translation="[243,492]" />
+
+        <!-- Grid viewport -->
+        <Group id="gridClip" translation="[92,546]">
+            <MarkupList id="list" translation="[0,0]" drawFocusFeedback="false"
+                vertFocusAnimationStyle="fixedFocusWrap" />
+        </Group>
+
+        <!-- Now-line -->
+        <Rectangle id="nowLine" width="3" height="534" color="0xEF4444FF" visible="false" />
+        <Poster id="nowDot" width="16" height="16" uri="pkg:/images/circle.png" blendColor="0xEF4444FF"
+            visible="false" />
+
+        <Label id="msg" translation="[510,500]" width="900" horizAlign="center" color="0x94A3B8FF"
+            text="Loading…" />
+    </children>
+</component>

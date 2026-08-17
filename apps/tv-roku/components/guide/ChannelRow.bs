@@ -1,0 +1,196 @@
+import "pkg:/source/lib/guideLayout.bs"
+import "pkg:/source/theme.bs"
+
+' Row layout mirrors tv-web/tv-native aurora-grid Row: a fixed-width rail + a program lane. Data comes
+' in on itemContent (channel AA, accentHex); nowMs/T0Ms live on m.global (set by the Guide scene).
+
+sub init()
+    rail = GuideLayout.railPx()
+    row = GuideLayout.rowPx()
+
+    ' z-order: full-row tint (behind) → top border → rail tint → accent bar → icon → labels → lane.
+    m.rowBg = m.top.createChild("Rectangle")
+    m.rowBg.color = "0x00000000"
+    m.rowBg.width = GuideLayout.STAGE_W
+    m.rowBg.height = row
+
+    m.topBorder = m.top.createChild("Rectangle")
+    m.topBorder.color = "0x94A3B81F"   ' rgba(148,163,184,.12)
+    m.topBorder.width = GuideLayout.STAGE_W
+    m.topBorder.height = 1
+
+    m.railBg = m.top.createChild("Rectangle")
+    m.railBg.color = "0x00000000"
+    m.railBg.width = rail
+    m.railBg.height = row
+
+    m.railBar = m.top.createChild("Rectangle")
+    m.railBar.width = GuideLayout.vw(4)
+    m.railBar.height = row
+    m.railBar.visible = false
+
+    circle = GuideLayout.vw(64 * GuideLayout.FEATURE_SCALE)
+    m.iconCircle = m.top.createChild("Poster")
+    m.iconCircle.uri = "pkg:/images/circle.png"
+    m.iconCircle.width = circle
+    m.iconCircle.height = circle
+    m.iconCircle.translation = [GuideLayout.vw(20), GuideLayout.vw(18)]
+
+    gl = Int(circle * 0.56)
+    m.iconGlyph = m.top.createChild("Poster")
+    m.iconGlyph.uri = "pkg:/images/ic-channel.png"
+    m.iconGlyph.width = gl
+    m.iconGlyph.height = gl
+    m.iconGlyph.translation = [GuideLayout.vw(20) + Int((circle - gl) / 2), GuideLayout.vw(18) + Int((circle - gl) / 2)]
+
+    m.numLabel = m.top.createChild("Label")
+    m.numLabel.width = GuideLayout.vw(60)
+    m.numLabel.horizAlign = "right"
+    m.numLabel.translation = [rail - GuideLayout.vw(20) - GuideLayout.vw(60), GuideLayout.vw(20)]
+    m.numLabel.color = "0x94A3B8FF"
+    Theme.setFont(m.numLabel, Theme.FONT_BOLD, GuideLayout.vw(34))
+
+    m.nameLabel = m.top.createChild("Label")
+    m.nameLabel.width = rail - GuideLayout.vw(40)
+    m.nameLabel.height = GuideLayout.vw(23) * 2 + 4
+    m.nameLabel.wrap = true
+    m.nameLabel.maxLines = 2
+    m.nameLabel.translation = [GuideLayout.vw(20), row - GuideLayout.vw(18) - GuideLayout.vw(23) * 2]
+    m.nameLabel.color = "0x94A3B8FF"
+    Theme.setFont(m.nameLabel, Theme.FONT_REG, GuideLayout.vw(23))
+
+    m.lane = m.top.createChild("Group")
+    m.lane.translation = [rail, 0]
+    m.lane.clippingRect = [0, 0, GuideLayout.laneW(), row]
+end sub
+
+sub onContent()
+    c = m.top.itemContent
+    if c = invalid then return
+    m.channel = c.channel
+    m.accentHex = c.accentHex
+    render()
+end sub
+
+sub onFocusChange()
+    if m.accentHex = invalid then return
+    f = (m.top.focusPercent > 0.5)
+    m.rowBg.color = f ? GuideLayout.argb(m.accentHex, 0.06) : "0x00000000"
+    m.railBg.color = f ? GuideLayout.argb(m.accentHex, 0.12) : "0x00000000"
+    m.railBar.visible = f
+    m.numLabel.color = f ? "0xE6EAF1FF" : "0x94A3B8FF"
+end sub
+
+sub render()
+    ch = m.channel
+    if ch = invalid then return
+    accent = m.accentHex
+
+    m.railBar.color = GuideLayout.argb(accent, 1.0)
+    m.iconCircle.blendColor = GuideLayout.argb(accent, 0.2)
+    m.iconGlyph.blendColor = GuideLayout.argb(accent, 1.0)
+    m.numLabel.text = GuideLayout.numStr(ch.number)
+    m.nameLabel.text = ch.name
+
+    buildLane(ch)
+end sub
+
+sub buildLane(ch as object)
+    lane = m.lane
+    while lane.getChildCount() > 0
+        lane.removeChildIndex(0)
+    end while
+    if ch.programs = invalid then return
+
+    accent = m.accentHex
+    row = GuideLayout.rowPx()
+    ppm = GuideLayout.ppm()
+    laneW = GuideLayout.laneW()
+    ' Times come in as ISO strings (node fields are 32-bit float — can't hold epoch-ms precisely) and are
+    ' parsed to doubles here.
+    t0 = GuideLayout.parseIso(m.global.guideT0Iso)
+    nowMs = GuideLayout.parseIso(m.global.guideServerTime)
+    cellH = row - GuideLayout.vw(12)
+
+    for each p in ch.programs
+        startMs = GuideLayout.parseIso(p.startsAt)
+        durMin = p.durationSeconds / 60.0
+        startMin = (startMs - t0) / 60000.0
+        endMin = startMin + durMin
+        if endMin > 0 and startMin < GuideLayout.WINDOW_MIN
+            gap = GuideLayout.vw(6)
+            rawLeft = startMin * ppm
+            rawRight = rawLeft + fixMax(laneW * 0.02, durMin * ppm) - gap
+            left = rawLeft
+            if left < 0 then left = gap
+            cw = rawRight - left
+            if cw >= 8
+                live = (nowMs >= startMs and nowMs < startMs + p.durationSeconds * 1000)
+                buildCell(lane, p, Int(left), Int(cw), cellH, accent, live, t0, ppm, nowMs)
+            end if
+        end if
+    end for
+end sub
+
+sub buildCell(lane as object, p as object, left as integer, cw as integer, cellH as integer, accent as string, live as boolean, t0 as double, ppm as float, nowMs as double)
+    cell = lane.createChild("Group")
+    cell.translation = [left, GuideLayout.vw(6)]
+    cell.clippingRect = [0, 0, cw, cellH]
+
+    if live
+        fillPct = ((nowMs - t0) / 60000.0 * ppm - left) / cw
+        if fillPct < 0 then fillPct = 0
+        if fillPct > 1 then fillPct = 1
+        elapsed = cell.createChild("Rectangle")
+        elapsed.width = Int(cw * fillPct)
+        elapsed.height = cellH
+        elapsed.color = GuideLayout.argb(accent, 0.32)
+        remain = cell.createChild("Rectangle")
+        remain.translation = [Int(cw * fillPct), 0]
+        remain.width = Int(cw * (1 - fillPct)) + 1
+        remain.height = cellH
+        remain.color = GuideLayout.argb(accent, 0.1)
+        bar = cell.createChild("Rectangle")
+        bar.translation = [3, GuideLayout.vw(10)]
+        bar.width = 3
+        bar.height = cellH - GuideLayout.vw(20)
+        bar.color = GuideLayout.argb(accent, 1.0)
+    else
+        bg = cell.createChild("Rectangle")
+        bg.width = cw
+        bg.height = cellH
+        bg.color = "0x94A3B80D"   ' rgba(148,163,184,0.05)
+    end if
+
+    ' Rounded border over the (square) fill — approximates radius 8 (like the diagnostic box).
+    frame = cell.createChild("Poster")
+    frame.uri = Theme.npBorder(8)
+    frame.width = cw
+    frame.height = cellH
+    frame.blendColor = "0x94A3B81A"   ' rgba(148,163,184,.10) cellBorder
+
+    title = cell.createChild("Label")
+    title.translation = [GuideLayout.vw(20), GuideLayout.vw(20)]
+    title.width = cw - GuideLayout.vw(40)
+    title.truncate = true
+    title.color = "0xF1F5F9FF"
+    Theme.setFont(title, Theme.FONT_SEMI, GuideLayout.vw(34))
+    if p.guide.showTitle <> invalid and p.guide.showTitle <> ""
+        title.text = p.guide.showTitle
+    else
+        title.text = p.guide.title
+    end if
+
+    subLbl = cell.createChild("Label")
+    subLbl.translation = [GuideLayout.vw(20), GuideLayout.vw(20) + GuideLayout.vw(34) + GuideLayout.vw(12)]
+    subLbl.width = cw - GuideLayout.vw(40)
+    subLbl.truncate = true
+    subLbl.color = "0x94A3B8FF"
+    Theme.setFont(subLbl, Theme.FONT_REG, GuideLayout.vw(26))
+    subLbl.text = GuideLayout.subLine(p.guide)
+end sub
+
+function fixMax(a as float, b as float) as float
+    if a > b then return a
+    return b
+end function

@@ -50,8 +50,21 @@ sub route()
     else if not Device.capsDoneForServer()
         showDiagnostic()
     else
-        showPlaceholder("Signed in", "The guide is coming in Phase 6.")
+        showGuide()
     end if
+end sub
+
+sub showGuide()
+    s = CreateObject("roSGNode", "Guide")
+    m.top.appendChild(s)
+    s.observeField("tuneChannelId", "onGuideTune")
+    s.setFocus(true)
+    m.screen = s
+end sub
+
+sub onGuideTune()
+    ' 6d wires this to the player; for now, log the tune intent.
+    if m.screen <> invalid then Log.info("guide tune -> " + m.screen.tuneChannelId)
 end sub
 
 sub showDiagnostic()

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  ChannelRow — one guide row (a MarkupList itemComponent): the channel rail (tinted icon circle +
+  number + name) and the program lane (blocks positioned by time; the on-now block gets the 2-tone
+  elapsed/remaining fill + accent bar). Ported from tv-web/tv-native aurora-grid Row. The list sets
+  itemContent / width / height / focusPercent. Channel data + nowMs/T0Ms travel on itemContent + m.global.
+-->
+<component name="ChannelRow" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onContent" />
+        <field id="width" type="float" />
+        <field id="height" type="float" />
+        <field id="focusPercent" type="float" onChange="onFocusChange" />
+    </interface>
+</component>

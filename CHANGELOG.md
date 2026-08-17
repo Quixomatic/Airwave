@@ -2,6 +2,30 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.27] - 2026-08-17
+
+Roku **Phase 6a — the Aurora guide grid foundation**, rendering real guide data on a real Ultra.
+
+### Added
+
+- **`apps/tv-roku` guide grid.** The signed-in home is now the Aurora guide.
+  `source/lib/guideLayout.bs` ports the layout math from tv-web/tv-native `layout.ts` (`vw()` 2560→FHD
+  scaling, rail/row/ppm geometry, the genre accent palette, `argb()` hex+alpha→ARGB, `subLine`/
+  `audioBadge`, ISO parsing, local-time `fmtTime`/`fmtDay`). `components/guide/ChannelRow.{xml,bs}` is a
+  row — the channel rail (tinted icon circle + number + name, focus highlight + 4px accent bar) and the
+  program lane, with the **2-tone on-now cell** rendered exactly as tv-web does it (elapsed `accent@0.32`
+  / remaining `accent@0.1` split + the 3px accent bar). `components/screens/Guide.{xml,bs}` fetches
+  `Api.guide`, snaps `T0`, and renders the time header (day + 30-min ticks) + a virtualized `MarkupList`
+  of rows + the red now-line. Wired into the entry gate (signed in + caps done → Guide). Verified on the
+  Ultra with 41 live channels.
+
+### Notes
+
+- 6a is the grid foundation. Next: the featured now/next panel (6b), the sidebar + lens + zone machine
+  (6c), the mini-player dock + tune (6d), and polish. Genre icons use a fallback glyph for now — the
+  full bundled lucide + phosphor raster set is the next pass. A minor tick-time snap (:01/:31) is
+  pending.
+
 ## [0.10.26] - 2026-08-16
 
 Roku **Phase 5 — the off-network Plex probe + the promise data layer wired up.**

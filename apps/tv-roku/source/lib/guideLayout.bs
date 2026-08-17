@@ -1,0 +1,135 @@
+' GuideLayout — the Aurora grid's layout constants + helpers, ported from tv-web/tv-native
+' features/guide/layout.ts. The design is authored at 2560px wide and used as a PROPORTION guide:
+' vw(px) converts a spec pixel to an actual FHD (1920) pixel, so the whole layout matches tv-web/native.
+' Roku renders at FHD with UI_SCALE 1 and no CHROME_SCALE (that's an Android-TV-only thing).
+namespace GuideLayout
+    const DESIGN_W = 2560
+    const STAGE_W = 1920
+    const STAGE_H = 1080
+
+    const SLIVER = 92           ' SIDEBAR_SLIVER_W — the only width the sidebar reserves
+    const WINDOW_MIN = 180      ' minutes of timeline across the lane
+    const LEAD_MIN = 30         ' minutes of "already aired" before the grid start
+    const FEATURE_SCALE = 0.76
+    const MIN_MS = 60000
+
+    ' spec px (at 2560) → FHD px.
+    function vw(px as float) as integer
+        return Int(px * GuideLayout.STAGE_W / GuideLayout.DESIGN_W)
+    end function
+
+    ' featured-panel px (uniformly shrunk so the grid keeps room).
+    function fv(px as float) as integer
+        return GuideLayout.vw(px * GuideLayout.FEATURE_SCALE)
+    end function
+
+    ' Derived grid geometry (all FHD px).
+    function colW() as integer
+        return GuideLayout.STAGE_W - GuideLayout.SLIVER          ' 1828
+    end function
+    function railPx() as integer
+        return Int(GuideLayout.colW() * 212 / GuideLayout.DESIGN_W)   ' ≈151
+    end function
+    function rowPx() as integer
+        return Int(GuideLayout.STAGE_W * 168 / GuideLayout.DESIGN_W)  ' 126
+    end function
+    function laneW() as integer
+        return GuideLayout.colW() - GuideLayout.railPx()              ' ≈1677
+    end function
+    function ppm() as float
+        return GuideLayout.laneW() / GuideLayout.WINDOW_MIN           ' ≈9.32 px/min
+    end function
+
+    ' Genre accent palette (cell left-border + tinted fill). Hex, tinted via argb().
+    function accents() as object
+        return ["3b82f6", "4a9fe0", "2f9e8f", "8b5cf6", "3fa66a", "d08b2f", "d0587e", "7c8aa3"]
+    end function
+    function accentOf(i as integer) as string
+        a = GuideLayout.accents()
+        return a[i mod a.count()]
+    end function
+
+    ' hex "rrggbb" + alpha 0..1 → Roku ARGB "0xRRGGBBAA".
+    function argb(hex as string, alpha as float) as string
+        a = Int(alpha * 255 + 0.5)
+        if a < 0 then a = 0
+        if a > 255 then a = 255
+        return "0x" + UCase(hex) + GuideLayout.hex2(a)
+    end function
+
+    function hex2(b as integer) as string
+        h = "0123456789ABCDEF"
+        return Mid(h, (b \ 16) + 1, 1) + Mid(h, (b mod 16) + 1, 1)
+    end function
+
+    ' A program's sub line — "S{s}, E{e} · {rating} · {dur}m" (matches layout.ts subLine).
+    function subLine(g as object) as string
+        parts = []
+        if g.season <> invalid and g.episode <> invalid then parts.push("S" + GuideLayout.numStr(g.season) + ", E" + GuideLayout.numStr(g.episode))
+        if g.contentRating <> invalid and g.contentRating <> "" then parts.push(g.contentRating)
+        if g.durationMs <> invalid then parts.push(GuideLayout.numStr(Int(g.durationMs / 60000 + 0.5)) + "m")
+        return GuideLayout.join(parts, " · ")
+    end function
+
+    function audioBadge(ch as dynamic) as string
+        if ch = 8 then return "7.1"
+        if ch = 6 then return "5.1"
+        if ch = 2 then return "Stereo"
+        if ch <> invalid and ch <> 0 then return "Mono"
+        return ""
+    end function
+
+    ' ---- small utils (BrightScript has no Number.toString / Array.join semantics we want) ----
+
+    function numStr(v as dynamic) as string
+        if v = invalid then return ""
+        if type(v) = "String" or type(v) = "roString" then return v
+        ' JSON numbers parse as Double — render whole numbers without a trailing ".0"/exponent.
+        i = Int(v)
+        if i = v then return i.toStr()
+        return Str(v).Trim()
+    end function
+
+    ' ISO-8601 timestamp → epoch milliseconds (Double, UTC). Positioning math uses UTC consistently.
+    function parseIso(s as string) as double
+        dt = CreateObject("roDateTime")
+        dt.FromISO8601String(s)
+        return dt.AsSeconds() * 1000.0
+    end function
+
+    ' UTC ms → LOCAL "h:MM AM/PM" (server sends UTC; the guide shows the viewer's local time, like tv-web).
+    function fmtTime(utcMs as double) as string
+        d = CreateObject("roDateTime")
+        d.FromSeconds(Int(utcMs / 1000))
+        d.ToLocalTime()
+        h = d.GetHours()
+        mn = d.GetMinutes()
+        ap = "AM"
+        if h >= 12 then ap = "PM"
+        h12 = h mod 12
+        if h12 = 0 then h12 = 12
+        mm = mn.toStr()
+        if mn < 10 then mm = "0" + mm
+        return h12.toStr() + ":" + mm + " " + ap
+    end function
+
+    ' UTC ms → LOCAL "Wkd M/D".
+    function fmtDay(utcMs as double) as string
+        d = CreateObject("roDateTime")
+        d.FromSeconds(Int(utcMs / 1000))
+        d.ToLocalTime()
+        days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        return days[d.GetDayOfWeek()] + " " + d.GetMonth().toStr() + "/" + d.GetDayOfMonth().toStr()
+    end function
+
+    function join(arr as object, sep as string) as string
+        out = ""
+        first = true
+        for each v in arr
+            if not first then out = out + sep
+            out = out + v
+            first = false
+        end for
+        return out
+    end function
+end namespace

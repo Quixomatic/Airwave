@@ -1,0 +1,153 @@
+import "pkg:/source/lib/guideLayout.bs"
+import "pkg:/source/theme.bs"
+import "pkg:/source/lib/api.bs"
+import "pkg:/source/lib/log.bs"
+import "pkg:/source/input/keys.bs"
+
+' Guide scene (6a): fetch the cross-channel grid, render the time header + a MarkupList of ChannelRow
+' (each row = rail + program lane with the 2-tone on-now cell) + the now-line. Featured panel + sidebar
+' + full zone machine are 6b/6c.
+
+sub init()
+    m.dayLabel = m.top.findNode("dayLabel")
+    m.ticks = m.top.findNode("ticks")
+    m.gridClip = m.top.findNode("gridClip")
+    m.list = m.top.findNode("list")
+    m.nowLine = m.top.findNode("nowLine")
+    m.nowDot = m.top.findNode("nowDot")
+    m.msg = m.top.findNode("msg")
+
+    Theme.setFont(m.dayLabel, Theme.FONT_SEMI, GuideLayout.vw(32))
+    Theme.setFont(m.msg, Theme.FONT_REG, 26)
+
+    m.gridClip.clippingRect = [0, 0, GuideLayout.colW(), 534]
+
+    m.list.itemComponentName = "ChannelRow"
+    m.list.itemSize = [GuideLayout.colW(), GuideLayout.rowPx()]
+    m.list.numColumns = 1
+    m.list.observeField("itemSelected", "onItemSelected")
+
+    ' Times travel to the rows as ISO strings on m.global (float fields can't hold epoch-ms).
+    if not m.global.hasField("guideServerTime")
+        m.global.addFields({ guideServerTime: "", guideT0Iso: "" })
+    end if
+
+    load()
+    m.top.setFocus(true)
+end sub
+
+sub load()
+    m.msg.visible = true
+    m.msg.text = "Loading…"
+    p = Api.guide(180)
+    onThen(p, onGuide, m)
+    onCatch(p, onGuideErr, m)
+end sub
+
+sub onGuide(data as object, _ctx as object)
+    if data = invalid or data.channels = invalid
+        onGuideErr({ message: "empty" }, invalid)
+        return
+    end if
+    channels = data.channels
+    if channels.count() = 0
+        m.msg.visible = true
+        m.msg.text = "No channels yet."
+        return
+    end if
+    m.msg.visible = false
+
+    serverTime = data.serverTime
+    m.nowMs = GuideLayout.parseIso(serverTime)
+    t0Iso = computeT0Iso(m.nowMs)
+    m.t0Ms = GuideLayout.parseIso(t0Iso)
+
+    ' Publish times for the rows.
+    m.global.guideServerTime = serverTime
+    m.global.guideT0Iso = t0Iso
+
+    buildTicks()
+    buildContent(channels)
+    drawNowLine()
+    m.list.setFocus(true)
+    Log.info("[guide] " + Str(channels.count()).Trim() + " channels rendered")
+end sub
+
+sub onGuideErr(err as object, _ctx as object)
+    m.msg.visible = true
+    m.msg.text = "Couldn't load the guide."
+    Log.warn("[guide] load error: " + Log.trunc(err))
+end sub
+
+' T0 = now − 30min, snapped back to the nearest :31 / :01 half-hour boundary (matches tv-web/native).
+' Returned as an ISO string (parsed to a precise double by callers).
+function computeT0Iso(nowMs as double) as string
+    baseSecs = Int(nowMs / 1000) - GuideLayout.LEAD_MIN * 60
+    d = CreateObject("roDateTime")
+    d.FromSeconds(baseSecs)
+    mins = d.GetMinutes()
+    secOfMin = d.GetSeconds()
+    if mins >= 31
+        target = 31
+    else if mins >= 1
+        target = 1
+    else
+        target = -29
+    end if
+    t0Secs = baseSecs - ((mins - target) * 60 + secOfMin)
+    d.FromSeconds(t0Secs)
+    return d.ToISOString()
+end function
+
+sub buildTicks()
+    tk = m.ticks
+    while tk.getChildCount() > 0
+        tk.removeChildIndex(0)
+    end while
+    m.dayLabel.text = GuideLayout.fmtDay(m.t0Ms)
+    ppm = GuideLayout.ppm()
+    n = Int(GuideLayout.WINDOW_MIN / 30) + 1
+    for i = 0 to n - 1
+        tickMs = m.t0Ms + i * 30 * 60000.0
+        lbl = tk.createChild("Label")
+        lbl.translation = [Int(i * 30 * ppm), GuideLayout.vw(6)]
+        lbl.color = "0xC3C9D4FF"
+        Theme.setFont(lbl, Theme.FONT_SEMI, GuideLayout.vw(32))
+        lbl.text = GuideLayout.fmtTime(tickMs)
+    end for
+end sub
+
+sub buildContent(channels as object)
+    content = CreateObject("roSGNode", "ContentNode")
+    i = 0
+    for each ch in channels
+        node = content.createChild("ContentNode")
+        node.addFields({ channel: ch, accentHex: GuideLayout.accentOf(i) })
+        i = i + 1
+    end for
+    m.list.content = content
+end sub
+
+sub drawNowLine()
+    nowMin = (m.nowMs - m.t0Ms) / 60000.0
+    if nowMin < 0 or nowMin > GuideLayout.WINDOW_MIN
+        m.nowLine.visible = false
+        m.nowDot.visible = false
+        return
+    end if
+    x = 92 + GuideLayout.railPx() + Int(nowMin * GuideLayout.ppm())
+    m.nowLine.translation = [x, 546]
+    m.nowLine.visible = true
+    m.nowDot.translation = [x - 6, 538]
+    m.nowDot.visible = true
+end sub
+
+sub onItemSelected()
+    idx = m.list.itemSelected
+    content = m.list.content
+    if content = invalid then return
+    node = content.getChild(idx)
+    if node = invalid or node.channel = invalid then return
+    Log.info("[guide] tune -> " + node.channel.id)
+    m.top.tuneChannelId = node.channel.id
+end sub
