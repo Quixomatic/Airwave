@@ -59,8 +59,11 @@ sub init()
 end sub
 
 sub load()
-    m.msg.visible = true
-    m.msg.text = "Loading…"
+    ' Show the ghost skeleton with a loading message while the first fetch is in flight (instead of a bare
+    ' "Loading…" over the empty/broken featured panel).
+    m.ghost.message = "Loading your guide…"
+    m.ghost.sub = ""
+    showEmpty(true)
     p = Api.guide(180)
     onThen(p, onGuide, m)
     onCatch(p, onGuideErr, m)
@@ -97,12 +100,12 @@ function processGuide(data as object, resetFocus as boolean) as boolean
     raw = data.channels
     if raw.count() = 0
         if resetFocus
-            m.msg.visible = true
-            m.msg.text = "No channels yet."
+            m.ghost.message = lensEmptyTitle()
+            m.ghost.sub = lensEmptySub()
+            showEmpty(true)
         end if
         return false
     end if
-    m.msg.visible = false
 
     serverTime = data.serverTime
     m.nowMs = GuideLayout.parseIso(serverTime)
@@ -247,8 +250,9 @@ function lensEmptySub() as string
 end function
 
 sub onGuideErr(err as object, _ctx as object)
-    m.msg.visible = true
-    m.msg.text = "Couldn't load the guide."
+    m.ghost.message = "Couldn't load the guide"
+    m.ghost.sub = "Check your connection and try again."
+    showEmpty(true)
     Log.warn("[guide] load error: " + Log.trunc(err))
 end sub
 

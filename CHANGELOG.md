@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.43] - 2026-08-17
+
+### Changed
+
+- **Roku guide loading + error states use the ghost** — while the first guide fetch is in flight (and on a
+  load error), the guide now shows the faint skeleton + a "Loading your guide…" / error message instead of a
+  bare "Loading…" over an empty, broken-looking featured panel.
+
 ## [0.10.42] - 2026-08-17
 
 ### Added
