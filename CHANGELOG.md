@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.41] - 2026-08-17
+
+### Changed
+
+- **Roku circle borders are 1px** (the tinted icon circles + glass buttons), matching tv-web/native's
+  `borderWidth:1`; the glass focus ring stays 2px so it reads as a distinct outer ring.
+
 ## [0.10.40] - 2026-08-17
 
 ### Changed

@@ -25,8 +25,9 @@ WHITE = (255, 255, 255, 255)
 
 # Solid fill discs: diameter px.
 FILLS = [36, 54, 96]
-# Rings: (diameter px, stroke px at the target size).
-RINGS = [(36, 2), (54, 2), (62, 2)]
+# Rings: (diameter px, stroke px at the target size). Borders are 1px (matches tv-web/native borderWidth:1);
+# the glass focus ring is 2px so it reads as a distinct ring outside the button's own border.
+RINGS = [(36, 1), (54, 1), (62, 2)]
 
 
 def fill(d):
