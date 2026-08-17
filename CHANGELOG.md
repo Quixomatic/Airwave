@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.45] - 2026-08-17
+
+### Fixed
+
+- **Roku guide polling no longer resets the scroll position** — when the 60s auto-refresh replaced the guide
+  content, `VirtualRowList` was zeroing its scroll offset, snapping the user back to the first channel (the
+  refresh preserves the focused channel, so nothing re-scrolled it into view). The refresh now preserves the
+  scroll offset and just clamps it to the new content bounds; a lens change still resets to the top (it resets
+  the focused channel, which re-scrolls). Matches tv-web/tv-native, where a background refetch never moves the
+  viewport.
+
 ## [0.10.44] - 2026-08-17
 
 Roku **Phase 7 kickoff — the player (first slice)**.

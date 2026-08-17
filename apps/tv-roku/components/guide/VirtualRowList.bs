@@ -34,17 +34,28 @@ sub buildPool()
     relayout()
 end sub
 
-' New content (or a lens switch) — reset to the top and rebind everything.
+' New content (a lens switch OR the 60s refresh). PRESERVE the scroll position — the 60s refresh must NOT
+' yank the user to the top. Just force a re-bind + clamp to the new content. A lens change resets fc, so the
+' owner's focusIndex change re-scrolls to the top via onFocusIndex; the refresh keeps fc, so we stay put.
 sub onContentChange()
-    m.scrollY = 0.0
     for i = 0 to m.rowAbs.count() - 1
         m.rowAbs[i] = -1
     end for
     if not m.built
         buildPool()
-    else
-        relayout()
+        return
     end if
+    clampScroll()
+    relayout()
+end sub
+
+sub clampScroll()
+    content = m.top.content
+    if content = invalid then return
+    maxScroll = content.getChildCount() * m.top.rowHeight - m.top.viewportHeight
+    if maxScroll < 0 then maxScroll = 0
+    if m.scrollY > maxScroll then m.scrollY = maxScroll
+    if m.scrollY < 0 then m.scrollY = 0
 end sub
 
 ' fc changed → scroll only if the focused row is off-screen (float-then-snap), then re-lay-out.
