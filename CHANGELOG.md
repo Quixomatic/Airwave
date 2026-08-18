@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.59] - 2026-08-18
+
+### Fixed
+
+- **Roku: DVR seek into a previous direct-play program no longer intermittently restarts from the beginning.**
+  Roku's `ContentNode.PlayStart` is honored inconsistently for direct-play raw files — sometimes the file
+  opens at 0 instead of the requested offset, so scrubbing back through a bumper into an earlier program would
+  occasionally start it over. The player now arms a one-shot **safety re-seek**: on a fresh direct-play load
+  with a real offset, if the Video node reaches `playing` at a position near 0 (`< offset − 3s`), it forces
+  `seek = offset`. It no-ops when `PlayStart` worked (position already ≈ offset), so it can't fight a correct
+  start, and only arms for direct-play. (tv-web/tv-native are unaffected — `<video>.currentTime` / mpv `start=`
+  apply the offset reliably.)
+
 ## [0.10.58] - 2026-08-18
 
 Roku **player-chrome button states** + Roku is documented on the site.

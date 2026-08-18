@@ -57,6 +57,7 @@ sub init()
     m.quality = "original"
     m.audioStreamId = invalid
     m.subtitleStreamId = invalid
+    m.wantSeek = 0.0   ' safety re-seek target for direct-play (Roku ignores PlayStart intermittently)
     ' PlaybackLog state (armed per fresh load in onMedia). logged=true here so nothing logs pre-load.
     m.logCtx = invalid
     m.logged = true
@@ -530,6 +531,7 @@ sub onMedia(info as object, pend as object)
     }
     m.logged = false
     m.audioForced = false
+    m.wantSeek = 0.0   ' safety-reseek target — armed only on a fresh direct-play load (see the else branch)
 
     sameMedia = (info.url = m.currentUrl)
     m.currentUrl = info.url
@@ -550,7 +552,10 @@ sub onMedia(info as object, pend as object)
         node.url = info.url
         node.streamFormat = fmt
         ' direct (raw file) opens AT the offset; a transcode (http/hls) bakes the offset server-side → from 0.
-        if info.mode = "direct" and offset > 0 then node.PlayStart = offset
+        if info.mode = "direct" and offset > 0
+            node.PlayStart = offset
+            m.wantSeek = offset   ' arm the safety re-seek (Roku ignores PlayStart intermittently) — see onVideoState
+        end if
         m.video.content = node
         m.video.control = "play"
         m.logTimer.control = "stop"
@@ -681,6 +686,14 @@ sub onVideoState()
         if cur <> invalid and cur.kind = "PROGRAM" and not cur.baselineReady
             cur.playStartCurrentTime = m.video.position
             cur.baselineReady = true
+        end if
+        ' PlayStart is INTERMITTENTLY IGNORED on Roku direct-play (the raw file opens at 0 instead of the
+        ' offset) → a DVR seek into a previous program sometimes starts it from the beginning. Belt-and-
+        ' suspenders: if we asked to open at a real offset but landed near 0, force the seek once. (tv-web/
+        ' tv-native don't need this — <video>.currentTime / mpv `start=` apply the offset reliably.)
+        if m.wantSeek > 0.0
+            if m.video.position < m.wantSeek - 3.0 then m.video.seek = m.wantSeek
+            m.wantSeek = 0.0
         end if
         if not m.logged then recordLog("playing", invalid)
     else if st = "finished"
