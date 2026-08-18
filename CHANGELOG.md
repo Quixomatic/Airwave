@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.54] - 2026-08-17
+
+### Fixed
+
+- **Roku player: audio/subtitle/quality picker selections now apply.** Picking an option opened the dialog
+  and updated the choice but did nothing to playback — `reResolve()` → `seekTo(currentEffective())` hit the
+  no-op guard (same program, same position) and bailed before re-requesting `/media`. The guard now also
+  requires the `paramsKey` (quality|audio|subtitle) to match, so a picker change forces the re-resolve
+  (subtitles burn into a transcode, audio/quality swap) — matching tv-web/tv-native.
+
 ## [0.10.53] - 2026-08-17
 
 Roku **ChannelSurf carousel + mini idle→full (Increment D + B2)**.

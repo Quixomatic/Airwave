@@ -1,6 +1,6 @@
 {
   "name": "tv-web",
-  "version": "0.10.53",
+  "version": "0.10.54",
   "private": true,
   "type": "module",
   "scripts": {

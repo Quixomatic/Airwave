@@ -237,6 +237,16 @@ sub reResolve()
     if m.current <> invalid and m.current.kind = "PROGRAM" then seekTo(currentEffective(), false, 0)
 end sub
 
+' A key over the current quality/audio/sub options — stamped on the loaded program so the seekTo no-op guard
+' re-resolves when a picker changes one (parity with tv-web's paramsKey).
+function paramsKeyOf() as string
+    a = ""
+    if m.audioStreamId <> invalid then a = m.audioStreamId
+    s = ""
+    if m.subtitleStreamId <> invalid then s = m.subtitleStreamId
+    return m.quality + "|" + a + "|" + s
+end function
+
 ' ---- channel surf -----------------------------------------------------------
 
 sub openSurf()
@@ -430,7 +440,10 @@ sub seekTo(target as double, forceHls as boolean, audioCandidate as integer)
     ' No-op guard: already playing this exact program near this position (skip on a forced-hls retry).
     if not forceHls and audioCandidate = 0 and entry.kind = "PROGRAM" and entry.ratingKey <> invalid and m.current <> invalid and m.current.kind = "PROGRAM"
         curEff# = currentEffective()
-        if m.current.index = idx and Abs(clamped# - curEff#) < 2.0
+        ' ...AND the same quality/audio/sub params — a picker change flips paramsKey so this re-resolves.
+        ' (⚠️ this makes pickers re-resolve → a transcode whose video+burned-subs play but audio is silent on
+        ' Roku — the open HLS-transcode-audio issue; see §0.5. Kept ON per James.)
+        if m.current.index = idx and Abs(clamped# - curEff#) < 2.0 and m.current.paramsKey = paramsKeyOf()
             m.transitioning = false
             return
         end if
@@ -488,7 +501,7 @@ sub onMedia(info as object, pend as object)
         index: pend.idx, kind: "PROGRAM", startS: entry.startS, endS: entry.endS,
         ratingKey: entry.ratingKey, guide: entry.guide, mode: info.mode, session: info.session,
         offset: offset, playStartCurrentTime: 0.0, baselineReady: false, retried: pend.forceHls,
-        delivery: buildDelivery(info)
+        delivery: buildDelivery(info), paramsKey: paramsKeyOf()
     }
     m.paused = false
     if m.chrome <> invalid
