@@ -572,8 +572,12 @@ sub renderControls()
 
     if paused then Icon.apply(m.ctl[0].icon, "lucide:Play", 22, C_TEXT) else Icon.apply(m.ctl[0].icon, "lucide:Pause", 22, C_TEXT)
     setPillText(0, paused ? "Play" : "Pause")
+    ' Restart is a no-op during a bumper (nothing to restart) → dim it. canRestart = current slot is a PROGRAM.
+    if st.canRestart = true then m.ctl[1].group.opacity = 1.0 else m.ctl[1].group.opacity = 0.4
+    ' Live button relabels on the live edge (tv-web/native parity): at live = "Continue Watching" (Clapperboard),
+    ' behind live = "Jump to Live" (Radio).
     if atLive then Icon.apply(m.ctl[4].icon, "lucide:Clapperboard", 22, C_TEXT) else Icon.apply(m.ctl[4].icon, "lucide:Radio", 22, C_TEXT)
-    setPillText(4, atLive ? "Jump to Live" : "Continue Watching")
+    setPillText(4, atLive ? "Continue Watching" : "Jump to Live")
     relayoutControls()
 end sub
 

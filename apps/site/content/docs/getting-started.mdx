@@ -75,7 +75,7 @@ Access is enforced **server-side** on every viewer REST read and on the playback
 
 With a channel built and a viewer account ready, open a client and tune in.
 
-1. **Open a TV app.** Pick your platform from the [availability table](https://github.com/Quixomatic/Airwave#platform-availability) in the README — Apple TV, iPad, Android TV, Fire TV, and LG webOS have native apps; **any browser** works via the `tvweb` Docker role (an auth-gated web player). The admin's built-in browser player at `/watch/:channel` is handy for a quick check without leaving the panel.
+1. **Open a TV app.** Pick your platform from the [availability table](https://github.com/Quixomatic/Airwave#platform-availability) in the README — Apple TV, iPad, Android TV, Fire TV, LG webOS, and Roku have native apps; **any browser** works via the `tvweb` Docker role (an auth-gated web player). The admin's built-in browser player at `/watch/:channel` is handy for a quick check without leaving the panel.
 2. **Point it at your server.** The native apps scan your LAN for the server automatically; if that doesn't find it, enter your `SERVER_PUBLIC_URL` manually.
 3. **Sign in** — "Sign in with Plex," or the email/password of any Airwave account. TV clients use a device-code flow (scan a QR / enter a short code).
 4. **Tune in.** Open the guide, pick a channel, and you join whatever's on now, mid-program, at the correct offset. Scrub back within the live buffer (DVR-style); you can't skip ahead. Channel up/down and channel-surf without leaving what's playing.

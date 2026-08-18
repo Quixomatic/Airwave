@@ -6,9 +6,10 @@ description: "What Airwave runs on — the client platform matrix (native apps v
 
 Airwave's viewer app is a full **10-foot TV experience** — an Aurora channel-guide grid, a native-first
 player with a DVR scrubber, channel up/down, and the "Up Next" bumper card. It's the **same app** across
-platforms, delivered two ways: as a **native binary** (`tv-native`) for the living-room streaming boxes,
-and as a **web player** (`tv-web`) for browsers and packaged webOS. Features land in one codebase and
-show up everywhere.
+platforms, delivered three ways: as a **native binary** (`tv-native`) for the living-room streaming boxes,
+as a **web player** (`tv-web`) for browsers and packaged webOS, and as a **native Roku channel** (`tv-roku`)
+built directly in Roku's SceneGraph. The web/native builds share a codebase; Roku is its own codebase held
+to the same design and server contract — so the experience matches everywhere.
 
 ## The 10-foot / large-tablet stance
 
@@ -22,9 +23,10 @@ a 6-inch screen.
 <PlatformMatrix />
 
 > **Store status vs. what runs today.** The native apps are **built and running on real hardware now**
-> (iPad, Apple TV 4K, Android TV, Fire TV) and webOS runs daily on a real LG C2. Publishing them to the
-> App Store / Google Play / Amazon Appstore / LG Content Store is a **prerequisite still being
-> completed** — iPad and Apple TV first, then the rest. The intended store-by-store distribution is
+> (iPad, Apple TV 4K, Android TV, Fire TV), webOS runs daily on a real LG C2, and the **Roku** channel runs
+> on a real Roku Streaming Stick 4K. Publishing them to the App Store / Google Play / Amazon Appstore / LG
+> Content Store / Roku Channel Store is a **prerequisite still being completed** — iPad and Apple TV first,
+> then the rest. The intended store-by-store distribution is
 > listed in the project [README's availability table](https://github.com/Quixomatic/Airwave#platform-availability).
 > Because Airwave is source-available, you can also **build and sideload** any native app yourself.
 
@@ -47,13 +49,31 @@ native `<video>` element with an **hls.js** fallback for MSE playback. It powers
 
 - **Any browser** — via the optional **`tvweb` Docker role**, an auth-gated web player you serve from the
   same compose stack. This works today, for free, on any modern browser.
-- **LG webOS** — the same web app packaged as a webOS TV app (with Roku and Samsung Tizen builds on the
-  roadmap).
+- **LG webOS** — the same web app packaged as a webOS TV app (with a Samsung Tizen build on the roadmap).
 
 TV clients sign in with a **device-code flow** — scan a QR or enter a short code — using either "Sign in
 with Plex" or any Airwave account.
 
 ![Signing in to the web player with a QR code](/screenshots/tvweb-qrcode.webp)
+
+## Roku (`tv-roku`)
+
+Roku can't run the web or React Native builds, so the Roku channel is its **own app**, written in
+**BrighterScript + SceneGraph** — Roku's native UI toolkit. It's a fully independent, separately-maintained
+codebase that shares **zero code** with `tv-web` or `tv-native`, yet it's held to **strict visual and
+functional parity**: the same Aurora guide, glass player with DVR scrubber, channel surf, "Up Next" bumper
+card, and settings — a household moving between an LG TV, an Apple TV, and a Roku should feel they're using
+**one product**.
+
+It plays through Roku's native **`Video` node**, which direct-plays wide codecs (4K HDR HEVC and more) with
+no server transcode — and where a transcode is unavoidable, the server hands Roku an MPEG-TS HLS stream its
+native player demuxes cleanly. Device capabilities come from Roku's authoritative
+**`roDeviceInfo.CanDecodeVideo`** API (rather than the measured `<video>`/mpv probe the other clients use),
+feeding the same capability model. Sign-in is the same **device-code flow** (Plex or an Airwave account),
+and it talks to the identical `/api/v1` server contract — so nothing server-side changes.
+
+Distribution is via the **Roku Channel Store** (built and running on real hardware; store submission still
+to come), or sideloaded from source in Developer Mode.
 
 ## Also: the admin panel
 

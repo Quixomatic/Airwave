@@ -2,6 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.58] - 2026-08-18
+
+Roku **player-chrome button states** + Roku is documented on the site.
+
+### Fixed
+
+- **Roku full-chrome control states now match tv-web/tv-native.** The **Restart** button dims (opacity 0.4)
+  during a bumper — there's nothing to restart (`canRestart` = the current slot is a PROGRAM) — and the
+  **Live** button relabels on the live edge: "Continue Watching" (Clapperboard) when at live, "Jump to Live"
+  (Radio) when behind. The Live label was previously inverted.
+
+### Docs
+
+- **getairwave.tv Platforms page** now documents **Roku as a built native channel** (`tv-roku`, BrighterScript +
+  SceneGraph, native `Video` node, `roDeviceInfo.CanDecodeVideo`, MPEG-TS HLS for transcodes) with its own
+  section; the availability matrix marks Roku **Supported**; and the platform lists on the home +
+  getting-started pages include Roku.
+
 ## [0.10.57] - 2026-08-18
 
 Roku **Settings** — the full settings section, ported to strict parity with tv-web/tv-native.

@@ -32,8 +32,8 @@ const ROWS: { platform: string; sub?: string; type: string; engine: string; tier
   { platform: "Any browser", type: "Web player", engine: "native + hls.js", tier: "full" },
   { platform: "Android TV", type: "Native app", engine: "mpv", tier: "supported" },
   { platform: "Fire TV", type: "Native app", engine: "mpv", tier: "supported" },
+  { platform: "Roku", type: "Native app", engine: "native (SceneGraph)", tier: "supported" },
   { platform: "Samsung", sub: "Tizen", type: "Web app", engine: "—", tier: "planned" },
-  { platform: "Roku", type: "Native app", engine: "—", tier: "planned" },
 ];
 
 function Badge({ tier }: { tier: Tier }) {
