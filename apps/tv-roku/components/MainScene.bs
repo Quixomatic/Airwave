@@ -96,6 +96,13 @@ sub onGuideTune()
         m.top.appendChild(m.player)
         m.player.observeField("playerCmd", "onPlayerCmd")
     end if
+    ' Re-selecting the channel that's ALREADY playing (a docked mini feed) = just re-expand to full — don't
+    ' re-tune (no `go` bump), matching tv-web/tv-native. A different channel falls through to a real tune.
+    if m.player.layout <> "off" and m.player.channelId = g.tuneChannelId
+        m.player.miniFocused = false
+        m.player.layout = "full"
+        return
+    end if
     ' The effectiveTime clock derives the on-now from the channel timeline (join-live / resume), so tuning
     ' only needs the channel id — the selected program can't seed playback (no future seek). The chrome also
     ' needs the channel's identity (chip + accent). layout=full → the player shows full-screen + takes focus.

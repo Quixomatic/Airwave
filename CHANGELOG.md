@@ -2,6 +2,26 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.56] - 2026-08-18
+
+Roku **mini-player re-expand** fix; the bumper-music video/audio hybrid was attempted and reverted.
+
+### Fixed
+
+- **Roku: reselecting the channel that's already playing now just re-expands the mini player** instead of
+  re-tuning from scratch. With the mini feed docked, opening the guide and picking the same channel restores
+  full-screen instantly (no "Tuning…"), matching tv-web/tv-native. A different channel still does a real tune.
+
+### Reverted
+
+- **Bumper music on Roku (the one-Video-node video/audio hybrid) is deferred.** The happy path worked (the bed
+  played, looped, DVR-synced, paused), but playing the audio-only music bed on the shared Video node **corrupts
+  the audio pipeline**: a following 5.1 program downmixed to stereo, a later channel change dropped audio
+  entirely, and the state persisted across an app restart (device-level HDMI audio config). Content-swapping
+  audio↔video on one Roku Video node doesn't cleanly re-negotiate the channel layout, and stop-based re-inits
+  were flaky. Reverted to the proven pause-and-hold (the BumperCard shows over the held program frame) —
+  reliable audio wins. May revisit with a more robust approach (recreating the Video node) later.
+
 ## [0.10.55] - 2026-08-18
 
 Roku **HLS transcode audio + stability** — the Roku's forced-transcode path (subtitle burn-in,
