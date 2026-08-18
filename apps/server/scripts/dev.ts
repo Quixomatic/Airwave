@@ -38,6 +38,13 @@ if (bundleMtime > sourceMtime) {
   console.log("[dev] workflow handlers up to date — skipping build");
 } else {
   console.log("[dev] workflow sources changed — rebuilding handlers…");
+  // `workflow build`'s directive discovery globs the project and — unlike tsconfig, which excludes it —
+  // does NOT skip build output. A leftover `dist/standalone/server.mjs` from `build:standalone` (a full CJS
+  // bundle of the server, carrying its top-level awaits + an `undici` import) makes the build fail with
+  // "Top-level await is not supported with cjs" / "Could not resolve undici". Clean dist/ first — it's
+  // gitignored build output that regenerates, and `build:standalone` already clears it for this exact reason.
+  const { rmSync } = await import("node:fs");
+  rmSync("./dist", { recursive: true, force: true });
   const build = Bun.spawn(["bunx", "workflow", "build"], { stdio: ["ignore", "inherit", "inherit"] });
   if ((await build.exited) !== 0) {
     console.error("[dev] workflow build failed");

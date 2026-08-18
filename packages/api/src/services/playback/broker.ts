@@ -40,6 +40,8 @@ export type ResolveMediaOptions = {
   deviceId?: string;
   /** Set by the client after a NATIVE attempt errored → force the hls.js/MSE path. */
   forceHls?: boolean;
+  /** HLS transcode packaging: "mp4" (fMP4/CMAF, default — hls.js/MSE) or "mpegts" (Roku native HLS). */
+  hlsContainer?: "mp4" | "mpegts";
   /** Which stored connection the CLIENT streams from — "local" (baseUrl), "remote" (WAN), or
    * "relay". The server always fetches Plex over baseUrl; this only picks the base stamped onto
    * the returned URL, for a TV that's away from home. A remote/relay with no stored URL falls
@@ -81,6 +83,7 @@ export async function resolveMedia(
       subtitleStreamId: opts.subtitleStreamId,
       caps: measured ?? opts.caps,
       forceHls: opts.forceHls,
+      hlsContainer: opts.hlsContainer,
       clientBaseUrl,
     },
   );

@@ -45,15 +45,22 @@ sub init()
     m.video.globalCaptionMode = "Off"
     m.video.subtitleTrack = ""
     m.video.observeField("state", "onVideoState")
+    ' Roku's native HLS player does NOT reliably auto-select an audio rendition (see onAudioTracks).
+    m.video.observeField("availableAudioTracks", "onAudioTracks")
     m.tickTimer.observeField("fire", "onTick")
     m.heartbeatTimer.observeField("fire", "onHeartbeat")
     m.timelineTimer.observeField("fire", "onTimelineRefresh")
+    m.logTimer.observeField("fire", "onLogTimeout")
     Theme.setFont(m.status, Theme.FONT_REG, 22)
     m.status.visible = false   ' the chrome renders real state now; keep the label only as a silent scratch
     ' Per-channel playback options (the pickers drive these in Incr C2).
     m.quality = "original"
     m.audioStreamId = invalid
     m.subtitleStreamId = invalid
+    ' PlaybackLog state (armed per fresh load in onMedia). logged=true here so nothing logs pre-load.
+    m.logCtx = invalid
+    m.logged = true
+    m.audioForced = false
     ' The "Coming up next" bumper interstitial — created BELOW the chrome (over the video), shown on a bumper.
     m.bumper = CreateObject("roSGNode", "BumperCard")
     m.top.appendChild(m.bumper)
@@ -512,6 +519,18 @@ sub onMedia(info as object, pend as object)
         m.chrome.tracks = { audio: atracks, subtitle: stracks }
     end if
 
+    ' PlaybackLog context (parity with tv-web/tv-native): one row per fresh load carries the server's
+    ' decision (mode/codecs/connection) + the real on-device outcome (playing / error / stuck). recordLog
+    ' fires from onVideoState (playing|error) or the logTimer backstop (never settled). See recordLog.
+    m.logCtx = {
+        deviceId: Device.id(), channelId: m.top.channelId, channelName: m.top.channelName,
+        ratingKey: entry.ratingKey, title: titleOf(entry.guide), mode: info.mode,
+        sourceContainer: info.container, sourceVideoCodec: info.videoCodec, sourceAudioCodec: info.audioCodec,
+        decision: info.decision, connection: info.connection
+    }
+    m.logged = false
+    m.audioForced = false
+
     sameMedia = (info.url = m.currentUrl)
     m.currentUrl = info.url
 
@@ -525,6 +544,7 @@ sub onMedia(info as object, pend as object)
             m.video.seek = offset
         end if
         m.video.control = "resume"
+        m.logged = true   ' resume-in-place (DVR seek / roll-back): no fresh decode → don't log a row
     else
         node = CreateObject("roSGNode", "ContentNode")
         node.url = info.url
@@ -533,6 +553,8 @@ sub onMedia(info as object, pend as object)
         if info.mode = "direct" and offset > 0 then node.PlayStart = offset
         m.video.content = node
         m.video.control = "play"
+        m.logTimer.control = "stop"
+        m.logTimer.control = "start"   ' arm the not_decoding backstop for this fresh load
         ' Anchor the baseline to the KNOWN offset immediately for direct-play (its position IS absolute media
         ' time — the same anchor the proven seek path uses). Anchoring on "playing" instead let a premature
         ' position (0, before the PlayStart seek settled) stick, then the position jumped to the offset → the
@@ -560,9 +582,22 @@ function currentEffective() as double
     cur = m.current
     if cur = invalid then return clockSec()
     if cur.kind = "PROGRAM"
-        if not cur.baselineReady then return cur.startS + cur.offset
-        pos# = m.video.position
-        return cur.startS + cur.offset + (pos# - cur.playStartCurrentTime)
+        live# = clockSec()
+        if not cur.baselineReady
+            eff# = cur.startS + cur.offset
+        else
+            pos# = m.video.position
+            eff# = cur.startS + cur.offset + (pos# - cur.playStartCurrentTime)
+        end if
+        ' You can NEVER be playing past live (we clamp every seek to it). For an HLS transcode Roku's `position`
+        ' can momentarily jump — the EXT-X-START:TIME-OFFSET settles AFTER "playing" anchors the baseline at ~0,
+        ' so effective briefly runs many seconds AHEAD of live → the tick's rollover (effective >= endS) misfires
+        ' → seekTo re-resolves at live EVERY tick, tearing down + restarting the Plex transcode each second
+        ' (it never sustains → buffering stutter). Clamping to live is physically correct, a no-op in healthy
+        ' playback (effective is always slightly behind live), and it breaks that loop. Direct-play is immune
+        ' (its baseline is anchored inline to the offset), which is why only transcodes looped.
+        if eff# > live# then eff# = live#
+        return eff#
     end if
     return m.bumperEff
 end function
@@ -647,15 +682,96 @@ sub onVideoState()
             cur.playStartCurrentTime = m.video.position
             cur.baselineReady = true
         end if
+        if not m.logged then recordLog("playing", invalid)
     else if st = "finished"
         ' keep-open EOF backstop: mpv/Video can stall on the last frame just shy of the slot boundary and
         ' never cross the 0.25s rollover threshold — roll to the next slot on EOF within 2s of the end.
         if cur <> invalid and cur.kind = "PROGRAM" and currentEffective() >= cur.endS - 2.0 then seekTo(cur.endS, false, 0)
     else if st = "error"
         m.status.text = "Video error"
+        Log.warn("[player] video error code=" + Str(m.video.errorCode).Trim() + " msg=" + Log.trunc(m.video.errorMsg))
+        if not m.logged then recordLog("error", "code=" + Str(m.video.errorCode).Trim() + " msg=" + m.video.errorMsg)
         ' native-first safety-catch: a decode error on a non-hls program → force an HLS transcode retry.
         if cur <> invalid and cur.kind = "PROGRAM" and cur.mode <> "hls" and not cur.retried then seekTo(currentEffective(), true, 0)
     end if
+end sub
+
+' Record ONE PlaybackLog row for the current load (parity with tv-web/tv-native recordLog). Fires once per
+' fresh load — from onVideoState "playing"/"error" or the logTimer backstop when a load never settles. The
+' `caps.audio` blob is a Roku-specific diagnostic: how many audio renditions the Video node exposed and
+' which one it selected — the ground truth for the transcode no-audio question.
+sub recordLog(outcome as string, errorDetail as dynamic)
+    if m.logCtx = invalid or m.logged then return
+    m.logged = true
+    m.logTimer.control = "stop"
+    ctx = m.logCtx
+
+    ' Audio-track diagnostic (Roku Video node): count of renditions + the currently-selected track + whether
+    ' we force-selected one (onAudioTracks). Nested under `caps.audio` so show-play-log.ts surfaces it.
+    audioInfo = Api.obj()
+    tracks = m.video.availableAudioTracks
+    if tracks = invalid then tracks = []
+    audioInfo.count = tracks.Count()
+    audioInfo.current = m.video.currentAudioTrack
+    audioInfo.forced = m.audioForced
+    ids = []
+    for each t in tracks
+        ids.push(t.LookupCI("Track"))
+    end for
+    audioInfo.ids = ids
+    capsObj = Api.obj()
+    capsObj.audio = audioInfo
+
+    pairs = [
+        ["deviceId", ctx.deviceId],
+        ["channelId", ctx.channelId],
+        ["channelName", ctx.channelName],
+        ["ratingKey", ctx.ratingKey],
+        ["title", ctx.title],
+        ["mode", ctx.mode],
+        ["sourceContainer", ctx.sourceContainer],
+        ["sourceVideoCodec", ctx.sourceVideoCodec],
+        ["sourceAudioCodec", ctx.sourceAudioCodec],
+        ["decision", ctx.decision],
+        ["connection", ctx.connection],
+        ["outcome", outcome],
+        ["caps", capsObj]
+    ]
+    if errorDetail <> invalid then pairs.push(["error", errorDetail])
+    onCatch(Api.logPlayback(pairs), onLogErr, m)
+    Log.info("[player] logged outcome=" + outcome + " mode=" + ctx.mode + " atracks=" + Str(audioInfo.count).Trim() + " cur=" + Api.asStr(audioInfo.current))
+end sub
+
+sub onLogErr(err as object, _m as object)
+    Log.warn("[player] playback-log post failed: " + Log.trunc(err))
+end sub
+
+' Backstop: a load that never reaches "playing" or "error" (stuck buffering → the black-screen case) still
+' gets a row after the logTimer fires, capturing WHY (the Video state it's stuck in + track count).
+sub onLogTimeout()
+    if m.logged then return
+    recordLog("not_decoding", "stuck: state=" + m.video.state)
+end sub
+
+' Roku's native HLS player does NOT reliably auto-select the audio rendition of an fMP4/CMAF
+' transcode. Our server packages HLS as fMP4 (built for webOS/hls.js/MSE), which carries audio in a
+' separate EXT-X-MEDIA group; Roku leaves it unselected → video plays with NO AUDIO (and the unselected
+' rendition can stall the pipeline → black screen). jellyfin-roku forces the track the same way
+' (VideoPlayerView.bs). A Plex HLS transcode always produces exactly ONE audio track (transcoded to a
+' single AAC rendition), so there's nothing to choose — select the one that exists. Direct-play is left
+' alone: Roku plays the raw file's muxed default audio fine.
+sub onAudioTracks()
+    cur = m.current
+    if cur = invalid then return
+    if cur.mode = "direct" then return
+    tracks = m.video.availableAudioTracks
+    if tracks = invalid or tracks.Count() = 0 then return
+    target = tracks[0].LookupCI("Track")
+    if target = invalid or target = "" then return
+    if m.video.currentAudioTrack = target then return   ' already selected — don't trigger a re-buffer
+    m.video.audioTrack = target
+    m.audioForced = true
+    Log.info("[player] force audioTrack=" + target + " (hls transcode, " + Str(tracks.Count()).Trim() + " rendition)")
 end sub
 
 ' ---- controls (media remote keys in Incr A; the FeaturePanel drives these in Incr C) -----

@@ -2,6 +2,44 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.55] - 2026-08-18
+
+Roku **HLS transcode audio + stability** — the Roku's forced-transcode path (subtitle burn-in,
+quality caps, audio picks) now plays audio and holds steady, and the Roku reaches playback-logging
+parity with the other clients.
+
+### What ships
+
+- **MPEG-TS HLS for native-HLS clients (server).** A new `hlsContainer` option on
+  `GET /channels/:id/media` — threaded through `broker.resolveMedia` → `getPlaybackInfo` →
+  `clientProfileExtra` — packages the HLS transcode as **MPEG-TS** (audio muxed into the segments)
+  instead of fMP4/CMAF when the client sends `hlsContainer=mpegts`. Roku's native HLS player can't
+  extract the audio muxed into Plex's fMP4/CMAF segments (`availableAudioTracks=0` → video plays with
+  no audio); MPEG-TS demuxes reliably. **The default is unchanged (fMP4)**, so webOS (hls.js/MSE) and
+  tv-native (mpv) are byte-for-byte untouched — only a client that opts in gets TS.
+- **tv-roku requests MPEG-TS** for its transcode path and force-selects the audio track when the
+  Video node exposes one (a no-op for muxed TS, correct for anything that does list a rendition).
+- **tv-roku playback logging** (`logPlayback`) at parity with tv-web/tv-native: one `PlaybackLog` row
+  per fresh load carrying the Plex decision (mode / codecs / connection) + the on-device outcome
+  (`playing` / `error` / a `not_decoding` backstop for a load that never settles) + a Roku
+  audio-track diagnostic (`caps.audio`: exposed-rendition count, selected track, forced?). Heartbeat,
+  session-end, stop, and device-report were already wired.
+- **Re-resolve loop fix (tv-roku).** `currentEffective()` now clamps to live. An HLS transcode's
+  reported `position` can momentarily jump past the baseline (the `EXT-X-START` offset settles after
+  the `"playing"` anchor), sending effective-time seconds past the program end → the 500 ms tick's
+  rollover re-resolved at live *every tick*, tearing down and restarting the Plex transcode each
+  second (the buffer stutter). Clamping to live is physically correct, a no-op in healthy playback,
+  and breaks the loop; direct-play was already immune (its baseline is anchored inline).
+
+### Fixed (build tooling)
+
+- `pnpm dev` and `pnpm build` now clean `dist/` before `workflow build`. The workflow
+  directive-discovery globs build output (unlike tsconfig, which excludes `dist`), so a leftover
+  `dist/standalone/server.mjs` from `build:standalone` — a full CJS bundle of the server with its
+  top-level `await`s and an `undici` import — made `workflow build` fail (`Top-level await is not
+  supported with the cjs output format`, `Could not resolve "undici"`). `build:standalone` already
+  cleaned `dist/` for this reason; `dev` and `build` now do too.
+
 ## [0.10.54] - 2026-08-17
 
 ### Fixed

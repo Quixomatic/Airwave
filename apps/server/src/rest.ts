@@ -198,6 +198,9 @@ api.get("/channels/:id/media", async (c) => {
   // Which stored connection the TV streams from (it probes local/remote/relay at launch and
   // sends its pick here). Only "remote"/"relay" are meaningful; anything else = local (default).
   const network = c.req.query("network");
+  // How to package the HLS transcode. A NATIVE-HLS client that can't read fMP4-muxed audio (Roku) sends
+  // "mpegts"; everything else defaults to fMP4/CMAF (hls.js/MSE). See getPlaybackInfo + clientProfileExtra.
+  const hlsContainer = c.req.query("hlsContainer") === "mpegts" ? "mpegts" : undefined;
   try {
     return c.json(
       await resolveMedia(prisma, c.req.param("id"), ratingKey, offsetSeconds, {
@@ -207,6 +210,7 @@ api.get("/channels/:id/media", async (c) => {
         caps,
         deviceId: c.req.query("deviceId"),
         forceHls: c.req.query("forceHls") === "1",
+        hlsContainer,
         connection: network === "remote" || network === "relay" ? network : undefined,
       }),
     );

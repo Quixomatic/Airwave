@@ -243,6 +243,10 @@ namespace Api
         if opts.quality <> invalid and opts.quality <> "original" then q.push(["quality", opts.quality])
         if opts.audioStreamId <> invalid then q.push(["audioStreamId", opts.audioStreamId])
         if opts.subtitleStreamId <> invalid then q.push(["subtitleStreamId", opts.subtitleStreamId])
+        ' Roku's native HLS player can't read the audio muxed into Plex's fMP4/CMAF segments
+        ' (availableAudioTracks=0 → no audio); MPEG-TS segments mux audio in a way it demuxes reliably.
+        ' Always request TS for the transcode (server defaults everyone else to fMP4). See broker/quality.ts.
+        q.push(["hlsContainer", "mpegts"])
         if opts.caps <> invalid
             q.push(["vcodecs", Api.joinArr(opts.caps.videoCodecs)])
             q.push(["acodecs", Api.joinArr(opts.caps.audioCodecs)])

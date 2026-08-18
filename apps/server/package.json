@@ -1,10 +1,10 @@
 {
   "name": "server",
-  "version": "0.10.54",
+  "version": "0.10.55",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "build": "workflow build && tsdown",
+    "build": "bun -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && workflow build && tsdown",
     "build:standalone": "bun -e \"require('fs').rmSync('dist',{recursive:true,force:true});require('fs').rmSync('.well-known',{recursive:true,force:true})\" && workflow build && tsdown && bun build dist/index.mjs --target=bun --outfile dist/standalone/server.mjs && bun build scripts/migrate-standalone.ts --target=bun --outfile dist/standalone/migrate.mjs && bun build scripts/workflow-bootstrap.ts --target=bun --outfile dist/standalone-wf/bootstrap.mjs && bun -e \"const fs=require('fs');fs.cpSync(fs.realpathSync('node_modules/@workflow/world-postgres')+'/src/drizzle/migrations','dist/standalone-wf/m',{recursive:true})\"",
     "check-types": "tsc -b",
     "compile": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile server",

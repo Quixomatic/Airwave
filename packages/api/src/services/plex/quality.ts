@@ -104,16 +104,21 @@ export function clientProfileExtra(
   caps: ClientCaps,
   protocol: "hls" | "http" = "http",
   httpContainer = "mkv",
+  hlsContainer: "mp4" | "mpegts" = "mp4",
 ): string {
   const v = caps.videoCodecs.join(",");
   const aDirect = caps.audioCodecs.join(","); // native player: full set
   const safe = caps.audioCodecs.filter((c) => MSE_SAFE_AUDIO.has(c));
   const aTrans = protocol === "hls" ? (safe.length ? safe : ["aac"]).join(",") : aDirect;
-  // hls always packages as fMP4/CMAF (container=mp4). http = a PROGRESSIVE transcode played
-  // by the native <video>: it MUST be a streamable-while-growing container (mkv/mpegts), not
-  // mp4 — a live mp4 has no front moov atom, so the native element gets an unplayable stub
-  // (~89 bytes) and shows black. See progressiveContainer() + [[project-tv-playback-protocol]].
-  const transContainer = protocol === "hls" ? "mp4" : httpContainer;
+  // hls packages as fMP4/CMAF (container=mp4) BY DEFAULT — needed by hls.js/MSE (webOS: HEVC-in-mpegts
+  // is undecodable by MSE). But Roku's NATIVE HLS player is the opposite: it does NOT extract the audio
+  // muxed into Plex's fMP4/CMAF segments (proven on-device — availableAudioTracks=0, video plays with no
+  // audio), and its HLS support is MPEG-TS-first (audio muxed into TS segments, reliably demuxed). So a
+  // native-HLS client (Roku) passes hlsContainer="mpegts" → audio works, matching jellyfin-roku's
+  // TS-preferred transcode profile. http = a PROGRESSIVE transcode played by the native <video>: it MUST
+  // be a streamable-while-growing container (mkv/mpegts), not mp4 (a live mp4 has no front moov atom → an
+  // unplayable ~89-byte stub → black). See progressiveContainer() + [[project-tv-playback-protocol]].
+  const transContainer = protocol === "hls" ? hlsContainer : httpContainer;
   return [
     `add-transcode-target(type=videoProfile&context=streaming&protocol=${protocol}&container=${transContainer}&videoCodec=${v}&audioCodec=${aTrans})`,
     `add-direct-play-target(type=videoProfile&container=mp4&videoCodec=${v}&audioCodec=${aDirect})`,

@@ -632,6 +632,10 @@ export type PlaybackOptions = {
    * client sets this only after a NATIVE attempt errored at runtime — the last-resort
    * rung of the native-first ladder. */
   forceHls?: boolean;
+  /** How to package the HLS transcode segments. "mp4" (default) = fMP4/CMAF, required by hls.js/MSE
+   * (webOS/browser). "mpegts" = MPEG-TS, required by Roku's NATIVE HLS player — it can't extract the
+   * audio muxed into Plex's fMP4 segments (availableAudioTracks=0), but demuxes TS audio reliably. */
+  hlsContainer?: "mp4" | "mpegts";
   /** The base URL to STAMP onto the returned playback URL (what the client streams from).
    * The server's own Plex fetches always use `baseUrl` (it's on the LAN); this only changes
    * the base the CLIENT hits — set to the source's remote/relay URL for an off-network TV.
@@ -881,7 +885,7 @@ export async function getPlaybackInfo(
   // the C2 "could not be decoded"). Platform MUST be Generic — real names 400 on /decision
   // with custom transcode targets (plezy). Without caps, the browser profile (quality path).
   if (caps) {
-    params.set("X-Plex-Client-Profile-Extra", clientProfileExtra(caps, protocol));
+    params.set("X-Plex-Client-Profile-Extra", clientProfileExtra(caps, protocol, "mkv", opts.hlsContainer));
     params.set("X-Plex-Platform", "Generic");
   } else if (quality) {
     params.set("X-Plex-Client-Profile-Extra", BROWSER_CLIENT_PROFILE);

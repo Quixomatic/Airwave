@@ -41,5 +41,7 @@
         <Timer id="tickTimer" repeat="true" duration="0.5" />
         <Timer id="heartbeatTimer" repeat="true" duration="10" />
         <Timer id="timelineTimer" repeat="true" duration="120" />
+        <!-- One-shot backstop: log a PlaybackLog row as "not_decoding" if a load never reaches playing/error. -->
+        <Timer id="logTimer" repeat="false" duration="9" />
     </children>
 </component>
