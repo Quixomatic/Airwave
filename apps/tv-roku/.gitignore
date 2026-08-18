@@ -2,6 +2,9 @@
 out/
 *.zip
 
+# On-demand device screenshots (scripts/grab-screenshot.ts) — local only
+screenshots/
+
 # Secrets: your Roku dev-mode IP + password live here (copy from rokudeploy.example.json)
 rokudeploy.json
 

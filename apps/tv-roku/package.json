@@ -7,6 +7,7 @@
     "build": "bsc",
     "presideload": "bsc",
     "sideload": "roku-deploy",
+    "grab-screenshot": "bun run scripts/grab-screenshot.ts",
     "format": "bsfmt \"**/*.{bs,brs,xml}\" --write",
     "format:check": "bsfmt \"**/*.{bs,brs,xml}\" --check",
     "clean": "rimraf out"
