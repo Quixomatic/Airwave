@@ -185,6 +185,11 @@ namespace Api
         return Api.get("/api/health")
     end function
 
+    ' The signed-in user (better-auth get-session over the bearer token) — { session, user:{name,email,image,role} }.
+    function session() as object
+        return Api.get("/api/auth/get-session")
+    end function
+
     ' Probe an arbitrary base (onboarding, before a server URL is stored). 7s timeout, like tv-web.
     function healthAt(base as string) as object
         return Api.requestAbs("GET", base + "/api/health", invalid, 7000)

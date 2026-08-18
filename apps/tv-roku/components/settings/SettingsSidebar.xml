@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  SettingsSidebar — the settings shell's left rail (port of tv-web/tv-native settings-sidebar.tsx). Same
+  sliver-of-glass-circles treatment as GuideSidebar, but the buttons are the settings categories + a
+  "Back to Guide" circle (separated by a divider). Collapsed 92px sliver → 300px OVERLAY when focused
+  (the content reserves only the sliver and never shifts). Driven by SettingsScreen's zone machine:
+  `expanded`/`focused`/`sel`/`activeKey` come in; `activated` (the chosen item's key) goes out.
+-->
+<component name="SettingsSidebar" extends="Group">
+    <interface>
+        <field id="expanded" type="boolean" onChange="onExpand" />
+        <field id="focused" type="boolean" onChange="onFocus" />
+        <field id="sel" type="integer" value="1" onChange="onSel" />
+        <field id="activeKey" type="string" value="general" onChange="refresh" />
+        <!-- SettingsScreen bumps `activate` to activate the current `sel`; the sidebar emits the item key. -->
+        <field id="activate" type="integer" value="0" alwaysNotify="true" onChange="onActivate" />
+        <field id="activated" type="string" alwaysNotify="true" />
+        <field id="itemCount" type="integer" value="7" />
+    </interface>
+    <children>
+        <Rectangle id="scrim" color="0x060A14FF" width="1920" height="1080" opacity="0" />
+        <Rectangle id="bg" color="0x0B1120F2" width="92" height="1080" />
+        <Rectangle id="rightBorder" color="0x94A3B840" width="1" height="1080" translation="[92,0]" />
+        <Group id="items" />
+        <Rectangle id="divider" color="0xFFFFFF14" height="1" width="56" />
+        <Animation id="expandAnim" duration="0.22" easeFunction="outCubic">
+            <FloatFieldInterpolator id="widthI" key="[0,1]" keyValue="[92,300]" fieldToInterp="bg.width" />
+            <Vector2DFieldInterpolator id="borderI" key="[0,1]" keyValue="[[92,0],[300,0]]" fieldToInterp="rightBorder.translation" />
+            <FloatFieldInterpolator id="scrimI" key="[0,1]" keyValue="[0,0.55]" fieldToInterp="scrim.opacity" />
+            <FloatFieldInterpolator id="dividerI" key="[0,1]" keyValue="[56,264]" fieldToInterp="divider.width" />
+        </Animation>
+    </children>
+</component>

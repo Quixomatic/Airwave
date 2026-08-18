@@ -1,0 +1,88 @@
+import "pkg:/source/lib/guideLayout.bs"
+
+' SettingsSidebar code-behind (mirrors GuideSidebar, minus the filter list). Builds the category circles
+' (Back to Guide + General/User/Server/Device/Audio/About), a divider after "Back to Guide", the collapsed↔
+' expanded animation, D-pad focus rings, and emits the chosen item key on `activated`.
+' (m.<id> auto-injected: scrim, bg, rightBorder, items, divider, expandAnim, widthI, borderI, scrimI, dividerI.)
+
+const SB_SLIVER = 92
+const SB_EXPANDED = 300
+const SB_PADH = 18
+const SB_PADV = 24
+const SB_GAP = 14
+const SB_CIRCLE = 54
+
+sub init()
+    m.keys = ["guide", "general", "user", "server", "device", "audio", "about"]
+    defs = [
+        { label: "Back to Guide", icon: "lucide:ArrowLeft" },
+        { label: "General", icon: "lucide:SlidersHorizontal" },
+        { label: "User", icon: "lucide:UserRound" },
+        { label: "Server", icon: "lucide:Server" },
+        { label: "Device", icon: "lucide:Cpu" },
+        { label: "Audio", icon: "lucide:Volume2" },
+        { label: "About", icon: "lucide:Info" }
+    ]
+    m.btns = []
+    y = SB_PADV
+    i = 0
+    for each d in defs
+        b = m.items.createChild("GlassCircleButton")
+        b.translation = [SB_PADH, y]
+        b.iconId = d.icon
+        b.label = d.label
+        m.btns.push(b)
+        y = y + SB_CIRCLE + SB_GAP
+        ' A divider gap after "Back to Guide" (index 0) — matches the guide/settings sidebars.
+        if i = 0
+            m.dividerY = y - SB_GAP + 4
+            m.divider.translation = [SB_PADH, m.dividerY]
+            y = y + 12
+        end if
+        i = i + 1
+    end for
+    refresh()
+end sub
+
+sub onExpand()
+    ex = m.top.expanded
+    if ex
+        m.widthI.keyValue = [SB_SLIVER, SB_EXPANDED]
+        m.borderI.keyValue = [[SB_SLIVER, 0], [SB_EXPANDED, 0]]
+        m.scrimI.keyValue = [0.0, 0.55]
+        m.dividerI.keyValue = [SB_SLIVER - 2 * SB_PADH, SB_EXPANDED - 2 * SB_PADH]
+    else
+        m.widthI.keyValue = [m.bg.width, SB_SLIVER]
+        m.borderI.keyValue = [[m.bg.width, 0], [SB_SLIVER, 0]]
+        m.scrimI.keyValue = [m.scrim.opacity, 0.0]
+        m.dividerI.keyValue = [m.divider.width, SB_SLIVER - 2 * SB_PADH]
+    end if
+    m.expandAnim.control = "start"
+    refresh()
+end sub
+
+sub onFocus()
+    refresh()
+end sub
+
+sub onSel()
+    refresh()
+end sub
+
+sub onActivate()
+    if m.top.sel < 0 or m.top.sel >= m.keys.count() then return
+    m.top.activated = m.keys[m.top.sel]
+end sub
+
+sub refresh()
+    ex = m.top.expanded
+    focused = m.top.focused
+    sel = m.top.sel
+    activeKey = m.top.activeKey
+    for i = 0 to m.btns.count() - 1
+        b = m.btns[i]
+        b.expanded = ex
+        b.active = (m.keys[i] = activeKey)
+        b.focused = (focused and sel = i)
+    end for
+end sub

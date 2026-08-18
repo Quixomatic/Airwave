@@ -82,8 +82,65 @@ sub showGuide()
     s = CreateObject("roSGNode", "Guide")
     m.top.appendChild(s)
     s.observeField("tuneChannelId", "onGuideTune")
+    s.observeField("openSettings", "onOpenSettings")
     s.setFocus(true)
     m.screen = s
+    ' Restore the player (hidden while in Settings) if one is docked/playing.
+    if m.player <> invalid and m.player.layout <> "off" then m.player.visible = true
+end sub
+
+' Guide sidebar → open the Settings shell at a category (General / User). Replaces the guide screen; the
+' player (if any) is hidden while in Settings and restored on return.
+sub onOpenSettings()
+    if m.screen = invalid then return
+    cat = m.screen.openSettings
+    if cat = invalid or cat = "" then return
+    if m.player <> invalid then m.player.visible = false
+    m.top.removeChild(m.screen)
+    s = CreateObject("roSGNode", "SettingsScreen")
+    s.category = cat
+    m.top.appendChild(s)
+    s.observeField("done", "onSettingsDone")
+    s.observeField("exitTo", "onSettingsExit")
+    s.observeField("reprobe", "onSettingsReprobe")
+    s.setFocus(true)
+    m.screen = s
+end sub
+
+sub onSettingsDone()
+    if m.screen <> invalid
+        m.top.removeChild(m.screen)
+        m.screen = invalid
+    end if
+    showGuide()
+end sub
+
+' Sign out ("login") or change server ("setup") — clear creds + tear down the player + re-route.
+sub onSettingsExit()
+    if m.screen = invalid then return
+    dest = m.screen.exitTo
+    if dest = invalid or dest = "" then return
+    ' Run capability diagnostic → show the Diagnostic screen (it re-measures, then routes on to the guide).
+    if dest = "diagnostic"
+        m.top.removeChild(m.screen)
+        m.screen = invalid
+        showDiagnostic()
+        return
+    end if
+    ' Sign out / change server → clear creds + tear down the player + re-route.
+    Auth.setToken("")
+    if dest = "setup" then ServerUrl.clear()
+    if m.player <> invalid
+        m.player.layout = "off"
+        m.top.removeChild(m.player)
+        m.player = invalid
+    end if
+    m.probeStarted = false
+    route()
+end sub
+
+sub onSettingsReprobe()
+    startConnectionProbe()
 end sub
 
 ' OK on a channel → show the persistent PlayerHost (created once) and tune it. The player takes focus; on

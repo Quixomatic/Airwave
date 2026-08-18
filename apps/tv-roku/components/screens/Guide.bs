@@ -476,7 +476,8 @@ sub onSidebarActivated()
     key = m.sidebar.activated
     if key = invalid or key = "" then return
     if key = "settings" or key = "account"
-        Log.info("[guide] sidebar action (todo): " + key)
+        ' Open the Settings shell — Account lands on the User page, Settings on General (tv-web/native parity).
+        if key = "account" then m.top.openSettings = "user" else m.top.openSettings = "general"
         exitSidebar()
         return
     end if

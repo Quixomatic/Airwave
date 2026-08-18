@@ -1,0 +1,887 @@
+import "pkg:/source/lib/log.bs"
+import "pkg:/source/theme.bs"
+import "pkg:/source/lib/icon.bs"
+import "pkg:/source/input/keys.bs"
+import "pkg:/source/lib/guideLayout.bs"
+import "pkg:/source/lib/api.bs"
+import "pkg:/source/lib/serverUrl.bs"
+import "pkg:/source/lib/plexConnection.bs"
+import "pkg:/source/lib/auth.bs"
+import "pkg:/source/lib/device.bs"
+
+' SettingsScreen code-behind — the master-detail shell + all subpages, built in code (like PlayerChrome).
+' Shared primitives (mkHeader/mkRow/mkSectionLabel/mkInfoCard/mkParagraph) mirror tv-web/native settings-ui.
+' (m.<id> auto-injected: bg, contentClip, content, sidebar.)
+
+const S_CONTENT_X = 494    ' 92 sliver + centered 1024 column: 92 + (1828-1024)/2
+const S_PAD_X = 64
+const S_PAD_TOP = 56
+const S_COL_W = 1024
+const S_CONTENT_W = 896    ' 1024 - 2*64
+const S_ROW_BG = "0x94A3B80F"        ' rgba(148,163,184,0.06)
+const S_ROW_BG_FOCUS = "0x4A9FE01A"  ' rgba(74,159,224,0.10)
+const S_RING = "0x4A9FE0FF"          ' settings accent #4a9fe0
+const S_KEYS_STR = "guide,general,user,server,device,audio,about"
+
+sub init()
+    m.contentClip.translation = [S_CONTENT_X + S_PAD_X, S_PAD_TOP]
+    m.contentClip.clippingRect = [0, 0, S_COL_W, GuideLayout.STAGE_H - S_PAD_TOP]
+    m.keys = S_KEYS_STR.split(",")
+    m.zone = "content"
+    m.rows = []
+    m.contentSel = 0
+    m.contentY = 0
+    m.sidebar.observeField("activated", "onSidebarActivated")
+    m.railSel = keyIndex(m.top.category)
+    if m.railSel < 1 then m.railSel = 1
+    buildPage(m.top.category)
+    m.sidebar.activeKey = m.top.category
+    m.sidebar.sel = m.railSel
+    m.sidebar.focused = false
+    enterContent()
+    m.top.setFocus(true)
+end sub
+
+function keyIndex(k as string) as integer
+    for i = 0 to m.keys.count() - 1
+        if m.keys[i] = k then return i
+    end for
+    return 1
+end function
+
+' MainScene re-points the screen at a category (or the same one) — rebuild + land in content.
+sub onCategory()
+    m.railSel = keyIndex(m.top.category)
+    if m.railSel < 1 then m.railSel = 1
+    buildPage(m.top.category)
+    m.sidebar.activeKey = m.top.category
+    m.sidebar.sel = m.railSel
+    enterContent()
+end sub
+
+sub onSidebarActivated()
+    k = m.sidebar.activated
+    if k = "" then return
+    if k = "guide"
+        m.top.done = true
+        return
+    end if
+    m.top.category = k   ' triggers onCategory → rebuild + enterContent
+end sub
+
+' ---- zone machine ------------------------------------------------------------
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+    if m.zone = "rail" then return onRailKey(key)
+    return onContentKey(key)
+end function
+
+function onRailKey(key as string) as boolean
+    if key = "up"
+        if m.railSel > 0 then m.railSel = m.railSel - 1
+        m.sidebar.sel = m.railSel
+        return true
+    else if key = "down"
+        if m.railSel < m.keys.count() - 1 then m.railSel = m.railSel + 1
+        m.sidebar.sel = m.railSel
+        return true
+    else if key = "OK"
+        m.sidebar.activate = m.sidebar.activate + 1   ' → onSidebarActivated
+        return true
+    else if key = "right"
+        enterContent()
+        return true
+    else if key = "back"
+        m.top.done = true
+        return true
+    end if
+    return false
+end function
+
+function onContentKey(key as string) as boolean
+    if key = "up"
+        if m.contentSel > 0
+            m.contentSel = m.contentSel - 1
+            applyContentFocus()
+        end if
+        return true
+    else if key = "down"
+        if m.contentSel < m.rows.count() - 1
+            m.contentSel = m.contentSel + 1
+            applyContentFocus()
+        end if
+        return true
+    else if key = "OK"
+        if m.contentSel >= 0 and m.contentSel < m.rows.count()
+            doRowAction(m.rows[m.contentSel])
+        end if
+        return true
+    else if key = "left" or key = "back"
+        toRail()
+        return true
+    end if
+    return false
+end function
+
+sub enterContent()
+    m.zone = "content"
+    m.sidebar.focused = false
+    m.sidebar.expanded = false   ' collapse the rail back to the sliver
+    m.contentSel = 0
+    applyContentFocus()
+end sub
+
+sub toRail()
+    m.zone = "rail"
+    m.sidebar.sel = m.railSel
+    m.sidebar.focused = true
+    m.sidebar.expanded = true    ' expand the rail overlay (labels reveal)
+    applyContentFocus(true)   ' clear all row focus
+end sub
+
+' Apply focus visuals to the content rows + snap-scroll the focused row into view.
+sub applyContentFocus(clearAll = false as boolean)
+    for i = 0 to m.rows.count() - 1
+        r = m.rows[i]
+        on = (not clearAll) and (m.zone = "content") and (i = m.contentSel)
+        if r.noRing = true
+            ' Recent-issue rows: no accent ring, just a bg tint on focus (transparent otherwise).
+            if on then r.bg.blendColor = "0x4A9FE01F" else r.bg.blendColor = "0x00000000"
+        else
+            r.ring.visible = on
+            if on then r.bg.blendColor = S_ROW_BG_FOCUS else r.bg.blendColor = S_ROW_BG
+        end if
+        ' Disarm a two-tap confirm row when focus leaves it (matches tv-web/native).
+        if r.armed and not on
+            r.armed = false
+            setRowSub(r, r.baseSub)
+            setRowPill(r, invalid)
+        end if
+    end for
+    if clearAll or m.rows.count() = 0 then return
+    scrollToRow(m.rows[m.contentSel])
+end sub
+
+' Band-scroll: only move when the focused row is off-screen.
+sub scrollToRow(r as object)
+    ' Landing on the FIRST focusable row scrolls the whole page back to the top, so the header + info card
+    ' above it (not focusable, so band-scroll never reveals them) come back into view — tv-native's scrollToTop.
+    if m.contentSel = 0
+        m.contentY = 0
+        m.content.translation = [0, 0]
+        return
+    end if
+    vpH = GuideLayout.STAGE_H - S_PAD_TOP
+    top# = r.top
+    bottom# = r.top + r.h
+    cushion = 24
+    if top# - cushion < m.contentY
+        m.contentY = top# - cushion
+    else if bottom# + cushion > m.contentY + vpH
+        m.contentY = bottom# + cushion - vpH
+    end if
+    if m.contentY < 0 then m.contentY = 0
+    m.content.translation = [0, -m.contentY]
+end sub
+
+' ---- page building -----------------------------------------------------------
+
+sub buildPage(category as string)
+    while m.content.getChildCount() > 0
+        m.content.removeChildIndex(0)
+    end while
+    m.rows = []
+    m.y = 0
+    m.contentY = 0
+    m.content.translation = [0, 0]
+    if category = "general"
+        pageGeneral()
+    else if category = "about"
+        pageAbout()
+    else if category = "user"
+        pageUser()
+    else if category = "server"
+        pageServer()
+    else if category = "device"
+        pageDevice()
+    else if category = "audio"
+        pageAudio()
+    else
+        pageGeneral()
+    end if
+end sub
+
+sub pageGeneral()
+    mkHeader("General", "App-wide preferences.")
+    mkRow({ label: "Back to guide", sublabel: "Return to live TV", cmd: "backToGuide" })
+    mkParagraph("Airwave — your media server as live TV channels. More general preferences will live here.")
+end sub
+
+' Dispatch a focusable row's OK by its string command (function refs in AAs are flaky on Roku). Per-page
+' commands are handled here; row.ctx carries any per-row payload (a codec token, a network mode, …).
+sub doRowAction(row as object)
+    cmd = row.cmd
+    if cmd = invalid or cmd = "" then return
+    if cmd = "backToGuide"
+        m.top.done = true
+    else if cmd = "signOut" or cmd = "changeServer"
+        if row.armed
+            if cmd = "signOut" then m.top.exitTo = "login" else m.top.exitTo = "setup"
+        else
+            row.armed = true
+            if cmd = "signOut"
+                setRowSub(row, "Press OK again to sign out of this TV")
+            else
+                setRowSub(row, "Press OK again to sign out and return to server setup")
+            end if
+            setRowPill(row, "Confirm", "warn")
+        end if
+    else if cmd = "cycleOverride"
+        cur = PlexConnection.getOverride()
+        nxt = ""
+        if cur = "" then nxt = "remote" else if cur = "remote" then nxt = "relay"
+        PlexConnection.setOverride(nxt)
+        setRowSub(row, forceSub(nxt))
+    else if cmd = "recheckNet"
+        setRowSub(row, "Checking…")
+        m.top.reprobe = true
+        if m.recheckTimer = invalid
+            m.recheckTimer = m.top.createChild("Timer")
+            m.recheckTimer.duration = 1.6
+            m.recheckTimer.observeField("fire", "onRecheckDone")
+        end if
+        m.recheckTimer.control = "start"
+    else if cmd = "diagnostic"
+        m.top.exitTo = "diagnostic"
+    else if cmd = "toggleCap"
+        toggleCap(row)
+    else if cmd = "resetCaps"
+        resetCaps()
+    end if
+end sub
+
+' Flip a codec override (optimistic + fire the API). value = the next effective, or null when it matches the
+' diagnostic's natural default (measured & not a quirk) → clears the override. Mirrors device.tsx.
+sub toggleCap(row as object)
+    tok = row.tok
+    nextOn = not (tok.effective = true)
+    naturalDefault = (tok.measured = true) and (tok.quirk = invalid)
+    if nextOn = naturalDefault
+        value = invalid          ' matches the default → clear the override
+        tok.override = invalid
+    else
+        value = nextOn
+        tok.override = nextOn
+    end if
+    tok.effective = nextOn
+    row.subLbl.text = tokenStatus(tok)
+    renderTokenRight(row)
+    Api.setDeviceCap(Device.id(), row.ctx.kind, row.ctx.token, value)
+end sub
+
+sub resetCaps()
+    Api.resetDeviceCaps(Device.id())
+    ' Re-fetch so the grid + Reset row reflect the cleared overrides.
+    onThen(Api.deviceCaps(Device.id()), onDeviceCaps, m)
+end sub
+
+sub onRecheckDone()
+    m.recheckTimer.control = "stop"
+    if m.netRow <> invalid then setRowSub(m.netRow, netLabel(PlexConnection.getNetwork()) + " — press OK to recheck")
+end sub
+
+' A flexible info card — label/value columns laid out horizontally (mirrors settings-ui's Info row).
+sub mkInfoCard(fields as object)
+    card = m.content.createChild("Poster")
+    card.uri = "pkg:/images/np/fill-14.9.png"
+    card.translation = [0, m.y]
+    card.width = S_CONTENT_W
+    card.height = 72
+    card.blendColor = S_ROW_BG
+    x = 22
+    for each f in fields
+        lab = m.content.createChild("Label")
+        Theme.setFont(lab, Theme.FONT_BOLD, 12)
+        lab.color = Theme.HINT
+        lab.translation = [x, m.y + 16]
+        lab.text = UCase(f.label)
+        val = m.content.createChild("Label")
+        Theme.setFont(val, Theme.FONT_SEMI, 17)
+        val.color = Theme.FG
+        val.translation = [x, m.y + 38]
+        val.text = f.value
+        w1 = Int(lab.boundingRect().width)
+        w2 = Int(val.boundingRect().width)
+        cw = w1
+        if w2 > cw then cw = w2
+        x = x + cw + 44
+    end for
+    m.y = m.y + 72 + 8
+end sub
+
+' App version from the manifest (major.minor.build), e.g. "0.10.56".
+function appVersion() as string
+    ai = CreateObject("roAppInfo")
+    return ai.GetValue("major_version") + "." + ai.GetValue("minor_version") + "." + ai.GetValue("build_version")
+end function
+
+sub pageAbout()
+    mkHeader("About", invalid)
+    ' Identity card: wordmark + tagline + version pill.
+    card = m.content.createChild("Poster")
+    card.uri = "pkg:/images/np/fill-16.9.png"
+    card.translation = [0, m.y]
+    card.width = 640
+    card.height = 168
+    card.blendColor = S_ROW_BG
+    ' Logo lockup (mark + wordmark), left-aligned — same proportions as LogoLockup / tv-native <Logo>.
+    mw = 68
+    markH = Int(mw * 517 / 715)
+    fontSize = Int(mw * 0.66)
+    gap = Int(mw * 0.28)
+    rowY = m.y + 28
+    mark = m.content.createChild("Poster")
+    mark.uri = "pkg:/images/logo.png"
+    mark.width = mw
+    mark.height = markH
+    mark.translation = [34, rowY]
+    name = m.content.createChild("Label")
+    Theme.setFont(name, Theme.FONT_BOLD, fontSize)
+    name.color = "0xFFFFFFFF"
+    name.translation = [34 + mw + gap, rowY - Int((fontSize * 1.3 - markH) / 2)]
+    name.text = "Airwave"
+    tag = m.content.createChild("Label")
+    Theme.setFont(tag, Theme.FONT_REG, 19)
+    tag.color = Theme.MUTED
+    tag.translation = [34, m.y + 84]
+    tag.text = "Your media server, as live TV."
+    ver = m.content.createChild("Poster")
+    ver.uri = "pkg:/images/np/fill-16.9.png"
+    ver.translation = [34, m.y + 120]
+    ver.height = 30
+    ver.blendColor = "0x4A9FE029"
+    vlbl = m.content.createChild("Label")
+    Theme.setFont(vlbl, Theme.FONT_SEMI, 14)
+    vlbl.color = S_RING
+    vlbl.translation = [46, m.y + 126]
+    vlbl.text = "Version " + appVersion()
+    r = vlbl.boundingRect()
+    ver.width = Int(r.width) + 24
+    m.y = m.y + 168 + 24
+    mkParagraph("Airwave turns your own media-server library into curated, always-on TV channels — a broadcast-style guide with live tune-in, DVR, and deterministic scheduling, playing straight from your server.")
+    mkParagraph("Looking for the connected server, the Plex connection, or how to sign out? Those live under Server and User.")
+end sub
+
+sub pageUser()
+    mkHeader("User", "Your account on this TV.")
+    ' Identity card (avatar + name/email/role) — filled async from Api.session() (onSession).
+    card = m.content.createChild("Poster")
+    card.uri = "pkg:/images/np/fill-16.9.png"
+    card.translation = [0, m.y]
+    card.width = 640
+    card.height = 148
+    card.blendColor = S_ROW_BG
+    av = m.content.createChild("Poster")
+    av.uri = "pkg:/images/np/fill-16.9.png"   ' rounded square stand-in for the avatar circle
+    av.width = 96
+    av.height = 96
+    av.translation = [28, m.y + 26]
+    av.blendColor = "0x4A9FE029"
+    avInit = m.content.createChild("Label")
+    Theme.setFont(avInit, Theme.FONT_BOLD, 34)
+    avInit.color = S_RING
+    avInit.width = 96
+    avInit.horizAlign = "center"
+    avInit.translation = [28, m.y + 52]
+    avInit.text = "?"
+    nm = m.content.createChild("Label")
+    Theme.setFont(nm, Theme.FONT_BOLD, 30)
+    nm.color = Theme.FG
+    nm.width = 460
+    nm.translation = [148, m.y + 34]
+    nm.text = "…"
+    em = m.content.createChild("Label")
+    Theme.setFont(em, Theme.FONT_REG, 17)
+    em.color = Theme.MUTED
+    em.width = 460
+    em.translation = [148, m.y + 74]
+    em.text = ""
+    roleGrp = m.content.createChild("Group")
+    roleGrp.translation = [148, m.y + 104]
+    m.userCard = { avInit: avInit, name: nm, email: em, roleGrp: roleGrp }
+    m.y = m.y + 148 + 8
+    mkSectionLabel("Account", false)
+    mkRow({ label: "Sign out", sublabel: "Sign this TV out of your account", cmd: "signOut" })
+    onThen(Api.session(), onSession, m)
+end sub
+
+sub onSession(data as object, _m as object)
+    if data = invalid or m.userCard = invalid then return
+    u = data.user
+    if u = invalid then return
+    nm = u.name
+    if nm = invalid or nm = "" then nm = "Signed in"
+    m.userCard.name.text = nm
+    em = u.email
+    if em = invalid then em = "—"
+    m.userCard.email.text = em
+    m.userCard.avInit.text = initialsOf(u.name, u.email)
+    if u.role <> invalid and u.role <> "" then buildPill(m.userCard.roleGrp, u.role, "muted")
+end sub
+
+' "James Freund" → "JF"; one name → first two; else the email's first letter.
+function initialsOf(name as dynamic, email as dynamic) as string
+    n = ""
+    if name <> invalid then n = name.Trim()
+    if n <> ""
+        parts = n.split(" ")
+        np = []
+        for each p in parts
+            if p <> "" then np.push(p)
+        end for
+        if np.count() >= 2 then return UCase(Left(np[0], 1) + Left(np[np.count() - 1], 1))
+        if np.count() = 1 then return UCase(Left(np[0], 2))
+    end if
+    if email <> invalid and email <> "" then return UCase(Left(email, 1))
+    return "?"
+end function
+
+sub pageServer()
+    mkHeader("Server", "The Airwave server this TV is signed in to.")
+    net = PlexConnection.getNetwork()
+    override = PlexConnection.getOverride()
+    modeStr = "Auto"
+    if override <> "" then modeStr = "Forced"
+    mkInfoCard([
+        { label: "Address", value: serverAddr() },
+        { label: "Media connection", value: netLabel(net) },
+        { label: "Connection mode", value: modeStr }
+    ])
+    mkSectionLabel("Plex connection", false)
+    mkParagraph("Video streams straight from your media server, so this TV picks the address it can actually reach — the local network at home, or the remote/relay address when it's away.")
+    m.netRow = mkRow({ label: "Media connection", sublabel: netLabel(net) + " — press OK to recheck", cmd: "recheckNet" })
+    mkRow({ label: "Force connection (testing)", sublabel: forceSub(override), cmd: "cycleOverride" })
+    mkSectionLabel("Change server", false)
+    mkRow({ label: "Change server", sublabel: "Sign out and pick a different Airwave server", cmd: "changeServer" })
+end sub
+
+function serverAddr() as string
+    u = ServerUrl.get()
+    if u = "" then return "Not connected"
+    return u
+end function
+
+function netLabel(n as string) as string
+    if n = "remote" then return "Remote (WAN)"
+    if n = "relay" then return "Relay"
+    if n = "local" then return "Local network"
+    return "Not determined"
+end function
+
+function forceSub(override as string) as string
+    if override = "" then return "Off — following auto probe. Press OK to force."
+    return "Forced: " + netLabel(override) + " — press OK to change"
+end function
+
+sub pageDevice()
+    mkHeader("Device", "This TV's playback capabilities and tools.")
+    m.devLoading = mkParagraphRef("Loading capabilities…")
+    onThen(Api.deviceCaps(Device.id()), onDeviceCaps, m)
+end sub
+
+' The caps arrived → rebuild the whole page with real data (the toggle rows are data-driven).
+sub onDeviceCaps(data as object, _m as object)
+    if data = invalid then return
+    while m.content.getChildCount() > 0
+        m.content.removeChildIndex(0)
+    end while
+    m.rows = []
+    m.y = 0
+    mkHeader("Device", "This TV's playback capabilities and tools.")
+    buildDeviceContent(data)
+    if m.contentSel >= m.rows.count() then m.contentSel = m.rows.count() - 1
+    if m.contentSel < 0 then m.contentSel = 0
+    applyContentFocus()
+end sub
+
+sub buildDeviceContent(data as object)
+    dev = data.device
+    if dev <> invalid
+        mkInfoCard([
+            { label: "Model", value: strOr(dev.model, "—") },
+            { label: "Roku OS", value: strOr(dev.osVersion, "—") },
+            { label: "Resolution", value: resStr(dev) },
+            { label: "HDR", value: yesNo(dev.hdr) }
+        ])
+    end if
+    mkSectionLabel("Tools", true)
+    mkRow({ label: "Run capability diagnostic", sublabel: "Re-measure what this TV plays natively", cmd: "diagnostic" })
+
+    mkSectionLabel("Playback capabilities", false)
+    mkParagraph("Force a codec on or off for this TV. Overrides win over what the diagnostic measured — forcing on something your TV can't actually decode may break playback.")
+
+    groups = data.groups
+    if groups <> invalid
+        for each g in groups
+            mkSectionLabel(groupLabel(g.kind), true)
+            toks = g.tokens
+            if toks <> invalid and toks.count() > 0
+                rowsCount = Int((toks.count() + 1) / 2)
+                colW = Int((S_CONTENT_W - 20) / 2)
+                gridTop = m.y
+                for i = 0 to toks.count() - 1
+                    col = Int(i / rowsCount)
+                    rw = i mod rowsCount
+                    x = col * (colW + 20)
+                    y = gridTop + rw * (78 + 12)
+                    mkTokenRow(toks[i], g.kind, x, y, colW)
+                end for
+                m.y = gridTop + rowsCount * (78 + 12)
+            end if
+        end for
+    end if
+
+    if data.hasOverrides = true
+        m.y = m.y + 8
+        mkRow({ label: "Reset to diagnostic", sublabel: "Clear all overrides — revert to what the diagnostic found", cmd: "resetCaps" })
+    end if
+
+    errs = data.recentErrors
+    if errs <> invalid and errs.count() > 0
+        mkSectionLabel("Recent playback issues", false)
+        buildRecentErrors(errs)
+    end if
+end sub
+
+' One data-driven codec toggle row (fixed position, 2-col grid). ctx carries {kind, token} for the API call.
+function mkTokenRow(tok as object, kind as string, x as integer, y as integer, w as integer) as object
+    h = 78
+    g = m.content.createChild("Group")
+    g.translation = [x, y]
+    bg = g.createChild("Poster")
+    bg.uri = "pkg:/images/np/fill-14.9.png"
+    bg.width = w
+    bg.height = h
+    bg.blendColor = S_ROW_BG
+    ring = g.createChild("Poster")
+    ring.uri = "pkg:/images/np/border-16.9.png"
+    ring.width = w
+    ring.height = h
+    ring.blendColor = S_RING
+    ring.visible = false
+    lbl = g.createChild("Label")
+    Theme.setFont(lbl, Theme.FONT_SEMI, 18)
+    lbl.color = Theme.FG
+    lbl.width = w - 90
+    lbl.translation = [18, 15]
+    lbl.text = strOr(tok.label, tok.token)
+    subLbl = g.createChild("Label")
+    Theme.setFont(subLbl, Theme.FONT_REG, 13)
+    subLbl.color = Theme.MUTED
+    subLbl.width = w - 90
+    subLbl.translation = [18, 42]
+    subLbl.text = tokenStatus(tok)
+    rightGrp = g.createChild("Group")
+    rightGrp.translation = [w - 18, Int(h / 2)]
+    row = { node: g, bg: bg, ring: ring, top: y, h: h, cmd: "toggleCap", ctx: { kind: kind, token: tok.token }, label: lbl, subLbl: subLbl, baseSub: "", hasSub: true, rightGrp: rightGrp, armed: false, tok: tok }
+    m.rows.push(row)
+    renderTokenRight(row)
+    return row
+end function
+
+' Toggle + optional Override/Forced pill on a token row's right edge (rebuilt on toggle).
+sub renderTokenRight(row as object)
+    grp = row.rightGrp
+    while grp.getChildCount() > 0
+        grp.removeChildIndex(0)
+    end while
+    tok = row.tok
+    forcedRisky = (tok.effective = true) and (tok.measured <> true)
+    ' Toggle sits at the far right (46 wide, centered on the anchor's y).
+    tg = grp.createChild("Group")
+    tg.translation = [-46, -13]
+    mkToggle(tg, tok.effective = true, forcedRisky)
+    ' Pill to the left of the toggle.
+    if tok.override <> invalid
+        pill = grp.createChild("Group")
+        if forcedRisky then w = buildPill(pill, "Forced", "warn") else w = buildPill(pill, "Override", "accent")
+        pill.translation = [-46 - 12 - w, -13]
+    end if
+end sub
+
+' A 46×26 switch (bg + knob), matching settings-ui's Toggle.
+sub mkToggle(parent as object, on as boolean, warn as boolean)
+    onCol = S_RING
+    if warn then onCol = "0xF0A92AFF"
+    bgCol = "0x94A3B84D"
+    if on then bgCol = onCol
+    bg = parent.createChild("Poster")
+    bg.uri = "pkg:/images/pill-sm.9.png"
+    bg.width = 46
+    bg.height = 26
+    bg.blendColor = bgCol
+    knob = parent.createChild("Poster")
+    knob.uri = "pkg:/images/circle-24.png"
+    knob.width = 20
+    knob.height = 20
+    knob.blendColor = "0xFFFFFFFF"
+    kx = 3
+    if on then kx = 23
+    knob.translation = [kx, 3]
+end sub
+
+function tokenStatus(tok as object) as string
+    if tok.override <> invalid
+        m2 = "doesn't play"
+        if tok.measured = true then m2 = "plays"
+        return "Overriding — diagnostic measured " + m2
+    end if
+    if tok.quirk <> invalid then return "Known issue — off by default"
+    if tok.measured = true then return "Measured: plays natively"
+    return "Measured: doesn't play"
+end function
+
+function groupLabel(kind as string) as string
+    if kind = "video" then return "Video codecs"
+    if kind = "audio" then return "Audio codecs"
+    if kind = "container" then return "Containers"
+    return kind
+end function
+
+' Recent playback issues — a slate card of FOCUSABLE rows (D-pad stops so the list is reachable + snaps
+' into view; OK is a no-op). Each: "channel · container/vcodec/acodec · mode" + the error in red.
+sub buildRecentErrors(errs as object)
+    cardTop = m.y
+    card = m.content.createChild("Poster")
+    card.uri = "pkg:/images/np/fill-14.9.png"
+    card.translation = [0, cardTop]
+    card.width = S_CONTENT_W
+    card.blendColor = S_ROW_BG
+    i = 0
+    for each e in errs
+        hasErr = (e.error <> invalid and e.error <> "")
+        rowH = 44
+        if hasErr then rowH = 66
+        g = m.content.createChild("Group")
+        g.translation = [10, m.y]
+        bg = g.createChild("Poster")
+        bg.uri = "pkg:/images/np/fill-8.9.png"
+        bg.width = S_CONTENT_W - 20
+        bg.height = rowH
+        bg.blendColor = "0x00000000"
+        if i > 0
+            div = g.createChild("Rectangle")
+            div.color = "0x94A3B81A"
+            div.width = S_CONTENT_W - 40
+            div.height = 1
+            div.translation = [10, 0]
+        end if
+        head = g.createChild("Label")
+        Theme.setFont(head, Theme.FONT_REG, 15)
+        head.color = "0xE6EAF1FF"
+        head.translation = [12, 13]
+        head.text = strOr(e.channelName, strOr(e.title, "—"))
+        cw = Int(head.boundingRect().width)
+        src = joinNonEmpty([e.sourceContainer, e.sourceVideoCodec, e.sourceAudioCodec], "/")
+        modeStr = ""
+        if e.mode <> invalid and e.mode <> "" then modeStr = " · " + e.mode
+        meta = g.createChild("Label")
+        Theme.setFont(meta, Theme.FONT_REG, 15)
+        meta.color = Theme.HINT
+        meta.translation = [12 + cw + 6, 13]
+        meta.text = "· " + src + modeStr
+        if hasErr
+            er = g.createChild("Label")
+            Theme.setFont(er, Theme.FONT_REG, 13)
+            er.color = Theme.ERROR
+            er.width = S_CONTENT_W - 44
+            er.translation = [12, 38]
+            er.text = e.error
+        end if
+        m.rows.push({ node: g, bg: bg, ring: invalid, top: m.y, h: rowH, cmd: "noop", noRing: true, armed: false, hasSub: false })
+        m.y = m.y + rowH
+        i = i + 1
+    end for
+    card.height = m.y - cardTop + 6
+    m.y = m.y + 12
+end sub
+
+' A paragraph that returns its node (so a loading line can be replaced).
+function mkParagraphRef(text as string) as object
+    p = m.content.createChild("Label")
+    Theme.setFont(p, Theme.FONT_REG, 15)
+    p.color = Theme.HINT
+    p.width = 620
+    p.wrap = true
+    p.translation = [0, m.y + 8]
+    p.text = text
+    m.y = m.y + 40
+    return p
+end function
+
+function strOr(v as dynamic, fallback as string) as string
+    if v = invalid or v = "" then return fallback
+    return v
+end function
+
+function yesNo(v as dynamic) as string
+    if v = true then return "Yes"
+    return "No"
+end function
+
+function resStr(dev as object) as string
+    if dev.screenWidth <> invalid and dev.screenWidth > 0 then return Str(dev.screenWidth).Trim() + "×" + Str(dev.screenHeight).Trim()
+    return "—"
+end function
+
+function joinNonEmpty(arr as object, sep as string) as string
+    out = ""
+    for each v in arr
+        if v <> invalid and v <> ""
+            if out <> "" then out = out + sep
+            out = out + v
+        end if
+    end for
+    if out = "" then return "—"
+    return out
+end function
+
+sub pageAudio()
+    mkHeader("Audio", "How this device sends audio to your TV or receiver.")
+    di = CreateObject("roDeviceInfo")
+    out = di.GetAudioOutputChannel()
+    if out = invalid or out = "" then out = "Unknown"
+    mkInfoCard([{ label: "Detected output", value: out }])
+    mkSectionLabel("Audio output", false)
+    mkParagraph("Airwave streams straight from your server and this Roku decodes the audio on-device — surround (5.1 / Dolby) plays when your TV or receiver supports it, and stereo content stays stereo.")
+    mkParagraph("Unlike the phone and TV apps, Roku doesn't expose a per-app audio setting — the speaker layout is controlled by the Roku's own Settings → Audio. Set 'Audio mode' to Auto (Dolby Digital Plus) / passthrough for surround, or Stereo to fold everything down to two channels.")
+    mkParagraph("If a 5.1 program ever sounds like stereo, flipping that Roku audio setting (Stereo ↔ Auto) forces the output to re-negotiate.")
+end sub
+
+' ---- shared primitives (mirror settings-ui.tsx) ------------------------------
+
+sub mkHeader(title as string, subtitle as dynamic)
+    h = m.content.createChild("Label")
+    Theme.setFont(h, Theme.FONT_BOLD, 34)
+    h.color = Theme.FG
+    h.translation = [0, m.y]
+    h.text = title
+    if subtitle <> invalid and subtitle <> ""
+        s = m.content.createChild("Label")
+        Theme.setFont(s, Theme.FONT_REG, 17)
+        s.color = Theme.MUTED
+        s.translation = [0, m.y + 44]
+        s.text = subtitle
+        m.y = m.y + 44 + 26 + 30
+    else
+        m.y = m.y + 44 + 30
+    end if
+end sub
+
+sub mkSectionLabel(text as string, small = false as boolean)
+    lbl = m.content.createChild("Label")
+    if small then Theme.setFont(lbl, Theme.FONT_BOLD, 13) else Theme.setFont(lbl, Theme.FONT_BOLD, 15)
+    lbl.color = Theme.HINT
+    if small then m.y = m.y + 20 else m.y = m.y + 34
+    lbl.translation = [0, m.y]
+    lbl.text = UCase(text)
+    if small then m.y = m.y + 26 else m.y = m.y + 30
+end sub
+
+sub mkParagraph(text as string)
+    p = m.content.createChild("Label")
+    Theme.setFont(p, Theme.FONT_REG, 15)
+    p.color = Theme.HINT
+    p.width = 620
+    p.wrap = true
+    p.translation = [0, m.y + 8]
+    p.text = text
+    r = p.boundingRect()
+    m.y = m.y + 8 + Int(r.height) + 10
+end sub
+
+' Build one focusable row. `def`: { label, sublabel?, ok? }. Returns the row handle (also pushed to m.rows).
+function mkRow(def as object) as object
+    hasSub = (def.sublabel <> invalid and def.sublabel <> "")
+    h = 56
+    if hasSub then h = 78
+    g = m.content.createChild("Group")
+    g.translation = [0, m.y]
+    bg = g.createChild("Poster")
+    bg.uri = "pkg:/images/np/fill-14.9.png"
+    bg.width = S_CONTENT_W
+    bg.height = h
+    bg.blendColor = S_ROW_BG
+    ring = g.createChild("Poster")
+    ring.uri = "pkg:/images/np/border-16.9.png"
+    ring.width = S_CONTENT_W
+    ring.height = h
+    ring.blendColor = S_RING
+    ring.visible = false
+    lbl = g.createChild("Label")
+    Theme.setFont(lbl, Theme.FONT_SEMI, 18)
+    lbl.color = Theme.FG
+    lbl.width = S_CONTENT_W - 240
+    if hasSub then lbl.translation = [22, 15] else lbl.translation = [22, 17]
+    lbl.text = def.label
+    subLbl = invalid
+    if hasSub
+        subLbl = g.createChild("Label")
+        Theme.setFont(subLbl, Theme.FONT_REG, 14)
+        subLbl.color = Theme.MUTED
+        subLbl.width = S_CONTENT_W - 240
+        subLbl.translation = [22, 42]
+        subLbl.text = def.sublabel
+    end if
+    ' Right-content host, anchored to the row's right edge (pills/toggles position with a negative x).
+    rightGrp = g.createChild("Group")
+    rightGrp.translation = [S_CONTENT_W - 22, Int(h / 2)]
+    baseSub = ""
+    if hasSub then baseSub = def.sublabel
+    row = { node: g, bg: bg, ring: ring, top: m.y, h: h, cmd: def.cmd, ctx: def.ctx, label: lbl, subLbl: subLbl, baseSub: baseSub, hasSub: hasSub, rightGrp: rightGrp, armed: false }
+    m.y = m.y + h + 12
+    m.rows.push(row)
+    return row
+end function
+
+' Update a row's sublabel text (arm-confirm state changes).
+sub setRowSub(row as object, text as string)
+    if row.subLbl <> invalid then row.subLbl.text = text
+end sub
+
+' Put a single pill on a row's right edge (clears any existing right content). tone = accent|warn|muted.
+sub setRowPill(row as object, text as dynamic, tone = "accent" as string)
+    grp = row.rightGrp
+    while grp.getChildCount() > 0
+        grp.removeChildIndex(0)
+    end while
+    if text = invalid or text = "" then return
+    w = buildPill(grp, text, tone)
+    grp.translation = [S_CONTENT_W - 22 - w, Int(row.h / 2) - 13]
+end sub
+
+' Build a pill (rounded bg behind + label in front) into `parent` at local (0,0); returns its width (h=26).
+function buildPill(parent as object, text as string, tone as string) as integer
+    bgCol = "0x4A9FE029"
+    fgCol = S_RING
+    if tone = "warn"
+        bgCol = "0xF0A92A29"
+        fgCol = "0xF0A92AFF"
+    else if tone = "muted"
+        bgCol = "0x94A3B829"
+        fgCol = "0x94A3B8FF"
+    end if
+    bg = parent.createChild("Poster")        ' child 0 — behind
+    bg.uri = "pkg:/images/pill-sm.9.png"
+    bg.blendColor = bgCol
+    bg.height = 26
+    lbl = parent.createChild("Label")        ' child 1 — in front
+    Theme.setFont(lbl, Theme.FONT_BOLD, 12)
+    lbl.color = fgCol
+    lbl.text = UCase(text)
+    lbl.translation = [10, 4]
+    w = Int(lbl.boundingRect().width) + 20
+    bg.width = w
+    return w
+end function

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  SettingsScreen — the settings master-detail shell (port of tv-web `/settings` route + tv-native
+  app/settings/_layout). A sliver category rail (SettingsSidebar) on the left + the selected subpage's
+  content on the right (built in code). D-pad zoning: RAIL (▲▼ move categories, OK opens one / Back-to-Guide
+  returns to live TV, ► enters content, Back → guide); CONTENT (▲▼ move rows, OK activates, ◄/Back → rail).
+  Lands in content (like tv-web). MainScene sets `category` + shows this; `done` → back to the guide.
+-->
+<component name="SettingsScreen" extends="Group">
+    <interface>
+        <field id="category" type="string" value="general" onChange="onCategory" />
+        <field id="done" type="boolean" alwaysNotify="true" />
+        <!-- Sign out / change server → MainScene clears creds + re-routes: "login" | "setup". -->
+        <field id="exitTo" type="string" alwaysNotify="true" />
+        <!-- Server page "recheck" → MainScene re-runs the connection probe. -->
+        <field id="reprobe" type="boolean" alwaysNotify="true" />
+    </interface>
+    <children>
+        <Rectangle id="bg" color="0x060A14FF" width="1920" height="1080" />
+        <Group id="contentClip">
+            <Group id="content" />
+        </Group>
+        <SettingsSidebar id="sidebar" />
+    </children>
+</component>

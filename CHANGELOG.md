@@ -2,6 +2,31 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.57] - 2026-08-18
+
+Roku **Settings** — the full settings section, ported to strict parity with tv-web/tv-native.
+
+### Added
+
+- **Settings shell** (`apps/tv-roku/components/settings/`) — a master-detail port of the tv-web/tv-native
+  settings: a sliver category rail (the guide's glass-circle treatment) that expands to an overlay + the
+  selected subpage rendered on the right, D-pad zoned (rail ▲▼/OK/►, content ▲▼/OK/◄/Back, land-in-content,
+  scroll-to-top on the first row). Reachable from the guide sidebar's **Settings** / **Account** circles.
+- **Six pages:** **General** (landing + back to guide); **User** (avatar/initials + name/email/role from a new
+  `Api.session()`, two-tap Sign out); **Server** (connection info card, re-probe local→remote→relay,
+  force-connection cycle, change-server → onboarding); **Device** (model/OS/resolution/HDR, Run capability
+  diagnostic, the per-codec capability **toggle grid** — video/audio/containers, 2-column, Override/Forced
+  pills, Reset-to-diagnostic, and a **focusable** Recent-playback-issues list); **Audio** (informational — Roku
+  has no per-app audio control, so it shows the detected output + points to the Roku's own Settings → Audio for
+  surround/passthrough); **About** (logo mark + wordmark + version + description).
+- Shared SceneGraph primitives (header/row/section-label/pill/toggle/info-card) mirroring `settings-ui`.
+
+### Fixed
+
+- (Roku) A codec's `quirk` field is a *string* (the known-issue reason), not a boolean; a `quirk = true`
+  comparison type-mismatched and silently killed the Device grid render at the first quirked codec (vp9).
+  Both quirk checks now test for presence, so the full grid (+ audio + containers) renders.
+
 ## [0.10.56] - 2026-08-18
 
 Roku **mini-player re-expand** fix; the bumper-music video/audio hybrid was attempted and reverted.
