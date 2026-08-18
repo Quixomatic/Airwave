@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.60] - 2026-08-18
+
+### Added
+
+- **Roku branded channel art + generator.** `apps/tv-roku/scripts/gen-channel-art.py` renders the Airwave logo
+  mark (home-screen icons + Channel Store posters) and the mark+wordmark lockup (boot splashes) on the app's
+  dark radial gradient, at Roku's sizes — mirroring `tv-native`'s `gen-app-icons.py`. Replaces the placeholder
+  navy `icon_focus_hd/fhd` + `splash_hd/fhd` in the manifest, and adds `store-poster-hd/fhd` for the Channel
+  Store listing. (Roku's required art sizes drift — the size tables at the bottom of the script are the one
+  place to adjust before submitting.)
+
 ## [0.10.59] - 2026-08-18
 
 ### Fixed
