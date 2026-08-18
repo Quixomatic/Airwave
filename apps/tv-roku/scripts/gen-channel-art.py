@@ -76,12 +76,24 @@ def _lockup(mark_h: int) -> Image.Image:
 
 
 def make_lockup(name: str, w: int, h: int, frac: float) -> None:
-    """Mark + wordmark centered on the gradient (opaque) — the branded splash."""
+    """Mark + wordmark centered on the gradient (opaque) — a branded still (unused for the splash now)."""
     bg = radial_bg(w, h)
     resized, nw, nh = _fit(_lockup(220), w, h, frac)
     bg.paste(resized, ((w - nw) // 2, (h - nh) // 2), resized)
     bg.convert("RGB").save(os.path.join(OUT, name))
     print(f"  {name:22s} {w}x{h}  (lockup)")
+
+
+# The Roku OS splash shows BEFORE our code runs; the app then plays the animated LogoLockup on a FLAT
+# #060a14 background (BootSplash bg). So the splash is a PLAIN #060a14 fill — no logo — and the animation
+# fades the wordmark up from black seamlessly (rather than flashing a big static logo). Roku requires a
+# splash image; this makes it invisible-as-a-handoff.
+BG = (6, 10, 20)  # #060a14 — matches BootSplash's Rectangle bg exactly
+
+
+def make_flat(name: str, w: int, h: int) -> None:
+    Image.new("RGB", (w, h), BG).save(os.path.join(OUT, name))
+    print(f"  {name:22s} {w}x{h}  (flat #060a14 — seamless handoff to the animated splash)")
 
 
 # name, width, height, logo-fraction-of-canvas
@@ -101,7 +113,7 @@ if __name__ == "__main__":
     print("Roku channel icons + store posters (mark-only):")
     for name, w, h, frac in ICONS:
         make_mark(name, w, h, frac)
-    print("Roku boot splashes (mark + wordmark lockup):")
-    for name, w, h, frac in SPLASHES:
-        make_lockup(name, w, h, frac)
+    print("Roku boot splashes (flat #060a14 — the animated LogoLockup does the branding):")
+    for name, w, h, _frac in SPLASHES:
+        make_flat(name, w, h)
     print("done — verify sizes at developer.roku.com's Channel Store art spec before submitting")

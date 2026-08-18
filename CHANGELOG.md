@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.61] - 2026-08-18
+
+### Changed
+
+- **Roku boot splash is now a flat `#060a14` fill** (matching the app background) instead of a static logo.
+  Roku requires a splash image, but ours now hands off **seamlessly** to the in-app animated LogoLockup (which
+  fades the wordmark up from black) rather than flashing a big static logo first. `splash_color` aligned to
+  `#060a14`; `gen-channel-art.py` generates the flat splashes.
+
 ## [0.10.60] - 2026-08-18
 
 ### Added
