@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.62] - 2026-08-18
+
+### Changed
+
+- **Roku channel icon + store posters now show a stacked lockup** — the logo mark with a centered white
+  "Airwave" wordmark below it — instead of the mark alone, so the home-screen tile reads as branded.
+  `gen-channel-art.py` gained a `_stacked()`/`make_stacked()` layout.
+
 ## [0.10.61] - 2026-08-18
 
 ### Changed

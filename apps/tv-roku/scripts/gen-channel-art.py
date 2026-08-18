@@ -51,12 +51,36 @@ def _fit(img: Image.Image, w: int, h: int, frac: float):
 
 
 def make_mark(name: str, w: int, h: int, frac: float) -> None:
-    """Logo mark centered on the gradient (opaque) — the bold home-screen tile / store poster."""
+    """Logo mark centered on the gradient (opaque)."""
     bg = radial_bg(w, h)
     resized, nw, nh = _fit(logo, w, h, frac)
     bg.paste(resized, ((w - nw) // 2, (h - nh) // 2), resized)
     bg.convert("RGB").save(os.path.join(OUT, name))
     print(f"  {name:22s} {w}x{h}  (mark)")
+
+
+def _stacked(mark_h: int) -> Image.Image:
+    """Vertical lockup: the logo mark with a centered white 'Airwave' wordmark BELOW it (transparent)."""
+    mw = int(mark_h * LOGO_AR)
+    mark = logo.resize((mw, mark_h), Image.LANCZOS)
+    font = ImageFont.truetype(FONT, int(mark_h * 0.44))
+    gap = int(mark_h * 0.16)
+    bx = ImageDraw.Draw(Image.new("RGBA", (8, 8))).textbbox((0, 0), "Airwave", font=font)
+    tw, th = bx[2] - bx[0], bx[3] - bx[1]
+    lw, lh = max(mw, tw), mark_h + gap + th
+    img = Image.new("RGBA", (lw, lh), (0, 0, 0, 0))
+    img.paste(mark, ((lw - mw) // 2, 0), mark)
+    ImageDraw.Draw(img).text(((lw - tw) // 2 - bx[0], mark_h + gap - bx[1]), "Airwave", font=font, fill=(255, 255, 255, 255))
+    return img
+
+
+def make_stacked(name: str, w: int, h: int, frac: float) -> None:
+    """Mark-over-'Airwave' stacked lockup centered on the gradient (opaque) — the branded tile / store poster."""
+    bg = radial_bg(w, h)
+    resized, nw, nh = _fit(_stacked(240), w, h, frac)
+    bg.paste(resized, ((w - nw) // 2, (h - nh) // 2), resized)
+    bg.convert("RGB").save(os.path.join(OUT, name))
+    print(f"  {name:22s} {w}x{h}  (mark + 'Airwave')")
 
 
 def _lockup(mark_h: int) -> Image.Image:
@@ -98,10 +122,10 @@ def make_flat(name: str, w: int, h: int) -> None:
 
 # name, width, height, logo-fraction-of-canvas
 ICONS = [
-    ("icon_focus_hd.png", 336, 210, 0.60),
-    ("icon_focus_fhd.png", 540, 405, 0.58),
-    ("store-poster-hd.png", 290, 218, 0.60),
-    ("store-poster-fhd.png", 540, 405, 0.58),
+    ("icon_focus_hd.png", 336, 210, 0.80),
+    ("icon_focus_fhd.png", 540, 405, 0.76),
+    ("store-poster-hd.png", 290, 218, 0.80),
+    ("store-poster-fhd.png", 540, 405, 0.76),
 ]
 SPLASHES = [
     ("splash_hd.png", 1280, 720, 0.44),
@@ -110,9 +134,9 @@ SPLASHES = [
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    print("Roku channel icons + store posters (mark-only):")
+    print("Roku channel icons + store posters (mark + 'Airwave' wordmark below):")
     for name, w, h, frac in ICONS:
-        make_mark(name, w, h, frac)
+        make_stacked(name, w, h, frac)
     print("Roku boot splashes (flat #060a14 — the animated LogoLockup does the branding):")
     for name, w, h, _frac in SPLASHES:
         make_flat(name, w, h)
