@@ -1,0 +1,37 @@
+# =============================================================================
+# Airwave — SIGN-IN script  (Roku Channel Behavior Analysis)
+# =============================================================================
+# Airwave connects to a self-hosted server and signs in with a DEVICE CODE approved
+# in a web browser — there is NO in-app username/password field — so sign-in cannot be
+# fully automated. This script drives as far as automation allows: it enters the server
+# URL, connects, and selects the device-code login, stopping at the code/QR screen. A
+# reviewer finishes sign-in in a browser.
+#
+# Manual step for the reviewer, after this script runs:
+#   1. Read the device code shown on the Roku screen.
+#   2. In a browser, sign in at https://tv-admin.turboforge.io with the test credentials.
+#   3. Open https://tv-admin.turboforge.io/device, enter the code, and approve it —
+#      the Roku app then signs in automatically and loads the channel guide.
+#
+# Re-record if the ServerSetup / Login UI changes. See apps/tv-roku/cert/README.md.
+# =============================================================================
+params:
+  rasp_version: 1
+  default_keypress_wait: 2
+  channels:
+    Airwave: dev
+steps:
+  - launch: Airwave
+  - press: ok
+  - text: https://tv.turboforge.io
+  - press: ok
+  - press: down
+  - press: down
+  - press: down
+  - press: down
+  - press: ok
+  - press: ok
+  - press: down
+  - press: ok
+  - text: script-login
+  - text: script-password
