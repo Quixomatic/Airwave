@@ -1,1 +1,0 @@
-Turn the media you already own into live TV. Airwave is the Roku client for your self-hosted Airwave server — the same channels, program guide, and live schedule you get on every device. Jump in mid-program, surf channels, and rewind DVR-style. Requires a self-hosted Airwave server + Plex.

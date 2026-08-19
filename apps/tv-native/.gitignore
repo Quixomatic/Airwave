@@ -22,3 +22,6 @@ expo-env.d.ts
 # Local env
 .env*.local
 .env
+
+# Local-only App Store submission copy / cert artifacts
+cert/

@@ -5,6 +5,9 @@ out/
 # On-demand device screenshots (scripts/grab-screenshot.ts) — local only
 screenshots/
 
+# Store-submission artifacts (.rasp scripts, listing copy, reviewer/exemption notes) — local only
+cert/
+
 # Secrets: your Roku dev-mode IP + password live here (copy from rokudeploy.example.json)
 rokudeploy.json
 
