@@ -1,0 +1,21 @@
+Roku Partner Success contact form (developer.roku.com/contact) — request to exempt the two
+Channel Behavior Analysis tests that can't run against a self-hosted, device-code channel.
+Two fields, 1000 chars max each.
+
+===================================================================================
+APP DETAILS  (849 / 1000)
+===================================================================================
+Airwave (channel ID 878438) is a Roku client for a user's own self-hosted media server. The user runs the Airwave server next to their Plex library; it builds persistent, continuously-scheduled live-TV channels — a program guide, channels airing on their own timeline, and DVR-style seeking. The Roku app is one of several clients (also Apple TV, Android TV, Fire TV, LG webOS, iPad, browser) that connect to that self-hosted server.
+
+Sign-in is a device-code flow: the app displays a code and the user approves it in a web browser (there is NO in-app username/password field). Airwave has no traditional on-demand catalog — its content is live, continuously-scheduled channels generated on the user's own server, so there are no stable per-title content IDs.
+
+Test credentials and step-by-step sign-in instructions are included with the submission.
+
+===================================================================================
+DESCRIPTION  (804 / 1000)
+===================================================================================
+Requesting an exemption from the Channel Behavior Analysis "Channel Deep Linking Basic" (5.1) and "Channel Content Play Performance" (3.6) tests. Both currently Skip and are blocking submission.
+
+Both tests require a signed-in, playing session. Airwave's sign-in is completed in a web browser (device-code activation), so the automated test devices can never reach a signed-in state — the documented case where the tool cannot run deep-linking or content-play tests on a channel with an intermediary introduction screen. Airwave also has no on-demand catalog or per-title content IDs to register for deep linking.
+
+Channel Launch Performance (3.2), Sign In, Sign Out, and Screensaver Policy all Pass. Please exempt or manually verify the two tests above so the channel can be submitted for certification.

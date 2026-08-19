@@ -27,6 +27,14 @@ Record `login.rasp` from a **logged-out** state (true-uninstall the dev channel 
 server screen); `logout.rasp` while logged in on the guide. The tool's `RASP_Scripts.zip` export is
 gitignored (`*.zip`) — only the `.rasp` files are versioned.
 
+## Partner Success exemption request
+
+- **`roku-exemption-request.txt`** — the "App details" + "Description" fields (1000 chars each) for
+  Roku's contact form (developer.roku.com/contact). The automated Channel Behavior Analysis can't run
+  the **Deep Linking Basic (5.1)** and **Content Play Performance (3.6)** tests on a device-code channel
+  with an intermediary sign-in screen (Roku grants a case-by-case exemption). Launch/Sign-in/Sign-out/
+  Screensaver all Pass; those two Skip and block submission until exempted.
+
 ## Store listing copy
 
 - **`store-description-short.txt`** — the on-device description (≤300 chars; currently 290). Shown when
