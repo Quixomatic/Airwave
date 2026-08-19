@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.0] - 2026-08-19
+
+Opens the 0.11.x store-launch phase: finalize the "Change server" affordance and cut fresh store-submission
+builds (webOS `.ipk` + signed Roku `.pkg`) carrying it.
+
+### What ships
+
+- **Removed the tv-web `?changeserver` preview hatch** (`features/auth/login.tsx`) — it was a temporary aid to
+  eyeball the button on a baked build. The "Change server" button now shows purely by its real rule
+  (`!hasBakedServer()`): visible on onboarded installs, hidden on the baked browser/desktop web player.
+- **Fresh store-submission builds** of the two hand-packaged clients, both carrying the new login button:
+  the webOS `.ipk` (`apps/tv-web/build-ipk`, ares `--no-minify`) and a signed Roku `.pkg`
+  (`apps/tv-roku/out`, SQUASHFS_ZSTD, min firmware v11.0.0 b1). The iOS/tvOS builds are cut separately via EAS.
+
 ## [0.10.72] - 2026-08-19
 
 All three TV clients: a "Change server" affordance on the login screen, so onboarding is no longer a dead end.

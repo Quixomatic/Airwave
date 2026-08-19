@@ -112,11 +112,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
   // "Change server" — clear the onboarded URL and reload; main.tsx re-gates to <ServerSetup /> when no
   // server is stored. Only offered when the URL was chosen (onboarded), NOT when it's baked at build time
   // (the browser/desktop web player, where there's no server to change and setup is unreachable).
-  // Preview hatch: append `?changeserver` to the URL to force it visible on a baked build too (harmless —
-  // on a baked build clearing the stored URL just reloads back to the baked one). For eyeballing the layout.
-  const previewChangeServer =
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("changeserver");
-  const showChangeServer = !hasBakedServer() || previewChangeServer;
+  const showChangeServer = !hasBakedServer();
   const changeServer = useCallback(() => {
     clearStoredServerUrl();
     window.location.reload();
