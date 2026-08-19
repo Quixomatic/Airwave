@@ -2,6 +2,36 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.1] - 2026-08-19
+
+Kicks off **`apps/tv-desktop`** — the Airwave native desktop client on Vercel's Native SDK
+(`vercel-labs/native`): a truly-native (no webview) Win/Mac/Linux client, UI in `.native` markup,
+logic in a TypeScript `core.ts`, with video (later) via a Zig `media-surface` producer driving
+libmpv. Post-1.0 stretch. It **builds and opens a native window on Windows today, on the TypeScript
+core** — which required fixing a real upstream bug.
+
+### What ships
+
+- **`apps/tv-desktop`** — `native init` scaffold (`src/core.ts` + `src/app.native` + `app.json`),
+  Windows target, Airwave identity (`com.airwave.tvdesktop`), 1280×720, `dev`/`build`/`check` scripts.
+- **`patches/@native-sdk__cli@0.9.5.patch`** — fixes **TS-core apps not linking on Windows**
+  (native-sdk 0.9.5 + Zig 0.16.0). The app-code `zig build-obj` is handed the multi-object compiled
+  core archive **plus** two loose platform C++ objects (`webview2_host`, `gpu_surface_renderer`), and
+  Zig 0.16's COFF backend can't merge multiple loose objects into one (`coff does not support linking
+  multiple objects into one`). Minimal repro: `build-obj a.o b.o` fails; `build-obj lib.a` ok;
+  `build-obj lib.a c.o` fails; `build-obj big.a -Mroot=x.zig` ok — COFF `build-obj` wants exactly one
+  archive + the zig root, zero loose objects. Fix (`build/app.zig`): on Windows, skip the
+  compile-once-into-an-object split and link the app module straight into the exe (`addExecutable`
+  does a real link, which handles an archive + many objects). Keeps the documented `core.ts` path
+  working. Upstream: `vercel-labs/native` #365. `@native-sdk/cli` is now a local devDependency so the
+  patch is reproducible from a clean `pnpm install`.
+
+### Notes
+
+- Windows dev toolchain (local, not committed): Node 24 + Zig 0.16.0 on PATH + `SCRIPTC_CC=zigcc`.
+- The `media-surface` producer is capped at 1080p SDR today (zero-copy GPU handles are "planned"
+  upstream), so 4K/HDR desktop is a fast-follow when that entry point ships.
+
 ## [0.11.0] - 2026-08-19
 
 Opens the 0.11.x store-launch phase: finalize the "Change server" affordance and cut fresh store-submission
