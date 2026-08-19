@@ -1,0 +1,9 @@
+Airwave turns the media you already own into real television. Point it at your Plex library and it builds persistent, scheduled channels with a full program guide — like a classic cable box, but generated entirely from your own library and running on your own hardware.
+
+This app is the Roku client for a self-hosted Airwave server. The server owns your channels, schedules, packages, and users; every client — Roku, Apple TV, Android TV, Fire TV, LG webOS, iPad, and the browser — tunes into the same network. Same channels, same guide, same program at the same point in its schedule, on every screen.
+
+Build channels from metadata filters, Plex collections, playlists, or hand-picked media. A deterministic scheduling engine groups episodes by show, rotates between shows, builds marathons, and enforces no-repeat windows. When you tune in, playback starts at the current live moment — not the beginning of the file.
+
+Airwave keeps each channel's past as a DVR: seek backward across program boundaries, restart the current program, or jump into something that aired earlier and keep watching forward. LIVE is the upper bound — go back through the channel, never past what's airing now. Optional bumpers and ambient music round out the experience.
+
+Requires a self-hosted Airwave server connected to Plex. The server, admin, and browser player are free and source-available to self-host; this prebuilt Roku app is a small paid convenience.

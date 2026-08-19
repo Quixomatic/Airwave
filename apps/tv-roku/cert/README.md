@@ -27,6 +27,13 @@ Record `login.rasp` from a **logged-out** state (true-uninstall the dev channel 
 server screen); `logout.rasp` while logged in on the guide. The tool's `RASP_Scripts.zip` export is
 gitignored (`*.zip`) — only the `.rasp` files are versioned.
 
+## Store listing copy
+
+- **`store-description-short.txt`** — the on-device description (≤300 chars; currently 290). Shown when
+  customers browse the Streaming Store on-device.
+- **`store-description-long.txt`** — the online description (≤1,500 chars; currently 1,440). Shown on the
+  app's detail page. Both make the self-hosted-server + Plex requirement explicit (cert + buyer expectations).
+
 ## Reviewer notes (paste into the dashboard's testing-instructions field)
 
 ```
