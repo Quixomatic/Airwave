@@ -2,6 +2,27 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.72] - 2026-08-19
+
+All three TV clients: a "Change server" affordance on the login screen, so onboarding is no longer a dead end.
+
+### What ships
+
+- **A "Change server" ghost button on the login chooser** (tv-web, tv-native, tv-roku) — a subtle third
+  stacked option below the two sign-in buttons. Once you enter a server URL and reach login there was
+  previously **no way back** to the server-setup screen; this clears the onboarded server URL and returns to
+  setup. There's no token yet at login, so it only drops the stored URL and re-routes through each app's
+  entry gate (which re-shows setup when no server is stored) — no sign-out needed.
+  - **tv-web** (`features/auth/login.tsx`): `clearStoredServerUrl()` + `window.location.reload()`
+    (`main.tsx` re-gates to `<ServerSetup />`). **Hidden when the server URL is baked at build time**
+    (`hasBakedServer()` — the browser/desktop web player, where there's no server to change and setup is
+    unreachable). A `?changeserver` query-string preview hatch forces it visible on a baked build for
+    eyeballing the layout (harmless — clearing a baked URL just reloads to the same one).
+  - **tv-native** (`app/login.tsx`): D-pad chooser count 2 → 3; `clearServerUrl()` + `router.replace("/")`.
+  - **tv-roku** (`components/screens/Login.{xml,bs}` + `MainScene`): a 3rd focusable ghost button sets a new
+    `changeServer` field that `MainScene` observes → `ServerUrl.clear()` + `route()` (which tears down Login
+    and lands on ServerSetup).
+
 ## [0.10.71] - 2026-08-19
 
 tv-native: scheme-by-host server-URL guard (tv-web/tv-roku parity) — typing a bare domain no longer 404s login.

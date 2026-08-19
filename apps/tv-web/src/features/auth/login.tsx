@@ -6,6 +6,7 @@ import { SERVER_URL, setToken } from "../../lib/auth-client";
 import { useDpadList } from "../../lib/input";
 import { Logo } from "../../lib/logo";
 import { Qr } from "../../lib/qr";
+import { clearStoredServerUrl, hasBakedServer } from "../../lib/server-url";
 
 const ACCENT = "#4a9fe0";
 
@@ -108,9 +109,27 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
     }, (data.interval ?? 5) * 1000);
   }, [onSignedIn]);
 
-  // Two focusable buttons on the chooser; one ("← Back") once a code is pending. Back on the
-  // pending view returns to the chooser, matching what the on-screen button does.
-  const choices = pending ? [() => reset(null)] : [startPlex, startDevice];
+  // "Change server" — clear the onboarded URL and reload; main.tsx re-gates to <ServerSetup /> when no
+  // server is stored. Only offered when the URL was chosen (onboarded), NOT when it's baked at build time
+  // (the browser/desktop web player, where there's no server to change and setup is unreachable).
+  // Preview hatch: append `?changeserver` to the URL to force it visible on a baked build too (harmless —
+  // on a baked build clearing the stored URL just reloads back to the baked one). For eyeballing the layout.
+  const previewChangeServer =
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("changeserver");
+  const showChangeServer = !hasBakedServer() || previewChangeServer;
+  const changeServer = useCallback(() => {
+    clearStoredServerUrl();
+    window.location.reload();
+  }, []);
+
+  // Focusable chooser buttons (Plex, code, and — when onboarded — Change server); collapses to one
+  // ("← Back") once a code is pending. Back on the pending view returns to the chooser, matching what
+  // the on-screen button does.
+  const choices = pending
+    ? [() => reset(null)]
+    : showChangeServer
+      ? [startPlex, startDevice, changeServer]
+      : [startPlex, startDevice];
   const { sel } = useDpadList({
     id: "login",
     count: choices.length,
@@ -174,6 +193,15 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
           >
             Log in with a code
           </button>
+          {showChangeServer && (
+            <button
+              onClick={changeServer}
+              style={ring(2)}
+              className="mt-2 self-center rounded-lg border border-zinc-800 px-4 py-2 text-sm text-zinc-500 transition hover:text-zinc-300"
+            >
+              Change server
+            </button>
+          )}
         </div>
       )}
 

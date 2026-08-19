@@ -63,6 +63,7 @@ sub setSel(i as integer)
     m.sel = i
     m.plexBtn.focused = (i = 0)
     m.codeBtn.focused = (i = 1)
+    m.changeBtn.focused = (i = 2)
 end sub
 
 ' ---- input --------------------------------------------------------------------
@@ -78,18 +79,22 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return key = Keys.UP or key = Keys.DOWN   ' swallow nav while pending
     end if
 
-    ' chooser
+    ' chooser (Plex 0 / code 1 / change-server 2)
     if key = Keys.UP
-        setSel(0)
+        if m.sel > 0 then setSel(m.sel - 1)
         return true
     else if key = Keys.DOWN
-        setSel(1)
+        if m.sel < 2 then setSel(m.sel + 1)
         return true
     else if key = Keys.OK
         if m.sel = 0
             startPlex()
-        else
+        else if m.sel = 1
             startDevice()
+        else
+            ' Drop the onboarded server URL and return to setup — MainScene observes this + re-routes.
+            Log.info("change server requested")
+            m.top.changeServer = true
         end if
         return true
     end if

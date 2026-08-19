@@ -6,7 +6,7 @@ import QRCode from "react-native-qrcode-svg";
 import { Logo } from "@/components/logo";
 
 import { ApiError, plexLink } from "@/lib/api";
-import { getServerUrl, setToken } from "@/lib/auth";
+import { clearServerUrl, getServerUrl, setToken } from "@/lib/auth";
 import { probeConnection } from "@/lib/plex-connection";
 import { authClient } from "@/lib/auth-client";
 import { cs, scaled } from "@/features/guide/layout";
@@ -105,10 +105,16 @@ export default function Login() {
     }, (data.interval ?? 5) * 1000);
   }, [router]);
 
+  // "Change server" — drop the onboarded URL and bounce through the entry gate → onboarding. No token
+  // exists yet at login (mirrors settings/server.tsx's changeServer, minus the setToken(null)).
+  const changeServer = useCallback(() => {
+    void clearServerUrl().then(() => router.replace("/"));
+  }, [router]);
+
   // D-pad zone machine. On Android TV our native key module consumes the D-pad and routes it here
   // (the native focus engine never sees it), so — like every other screen — we drive selection
   // ourselves: ▲/▼ move between the buttons, OK activates, Back exits the code view.
-  const count = pending ? 1 : 2; // pending view = just the Back button
+  const count = pending ? 1 : 3; // chooser = Plex + code + Change server; pending = just the Back button
   useEffect(() => setSel(0), [pending]); // reset selection when the view switches
   useKeyLayer({
     id: "login",
@@ -119,7 +125,8 @@ export default function Login() {
       if (e.key === "ok") {
         if (pending) reset(null);
         else if (sel === 0) void startPlex();
-        else void startDevice();
+        else if (sel === 1) void startDevice();
+        else changeServer();
         return true;
       }
       if (e.key === "back" && pending) {
@@ -177,6 +184,13 @@ export default function Login() {
             style={{ borderWidth: 2, borderColor: sel === 1 ? C.accent : "rgba(255,255,255,0.15)" }}
           >
             <Text className="text-xl font-semibold text-fg">Log in with a code</Text>
+          </Pressable>
+          <Pressable
+            onPress={changeServer}
+            className="mt-1 items-center self-center rounded-lg px-4 py-2 active:opacity-60"
+            style={{ borderWidth: 2, borderColor: sel === 2 ? "#fff" : "transparent" }}
+          >
+            <Text className="text-sm text-subtle">Change server</Text>
           </Pressable>
         </View>
       )}

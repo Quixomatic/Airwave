@@ -7,6 +7,7 @@
 <component name="Login" extends="Group">
     <interface>
         <field id="done" type="boolean" alwaysNotify="true" />
+        <field id="changeServer" type="boolean" alwaysNotify="true" />
     </interface>
 
     <children>
@@ -24,6 +25,10 @@
             <RoundedButton id="codeBtn" translation="[700,434]" w="520" h="84" radius="12" outlined="true"
                 fillColor="0x3F3F46FF" textColor="0xE4E4E7FF" focusFill="0x27272AFF" focusInk="0xE4E4E7FF"
                 fontUri="pkg:/fonts/Inter-SemiBold.ttf" fontSize="22" text="Log in with a code" />
+            <!-- Subtle ghost: drop the onboarded server URL and return to setup (no way back otherwise). -->
+            <RoundedButton id="changeBtn" translation="[830,548]" w="260" h="56" radius="10" outlined="true"
+                fillColor="0x27272AFF" textColor="0xA1A1AAFF" focusFill="0x27272AFF" focusInk="0xE4E4E7FF"
+                fontUri="pkg:/fonts/Inter-Medium.ttf" fontSize="16" text="Change server" />
         </Group>
 
         <!-- Pending (hidden until a flow starts) -->
