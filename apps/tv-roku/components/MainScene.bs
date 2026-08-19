@@ -22,6 +22,13 @@ sub init()
     ' player do it) → the timer restarts; when it fires while still in mini we go full.
     m.global.addFields({ inputPing: 0 })
     m.global.observeField("inputPing", "onInputPing")
+    ' Roku performance beacons: appLoaded flips true when the guide (home) first renders + fires
+    ' AppLaunchComplete. Until then, the pre-home screens (setup/login/diagnostic) are treated as
+    ' "dialogs before home" and bracket themselves with AppDialogInitiate/AppDialogComplete.
+    m.global.addFields({ appLoaded: false })
+    m.screenIsDialog = false
+    m.pendingDeepLink = ""
+    m.top.observeField("deepLink", "onDeepLink")
     m.idleTimer = CreateObject("roSGNode", "Timer")
     m.idleTimer.duration = 60
     m.idleTimer.repeat = false
@@ -54,8 +61,33 @@ sub onBootDone()
     route()
 end sub
 
+' A deep-link channel target arrived (launch args / roInput). Remember it; if the guide is already up,
+' tune immediately, otherwise it's applied once the guide renders (onGuideReady).
+sub onDeepLink()
+    cid = m.top.deepLink
+    if cid = invalid or cid = "" then return
+    m.pendingDeepLink = cid
+    if m.screen <> invalid and m.screen.subtype() = "Guide" then applyDeepLink()
+end sub
+
+sub applyDeepLink()
+    if m.pendingDeepLink = "" or m.screen = invalid then return
+    if m.screen.subtype() = "Guide"
+        m.screen.deepLinkChannelId = m.pendingDeepLink
+        m.pendingDeepLink = ""
+    end if
+end sub
+
+' Fire a Roku performance beacon (no-op-safe wrapper).
+sub perfBeacon(name as string)
+    m.top.signalBeacon(name)
+end sub
+
 sub route()
     if m.screen <> invalid
+        ' Close the pre-home "dialog" beacon if we're leaving a setup/login/diagnostic screen.
+        if m.screenIsDialog and m.global.appLoaded = false then perfBeacon("AppDialogComplete")
+        m.screenIsDialog = false
         m.top.removeChild(m.screen)
         m.screen = invalid
     end if
@@ -87,6 +119,8 @@ sub showGuide()
     m.screen = s
     ' Restore the player (hidden while in Settings) if one is docked/playing.
     if m.player <> invalid and m.player.layout <> "off" then m.player.visible = true
+    ' Hand off any deep-link target that arrived before the guide existed.
+    applyDeepLink()
 end sub
 
 ' Guide sidebar → open the Settings shell at a category (General / User). Replaces the guide screen; the
@@ -225,6 +259,15 @@ sub showDiagnostic()
     s.observeField("done", "onDiagnosticDone")
     s.setFocus(true)
     m.screen = s
+    markPreHomeDialog()
+end sub
+
+' Mark the just-shown screen as a pre-home "dialog" and fire AppDialogInitiate (Roku cert 3.2), once,
+' before the app has finished launching (the guide sets appLoaded=true + fires AppLaunchComplete).
+sub markPreHomeDialog()
+    if m.global.appLoaded = true then return
+    m.screenIsDialog = true
+    perfBeacon("AppDialogInitiate")
 end sub
 
 sub onDiagnosticDone()
@@ -283,6 +326,7 @@ sub showServerSetup()
     s.observeField("done", "onSetupDone")
     s.setFocus(true)
     m.screen = s
+    markPreHomeDialog()
 end sub
 
 sub onSetupDone()
@@ -296,6 +340,7 @@ sub showLogin()
     s.observeField("done", "onLoginDone")
     s.setFocus(true)
     m.screen = s
+    markPreHomeDialog()
 end sub
 
 sub onLoginDone()

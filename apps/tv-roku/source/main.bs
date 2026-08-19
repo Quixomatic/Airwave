@@ -1,6 +1,6 @@
 ' Airwave — Roku client entry point.
 ' Creates the SceneGraph screen, shows MainScene, and runs the event loop.
-sub Main()
+sub Main(args as object)
     print "[Airwave] booting Roku client"
 
     ' Dev-only: pre-seed the server URL on a sideloaded build (no-op on a store install) so a
@@ -25,8 +25,30 @@ sub Main()
         dead: CreateObject("roAudioResource", "deadend")
     }
 
-    screen.CreateScene("MainScene")
+    scene = screen.CreateScene("MainScene")
     screen.show()
+
+    ' Deep linking (Roku cert): channels must handle roInput events. The manifest declares
+    ' supports_input_launch=1; here we route both the initial launch args and any subsequent roInput
+    ' events to the scene's `deepLink` field so it can act on a channel target if one is present.
+    handleDeepLink(scene, args)
+    input = CreateObject("roInput")
+    input.SetMessagePort(m.port)
+
+    ' Memory monitoring (Roku cert warnings): register for the OS low-memory event and read the channel's
+    ' memory budget so we can react before the OS reaps us. WRAPPED IN try/catch — several of these
+    ' roDeviceInfo methods only exist on newer firmware, and a missing member hard-crashes launch (&hf4).
+    ' The store floor is v11, where try/catch is available, so this degrades gracefully on any real device.
+    devInfo = CreateObject("roDeviceInfo")
+    devInfo.SetMessagePort(m.port)
+    m.devInfo = devInfo
+    try
+        devInfo.EnableLowGeneralMemoryEvent(true)
+        devInfo.EnableMemoryWarningEvent(true)
+        print "[Airwave] memory limitPct="; devInfo.GetMemoryLimitPercent(); " channelLimit="; devInfo.GetChannelMemoryLimit(); " available="; devInfo.GetChannelAvailableMemory()
+    catch e
+        print "[Airwave] memory monitoring: some APIs unavailable on this firmware ("; e.message; ")"
+    end try
 
     ' Standard SceneGraph render loop — exit when the screen closes.
     while true
@@ -34,6 +56,12 @@ sub Main()
         mt = type(msg)
         if mt = "roSGScreenEvent"
             if msg.isScreenClosed() then return
+        else if mt = "roInputEvent"
+            ' A deep link arrived while running (or a voice/ECP input). Route it to the scene.
+            if msg.IsInput() then handleDeepLink(scene, msg.GetInfo())
+        else if mt = "roDeviceInfoEvent"
+            info = msg.GetInfo()
+            if type(info) = "roAssociativeArray" then print "[Airwave] roDeviceInfo event: "; FormatJson(info)
         else if mt = "roSGNodeEvent"
             if msg.getField() = "uiSound"
                 val = msg.getData()
@@ -46,4 +74,13 @@ sub Main()
             end if
         end if
     end while
+end sub
+
+' Pass a launch/roInput payload to the scene. Roku sends deep-link params as { contentId, mediaType }.
+' We only surface a channel target; the scene decides what to do (tune it once the guide is up). A launch
+' with no recognizable params is a normal cold start — a no-op here, which is the required graceful handling.
+sub handleDeepLink(scene as object, params as object)
+    if scene = invalid or type(params) <> "roAssociativeArray" then return
+    cid = params.contentId
+    if cid <> invalid and cid <> "" then scene.deepLink = cid
 end sub

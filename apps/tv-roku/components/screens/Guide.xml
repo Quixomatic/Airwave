@@ -18,6 +18,8 @@
         <field id="done" type="boolean" alwaysNotify="true" />
         <!-- Sidebar Settings/Account → open the Settings shell at this category (MainScene observes). -->
         <field id="openSettings" type="string" alwaysNotify="true" />
+        <!-- Deep-link target: MainScene sets this (from a launch arg / roInput) → tune that channel if present. -->
+        <field id="deepLinkChannelId" type="string" alwaysNotify="true" onChange="onDeepLinkChannel" />
         <!-- Mini-player dock: MainScene sets miniActive → the featured panel reserves its right slot; the
              computed slot rect (screen coords) is read back for the docked player. -->
         <field id="miniActive" type="boolean" onChange="onMiniActive" />

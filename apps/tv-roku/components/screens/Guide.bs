@@ -164,6 +164,26 @@ sub onGuide(data as object, _ctx as object)
         m.refreshTimer.control = "start"
     end if
     Log.info("[guide] " + Str(m.allChannels.count()).Trim() + " channels loaded")
+    ' Roku performance monitoring: the home screen has rendered its content → launch is complete.
+    if m.global.appLoaded = false
+        m.global.appLoaded = true
+        m.top.signalBeacon("AppLaunchComplete")
+    end if
+    ' Apply a pending deep-link now that channels exist.
+    if m.top.deepLinkChannelId <> invalid and m.top.deepLinkChannelId <> "" then onDeepLinkChannel()
+end sub
+
+' Deep-link (Roku cert): tune the requested channel id if it's in the current (lens-filtered) list.
+sub onDeepLinkChannel()
+    id = m.top.deepLinkChannelId
+    if id = invalid or id = "" or m.channels = invalid then return
+    for i = 0 to m.channels.count() - 1
+        if m.channels[i].id = id
+            m.fc = i
+            tune()
+            return
+        end if
+    end for
 end sub
 
 ' 60s periodic re-fetch (tv-web/native refetchInterval) — advances now/on-now/progress, preserving fc/fp.

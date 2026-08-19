@@ -4,7 +4,7 @@ the app's dark radial gradient, at every size the Roku manifest + Channel Store 
 in `apps/tv-native/scripts/gen-app-icons.py`, adapted to Roku's sizes.
 
 Outputs (apps/tv-roku/images/) — these REPLACE the placeholder navy assets the manifest already points at:
-  - icon_focus_hd.png    336x210    home-screen focus icon   (manifest `mm_icon_focus_hd`)
+  - icon_focus_hd.png    290x218    home-screen focus icon   (manifest `mm_icon_focus_hd`)
   - icon_focus_fhd.png   540x405    home-screen focus icon   (manifest `mm_icon_focus_fhd`)
   - splash_hd.png        1280x720   boot splash              (manifest `splash_screen_hd`)
   - splash_fhd.png       1920x1080  boot splash              (manifest `splash_screen_fhd`)
@@ -122,7 +122,7 @@ def make_flat(name: str, w: int, h: int) -> None:
 
 # name, width, height, logo-fraction-of-canvas
 ICONS = [
-    ("icon_focus_hd.png", 336, 210, 0.80),
+    ("icon_focus_hd.png", 290, 218, 0.80),
     ("icon_focus_fhd.png", 540, 405, 0.76),
     ("store-poster-hd.png", 290, 218, 0.80),
     ("store-poster-fhd.png", 540, 405, 0.76),

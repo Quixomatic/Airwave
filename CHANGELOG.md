@@ -2,6 +2,38 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.65] - 2026-08-18
+
+Roku **Channel Store submission**: the real "malformed package" fix + a full pass over Roku's certification
+pre-scan, plus a launch-crash fix.
+
+### Fixed
+
+- **"Channel package is malformed" was a CORRUPTED DOWNLOAD, not the format.** roku-deploy 3.18.2's `needle`
+  HTTP shim decodes the binary signed `.pkg` as UTF-8 on download — every high byte collapses to U+FFFD
+  (`ef bf bd`), mangling ~1/4 of the file so the dashboard rejects it. `package-roku.ts` now signs on-device
+  via `roku-deploy` but **downloads the `.pkg` with `curl`** (binary-safe digest auth), and verifies the result
+  has ~0 replacement bytes + a valid `Roku Channel Pak` header before declaring success.
+- **Roku launch crash** (`&hf4`, `EXIT_BRIGHTSCRIPT_UNK_FUNC`): the memory-monitoring calls used method names
+  from Roku's cert-checker wording (`EnableMemoryWarningEvent`, `GetMemoryLimitPercent`, …) that **aren't real
+  `roDeviceInfo` methods on current firmware** — calling them hard-crashed the app at launch. They're now
+  wrapped in `try/catch` so they degrade gracefully (verified booting on the Stick 4K).
+
+### Roku certification hardening (pre-scan pass)
+
+- **`roInput` deep-link handling** (`main.bs` → MainScene/Guide `deepLinkChannelId`) — the manifest already
+  declared `supports_input_launch=1`; the app now handles the events (and tunes a deep-linked channel if present).
+- **Performance beacons:** `AppLaunchComplete` when the guide first renders (`Guide.onGuide`), and
+  `AppDialogInitiate`/`AppDialogComplete` bracketing the pre-home setup/login/diagnostic screens (`MainScene`).
+- **Manifest:** removed the deprecated `subtitle=` attribute.
+- **Channel art:** regenerated the HD focus icon at **290×218** (was 336×210) per the current spec
+  (`gen-channel-art.py`).
+
+### Packaging
+
+- `pnpm -F tv-roku package` ships **SQUASHFS_ZSTD** (min firmware **v11.0.0 b1**) — the latest format, matching
+  the 4K-HDR audience. Set `convertToSquashfs:false` in `rokudeploy.json` to widen reach to ~v8.0 instead.
+
 ## [0.10.64] - 2026-08-18
 
 Roku packaging now builds **squashfs** — fixes the Channel Store's "channel package is malformed" rejection.

@@ -6,6 +6,10 @@
   Script auto-imported (bsconfig autoImportComponentScript).
 -->
 <component name="MainScene" extends="Scene">
+    <interface>
+        <!-- Deep-link channel target, set by main.bs from launch args / roInput (Roku cert). -->
+        <field id="deepLink" type="string" alwaysNotify="true" />
+    </interface>
     <children>
         <Rectangle id="bg" width="1920" height="1080" color="0x060A14FF" />
     </children>
