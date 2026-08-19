@@ -1,0 +1,22 @@
+diff --git a/build/app.zig b/build/app.zig
+index 7590a9e0ef354474b82d0ba16fb60d38828d8812..1e278b3a8953d42fc89987c8862212691ceecbc4 100644
+--- a/build/app.zig
++++ b/build/app.zig
+@@ -1772,6 +1772,17 @@ pub fn addAppArtifacts(b: *std.Build, dep: *std.Build.Dependency, app_options: A
+     // cached object plus the tiny generated markup-data object. A markup edit
+     // therefore avoids re-analyzing the SDK and app runner entirely.
+     const exe_root = if (ts_stage) |stage| root: {
++        // PATCH (Airwave, tv-desktop): Windows COFF `zig build-obj` cannot merge
++        // the multi-object compiled-core archive + the loose platform C++ objects
++        // into one object — "coff does not support linking multiple objects into
++        // one" (Zig 0.16). Skip the compile-once-into-an-object split on Windows
++        // and link the app module straight into the exe: `addExecutable` does a
++        // real link, which handles an archive + many objects fine. Costs only the
++        // markup-edit caching optimization, and only on Windows. See upstream #365.
++        if (target.result.os.tag == .windows) {
++            app_mod.addObject(markupDataObject(b, target, app_optimize, stage.markup_c));
++            break :root app_mod;
++        }
+         const app_code = b.addObject(.{
+             .name = b.fmt("{s}-app-code", .{app_options.name}),
+             .root_module = app_mod,

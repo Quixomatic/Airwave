@@ -1,0 +1,32 @@
+{
+    "$schema": "https://schema.native-sdk.dev/app/v1.json",
+    "id": "com.airwave.tvdesktop",
+    "name": "tv-desktop",
+    "display_name": "Airwave",
+    "description": "Airwave — your media library as live TV channels, native on the desktop.",
+    "version": "0.11.0",
+    "icons": ["assets/icon.png"],
+    "platforms": ["windows"],
+    "permissions": ["view", "command"],
+    "capabilities": ["native_views", "gpu_surfaces"],
+    "shell": {
+        "windows": [
+            {
+                "label": "main",
+                "title": "Airwave",
+                "width": 1280,
+                "height": 720,
+                "views": [
+                    { "label": "main-canvas", "kind": "gpu_surface", "fill": true, "role": "App canvas", "accessibility_label": "Airwave", "gpu_pixel_format": "bgra8_unorm", "gpu_present_mode": "timer", "gpu_alpha_mode": "opaque", "gpu_color_space": "srgb", "gpu_vsync": true }
+                ]
+            }
+        ]
+    },
+    "security": {
+        "navigation": {
+            "allowed_origins": ["zero://app", "zero://inline"],
+            "external_links": { "action": "deny" }
+        }
+    },
+    "web_engine": "system"
+}

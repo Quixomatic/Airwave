@@ -37,7 +37,8 @@
       "@expo/dom-webview": "55.0.6"
     },
     "patchedDependencies": {
-      "react-native-tvos@0.83.6-0": "patches/react-native-tvos@0.83.6-0.patch"
+      "react-native-tvos@0.83.6-0": "patches/react-native-tvos@0.83.6-0.patch",
+      "@native-sdk/cli@0.9.5": "patches/@native-sdk__cli@0.9.5.patch"
     },
     "onlyBuiltDependencies": [
       "@embedded-postgres/windows-x64",
