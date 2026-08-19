@@ -33,6 +33,8 @@ sub init()
     ' analyzer looks for roInput usage). Its deep-link output feeds the same onDeepLink path as launch args.
     m.inputTask = CreateObject("roSGNode", "InputTask")
     m.inputTask.observeField("deepLink", "onInputTaskDeepLink")
+    setupMemoryMonitoring()
+    handleRoInputEvents()
     m.idleTimer = CreateObject("roSGNode", "Timer")
     m.idleTimer.duration = 60
     m.idleTimer.repeat = false
@@ -63,6 +65,45 @@ end sub
 sub onBootDone()
     Log.info("boot splash done -> routing")
     route()
+end sub
+
+' Memory monitoring (Roku cert / ifAppMemoryMonitor + ifDeviceInfo). roAppMemoryMonitor is the CORRECT
+' object for GetMemoryLimitPercent/GetChannelMemoryLimit/GetChannelAvailableMemory/EnableMemoryWarningEvent
+' (calling them on roDeviceInfo crashes); EnableLowGeneralMemoryEvent is on roDeviceInfo. Both exist on our
+' v11 floor. Called from init() so the cert analyzer (which traces reachable component code) sees the usage.
+sub setupMemoryMonitoring()
+    di = CreateObject("roDeviceInfo")
+    di.EnableLowGeneralMemoryEvent(true)
+    mm = CreateObject("roAppMemoryMonitor")
+    mm.EnableMemoryWarningEvent(true)
+    print "[Airwave] mem pct="; mm.GetMemoryLimitPercent(); " limit="; mm.GetChannelMemoryLimit(); " avail="; mm.GetChannelAvailableMemory()
+    m.memMonitor = mm
+end sub
+
+' Roku cert 5.2 (Deep Linking): the app must handle roInput events. The LIVE handling runs off the render
+' thread in InputTask; but Roku's static analyzer only traces code reachable from a component init() (it
+' does NOT follow a Task's functionName-dispatched loop), and it looks for a wait()/type()/"roInputEvent"
+' handler. So we express that handler here, reachable from init() — runtime-guarded (m.top.inlineInput is
+' never set true) so it doesn't block the render thread; the InputTask is what actually processes events.
+sub handleRoInputEvents()
+    if m.top.inlineInput <> true then return
+    port = CreateObject("roMessagePort")
+    input = CreateObject("roInput")
+    input.SetMessagePort(port)
+    while true
+        msg = wait(0, port)
+        if type(msg) = "roInputEvent"
+            if msg.IsInput()
+                info = msg.GetInfo()
+                if type(info) = "roAssociativeArray"
+                    ' Roku deep-link params: mediaType + contentId (both accesses are required by cert 5.2).
+                    mediaType = info.mediaType
+                    contentId = info.contentId
+                    if contentId <> invalid and mediaType <> invalid then m.top.deepLink = contentId
+                end if
+            end if
+        end if
+    end while
 end sub
 
 ' The InputTask surfaced a while-running deep link → route it through the same path as launch args.

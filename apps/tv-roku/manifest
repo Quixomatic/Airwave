@@ -1,9 +1,9 @@
 title=Airwave
 
-# Version — kept in lockstep with the other apps/* (see /version-bump). Mirrors package.json 0.10.66.
+# Version — kept in lockstep with the other apps/* (see /version-bump). Mirrors package.json 0.10.67.
 major_version=0
 minor_version=10
-build_version=66
+build_version=67
 
 # Icons = branded logo mark on the radial gradient (home-screen tile). Splash = a FLAT #060a14 fill (Roku
 # requires a splash image, but ours hands off seamlessly to the in-app animated LogoLockup, which fades the
@@ -19,5 +19,8 @@ splash_min_time=500
 ui_resolutions=fhd
 supports_input_launch=1
 supports_voice_roinput=1
+# NOTE: Roku will require rsg_version=1.3 for channels from 2026-10-01, but it raises the minimum firmware
+# to v15.1 (big reach cut), so we hold off. Add `rsg_version=1.3` here + set dashboard Min Firmware v15.1
+# when that deadline forces it. Until then this is a non-blocking Static Analysis warning.
 
 bs_const=DEBUG=false

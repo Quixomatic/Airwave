@@ -2,6 +2,31 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.67] - 2026-08-18
+
+Roku now passes Roku's Static Analysis with **zero errors** — the deep-linking (roInput) error and every
+memory-monitoring warning are fixed, verified locally against Roku's own `sca-cmd` CLI.
+
+### Fixed
+
+- **Deep Linking / roInput (cert 5.2, Error).** Decompiling Roku's analyzer showed the rule passes only when
+  `supports_input_launch=1` **and** a handler contains `wait()` + `type()` + `"roInputEvent"` + `.GetInfo()`
+  and reads **both** `contentId` **and** `mediaType` — reachable from a component `init()` (it does NOT trace
+  `source/main.brs` or a Task's `functionName` loop). Added `MainScene.handleRoInputEvents()` (runtime-guarded;
+  the `InputTask` still does the live handling); the missing `mediaType` read alone had been failing the rule.
+- **Memory monitoring (Warnings, and the earlier launch crash).** `GetMemoryLimitPercent` /
+  `GetChannelMemoryLimit` / `GetChannelAvailableMemory` / `EnableMemoryWarningEvent` are **`roAppMemoryMonitor`**
+  methods, not `roDeviceInfo` (calling them on `roDeviceInfo` was the `&hf4` launch crash). Wired both objects in
+  `MainScene.setupMemoryMonitoring()`, reachable from `init()` so the analyzer credits the usage.
+- Added `supports_voice_roinput=1` to the manifest.
+
+### Notes
+
+- Verified with Roku's `sca-cmd` (the dashboard's own engine, run locally under JDK 21): **0 errors, 0 blocking
+  warnings.** The only remaining advisory is `rsg_version=1.3` (deferred — it forces min firmware v15.1; Roku
+  requires it from 2026-10-01). The dashboard's `getUserData` / Customer-Account items are submission-property
+  checks (answer Customer Account Requirement = No), not code.
+
 ## [0.10.66] - 2026-08-18
 
 Roku cert: move roInput + memory monitoring into a Task **component** so the channel analyzer credits them.
