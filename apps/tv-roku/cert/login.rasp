@@ -33,5 +33,9 @@ steps:
   - press: ok
   - press: down
   - press: ok
-  - text: script-login
-  - text: script-password
+  # The device-code flow has NO in-app username/password field, so these credential
+  # variables have nowhere to be typed and are NOT needed — the reviewer enters the
+  # device code in a browser instead (see the header comment + README). Left here,
+  # commented, only to document that credential entry is intentionally omitted.
+  # - text: script-login
+  # - text: script-password
