@@ -18,7 +18,9 @@ import { C } from "@/lib/theme";
  */
 export default function Setup() {
   const router = useRouter();
-  const [url, setUrl] = useState("http://");
+  // Start empty (not "http://") so normalizeServerUrl can pick the scheme by host — a bare domain gets
+  // https, a LAN IP gets http. Pre-filling "http://" forced a typed domain to http:// → the 301→GET→404 trap.
+  const [url, setUrl] = useState("");
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -115,7 +117,7 @@ export default function Setup() {
           value={url}
           onChangeText={setUrl}
           onSubmitEditing={() => void connect()}
-          placeholder="http://192.168.1.50:3000"
+          placeholder="your-server.com or 192.168.1.50:3000"
           placeholderTextColor={C.subtleFg}
           autoCapitalize="none"
           autoCorrect={false}

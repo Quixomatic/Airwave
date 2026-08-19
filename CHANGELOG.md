@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.71] - 2026-08-19
+
+tv-native: scheme-by-host server-URL guard (tv-web/tv-roku parity) — typing a bare domain no longer 404s login.
+
+### Fixed
+
+- **tv-native `normalizeServerUrl` now picks the scheme by host** (`src/lib/auth.ts`): a scheme-less **domain**
+  defaults to **https**, a **LAN address / IP / `*.local`** defaults to **http** — matching tv-web (v0.10.16)
+  and tv-roku. Previously it always prepended `http://`, so typing `tv.turboforge.io` became
+  `http://tv.turboforge.io` → the server 301s to https → the redirected login POST becomes a GET → the
+  POST-only auth endpoints 404 (the health GET survives, so onboarding wrongly "connects"). An explicitly
+  typed `http://` or `https://` is always respected.
+- **The setup input no longer pre-fills `http://`** (`app/setup.tsx` — was `useState("http://")`), which had
+  forced a typed domain to `http://` and defeated the guard. It now starts empty with a
+  `your-server.com or 192.168.1.50:3000` placeholder, so the scheme-by-host logic applies.
+
 ## [0.10.70] - 2026-08-19
 
 Roku: restore the AppDialog beacon calls (analyzer wants them present, cert 3.2).
