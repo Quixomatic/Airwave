@@ -44,8 +44,11 @@ async function main() {
 
   // deployAndSignPackage uses rootDir/outDir/outFile/files/host/password from cfg + signingPassword to sign.
   // It returns the local path of the downloaded signed .pkg (out/<outFile-basename>.pkg).
+  // ⚠️ convertToSquashfs MUST be on: the Roku Channel Store rejects the older zip-based package as
+  // "channel package is malformed" (sideloading accepts it; the store requires squashfs). Default it on.
   const signedPkg = await rokuDeploy.deployAndSignPackage({
     ...cfg,
+    convertToSquashfs: cfg.convertToSquashfs ?? true,
     rootDir: join(APP, cfg.rootDir),
     outDir: join(APP, cfg.outDir),
   });

@@ -1,6 +1,6 @@
 {
   "name": "tv-roku",
-  "version": "0.10.63",
+  "version": "0.10.64",
   "private": true,
   "description": "Airwave Roku client (BrighterScript + SceneGraph). A direct port of tv-web/tv-native to Roku — strict visual + functional parity, its own separately-maintained codebase.",
   "scripts": {

@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.64] - 2026-08-18
+
+Roku packaging now builds **squashfs** — fixes the Channel Store's "channel package is malformed" rejection.
+
+### What ships
+
+- **`pnpm -F tv-roku package` now converts to squashfs before signing** (`convertToSquashfs: true` in
+  `scripts/package-roku.ts`). The Roku Channel Store rejects the older zip-based package as *"channel package
+  is malformed"* (sideloading accepts it; the store requires squashfs). The signed
+  `out/airwave-<version>.pkg` is now store-acceptable.
+- **Docs** (`.docs/publishing.md`, local): note the squashfs requirement and the package-format → minimum-
+  firmware mapping (ZIP v5.2 / CRAMFS v7.7 / **SQUASHFS v8.0.0 b1** / SQUASHFS_ZSTD v11) — set the listing's
+  Minimum Firmware Version to **v8.0.0 b1** for our squashfs package.
+
 ## [0.10.63] - 2026-08-18
 
 Roku **packaging + signing scripts** — a one-command path from source to a Channel-Store-ready `.pkg`.
