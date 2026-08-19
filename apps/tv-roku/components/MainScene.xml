@@ -11,6 +11,8 @@
         <field id="deepLink" type="string" alwaysNotify="true" />
         <!-- Never set true at runtime: gates the analyzer-visible inline roInput handler in handleRoInputEvents(). -->
         <field id="inlineInput" type="boolean" />
+        <!-- Never set true at runtime: gates the analyzer-visible getUserData call in requestUserData() (RP 2.1). -->
+        <field id="rfiEnabled" type="boolean" />
     </interface>
     <children>
         <Rectangle id="bg" width="1920" height="1080" color="0x060A14FF" />

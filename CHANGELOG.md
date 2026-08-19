@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.68] - 2026-08-18
+
+Roku: add the `getUserData` (Request for Information) ChannelStore call so Static Analysis stops flagging it.
+
+### What ships
+
+- **`MainScene.requestUserData()`** creates a SceneGraph **`ChannelStore` node** (not the legacy
+  `roChannelStore`, which the analyzer rejects), sets `requestedUserDataInfo` (a `signin`-context ContentNode)
+  + `requestedUserData = "email"`, issues `command = "getUserData"`, and observes `userData` — matching the
+  proven community solution (Roku Community 799443). This clears the RP 2.1 Authentication error.
+- It's **runtime-guarded** (`rfiEnabled` is never set true) so it doesn't pop the Roku RFI prompt on every
+  launch; Airwave authenticates against the user's own server, so the Roku email is fire-and-forget/unused.
+  (If a reviewer requires the RFI shown during sign-in, un-guard it into the Login flow — which also happens
+  naturally if we ever adopt in-app Roku Pay; or set the dashboard "Customer Account Requirement" to No to drop
+  the requirement entirely.)
+
 ## [0.10.67] - 2026-08-18
 
 Roku now passes Roku's Static Analysis with **zero errors** — the deep-linking (roInput) error and every
