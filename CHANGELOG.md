@@ -2,6 +2,27 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.63] - 2026-08-18
+
+Roku **packaging + signing scripts** — a one-command path from source to a Channel-Store-ready `.pkg`.
+
+### What ships
+
+- **`pnpm -F tv-roku genkey`** (`apps/tv-roku/scripts/roku-genkey.ts`) — generates this device's one-time
+  Roku **signing key**: talks to the dev-key console (telnet port 8080), runs `genkey`, and saves the printed
+  signing **password** + **DevID** into `rokudeploy.json` (gitignored). It **refuses to overwrite an existing
+  key** — a published channel is permanently bound to it — unless `--force` (never-published devices only), and
+  prints a loud back-it-up warning.
+- **`pnpm -F tv-roku package`** (`apps/tv-roku/scripts/package-roku.ts`) — runs `bsc`, then
+  `roku-deploy deployAndSignPackage`: zips staging, sideloads to the Roku in `rokudeploy.json`, signs the
+  installed channel with the saved `signingPassword`, and downloads the signed package to
+  **`out/airwave-<version>.pkg`** (version from the manifest). Proven end-to-end against the Stick 4K.
+- `rokudeploy.example.json` documents the new `signingPassword` / `devId` fields.
+- **Docs** (`.docs/publishing.md`, local): the Roku section is rewritten around the two scripts, with a CI note —
+  Roku signing is **device-bound** (a GitHub-hosted cloud runner can't reach a home-LAN Roku, and
+  `create-package` only zips; producing a signed `.pkg` needs a real device), so CI requires a self-hosted /
+  tailnet runner, and publishing is manual regardless.
+
 ## [0.10.62] - 2026-08-18
 
 ### Changed
