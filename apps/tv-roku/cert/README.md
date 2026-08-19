@@ -3,6 +3,10 @@
 Submission artifacts for the Roku Channel Store — versioned here because they must be **re-recorded
 whenever the login or settings UI changes** (parity discipline, like the rest of the Roku port).
 
+**Published channel ID: `878438`** (sideloaded dev builds use the `dev` id). The `.rasp` `channels` map
+targets `878438` because Channel Behavior Analysis runs against the published channel; swap it to `dev`
+to re-record/test against a local sideload.
+
 ## Channel Behavior Analysis `.rasp` scripts
 
 Recorded with the **Roku Remote Tool** (needs the Roku's *Settings → System → Advanced system settings →

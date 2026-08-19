@@ -19,7 +19,9 @@ params:
   rasp_version: 1
   default_keypress_wait: 2
   channels:
-    Airwave: dev
+    # "878438" = the published channel ID — Channel Behavior Analysis runs against this.
+    # Change to "dev" to re-record/test against a locally SIDELOADED build.
+    Airwave: "878438"
 steps:
   - launch: Airwave
   - press: ok
