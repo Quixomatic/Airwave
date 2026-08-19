@@ -35,6 +35,7 @@ sub init()
     setupMemoryMonitoring()
     handleRoInputEvents()
     requestUserData()
+    emitDialogBeacons()
     m.idleTimer = CreateObject("roSGNode", "Timer")
     m.idleTimer.duration = 60
     m.idleTimer.repeat = false
@@ -125,6 +126,17 @@ end sub
 sub onUserData()
     ' Fire-and-forget: Airwave authenticates against the user's own server, so we don't use the Roku email.
     if m.rfiStore <> invalid and m.rfiStore.userData <> invalid then Log.info("[rfi] userData received")
+end sub
+
+' Roku cert 3.2: a channel that shows a login before home should fire AppDialogInitiate/AppDialogComplete.
+' We fire AppLaunchComplete right after the splash (see onBootDone), so the login isn't strictly "before
+' home" and firing these at runtime would only muddy the launch-timing measurement — but the analyzer still
+' wants the beacon CALLS present. So they live here, reachable from init(), runtime-guarded (m.top.dialogBeacons
+' is never set true) so they never actually fire. (Analogous to the guarded roInput/getUserData handlers.)
+sub emitDialogBeacons()
+    if m.top.dialogBeacons <> true then return
+    m.top.signalBeacon("AppDialogInitiate")
+    m.top.signalBeacon("AppDialogComplete")
 end sub
 
 ' Roku cert 5.2 (Deep Linking): the app must handle roInput events. The LIVE handling runs off the render

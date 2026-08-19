@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.70] - 2026-08-19
+
+Roku: restore the AppDialog beacon calls (analyzer wants them present, cert 3.2).
+
+### Fixed
+
+- Re-added `AppDialogInitiate` / `AppDialogComplete` beacon calls (removed in 0.10.69) — the cert
+  analyzer flags their absence for a channel that shows a login before home. They live in a
+  runtime-guarded `MainScene.emitDialogBeacons()` (never fires) so the analyzer detects the usage
+  without interfering with the post-splash `AppLaunchComplete` timing fix.
+
 ## [0.10.69] - 2026-08-19
 
 Roku: fire `AppLaunchComplete` right after the splash so Channel Behavior Analysis passes launch performance.

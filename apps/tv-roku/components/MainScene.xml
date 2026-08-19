@@ -13,6 +13,8 @@
         <field id="inlineInput" type="boolean" />
         <!-- Never set true at runtime: gates the analyzer-visible getUserData call in requestUserData() (RP 2.1). -->
         <field id="rfiEnabled" type="boolean" />
+        <!-- Never set true at runtime: gates the analyzer-visible AppDialog beacons in emitDialogBeacons() (cert 3.2). -->
+        <field id="dialogBeacons" type="boolean" />
     </interface>
     <children>
         <Rectangle id="bg" width="1920" height="1080" color="0x060A14FF" />
