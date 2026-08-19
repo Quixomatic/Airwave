@@ -1,9 +1,9 @@
 title=Airwave
 
-# Version — kept in lockstep with the other apps/* (see /version-bump). Mirrors package.json 0.10.65.
+# Version — kept in lockstep with the other apps/* (see /version-bump). Mirrors package.json 0.10.66.
 major_version=0
 minor_version=10
-build_version=65
+build_version=66
 
 # Icons = branded logo mark on the radial gradient (home-screen tile). Splash = a FLAT #060a14 fill (Roku
 # requires a splash image, but ours hands off seamlessly to the in-app animated LogoLockup, which fades the
@@ -18,5 +18,6 @@ splash_min_time=500
 # Design/render at FHD (1920x1080); Roku downscales to 720 on HD boxes.
 ui_resolutions=fhd
 supports_input_launch=1
+supports_voice_roinput=1
 
 bs_const=DEBUG=false

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  InputTask — a SceneGraph Task that owns roInput (deep-link / voice / transport events) and the
+  roDeviceInfo low-memory event, running its own message-port loop off the render thread.
+
+  WHY a component (not source/main.brs): Roku's certification channel-analyzer scans the components/
+  tree for roInput + memory-monitoring usage; code in the plain-BrightScript entry (source/main.brs)
+  is NOT credited (cert 5.2 "must support roInput events" + the Monitoring warnings). This mirrors
+  jellyfin-roku's VoiceInputTask. Deep-link channel targets are forwarded to MainScene via `deepLink`.
+-->
+<component name="InputTask" extends="Task">
+    <interface>
+        <!-- A deep-linked channel id arrived while the app is running → MainScene tunes it. -->
+        <field id="deepLink" type="string" alwaysNotify="true" />
+    </interface>
+</component>

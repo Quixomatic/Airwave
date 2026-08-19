@@ -29,6 +29,10 @@ sub init()
     m.screenIsDialog = false
     m.pendingDeepLink = ""
     m.top.observeField("deepLink", "onDeepLink")
+    ' Deep link / voice / low-memory events run in a Task (off the render thread, and where Roku's cert
+    ' analyzer looks for roInput usage). Its deep-link output feeds the same onDeepLink path as launch args.
+    m.inputTask = CreateObject("roSGNode", "InputTask")
+    m.inputTask.observeField("deepLink", "onInputTaskDeepLink")
     m.idleTimer = CreateObject("roSGNode", "Timer")
     m.idleTimer.duration = 60
     m.idleTimer.repeat = false
@@ -59,6 +63,12 @@ end sub
 sub onBootDone()
     Log.info("boot splash done -> routing")
     route()
+end sub
+
+' The InputTask surfaced a while-running deep link → route it through the same path as launch args.
+sub onInputTaskDeepLink()
+    cid = m.inputTask.deepLink
+    if cid <> invalid and cid <> "" then m.top.deepLink = cid
 end sub
 
 ' A deep-link channel target arrived (launch args / roInput). Remember it; if the guide is already up,

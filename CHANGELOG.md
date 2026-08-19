@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.66] - 2026-08-18
+
+Roku cert: move roInput + memory monitoring into a Task **component** so the channel analyzer credits them.
+
+### Fixed
+
+- **Roku cert kept reporting "roInput events not handled" (5.2, Error) and the memory calls as "usage not
+  found"** even though both were present in `source/main.brs` — because **Roku's channel analyzer scans the
+  SceneGraph `components/` tree, not the plain-BrightScript entry** (the AppLaunchComplete/AppDialog beacons,
+  which live in components, *were* credited). Moved `roInput` (deep link / voice / transport, with
+  `enableTransportEvents()`) and the `roDeviceInfo` low-memory event into a new
+  **`components/tasks/InputTask`** (mirrors jellyfin-roku's `VoiceInputTask`); it forwards while-running
+  deep-link targets to `MainScene`. `main.bs` still handles the cold-start launch args. Added
+  **`supports_voice_roinput=1`** to the manifest (alongside the existing `supports_input_launch=1`).
+
 ## [0.10.65] - 2026-08-18
 
 Roku **Channel Store submission**: the real "malformed package" fix + a full pass over Roku's certification

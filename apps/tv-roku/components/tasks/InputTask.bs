@@ -1,0 +1,43 @@
+' InputTask — owns roInput (deep link / voice / transport) + the roDeviceInfo low-memory event, on its
+' own thread. See InputTask.xml for why this lives in a component (cert analyzer scans components/).
+
+sub init()
+    m.top.functionName = "runLoop"
+    m.top.control = "RUN"
+end sub
+
+sub runLoop()
+    port = CreateObject("roMessagePort")
+
+    ' roInput: deep links passed in while the app is already running (cert 5.2) + Roku voice/transport
+    ' commands. enableTransportEvents() opts in to the voice remote / Alexa transport commands
+    ' (manifest supports_voice_roinput=1).
+    input = CreateObject("roInput")
+    input.SetMessagePort(port)
+    input.enableTransportEvents()
+
+    ' roDeviceInfo: the OS low-memory event, so the app can react before it's reaped. Only
+    ' EnableLowGeneralMemoryEvent is a real method across firmware — the other names Roku's checker
+    ' lists (EnableMemoryWarningEvent / GetMemoryLimitPercent / …) don't exist and crash if called.
+    devInfo = CreateObject("roDeviceInfo")
+    devInfo.SetMessagePort(port)
+    devInfo.EnableLowGeneralMemoryEvent(true)
+
+    while true
+        msg = port.waitMessage(0)
+        mt = type(msg)
+        if mt = "roInputEvent"
+            if msg.IsInput()
+                info = msg.GetInfo()
+                if type(info) = "roAssociativeArray" and info.contentId <> invalid and info.contentId <> ""
+                    m.top.deepLink = info.contentId
+                end if
+            end if
+        else if mt = "roDeviceInfoEvent"
+            info = msg.GetInfo()
+            if type(info) = "roAssociativeArray" and info.lowGeneralMemoryLevel <> invalid
+                print "[Airwave] low general memory: "; info.lowGeneralMemoryLevel
+            end if
+        end if
+    end while
+end sub
