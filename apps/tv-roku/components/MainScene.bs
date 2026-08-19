@@ -22,11 +22,10 @@ sub init()
     ' player do it) → the timer restarts; when it fires while still in mini we go full.
     m.global.addFields({ inputPing: 0 })
     m.global.observeField("inputPing", "onInputPing")
-    ' Roku performance beacons: appLoaded flips true when the guide (home) first renders + fires
-    ' AppLaunchComplete. Until then, the pre-home screens (setup/login/diagnostic) are treated as
-    ' "dialogs before home" and bracket themselves with AppDialogInitiate/AppDialogComplete.
+    ' Roku launch performance (cert 3.2): appLoaded guards a one-shot AppLaunchComplete beacon, fired in
+    ' onBootDone right after the splash (see there) so it fires on EVERY launch — an unauthenticated launch
+    ' never reaches the guide, and Roku's automated CBA can't complete our device-code sign-in.
     m.global.addFields({ appLoaded: false })
-    m.screenIsDialog = false
     m.pendingDeepLink = ""
     m.top.observeField("deepLink", "onDeepLink")
     ' Deep link / voice / low-memory events run in a Task (off the render thread, and where Roku's cert
@@ -66,6 +65,27 @@ end sub
 sub onBootDone()
     Log.info("boot splash done -> routing")
     route()
+    ' Roku launch performance (cert 3.2): fire AppLaunchComplete once the FIRST interactive screen has
+    ' rendered — NOT gated on reaching the guide. An unauthenticated launch never reaches the guide (this
+    ' includes Roku's automated CBA test devices, which can't complete our browser-approved device-code
+    ' sign-in), so gating on the guide made Channel Launch Performance time out. We fire it a frame after
+    ' route() shows the first screen — firing pre-render (in this sub directly) reports "Pended without
+    ' Render". jellyfin fires at its home render; we fire at our first-screen render (home may be unreachable).
+    if m.global.appLoaded = false
+        m.launchTimer = CreateObject("roSGNode", "Timer")
+        m.launchTimer.duration = 0.1
+        m.launchTimer.repeat = false
+        m.launchTimer.observeField("fire", "onLaunchBeacon")
+        m.top.appendChild(m.launchTimer)
+        m.launchTimer.control = "start"
+    end if
+end sub
+
+sub onLaunchBeacon()
+    if m.global.appLoaded = false
+        m.global.appLoaded = true
+        m.top.signalBeacon("AppLaunchComplete")
+    end if
 end sub
 
 ' Memory monitoring (Roku cert / ifAppMemoryMonitor + ifDeviceInfo). roAppMemoryMonitor is the CORRECT
@@ -156,16 +176,8 @@ sub applyDeepLink()
     end if
 end sub
 
-' Fire a Roku performance beacon (no-op-safe wrapper).
-sub perfBeacon(name as string)
-    m.top.signalBeacon(name)
-end sub
-
 sub route()
     if m.screen <> invalid
-        ' Close the pre-home "dialog" beacon if we're leaving a setup/login/diagnostic screen.
-        if m.screenIsDialog and m.global.appLoaded = false then perfBeacon("AppDialogComplete")
-        m.screenIsDialog = false
         m.top.removeChild(m.screen)
         m.screen = invalid
     end if
@@ -337,15 +349,6 @@ sub showDiagnostic()
     s.observeField("done", "onDiagnosticDone")
     s.setFocus(true)
     m.screen = s
-    markPreHomeDialog()
-end sub
-
-' Mark the just-shown screen as a pre-home "dialog" and fire AppDialogInitiate (Roku cert 3.2), once,
-' before the app has finished launching (the guide sets appLoaded=true + fires AppLaunchComplete).
-sub markPreHomeDialog()
-    if m.global.appLoaded = true then return
-    m.screenIsDialog = true
-    perfBeacon("AppDialogInitiate")
 end sub
 
 sub onDiagnosticDone()
@@ -404,7 +407,6 @@ sub showServerSetup()
     s.observeField("done", "onSetupDone")
     s.setFocus(true)
     m.screen = s
-    markPreHomeDialog()
 end sub
 
 sub onSetupDone()
@@ -418,7 +420,6 @@ sub showLogin()
     s.observeField("done", "onLoginDone")
     s.setFocus(true)
     m.screen = s
-    markPreHomeDialog()
 end sub
 
 sub onLoginDone()

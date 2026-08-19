@@ -2,6 +2,27 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.10.69] - 2026-08-19
+
+Roku: fire `AppLaunchComplete` right after the splash so Channel Behavior Analysis passes launch performance.
+
+### Fixed
+
+- **Channel Launch Performance (cert 3.2) failed in CBA.** `AppLaunchComplete` was fired only when the guide
+  (home) rendered — but Roku's automated test devices can't complete Airwave's browser-approved **device-code
+  sign-in**, so they never reach the guide and the beacon never fired → launch timed out. It's now fired once,
+  a frame after the first interactive screen renders (`MainScene.onBootDone` → short Timer → `onLaunchBeacon`),
+  so it fires on every launch regardless of auth state and reports a real render Duration (~2 s) instead of
+  "Pended without Render". Removed the now-moot `AppDialogInitiate`/`AppDialogComplete` pre-home-dialog beacons.
+- The CBA `.rasp` scripts' `channels` map is reverted to **`dev`** (CBA installs the submitted package as a dev
+  channel; confirmed the sign-in/out scripts pass with `channel_id: dev`).
+
+### Notes
+
+- Deep-linking (5.1) and content-play (3.6) CBA tests still **skip** — they require a signed-in session, which
+  automated CBA can't reach with device-code auth. Those are expected to be verified via Roku's manual review
+  using the reviewer notes (`apps/tv-roku/cert/README.md`).
+
 ## [0.10.68] - 2026-08-18
 
 Roku: add the `getUserData` (Request for Information) ChannelStore call so Static Analysis stops flagging it.

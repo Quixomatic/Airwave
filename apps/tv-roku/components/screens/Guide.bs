@@ -164,11 +164,8 @@ sub onGuide(data as object, _ctx as object)
         m.refreshTimer.control = "start"
     end if
     Log.info("[guide] " + Str(m.allChannels.count()).Trim() + " channels loaded")
-    ' Roku performance monitoring: the home screen has rendered its content → launch is complete.
-    if m.global.appLoaded = false
-        m.global.appLoaded = true
-        m.top.signalBeacon("AppLaunchComplete")
-    end if
+    ' (AppLaunchComplete is fired in MainScene.onBootDone, right after the splash — not here — so it fires
+    ' on every launch, including unauthenticated ones that never reach the guide.)
     ' Apply a pending deep-link now that channels exist.
     if m.top.deepLinkChannelId <> invalid and m.top.deepLinkChannelId <> "" then onDeepLinkChannel()
 end sub
