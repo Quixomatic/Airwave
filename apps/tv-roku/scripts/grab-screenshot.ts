@@ -9,6 +9,11 @@
  *
  * Host + password come from rokudeploy.json; override with ROKU_HOST / ROKU_PASS env vars (e.g. the .252 TV).
  * Uses `curl --digest` (the dev console needs HTTP digest auth) via a subprocess — works under bun or node.
+ *
+ * ⚠️ LIMITATION: the dev-console screenshot captures the GRAPHICS plane (SceneGraph UI) only — NOT the VIDEO
+ * plane (Roku renders video on a separate hardware layer). So the player-with-video comes back as chrome over
+ * BLACK. Great for the pure-UI screens (guide / settings / onboarding / surf / bumper card); for a "video
+ * playing" store shot use an HDMI capture card, a photo of the TV, or composite a still behind the chrome.
  */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
