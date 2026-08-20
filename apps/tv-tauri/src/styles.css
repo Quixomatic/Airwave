@@ -6,6 +6,19 @@
 
 :root {
   color-scheme: dark;
+  /* Height of the custom titlebar; the app content region sits below it. */
+  --titlebar-h: 40px;
+}
+
+/* The app content region — every screen lives here, offset below the fixed titlebar so nothing hides
+   under it. `position: fixed` makes it the containing block for the screens' `absolute inset-0`. */
+.app-viewport {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--titlebar-h);
+  bottom: 0;
+  overflow: hidden;
 }
 
 /* ── Aurora theme ──────────────────────────────────────────────────────────
@@ -50,9 +63,10 @@ body {
   overflow: hidden;
 }
 
-/* Transparent stage: video shows through; chrome sits at top + bottom. */
+/* Transparent stage: video shows through; chrome sits at top + bottom. Fills the app-viewport. */
 .stage {
-  height: 100%;
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -134,7 +148,7 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  height: 40px;
+  height: var(--titlebar-h);
   display: flex;
   align-items: center;
   justify-content: space-between;

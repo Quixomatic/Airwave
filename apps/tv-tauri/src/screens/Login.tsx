@@ -115,7 +115,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
   }, []);
 
   return (
-    <div className="fixed inset-0 flex flex-col items-center justify-center gap-8 overflow-auto bg-background p-10 text-center text-foreground">
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-8 overflow-auto bg-background p-10 text-center text-foreground">
       <div className="flex flex-col items-center gap-2">
         <Logo markWidth={130} wordmark animate />
         <p className="text-muted-foreground">Sign in to start watching.</p>

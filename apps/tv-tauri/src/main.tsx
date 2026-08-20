@@ -37,7 +37,9 @@ initStore().then(() => {
   createRoot(document.getElementById("root") as HTMLElement).render(
     <StrictMode>
       <TitleBar />
-      {hasServerUrl() ? <RouterProvider router={router} /> : <ServerSetup />}
+      <div className="app-viewport">
+        {hasServerUrl() ? <RouterProvider router={router} /> : <ServerSetup />}
+      </div>
     </StrictMode>,
   );
 });

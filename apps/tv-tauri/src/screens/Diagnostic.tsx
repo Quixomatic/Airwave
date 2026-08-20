@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Check, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { Badge } from "@airwave/ui/components/badge";
 import { Button } from "@airwave/ui/components/button";
 import { api, type CapTest } from "../lib/api";
 import { deviceId, gatherDeviceReport, markCapsDone } from "../lib/device";
@@ -153,7 +154,7 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
 
   if (error) {
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center gap-5 bg-background p-10 text-center text-foreground">
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-background p-10 text-center text-foreground">
         <p className="max-w-lg text-lg text-destructive">{error}</p>
         <Button variant="outline" onClick={finish}>
           Skip
@@ -163,9 +164,9 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col items-center justify-center bg-background p-6 text-foreground">
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-background p-6 text-foreground">
       {/* The "screen" — decorative frame. Headless probe = no live video; shows a spinner then a check. */}
-      <div className="relative aspect-video w-[min(52vw,720px)] overflow-hidden rounded-[20px] border border-border bg-black">
+      <div className="relative aspect-video w-[min(52vw,720px)] overflow-hidden rounded-[20px] border border-border bg-black shadow-[0_30px_90px_rgba(0,0,0,0.6)]">
         {!done && (
           <div className="absolute inset-0 flex items-center justify-center">
             <Loader2 className="size-10 animate-spin text-primary" />
@@ -173,13 +174,16 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
         )}
         {done && (
           <motion.div
-            initial={{ scale: 0.4, opacity: 0 }}
+            initial={{ scale: 0.6, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", damping: 18 }}
+            transition={{ type: "spring", stiffness: 300, damping: 18 }}
             className="absolute inset-0 flex items-center justify-center"
           >
-            <div className="flex size-[92px] items-center justify-center rounded-full bg-primary">
-              <Check size={50} strokeWidth={3} className="text-[#04060c]" />
+            <div
+              className="flex size-24 items-center justify-center rounded-full bg-primary"
+              style={{ boxShadow: "0 0 40px rgba(59,130,246,0.55)" }}
+            >
+              <Check size={52} strokeWidth={3} className="text-[#04060c]" />
             </div>
           </motion.div>
         )}
@@ -211,12 +215,9 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
               <div className="text-center text-[22px] font-bold">{cur.diagnostic}</div>
               <div className="flex flex-row flex-wrap justify-center gap-2">
                 {chips.map((chip, i) => (
-                  <span
-                    key={i}
-                    className="rounded-full bg-[rgba(148,163,184,0.14)] px-2.5 py-[3px] text-[13px] font-semibold uppercase tracking-wide text-[#cbd5e1]"
-                  >
+                  <Badge key={i} variant="secondary" size="lg" className="uppercase tracking-wide">
                     {chip}
-                  </span>
+                  </Badge>
                 ))}
               </div>
             </motion.div>

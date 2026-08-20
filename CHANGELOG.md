@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.14] - 2026-08-20
+
+tv-tauri diagnostic polish + a global titlebar-clearance layout fix.
+
+### What ships
+
+- **Diagnostic parity** — the codec chips are now real `Badge` components (`@airwave/ui`, `secondary`
+  variant); the done-check regains tv-web's glow + spring: a 96px accent circle with a
+  `0 0 40px` glow, `spring(stiffness 300, damping 18)` scale-in, and the framed screen gets its drop
+  shadow.
+- **Titlebar clearance (global)** — every screen now lives in an `.app-viewport` region offset below
+  the fixed titlebar (`--titlebar-h`), so nothing hides under it (the guide was using the full window
+  height). Screens fill the region via `absolute inset-0`; the titlebar stays transparent.
+
 ## [0.11.13] - 2026-08-20
 
 tv-tauri Phase 2.4 — the mpv-measured capability diagnostic, plus the full libmpv FFI surface a

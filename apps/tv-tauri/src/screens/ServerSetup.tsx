@@ -85,7 +85,7 @@ export function ServerSetup() {
   };
 
   return (
-    <div className="fixed inset-0 flex flex-col items-center justify-center bg-background p-10 text-foreground">
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-background p-10 text-foreground">
       <div className="w-[min(56vw,560px)] max-w-full">
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-extrabold tracking-tight">Connect to your server</h1>
