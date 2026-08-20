@@ -48,6 +48,12 @@ impl Mpv {
             ("target-colorspace-hint", "yes"),
             ("hdr-compute-peak", "auto"),
             ("audio-fallback-to-null", "yes"),
+            // Never auto-select an embedded/forced subtitle track. Airwave delivers subtitles by
+            // SERVER-SIDE burn-in (the picker re-resolves `/media` to a transcode that bakes them into
+            // the video), so mpv must never render a text sub itself — otherwise a media's default/
+            // forced sub shows even though none was chosen (the tv-native fix, CHANGELOG v0.7.x).
+            ("sid", "no"),
+            ("sub-auto", "no"),
         ] {
             mpv.set_option_string(k, v)?;
         }

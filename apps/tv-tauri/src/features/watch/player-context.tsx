@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "framer-motion";
+import { Maximize2, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "../../lib/api";
 import { useGuide } from "../../hooks/use-guide";
 import { useFullBleed } from "../../lib/full-bleed";
-import { FullChrome } from "./full-chrome";
+import { accentForChannel, FullChrome } from "./full-chrome";
 import { mpv } from "./mpv";
 import { Ctx, type Layout, type PlayerCtx } from "./player-ctx";
 import { useTvPlayer } from "./use-tv-player";
@@ -122,6 +124,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // The channel (for the chip) + the quality ladder, for the FullChrome overlay.
   const { data: guide } = useGuide();
   const channel = useMemo(() => guide?.channels.find((c) => c.id === channelId), [guide, channelId]);
+  const accent = accentForChannel(channel);
   const { data: qData } = useQuery({ queryKey: ["qualities"], queryFn: () => api.qualities() });
 
   const hidden = layout === "full";
@@ -153,6 +156,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         {children}
       </div>
 
+      {/* Mini feed controls — over the slot; a footer hint when idle, the two buttons on hover or when
+          navigated into (`miniFocused`). */}
+      {layout === "mini" && miniRect && (
+        <MiniControls rect={miniRect} focused={miniFocused} sel={miniSel} accent={accent} onExpand={goFull} onClose={stop} />
+      )}
+
       {layout === "full" && channelId && (
         <FullOverlay
           channelId={channelId}
@@ -180,5 +189,89 @@ function FullOverlay(props: React.ComponentProps<typeof FullChrome>) {
     <div className="fixed inset-0 z-[60] text-white">
       <FullChrome {...props} />
     </div>
+  );
+}
+
+/**
+ * The mini-feed overlay, pinned over the slot rect. Idle → a footer hint ("↑ or hover for controls");
+ * hovered OR navigated-into (`focused`) → the two buttons (Full screen / Close). Transparent when idle
+ * (the video shows through) but pointer-events:auto so it catches the hover.
+ */
+function MiniControls({
+  rect,
+  focused,
+  sel,
+  accent,
+  onExpand,
+  onClose,
+}: {
+  rect: Rect;
+  focused: boolean;
+  sel: 0 | 1;
+  accent: string;
+  onExpand: () => void;
+  onClose: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const show = focused || hovered;
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ position: "fixed", left: rect.x, top: rect.y, width: rect.w, height: rect.h, borderRadius: 14, overflow: "hidden", zIndex: 5, pointerEvents: "auto" }}
+    >
+      <AnimatePresence mode="wait">
+        {show ? (
+          <motion.div
+            key="buttons"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 14, background: "rgba(6,10,20,0.55)", backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)" }}
+          >
+            <MiniButton icon={<Maximize2 size={22} />} label="Full screen" selected={focused && sel === 0} accent={accent} onClick={onExpand} />
+            <MiniButton icon={<X size={22} />} label="Close" selected={focused && sel === 1} accent={accent} onClick={onClose} />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="hint"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ delay: 0.4, duration: 0.25 }}
+            style={{ position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "7px 0 8px", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", background: "linear-gradient(to top, rgba(6,10,20,0.82), rgba(6,10,20,0))", pointerEvents: "none" }}
+          >
+            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 20, height: 18, padding: "0 5px", borderRadius: 5, border: "1px solid rgba(255,255,255,0.35)", fontSize: 12, lineHeight: 1 }}>↑</span>
+            or hover for controls
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function MiniButton({ icon, label, selected, accent, onClick }: { icon: ReactNode; label: string; selected: boolean; accent: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 6,
+        padding: "10px 16px",
+        borderRadius: 12,
+        border: `1px solid ${selected ? accent : "rgba(255,255,255,0.15)"}`,
+        background: selected ? `${accent}33` : "rgba(18,24,38,0.6)",
+        color: "#f1f5f9",
+        cursor: "pointer",
+        boxShadow: selected ? `0 0 0 2px ${accent}88` : "none",
+      }}
+    >
+      {icon}
+      <span style={{ fontSize: 12, fontWeight: 600 }}>{label}</span>
+    </button>
   );
 }

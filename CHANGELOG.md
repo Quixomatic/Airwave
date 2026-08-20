@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.24] - 2026-08-20
+
+tv-tauri — mini-feed controls + the subtitle auto-select fix.
+
+### What ships
+
+- **Mini-feed controls** (`MiniControls` in the PlayerProvider, pinned over the slot): an idle **footer
+  hint** ("↑ or hover for controls"), and the two buttons — **Full screen** (`Maximize2` → `goFull`)
+  and **Close** (`X` → `stop`) — shown on **hover** or when navigated into (`miniFocused`, ↑ from the
+  guide's top row; ◀▶ select, OK activates), the selected one lit in the channel accent. The desktop
+  take on tv-web's "press green to focus."
+- **Subtitles no longer auto-show** — mpv auto-selects a media's embedded/forced sub track by default
+  (`sid=auto`), so subs appeared unchosen. Airwave delivers subtitles by server-side burn-in (the
+  picker re-resolves `/media` to a transcode), so mpv must never render text subs itself: defaulted to
+  **`sid=no` / `sub-auto=no`** in the mpv baseline options (the tv-native fix).
+
 ## [0.11.23] - 2026-08-20
 
 tv-tauri Phase 4.4 — **the mini feed.** The player is now persistent and picture-in-picture works —
