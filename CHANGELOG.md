@@ -2,6 +2,32 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.2] - 2026-08-19
+
+tv-desktop Phase 0.3b — **proves libmpv renders inside the Native SDK app.** mpv now decodes and
+draws video into a child of the single app window via `--wid` (no second window), the feasibility
+question the whole desktop-client bet hinged on.
+
+### What ships
+
+- **`apps/tv-desktop/src/main.zig` — mpv `--wid` embed.** On a worker thread (the SDK window doesn't
+  exist until `runWithOptions`, which blocks), we self-locate our own top-level `HWND` via Win32
+  `EnumWindows`, `CreateWindowExW` a `WS_CHILD` window parented to it, and hand mpv that handle
+  (`mpv_set_option "wid"`, `vo=gpu-next`). Verified: mpv events `start-file → file-loaded →
+  video-reconfig → playback-restart` and decoded dimensions `1280×720` — video renders in-window.
+- The SDK exposes no window handle by design (confirmed across the docs, the extern-C host seam, and
+  `extensions.RuntimeContext`), and its only documented mpv path is the RGBA8 `media-surface` producer
+  (1080p/SDR) — so the 4K/HDR `--wid` embed is app-side Win32, no SDK patch.
+
+### Notes
+
+- **Known limit (next):** the window has two sibling child HWNDs — the SDK's `NativeSdkGpuSurface`
+  canvas and mpv's — and the host re-tops its canvas over mpv (blank/white, since the scaffold markup
+  fails to build), so mpv is occluded except when momentarily raised. Fixing this reliably (z-order)
+  **and** compositing glass chrome over the video (per-pixel alpha) is one Windows-host patch to
+  `@native-sdk/cli` — teach the host to manage mpv's video as a first-class layer (its `ShellView.layer`
+  system) with DirectComposition alpha above it. That's the next step.
+
 ## [0.11.1] - 2026-08-19
 
 Kicks off **`apps/tv-desktop`** — the Airwave native desktop client on Vercel's Native SDK
