@@ -104,6 +104,16 @@ export function FullChrome({
     return () => window.removeEventListener("mousemove", onMove);
   }, [surfOpen]);
 
+  // Sync the GLOBAL window titlebar (logo + min/max/close, rendered outside the player) with the
+  // chrome: while the full player is up it slides away with everything else — revealed only on
+  // mouse-move (panelOpen) — so nothing sits over the edge-to-edge video. Always shown again on
+  // unmount (leaving the full player). The `.chrome-hidden` class on <html> drives the titlebar CSS.
+  useEffect(() => {
+    const el = document.documentElement;
+    el.classList.toggle("chrome-hidden", !panelOpen);
+    return () => el.classList.remove("chrome-hidden");
+  }, [panelOpen]);
+
   const isBumper = status.state === "bumper";
 
   return (

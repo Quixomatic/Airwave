@@ -2,6 +2,10 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.29] - 2026-08-20
+
+tv-tauri — on the fullscreen player the window titlebar (logo + min/max/close) now auto-hides WITH the chrome: it slides up when idle and back down on mouse-move, so nothing sits over the edge-to-edge video (FullChrome toggles a `.chrome-hidden` class on `<html>` from its `panelOpen`; the titlebar transitions off-screen). Always visible elsewhere.
+
 ## [0.11.28] - 2026-08-20
 
 tv-tauri player mouse polish — Channel Surf owns the mouse while open (the full-chrome reveal is gated on `!surfOpen`, matching the keyboard modal lock); surf tiles respond to the mouse (hover focuses like ◄►, click tunes like OK then closes, resetting the auto-hide); and the chrome auto-hide is shortened 8s→3.5s (a mouse reveals it instantly).

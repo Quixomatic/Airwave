@@ -162,6 +162,15 @@ body {
      Route-dependent: the fullscreen player sets `--titlebar-bg: transparent` (via useFullBleed) so the
      bar floats over the edge-to-edge video instead. */
   background: var(--titlebar-bg, var(--background));
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+/* Fullscreen player: the titlebar slides away with the rest of the chrome (FullChrome toggles this
+   class from its `panelOpen`), so the window controls only appear on mouse-move over the video. */
+html.chrome-hidden .titlebar {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
 }
 /* Brand mark in the titlebar. Children are non-interactive so drags pass to the drag-region;
    -webkit-user-drag:none stops the browser's native image-drag from hijacking the window move. */
