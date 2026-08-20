@@ -341,10 +341,9 @@ copy_config_data() {
 
 echo "Preparing Linux runtime bundle from: $BUILD_DIR"
 copy_root_mpv_libs
-copy_soia_utils_lib
-copy_config_data
 
-for file in "$LIB_DIR"/libmpv*.so* "$LIB_DIR"/libsoia_utils*.so*; do
+# Airwave: vanilla libmpv only — no soia_utils / config.data.
+for file in "$LIB_DIR"/libmpv*.so*; do
   [ -e "$file" ] || continue
   scan_and_copy_deps "$file"
 done

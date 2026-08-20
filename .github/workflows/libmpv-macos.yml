@@ -1,0 +1,155 @@
+name: Build libmpv (macOS)
+
+# Airwave's own reproducible libmpv build (macOS arm64 + x64) via vcpkg. Vanilla
+# libmpv, adapted from FengZeng/mpv (GPL). Scripts in tools/libmpv/. Manual dispatch.
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: "Architecture to build"
+        required: true
+        default: "arm64"
+        type: choice
+        options:
+          - all
+          - arm64
+          - x64
+
+permissions:
+  contents: read
+
+concurrency:
+  group: libmpv-macos-${{ github.ref }}-${{ inputs.arch }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: tools/libmpv
+
+jobs:
+  macos-arm64:
+    if: ${{ inputs.arch == 'all' || inputs.arch == 'arm64' }}
+    name: Build libmpv (macOS / arm64)
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
+      MPV_TARGET_ARCH: arm64
+      VCPKG_TARGET_TRIPLET: arm64-osx-mp
+      VCPKG_ROOT: ${{ github.workspace }}/tools/libmpv/vcpkg
+      VCPKG_INSTALLED_DIR: ${{ github.workspace }}/tools/libmpv/vcpkg_installed
+      VCPKG_FORCE_SYSTEM_BINARIES: 1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build tools
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade pip
+          python3 -m pip install meson ninja
+          FORMULAE=(pkgconf autoconf autoconf-archive automake libtool nasm)
+          MISSING=()
+          for f in "${FORMULAE[@]}"; do
+            brew list --formula "$f" >/dev/null 2>&1 || MISSING+=("$f")
+          done
+          if [ "${#MISSING[@]}" -gt 0 ]; then brew update && brew install -q "${MISSING[@]}"; fi
+      - name: Restore vcpkg cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            tools/libmpv/vcpkg_installed
+            ~/Library/Caches/vcpkg/archives
+          key: ${{ runner.os }}-arm64-osx-mp-vcpkg-${{ hashFiles('tools/libmpv/bootstrap-vcpkg.sh', 'tools/libmpv/install-vcpkg-deps.sh', 'tools/libmpv/vcpkg-triplets/*.cmake', 'tools/libmpv/vcpkg-ports/**') }}
+          restore-keys: ${{ runner.os }}-arm64-osx-mp-vcpkg-
+      - name: Bootstrap vcpkg
+        run: bash ./bootstrap-vcpkg.sh
+      - name: Install vcpkg dependencies
+        env:
+          VCPKG_SKIP_BOOTSTRAP: 1
+        run: bash ./install-vcpkg-deps.sh
+      - name: Download vanilla mpv source
+        run: bash ./download.sh
+      - name: Build FFmpeg from source
+        run: bash ./build-ffmpeg.sh
+      - name: Build libmpv
+        run: bash ./build-macos.sh
+      - name: Package runtime
+        run: |
+          set -euo pipefail
+          bash ./package-macos-runtime.sh \
+            --pkg-name "libmpv-airwave-${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}-macos-arm64"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmpv-airwave-macos-arm64-${{ github.run_number }}
+          path: |
+            tools/libmpv/libmpv-*.tar.gz
+            tools/libmpv/libmpv-*.tar.gz.sha256
+          compression-level: 0
+
+  macos-x64:
+    if: ${{ inputs.arch == 'all' || inputs.arch == 'x64' }}
+    name: Build libmpv (macOS / x64)
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
+      MPV_TARGET_ARCH: x86_64
+      VCPKG_TARGET_TRIPLET: x64-osx-mp
+      VCPKG_ROOT: ${{ github.workspace }}/tools/libmpv/vcpkg
+      VCPKG_INSTALLED_DIR: ${{ github.workspace }}/tools/libmpv/vcpkg_installed
+      VCPKG_FORCE_SYSTEM_BINARIES: 1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build tools
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade pip
+          python3 -m pip install meson ninja
+          FORMULAE=(pkgconf autoconf autoconf-archive automake libtool nasm)
+          MISSING=()
+          for f in "${FORMULAE[@]}"; do
+            brew list --formula "$f" >/dev/null 2>&1 || MISSING+=("$f")
+          done
+          if [ "${#MISSING[@]}" -gt 0 ]; then brew update && brew install -q "${MISSING[@]}"; fi
+      - name: Restore vcpkg cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            tools/libmpv/vcpkg_installed
+            ~/Library/Caches/vcpkg/archives
+          key: ${{ runner.os }}-x64-osx-mp-vcpkg-${{ hashFiles('tools/libmpv/bootstrap-vcpkg.sh', 'tools/libmpv/install-vcpkg-deps.sh', 'tools/libmpv/vcpkg-triplets/*.cmake', 'tools/libmpv/vcpkg-ports/**') }}
+          restore-keys: ${{ runner.os }}-x64-osx-mp-vcpkg-
+      - name: Bootstrap vcpkg
+        run: bash ./bootstrap-vcpkg.sh
+      - name: Install vcpkg dependencies
+        env:
+          VCPKG_SKIP_BOOTSTRAP: 1
+        run: bash ./install-vcpkg-deps.sh
+      - name: Download vanilla mpv source
+        run: bash ./download.sh
+      - name: Build FFmpeg from source
+        run: bash ./build-ffmpeg.sh
+      - name: Build libmpv
+        run: bash ./build-macos.sh
+      - name: Package runtime
+        run: |
+          set -euo pipefail
+          bash ./package-macos-runtime.sh \
+            --pkg-name "libmpv-airwave-${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}-macos-x64"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmpv-airwave-macos-x64-${{ github.run_number }}
+          path: |
+            tools/libmpv/libmpv-*.tar.gz
+            tools/libmpv/libmpv-*.tar.gz.sha256
+          compression-level: 0

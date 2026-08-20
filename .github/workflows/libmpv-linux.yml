@@ -1,0 +1,121 @@
+name: Build libmpv (Linux)
+
+# Airwave's own reproducible libmpv build (Linux x64 + arm64). Vanilla libmpv,
+# adapted from FengZeng/mpv (GPL). Scripts in tools/libmpv/. Manual dispatch.
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: "Architecture to build"
+        required: true
+        default: "x64"
+        type: choice
+        options:
+          - all
+          - x64
+          - arm64
+
+permissions:
+  contents: read
+
+concurrency:
+  group: libmpv-linux-${{ github.ref }}-${{ inputs.arch }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: tools/libmpv
+
+jobs:
+  linux-x64:
+    if: ${{ inputs.arch == 'all' || inputs.arch == 'x64' }}
+    name: Build libmpv (Linux / x64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install apt dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential git curl python3 meson ninja-build pkg-config patchelf nasm \
+            libfreetype-dev libfribidi-dev liblcms2-dev libluajit-5.1-dev \
+            libass-dev libopus-dev librubberband-dev \
+            zlib1g-dev libbz2-dev liblzma-dev \
+            libpipewire-0.3-dev libpulse-dev \
+            libxss-dev libxpresent-dev \
+            libwayland-dev wayland-protocols libxkbcommon-dev \
+            libarchive-dev libbluray-dev libcdio-paranoia-dev libdvdnav-dev \
+            libzimg-dev libplacebo-dev libvulkan-dev
+      - name: Install Meson
+        run: |
+          set -euo pipefail
+          bash ./ensure-meson.sh
+          echo "$GITHUB_WORKSPACE/tools/libmpv/vendor/meson-bin" >> "$GITHUB_PATH"
+      - name: Download vanilla mpv source
+        run: bash ./download.sh
+      - name: Build FFmpeg from source
+        run: bash ./build-ffmpeg.sh
+      - name: Build libmpv
+        run: bash ./build-linux.sh
+      - name: Package runtime
+        run: |
+          set -euo pipefail
+          bash ./package-linux-runtime.sh \
+            --pkg-name "libmpv-airwave-${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}-linux-x64"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmpv-airwave-linux-x64-${{ github.run_number }}
+          path: |
+            tools/libmpv/libmpv-*.tar.gz
+            tools/libmpv/libmpv-*.tar.gz.sha256
+          compression-level: 0
+
+  linux-arm64:
+    if: ${{ inputs.arch == 'all' || inputs.arch == 'arm64' }}
+    name: Build libmpv (Linux / arm64)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install apt dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential git curl python3 meson ninja-build pkg-config patchelf nasm \
+            libfreetype-dev libfribidi-dev liblcms2-dev libluajit-5.1-dev \
+            libass-dev libopus-dev librubberband-dev \
+            zlib1g-dev libbz2-dev liblzma-dev \
+            libpipewire-0.3-dev libpulse-dev \
+            libxss-dev libxpresent-dev \
+            libwayland-dev wayland-protocols libxkbcommon-dev \
+            libarchive-dev libbluray-dev libcdio-paranoia-dev libdvdnav-dev \
+            libzimg-dev libplacebo-dev libvulkan-dev
+      - name: Install Meson
+        run: |
+          set -euo pipefail
+          bash ./ensure-meson.sh
+          echo "$GITHUB_WORKSPACE/tools/libmpv/vendor/meson-bin" >> "$GITHUB_PATH"
+      - name: Download vanilla mpv source
+        run: bash ./download.sh
+      - name: Build FFmpeg from source
+        run: bash ./build-ffmpeg.sh
+      - name: Build libmpv
+        run: bash ./build-linux.sh
+      - name: Package runtime
+        run: |
+          set -euo pipefail
+          bash ./package-linux-runtime.sh \
+            --pkg-name "libmpv-airwave-${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}-linux-arm64"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmpv-airwave-linux-arm64-${{ github.run_number }}
+          path: |
+            tools/libmpv/libmpv-*.tar.gz
+            tools/libmpv/libmpv-*.tar.gz.sha256
+          compression-level: 0

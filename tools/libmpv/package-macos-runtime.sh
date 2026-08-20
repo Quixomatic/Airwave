@@ -362,7 +362,7 @@ copy_moltenvk_runtime() {
 
   # Fallback: resolve from already-copied binaries when local build output is absent.
   if [ -z "$moltenvk_lib_src" ]; then
-    for owner in "$LIB_DIR"/libmpv*.dylib "$LIB_DIR"/libsoia_utils*.dylib; do
+    for owner in "$LIB_DIR"/libmpv*.dylib; do
       [ -e "$owner" ] || continue
       if moltenvk_lib_src="$(resolve_dep "$owner" "libMoltenVK.dylib" 2>/dev/null || true)"; then
         [ -n "$moltenvk_lib_src" ] && break
@@ -450,11 +450,10 @@ copy_config_data() {
 
 echo "Preparing runtime bundle from: $BUILD_DIR"
 copy_root_mpv_libs
-copy_soia_utils_lib
 copy_moltenvk_runtime
-copy_config_data
 
-for file in "$LIB_DIR"/libmpv*.dylib "$LIB_DIR"/libsoia_utils*.dylib; do
+# Airwave: vanilla libmpv only — no soia_utils / config.data.
+for file in "$LIB_DIR"/libmpv*.dylib; do
   [ -e "$file" ] || continue
   scan_and_copy_deps "$file"
 done
