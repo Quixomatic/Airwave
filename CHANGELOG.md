@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.12] - 2026-08-20
+
+tv-tauri branding — the Airwave logo in the window titlebar + real app icons.
+
+### What ships
+
+- **Titlebar brand mark** — the `Logo` component (mark + wordmark) replaces the plain blue "AIRWAVE"
+  text in the custom titlebar. Children are pointer-events-none so window drags pass through, with
+  `-webkit-user-drag: none` to stop native image-drag hijacking the move.
+- **App icons regenerated** from Airwave's source (`tauri icon` off tv-native's 1024² `icon-ios.png`
+  — the mark on the navy radial gradient): `icon.ico` / `icon.icns` / the PNG + Windows Square/Store
+  logos now all show Airwave instead of the default Tauri glyph. Dropped the iOS/Android sets the
+  generator also emits (tv-tauri is desktop-only). The window/taskbar icon updates on the next build.
+
 ## [0.11.11] - 2026-08-20
 
 tv-tauri Phase 2.3 — device-code login + TanStack Router, faithfully ported from tv-web, plus a

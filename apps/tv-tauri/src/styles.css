@@ -142,12 +142,26 @@ body {
   z-index: 1000;
   user-select: none;
 }
-.tb-badge {
-  letter-spacing: 0.3em;
-  font-size: 0.68rem;
+/* Brand mark in the titlebar. Children are non-interactive so drags pass to the drag-region;
+   -webkit-user-drag:none stops the browser's native image-drag from hijacking the window move. */
+.tb-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  opacity: 0.95;
+}
+.tb-brand * {
+  pointer-events: none;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+/* All-caps wordmark, sized a touch shorter than the mark so they read as one balanced lockup. */
+.tb-word {
+  font-size: 0.8rem;
   font-weight: 700;
-  color: #3b82f6;
-  opacity: 0.9;
+  letter-spacing: 0.2em;
+  line-height: 1;
+  color: #fff;
 }
 .tb-controls {
   display: flex;

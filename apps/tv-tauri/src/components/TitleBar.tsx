@@ -1,5 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
+import { Logo } from "../lib/logo";
+
 // Borderless window (decorations:false) → we draw our own titlebar. The bar itself
 // is a `data-tauri-drag-region` (drag to move); the top-right buttons drive the
 // native window ops. Child buttons don't carry the attribute, so they stay clickable.
@@ -8,8 +10,9 @@ const win = getCurrentWindow();
 export function TitleBar() {
   return (
     <div className="titlebar" data-tauri-drag-region>
-      <span className="tb-badge" data-tauri-drag-region>
-        AIRWAVE
+      <span className="tb-brand" data-tauri-drag-region>
+        <Logo markWidth={24} />
+        <span className="tb-word">AIRWAVE</span>
       </span>
       <div className="tb-controls">
         <button className="tb-btn" onClick={() => win.minimize()} aria-label="Minimize" title="Minimize">
