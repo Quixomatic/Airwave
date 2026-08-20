@@ -1,6 +1,6 @@
 [package]
 name = "airwave"
-version = "0.11.9"
+version = "0.11.10"
 description = "Airwave desktop client (Tauri + libmpv)"
 authors = ["Airwave"]
 license = ""
@@ -34,6 +34,11 @@ tauri-plugin-window-state = "2"
 tauri-plugin-store = "2"
 # The native window handle (mpv `--wid` embed) + per-platform windowing.
 raw-window-handle = "0.6"
+# Enumerate LAN interfaces natively for onboarding's server scan — the webview's WebRTC
+# subnet trick (tv-web) gets mDNS-obfuscated inside WebView2, so we read interfaces in Rust.
+if-addrs = "0.13"
+# Concurrent health probes in the server scan. reqwest comes from tauri-plugin-http (re-exported).
+futures = "0.3"
 
 # Windows: Win32 for the child-HWND video surface + WS_CLIPCHILDREN + resize.
 [target.'cfg(target_os = "windows")'.dependencies]

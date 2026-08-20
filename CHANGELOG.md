@@ -2,6 +2,48 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.10] - 2026-08-20
+
+tv-tauri Phase 2 — a faithful port of tv-web's server onboarding onto the shared design system, with
+a working native LAN server scan. This also establishes the styling + HTTP foundation the login and
+diagnostic screens build on.
+
+### What ships
+
+- **Shared design system wired in.** tv-tauri now depends on **`@airwave/ui`** (base-lyra shadcn) —
+  `@import "@airwave/ui/globals.css"`, `<html class="dark">`, and the `Button`/`Input`/`Separator`
+  components. An **Aurora token remap** (`styles.css` `:root.dark`) overrides the base-lyra dark tokens
+  with tv-web's `theme.ts` palette (navy `#060a14`, card `#0b1120`, accent `#3b82f6`, …) so every
+  component renders in Airwave colors, not the admin's neutral gray. Added **framer-motion** (`^12.42.2`,
+  matching tv-web) for the animation work ahead.
+- **`ServerSetup` — faithful port** of tv-web `features/setup/server-setup.tsx`: same layout + copy, the
+  LAN **server scan**, and manual entry with the scheme-by-host guard. Rebuilt on the shared components
+  (Scan/Connect are consistent by construction) with lucide touches (spinner, radar/server icons). The
+  webOS D-pad/on-screen-keyboard machinery is dropped — desktop uses a real keyboard + mouse.
+- **Native LAN discovery (Rust).** A `local_subnets` command (`if-addrs`) reads the machine's real
+  private-IPv4 interfaces — the webview's WebRTC subnet trick gets mDNS-obfuscated in WebView2. The
+  scan sweeps every detected `/24`.
+- **Server HTTP happens in Rust.** A `probe_health` command (reqwest, re-exported by tauri-plugin-http)
+  health-checks candidate servers concurrently. This sidesteps the webview HTTP scope entirely — the
+  scope glob (`*` = one hostname label) genuinely can't express "an arbitrary user-typed LAN IP", so the
+  scan and the manual Connect both go through Rust.
+- **Logging.** `tauri-plugin-log` (JS `@tauri-apps/plugin-log` → the same terminal as Rust `log::*`) plus
+  a small `lib/log.ts` shim, so the scan flow is observable end to end.
+
+## [0.11.9] - 2026-08-20
+
+tv-tauri persistence hardening + the macOS Apple-Silicon libmpv build.
+
+### What ships
+
+- **Persistence migrated to `tauri-plugin-store`.** Server URL + token move off `localStorage` to a
+  file-backed store (`airwave.json`) in the app-data dir; `lib/store.ts` hydrates a synchronous cache at
+  startup (awaited in `main.tsx` before render), writes flush via autoSave, with a localStorage fallback
+  for plain browser dev.
+- **macOS arm64 libmpv build fixed.** The Apple-Silicon (native) build hit a bash-3.2
+  empty-array-under-`set -u` bug (`DAV1D_MESON_CROSS_ARGS[@]: unbound`); guarded the cross-arg expansions
+  (`${arr[@]+"${arr[@]}"}`) so all libmpv platforms build.
+
 ## [0.11.8] - 2026-08-20
 
 tv-tauri Phase 2 foundation — window chrome, HTTP layer, and server onboarding.

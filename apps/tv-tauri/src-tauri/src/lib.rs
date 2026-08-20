@@ -2,21 +2,105 @@ mod mpv;
 
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use tauri::Manager;
+use tauri_plugin_http::reqwest;
+
+/// Probe a batch of candidate base URLs for an Airwave server — `GET {base}/api/health` must answer
+/// `{ "ok": true }`. Returns the bases that responded. Runs in Rust (reqwest, re-exported by
+/// tauri-plugin-http) so it's NOT subject to the webview's HTTP scope or CORS — this app connects to
+/// an arbitrary, user-provided self-hosted address (a bare LAN IP), which the webview scope can't
+/// express. Used by both the onboarding LAN scan and the manual "Connect" check.
+#[tauri::command]
+async fn probe_health(urls: Vec<String>) -> Vec<String> {
+    let client = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_millis(1200))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("probe_health: client build failed: {e}");
+            return Vec::new();
+        }
+    };
+    // All probes in-flight concurrently (join_all) — a 254-host sweep must not be serial.
+    let probes = urls.into_iter().map(|base| {
+        let client = client.clone();
+        async move {
+            let url = format!("{base}/api/health");
+            match client.get(&url).send().await {
+                Ok(resp) if resp.status().is_success() => {
+                    // reqwest's `.json()` needs its `json` feature (off on the re-export), so read
+                    // text and parse with serde_json (already a dep). Health = `{ "ok": true }`.
+                    match resp.text().await {
+                        Ok(text) => match serde_json::from_str::<serde_json::Value>(&text) {
+                            Ok(v) if v.get("ok").and_then(|b| b.as_bool()) == Some(true) => Some(base),
+                            _ => None,
+                        },
+                        Err(_) => None,
+                    }
+                }
+                _ => None,
+            }
+        }
+    });
+    futures::future::join_all(probes)
+        .await
+        .into_iter()
+        .flatten()
+        .collect()
+}
+
+/// LAN discovery for onboarding — return the /24 prefixes (e.g. `"192.168.1"`) of this machine's
+/// private IPv4 interfaces, so the setup screen can sweep them for Airwave servers answering
+/// `/api/health`. On desktop we read the real interfaces natively: the webview's WebRTC subnet
+/// trick that tv-web uses gets mDNS-obfuscated inside WebView2, so it can't see the subnet.
+#[tauri::command]
+fn local_subnets() -> Vec<String> {
+    let mut prefixes: Vec<String> = Vec::new();
+    match if_addrs::get_if_addrs() {
+        Ok(ifaces) => {
+            for iface in ifaces {
+                let ip = iface.ip();
+                log::info!("local_subnets: iface {} -> {} (loopback={})", iface.name, ip, iface.is_loopback());
+                if iface.is_loopback() {
+                    continue;
+                }
+                if let std::net::IpAddr::V4(v4) = ip {
+                    let o = v4.octets();
+                    // Private ranges only: 10/8, 172.16/12, 192.168/16 (skip link-local 169.254).
+                    let is_private = o[0] == 10
+                        || (o[0] == 172 && (16..=31).contains(&o[1]))
+                        || (o[0] == 192 && o[1] == 168);
+                    if !is_private {
+                        continue;
+                    }
+                    let prefix = format!("{}.{}.{}", o[0], o[1], o[2]);
+                    if !prefixes.contains(&prefix) {
+                        prefixes.push(prefix);
+                    }
+                }
+            }
+        }
+        Err(e) => log::error!("local_subnets: get_if_addrs failed: {e}"),
+    }
+    log::info!("local_subnets: prefixes = {prefixes:?}");
+    prefixes
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Log plugin first so it captures everything (Rust `log::*` + JS `@tauri-apps/plugin-log`)
+        // to the terminal running `tauri dev`. Registered unconditionally so JS logging works.
+        .plugin(
+            tauri_plugin_log::Builder::default()
+                .level(log::LevelFilter::Info)
+                .build(),
+        )
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .invoke_handler(tauri::generate_handler![local_subnets, probe_health])
         .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
             if let Err(e) = setup_player(app) {
                 log::error!("mpv setup failed: {e}");
             }

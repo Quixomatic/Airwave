@@ -1,7 +1,38 @@
-@import "tailwindcss";
+/* The shared base-lyra design system (same tokens/components as the admin + tv-web) — this pulls in
+   Tailwind, the oklch theme tokens, Inter, and the shadcn component styles. `<html class="dark">`
+   (index.html) selects the dark tokens. WebView2/WebKit are evergreen, so no Chrome-108 lightningcss
+   down-leveling like tv-web needs. `pnpm dlx shadcn add <c>` drops components into @airwave/ui. */
+@import "@airwave/ui/globals.css";
 
 :root {
   color-scheme: dark;
+}
+
+/* ── Aurora theme ──────────────────────────────────────────────────────────
+   Remap the base-lyra dark tokens to tv-web / tv-native's "Aurora" palette
+   (apps/tv-web/src/lib/theme.ts + .docs/tv-design-spec.md) so every @airwave/ui
+   component renders in Airwave navy/blue instead of the admin's neutral gray.
+   `:root.dark` (0,2,0) outranks base-lyra's `.dark`. Hex mirrors theme.ts, which
+   is intentionally hex; the oklch-only rule is scoped to the packages/ui tokens. */
+:root.dark {
+  --background: #060a14;
+  --foreground: #f1f5f9;
+  --card: #0b1120;
+  --card-foreground: #f1f5f9;
+  --popover: #0b1120;
+  --popover-foreground: #f1f5f9;
+  --primary: #3b82f6; /* ring/accent — the Aurora focus blue */
+  --primary-foreground: #f8fafc;
+  --secondary: #0f1626; /* the lifted nav/sidebar surface */
+  --secondary-foreground: #f1f5f9;
+  --muted: #1e293b; /* badge fill */
+  --muted-foreground: #94a3b8;
+  --accent: #12233d; /* selected-cell highlight */
+  --accent-foreground: #f1f5f9;
+  --destructive: #ef4444; /* the now-line red */
+  --border: rgba(148, 163, 184, 0.14);
+  --input: rgba(148, 163, 184, 0.2);
+  --ring: #3b82f6;
 }
 
 html,
@@ -143,69 +174,4 @@ body {
   background: #e01b24;
   color: #fff;
 }
-
-/* ---- Onboarding (ServerSetup) ---- */
-.setup {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #0a0e1a; /* opaque — covers the idle video during onboarding */
-}
-.setup-card {
-  width: min(440px, 88vw);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 34px 32px;
-  background: rgba(18, 24, 40, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-}
-.setup-title {
-  margin: 4px 0 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-.setup-hint {
-  margin: 0 0 8px;
-  opacity: 0.65;
-  font-size: 0.9rem;
-}
-.setup-input {
-  padding: 13px 15px;
-  font-size: 0.98rem;
-  color: #e6ebff;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 12px;
-  outline: none;
-}
-.setup-input:focus {
-  border-color: #3b82f6;
-}
-.setup-error {
-  color: #f87171;
-  font-size: 0.85rem;
-}
-.setup-btn {
-  margin-top: 6px;
-  padding: 13px;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #fff;
-  background: #3b82f6;
-  border: none;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: background 0.12s, opacity 0.12s;
-}
-.setup-btn:hover {
-  background: #2f6fe0;
-}
-.setup-btn:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
+/* Onboarding (ServerSetup) is fully inline-styled — a faithful port of tv-web's inline styles. */

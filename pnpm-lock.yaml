@@ -453,15 +453,27 @@ importers:
 
   apps/tv-tauri:
     dependencies:
+      '@airwave/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@tauri-apps/api':
         specifier: ^2
         version: 2.11.1
       '@tauri-apps/plugin-http':
         specifier: ^2
         version: 2.5.9
+      '@tauri-apps/plugin-log':
+        specifier: ^2
+        version: 2.9.0
       '@tauri-apps/plugin-store':
         specifier: ^2
         version: 2.4.4
+      framer-motion:
+        specifier: ^12.42.2
+        version: 12.43.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.24.0(react@19.2.7)
       react:
         specifier: 'catalog:'
         version: 19.2.7
@@ -4548,6 +4560,9 @@ packages:
 
   '@tauri-apps/plugin-http@2.5.9':
     resolution: {integrity: sha512-lCiY0+vs4HvIUSvZrBs8TC3TiCB0MOPRmiUjTq4prW7SlcJE2jdLeT6KBsJrT9Tlplufl7W1pY6SFAO3gCWxDA==}
+
+  '@tauri-apps/plugin-log@2.9.0':
+    resolution: {integrity: sha512-Ql8okrnsguk0eDq1GvRfttFV5KaeW/7vcao6bdbkXCRJ1+2sWE15ZJvJVEKVANrOKy1mRngqC3IFIAP+wP5qSw==}
 
   '@tauri-apps/plugin-store@2.4.4':
     resolution: {integrity: sha512-oxSMaj/QpVfJcBMYX5aOQV94fWvga0MwQMfD6TLlbK2dh+ShPWAzefd8HWXhvOKjPRJdGVAkW7ZGO76JzzjaDA==}
@@ -15262,6 +15277,10 @@ snapshots:
       '@tauri-apps/cli-win32-x64-msvc': 2.11.4
 
   '@tauri-apps/plugin-http@2.5.9':
+    dependencies:
+      '@tauri-apps/api': 2.11.1
+
+  '@tauri-apps/plugin-log@2.9.0':
     dependencies:
       '@tauri-apps/api': 2.11.1
 

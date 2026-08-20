@@ -46,16 +46,6 @@ async function request<T>(base: string, path: string, init: RequestInit = {}): P
   return (await res.json()) as T;
 }
 
-/** Validate a candidate server during onboarding: GET /api/health (must be reachable + ok). */
-export async function checkHealth(base: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${base}/api/health`, { method: "GET" });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
 /** REST helpers against the onboarded server. */
 export const api = {
   channels: () => request<{ channels: unknown[] }>(getStoredServerUrl(), "/api/v1/channels"),
