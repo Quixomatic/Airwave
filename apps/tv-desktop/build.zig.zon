@@ -3,6 +3,6 @@
     .fingerprint = 0x879acc7b5a707070,
     .version = "0.1.0",
     .minimum_zig_version = "0.16.0",
-    .dependencies = .{ .native_sdk = .{ .path = "..\\..\\node_modules\\.pnpm\\@native-sdk+cli@0.9.5_patch_07c716a5730f1712e6c423e1370ddc6f\\node_modules\\@native-sdk\\cli" } },
+    .dependencies = .{ .native_sdk = .{ .path = "..\\..\\node_modules\\.pnpm\\@native-sdk+cli@0.9.5_patch_65ff5d5e1211c60105772b0fe3925a0e\\node_modules\\@native-sdk\\cli" } },
     .paths = .{ "build.zig", "build.zig.zon", "src", "assets", "app.json" },
 }

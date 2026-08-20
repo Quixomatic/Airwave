@@ -40,6 +40,11 @@ extern "user32" fn GetClientRect(hwnd: HWND, rect: *RECT) callconv(.winapi) BOOL
 extern "user32" fn CreateWindowExW(ex: u32, class: [*:0]const u16, name: [*:0]const u16, style: u32, x: i32, y: i32, w: i32, h: i32, parent: ?HWND, menu: ?win.HMENU, inst: ?win.HINSTANCE, param: ?*anyopaque) callconv(.winapi) ?HWND;
 extern "user32" fn SetWindowPos(hwnd: HWND, insert_after: ?HWND, x: i32, y: i32, cx: i32, cy: i32, flags: u32) callconv(.winapi) BOOL;
 extern "kernel32" fn GetModuleHandleW(name: ?[*:0]const u16) callconv(.winapi) ?win.HINSTANCE;
+
+// 0.3c: patched host export — set up the DComp glass (per-pixel alpha, topmost)
+// over the video child. Keyed on the top-level HWND we already hold. Proof stage
+// draws a scrim gradient; later this composites the real SDK chrome canvas.
+extern fn native_sdk_windows_video_glass_setup(hwnd: ?*anyopaque) callconv(.c) c_int;
 extern "kernel32" fn GetCurrentProcessId() callconv(.winapi) u32;
 extern "kernel32" fn Sleep(ms: u32) callconv(.winapi) void;
 
@@ -175,6 +180,14 @@ fn embedWorker() void {
     // host keeps it there (folds "AirwaveVideo" into reorderWindowChildren) and
     // the window's WS_CLIPCHILDREN stops the parent repainting over it.
     _ = SetWindowPos(child, null, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+
+    // 0.3c: set up a DirectComposition topmost visual (per-pixel alpha) over the
+    // whole window and draw the player-chrome scrim. DComp composes it ABOVE the
+    // child-HWND video, so the glass chrome shows over live video — the airspace
+    // fix. (Increment 2 will draw the real SDK chrome canvas here, not a gradient.)
+    Sleep(400);
+    const glass_rc = native_sdk_windows_video_glass_setup(@ptrCast(parent));
+    std.debug.print("[airwave] 0.3c: DComp glass rc={d} (1=ok, negative=failed step)\n", .{glass_rc});
 
     // This thread becomes mpv's event pump for the process lifetime (blocking
     // wait, ~no CPU when idle). Rendering runs on mpv's own threads regardless.

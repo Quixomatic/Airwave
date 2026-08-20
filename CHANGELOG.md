@@ -2,6 +2,37 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.4] - 2026-08-20
+
+tv-desktop Phase 0.3c foundation: **glass chrome composites over the video via DirectComposition.**
+The airspace problem — translucent UI over a child-HWND video — is solved. Proven with a red-tint
+test, now rendering the real player-chrome scrim (dark top/bottom, clear middle) over live mpv video.
+
+### What ships
+
+- **`@native-sdk/cli` host patch — a DirectComposition overlay for glass-over-video.** A child HWND
+  (the mpv video) can't be alpha-composited by the SDK's software layered path; DirectComposition
+  composes a **topmost visual with per-pixel alpha above all child HWNDs** via the DWM, so UI drawn
+  into it shows the video through its transparent pixels. New host code (`webview2_host.cpp`): a D3D11
+  device backs an `IDCompositionDevice`; `CreateTargetForHwnd(topmost)` + a visual + an
+  `IDCompositionSurface` drawn with Direct2D (1.1); exported as `native_sdk_windows_video_glass_setup`,
+  keyed on the top-level HWND the app already holds (no `Host` dependency). `build/app.zig` links
+  `dcomp`/`d3d11`/`dxgi`.
+- **`apps/tv-desktop/src/main.zig`** calls the glass setup after the video is embedded; the proof draws
+  the player-chrome scrim (transparent middle so the video reads clearly, ~88% black at the bottom for
+  the transport controls, a lighter top band for the title/live badge).
+
+### Notes
+
+- **Gotchas banked:** the D2D target bitmap for a DComp surface needs
+  `D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW` and explicit 96 DPI (without
+  `CANNOT_DRAW`, `CreateBitmapFromDxgiSurface` fails). `CreateTargetForHwnd(hwnd, topmost=TRUE)` is what
+  puts the visual above the child-HWND video.
+- **Next (0.3c increment 2):** draw the **real SDK chrome canvas** (actual controls/scrubber/text with
+  the slide-in/fade-in) into the DComp surface instead of a hardcoded gradient. A future cleaner refactor
+  is to expose the video + glass as a first-class `ShellView` kind rather than the current
+  `FindWindowExW`-by-class hook.
+
 ## [0.11.3] - 2026-08-19
 
 tv-desktop Phase 0.3b **complete and stable**: mpv now plays reliably *inside* the single Native SDK
