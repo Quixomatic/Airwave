@@ -2,6 +2,30 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.21] - 2026-08-20
+
+tv-tauri Phase 4.2 — **channels play.** The DVR clock drives the Rust mpv surface; glass chrome
+composites over the full-window video.
+
+### What ships
+
+- **`use-tv-player`** — the effectiveTime clock + DVR ported from tv-native (which itself ports
+  tv-web), with the seams swapped for tv-tauri: `viewRef.play/pause/seek` → the `mpv_*` Tauri
+  commands, `setSource` → `mpv_load`, and the view events → `mpv:*` Tauri-event listeners
+  (`features/watch/mpv.ts`). Derives the current slot + offset from the real playback position, rolls
+  at boundaries, `goTo(anyTime)` rewinds through bumpers (DVR), builds the multi-segment scrubber,
+  heartbeats the session, and logs playback. Bumpers use the proven pause-and-hold path (the ambient
+  music bed + native-first retry / full track wiring from tv-web are the next refinements).
+- **`/watch/$channelId`** — the fullscreen player: a transparent stage over the full-window mpv video
+  (`useFullBleed` → edge-to-edge under the floating titlebar) with glass chrome — play/pause, restart,
+  jump-to-live, a multi-segment scrubber with the live marker, a bumper "Up next" state, delivery
+  readout, and keyboard controls (OK pause · ◀▶ seek · Back → guide) with auto-hide.
+
+### Verified
+
+Channels play full-screen with the chrome composited over the video — the Phase-1 compositing model
+proven in the real app.
+
 ## [0.11.20] - 2026-08-20
 
 tv-tauri Phase 4.1 — the Rust mpv player command + event surface (the foundation for the player).
