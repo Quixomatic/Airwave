@@ -2,6 +2,36 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.7] - 2026-08-20
+
+**tv-tauri Phase 1 go/no-go PASSED** — our own libmpv plays in the Tauri window with a real React
+glass control bar composited OVER the video via WebView2's DirectComposition. The exact thing that
+was architecturally impossible on the Native SDK works cleanly on Tauri, following soia's proven
+pattern (no `soia_utils`, no hacks).
+
+### What ships
+
+- **Our own libmpv, built + wired.** The `libmpv-latest` GitHub Release now carries
+  `libmpv-airwave-windows-x64.tar.gz` (our from-source build: libmpv-2.dll + ffmpeg/libplacebo/
+  dav1d/libass/vulkan/**libdovi** + ~50 deps). Vendored per-os-arch into
+  `apps/tv-tauri/src-tauri/vendor/libmpv/windows-x64/` (binaries gitignored; headers tracked).
+- **`build.rs`** selects the per-target vendor dir, links `mpv.lib` (an MSVC import lib generated
+  from the DLL, since the mingw build emits only a GNU `.dll.a`), and stages the runtime DLLs beside
+  the dev exe.
+- **`src/mpv/`** — libmpv FFI + a safe `Mpv` handle (create, `wid`, `hwdec=auto`/`gpu-next`/HDR
+  options, initialize, loadfile).
+- **`lib.rs`** setup follows soia's `app_bootstrap.rs`: `set_background_color(0,0,0,0)` makes the
+  webview transparent, resolves the Win32 HWND, attaches mpv via `wid`, and plays a test source.
+- **`App.tsx` / `styles.css`** — a transparent stage + a frosted-glass (`backdrop-filter: blur`)
+  control bar proving real React chrome over the video.
+
+### Notes
+
+- Reproducibility follow-up: have the Windows CI also emit `mpv.lib` (via dumpbin+lib on the runner)
+  so the artifact is self-contained, and add a `fetch-libmpv` script — currently the import lib was
+  generated locally. `build.rs` panics with fetch instructions if libmpv isn't vendored.
+- macOS/Linux libmpv workflows exist; those builds + `platform` attach are the fast-follow.
+
 ## [0.11.6] - 2026-08-20
 
 Pivots the desktop client from the Native SDK experiment to **Tauri** and scaffolds `apps/tv-tauri`.

@@ -1,6 +1,6 @@
 [package]
 name = "airwave"
-version = "0.11.6"
+version = "0.11.7"
 description = "Airwave desktop client (Tauri + libmpv)"
 authors = ["Airwave"]
 license = ""

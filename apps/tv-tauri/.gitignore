@@ -5,5 +5,10 @@ dist/
 src-tauri/target/
 src-tauri/gen/
 
-# Vendored runtime libs (libmpv etc.) — fetched per-platform, not committed
+# Vendored libmpv binaries — big + reproducible from our CI (tools/libmpv + the
+# libmpv-latest release). Fetched per os-arch; NOT committed. Headers (include/)
+# ARE tracked (small, stable).
 src-tauri/resources/lib/
+src-tauri/vendor/libmpv/windows-*/
+src-tauri/vendor/libmpv/macos-*/
+src-tauri/vendor/libmpv/linux-*/
