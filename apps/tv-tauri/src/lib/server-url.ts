@@ -5,7 +5,9 @@
  * installed desktop app always onboards (no baked/browser-player persona), so BAKED is always "".
  */
 
-const KEY = "cg-tv-server-url";
+import { getVal, setVal, delVal } from "./store";
+
+const KEY = "serverUrl";
 
 /** Coerce user input into a usable base URL (add scheme if missing, drop trailing slash). */
 export function normalizeServerUrl(raw: string): string {
@@ -24,23 +26,17 @@ export function normalizeServerUrl(raw: string): string {
 }
 
 export function getStoredServerUrl(): string {
-  try {
-    return (localStorage.getItem(KEY) ?? "").replace(/\/+$/, "");
-  } catch {
-    return "";
-  }
+  return getVal(KEY).replace(/\/+$/, "");
 }
 export function setStoredServerUrl(url: string) {
-  localStorage.setItem(KEY, normalizeServerUrl(url));
+  setVal(KEY, normalizeServerUrl(url));
 }
 export function clearStoredServerUrl() {
-  localStorage.removeItem(KEY);
+  delVal(KEY);
 }
 
-/** The active server base URL (a stored onboarded address, else empty). Evaluated at module load —
- *  onboarding stores it then reloads, so the whole app re-initialises against it. */
-export const SERVER_URL = getStoredServerUrl();
-
+/** Whether we have an onboarded server to talk to yet (else show ServerSetup). Read live from the
+ *  store cache — onboarding stores the URL then reloads, so the app re-initialises against it. */
 export function hasServerUrl(): boolean {
-  return SERVER_URL !== "";
+  return getStoredServerUrl() !== "";
 }

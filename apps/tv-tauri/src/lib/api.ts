@@ -1,5 +1,6 @@
 import { fetch } from "@tauri-apps/plugin-http";
 import { getStoredServerUrl } from "./server-url";
+import { getVal, setVal, delVal } from "./store";
 
 /**
  * Thin client for Airwave's REST API (`/api/v1`, bearer-auth) + onboarding. Uses the Tauri HTTP
@@ -8,20 +9,16 @@ import { getStoredServerUrl } from "./server-url";
  * out per phase (Phase 2 = onboarding/health + auth; guide/player land later).
  */
 
-const TOKEN_KEY = "cg-tv-token";
+const TOKEN_KEY = "token";
 
 export function getToken(): string {
-  try {
-    return localStorage.getItem(TOKEN_KEY) ?? "";
-  } catch {
-    return "";
-  }
+  return getVal(TOKEN_KEY);
 }
 export function setToken(t: string) {
-  localStorage.setItem(TOKEN_KEY, t);
+  setVal(TOKEN_KEY, t);
 }
 export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
+  delVal(TOKEN_KEY);
 }
 
 export class ApiError extends Error {

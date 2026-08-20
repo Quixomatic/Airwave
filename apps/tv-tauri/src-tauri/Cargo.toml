@@ -1,6 +1,6 @@
 [package]
 name = "airwave"
-version = "0.11.8"
+version = "0.11.9"
 description = "Airwave desktop client (Tauri + libmpv)"
 authors = ["Airwave"]
 license = ""
@@ -29,6 +29,9 @@ tauri-plugin-log = "2"
 tauri-plugin-http = "2"
 # Persist + restore the window size/position/maximized state across launches.
 tauri-plugin-window-state = "2"
+# File-backed key-value store (server URL, token, settings) in the app-data dir —
+# survives webview-cache clears; readable from Rust (@tauri-apps/plugin-store on JS).
+tauri-plugin-store = "2"
 # The native window handle (mpv `--wid` embed) + per-platform windowing.
 raw-window-handle = "0.6"
 
