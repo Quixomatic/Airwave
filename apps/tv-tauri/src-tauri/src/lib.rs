@@ -51,6 +51,47 @@ fn mpv_stop(mpv: State<'_, Arc<mpv::Mpv>>) -> Result<(), String> {
     mpv.command(&["stop"])
 }
 
+/// Render the video into a sub-rectangle of the window — the guide's featured-panel slot — for the
+/// MINI FEED. The single full-window mpv surface stays put; `video-margin-ratio-*` scales the video
+/// into `(x,y,w,h)` (physical px within a `win_w`×`win_h` window). The guide punches only that slot
+/// transparent, so the positioned video shows there and the black margins are covered by the opaque
+/// guide. No child HWND, so no airspace problem — it builds on the proven full-window compositing.
+#[tauri::command]
+fn mpv_set_region(
+    mpv: State<'_, Arc<mpv::Mpv>>,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+    win_w: f64,
+    win_h: f64,
+) -> Result<(), String> {
+    let (ww, wh) = (win_w.max(1.0), win_h.max(1.0));
+    let left = (x / ww).clamp(0.0, 1.0);
+    let right = ((ww - x - w) / ww).clamp(0.0, 1.0);
+    let top = (y / wh).clamp(0.0, 1.0);
+    let bottom = ((wh - y - h) / wh).clamp(0.0, 1.0);
+    mpv.set_property_double("video-margin-ratio-left", left)?;
+    mpv.set_property_double("video-margin-ratio-right", right)?;
+    mpv.set_property_double("video-margin-ratio-top", top)?;
+    mpv.set_property_double("video-margin-ratio-bottom", bottom)?;
+    Ok(())
+}
+
+/// Reset the video to fill the whole window (fullscreen player) — clears the mini-feed margins.
+#[tauri::command]
+fn mpv_fill_window(mpv: State<'_, Arc<mpv::Mpv>>) -> Result<(), String> {
+    for p in [
+        "video-margin-ratio-left",
+        "video-margin-ratio-right",
+        "video-margin-ratio-top",
+        "video-margin-ratio-bottom",
+    ] {
+        mpv.set_property_double(p, 0.0)?;
+    }
+    Ok(())
+}
+
 /// The mpv event-loop thread: observe the properties the player UI needs and forward every change as
 /// a Tauri event (`mpv:*`). Routes property changes on `reply_userdata` (the id we passed to
 /// `observe_property`) rather than parsing the event payload union. Ends on mpv shutdown.
@@ -345,7 +386,9 @@ pub fn run() {
             mpv_seek,
             mpv_set_audio_track,
             mpv_set_subtitle_track,
-            mpv_stop
+            mpv_stop,
+            mpv_set_region,
+            mpv_fill_window
         ])
         .setup(|app| {
             if let Err(e) = setup_player(app) {

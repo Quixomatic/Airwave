@@ -18,6 +18,11 @@ export const mpv = {
   stop: () => invoke("mpv_stop"),
   setAudioTrack: (aid: string) => invoke("mpv_set_audio_track", { aid }),
   setSubtitleTrack: (sid: string) => invoke("mpv_set_subtitle_track", { sid }),
+  /** Mini feed: render the video into a sub-rect `(x,y,w,h)` of a `winW`×`winH` window (CSS px — the
+   *  ratio is DPR-independent) via mpv `video-margin-ratio`. `fillWindow` clears it (fullscreen). */
+  setRegion: (x: number, y: number, w: number, h: number, winW: number, winH: number) =>
+    invoke("mpv_set_region", { x, y, w, h, winW, winH }),
+  fillWindow: () => invoke("mpv_fill_window"),
 };
 
 export type MpvLoaded = { width: number; height: number; duration: number };

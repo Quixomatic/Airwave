@@ -2,6 +2,29 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.23] - 2026-08-20
+
+tv-tauri Phase 4.4 — **the mini feed.** The player is now persistent and picture-in-picture works —
+the one piece that goes beyond soia (which is full-window only).
+
+### The compositing (proven in isolation first)
+mpv is one full-window surface behind the transparent webview. For the mini feed:
+- **`mpv_set_region(x,y,w,h,winW,winH)`** (Rust) positions the video into a sub-rect via mpv's own
+  `video-margin-ratio-*` — no child HWND, so no airspace problem; it builds on the proven full-window
+  model. `mpv_fill_window` resets to fullscreen.
+- The guide gets a **rounded transparent cutout** at the featured-panel slot: the `PlayerProvider`
+  renders a navy backdrop that's a single `box-shadow: 0 0 0 100vmax #060a14` div at the slot rect
+  (rounded corners for free), so only the slot shows the positioned video.
+
+### The persistent player (`PlayerProvider`)
+Promoted from the minimal stub to the real state machine (`off`/`mini`/`full`), holding `useTvPlayer`
+so playback survives guide↔player navigation. `full` → `fillWindow` + the `FullChrome` overlay (guide
+hidden `opacity:0` so video fills edge-to-edge, `useFullBleed`); `mini` → `setRegion(slotRect)` with
+the cutout, resynced on resize; `off` → full navy, mpv idle. Tuning is now **layout-based** (guide
+`onTune` → `player.tune`, no route change); the `/watch` route is gone. The guide root is transparent
+(the backdrop provides the navy). The grid's existing mini-feed code (`player.layout`/`miniFocused`/
+`focusMini`, the featured-panel slot) — ported inert in Phase 3 — now drives the real feed.
+
 ## [0.11.22] - 2026-08-20
 
 tv-tauri Phase 4.3 — the **full tv-web player chrome** (exact-parity), replacing the early bar.

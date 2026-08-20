@@ -500,7 +500,9 @@ export function AuroraGrid({
         // BELOW the titlebar, and is the positioned ancestor for the inset floating sidebar.
         position: "absolute",
         inset: 0,
-        background: C.bg,
+        // Transparent: the PlayerProvider's backdrop provides the navy (so the mini-feed slot can be a
+        // real transparent cutout showing the mpv video behind the webview). tv-web paints C.bg here.
+        background: "transparent",
         color: C.fg,
         display: "flex",
         flexDirection: "row",

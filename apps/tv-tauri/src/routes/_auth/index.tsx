@@ -1,6 +1,7 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 
 import { GuideScreen } from "../../features/guide/guide-screen";
+import { usePlayer } from "../../features/watch/player-context";
 import { setToken } from "../../lib/auth-client";
 import { capsDoneForCurrentServer } from "../../lib/device";
 
@@ -16,11 +17,12 @@ export const Route = createFileRoute("/_auth/")({
 
 function GuideRoute() {
   const navigate = useNavigate();
+  const player = usePlayer();
   return (
     <GuideScreen
-      // Tuning navigates to the fullscreen player route (Phase 4). tv-web keeps a persistent mini
-      // player instead; that lands with the mpv player.
-      onTune={(channelId) => void navigate({ to: "/watch/$channelId", params: { channelId } })}
+      // Tuning is layout-based (the persistent PlayerProvider) — plays the channel full-screen, then a
+      // mini feed docks in the guide's featured-panel slot on Back. No route change.
+      onTune={(channelId) => player.tune(channelId)}
       onSettings={() => void navigate({ to: "/settings" })}
       onAccount={() => void navigate({ to: "/settings" })}
       onDiagnostic={() => void navigate({ to: "/diagnostic" })}

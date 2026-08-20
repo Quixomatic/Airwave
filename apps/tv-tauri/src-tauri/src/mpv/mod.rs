@@ -228,6 +228,24 @@ impl Mpv {
         }
     }
 
+    /// Set a DOUBLE property (e.g. `video-margin-ratio-*` for the mini-feed region).
+    pub fn set_property_double(&self, name: &str, mut value: f64) -> Result<(), String> {
+        let c_name = CString::new(name).map_err(|_| "property name has null byte")?;
+        let rc = unsafe {
+            ffi::mpv_set_property(
+                self.ctx(),
+                c_name.as_ptr(),
+                MpvFormat::Double as i32,
+                &mut value as *mut f64 as *mut c_void,
+            )
+        };
+        if rc < 0 {
+            Err(format!("mpv_set_property({name}=double) failed: {rc}"))
+        } else {
+            Ok(())
+        }
+    }
+
     /// Set a STRING property (e.g. `aid=auto`, `sid=no`).
     pub fn set_property_string(&self, name: &str, value: &str) -> Result<(), String> {
         let c_name = CString::new(name).map_err(|_| "property name has null byte")?;
