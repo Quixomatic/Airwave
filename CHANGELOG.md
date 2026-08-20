@@ -2,6 +2,34 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.11] - 2026-08-20
+
+tv-tauri Phase 2.3 — device-code login + TanStack Router, faithfully ported from tv-web, plus a
+Rust HTTP chokepoint so the whole app can talk to an arbitrary self-hosted server.
+
+### What ships
+
+- **TanStack Router** (file-based routes, matching tv-web): `__root` (QueryClient context) → `/login`
+  and the `_auth` guard layout (`beforeLoad` redirects to `/login` without a token) → `_auth/` (the
+  guide home, still the mpv-compositing placeholder) + `_auth/diagnostic` (placeholder). `main.tsx`
+  mounts `<RouterProvider>` with **hash history** (the packaged app is served from a custom protocol,
+  where clean-path reloads 404) behind the server gate, with the custom titlebar as global chrome.
+  Query mounts via the router's `Wrap`. `App.tsx` is gone.
+- **Login screen** — faithful port of tv-web `features/auth/login.tsx` on `@airwave/ui` + Aurora: the
+  two device-code flows (custom Plex `/api/tv/auth/plex/*` and the better-auth device grant), the QR +
+  code panel, the animated **Logo**, and a "Change server" ghost button. The webOS D-pad machinery is
+  dropped for mouse.
+- **Logo / Qr / app-info** — faithfully ported (`framer-motion` staggered entrance; `qrcode` data-URL
+  QR). The `logo.png` art is vendored into tv-tauri.
+- **One Rust HTTP chokepoint.** An `api_request` command (reqwest) backs a `fetch`-shaped `apiFetch`
+  that returns a real `Response`; the REST client (`api.ts`, full port), the Plex link, and
+  better-auth (via `customFetchImpl`) all route through it. This is the app's answer to talking to an
+  arbitrary user-typed server: no webview CORS, no HTTP-scope allowlist, and no mixed-content block
+  (the packaged app is a secure context, so a webview `fetch` to a plain-`http://` LAN server is
+  refused). better-auth's `authClient` is a lazy singleton (server URL known only post-onboarding).
+- **Fixed `check-types`** (dropped the `composite`+`noEmit` project reference that tripped TS6310; added
+  `vite/client` types for the asset import).
+
 ## [0.11.10] - 2026-08-20
 
 tv-tauri Phase 2 — a faithful port of tv-web's server onboarding onto the shared design system, with

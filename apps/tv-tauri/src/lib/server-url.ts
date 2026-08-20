@@ -40,3 +40,10 @@ export function clearStoredServerUrl() {
 export function hasServerUrl(): boolean {
   return getStoredServerUrl() !== "";
 }
+
+/** tv-web has a build-time BAKED server persona (its browser/desktop web player) where the URL can't
+ *  be changed and setup is unreachable; the installed desktop app ALWAYS onboards, so this is always
+ *  false — which is what makes the login's "Change server" button always available. */
+export function hasBakedServer(): boolean {
+  return false;
+}

@@ -49,6 +49,53 @@ async fn probe_health(urls: Vec<String>) -> Vec<String> {
         .collect()
 }
 
+/// A pooled reqwest client for all Airwave API calls (connection reuse across requests).
+fn http_client() -> &'static reqwest::Client {
+    static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+    CLIENT.get_or_init(reqwest::Client::new)
+}
+
+#[derive(serde::Deserialize)]
+struct ApiRequest {
+    url: String,
+    method: String,
+    headers: Vec<(String, String)>,
+    body: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+struct ApiResponse {
+    status: u16,
+    headers: Vec<(String, String)>,
+    body: String,
+}
+
+/// The single chokepoint for ALL Airwave server HTTP — the JS `apiFetch` routes every request
+/// (REST `/api/v1`, the Plex device-link, better-auth) through here. Runs in Rust (reqwest) so it's
+/// free of the webview's CORS, its HTTP-scope allowlist, AND the mixed-content block (the packaged app
+/// is a secure context, so a webview `fetch` to a plain-`http://` LAN server would be refused).
+#[tauri::command]
+async fn api_request(req: ApiRequest) -> Result<ApiResponse, String> {
+    let method =
+        reqwest::Method::from_bytes(req.method.to_uppercase().as_bytes()).map_err(|e| e.to_string())?;
+    let mut rb = http_client().request(method, &req.url);
+    for (k, v) in &req.headers {
+        rb = rb.header(k.as_str(), v.as_str());
+    }
+    if let Some(b) = req.body {
+        rb = rb.body(b);
+    }
+    let resp = rb.send().await.map_err(|e| e.to_string())?;
+    let status = resp.status().as_u16();
+    let headers = resp
+        .headers()
+        .iter()
+        .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap_or("").to_string()))
+        .collect();
+    let body = resp.text().await.map_err(|e| e.to_string())?;
+    Ok(ApiResponse { status, headers, body })
+}
+
 /// LAN discovery for onboarding — return the /24 prefixes (e.g. `"192.168.1"`) of this machine's
 /// private IPv4 interfaces, so the setup screen can sweep them for Airwave servers answering
 /// `/api/health`. On desktop we read the real interfaces natively: the webview's WebRTC subnet
@@ -99,7 +146,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![local_subnets, probe_health])
+        .invoke_handler(tauri::generate_handler![local_subnets, probe_health, api_request])
         .setup(|app| {
             if let Err(e) = setup_player(app) {
                 log::error!("mpv setup failed: {e}");

@@ -12,3 +12,4 @@ src-tauri/resources/lib/
 src-tauri/vendor/libmpv/windows-*/
 src-tauri/vendor/libmpv/macos-*/
 src-tauri/vendor/libmpv/linux-*/
+routeTree.gen.ts
