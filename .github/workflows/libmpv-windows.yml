@@ -19,7 +19,7 @@ on:
           - arm64
 
 permissions:
-  contents: read
+  contents: write # publish the built libmpv as a Release asset (bypasses the artifact quota)
 
 concurrency:
   group: libmpv-windows-${{ github.ref }}-${{ inputs.arch }}
@@ -103,20 +103,20 @@ jobs:
 
       - name: Package runtime
         shell: msys2 {0}
+        run: bash ./package-mingw64-runtime.sh --pkg-name "libmpv-airwave-windows-x64"
+
+      - name: Publish to GitHub Release (bypasses the artifact-storage quota)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          LABEL="${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}"
-          bash ./package-mingw64-runtime.sh \
-            --pkg-name "libmpv-airwave-${LABEL}-windows-x64"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: libmpv-airwave-windows-x64-${{ github.run_number }}
-          path: |
-            tools/libmpv/libmpv-*.tar.gz
-            tools/libmpv/libmpv-*.tar.gz.sha256
-          compression-level: 0
+          TAG="libmpv-latest"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" \
+            --title "Airwave libmpv builds" \
+            --notes "Auto-updated libmpv runtime bundles (per platform/arch). Not a code release." \
+            --prerelease --latest=false
+          gh release upload "$TAG" libmpv-*.tar.gz libmpv-*.tar.gz.sha256 --clobber
 
   windows-arm64:
     if: ${{ inputs.arch == 'all' || inputs.arch == 'arm64' }}
@@ -181,17 +181,17 @@ jobs:
 
       - name: Package runtime
         shell: msys2 {0}
+        run: bash ./package-mingw64-runtime.sh --pkg-name "libmpv-airwave-windows-arm64"
+
+      - name: Publish to GitHub Release (bypasses the artifact-storage quota)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          LABEL="${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}"
-          bash ./package-mingw64-runtime.sh \
-            --pkg-name "libmpv-airwave-${LABEL}-windows-arm64"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: libmpv-airwave-windows-arm64-${{ github.run_number }}
-          path: |
-            tools/libmpv/libmpv-*.tar.gz
-            tools/libmpv/libmpv-*.tar.gz.sha256
-          compression-level: 0
+          TAG="libmpv-latest"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" \
+            --title "Airwave libmpv builds" \
+            --notes "Auto-updated libmpv runtime bundles (per platform/arch). Not a code release." \
+            --prerelease --latest=false
+          gh release upload "$TAG" libmpv-*.tar.gz libmpv-*.tar.gz.sha256 --clobber

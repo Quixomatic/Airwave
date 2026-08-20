@@ -17,7 +17,7 @@ on:
           - arm64
 
 permissions:
-  contents: read
+  contents: write # publish the built libmpv as a Release asset (bypasses the artifact quota)
 
 concurrency:
   group: libmpv-linux-${{ github.ref }}-${{ inputs.arch }}
@@ -66,18 +66,18 @@ jobs:
       - name: Build libmpv
         run: bash ./build-linux.sh
       - name: Package runtime
+        run: bash ./package-linux-runtime.sh --pkg-name "libmpv-airwave-linux-x64"
+      - name: Publish to GitHub Release (bypasses the artifact-storage quota)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          bash ./package-linux-runtime.sh \
-            --pkg-name "libmpv-airwave-${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}-linux-x64"
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: libmpv-airwave-linux-x64-${{ github.run_number }}
-          path: |
-            tools/libmpv/libmpv-*.tar.gz
-            tools/libmpv/libmpv-*.tar.gz.sha256
-          compression-level: 0
+          TAG="libmpv-latest"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" \
+            --title "Airwave libmpv builds" \
+            --notes "Auto-updated libmpv runtime bundles (per platform/arch). Not a code release." \
+            --prerelease --latest=false
+          gh release upload "$TAG" libmpv-*.tar.gz libmpv-*.tar.gz.sha256 --clobber
 
   linux-arm64:
     if: ${{ inputs.arch == 'all' || inputs.arch == 'arm64' }}
@@ -117,15 +117,15 @@ jobs:
       - name: Build libmpv
         run: bash ./build-linux.sh
       - name: Package runtime
+        run: bash ./package-linux-runtime.sh --pkg-name "libmpv-airwave-linux-arm64"
+      - name: Publish to GitHub Release (bypasses the artifact-storage quota)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          bash ./package-linux-runtime.sh \
-            --pkg-name "libmpv-airwave-${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}-linux-arm64"
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: libmpv-airwave-linux-arm64-${{ github.run_number }}
-          path: |
-            tools/libmpv/libmpv-*.tar.gz
-            tools/libmpv/libmpv-*.tar.gz.sha256
-          compression-level: 0
+          TAG="libmpv-latest"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" \
+            --title "Airwave libmpv builds" \
+            --notes "Auto-updated libmpv runtime bundles (per platform/arch). Not a code release." \
+            --prerelease --latest=false
+          gh release upload "$TAG" libmpv-*.tar.gz libmpv-*.tar.gz.sha256 --clobber
