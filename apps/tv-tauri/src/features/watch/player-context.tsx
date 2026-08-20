@@ -6,6 +6,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { api } from "../../lib/api";
 import { useGuide } from "../../hooks/use-guide";
 import { useFullBleed } from "../../lib/full-bleed";
+import { BumperCard } from "./bumper-card";
 import { accentForChannel, FullChrome } from "./full-chrome";
 import { mpv } from "./mpv";
 import { Ctx, type Layout, type PlayerCtx } from "./player-ctx";
@@ -155,6 +156,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       <div style={{ position: "absolute", inset: 0, opacity: hidden ? 0 : 1, pointerEvents: hidden ? "none" : "auto" }}>
         {children}
       </div>
+
+      {/* Mini feed: the compact "Up next" BumperCard during a bumper (the docked video is paused on the
+          last frame), pinned over the slot — under the controls so hover still reveals them. */}
+      {layout === "mini" && miniRect && channelId && tvPlayer.status.state === "bumper" && tvPlayer.status.guide && (
+        <div style={{ position: "fixed", left: miniRect.x, top: miniRect.y, width: miniRect.w, height: miniRect.h, borderRadius: 14, overflow: "hidden", zIndex: 4 }}>
+          <BumperCard
+            channelId={channelId}
+            guide={tvPlayer.status.guide}
+            remaining={tvPlayer.status.bumperRemaining}
+            total={tvPlayer.status.bumperTotal}
+            accent={accent}
+            compact
+            paused={tvPlayer.status.paused}
+          />
+        </div>
+      )}
 
       {/* Mini feed controls — over the slot; a footer hint when idle, the two buttons on hover or when
           navigated into (`miniFocused`). */}

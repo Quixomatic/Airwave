@@ -2,6 +2,10 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.30] - 2026-08-20
+
+tv-tauri — the compact **mini BumperCard** now renders over the mini feed during a bumper (the ported `compact` variant: dark overlay + draining countdown donut + "Up next" blurb), pinned to the slot under the mini controls. The full-screen BumperCard was already wired in FullChrome.
+
 ## [0.11.29] - 2026-08-20
 
 tv-tauri — on the fullscreen player the window titlebar (logo + min/max/close) now auto-hides WITH the chrome: it slides up when idle and back down on mouse-move, so nothing sits over the edge-to-edge video (FullChrome toggles a `.chrome-hidden` class on `<html>` from its `panelOpen`; the titlebar transitions off-screen). Always visible elsewhere.
