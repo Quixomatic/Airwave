@@ -2,6 +2,26 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.22] - 2026-08-20
+
+tv-tauri Phase 4.3 — the **full tv-web player chrome** (exact-parity), replacing the early bar.
+
+### What ships
+
+- **`FeaturePanel`** ported verbatim from tv-web (`../../lib/*`, `@airwave/ui/components/dropdown-menu`
+  all resolve): the program title, the borderless multi-segment DVR scrubber (accent fill, thumb, time
+  under the thumb, LIVE/-behind on the right), the row of glass control pills (Pause · Restart · Channel
+  Surf · Info · Live), and the circular audio / subtitle / quality dropdowns (base-lyra, opening upward),
+  plus the **Info view** (year/rating/critic/duration, summary, genres/cast/director/studio, and the
+  delivery readout: mode / container / codecs / connection).
+- **`FullChrome`** orchestrator (from tv-web `watch.tsx`) — the glass channel chip (top-right, channel
+  tint), the panel open/close key machine, `BumperCard`, and `ChannelSurf`.
+- **`ChannelSurf`** (virtualized ◄►carousel) + **`BumperCard`** + **`glass-button`** ported. ChannelSurf's
+  tune is a route change now (an `onTune` prop) instead of the mini-feed `player.tune`.
+- The `/watch` route drives it all — manages quality / audio / subtitle state (fed into `useTvPlayer`),
+  fetches the channel (guide) + the quality ladder, and wires Back → guide and Channel-Surf tune →
+  `/watch/$id`. `Delivery` gained the optional `directAudioLabel` the FeaturePanel readout expects.
+
 ## [0.11.21] - 2026-08-20
 
 tv-tauri Phase 4.2 — **channels play.** The DVR clock drives the Rust mpv surface; glass chrome

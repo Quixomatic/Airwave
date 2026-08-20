@@ -41,6 +41,8 @@ export type Delivery = {
   videoDecision: string | null;
   audioDecision: string | null;
   connection: "local" | "remote" | "relay" | null;
+  /** tv-web's direct-play companion-audio label (the FeaturePanel readout). Not wired yet in tv-tauri. */
+  directAudioLabel?: string | null;
 };
 
 export type ScrubberSegment = { kind: "PROGRAM" | "BUMPER"; leftPct: number; widthPct: number; current: boolean; fillPct: number };
