@@ -95,11 +95,14 @@ export function FullChrome({
 
   // Desktop: moving the mouse reveals the chrome (like any video player) — same as OK/Space via the
   // key layer. The FeaturePanel's own auto-hide (reset on mouse-move too) fades it back when idle.
+  // Gated on `!surfOpen`: Channel Surf is the modal (exclusive) input layer, so — exactly like the
+  // keyboard — the mouse must ONLY drive the surf while it's open, never reveal the panel behind it.
   useEffect(() => {
+    if (surfOpen) return;
     const onMove = () => setPanelOpen(true);
     window.addEventListener("mousemove", onMove);
     return () => window.removeEventListener("mousemove", onMove);
-  }, []);
+  }, [surfOpen]);
 
   const isBumper = status.state === "bumper";
 

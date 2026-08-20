@@ -203,11 +203,23 @@ export function ChannelSurf({
             return (
               <div
                 key={ch.id}
+                // Mouse parity with the keyboard: hovering a tile focuses it (like ◄►), clicking tunes
+                // it (like OK) then closes; either way the auto-hide resets.
+                onMouseEnter={() => {
+                  focusedRef.current = vi.index;
+                  setFocused(vi.index);
+                  resetHide();
+                }}
+                onClick={() => {
+                  if (ch.id !== currentChannelId) onTune(ch.id);
+                  onCloseRef.current();
+                }}
                 style={{
                   position: "absolute",
                   top: 4,
                   left: vi.start,
                   width: TILE_W,
+                  cursor: "pointer",
                   transform: isFocused ? "scale(1.06)" : "scale(1)",
                   transformOrigin: "center top",
                   opacity: isFocused ? 1 : 0.5,

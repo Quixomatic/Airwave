@@ -2,6 +2,10 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.28] - 2026-08-20
+
+tv-tauri player mouse polish — Channel Surf owns the mouse while open (the full-chrome reveal is gated on `!surfOpen`, matching the keyboard modal lock); surf tiles respond to the mouse (hover focuses like ◄►, click tunes like OK then closes, resetting the auto-hide); and the chrome auto-hide is shortened 8s→3.5s (a mouse reveals it instantly).
+
 ## [0.11.27] - 2026-08-20
 
 tv-tauri player chrome — a top-left glass **circle Back button** on the full player (click to return to the guide/mini feed, no Backspace needed), and the Info-view Back moved above the program title.

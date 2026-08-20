@@ -38,7 +38,7 @@ import type { Delivery, ScrubberView } from "./use-tv-player";
  * (◄► move, OK activate, ▲ to scrubber). Back closes an open menu then the panel.
  */
 
-const HIDE_MS = 8000;
+const HIDE_MS = 3500; // desktop: shorter than tv-web's 8s — a mouse reveals the chrome instantly
 type MenuKey = "audio" | "subs" | "quality" | null;
 type Track = { id: string; lang: string; label: string };
 
