@@ -19,14 +19,16 @@ dependencies = [
 
 [[package]]
 name = "airwave"
-version = "0.11.5"
+version = "0.11.6"
 dependencies = [
  "log",
+ "raw-window-handle",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-log",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
