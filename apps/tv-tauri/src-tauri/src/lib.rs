@@ -279,6 +279,20 @@ fn probe_blocking(url: &str, timeout_ms: u64) -> ProbeResult {
     }
 }
 
+/// Reachability probe for the Plex connection selection (local→remote→relay): GET the URL with a
+/// short timeout, return whether it responded at all (any status). Runs in Rust (reqwest) since the
+/// app streams DIRECTLY from arbitrary Plex connection URLs, which the webview CORS/mixed-content can't.
+#[tauri::command]
+async fn probe_reachable(url: String, timeout_ms: u64) -> bool {
+    match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_millis(timeout_ms))
+        .build()
+    {
+        Ok(client) => client.get(&url).send().await.is_ok(),
+        Err(_) => false,
+    }
+}
+
 /// A pooled reqwest client for all Airwave API calls (connection reuse across requests).
 fn http_client() -> &'static reqwest::Client {
     static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
@@ -379,6 +393,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             local_subnets,
             probe_health,
+            probe_reachable,
             api_request,
             mpv_probe,
             mpv_load,

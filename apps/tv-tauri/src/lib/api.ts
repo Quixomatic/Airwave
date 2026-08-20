@@ -1,4 +1,5 @@
 import { apiFetch } from "./api-fetch";
+import { getNetwork } from "./plex-connection";
 import { getStoredServerUrl } from "./server-url";
 import { getToken } from "./token";
 
@@ -10,11 +11,6 @@ import { getToken } from "./token";
  * Faithful port of tv-web `lib/api.ts`. The one seam: every request goes through `apiFetch` (the Rust
  * `api_request` command) instead of the webview `fetch`, and the base URL is read live from the store.
  */
-
-/** Off-network connection probing (local/remote/relay) is a later phase — desktop is local for now. */
-function getNetwork(): "local" | "remote" | "relay" {
-  return "local";
-}
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();

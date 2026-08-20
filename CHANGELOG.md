@@ -2,6 +2,10 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.31] - 2026-08-20
+
+tv-tauri Phase 4.3 — connection probing (local/remote/relay). At launch the `_auth` guard probes the media server's Plex connections (`/api/v1/connections`) local→remote→relay and remembers the first reachable one; `/media` stamps it as `?network=` so off-network playback streams from the right base. `lib/plex-connection.ts` (store-backed, sync `getNetwork`); a Rust `probe_reachable(url,timeout)` command does the reachability GET (arbitrary Plex URLs the webview can't reach). This is the off-network path native mpv enables that a browser can't.
+
 ## [0.11.30] - 2026-08-20
 
 tv-tauri — the compact **mini BumperCard** now renders over the mini feed during a bumper (the ported `compact` variant: dark overlay + draining countdown donut + "Up next" blurb), pinned to the slot under the mini controls. The full-screen BumperCard was already wired in FullChrome.

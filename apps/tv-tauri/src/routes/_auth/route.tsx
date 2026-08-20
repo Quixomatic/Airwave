@@ -1,7 +1,9 @@
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
+import { useEffect } from "react";
 
 import { PlayerProvider } from "../../features/watch/player-context";
 import { getToken } from "../../lib/auth-client";
+import { probeConnection } from "../../lib/plex-connection";
 
 /**
  * The authenticated layout gate — every `_auth/*` route requires a bearer token (faithful port of
@@ -17,6 +19,12 @@ export const Route = createFileRoute("/_auth")({
 });
 
 function AuthedLayout() {
+  // Probe which Plex connection this device reaches (local → remote → relay) once per launch, so
+  // off-network playback streams from the right base. See lib/plex-connection.ts.
+  useEffect(() => {
+    void probeConnection();
+  }, []);
+
   return (
     <PlayerProvider>
       <Outlet />
