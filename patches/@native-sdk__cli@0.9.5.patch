@@ -20,3 +20,41 @@ index 7590a9e0ef354474b82d0ba16fb60d38828d8812..1e278b3a8953d42fc89987c886221269
          const app_code = b.addObject(.{
              .name = b.fmt("{s}-app-code", .{app_options.name}),
              .root_module = app_mod,
+diff --git a/src/platform/windows/webview2_host.cpp b/src/platform/windows/webview2_host.cpp
+index d8118237743f1424f500866cfe5955d77933567b..af57a0ad1ddc584eefcc166ec00acae0694fc4d8 100644
+--- a/src/platform/windows/webview2_host.cpp
++++ b/src/platform/windows/webview2_host.cpp
+@@ -1970,6 +1970,21 @@ static void reorderWindowChildren(Host *host, uint64_t window_id) {
+             items.push_back({ view.hwnd, view.layer, view.creation_order });
+         }
+     }
++    // Airwave (tv-desktop): the app parents an mpv video child HWND (window
++    // class "AirwaveVideo") to the window via --wid. It is not an SDK view, so
++    // without this it stays out of the layer order and the canvas re-tops over
++    // it. Fold any such child into the sort at a top layer so the video is
++    // ordered as a first-class layer (highest = on top of sibling children;
++    // the DComp alpha UI, when present, still composes above all children).
++    {
++        auto win_it = host->windows.find(window_id);
++        if (win_it != host->windows.end() && win_it->second.hwnd) {
++            HWND video = nullptr;
++            while ((video = FindWindowExW(win_it->second.hwnd, video, L"AirwaveVideo", nullptr)) != nullptr) {
++                items.push_back({ video, (1 << 30), 0 });
++            }
++        }
++    }
+     std::sort(items.begin(), items.end(), [](const LayerItem &a, const LayerItem &b) {
+         if (a.layer != b.layer) return a.layer < b.layer;
+         return a.order < b.order;
+@@ -6041,6 +6056,11 @@ static bool createNativeWindow(Host *host, Window &window) {
+         style = WS_POPUP | WS_SYSMENU | WS_MINIMIZEBOX;
+         if (window.resizable) style |= WS_THICKFRAME | WS_MAXIMIZEBOX;
+     }
++    // Airwave (tv-desktop): clip child windows out of the top-level's own
++    // painting. The app parents an mpv video child HWND here; without this the
++    // parent's WM_PAINT (fired every frame by the pump) repaints over the child
++    // and the video flashes white. Harmless for the canvas-covers-client case.
++    style |= WS_CLIPCHILDREN;
+     /* The requested frame is a CONTENT size in LOGICAL points (the
+      * other hosts size the content area); scale it to physical pixels
+      * at the DPI the window opens at (the system DPI — WM_DPICHANGED

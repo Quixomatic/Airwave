@@ -39,12 +39,33 @@ extern "user32" fn GetWindow(hwnd: HWND, cmd: u32) callconv(.winapi) ?HWND;
 extern "user32" fn GetClientRect(hwnd: HWND, rect: *RECT) callconv(.winapi) BOOL;
 extern "user32" fn CreateWindowExW(ex: u32, class: [*:0]const u16, name: [*:0]const u16, style: u32, x: i32, y: i32, w: i32, h: i32, parent: ?HWND, menu: ?win.HMENU, inst: ?win.HINSTANCE, param: ?*anyopaque) callconv(.winapi) ?HWND;
 extern "user32" fn SetWindowPos(hwnd: HWND, insert_after: ?HWND, x: i32, y: i32, cx: i32, cy: i32, flags: u32) callconv(.winapi) BOOL;
-extern "user32" fn BringWindowToTop(hwnd: HWND) callconv(.winapi) BOOL;
-extern "user32" fn EnumChildWindows(parent: HWND, cb: WndEnumProc, lparam: LPARAM) callconv(.winapi) BOOL;
-extern "user32" fn GetClassNameW(hwnd: HWND, buf: [*]u16, max: i32) callconv(.winapi) i32;
 extern "kernel32" fn GetModuleHandleW(name: ?[*:0]const u16) callconv(.winapi) ?win.HINSTANCE;
 extern "kernel32" fn GetCurrentProcessId() callconv(.winapi) u32;
 extern "kernel32" fn Sleep(ms: u32) callconv(.winapi) void;
+
+// The mpv child uses a dedicated window class so the patched SDK host can
+// recognize it (FindWindowExW by class) and fold it into its layer z-order.
+const video_class = L("AirwaveVideo");
+const WNDCLASSEXW = extern struct {
+    cbSize: u32,
+    style: u32 = 0,
+    lpfnWndProc: *const fn (HWND, u32, usize, isize) callconv(.winapi) isize,
+    cbClsExtra: i32 = 0,
+    cbWndExtra: i32 = 0,
+    hInstance: ?win.HINSTANCE = null,
+    hIcon: ?*anyopaque = null,
+    hCursor: ?*anyopaque = null,
+    hbrBackground: ?*anyopaque = null,
+    lpszMenuName: ?[*:0]const u16 = null,
+    lpszClassName: [*:0]const u16,
+    hIconSm: ?*anyopaque = null,
+};
+extern "user32" fn RegisterClassExW(cls: *const WNDCLASSEXW) callconv(.winapi) u16;
+extern "user32" fn DefWindowProcW(hwnd: HWND, msg: u32, wparam: usize, lparam: isize) callconv(.winapi) isize;
+
+fn videoWndProc(hwnd: HWND, msg: u32, wparam: usize, lparam: isize) callconv(.winapi) isize {
+    return DefWindowProcW(hwnd, msg, wparam, lparam);
+}
 
 const SWP_NOSIZE: u32 = 0x0001;
 const SWP_NOMOVE: u32 = 0x0002;
@@ -70,18 +91,6 @@ fn enumProc(hwnd: HWND, lparam: LPARAM) callconv(.winapi) BOOL {
         return 0; // FALSE → stop enumeration
     }
     return 1; // TRUE → keep looking
-}
-
-/// EnumChildWindows callback: log each child HWND's class + visibility so we
-/// can see the SDK's window topology (is its canvas a sibling child HWND?).
-fn childProc(hwnd: HWND, lparam: LPARAM) callconv(.winapi) BOOL {
-    _ = lparam;
-    var wbuf: [128]u16 = undefined;
-    const n = GetClassNameW(hwnd, &wbuf, 128);
-    var u8buf: [256]u8 = undefined;
-    const len = if (n > 0) (std.unicode.utf16LeToUtf8(&u8buf, wbuf[0..@intCast(n)]) catch 0) else 0;
-    std.debug.print("[airwave]   child hwnd=0x{x} class={s} visible={d}\n", .{ @intFromPtr(hwnd), u8buf[0..len], IsWindowVisible(hwnd) });
-    return 1;
 }
 
 /// Runs off-thread: wait for the SDK window to exist (runWithOptions creates it
@@ -111,11 +120,16 @@ fn embedWorker() void {
     _ = GetClientRect(parent, &rect);
     const w = rect.right - rect.left;
     const h = rect.bottom - rect.top;
-    std.debug.print("[airwave] embed: parent client {d}x{d}\n", .{ w, h });
+
+    // Register the mpv child's window class (idempotent; a second call just
+    // fails harmlessly). The host recognizes this class to z-order the video.
+    var wc = WNDCLASSEXW{ .cbSize = @sizeOf(WNDCLASSEXW), .lpfnWndProc = &videoWndProc, .lpszClassName = video_class };
+    wc.hInstance = GetModuleHandleW(null);
+    _ = RegisterClassExW(&wc);
 
     const child = CreateWindowExW(
         WS_EX_NOPARENTNOTIFY,
-        L("STATIC"),
+        video_class,
         L(""),
         WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
         0,
@@ -157,30 +171,17 @@ fn embedWorker() void {
     const rc = mpv.mpv_command(handle, &cmd);
     std.debug.print("[airwave] embed: mpv wid=0x{x} loadfile rc={d} source={s}\n", .{ @intFromPtr(child), rc, g_source });
 
-    // --- DIAGNOSTIC (0.3b): why is only a white panel visible? ---
-    // (1) Window topology: enumerate the parent's children so we can see
-    //     whether the SDK canvas is a sibling child HWND we must out-z-order.
-    std.debug.print("[airwave] parent=0x{x} children:\n", .{@intFromPtr(parent)});
-    _ = EnumChildWindows(parent, &childProc, 0);
+    // Bring the video child to the top of the sibling z-order once; the patched
+    // host keeps it there (folds "AirwaveVideo" into reorderWindowChildren) and
+    // the window's WS_CLIPCHILDREN stops the parent repainting over it.
+    _ = SetWindowPos(child, null, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
 
-    // (2) Did mpv actually decode + configure video? Pump events for ~3s,
-    //     keep raising the child, then read the decoded dimensions.
-    var i: u32 = 0;
-    while (i < 60) : (i += 1) {
-        while (true) {
-            const ev = mpv.mpv_wait_event(handle, 0);
-            if (ev.*.event_id == mpv.MPV_EVENT_NONE) break;
-            std.debug.print("[airwave]   mpv event: {s}\n", .{mpv.mpv_event_name(ev.*.event_id)});
-        }
-        _ = SetWindowPos(child, null, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
-        _ = BringWindowToTop(child);
-        Sleep(50);
+    // This thread becomes mpv's event pump for the process lifetime (blocking
+    // wait, ~no CPU when idle). Rendering runs on mpv's own threads regardless.
+    while (true) {
+        const ev = mpv.mpv_wait_event(handle, -1);
+        if (ev.*.event_id == mpv.MPV_EVENT_SHUTDOWN) break;
     }
-    var dwidth: i64 = 0;
-    var dheight: i64 = 0;
-    _ = mpv.mpv_get_property(handle, "dwidth", mpv.MPV_FORMAT_INT64, @ptrCast(&dwidth));
-    _ = mpv.mpv_get_property(handle, "dheight", mpv.MPV_FORMAT_INT64, @ptrCast(&dheight));
-    std.debug.print("[airwave] mpv decoded video: {d}x{d} (0x0 = not decoding)\n", .{ dwidth, dheight });
 }
 
 pub const panic = std.debug.FullPanic(native_sdk.debug.capturePanic);

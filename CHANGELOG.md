@@ -2,6 +2,37 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.3] - 2026-08-19
+
+tv-desktop Phase 0.3b **complete and stable**: mpv now plays reliably *inside* the single Native SDK
+window — a proper, show/hide/resize-able video surface. This is the milestone that makes a real
+desktop player possible (guide, fullscreen, and mini-player all become plain window operations).
+
+### What ships
+
+- **`@native-sdk/cli` host patch (`patches/@native-sdk__cli@0.9.5.patch`) — two Windows-host fixes so
+  an app-owned mpv video child HWND renders correctly:**
+  - **`WS_CLIPCHILDREN` on the top-level window.** This was the real bug: the window lacked it, so the
+    parent's `WM_PAINT` (fired every frame by the SDK's pump) repainted over the child video and it
+    flashed white after a second or two. Clipping children out of the parent's paint makes it rock-stable.
+  - **Video folded into the layer z-order.** `reorderWindowChildren` now includes any `"AirwaveVideo"`
+    class child at the top layer, so the video is ordered as a first-class sibling instead of an
+    out-of-band child the canvas re-tops over.
+- **`apps/tv-desktop/src/main.zig` — the mpv `--wid` embed, cleaned up.** Self-locates our top-level
+  HWND (Win32 `EnumWindows`), registers an `AirwaveVideo` window class, `CreateWindowExW` a `WS_CHILD`
+  parented to the window, `mpv_set_option "wid"`, `loadfile`; a worker thread becomes mpv's event pump
+  for the process lifetime. Verified stable across relaunches.
+- **`apps/tv-desktop/build.zig.zon`** re-pinned to the new patched `@native-sdk/cli` store path.
+
+### Notes
+
+- The video being a real child window means **show/hide/resize are plain `ShowWindow`/`SetWindowPos`
+  calls** — guide (hidden), fullscreen (fill), and mini-player (a rect with the guide UI around it) all
+  work with this alone.
+- **Still to do (0.3c):** glass chrome *over* fullscreen video with transparency (controls/scrubber/
+  bumper card) needs per-pixel alpha over the video — DirectComposition (UI as a topmost alpha visual)
+  or drawing the chrome through mpv. Not in this release.
+
 ## [0.11.2] - 2026-08-19
 
 tv-desktop Phase 0.3b — **proves libmpv renders inside the Native SDK app.** mpv now decodes and
