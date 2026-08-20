@@ -1,3 +1,4 @@
+import { Button } from "@airwave/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -308,25 +309,11 @@ export function FeaturePanel({
             {g?.studio ? <DetailCol label="Studio" value={g.studio} /> : null}
           </div>
           {delivery && <DeliveryReadout delivery={delivery} accent={accent} />}
-          <button
-            onClick={() => setInfoMode(false)}
-            style={{
-              marginTop: 24,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "10px 18px",
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.15)",
-              background: "transparent",
-              color: "#c3c9d4",
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            ← Back
-          </button>
+          <div style={{ marginTop: 24 }}>
+            <Button variant="ghost" onClick={() => setInfoMode(false)}>
+              ← Back
+            </Button>
+          </div>
         </div>
       ) : (
         <>

@@ -2,6 +2,10 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.26] - 2026-08-20
+
+tv-tauri — the Info-view "Back" is now the real @airwave/ui shadcn `Button` (ghost variant), not a hand-rolled inline button.
+
 ## [0.11.25] - 2026-08-20
 
 tv-tauri player-chrome desktop polish.
