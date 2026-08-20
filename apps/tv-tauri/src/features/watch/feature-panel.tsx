@@ -125,6 +125,14 @@ export function FeaturePanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openMenu]);
 
+  // Desktop: moving the mouse keeps the panel up (resets the auto-hide), like any video player.
+  useEffect(() => {
+    const onMove = () => armHide();
+    window.addEventListener("mousemove", onMove);
+    return () => window.removeEventListener("mousemove", onMove);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openMenu]);
+
   useEffect(() => {
     if (focus.row === 0) scrubberRef.current?.focus();
     else ctlRefs.current[focus.col]?.focus();
@@ -300,7 +308,25 @@ export function FeaturePanel({
             {g?.studio ? <DetailCol label="Studio" value={g.studio} /> : null}
           </div>
           {delivery && <DeliveryReadout delivery={delivery} accent={accent} />}
-          <div style={{ marginTop: 24, fontSize: 15, color: "#64748b" }}>Press Back to return</div>
+          <button
+            onClick={() => setInfoMode(false)}
+            style={{
+              marginTop: 24,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 18px",
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.15)",
+              background: "transparent",
+              color: "#c3c9d4",
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            ← Back
+          </button>
         </div>
       ) : (
         <>

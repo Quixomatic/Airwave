@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.25] - 2026-08-20
+
+tv-tauri player-chrome desktop polish.
+
+### What ships
+
+- **Mini-feed buttons** now match tv-web exactly — 54px glass **circles** (icon + label below, selected
+  fills the channel accent + a ring) instead of rects — and appear **instantly on hover** (removed the
+  `AnimatePresence mode="wait"` that made them wait for the hint's exit).
+- **Full chrome reveals on mouse-move** — like any desktop video player, moving the mouse slides up the
+  FeaturePanel (same as OK/Space) and resets the auto-hide, so it stays up while you move and fades when
+  idle.
+- **Info view "Back"** is a clickable **← Back** ghost button now (keyboard Back still works).
+
 ## [0.11.24] - 2026-08-20
 
 tv-tauri — mini-feed controls + the subtitle auto-select fix.

@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Tv } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { BumperCard } from "./bumper-card";
 import { ChannelSurf } from "./channel-surf";
@@ -92,6 +92,14 @@ export function FullChrome({
       return false;
     },
   });
+
+  // Desktop: moving the mouse reveals the chrome (like any video player) — same as OK/Space via the
+  // key layer. The FeaturePanel's own auto-hide (reset on mouse-move too) fades it back when idle.
+  useEffect(() => {
+    const onMove = () => setPanelOpen(true);
+    window.addEventListener("mousemove", onMove);
+    return () => window.removeEventListener("mousemove", onMove);
+  }, []);
 
   const isBumper = status.state === "bumper";
 

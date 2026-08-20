@@ -220,26 +220,27 @@ function MiniControls({
       onMouseLeave={() => setHovered(false)}
       style={{ position: "fixed", left: rect.x, top: rect.y, width: rect.w, height: rect.h, borderRadius: 14, overflow: "hidden", zIndex: 5, pointerEvents: "auto" }}
     >
-      <AnimatePresence mode="wait">
-        {show ? (
+      <AnimatePresence>
+        {show && (
           <motion.div
             key="buttons"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 14, background: "rgba(6,10,20,0.55)", backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)" }}
+            transition={{ duration: 0.12 }}
+            style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 22, background: "rgba(6,10,20,0.55)", backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)" }}
           >
-            <MiniButton icon={<Maximize2 size={22} />} label="Full screen" selected={focused && sel === 0} accent={accent} onClick={onExpand} />
-            <MiniButton icon={<X size={22} />} label="Close" selected={focused && sel === 1} accent={accent} onClick={onClose} />
+            <MiniButton icon={<Maximize2 size={24} />} label="Full screen" selected={focused && sel === 0} accent={accent} onClick={onExpand} />
+            <MiniButton icon={<X size={24} />} label="Close" selected={focused && sel === 1} accent={accent} onClick={onClose} />
           </motion.div>
-        ) : (
+        )}
+        {!show && (
           <motion.div
             key="hint"
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            transition={{ delay: 0.4, duration: 0.25 }}
+            transition={{ duration: 0.2 }}
             style={{ position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "7px 0 8px", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", background: "linear-gradient(to top, rgba(6,10,20,0.82), rgba(6,10,20,0))", pointerEvents: "none" }}
           >
             <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 20, height: 18, padding: "0 5px", borderRadius: 5, border: "1px solid rgba(255,255,255,0.35)", fontSize: 12, lineHeight: 1 }}>↑</span>
@@ -251,27 +252,31 @@ function MiniControls({
   );
 }
 
+/** A circle glass button with a label below — matches tv-web's mini-feed MiniButton. */
 function MiniButton({ icon, label, selected, accent, onClick }: { icon: ReactNode; label: string; selected: boolean; accent: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       title={label}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 6,
-        padding: "10px 16px",
-        borderRadius: 12,
-        border: `1px solid ${selected ? accent : "rgba(255,255,255,0.15)"}`,
-        background: selected ? `${accent}33` : "rgba(18,24,38,0.6)",
-        color: "#f1f5f9",
-        cursor: "pointer",
-        boxShadow: selected ? `0 0 0 2px ${accent}88` : "none",
-      }}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, border: "none", background: "transparent", cursor: "pointer", color: selected ? "#f1f5f9" : "#94a3b8" }}
     >
-      {icon}
-      <span style={{ fontSize: 12, fontWeight: 600 }}>{label}</span>
+      <span
+        style={{
+          width: 54,
+          height: 54,
+          borderRadius: "50%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: selected ? accent : "rgba(30,41,59,0.85)",
+          color: selected ? "#06121f" : "#dfe4ec",
+          boxShadow: selected ? `0 0 0 3px ${accent}66` : "none",
+          transition: "all .12s",
+        }}
+      >
+        {icon}
+      </span>
+      <span style={{ fontSize: 14, fontWeight: 600 }}>{label}</span>
     </button>
   );
 }
