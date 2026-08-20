@@ -41,6 +41,18 @@ extern "user32" fn CreateWindowExW(ex: u32, class: [*:0]const u16, name: [*:0]co
 extern "user32" fn SetWindowPos(hwnd: HWND, insert_after: ?HWND, x: i32, y: i32, cx: i32, cy: i32, flags: u32) callconv(.winapi) BOOL;
 extern "kernel32" fn GetModuleHandleW(name: ?[*:0]const u16) callconv(.winapi) ?win.HINSTANCE;
 
+// Message pump for the worker thread — our video child HWND lives on this
+// thread, so we MUST pump its messages or the main thread deadlocks during
+// move/resize (its cross-window SendMessage to the child blocks until we pump).
+const POINT = extern struct { x: i32, y: i32 };
+const MSG = extern struct { hwnd: ?HWND, message: u32, wParam: usize, lParam: isize, time: u32, pt: POINT, lPrivate: u32 };
+const PM_REMOVE: u32 = 0x0001;
+const QS_ALLINPUT: u32 = 0x04FF;
+extern "user32" fn PeekMessageW(msg: *MSG, hwnd: ?HWND, min: u32, max: u32, remove: u32) callconv(.winapi) BOOL;
+extern "user32" fn TranslateMessage(msg: *const MSG) callconv(.winapi) BOOL;
+extern "user32" fn DispatchMessageW(msg: *const MSG) callconv(.winapi) isize;
+extern "user32" fn MsgWaitForMultipleObjectsEx(count: u32, handles: ?*const anyopaque, ms: u32, wake_mask: u32, flags: u32) callconv(.winapi) u32;
+
 // 0.3c: patched host export — set up the DComp glass (per-pixel alpha, topmost)
 // over the video child. Keyed on the top-level HWND we already hold. Proof stage
 // draws a scrim gradient; later this composites the real SDK chrome canvas.
@@ -189,11 +201,42 @@ fn embedWorker() void {
     const glass_rc = native_sdk_windows_video_glass_setup(@ptrCast(parent));
     std.debug.print("[airwave] 0.3c: DComp glass rc={d} (1=ok, negative=failed step)\n", .{glass_rc});
 
-    // This thread becomes mpv's event pump for the process lifetime (blocking
-    // wait, ~no CPU when idle). Rendering runs on mpv's own threads regardless.
+    // Combined loop for the process lifetime: pump this thread's Windows
+    // messages (REQUIRED — the video child HWND is owned by this thread; without
+    // pumping, the main thread deadlocks on move/resize) and drain mpv events.
+    // MsgWaitForMultipleObjectsEx parks the thread until a message arrives or a
+    // short timeout, so this is ~no CPU when idle. Rendering runs on mpv threads.
+    var msg: MSG = undefined;
+    var last_w = w;
+    var last_h = h;
     while (true) {
-        const ev = mpv.mpv_wait_event(handle, -1);
-        if (ev.*.event_id == mpv.MPV_EVENT_SHUTDOWN) break;
+        while (PeekMessageW(&msg, null, 0, 0, PM_REMOVE) != 0) {
+            _ = TranslateMessage(&msg);
+            _ = DispatchMessageW(&msg);
+        }
+        var shutting_down = false;
+        while (true) {
+            const ev = mpv.mpv_wait_event(handle, 0);
+            if (ev.*.event_id == mpv.MPV_EVENT_NONE) break;
+            if (ev.*.event_id == mpv.MPV_EVENT_SHUTDOWN) shutting_down = true;
+        }
+        if (shutting_down) break;
+
+        // Track window resize: when the parent's client rect changes, reflow the
+        // video child to fill it and rebuild the DComp glass at the new size — so
+        // it behaves like a normal, resizable window (plezy's SetRect role).
+        var cur: RECT = undefined;
+        _ = GetClientRect(parent, &cur);
+        const cw = cur.right - cur.left;
+        const ch = cur.bottom - cur.top;
+        if (cw > 0 and ch > 0 and (cw != last_w or ch != last_h)) {
+            last_w = cw;
+            last_h = ch;
+            _ = SetWindowPos(child, null, 0, 0, cw, ch, SWP_NOMOVE | SWP_NOACTIVATE);
+            _ = native_sdk_windows_video_glass_setup(@ptrCast(parent));
+        }
+
+        _ = MsgWaitForMultipleObjectsEx(0, null, 16, QS_ALLINPUT, 0);
     }
 }
 

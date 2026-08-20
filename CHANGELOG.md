@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.5] - 2026-08-20
+
+tv-desktop: **the video window now behaves like a normal window** — move, resize, and maximize with
+no freeze. This was the make-or-break stability requirement.
+
+### Fixed
+
+- **Move/resize no longer freezes the app** (`apps/tv-desktop/src/main.zig`). The mpv video child HWND
+  is owned by the embed worker thread, which previously blocked in `mpv_wait_event` without a Windows
+  message pump — so during a move/resize the main thread's cross-window `SendMessage` to that child
+  deadlocked until the child's thread pumped (which it never did) → "not responding." The worker now
+  runs a real message pump (`PeekMessage`/`DispatchMessage` + `MsgWaitForMultipleObjectsEx`) alongside
+  draining mpv events, so the child's messages are serviced. (This mirrors plezy's model of keeping the
+  video HWND on the pumping platform thread; ref `.refs/plezy/windows/runner/mpv/mpv_plugin.cpp`.)
+- **The video + glass now track window resize.** The worker polls the client rect and, on change,
+  reflows the video child to fill and rebuilds the DComp glass at the new size (plezy's `SetRect` role).
+
+### Notes
+
+- Minor: a little flicker during an *active* window move (DWM/compositing) — cosmetic polish for later;
+  no rebuild happens on a pure move (only on size change).
+
 ## [0.11.4] - 2026-08-20
 
 tv-desktop Phase 0.3c foundation: **glass chrome composites over the video via DirectComposition.**
