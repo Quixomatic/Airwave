@@ -1,0 +1,26 @@
+{
+  "name": "libplacebo",
+  "version-string": "7.360.1",
+  "description": "Reusable library for GPU-accelerated rendering and video/image processing primitives.",
+  "homepage": "https://code.videolan.org/videolan/libplacebo",
+  "license": "LGPL-2.1-or-later",
+  "dependencies": [
+    "freetype",
+    "fribidi",
+    "glslang",
+    "lcms",
+    "libepoxy",
+    "shaderc",
+    "spirv-cross",
+    "vulkan",
+    "xxhash",
+    {
+      "name": "vcpkg-tool-meson",
+      "host": true
+    },
+    {
+      "name": "vcpkg-tool-ninja",
+      "host": true
+    }
+  ]
+}

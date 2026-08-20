@@ -1,0 +1,5 @@
+# Build inputs/outputs — fetched/compiled by the scripts, never committed
+vendor/
+release/
+*.tar.gz
+*.tar.gz.sha256

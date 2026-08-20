@@ -1,0 +1,187 @@
+name: Build libmpv (Windows)
+
+# Airwave's own reproducible libmpv build for the tv-tauri desktop client.
+# Adapted from FengZeng/mpv (GPL) — builds VANILLA libmpv (ffmpeg + mpv from
+# source under MSYS2/MINGW64), no soia_utils. Scripts live in tools/libmpv/.
+# Manual dispatch; downloads the artifact and vendors it into apps/tv-tauri.
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: "Architecture to build"
+        required: true
+        default: "x64"
+        type: choice
+        options:
+          - all
+          - x64
+          - arm64
+
+permissions:
+  contents: read
+
+concurrency:
+  group: libmpv-windows-${{ github.ref }}-${{ inputs.arch }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: tools/libmpv
+
+jobs:
+  windows-x64:
+    if: ${{ inputs.arch == 'all' || inputs.arch == 'x64' }}
+    name: Build libmpv (Windows / x64)
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      MINGW_PREFIX: /mingw64
+      FFMPEG_ARCH: x86_64
+      FFMPEG_CC: gcc
+      FFMPEG_CXX: g++
+      FFMPEG_BUILD_NAME: mingw64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSYS2 (MINGW64)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            git
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-meson
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-python
+            mingw-w64-x86_64-nasm
+            mingw-w64-x86_64-bzip2
+            mingw-w64-x86_64-libass
+            mingw-w64-x86_64-libjpeg-turbo
+            mingw-w64-x86_64-luajit
+            mingw-w64-x86_64-opus
+            mingw-w64-x86_64-uchardet
+            mingw-w64-x86_64-libplacebo
+            mingw-w64-x86_64-libbluray
+            mingw-w64-x86_64-libcdio-paranoia
+            mingw-w64-x86_64-libdvdnav
+            mingw-w64-x86_64-rubberband
+            mingw-w64-x86_64-zimg
+            mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-xz
+            mingw-w64-x86_64-vulkan-loader
+            mingw-w64-x86_64-vulkan-headers
+
+      - name: Show build environment
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          uname -a
+          gcc --version
+          meson --version
+          pkg-config --version
+
+      - name: Download vanilla mpv source
+        shell: msys2 {0}
+        run: bash ./download.sh
+
+      - name: Build FFmpeg from source
+        shell: msys2 {0}
+        run: bash ./build-ffmpeg.sh
+
+      - name: Build libmpv
+        shell: msys2 {0}
+        run: bash ./build-mingw64.sh
+
+      - name: Package runtime
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          LABEL="${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}"
+          bash ./package-mingw64-runtime.sh \
+            --pkg-name "libmpv-airwave-${LABEL}-windows-x64"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmpv-airwave-windows-x64-${{ github.run_number }}
+          path: |
+            tools/libmpv/libmpv-*.tar.gz
+            tools/libmpv/libmpv-*.tar.gz.sha256
+          compression-level: 0
+
+  windows-arm64:
+    if: ${{ inputs.arch == 'all' || inputs.arch == 'arm64' }}
+    name: Build libmpv (Windows / arm64)
+    runs-on: windows-11-arm
+    timeout-minutes: 90
+    env:
+      MINGW_PREFIX: /clangarm64
+      FFMPEG_ARCH: aarch64
+      FFMPEG_CC: clang
+      FFMPEG_CXX: clang++
+      FFMPEG_BUILD_NAME: clangarm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSYS2 (CLANGARM64)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANGARM64
+          update: true
+          install: >-
+            base-devel
+            git
+            mingw-w64-clang-aarch64-toolchain
+            mingw-w64-clang-aarch64-meson
+            mingw-w64-clang-aarch64-ninja
+            mingw-w64-clang-aarch64-pkgconf
+            mingw-w64-clang-aarch64-python
+            mingw-w64-clang-aarch64-bzip2
+            mingw-w64-clang-aarch64-libass
+            mingw-w64-clang-aarch64-libjpeg-turbo
+            mingw-w64-clang-aarch64-luajit
+            mingw-w64-clang-aarch64-opus
+            mingw-w64-clang-aarch64-uchardet
+            mingw-w64-clang-aarch64-libplacebo
+            mingw-w64-clang-aarch64-libbluray
+            mingw-w64-clang-aarch64-libcdio-paranoia
+            mingw-w64-clang-aarch64-libdvdnav
+            mingw-w64-clang-aarch64-rubberband
+            mingw-w64-clang-aarch64-zimg
+            mingw-w64-clang-aarch64-zlib
+            mingw-w64-clang-aarch64-xz
+            mingw-w64-clang-aarch64-vulkan-loader
+            mingw-w64-clang-aarch64-vulkan-headers
+
+      - name: Download vanilla mpv source
+        shell: msys2 {0}
+        run: bash ./download.sh
+
+      - name: Build FFmpeg from source
+        shell: msys2 {0}
+        run: bash ./build-ffmpeg.sh
+
+      - name: Build libmpv
+        shell: msys2 {0}
+        run: bash ./build-mingw64.sh
+
+      - name: Package runtime
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          LABEL="${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}"
+          bash ./package-mingw64-runtime.sh \
+            --pkg-name "libmpv-airwave-${LABEL}-windows-arm64"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmpv-airwave-windows-arm64-${{ github.run_number }}
+          path: |
+            tools/libmpv/libmpv-*.tar.gz
+            tools/libmpv/libmpv-*.tar.gz.sha256
+          compression-level: 0
