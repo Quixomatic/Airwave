@@ -119,6 +119,15 @@ EOF
     fi
 fi
 
+# Airwave: cache skip-guard. FFmpeg is the slow step (~20-30 min); when CI restores
+# a matching ffmpeg-build cache, this stamp lets us skip the whole recompile.
+FFMPEG_BUILD_STAMP="$FFMPEG_PREFIX/.airwave-ffmpeg-build"
+FFMPEG_BUILD_ID="ffmpeg-n8.1_dav1d-1.5.3_${FFMPEG_BUILD_NAME}_${FFMPEG_ARCH}"
+if [ -f "$FFMPEG_BUILD_STAMP" ] && [ "$(cat "$FFMPEG_BUILD_STAMP" 2>/dev/null)" = "$FFMPEG_BUILD_ID" ]; then
+    echo "FFmpeg already built ($FFMPEG_BUILD_ID) at $FFMPEG_PREFIX — skipping (cache hit)."
+    exit 0
+fi
+
 for tool in curl tar make meson ninja pkg-config strip "$FFMPEG_CC" "$FFMPEG_CXX"; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "$tool not found in PATH" >&2
@@ -218,4 +227,5 @@ find "$FFMPEG_PREFIX" -name "$STRIP_PATTERN" -type f -exec strip --strip-unneede
 
 popd
 
+printf '%s' "$FFMPEG_BUILD_ID" > "$FFMPEG_BUILD_STAMP"
 echo "FFmpeg build output ready in: $FFMPEG_PREFIX"

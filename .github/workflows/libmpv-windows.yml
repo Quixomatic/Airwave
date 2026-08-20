@@ -88,6 +88,11 @@ jobs:
         shell: msys2 {0}
         run: bash ./download.sh
 
+      - name: Cache ffmpeg build (skips the ~20-30min compile on hit)
+        uses: actions/cache@v4
+        with:
+          path: tools/libmpv/vendor/ffmpeg-build
+          key: ffmpeg-${{ runner.os }}-${{ runner.arch }}-${{ env.MPV_TARGET_ARCH }}-n8.1-dav1d1.5.3-${{ hashFiles('tools/libmpv/build-ffmpeg.sh') }}
       - name: Build FFmpeg from source
         shell: msys2 {0}
         run: bash ./build-ffmpeg.sh
@@ -161,6 +166,11 @@ jobs:
         shell: msys2 {0}
         run: bash ./download.sh
 
+      - name: Cache ffmpeg build (skips the ~20-30min compile on hit)
+        uses: actions/cache@v4
+        with:
+          path: tools/libmpv/vendor/ffmpeg-build
+          key: ffmpeg-${{ runner.os }}-${{ runner.arch }}-${{ env.MPV_TARGET_ARCH }}-n8.1-dav1d1.5.3-${{ hashFiles('tools/libmpv/build-ffmpeg.sh') }}
       - name: Build FFmpeg from source
         shell: msys2 {0}
         run: bash ./build-ffmpeg.sh
