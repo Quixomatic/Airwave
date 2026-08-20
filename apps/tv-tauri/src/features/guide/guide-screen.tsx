@@ -1,0 +1,71 @@
+import { useEffect } from "react";
+
+import { useGuide } from "../../hooks/use-guide";
+import { ApiError, api } from "../../lib/api";
+import { capsDoneForCurrentServer, gatherDeviceReport } from "../../lib/device";
+import { AuroraGrid } from "./aurora-grid";
+
+/**
+ * The guide screen — fetches the cross-channel grid and renders the Aurora guide.
+ * Also carries the two side-effects that used to live in Home: report this device's
+ * real capabilities once, and run the capability onboarding on a device's first sign-in.
+ */
+export function GuideScreen({
+  onTune,
+  onSettings,
+  onDiagnostic,
+  onAccount,
+  onSignOut,
+}: {
+  onTune: (channelId: string) => void;
+  onSettings: () => void;
+  onDiagnostic: () => void;
+  /** Sidebar Account circle → the User settings page. */
+  onAccount: () => void;
+  /** Forced sign-out — only for an expired/invalid token (a 401 from the guide fetch). */
+  onSignOut: () => void;
+}) {
+  const { data, error } = useGuide(180);
+
+  useEffect(() => {
+    // tv-tauri's gatherDeviceReport is synchronous (desktop identity/screen), unlike tv-web's async one.
+    void api.reportDevice(gatherDeviceReport()).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    // Run the diagnostic on first sign-in AND whenever this device is pointed at a new server
+    // (that server has no capability profile for it yet).
+    if (!capsDoneForCurrentServer()) onDiagnostic();
+  }, [onDiagnostic]);
+
+  useEffect(() => {
+    if (error instanceof ApiError && error.status === 401) onSignOut();
+  }, [error, onSignOut]);
+
+  // Only a genuine first-load (no data AND no error yet) shows the spinner.
+  if (!data && !error) return <Centered>Loading…</Centered>;
+
+  // NO early return for an error OR an empty channel list. AuroraGrid renders the full interface
+  // (sidebar + featured chrome + its own context-aware GuideGhost empty state) even with zero
+  // channels, so a fresh install — OR a server that's unreachable/down — still gets the sidebar to
+  // reach Settings/scan (change server / sign out). A plain "Couldn't load the guide." card here would
+  // strand the user with no navigation. `serverTime` falls back to the client clock when the fetch
+  // failed. (A 401 is handled in the effect above → forced sign-out.)
+  return (
+    <AuroraGrid
+      channels={data?.channels ?? []}
+      serverTime={data?.serverTime ?? new Date().toISOString()}
+      onTune={onTune}
+      onSettings={onSettings}
+      onAccount={onAccount}
+    />
+  );
+}
+
+function Centered({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, background: "#060a14", color: "#94a3b8" }} className="flex items-center justify-center text-2xl">
+      {children}
+    </div>
+  );
+}

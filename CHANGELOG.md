@@ -2,6 +2,29 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.17] - 2026-08-20
+
+tv-tauri Phase 3 — the Aurora guide renders: an exact port of tv-web's grid + a desktop-rebuilt sidebar.
+
+### What ships
+
+- **Aurora guide grid** — `features/guide/aurora-grid.tsx` ported **verbatim** from tv-web (the whole
+  thing is self-contained: featured panel, channel rails, program cells, now-marker, virtualized rows,
+  empty-state ghost, skeletons, the D-pad zone machine). One seam: root `fixed`→`absolute` so it fills
+  the app-viewport below the titlebar and anchors the inset sidebar. `guide-screen.tsx` ported (its
+  device report adapted to tv-tauri's sync `gatherDeviceReport`).
+- **Sidebar — desktop rebuild** (`features/guide/guide-sidebar.tsx`). The DATA model
+  (`buildSidebarItems`/`Lens`/`lensEquals`) is identical to tv-web so the grid's driving code is
+  unchanged, but the visual is new: a **floating, inset, rounded** panel (offset from the grid with a
+  gap) that collapses to a slim rail and **expands on hover** (mouse) or keyboard focus — normal
+  desktop sizing, not tv-web's 10-foot column.
+- **Minimal `PlayerProvider`** (`features/watch/player-context.tsx`) — satisfies the `PlayerCtx` the
+  guide drives, with `layout: "off"` so the guide is a pure guide (mini-feed paths inert); the
+  mpv-based player lands in Phase 4. Tuning navigates to the fullscreen `/watch/$channelId` route (a
+  placeholder that exercises `useFullBleed`); `/settings` is a Phase-5 placeholder.
+- Routing: `_auth/` wraps the outlet in `PlayerProvider`; `_auth/index` renders the guide with
+  tune/settings/account/diagnostic/sign-out wired.
+
 ## [0.11.16] - 2026-08-20
 
 tv-tauri Phase 3 start — the guide's self-contained foundation ported from tv-web.

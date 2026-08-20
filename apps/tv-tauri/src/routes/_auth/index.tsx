@@ -1,11 +1,10 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 
-import { Button } from "@airwave/ui/components/button";
+import { GuideScreen } from "../../features/guide/guide-screen";
 import { setToken } from "../../lib/auth-client";
 import { capsDoneForCurrentServer } from "../../lib/device";
 
-/** / — the Aurora guide grid lands here (Phase 3). For now, a placeholder that doubles as the mpv
- *  compositing proof: transparent stage + a glass control bar floating over the video. */
+/** / — the Aurora guide grid. Faithful port of tv-web `routes/_auth/index.tsx`. */
 export const Route = createFileRoute("/_auth/")({
   // First launch against a server → run the capability diagnostic once (per-server done flag), like
   // tv-web/tv-native onboarding. Once measured, the guide loads normally.
@@ -18,34 +17,18 @@ export const Route = createFileRoute("/_auth/")({
 function GuideRoute() {
   const navigate = useNavigate();
   return (
-    <div className="stage">
-      <div className="topbar">
-        <span className="ttl">connected · guide + player land here (Phase 3)</span>
-        <div className="ml-auto flex gap-2">
-          <Button variant="ghost" size="sm" onClick={() => void navigate({ to: "/diagnostic" })}>
-            Diagnostic
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setToken(null);
-              void navigate({ to: "/login" });
-            }}
-          >
-            Sign out
-          </Button>
-        </div>
-      </div>
-      <div className="controls">
-        <button className="pill">⏮</button>
-        <button className="pill play">⏯</button>
-        <button className="pill">⏭</button>
-        <div className="scrubber">
-          <div className="fill" />
-        </div>
-        <span className="live">● LIVE</span>
-      </div>
-    </div>
+    <GuideScreen
+      // Tuning navigates to the fullscreen player route (Phase 4). tv-web keeps a persistent mini
+      // player instead; that lands with the mpv player.
+      onTune={(channelId) => void navigate({ to: "/watch/$channelId", params: { channelId } })}
+      onSettings={() => void navigate({ to: "/settings" })}
+      onAccount={() => void navigate({ to: "/settings" })}
+      onDiagnostic={() => void navigate({ to: "/diagnostic" })}
+      // Only fires when the token is rejected (401 from the guide fetch).
+      onSignOut={() => {
+        setToken(null);
+        void navigate({ to: "/login" });
+      }}
+    />
   );
 }
