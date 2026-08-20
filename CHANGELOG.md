@@ -2,6 +2,31 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.6] - 2026-08-20
+
+Pivots the desktop client from the Native SDK experiment to **Tauri** and scaffolds `apps/tv-tauri`.
+The Native SDK path (`apps/tv-desktop`) proved every hard piece works, but the last mile — real,
+*transparent* SDK-widget chrome over a child-HWND video — is architecturally blocked (the SDK gates a
+transparent canvas clear behind transparent *windows*, which reject child HWNDs). Tauri sidesteps it:
+reuse tv-web's React UI, mature tooling, and libmpv-behind-a-webview is a shipped pattern (soia).
+
+### What ships
+
+- **`apps/tv-tauri`** — a Tauri v2 desktop client scaffold: Vite + React 19 + TypeScript + Tailwind v4
+  frontend (dev server on :3003) and a Rust `src-tauri` shell (Tauri 2.11). Borderless 1280×720 window
+  (`decorations: false`), Airwave identity (`com.airwave.tvdesktop`), `macos-private-api` enabled for
+  the later macOS transparent-webview compositing. Frontend builds; Rust compiles (`cargo check` green).
+- **Monorepo wiring** — `pnpm dev` (turbo) launches `tauri dev` like any other app; root `build`
+  excludes tv-tauri (`--filter=!tv-tauri`) since a full `tauri build` is heavy.
+
+### Notes
+
+- The plan lives in `.plans/tv-tauri.md` (Phase 1 next = libmpv + the per-platform video/webview
+  compositing spike, mirroring `.refs/soia` + `.refs/plezy`).
+- `apps/tv-desktop` (Native SDK) is left in-repo as a proven-out experiment, not deleted; its
+  Windows-mpv findings (WS_CLIPCHILDREN, the worker message-pump deadlock fix, the `--wid`/`gpu-next`
+  recipe) transfer directly to tv-tauri's `platform/windows.rs`.
+
 ## [0.11.5] - 2026-08-20
 
 tv-desktop: **the video window now behaves like a normal window** — move, resize, and maximize with

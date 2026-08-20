@@ -8,7 +8,7 @@
   "type": "module",
   "scripts": {
     "dev": "turbo run dev --filter=!desktop --filter=!@airwave/desktop-setup --filter=!tv-desktop",
-    "build": "turbo run build --filter=!tv-desktop",
+    "build": "turbo run build --filter=!tv-desktop --filter=!tv-tauri",
     "check-types": "turbo run check-types",
     "dev:web": "turbo run dev -F web",
     "dev:server": "turbo run dev -F server",

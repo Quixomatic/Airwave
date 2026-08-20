@@ -1,0 +1,29 @@
+[package]
+name = "airwave"
+version = "0.11.6"
+description = "Airwave desktop client (Tauri + libmpv)"
+authors = ["Airwave"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+# The Tauri app library. `main.rs` calls `app_lib::run()`; keeping the lib name
+# stable avoids touching the entry points. staticlib/cdylib are for the mobile
+# targets, rlib for desktop.
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3" }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.11.3", features = ["macos-private-api"] }
+tauri-plugin-log = "2"
+
+# Phase 2 (libmpv): add the mpv binding + windowing/compositing crates here,
+# mirroring .refs/soia/src-tauri (its `mpv` module + per-platform render target).

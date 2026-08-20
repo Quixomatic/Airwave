@@ -1,0 +1,9 @@
+# Frontend build
+dist/
+
+# Rust / Tauri build output
+src-tauri/target/
+src-tauri/gen/
+
+# Vendored runtime libs (libmpv etc.) — fetched per-platform, not committed
+src-tauri/resources/lib/

@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  /* Transparent so the libmpv video composites behind the webview (Phase 2).
+     A solid Aurora-navy paints under non-video screens via the shell below. */
+  background: transparent;
+  color: #e6ebff;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+.shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #0a0e1a; /* placeholder until the guide draws its own ground */
+}
+
+.badge {
+  letter-spacing: 0.35em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #3b82f6;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2.4rem;
+  font-weight: 700;
+}
+
+.sub {
+  margin: 0;
+  opacity: 0.8;
+}
+
+.hint {
+  margin-top: 4px;
+  opacity: 0.5;
+  font-size: 0.9rem;
+}
