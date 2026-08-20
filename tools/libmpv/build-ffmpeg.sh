@@ -152,7 +152,7 @@ CC="$FFMPEG_CC" CXX="$FFMPEG_CXX" meson setup "$DAV1D_DIR/buildout" "$DAV1D_DIR"
     -Db_staticpic=true \
     -Denable_tools=false \
     -Denable_tests=false \
-    "${DAV1D_MESON_CROSS_ARGS[@]}"
+    ${DAV1D_MESON_CROSS_ARGS[@]+"${DAV1D_MESON_CROSS_ARGS[@]}"}
 meson compile -C "$DAV1D_DIR/buildout" -j "$FFMPEG_JOBS"
 meson install -C "$DAV1D_DIR/buildout"
 
@@ -199,7 +199,7 @@ CONFIGURE_ARGS=(
     --enable-bzlib
     --enable-lzma
     --enable-zlib
-    "${FFMPEG_CROSS_ARGS[@]}"
+    ${FFMPEG_CROSS_ARGS[@]+"${FFMPEG_CROSS_ARGS[@]}"}
 )
 
 if [ "$TARGET_OS" != "mingw32" ]; then
