@@ -12,7 +12,7 @@ export function TitleBar() {
     <div className="titlebar" data-tauri-drag-region>
       <span className="tb-brand" data-tauri-drag-region>
         <Logo markWidth={24} />
-        <span className="tb-word">AIRWAVE</span>
+        <span className="tb-word">Airwave</span>
       </span>
       <div className="tb-controls">
         <button className="tb-btn" onClick={() => win.minimize()} aria-label="Minimize" title="Minimize">

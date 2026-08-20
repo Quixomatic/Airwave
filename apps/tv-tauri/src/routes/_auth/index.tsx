@@ -1,11 +1,17 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 
 import { Button } from "@airwave/ui/components/button";
 import { setToken } from "../../lib/auth-client";
+import { capsDoneForCurrentServer } from "../../lib/device";
 
 /** / — the Aurora guide grid lands here (Phase 3). For now, a placeholder that doubles as the mpv
  *  compositing proof: transparent stage + a glass control bar floating over the video. */
 export const Route = createFileRoute("/_auth/")({
+  // First launch against a server → run the capability diagnostic once (per-server done flag), like
+  // tv-web/tv-native onboarding. Once measured, the guide loads normally.
+  beforeLoad: () => {
+    if (!capsDoneForCurrentServer()) throw redirect({ to: "/diagnostic" });
+  },
   component: GuideRoute,
 });
 

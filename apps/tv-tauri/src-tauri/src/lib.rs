@@ -49,6 +49,90 @@ async fn probe_health(urls: Vec<String>) -> Vec<String> {
         .collect()
 }
 
+#[derive(serde::Serialize)]
+struct ProbeResult {
+    decoded: bool,
+    width: i64,
+    height: i64,
+    audio: bool,
+    error: Option<String>,
+}
+
+/// Decode-probe a single caps-matrix clip in a THROWAWAY headless mpv instance (fresh per clip, like
+/// tv-native): load the URL with no window / no audio output, software-decode, then wait for a decoded
+/// frame's dimensions (`dwidth`/`dheight` > 0) or an end-file error, with a hard timeout. Mirrors
+/// tv-native's "decoded === real dims > 0" signal. Software decode is a safe LOWER BOUND on what the
+/// device plays (real playback also uses gpu-next + hwdec); the server transcodes anything undecodable.
+/// Runs on a blocking thread so the synchronous mpv wait doesn't stall the async runtime.
+#[tauri::command]
+async fn mpv_probe(url: String, timeout_ms: u64) -> ProbeResult {
+    tauri::async_runtime::spawn_blocking(move || probe_blocking(&url, timeout_ms))
+        .await
+        .unwrap_or_else(|_| ProbeResult {
+            decoded: false,
+            width: 0,
+            height: 0,
+            audio: false,
+            error: Some("probe task failed".into()),
+        })
+}
+
+fn probe_blocking(url: &str, timeout_ms: u64) -> ProbeResult {
+    let fail = |msg: String| ProbeResult {
+        decoded: false,
+        width: 0,
+        height: 0,
+        audio: false,
+        error: Some(msg),
+    };
+    let mpv = match mpv::Mpv::new() {
+        Ok(m) => m,
+        Err(e) => return fail(format!("mpv create: {e}")),
+    };
+    // Headless software-decode probe — override the visible instance's gpu-next baseline.
+    for (k, v) in [("vo", "null"), ("ao", "null"), ("hwdec", "no"), ("keep-open", "no")] {
+        if let Err(e) = mpv.set_option_string(k, v) {
+            return fail(format!("set {k}: {e}"));
+        }
+    }
+    if let Err(e) = mpv.initialize() {
+        return fail(format!("init: {e}"));
+    }
+    if let Err(e) = mpv.loadfile(url) {
+        return fail(format!("loadfile: {e}"));
+    }
+
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms);
+    let mut audio = false;
+    let check_audio = |m: &mpv::Mpv| {
+        m.get_property_i64("aid").map(|a| a > 0).unwrap_or(false)
+            || m.get_property_string("audio-codec").is_some()
+    };
+    loop {
+        if std::time::Instant::now() >= deadline {
+            return fail("timeout (no frame)".into());
+        }
+        let (id, err) = mpv.wait_event(0.1);
+        if id == mpv::MPV_EVENT_END_FILE && err < 0 {
+            return fail(format!("end-file error {err}"));
+        }
+        if id == mpv::MPV_EVENT_FILE_LOADED {
+            audio = check_audio(&mpv);
+        }
+        let dw = mpv.get_property_i64("dwidth").unwrap_or(0);
+        let dh = mpv.get_property_i64("dheight").unwrap_or(0);
+        if dw > 0 && dh > 0 {
+            return ProbeResult {
+                decoded: true,
+                width: dw,
+                height: dh,
+                audio: audio || check_audio(&mpv),
+                error: None,
+            };
+        }
+    }
+}
+
 /// A pooled reqwest client for all Airwave API calls (connection reuse across requests).
 fn http_client() -> &'static reqwest::Client {
     static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
@@ -146,7 +230,12 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![local_subnets, probe_health, api_request])
+        .invoke_handler(tauri::generate_handler![
+            local_subnets,
+            probe_health,
+            api_request,
+            mpv_probe
+        ])
         .setup(|app| {
             if let Err(e) = setup_player(app) {
                 log::error!("mpv setup failed: {e}");

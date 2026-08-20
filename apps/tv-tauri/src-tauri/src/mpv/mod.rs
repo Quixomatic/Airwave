@@ -16,6 +16,7 @@ use std::ptr;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
 pub use ffi::MpvFormat;
+pub use ffi::{MPV_EVENT_END_FILE, MPV_EVENT_FILE_LOADED};
 
 /// Owns a libmpv context. `Send`/`Sync`: libmpv's client API is thread-safe for
 /// the calls we make, and the context is guarded by an atomic pointer.
@@ -117,6 +118,37 @@ impl Mpv {
     /// Convenience: load + play a file/URL.
     pub fn loadfile(&self, url: &str) -> Result<(), String> {
         self.command(&["loadfile", url])
+    }
+
+    /// Read an INT64 property (e.g. `dwidth`/`dheight`/`aid`). None if unset/not yet available.
+    pub fn get_property_i64(&self, name: &str) -> Option<i64> {
+        let c_name = CString::new(name).ok()?;
+        let mut out: i64 = 0;
+        let rc = unsafe {
+            ffi::mpv_get_property(
+                self.ctx(),
+                c_name.as_ptr(),
+                MpvFormat::Int64 as i32,
+                &mut out as *mut i64 as *mut c_void,
+            )
+        };
+        if rc < 0 {
+            None
+        } else {
+            Some(out)
+        }
+    }
+
+    /// Block up to `timeout` seconds for the next event; returns `(event_id, error)`. The event
+    /// pointer is mpv-owned and only valid until the next call, so we copy the fields out immediately.
+    pub fn wait_event(&self, timeout: f64) -> (i32, i32) {
+        unsafe {
+            let ev = ffi::mpv_wait_event(self.ctx(), timeout);
+            if ev.is_null() {
+                return (ffi::MPV_EVENT_NONE, 0);
+            }
+            ((*ev).event_id, (*ev).error)
+        }
     }
 
     /// Read a string property (caller-owned copy). Returns None if unset.

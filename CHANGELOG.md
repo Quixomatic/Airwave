@@ -2,6 +2,32 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.13] - 2026-08-20
+
+tv-tauri Phase 2.4 — the mpv-measured capability diagnostic, plus the full libmpv FFI surface a
+player needs, and login polish.
+
+### What ships
+
+- **Capability diagnostic** (`screens/Diagnostic.tsx` + `/diagnostic` route) — the desktop port of
+  tv-native's mpv-based diagnostic: report device → fetch the caps matrix → decode-probe each clip →
+  record per-device on the server → derive the audio verdict cross-clip → `markCapsDone` per server.
+  The `_auth/` guide route auto-runs it once per server (onboarding gate). Faithful look (framed
+  screen, per-test slide-in chips, progress with native/transcode counts, Continue) on
+  shadcn/Aurora/framer-motion. Since the probe is headless there's no live video — the frame shows a
+  spinner then a done check.
+- **`mpv_probe` Rust command** — decode-probes a clip in a THROWAWAY headless mpv instance per clip
+  (fresh per clip like tv-native, so decoders don't accumulate): software-decode, wait for a decoded
+  frame's dimensions or an end-file error with a hard timeout. `decoded === dims > 0`. Software decode
+  is a safe lower bound on what the device plays (real playback also uses gpu-next + hwdec).
+- **Full libmpv FFI** (`mpv/ffi.rs`) — expanded from the probe subset to the complete client-API
+  surface a player drives (matching tv-native's `@airwave/mpv-player`): properties in every format,
+  observe/unobserve, the command variants, the event payload structs, the node data model, wakeup, and
+  timing. Phase 4 grows the safe layer over it without another FFI pass. `device.ts` ported.
+- **Login polish** — the Plex tile logo (same SVG as apps/web) on the "Log in with Plex" button; the
+  pending view's left column top-aligns with "Back" pushed to the bottom.
+- **Titlebar** — mark at 24 with a mixed-case "Airwave" wordmark.
+
 ## [0.11.12] - 2026-08-20
 
 tv-tauri branding — the Airwave logo in the window titlebar + real app icons.

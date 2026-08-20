@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@airwave/ui/components/button";
+import { PlexIcon } from "../components/icons/plex-icon";
 import { ApiError, plexLink } from "../lib/api";
 import { authClient, setToken } from "../lib/auth-client";
 import { Logo } from "../lib/logo";
@@ -123,18 +124,20 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
       {pending ? (
         // Two columns (16:9 has width to spare, height is tight): heading + instruction + Back on the
         // left, a divider, then the QR + code on the right — matching tv-web / tv-native.
-        <div className="flex flex-row items-center rounded-2xl border border-border bg-card/60 p-8">
-          <div className="flex max-w-sm flex-col gap-4 pr-8 text-left">
-            <p className="text-2xl font-semibold">{pending.heading}</p>
-            <p className="leading-relaxed text-muted-foreground">{pending.instruction}</p>
-            <Button variant="ghost" size="sm" onClick={() => reset(null)} className="self-start">
+        <div className="flex flex-row items-stretch rounded-2xl border border-border bg-card/60 p-8">
+          <div className="flex max-w-sm flex-col justify-between pr-8 text-left">
+            <div className="flex flex-col gap-4">
+              <p className="text-2xl font-semibold">{pending.heading}</p>
+              <p className="leading-relaxed text-muted-foreground">{pending.instruction}</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => reset(null)} className="mt-6 self-start">
               ← Back
             </Button>
           </div>
 
           <div className="w-px self-stretch bg-white/10" />
 
-          <div className="flex flex-col items-center gap-4 pl-8">
+          <div className="flex flex-col items-center justify-center gap-4 pl-8">
             <div className="rounded-xl bg-white p-3">
               <Qr value={pending.qrValue} size={190} />
             </div>
@@ -147,6 +150,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
             onClick={startPlex}
             className="h-16 rounded-xl bg-[#e5a00d] text-xl font-semibold text-black hover:bg-[#f0b429]"
           >
+            <PlexIcon className="size-6" />
             Log in with Plex
           </Button>
           <Button onClick={startDevice} variant="outline" className="h-16 rounded-xl text-xl font-semibold">
