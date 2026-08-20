@@ -2,6 +2,27 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.16] - 2026-08-20
+
+tv-tauri Phase 3 start — the guide's self-contained foundation ported from tv-web.
+
+### What ships
+
+- **Input machine** (`lib/input/`: dispatcher, keys, use-dpad-list, virtual-keyboard) — the
+  layered keyboard dispatcher + semantic-key normalization + list navigator, ported verbatim (it's
+  platform-agnostic). Desktop seam: **Escape → Back** added in `keys.ts`.
+- **Guide data hooks** (`hooks/use-favorites`, `use-packages`, `use-recents`) + `lib/{theme,tint}.ts`
+  (the Aurora palette + accent helpers over `@airwave/ui/lib/accent-palette`) + `use-guide`.
+- **Player context interface** (`features/watch/player-ctx.ts`) — the `PlayerCtx` shape the guide's
+  zone machine drives; the provider (mpv-based, from tv-native) lands in Phase 4.
+- `@tanstack/react-virtual` added (the channel-row virtualizer).
+
+### Note
+
+The Aurora grid + featured panel + channel rows are an **exact port** (adapted later); the sidebar
+is a **desktop rebuild** (normal-sized collapse→expand, floating/inset/rounded — tv-web's is 10-foot
+huge). Both land next.
+
 ## [0.11.15] - 2026-08-20
 
 tv-tauri titlebar polish + a route-dependent full-bleed mechanism for the player.
