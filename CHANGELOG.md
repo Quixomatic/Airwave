@@ -2,6 +2,30 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.20] - 2026-08-20
+
+tv-tauri Phase 4.1 — the Rust mpv player command + event surface (the foundation for the player).
+
+### What ships
+
+- **Player commands** (over the FFI added in 0.11.13): `mpv_load(url, startAt)` (opens AT an offset
+  via mpv `start=` — a fast byte-range seek, not play-from-0), `mpv_set_pause`, `mpv_seek` (absolute),
+  `mpv_set_audio_track` (`aid`), `mpv_set_subtitle_track` (`sid`), `mpv_stop` — mirroring tv-native's
+  `@airwave/mpv-player` contract. They drive the single full-window mpv instance (now shared as
+  `Arc<Mpv>` app state).
+- **Event-loop thread** (`spawn_mpv_event_loop`) observes `time-pos` / `pause` / `duration` /
+  `core-idle` / `eof-reached` and forwards each change as a Tauri event (`mpv:time-pos`, `mpv:pause`,
+  `mpv:duration`, `mpv:idle`, `mpv:eof`), plus `mpv:loaded` (width/height/duration on file-load) and
+  `mpv:end`. Property changes route on `reply_userdata` (the `observe_property` id), not payload-union
+  parsing.
+- Handle grown with `get_property_double`/`get_property_flag`, `set_property_flag`/`_i64`/`_string`,
+  `observe_property`, and a `poll_event` returning `(id, error, reply_userdata)`.
+
+### Next
+
+The JS player controller (port tv-native's `use-tv-player` effectiveTime/DVR clock, wired to these
+commands + events) and the fullscreen `/watch` route — turning the placeholder into real playback.
+
 ## [0.11.19] - 2026-08-20
 
 tv-tauri guide — the first real mouse interaction: click-to-focus, click-again-to-tune.

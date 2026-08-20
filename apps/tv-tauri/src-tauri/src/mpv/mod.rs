@@ -11,12 +11,12 @@
 mod ffi;
 
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_void};
+use std::os::raw::{c_char, c_int, c_void};
 use std::ptr;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
 pub use ffi::MpvFormat;
-pub use ffi::{MPV_EVENT_END_FILE, MPV_EVENT_FILE_LOADED};
+pub use ffi::{MPV_EVENT_END_FILE, MPV_EVENT_FILE_LOADED, MPV_EVENT_PROPERTY_CHANGE, MPV_EVENT_SHUTDOWN};
 
 /// Owns a libmpv context. `Send`/`Sync`: libmpv's client API is thread-safe for
 /// the calls we make, and the context is guarded by an atomic pointer.
@@ -148,6 +148,121 @@ impl Mpv {
                 return (ffi::MPV_EVENT_NONE, 0);
             }
             ((*ev).event_id, (*ev).error)
+        }
+    }
+
+    /// Read a DOUBLE property (e.g. `time-pos`/`duration`). None if unset/not yet available.
+    pub fn get_property_double(&self, name: &str) -> Option<f64> {
+        let c_name = CString::new(name).ok()?;
+        let mut out: f64 = 0.0;
+        let rc = unsafe {
+            ffi::mpv_get_property(
+                self.ctx(),
+                c_name.as_ptr(),
+                MpvFormat::Double as i32,
+                &mut out as *mut f64 as *mut c_void,
+            )
+        };
+        if rc < 0 {
+            None
+        } else {
+            Some(out)
+        }
+    }
+
+    /// Read a FLAG property as bool (e.g. `pause`/`core-idle`/`eof-reached`).
+    pub fn get_property_flag(&self, name: &str) -> Option<bool> {
+        let c_name = CString::new(name).ok()?;
+        let mut out: c_int = 0;
+        let rc = unsafe {
+            ffi::mpv_get_property(
+                self.ctx(),
+                c_name.as_ptr(),
+                MpvFormat::Flag as i32,
+                &mut out as *mut c_int as *mut c_void,
+            )
+        };
+        if rc < 0 {
+            None
+        } else {
+            Some(out != 0)
+        }
+    }
+
+    /// Set a FLAG property (e.g. `pause`).
+    pub fn set_property_flag(&self, name: &str, value: bool) -> Result<(), String> {
+        let c_name = CString::new(name).map_err(|_| "property name has null byte")?;
+        let mut v: c_int = if value { 1 } else { 0 };
+        let rc = unsafe {
+            ffi::mpv_set_property(
+                self.ctx(),
+                c_name.as_ptr(),
+                MpvFormat::Flag as i32,
+                &mut v as *mut c_int as *mut c_void,
+            )
+        };
+        if rc < 0 {
+            Err(format!("mpv_set_property({name}=flag) failed: {rc}"))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Set an INT64 property (e.g. `volume`). Track selection uses `set_property_string` (`aid`/`sid`
+    /// accept `"auto"`/`"no"` too). Part of the handle surface; not all callers are wired yet.
+    #[allow(dead_code)]
+    pub fn set_property_i64(&self, name: &str, mut value: i64) -> Result<(), String> {
+        let c_name = CString::new(name).map_err(|_| "property name has null byte")?;
+        let rc = unsafe {
+            ffi::mpv_set_property(
+                self.ctx(),
+                c_name.as_ptr(),
+                MpvFormat::Int64 as i32,
+                &mut value as *mut i64 as *mut c_void,
+            )
+        };
+        if rc < 0 {
+            Err(format!("mpv_set_property({name}=i64) failed: {rc}"))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Set a STRING property (e.g. `aid=auto`, `sid=no`).
+    pub fn set_property_string(&self, name: &str, value: &str) -> Result<(), String> {
+        let c_name = CString::new(name).map_err(|_| "property name has null byte")?;
+        let c_value = CString::new(value).map_err(|_| "property value has null byte")?;
+        let rc =
+            unsafe { ffi::mpv_set_property_string(self.ctx(), c_name.as_ptr(), c_value.as_ptr()) };
+        if rc < 0 {
+            Err(format!("mpv_set_property_string({name}={value}) failed: {rc}"))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Register interest in a property; changes arrive as `MPV_EVENT_PROPERTY_CHANGE` events whose
+    /// `reply_userdata` is `id` (we route on that instead of parsing the event payload union).
+    pub fn observe_property(&self, id: u64, name: &str, format: MpvFormat) -> Result<(), String> {
+        let c_name = CString::new(name).map_err(|_| "property name has null byte")?;
+        let rc = unsafe {
+            ffi::mpv_observe_property(self.ctx(), id, c_name.as_ptr(), format as i32)
+        };
+        if rc < 0 {
+            Err(format!("mpv_observe_property({name}) failed: {rc}"))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Block up to `timeout`s for the next event; returns `(event_id, error, reply_userdata)`.
+    pub fn poll_event(&self, timeout: f64) -> (i32, i32, u64) {
+        unsafe {
+            let ev = ffi::mpv_wait_event(self.ctx(), timeout);
+            if ev.is_null() {
+                return (ffi::MPV_EVENT_NONE, 0, 0);
+            }
+            ((*ev).event_id, (*ev).error, (*ev).reply_userdata)
         }
     }
 

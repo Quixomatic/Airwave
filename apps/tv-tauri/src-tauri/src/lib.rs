@@ -1,8 +1,113 @@
 mod mpv;
 
+use std::sync::Arc;
+
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use tauri::Manager;
+use tauri::{Emitter, Manager, State};
 use tauri_plugin_http::reqwest;
+
+// ── The mpv player command surface (Phase 4) ───────────────────────────────
+// The single full-window mpv instance is created in `setup_player` and shared as `Arc<Mpv>` app
+// state; these commands drive it from JS, mirroring tv-native's `@airwave/mpv-player` contract
+// (load / play-pause / seek / track select / stop). Playback status flows the other way as Tauri
+// events emitted by the event-loop thread (see `spawn_mpv_event_loop`).
+
+/// Load a URL and open AT `start_at` seconds (mpv's `start=` = a fast byte-range seek, not
+/// play-from-0-then-seek). `start_at <= 0` opens from the beginning.
+#[tauri::command]
+fn mpv_load(mpv: State<'_, Arc<mpv::Mpv>>, url: String, start_at: f64) -> Result<(), String> {
+    if start_at > 0.0 {
+        mpv.command(&["loadfile", &url, "replace", "0", &format!("start={start_at}")])
+    } else {
+        mpv.command(&["loadfile", &url, "replace"])
+    }
+}
+
+#[tauri::command]
+fn mpv_set_pause(mpv: State<'_, Arc<mpv::Mpv>>, paused: bool) -> Result<(), String> {
+    mpv.set_property_flag("pause", paused)
+}
+
+/// Absolute seek, in seconds (mpv estimates the byte position → fast even on un-indexed MKV).
+#[tauri::command]
+fn mpv_seek(mpv: State<'_, Arc<mpv::Mpv>>, seconds: f64) -> Result<(), String> {
+    mpv.command(&["seek", &seconds.to_string(), "absolute"])
+}
+
+/// Select the audio track by mpv `aid` (a track id string, or `"auto"`/`"no"`).
+#[tauri::command]
+fn mpv_set_audio_track(mpv: State<'_, Arc<mpv::Mpv>>, aid: String) -> Result<(), String> {
+    mpv.set_property_string("aid", &aid)
+}
+
+/// Select the subtitle track by mpv `sid` (a track id string, or `"no"` to disable).
+#[tauri::command]
+fn mpv_set_subtitle_track(mpv: State<'_, Arc<mpv::Mpv>>, sid: String) -> Result<(), String> {
+    mpv.set_property_string("sid", &sid)
+}
+
+#[tauri::command]
+fn mpv_stop(mpv: State<'_, Arc<mpv::Mpv>>) -> Result<(), String> {
+    mpv.command(&["stop"])
+}
+
+/// The mpv event-loop thread: observe the properties the player UI needs and forward every change as
+/// a Tauri event (`mpv:*`). Routes property changes on `reply_userdata` (the id we passed to
+/// `observe_property`) rather than parsing the event payload union. Ends on mpv shutdown.
+fn spawn_mpv_event_loop(app: tauri::AppHandle, mpv: Arc<mpv::Mpv>) {
+    use mpv::MpvFormat;
+    let _ = mpv.observe_property(1, "time-pos", MpvFormat::Double);
+    let _ = mpv.observe_property(2, "pause", MpvFormat::Flag);
+    let _ = mpv.observe_property(3, "duration", MpvFormat::Double);
+    let _ = mpv.observe_property(4, "core-idle", MpvFormat::Flag);
+    let _ = mpv.observe_property(5, "eof-reached", MpvFormat::Flag);
+
+    std::thread::spawn(move || loop {
+        let (id, _err, reply) = mpv.poll_event(1.0);
+        if id == mpv::MPV_EVENT_SHUTDOWN {
+            break;
+        }
+        if id == mpv::MPV_EVENT_PROPERTY_CHANGE {
+            match reply {
+                1 => {
+                    if let Some(t) = mpv.get_property_double("time-pos") {
+                        let _ = app.emit("mpv:time-pos", t);
+                    }
+                }
+                2 => {
+                    if let Some(p) = mpv.get_property_flag("pause") {
+                        let _ = app.emit("mpv:pause", p);
+                    }
+                }
+                3 => {
+                    if let Some(d) = mpv.get_property_double("duration") {
+                        let _ = app.emit("mpv:duration", d);
+                    }
+                }
+                4 => {
+                    if let Some(idle) = mpv.get_property_flag("core-idle") {
+                        let _ = app.emit("mpv:idle", idle);
+                    }
+                }
+                5 => {
+                    if mpv.get_property_flag("eof-reached") == Some(true) {
+                        let _ = app.emit("mpv:eof", ());
+                    }
+                }
+                _ => {}
+            }
+        } else if id == mpv::MPV_EVENT_FILE_LOADED {
+            let payload = serde_json::json!({
+                "width": mpv.get_property_i64("dwidth").unwrap_or(0),
+                "height": mpv.get_property_i64("dheight").unwrap_or(0),
+                "duration": mpv.get_property_double("duration").unwrap_or(0.0),
+            });
+            let _ = app.emit("mpv:loaded", payload);
+        } else if id == mpv::MPV_EVENT_END_FILE {
+            let _ = app.emit("mpv:end", ());
+        }
+    });
+}
 
 /// Probe a batch of candidate base URLs for an Airwave server — `GET {base}/api/health` must answer
 /// `{ "ok": true }`. Returns the bases that responded. Runs in Rust (reqwest, re-exported by
@@ -234,7 +339,13 @@ pub fn run() {
             local_subnets,
             probe_health,
             api_request,
-            mpv_probe
+            mpv_probe,
+            mpv_load,
+            mpv_set_pause,
+            mpv_seek,
+            mpv_set_audio_track,
+            mpv_set_subtitle_track,
+            mpv_stop
         ])
         .setup(|app| {
             if let Err(e) = setup_player(app) {
@@ -272,23 +383,23 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
         other => return Err(format!("unsupported window handle: {other:?}")),
     };
 
-    let mpv = mpv::Mpv::new()?;
+    let mpv = Arc::new(mpv::Mpv::new()?);
     // `wid` is a pre-init option — set it, then initialize.
     mpv.set_option_string("hwdec", "auto")?; // hardware decode (soia baseline)
     mpv.set_option_i64("wid", hwnd as i64)?;
     mpv.initialize()?;
 
-    // mpv stays IDLE (attached, initialized, ready) — no autoplay, so it doesn't
-    // burn GPU during development. Tune-in (Phase 4) calls loadfile. Pass a file/URL
-    // as the first CLI arg to manually test playback (compositing already proven).
-    match std::env::args().nth(1) {
-        Some(src) => {
-            mpv.loadfile(&src)?;
-            log::info!("mpv attached (wid={hwnd}) + loadfile {src}");
-        }
-        None => log::info!("mpv attached (wid={hwnd}) — idle (pass a file/URL arg to test playback)"),
+    // mpv stays IDLE (attached, initialized, ready) — no autoplay. The watch route drives it via the
+    // `mpv_*` commands; playback status flows back as `mpv:*` Tauri events from the loop below. Pass a
+    // file/URL as the first CLI arg to manually test playback.
+    if let Some(src) = std::env::args().nth(1) {
+        mpv.loadfile(&src)?;
+        log::info!("mpv attached (wid={hwnd}) + loadfile {src}");
+    } else {
+        log::info!("mpv attached (wid={hwnd}) — idle");
     }
 
-    app.manage(mpv); // keep the handle alive for the app's lifetime
+    spawn_mpv_event_loop(app.handle().clone(), mpv.clone());
+    app.manage(mpv); // keep the handle alive + expose it to the mpv_* commands
     Ok(())
 }
