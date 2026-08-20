@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import * as LucideIcons from "lucide-react";
 import { History, LayoutGrid, ListFilter, Menu, Settings as SettingsIcon, Star, User } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
@@ -33,7 +33,7 @@ export type SidebarItem = {
   icon: React.ReactNode;
   lens?: Lens;
   kind: "settings" | "account" | "lens";
-  group: "action" | "filter";
+  group: "action" | "filter" | "footer";
   accent?: string;
 };
 
@@ -51,18 +51,6 @@ export function buildSidebarItems(packages: Package[], lens: Lens): SidebarItem[
     { key: "guide", label: "Guide", icon: <Menu size={20} />, kind: "lens", lens: { type: "all" }, group: "action" },
     { key: "settings", label: "Settings", icon: <SettingsIcon size={20} />, kind: "settings", group: "action" },
     { key: "account", label: "Account", icon: <User size={20} />, kind: "account", group: "action" },
-    ...(filtered
-      ? [
-          {
-            key: "show-all",
-            label: "Show All",
-            icon: <LayoutGrid size={20} />,
-            kind: "lens" as const,
-            lens: { type: "all" as const },
-            group: "filter" as const,
-          },
-        ]
-      : []),
     { key: "favorites", label: "Favorites", icon: <Star size={20} />, kind: "lens", lens: { type: "favorites" }, group: "filter" },
     { key: "recents", label: "Recents", icon: <History size={20} />, kind: "lens", lens: { type: "recents" }, group: "filter" },
     ...packages.map<SidebarItem>((p) => ({
@@ -75,6 +63,20 @@ export function buildSidebarItems(packages: Package[], lens: Lens): SidebarItem[
       group: "filter",
       accent: accentVivid(p.tint),
     })),
+    // "Show All" clears any active filter. Kept LAST so keyboard order matches its sticky-bottom
+    // position, and only when a filter is applied (the "Guide" action covers the unfiltered case).
+    ...(filtered
+      ? [
+          {
+            key: "show-all",
+            label: "Show All",
+            icon: <LayoutGrid size={20} />,
+            kind: "lens" as const,
+            lens: { type: "all" as const },
+            group: "footer" as const,
+          },
+        ]
+      : []),
   ];
 }
 
@@ -116,14 +118,17 @@ function SidebarRow({
   rowRef?: (el: HTMLButtonElement | null) => void;
 }) {
   const accent = item.accent ?? C.ring;
+  // Inline bg only for the ACTIVE (dynamic-accent) state; otherwise a class so hover works (inline
+  // styles beat hover classes). Collapsed → center the icon (no padding); expanded → left-align + label.
+  const bgClass = active ? "" : focused ? "bg-white/[0.07]" : "hover:bg-white/[0.06]";
   return (
     <button
       ref={rowRef}
       onClick={onClick}
       title={!open ? item.label : undefined}
-      className="flex h-11 w-full shrink-0 cursor-pointer items-center gap-3 rounded-xl border-none px-3 text-left transition-colors"
+      className={`flex h-11 w-full shrink-0 cursor-pointer items-center rounded-xl border-none text-left transition-colors ${open ? "justify-start gap-3 px-3" : "justify-center px-0"} ${bgClass}`}
       style={{
-        background: active ? hexA(accent, 0.16) : focused ? "rgba(255,255,255,0.06)" : "transparent",
+        background: active ? hexA(accent, 0.16) : undefined,
         color: active ? accent : "#e6eaf1",
         outline: focused ? `2px solid ${accent}` : "none",
         outlineOffset: -2,
@@ -162,6 +167,9 @@ export function GuideSidebar({
   const actions = items.filter((i) => i.group === "action");
   const filters = items.filter((i) => i.group === "filter");
   const activeFilter = filters.find((f) => f.lens && lensEquals(f.lens, lens));
+  // "Show All" — a footer item pinned to the bottom (present only while a filter is applied).
+  const footer = items.find((i) => i.group === "footer");
+  const footerIdx = items.findIndex((i) => i.group === "footer");
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   // Keep the focused row in view (the package list can be taller than the panel).
@@ -171,11 +179,36 @@ export function GuideSidebar({
   }, [sel, focused]);
 
   return (
-    <motion.div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      initial={false}
-      animate={{ width: open ? EXPANDED_W : COLLAPSED_W }}
+    <>
+      {/* Backdrop: while the sidebar is open (hover or keyboard focus), dim + blur the rest of the
+          guide so the sidebar reads as the focused layer. Covers the whole guide root; sits just under
+          the panel (z30). pointer-events:none so it never blocks the grid or the hover-collapse. */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            key="sidebar-scrim"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 29,
+              background: "rgba(6,10,20,0.45)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              pointerEvents: "none",
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <motion.div
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        initial={false}
+        animate={{ width: open ? EXPANDED_W : COLLAPSED_W }}
       transition={{ type: "spring", stiffness: 320, damping: 34 }}
       style={{
         position: "absolute",
@@ -250,6 +283,23 @@ export function GuideSidebar({
           </div>
         )}
       </div>
-    </motion.div>
+
+      {/* "Show All" — sticky to the bottom (the flex-1 scroll above pushes it down). Only present
+          while a filter is applied; clears the filter. */}
+      {footer && (
+        <>
+          <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "2px 4px", flexShrink: 0 }} />
+          <SidebarRow
+            item={footer}
+            open={open}
+            focused={focused && sel === footerIdx}
+            active={false}
+            onClick={() => onActivate(footerIdx)}
+            rowRef={(el) => void (itemRefs.current[footerIdx] = el)}
+          />
+        </>
+      )}
+      </motion.div>
+    </>
   );
 }

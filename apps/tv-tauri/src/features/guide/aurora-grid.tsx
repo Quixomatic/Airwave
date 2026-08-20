@@ -771,7 +771,8 @@ function TimeHeader({
     // marginTop = breathing room below the featured card (they read as crowded when it's tight);
     // marginBottom = clearance for the now-marker triangle that caps the grid.
     <div style={{ position: "relative", height: vw(52), flexShrink: 0, marginTop: vw(56), marginBottom: vw(20) }}>
-      <div style={{ position: "absolute", left: vw(40), top: vw(6), fontSize: vw(32), fontWeight: 600, color: "#e6eaf1" }}>
+      {/* Left-aligned with the channel rail content below (the rail cell pads vw(20) on the left). */}
+      <div style={{ position: "absolute", left: vw(20), top: vw(6), fontSize: vw(32), fontWeight: 600, color: "#e6eaf1" }}>
         {fmtDay(T0)}
       </div>
       <div style={{ position: "absolute", left: railPx, right: 0, top: 0, bottom: 0 }}>

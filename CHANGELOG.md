@@ -2,6 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.18] - 2026-08-20
+
+tv-tauri guide polish — sidebar interactions + a small grid alignment tweak.
+
+### What ships
+
+- **Sidebar backdrop** — while the sidebar is open (hover or keyboard focus), a `blur(8px)` dark scrim
+  fades in over the rest of the guide so the sidebar reads as the focused layer (WebView2 does
+  backdrop-filter for free); `pointer-events:none` so it never blocks the grid or the hover-collapse.
+- **"Show All" sticky-bottom** — moved to its own `footer` group pinned to the bottom of the panel
+  (the filter list flex-grows above it) and kept last in the item order so keyboard order matches;
+  only present while a filter is applied.
+- **Collapsed action icons centered** — the Guide/Settings/Account rows center their icons when
+  collapsed (matching the filter stand-in), and **all rows now have a hover state** (the inline
+  background that was blocking hover is now used only for the active state).
+- **Guide date left-aligned** — the "Thu, 8/20" above the rails aligns flush with the channel rail
+  content (`vw(20)`).
+
 ## [0.11.17] - 2026-08-20
 
 tv-tauri Phase 3 — the Aurora guide renders: an exact port of tv-web's grid + a desktop-rebuilt sidebar.
