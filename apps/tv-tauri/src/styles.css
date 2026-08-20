@@ -11,12 +11,15 @@
 }
 
 /* The app content region — every screen lives here, offset below the fixed titlebar so nothing hides
-   under it. `position: fixed` makes it the containing block for the screens' `absolute inset-0`. */
+   under it. `position: fixed` makes it the containing block for the screens' `absolute inset-0`.
+   The offset is route-dependent: it defaults to the titlebar height, but the fullscreen player route
+   sets `--content-top: 0` (via `useFullBleed`) so the video plays edge-to-edge with the titlebar
+   floating transparently over the top. */
 .app-viewport {
   position: fixed;
   left: 0;
   right: 0;
-  top: var(--titlebar-h);
+  top: var(--content-top, var(--titlebar-h));
   bottom: 0;
   overflow: hidden;
 }
@@ -155,6 +158,10 @@ body {
   padding: 0 6px 0 18px;
   z-index: 1000;
   user-select: none;
+  /* Match the page canvas (the Aurora navy) so the bar reads as one surface with the screen below.
+     Route-dependent: the fullscreen player sets `--titlebar-bg: transparent` (via useFullBleed) so the
+     bar floats over the edge-to-edge video instead. */
+  background: var(--titlebar-bg, var(--background));
 }
 /* Brand mark in the titlebar. Children are non-interactive so drags pass to the drag-region;
    -webkit-user-drag:none stops the browser's native image-drag from hijacking the window move. */

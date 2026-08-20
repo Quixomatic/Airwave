@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.15] - 2026-08-20
+
+tv-tauri titlebar polish + a route-dependent full-bleed mechanism for the player.
+
+### What ships
+
+- **Titlebar matches the page** — its background is now the Aurora canvas token (`var(--background)`),
+  so it reads as one surface with the setup/login/diagnostic/guide screens below it.
+- **Route-dependent full-bleed** — the app-viewport's top offset and the titlebar background are driven
+  by CSS vars (`--content-top`, `--titlebar-bg`). A `useFullBleed()` hook (`lib/full-bleed.ts`) sets the
+  offset to 0 and the titlebar to transparent while mounted, so the Phase-4 fullscreen player plays
+  edge-to-edge with the titlebar floating over the video — while every other route keeps the titlebar
+  clearance and matching bar.
+
 ## [0.11.14] - 2026-08-20
 
 tv-tauri diagnostic polish + a global titlebar-clearance layout fix.
