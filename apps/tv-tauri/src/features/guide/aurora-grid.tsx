@@ -328,6 +328,25 @@ export function AuroraGrid({
   // The strategy a channel change uses to pick the highlighted program (toggle at the top).
   const pickForChannel = TIME_ALIGN_CHANNEL_NAV ? pickAtCursor : pickAtLive;
 
+  // Mouse (tv-tauri): click a program to FOCUS it (first click → its details in the featured panel),
+  // click an already-focused program to TUNE — so you can browse with the mouse the same way the
+  // keyboard navigates, without a stray click committing to a channel.
+  const handleProgramClick = (channelIndex: number, programId: string) => {
+    if (player.miniFocused) return;
+    const ch = channels[channelIndex];
+    if (!ch) return;
+    const pi = ch.programs.findIndex((x) => x.id === programId);
+    if (pi < 0) return;
+    const alreadyFocused = zone === "grid" && fc === channelIndex && fp === pi;
+    if (alreadyFocused) {
+      onTune(ch.id);
+      return;
+    }
+    setZone("grid");
+    setFc(channelIndex);
+    setFp(pi);
+  };
+
   // The guide's zone machine. Off the stack entirely while the full-screen player is up (which is
   // what the old `if (player.layout === "full") return` did by hand).
   //
@@ -582,9 +601,9 @@ export function AuroraGrid({
                 <div
                   key={c.id}
                   onClick={() => {
-                    // Pointer/magic-remote click = tune this channel. But the OK button also
-                    // fires a click on whatever the pointer hovers — so if focus is on the pill
-                    // or mini feed, a click here just returns to the grid (never a stray tune).
+                    // Row (non-program) click = FOCUS this channel's live program — never a stray tune.
+                    // Tuning is deliberate: click a program to focus it, click it again to tune
+                    // (handleProgramClick). Program cells stopPropagation, so they don't reach here.
                     if (player.miniFocused) return;
                     if (zone !== "grid") {
                       setZone("grid");
@@ -592,7 +611,6 @@ export function AuroraGrid({
                     }
                     setFc(vi.index);
                     setFp(liveProgramIndex(c.programs, now.getTime()));
-                    onTune(c.id);
                   }}
                   style={{ position: "absolute", top: 0, left: 0, width: "100%", height: rowPx, transform: `translateY(${vi.start}px)`, cursor: "pointer" }}
                 >
@@ -607,6 +625,7 @@ export function AuroraGrid({
                     railFocused={vi.index === fc && zone === "rail" && !player.miniFocused}
                     favorited={favoriteIds.has(c.id)}
                     onToggleFavorite={() => toggleFavorite(c.id)}
+                    onProgramClick={(id) => handleProgramClick(vi.index, id)}
                     now={now}
                     rowPx={rowPx}
                     railPx={railPx}
@@ -797,6 +816,7 @@ function Row({
   railFocused,
   favorited,
   onToggleFavorite,
+  onProgramClick,
   now,
   rowPx,
   railPx,
@@ -813,6 +833,8 @@ function Row({
   railFocused: boolean;
   favorited: boolean;
   onToggleFavorite: () => void;
+  /** Mouse: click a program to focus it (first click) or tune it (second click, already focused). */
+  onProgramClick: (programId: string) => void;
   now: Date;
   rowPx: number;
   railPx: number;
@@ -974,12 +996,20 @@ function Row({
             return (
               <div
                 key={p.id}
+                // Click to focus this program (first click → details in the featured panel); a second
+                // click on the already-focused program tunes the channel. stopPropagation so the
+                // row-level click (focus the channel's live program) doesn't also fire.
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onProgramClick(p.id);
+                }}
                 style={{
                   position: "absolute",
                   top: vw(6),
                   left,
                   width,
                   height: `calc(100% - ${vw(12)})`,
+                  cursor: "pointer",
                   // Padding lives on the inner wrapper, NOT here: with box-sizing:border-box a
                   // block narrower than the horizontal padding can't shrink below it, so a
                   // clamped sliver would floor to the padding width (~42px) and overlap its

@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.19] - 2026-08-20
+
+tv-tauri guide — the first real mouse interaction: click-to-focus, click-again-to-tune.
+
+### What ships
+
+- **Program cells** now respond to a mouse click by **focusing** the program (first click → its
+  details in the featured panel, exactly like keyboard navigation) rather than tuning immediately; a
+  **second click on the already-focused program tunes** the channel. So you can browse program details
+  with the mouse without a stray click committing to a channel.
+- Clicking a row's non-program area (rail / empty lane) focuses that channel's live program (no tune);
+  the rail circle still toggles favorite. Keyboard navigation is untouched.
+
 ## [0.11.18] - 2026-08-20
 
 tv-tauri guide polish — sidebar interactions + a small grid alignment tweak.
