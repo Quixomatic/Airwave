@@ -2,6 +2,10 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.27] - 2026-08-20
+
+tv-tauri player chrome — a top-left glass **circle Back button** on the full player (click to return to the guide/mini feed, no Backspace needed), and the Info-view Back moved above the program title.
+
 ## [0.11.26] - 2026-08-20
 
 tv-tauri — the Info-view "Back" is now the real @airwave/ui shadcn `Button` (ghost variant), not a hand-rolled inline button.

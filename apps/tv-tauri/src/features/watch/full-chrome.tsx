@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Tv } from "lucide-react";
+import { ArrowLeft, Tv } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { BumperCard } from "./bumper-card";
@@ -122,6 +122,42 @@ export function FullChrome({
           {status.error}
         </div>
       )}
+
+      {/* Glass circle Back button, top-left — click to return to the guide (mini feed). Only while
+          the panel is up (mouse-move / OK reveals it), so nothing sits burned on the live video. */}
+      <AnimatePresence>
+        {panelOpen && (
+          <motion.button
+            key="back"
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -30 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            onClick={onBack}
+            title="Back to guide"
+            aria-label="Back to guide"
+            style={{
+              position: "absolute",
+              top: 28,
+              left: 40,
+              width: 56,
+              height: 56,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(18,24,38,0.55)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              color: "#e6eaf1",
+              cursor: "pointer",
+            }}
+          >
+            <ArrowLeft size={24} />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* Glass channel chip, top-right — only while the panel is up. */}
       <AnimatePresence>

@@ -282,6 +282,15 @@ export function FeaturePanel({
         color: "#f1f5f9",
       }}
     >
+      {/* Info view: a Back button above the title (exits the details). */}
+      {infoMode && (
+        <div style={{ marginBottom: 12 }}>
+          <Button variant="ghost" onClick={() => setInfoMode(false)}>
+            ← Back
+          </Button>
+        </div>
+      )}
+
       {/* Program title */}
       <div style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: "-0.5px" }}>{title}</div>
@@ -309,11 +318,6 @@ export function FeaturePanel({
             {g?.studio ? <DetailCol label="Studio" value={g.studio} /> : null}
           </div>
           {delivery && <DeliveryReadout delivery={delivery} accent={accent} />}
-          <div style={{ marginTop: 24 }}>
-            <Button variant="ghost" onClick={() => setInfoMode(false)}>
-              ← Back
-            </Button>
-          </div>
         </div>
       ) : (
         <>
