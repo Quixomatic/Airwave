@@ -105,16 +105,32 @@ pub fn initialModel() Model {
 }
 
 pub fn main(init: std.process.Init) !void {
-    // Phase 0.1 proof: libmpv links AND loads at runtime (the DLL resolves
-    // next to the exe). This confirms the whole mpv toolchain before we wire
-    // the media-surface producer.
-    const api = mpv.mpv_client_api_version();
-    std.debug.print("[airwave] libmpv client API: 0x{x}\n", .{api});
-    if (mpv.mpv_create()) |handle| {
-        std.debug.print("[airwave] mpv_create() OK — libmpv is live\n", .{});
-        mpv.mpv_destroy(handle);
-    } else {
-        std.debug.print("[airwave] mpv_create() returned null\n", .{});
+    // Phase 0.3 Part 1 — prove mpv DECODES + RENDERS video on Windows: spin mpv
+    // up in its OWN window playing a source (the --wid embed into the SDK window
+    // + the airspace overlay are the next step). Pass a file path/URL as the
+    // launch arg to play real media; defaults to an offline synthetic source.
+    std.debug.print("[airwave] libmpv client API: 0x{x}\n", .{mpv.mpv_client_api_version()});
+    var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, init.gpa);
+    defer args.deinit();
+    _ = args.next(); // exe path
+    const source_slice = args.next() orelse "av://lavfi:testsrc=size=1280x720:rate=30";
+    if (mpv.mpv_create()) |h| {
+        _ = mpv.mpv_set_option_string(h, "vo", "gpu-next");
+        _ = mpv.mpv_set_option_string(h, "gpu-api", "auto");
+        _ = mpv.mpv_set_option_string(h, "force-window", "yes");
+        _ = mpv.mpv_set_option_string(h, "keep-open", "yes");
+        _ = mpv.mpv_set_option_string(h, "title", "Airwave mpv (Phase 0.3 test)");
+        if (mpv.mpv_initialize(h) == 0) {
+            const source = try init.gpa.dupeZ(u8, source_slice);
+            const load_arg: [*c]const u8 = "loadfile";
+            const src_arg: [*c]const u8 = source.ptr;
+            var cmd = [_][*c]const u8{ load_arg, src_arg, null };
+            const rc = mpv.mpv_command(h, &cmd);
+            std.debug.print("[airwave] mpv loadfile rc={d} source={s}\n", .{ rc, source_slice });
+        } else {
+            std.debug.print("[airwave] mpv_initialize failed\n", .{});
+        }
+        // Keep the handle alive for the run (leak for this test).
     }
 
     const app_state = try AirwaveApp.create(std.heap.page_allocator, .{
