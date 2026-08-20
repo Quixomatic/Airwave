@@ -6,6 +6,8 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -55,12 +57,16 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
     mpv.set_option_i64("wid", hwnd as i64)?;
     mpv.initialize()?;
 
-    // Play a file/URL passed as the first CLI arg, else a synthetic test pattern.
-    let src = std::env::args()
-        .nth(1)
-        .unwrap_or_else(|| "av://lavfi:testsrc=size=1280x720:rate=30".to_string());
-    mpv.loadfile(&src)?;
-    log::info!("mpv attached (wid={hwnd}) + loadfile {src}");
+    // mpv stays IDLE (attached, initialized, ready) — no autoplay, so it doesn't
+    // burn GPU during development. Tune-in (Phase 4) calls loadfile. Pass a file/URL
+    // as the first CLI arg to manually test playback (compositing already proven).
+    match std::env::args().nth(1) {
+        Some(src) => {
+            mpv.loadfile(&src)?;
+            log::info!("mpv attached (wid={hwnd}) + loadfile {src}");
+        }
+        None => log::info!("mpv attached (wid={hwnd}) — idle (pass a file/URL arg to test playback)"),
+    }
 
     app.manage(mpv); // keep the handle alive for the app's lifetime
     Ok(())

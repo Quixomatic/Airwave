@@ -2,6 +2,31 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.8] - 2026-08-20
+
+tv-tauri Phase 2 foundation — window chrome, HTTP layer, and server onboarding.
+
+### What ships
+
+- **Custom titlebar** (`components/TitleBar.tsx`) for the borderless window: a `data-tauri-drag-region`
+  to move the window + minimize/maximize/close buttons (top-right), like soia. Window-control
+  permissions added to `capabilities/default.json`.
+- **Tauri plugins wired:** `tauri-plugin-http` (CORS-free `/api/v1` calls from the webview, via
+  `@tauri-apps/plugin-http`) with an `http://**`/`https://**` scope; `tauri-plugin-window-state`
+  (persist + restore window size/position/maximized across launches).
+- **Server onboarding (Phase 2):** `lib/server-url.ts` (ported from tv-web — the scheme-by-host guard:
+  bare domain→https, LAN/IP/`.local`→http), `lib/api.ts` (HTTP-plugin `fetch` + bearer token +
+  `checkHealth`), and a `ServerSetup` screen (enter URL → validate `/api/health` → store → reload).
+  `App.tsx` gates on `hasServerUrl()`.
+- **mpv is idle by default now** — attached + initialized + ready, but no autoplay (was burning GPU
+  rendering a test pattern during dev; compositing is already proven). Pass a file/URL CLI arg to test.
+
+### Notes
+
+- Persistence uses `localStorage` as a placeholder; migrate to `tauri-plugin-store` (proper Tauri
+  file-backed store) next. `tauri-plugin-updater` is Phase 7 (distribution); `persisted-scope` is a
+  later option if we tighten the HTTP scope to only the onboarded server.
+
 ## [0.11.7] - 2026-08-20
 
 **tv-tauri Phase 1 go/no-go PASSED** — our own libmpv plays in the Tauri window with a real React

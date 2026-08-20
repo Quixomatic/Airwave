@@ -96,3 +96,116 @@ body {
   letter-spacing: 0.1em;
   color: #ef4444;
 }
+
+/* ---- Custom titlebar (borderless window) ---- */
+.titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px 0 18px;
+  z-index: 1000;
+  user-select: none;
+}
+.tb-badge {
+  letter-spacing: 0.3em;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #3b82f6;
+  opacity: 0.9;
+}
+.tb-controls {
+  display: flex;
+  gap: 2px;
+}
+.tb-btn {
+  width: 40px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #c7d0e8;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.tb-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.tb-close:hover {
+  background: #e01b24;
+  color: #fff;
+}
+
+/* ---- Onboarding (ServerSetup) ---- */
+.setup {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0a0e1a; /* opaque — covers the idle video during onboarding */
+}
+.setup-card {
+  width: min(440px, 88vw);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 34px 32px;
+  background: rgba(18, 24, 40, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.setup-title {
+  margin: 4px 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.setup-hint {
+  margin: 0 0 8px;
+  opacity: 0.65;
+  font-size: 0.9rem;
+}
+.setup-input {
+  padding: 13px 15px;
+  font-size: 0.98rem;
+  color: #e6ebff;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  outline: none;
+}
+.setup-input:focus {
+  border-color: #3b82f6;
+}
+.setup-error {
+  color: #f87171;
+  font-size: 0.85rem;
+}
+.setup-btn {
+  margin-top: 6px;
+  padding: 13px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background: #3b82f6;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.12s, opacity 0.12s;
+}
+.setup-btn:hover {
+  background: #2f6fe0;
+}
+.setup-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
