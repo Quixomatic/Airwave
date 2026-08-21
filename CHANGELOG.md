@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.47] - 2026-08-20
+
+tv-tauri GhostGuide — the centered message card now overlays the **whole ghost** (featured panel +
+time axis + rows), so it reads as vertically centered on the guide instead of centered only over the
+rows area (which pushed it well below the featured panel). Added a **frosted scrim** behind the card
+that blurs + dims the entire ghost skeleton, so the message is the crisp focused layer over a soft
+skeleton — toggleable via a `GHOST_SCRIM_BLUR` boolean (set `false` for a crisp skeleton).
+
 ## [0.11.46] - 2026-08-20
 
 Docs + cleanup. The getairwave.tv site's **Platforms** matrix now lists the desktop client — **Windows**

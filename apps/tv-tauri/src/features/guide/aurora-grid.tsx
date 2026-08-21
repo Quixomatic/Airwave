@@ -762,6 +762,9 @@ const GHOST_ROWS = [
  *  so the ghosted grid always reaches the bottom edge. */
 const GHOST_ROW_COUNT = 16;
 
+/** Frost the whole ghost behind the message card (blur + dim). Flip to `false` for a crisp skeleton. */
+const GHOST_SCRIM_BLUR = true;
+
 /**
  * The guide's OWN structure rendered as static skeletons (featured panel + the REAL time axis + tiled
  * program rows), behind a centered message card. Deliberately mirrors the loaded layout — the same
@@ -856,27 +859,43 @@ function GuideGhost({
             </div>
           );
         })}
+      </div>
 
-        {/* Centered message card, floating over the ghosted grid (apps/web treatment). */}
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: vw(48), pointerEvents: "none" }}>
-          <div
-            style={{
-              pointerEvents: "auto",
-              maxWidth: vw(1100),
-              textAlign: "center",
-              background: "rgba(6,10,20,0.82)",
-              border: `1px solid ${C.border}`,
-              borderRadius: vw(28),
-              padding: `${vw(40)} ${vw(60)}`,
-              backdropFilter: "blur(3px)",
-              WebkitBackdropFilter: "blur(3px)",
-              boxShadow: "0 24px 60px rgba(0,0,0,0.45)",
-            }}
-          >
-            <Icon className={variant === "loading" ? "animate-spin" : undefined} color="#94a3b8" strokeWidth={1.5} style={{ width: vw(56), height: vw(56), margin: "0 auto" }} />
-            <div style={{ fontSize: vw(48), fontWeight: 700, letterSpacing: "-0.5px", color: "#e2e8f0", marginTop: vw(16) }}>{message}</div>
-            {sub && <div style={{ marginTop: vw(14), fontSize: vw(30), color: "#94a3b8", lineHeight: 1.45 }}>{sub}</div>}
-          </div>
+      {/* Centered message card — overlays the WHOLE ghost (featured panel + time axis + rows) so it
+          reads as vertically centered on the guide, instead of centered only over the rows area (which
+          pushed it down below the featured panel). A frosted scrim blurs + dims the entire ghost behind
+          it, so the message reads as the focused layer over a soft skeleton. */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: vw(48),
+          pointerEvents: "none",
+          ...(GHOST_SCRIM_BLUR
+            ? { background: "rgba(6,10,20,0.4)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }
+            : null),
+        }}
+      >
+        <div
+          style={{
+            pointerEvents: "auto",
+            maxWidth: vw(1100),
+            textAlign: "center",
+            background: "rgba(6,10,20,0.82)",
+            border: `1px solid ${C.border}`,
+            borderRadius: vw(28),
+            padding: `${vw(40)} ${vw(60)}`,
+            backdropFilter: "blur(3px)",
+            WebkitBackdropFilter: "blur(3px)",
+            boxShadow: "0 24px 60px rgba(0,0,0,0.45)",
+          }}
+        >
+          <Icon className={variant === "loading" ? "animate-spin" : undefined} color="#94a3b8" strokeWidth={1.5} style={{ width: vw(56), height: vw(56), margin: "0 auto" }} />
+          <div style={{ fontSize: vw(48), fontWeight: 700, letterSpacing: "-0.5px", color: "#e2e8f0", marginTop: vw(16) }}>{message}</div>
+          {sub && <div style={{ marginTop: vw(14), fontSize: vw(30), color: "#94a3b8", lineHeight: 1.45 }}>{sub}</div>}
         </div>
       </div>
     </div>
