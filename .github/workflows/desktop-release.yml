@@ -220,6 +220,27 @@ jobs:
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
 
+      # Linux artifacts come straight from electrobun as `stable-linux-<arch>-Airwave-*` (Windows/mac are
+      # named Airwave-Server-… by our own installer/DMG scripts). Rename the Linux ones to match, and
+      # patch the update.json's tarball reference so the (electrobun) updater still resolves.
+      - name: Rename Linux artifacts to Airwave-Server
+        if: runner.os == 'Linux'
+        working-directory: apps/desktop/artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in *Airwave*; do
+            [ -e "$f" ] || continue
+            new="${f/Airwave/Airwave-Server}"
+            [ "$f" = "$new" ] && continue
+            mv "$f" "$new"
+          done
+          for j in *update.json; do
+            [ -e "$j" ] || continue
+            sed -i 's/Airwave\.tar\.zst/Airwave-Server.tar.zst/g; s/Airwave-Setup/Airwave-Server-Setup/g' "$j"
+          done
+          echo "renamed:"; ls -la
+
       - name: List artifacts
         shell: bash
         run: ls -la apps/desktop/artifacts/ || echo "no artifacts/"

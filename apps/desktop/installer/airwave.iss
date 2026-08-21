@@ -52,7 +52,7 @@ PrivilegesRequired=lowest
 OutputDir={#OutputDir}
 ; Descriptive, versioned name so the release asset clearly reads as the Windows installer (mirrors the mac
 ; DMG's Airwave-<version>-macos-arm64.dmg). e.g. Airwave-0.10.15-windows-x64-Setup.exe
-OutputBaseFilename=Airwave-{#MyAppVersion}-windows-x64-Setup
+OutputBaseFilename=Airwave-Server-{#MyAppVersion}-windows-x64-Setup
 SetupIconFile={#IconFile}
 UninstallDisplayIcon={app}\bin\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}

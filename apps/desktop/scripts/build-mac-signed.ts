@@ -176,7 +176,7 @@ const staging = join(outDir, ".dmg-staging");
 mkdirSync(staging, { recursive: true });
 run("cp", ["-R", appPath, join(staging, "Airwave.app")]);
 symlinkSync("/Applications", join(staging, "Applications"));
-const dmg = join(outDir, `Airwave-${version}-macos-${arch}.dmg`);
+const dmg = join(outDir, `Airwave-Server-${version}-macos-${arch}.dmg`);
 run("hdiutil", ["create", "-volname", "Airwave", "-srcfolder", staging, "-ov", "-format", "ULFO", dmg]);
 run("codesign", ["--force", "--timestamp", "--sign", identity, dmg]);
 console.log(`[mac-sign] DMG built + signed: ${dmg}`);
@@ -216,6 +216,6 @@ console.log("[mac-sign] notarized + stapled.");
 // ── 7. Publish to artifacts/ ─────────────────────────────────────────────────────────────────────────────────
 const artifacts = join(APP, "artifacts");
 mkdirSync(artifacts, { recursive: true });
-run("cp", [dmg, join(artifacts, `Airwave-${version}-macos-${arch}.dmg`)]);
+run("cp", [dmg, join(artifacts, `Airwave-Server-${version}-macos-${arch}.dmg`)]);
 rmSync(staging, { recursive: true, force: true });
-console.log(`[mac-sign] ✅ done → artifacts/Airwave-${version}-macos-${arch}.dmg`);
+console.log(`[mac-sign] ✅ done → artifacts/Airwave-Server-${version}-macos-${arch}.dmg`);

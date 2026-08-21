@@ -78,7 +78,7 @@ const iscc =
   ].find(existsSync) ?? "ISCC.exe";
 
 // 3. Compile installer/airwave.iss → build/inno/Airwave-<version>-windows-x64-Setup.exe (OutputBaseFilename).
-const outName = `Airwave-${version}-windows-x64-Setup.exe`;
+const outName = `Airwave-Server-${version}-windows-x64-Setup.exe`;
 console.log(`[installer] compiling with ${iscc} (v${version}) …`);
 const r = spawnSync(
   iscc,
