@@ -8,6 +8,7 @@ import { FaAmazon, FaWindows, FaLinux } from "react-icons/fa";
 import { cn } from "@/lib/cn";
 import { button, card, heading, Wide } from "@/components/landing";
 import { ClipCarousel } from "@/components/clip-carousel";
+import { DownloadSection } from "@/components/downloads";
 import { AgnosticBackground, HeroShaders, ShaderCta } from "@/components/shaders";
 import { COMPOSE } from "./compose";
 import { PreviewImages } from "./page.client";
@@ -87,7 +88,10 @@ export default function HomePage() {
             bumpers — streamed straight from your Plex to native apps on every big screen you own.
           </p>
           <div className="flex w-fit flex-row flex-wrap items-center justify-center gap-4">
-            <Link href="/docs/getting-started" className={cn(button(), "max-sm:text-sm")}>
+            <a href="#download" className={cn(button(), "max-sm:text-sm")}>
+              Download
+            </a>
+            <Link href="/docs/getting-started" className={cn(button("secondary"), "max-sm:text-sm")}>
               Get started
             </Link>
             <a
@@ -96,7 +100,7 @@ export default function HomePage() {
               rel="noreferrer noopener"
               className={cn(button("secondary"), "max-sm:text-sm")}
             >
-              View on GitHub
+              GitHub
             </a>
           </div>
         </div>
@@ -112,6 +116,9 @@ export default function HomePage() {
           leave on, not another grid of posters to scroll. You own the server, the content, and the data.
         </p>
       </Wide>
+
+      {/* ── Downloads (Server + Client, inline pills) ────────────────────────── */}
+      <DownloadSection />
 
       {/* ── Get running ──────────────────────────────────────────────────────── */}
       <Wide className="mt-16 grid grid-cols-1 items-start gap-10 lg:mt-28 lg:grid-cols-2">
