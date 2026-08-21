@@ -91,7 +91,10 @@ export function lensEquals(a: Lens | undefined, b: Lens): boolean {
 
 /** Layout reservation: the collapsed rail (COLLAPSED_W) + its left inset + a gap before the grid. The
  *  grid reserves exactly this; expanding is a pure overlay (the sidebar grows over the grid). */
-export const COLLAPSED_W = 56;
+// Collapsed rail width. The panel pads 8px each side, so the rows get `COLLAPSED_W - 16` of width;
+// at 60 that's 44px — square with the rows' h-11 (44px) height, so a collapsed item reads as a circle-
+// in-a-square rather than a squished pill.
+export const COLLAPSED_W = 60;
 export const EXPANDED_W = 240;
 export const INSET = 12;
 const GAP = 16;

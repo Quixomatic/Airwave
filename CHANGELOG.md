@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.36] - 2026-08-20
+
+tv-tauri — the collapsed sidebar rail is a touch wider (`COLLAPSED_W` 56→60) so a collapsed menu
+item is a **square 44×44** (matching the rows' 44px height) instead of a squished ~40px-wide pill —
+the icon now sits in a proper circle-in-a-square. Applies to both the guide and settings rails (they
+share the constant); the reserved sliver widens 84→88px to match.
+
 ## [0.11.35] - 2026-08-20
 
 tv-tauri guide — **click-to-focus-the-rail, click-again-to-favorite**, the rail mirror of the

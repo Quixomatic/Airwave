@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Airwave",
-  "version": "0.11.35",
+  "version": "0.11.36",
   "identifier": "com.airwave.tvdesktop",
   "build": {
     "frontendDist": "../dist",
