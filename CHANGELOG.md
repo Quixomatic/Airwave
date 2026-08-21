@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.39] - 2026-08-20
+
+tv-tauri player chrome — **hover now drives the same focus styling as the keyboard**. Mousing over a
+control pill, a circle dropdown, or the scrubber focuses it (accent tint + ring), exactly like ◄►
+navigation — no separate hover style. Leaving the control cluster (or the scrubber) clears the
+highlight (`col: -1` = nothing lit); moving between buttons doesn't clear (mouseleave ignores child
+transitions), and keyboard nav re-seeds from -1 to the first control on the next arrow so the two
+input modes stay consistent.
+
 ## [0.11.38] - 2026-08-20
 
 tv-tauri — **Spacebar now plays/pauses** the full-screen player (it was genuinely unbound). New

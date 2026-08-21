@@ -235,6 +235,7 @@ export function FeaturePanel({
           ctlRefs.current[col] = el;
         }}
         style={glass(col, true)}
+        onMouseEnter={() => setFocus({ row: 1, col })}
         aria-label={key}
       >
         <Icon size={ICON} />
@@ -330,6 +331,8 @@ export function FeaturePanel({
           <button
             ref={scrubberRef}
             onClick={onPlayPause}
+            onMouseEnter={() => setFocus({ row: 0, col: 0 })}
+            onMouseLeave={() => setFocus({ row: 1, col: -1 })}
             style={{ display: "block", width: "100%", textAlign: "left", border: "none", outline: "none", background: "transparent", cursor: "pointer", padding: "6px 0 4px" }}
           >
             <div style={{ position: "relative", height: 8 }}>
@@ -386,25 +389,28 @@ export function FeaturePanel({
             </div>
           </button>
 
-          {/* Controls */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18 }}>
-            <button ref={(el) => { ctlRefs.current[0] = el; }} style={glass(0)} onClick={onPlayPause}>
+          {/* Controls. Mouse-leaving the whole cluster clears the hover highlight (col -1 = nothing lit);
+              moving BETWEEN buttons doesn't fire this (mouseleave ignores child transitions). Keyboard
+              nav re-seeds from -1 to col 0 on the next arrow, so it stays consistent. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18 }} onMouseLeave={() => setFocus({ row: 1, col: -1 })}>
+            <button ref={(el) => { ctlRefs.current[0] = el; }} style={glass(0)} onMouseEnter={() => setFocus({ row: 1, col: 0 })} onClick={onPlayPause}>
               {paused ? <Play size={ICON} /> : <Pause size={ICON} />} {paused ? "Play" : "Pause"}
             </button>
             <button
               ref={(el) => { ctlRefs.current[1] = el; }}
               style={{ ...glass(1), opacity: canRestart ? 1 : 0.4 }}
+              onMouseEnter={() => setFocus({ row: 1, col: 1 })}
               onClick={onRestart}
             >
               <RotateCcw size={ICON} /> Restart
             </button>
-            <button ref={(el) => { ctlRefs.current[2] = el; }} style={glass(2)} onClick={onChannelSurf}>
+            <button ref={(el) => { ctlRefs.current[2] = el; }} style={glass(2)} onMouseEnter={() => setFocus({ row: 1, col: 2 })} onClick={onChannelSurf}>
               <Tv size={ICON} /> Channel Surf
             </button>
-            <button ref={(el) => { ctlRefs.current[3] = el; }} style={glass(3)} onClick={() => setInfoMode(true)}>
+            <button ref={(el) => { ctlRefs.current[3] = el; }} style={glass(3)} onMouseEnter={() => setFocus({ row: 1, col: 3 })} onClick={() => setInfoMode(true)}>
               <Info size={ICON} /> Info
             </button>
-            <button ref={(el) => { ctlRefs.current[4] = el; }} style={glass(4)} onClick={onLive}>
+            <button ref={(el) => { ctlRefs.current[4] = el; }} style={glass(4)} onMouseEnter={() => setFocus({ row: 1, col: 4 })} onClick={onLive}>
               {atLive ? <Clapperboard size={ICON} /> : <Radio size={ICON} />} {atLive ? "Continue Watching" : "Jump to Live"}
             </button>
 
