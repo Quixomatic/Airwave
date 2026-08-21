@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.58] - 2026-08-21
+
+tv-tauri — macOS video **embedded via mpv's render API** (soia's approach; the real fix). mpv 0.41 has no
+CAMetalLayer/NSView embed *window* context on macOS (cocoa/`macvk` always open their own window), so we
+stop using `wid` there: macOS now runs `vo=libmpv`, creates an OpenGL `mpv_render_context`, and drives it
+with a `CVDisplayLink` into an `NSOpenGLContext` attached to a view inserted BEHIND the transparent
+WKWebView (`src/render_macos.rs`). Render-API FFI added to `mpv/ffi.rs`; `build.rs` links CoreVideo +
+OpenGL. The mini-feed (`video-margin-ratio`) and all mpv commands/events are unchanged and shared. Windows'
+child-HWND `wid` path is completely untouched (`#[cfg]`-gated). HDR-EDR passthrough is a follow-up.
+
 ## [0.11.57] - 2026-08-21
 
 tv-tauri — macOS video embedding experiment: try mpv's `macvk` Vulkan context into a CAMetalLayer `wid`.

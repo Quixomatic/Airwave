@@ -1,4 +1,6 @@
 mod mpv;
+#[cfg(target_os = "macos")]
+mod render_macos;
 
 use std::sync::Arc;
 
@@ -437,6 +439,15 @@ pub fn run() {
             }
             Ok(())
         })
+        .on_window_event(|_window, _event| {
+            // macOS render API: refit the GL drawable when the window resizes.
+            #[cfg(target_os = "macos")]
+            if let tauri::WindowEvent::Resized(_) = _event {
+                if let Some(w) = _window.get_webview_window("main") {
+                    render_macos::on_resize(&w);
+                }
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -463,48 +474,40 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
     }
 
     let mpv = Arc::new(mpv::Mpv::new()?);
-    // `wid` is a pre-init option — set it, then initialize. The surface is per-platform (see
-    // `resolve_video_wid`): Windows = the main window HWND; macOS = a CAMetalLayer inserted behind
-    // the transparent WKWebView. Setup runs on the main thread, so the macOS AppKit calls are safe.
     mpv.set_option_string("hwdec", "auto")?; // hardware decode (soia baseline)
-    // macOS: gpu-next must render through MoltenVK/Vulkan to draw into the CAMetalLayer we pass as
-    // `wid`. Two parts, both required (soia's recipe): (1) point the Vulkan LOADER at the bundled
-    // MoltenVK ICD via VK_ICD_FILENAMES — without it Vulkan finds no driver and mpv_initialize FAILS
-    // (nothing plays at all); (2) select gpu-api=vulkan + gpu-context=moltenvk. Env must be set before
-    // initialize() (the Vulkan instance is created during mpv init). Creation-only mpv options too.
+
+    // Video attach is per-platform. Windows/Linux: mpv renders itself into a native surface passed as
+    // `wid` (Windows = the main window HWND under the WebView2 DComp visual) — a pre-init option. macOS:
+    // mpv 0.41 has no embed window context (cocoa/macvk make their own window — see
+    // project-tv-tauri-macos-render), so we use the RENDER API: `vo=libmpv`, then create + drive an
+    // OpenGL render context into a view behind the transparent webview.
     #[cfg(target_os = "macos")]
     {
-        // Point Vulkan at the bundled MoltenVK ICD in case a vulkan path is used (harmless otherwise).
-        set_vulkan_icd_env();
-        // Diagnostic: mpv's own verbose log (vo/gpu-context selection + any render error) to a
-        // predictable file, so failures are readable instead of guessed. Non-fatal.
+        // Diagnostic: mpv's own verbose log to a predictable file (readable render failures). Non-fatal.
         if let Ok(home) = std::env::var("HOME") {
             let logp = format!("{home}/Library/Logs/airwave-mpv.log");
             let _ = mpv.set_option_string("log-file", &logp);
             let _ = mpv.set_option_string("msg-level", "all=v");
             log::info!("mpv log-file: {logp}");
         }
-        // macOS Vulkan-into-CAMetalLayer embedding. Upstream exposes this as `macvk` on macOS
-        // (`moltenvk` is the iOS name, which our build rejects with -7). gpu-api=vulkan is required.
-        // If macvk also errors, the context isn't compiled into our libmpv (needs a build change).
-        mpv.set_option_string("gpu-api", "vulkan")?;
-        if let Err(e) = mpv.set_option_string("gpu-context", "macvk") {
-            log::error!("gpu-context=macvk rejected ({e}) — libmpv lacks the macOS Vulkan window context");
-            return Err(e);
-        }
+        mpv.set_option_string("vo", "libmpv")?; // enable the render API
+        mpv.initialize()?;
+        render_macos::setup(&window, &mpv)?;
     }
-    let wid = resolve_video_wid(&window)?;
-    mpv.set_option_i64("wid", wid)?;
-    mpv.initialize()?;
+    #[cfg(not(target_os = "macos"))]
+    {
+        let wid = resolve_video_wid(&window)?;
+        mpv.set_option_i64("wid", wid)?;
+        mpv.initialize()?;
+        log::info!("mpv attached (wid={wid})");
+    }
 
     // mpv stays IDLE (attached, initialized, ready) — no autoplay. The watch route drives it via the
     // `mpv_*` commands; playback status flows back as `mpv:*` Tauri events from the loop below. Pass a
     // file/URL as the first CLI arg to manually test playback.
     if let Some(src) = std::env::args().nth(1) {
         mpv.loadfile(&src)?;
-        log::info!("mpv attached (wid={wid}) + loadfile {src}");
-    } else {
-        log::info!("mpv attached (wid={wid}) — idle");
+        log::info!("loadfile {src}");
     }
 
     spawn_mpv_event_loop(app.handle().clone(), mpv.clone());
@@ -525,76 +528,9 @@ fn resolve_video_wid(window: &tauri::WebviewWindow) -> Result<i64, String> {
     }
 }
 
-#[cfg(target_os = "macos")]
-fn resolve_video_wid(window: &tauri::WebviewWindow) -> Result<i64, String> {
-    use objc2::{class, msg_send, runtime::AnyObject};
-    let ns_window = window.ns_window().map_err(|e| e.to_string())? as *mut AnyObject;
-    if ns_window.is_null() {
-        return Err("null NSWindow".into());
-    }
-    // SAFETY: called from Tauri's setup (main thread); pointers come from live AppKit objects.
-    unsafe {
-        let content_view: *mut AnyObject = msg_send![ns_window, contentView];
-        if content_view.is_null() {
-            return Err("no contentView".into());
-        }
-        let _: () = msg_send![content_view, setWantsLayer: true];
-        let super_layer: *mut AnyObject = msg_send![content_view, layer];
-        if super_layer.is_null() {
-            return Err("no content-view layer".into());
-        }
-        // mpv's Vulkan (macvk/moltenvk) context embeds by rendering into a CAMetalLayer passed as `wid`.
-        // Create one sized to the content view, insert it as sublayer 0 (behind the transparent WKWebView)
-        // so video composites under our glass chrome, and return its pointer.
-        let metal_layer: *mut AnyObject = msg_send![class!(CAMetalLayer), layer];
-        if metal_layer.is_null() {
-            return Err("CAMetalLayer alloc failed".into());
-        }
-        let _: *mut AnyObject = msg_send![metal_layer, retain]; // outlive scope for mpv's wid
-        let bounds: objc2_foundation::NSRect = msg_send![content_view, bounds];
-        let scale: f64 = msg_send![ns_window, backingScaleFactor];
-        let _: () = msg_send![metal_layer, setFrame: bounds];
-        let _: () = msg_send![metal_layer, setContentsScale: scale];
-        let _: () = msg_send![metal_layer, setFramebufferOnly: true];
-        let _: () = msg_send![metal_layer, setOpaque: true];
-        // kCALayerWidthSizable (2) | kCALayerHeightSizable (16) so it follows window resizes.
-        let _: () = msg_send![metal_layer, setAutoresizingMask: 18u64];
-        let _: () = msg_send![super_layer, insertSublayer: metal_layer, atIndex: 0u32];
-        Ok(metal_layer as i64)
-    }
-}
-
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
 fn resolve_video_wid(_window: &tauri::WebviewWindow) -> Result<i64, String> {
     Err("video render-attach not implemented on this platform yet".into())
-}
-
-/// macOS: point the Vulkan loader at the bundled MoltenVK ICD (`VK_ICD_FILENAMES`/`VK_DRIVER_FILES`),
-/// so mpv's `gpu-context=moltenvk` can create a Vulkan instance. The ICD manifest ships in the `.app`
-/// at `Contents/Resources/vulkan/icd.d/MoltenVK_icd.json` (its `library_path` is the bare
-/// `libMoltenVK.dylib`, resolved via `libvulkan`'s `@loader_path` rpath into `Frameworks/`). In dev
-/// (`cargo run`, no bundle) fall back to the vendored copy whose path `build.rs` compiles in.
-#[cfg(target_os = "macos")]
-fn set_vulkan_icd_env() {
-    let bundled = std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().and_then(|p| p.parent()).map(|c| c.to_path_buf()))
-        .map(|contents| contents.join("Resources/vulkan/icd.d/MoltenVK_icd.json"))
-        .filter(|p| p.exists());
-    let icd = bundled.or_else(|| {
-        option_env!("AIRWAVE_DEV_VK_ICD")
-            .map(std::path::PathBuf::from)
-            .filter(|p| p.exists())
-    });
-    match icd {
-        Some(p) => {
-            let s = p.to_string_lossy().to_string();
-            std::env::set_var("VK_ICD_FILENAMES", &s);
-            std::env::set_var("VK_DRIVER_FILES", &s);
-            log::info!("Vulkan ICD: {s}");
-        }
-        None => log::warn!("MoltenVK ICD manifest not found — macOS video will not render"),
-    }
 }
 
 /// macOS: put the window in "full-size content view" with a transparent, title-less titlebar so the

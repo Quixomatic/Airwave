@@ -142,6 +142,50 @@ pub struct MpvEventClientMessage {
 
 pub type MpvWakeupCallback = extern "C" fn(d: *mut c_void);
 
+// ── Render API (mpv/render.h) — macOS embeds video by rendering into a layer WE own (soia's path),
+// since mpv 0.41 has no CAMetalLayer-embed window context on macOS. `mpv_render_param` is a
+// {type, data} pair; arrays are terminated by a param with type == INVALID (0). ─────────────────
+#[repr(C)]
+pub struct MpvRenderParam {
+    pub type_: c_int,
+    pub data: *mut c_void,
+}
+
+pub const MPV_RENDER_PARAM_INVALID: c_int = 0;
+pub const MPV_RENDER_PARAM_API_TYPE: c_int = 1;
+pub const MPV_RENDER_PARAM_OPENGL_INIT_PARAMS: c_int = 2;
+pub const MPV_RENDER_PARAM_OPENGL_FBO: c_int = 3;
+pub const MPV_RENDER_PARAM_FLIP_Y: c_int = 4;
+pub const MPV_RENDER_PARAM_ADVANCED_CONTROL: c_int = 10;
+
+/// `MPV_RENDER_API_TYPE_OPENGL` string value for the API_TYPE param.
+pub const MPV_RENDER_API_TYPE_OPENGL: &[u8] = b"opengl\0";
+
+/// Bit returned by `mpv_render_context_update`: a new frame is ready to render.
+pub const MPV_RENDER_UPDATE_FRAME: u64 = 1;
+
+/// `mpv_opengl_init_params` — how mpv resolves GL functions. `get_proc_address(ctx, name)` returns the
+/// address of the named GL symbol (we resolve via dlsym on the OpenGL framework).
+#[repr(C)]
+pub struct MpvOpenglInitParams {
+    pub get_proc_address: extern "C" fn(ctx: *mut c_void, name: *const c_char) -> *mut c_void,
+    pub get_proc_address_ctx: *mut c_void,
+}
+
+/// `mpv_opengl_fbo` — the target framebuffer for `mpv_render_context_render`. fbo 0 = the current
+/// GL context's default drawable; w/h are the viewport in PIXELS.
+#[repr(C)]
+pub struct MpvOpenglFbo {
+    pub fbo: c_int,
+    pub w: c_int,
+    pub h: c_int,
+    pub internal_format: c_int,
+}
+
+/// Update callback — invoked (from any thread) when a new frame should be drawn. It must only WAKE
+/// the render loop, never render inline.
+pub type MpvRenderUpdateFn = extern "C" fn(cb_ctx: *mut c_void);
+
 extern "C" {
     // ── Lifecycle ────────────────────────────────────────────────────────────
     pub fn mpv_create() -> *mut c_void;
@@ -187,4 +231,19 @@ extern "C" {
     pub fn mpv_free(data: *mut c_void);
     pub fn mpv_free_node_contents(node: *mut MpvNode);
     pub fn mpv_get_time_us(ctx: *mut c_void) -> i64;
+
+    // ── Render API (mpv/render.h) ────────────────────────────────────────────
+    pub fn mpv_render_context_create(
+        res: *mut *mut c_void,
+        ctx: *mut c_void,
+        params: *mut MpvRenderParam,
+    ) -> c_int;
+    pub fn mpv_render_context_set_update_callback(
+        ctx: *mut c_void,
+        callback: MpvRenderUpdateFn,
+        callback_ctx: *mut c_void,
+    );
+    pub fn mpv_render_context_update(ctx: *mut c_void) -> u64;
+    pub fn mpv_render_context_render(ctx: *mut c_void, params: *mut MpvRenderParam) -> c_int;
+    pub fn mpv_render_context_free(ctx: *mut c_void);
 }

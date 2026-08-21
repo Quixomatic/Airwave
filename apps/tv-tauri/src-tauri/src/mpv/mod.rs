@@ -8,7 +8,8 @@
 //! Adapted in spirit from `.refs/soia` (which drives the same C API), minus its
 //! proprietary `soia_utils` render helper: we attach mpv to the window directly.
 
-mod ffi;
+// `pub(crate)` so the macOS render path (`crate::render_macos`) can reach the render-API bindings.
+pub(crate) mod ffi;
 
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
@@ -62,6 +63,13 @@ impl Mpv {
 
     fn ctx(&self) -> *mut c_void {
         self.ctx.load(Ordering::Acquire)
+    }
+
+    /// The raw mpv context pointer (for `mpv_render_context_create` on macOS). The render context is
+    /// created once at setup and lives for the app; the caller must not free the ctx.
+    #[cfg(target_os = "macos")]
+    pub fn ctx_raw(&self) -> *mut c_void {
+        self.ctx()
     }
 
     /// Set a string option (pre- or post-init).

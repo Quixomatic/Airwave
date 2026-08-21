@@ -57,6 +57,10 @@ fn main() {
         }
         println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_dir.display());
         println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path/../Frameworks");
+        // The macOS render path (render_macos.rs) uses CVDisplayLink (CoreVideo) + NSOpenGLContext/CGL
+        // (OpenGL). AppKit/Foundation come from objc2/tauri; these two frameworks need explicit linking.
+        println!("cargo:rustc-link-lib=framework=CoreVideo");
+        println!("cargo:rustc-link-lib=framework=OpenGL");
         // Dev (`cargo run`, no .app bundle): compile in the vendored MoltenVK ICD path so the app can
         // set VK_ICD_FILENAMES to it (the packaged app finds the ICD in Contents/Resources instead).
         println!(
