@@ -51,3 +51,11 @@ windows-sys = { version = "0.61", features = [
     "Win32_Graphics_Gdi",
     "Win32_UI_WindowsAndMessaging",
 ] }
+
+# macOS: objc2 for the mpv render target — a CAMetalLayer inserted behind the transparent WKWebView,
+# passed to mpv as `wid` (the Metal-layer analog of the Windows HWND). Versions match soia's proven set.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6.1"
+objc2-app-kit = { version = "0.3.1", features = ["NSWindow", "NSView", "NSResponder"] }
+objc2-foundation = { version = "0.3.1", features = ["NSString", "NSGeometry"] }
+objc2-quartz-core = { version = "0.3.1", features = ["CALayer", "CAMetalLayer"] }

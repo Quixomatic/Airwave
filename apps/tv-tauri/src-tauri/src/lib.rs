@@ -2,6 +2,7 @@ mod mpv;
 
 use std::sync::Arc;
 
+#[cfg(target_os = "windows")]
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_http::reqwest;
@@ -449,27 +450,18 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
         .get_webview_window("main")
         .ok_or("no main window")?;
 
-    // Transparent webview so the video shows behind the UI. NOT window
-    // transparency — just the webview background (soia app_bootstrap.rs).
-    #[cfg(target_os = "windows")]
-    {
-        let _ = window.set_background_color(Some(tauri::utils::config::Color(0, 0, 0, 0)));
-    }
-
-    // Native window handle for the mpv `--wid` embed.
-    let hwnd = match window
-        .window_handle()
-        .map_err(|e| e.to_string())?
-        .as_raw()
-    {
-        RawWindowHandle::Win32(h) => h.hwnd.get(),
-        other => return Err(format!("unsupported window handle: {other:?}")),
-    };
+    // Transparent webview so the video composites behind the UI (Windows: WebView2/DComp over the
+    // child HWND; macOS: transparent WKWebView over the Metal layer). NOT window transparency on
+    // Windows; on macOS the window itself is transparent (tauri.macos.conf `transparent: true`).
+    let _ = window.set_background_color(Some(tauri::utils::config::Color(0, 0, 0, 0)));
 
     let mpv = Arc::new(mpv::Mpv::new()?);
-    // `wid` is a pre-init option — set it, then initialize.
+    // `wid` is a pre-init option — set it, then initialize. The surface is per-platform (see
+    // `resolve_video_wid`): Windows = the main window HWND; macOS = a CAMetalLayer inserted behind
+    // the transparent WKWebView. Setup runs on the main thread, so the macOS AppKit calls are safe.
     mpv.set_option_string("hwdec", "auto")?; // hardware decode (soia baseline)
-    mpv.set_option_i64("wid", hwnd as i64)?;
+    let wid = resolve_video_wid(&window)?;
+    mpv.set_option_i64("wid", wid)?;
     mpv.initialize()?;
 
     // mpv stays IDLE (attached, initialized, ready) — no autoplay. The watch route drives it via the
@@ -477,12 +469,68 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
     // file/URL as the first CLI arg to manually test playback.
     if let Some(src) = std::env::args().nth(1) {
         mpv.loadfile(&src)?;
-        log::info!("mpv attached (wid={hwnd}) + loadfile {src}");
+        log::info!("mpv attached (wid={wid}) + loadfile {src}");
     } else {
-        log::info!("mpv attached (wid={hwnd}) — idle");
+        log::info!("mpv attached (wid={wid}) — idle");
     }
 
     spawn_mpv_event_loop(app.handle().clone(), mpv.clone());
     app.manage(mpv); // keep the handle alive + expose it to the mpv_* commands
     Ok(())
+}
+
+/// Resolve the native surface mpv renders into (`--wid`), per platform.
+///  - **Windows:** the main window's HWND (video is a child HWND under the WebView2 DComp visual).
+///  - **macOS:** a **CAMetalLayer** inserted as sublayer 0 of the window's contentView (behind the
+///    transparent WKWebView), returned as its pointer — mpv accepts a CAMetalLayer\* as `wid`
+///    (soia's open layer-setup + plezy's `wid` attach). Must be called on the main thread.
+#[cfg(target_os = "windows")]
+fn resolve_video_wid(window: &tauri::WebviewWindow) -> Result<i64, String> {
+    match window.window_handle().map_err(|e| e.to_string())?.as_raw() {
+        RawWindowHandle::Win32(h) => Ok(h.hwnd.get() as i64),
+        other => Err(format!("unsupported window handle: {other:?}")),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn resolve_video_wid(window: &tauri::WebviewWindow) -> Result<i64, String> {
+    use objc2::{class, msg_send, runtime::AnyObject};
+    let ns_window = window.ns_window().map_err(|e| e.to_string())? as *mut AnyObject;
+    if ns_window.is_null() {
+        return Err("null NSWindow".into());
+    }
+    // SAFETY: called from Tauri's setup (main thread); pointers come from live AppKit objects.
+    unsafe {
+        let content_view: *mut AnyObject = msg_send![ns_window, contentView];
+        if content_view.is_null() {
+            return Err("no contentView".into());
+        }
+        let _: () = msg_send![content_view, setWantsLayer: true];
+        let super_layer: *mut AnyObject = msg_send![content_view, layer];
+        if super_layer.is_null() {
+            return Err("no content-view layer".into());
+        }
+        // A CAMetalLayer for mpv, sized to the content view, behind the (transparent) webview.
+        let metal_layer: *mut AnyObject = msg_send![class!(CAMetalLayer), layer];
+        if metal_layer.is_null() {
+            return Err("CAMetalLayer alloc failed".into());
+        }
+        let _: *mut AnyObject = msg_send![metal_layer, retain]; // outlive scope for mpv's wid
+        let bounds: objc2_foundation::NSRect = msg_send![content_view, bounds];
+        let scale: f64 = msg_send![ns_window, backingScaleFactor];
+        let _: () = msg_send![metal_layer, setFrame: bounds];
+        let _: () = msg_send![metal_layer, setContentsScale: scale];
+        let _: () = msg_send![metal_layer, setFramebufferOnly: true];
+        let _: () = msg_send![metal_layer, setOpaque: true];
+        // kCALayerWidthSizable (2) | kCALayerHeightSizable (16) so it follows window resizes.
+        let _: () = msg_send![metal_layer, setAutoresizingMask: 18u64];
+        // Insert BEHIND the webview.
+        let _: () = msg_send![super_layer, insertSublayer: metal_layer, atIndex: 0u32];
+        Ok(metal_layer as i64)
+    }
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+fn resolve_video_wid(_window: &tauri::WebviewWindow) -> Result<i64, String> {
+    Err("video render-attach not implemented on this platform yet".into())
 }
