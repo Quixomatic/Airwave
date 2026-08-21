@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.46] - 2026-08-20
+
+Docs + cleanup. The getairwave.tv site's **Platforms** matrix now lists the desktop client — **Windows**
+as full support and **macOS/Linux** as planned (all three "Desktop app (Tauri)", mpv engine) — with a
+new "Desktop (`tv-tauri`)" prose section, and the "what runs today" note updated. The **Architecture**
+doc's parts table, diagram, deployment, and source map now include both `tv-tauri` (desktop) and
+`tv-roku`. Separately, **`apps/tv-desktop` is deleted** — the abandoned Vercel Native SDK experiment
+that `tv-tauri` replaced (its `@native-sdk/cli` patch, lockfile entry, and the two root turbo
+`--filter=!tv-desktop` excludes removed with it).
+
 ## [0.11.45] - 2026-08-20
 
 tv-tauri — minimize + maximize stay **enabled** in fullscreen and now **break out of fullscreen

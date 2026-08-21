@@ -1,7 +1,7 @@
 ---
 icon: Boxes
 title: "Architecture"
-description: "The main parts of Airwave — the self-hosted server, the admin web app, the tv-web and tv-native players, and the shared packages — and how they fit together."
+description: "The main parts of Airwave — the self-hosted server, the admin web app, the viewer apps (tv-web, tv-native, tv-tauri desktop, tv-roku), and the shared packages — and how they fit together."
 ---
 
 import { Cards, Card } from "fumadocs-ui/components/card";
@@ -19,10 +19,13 @@ tune in and stream. Everything lives in a single **pnpm + Turborepo** monorepo b
 | **Admin web** (`apps/web`) | The admin-only panel for building channels, packages, users, bumpers, jobs, and previewing lineups. Includes a built-in browser player for a quick check. | React, TanStack Router/Query, **Vite**, TailwindCSS, shadcn/ui, tRPC client |
 | **`tv-web`** (`apps/tv-web`) | The 10-foot TV app as a web player — runs in **any browser** and is packaged for **LG webOS** (and, on the roadmap, Samsung Tizen). Native-first `<video>` with an hls.js fallback. | React, TanStack Router/Query, **Vite**, hls.js |
 | **`tv-native`** (`apps/tv-native`) | The same 10-foot app as a native binary for **Apple TV, iPad, Android TV, and Fire TV**, with an **mpv** engine for wide-codec direct play (4K HDR HEVC, TrueHD/DTS). | **Expo / React Native** (`react-native-tvos`), `@airwave/mpv-player` |
+| **`tv-tauri`** (`apps/tv-tauri`) | The same 10-foot app as a native **desktop** client for **Windows, macOS, and Linux** — reuses the `tv-web` React UI in a native shell with its own bundled **libmpv** for direct play, plus desktop affordances (mouse, PiP mini feed, true fullscreen). | **Tauri** (Rust shell), React/Vite, **libmpv** |
+| **`tv-roku`** (`apps/tv-roku`) | The 10-foot app as a native **Roku** channel — an independent codebase (zero shared code) held to strict visual + functional parity, playing through Roku's native `Video` node. | **BrighterScript + SceneGraph** |
 | **Shared packages** (`packages/*`) | The business logic and shared building blocks every app draws on (see below). | TypeScript workspace packages |
 
-The two web apps (`web`, `tv-web`) and the native app (`tv-native`) are **separate front-ends over the
-same server API**, so a channel you build in the admin plays identically on every client.
+The web apps (`web`, `tv-web`), the native mobile/TV app (`tv-native`), and the native desktop app
+(`tv-tauri`) are **separate front-ends over the same server API**; `tv-roku` is its own codebase held to
+the same contract. A channel you build in the admin plays identically on every client.
 
 ### The shared packages
 
@@ -32,7 +35,7 @@ same server API**, so a channel you build in the admin plays identically on ever
 | `@airwave/auth` | [Better-Auth](https://www.better-auth.com) config — Plex OAuth + roles, plus the TV device-code login flow. |
 | `@airwave/db` | The [Prisma](https://www.prisma.io) schema, migrations, and generated client (PostgreSQL). |
 | `@airwave/env` | Typed environment loading. |
-| `@airwave/ui` | Shared shadcn/ui primitives and design tokens, used by `web` and `tv-web`. |
+| `@airwave/ui` | Shared shadcn/ui primitives and design tokens, used by `web`, `tv-web`, and `tv-tauri`. |
 | `@airwave/config` | Shared TypeScript / build config. |
 | `@airwave/mpv-player` | The native **mpv** playback module (video + headless audio) for `tv-native`. |
 | `@airwave/key-input` | The native remote / hardware-key input module for `tv-native`. |
@@ -44,14 +47,15 @@ Business logic stays in `@airwave/api` services; the routers in `apps/server` ar
 ```
   Admin web  ──tRPC (cookie)──┐
                               ├──►  Server (Hono/Bun)  ──Prisma──►  PostgreSQL
-  tv-web / tv-native  ──REST──┘         │
-       │                                └──owner token──►  Plex Media Server
+  Viewer apps  ──REST────────┘         │
+  (tv-web · tv-native ·                └──owner token──►  Plex Media Server
+   tv-tauri · tv-roku)
        └────────────── streams media directly from Plex ─────────┘
 ```
 
-- **Viewers (`tv-web`, `tv-native`) use the REST API** at `/api/v1`, authenticated with a **bearer
-  token** obtained through the TV device-code login. A client asks "what's on channel N right now?" and
-  gets back the item plus the exact offset (the `effectiveTime`) to start playing at.
+- **Viewers (`tv-web`, `tv-native`, `tv-tauri`, `tv-roku`) use the REST API** at `/api/v1`, authenticated
+  with a **bearer token** obtained through the TV device-code login. A client asks "what's on channel N
+  right now?" and gets back the item plus the exact offset (the `effectiveTime`) to start playing at.
 - **The admin (`apps/web`) uses tRPC** at `/trpc` with a cookie session — the type-safe channel/package/
   user/job management surface. (It can also hit REST for the browser player.)
 - **Channel artwork is served through a public `/img` proxy.** A CSS or `<img>` background can't send a
@@ -83,8 +87,9 @@ environment variable:
 | `tvweb` *(optional)* | Serves `tv-web` as an auth-gated browser player, for casting / kiosk setups. |
 
 A PostgreSQL database and a `docker-compose.yml` wire it together; the `server` role applies Prisma
-migrations (`prisma migrate deploy`) on start. The native `tv-native` apps are built and distributed
-separately through their platform stores (or sideloaded). See the project
+migrations (`prisma migrate deploy`) on start. The viewer apps are built and distributed separately —
+`tv-native` and `tv-roku` through their platform stores, `tv-tauri` as signed desktop installers (or
+sideloaded from source). See the project
 [README](https://github.com/Quixomatic/Airwave#self-hosting-docker) for the full deploy.
 
 ## Where to go next
@@ -109,6 +114,8 @@ separately through their platform stores (or sideloaded). See the project
 | Admin web app | `apps/web/src` |
 | `tv-web` player | `apps/tv-web/src` |
 | `tv-native` app | `apps/tv-native` |
+| `tv-tauri` desktop app (React UI + Rust/libmpv shell) | `apps/tv-tauri` |
+| `tv-roku` channel (BrighterScript + SceneGraph) | `apps/tv-roku` |
 | Native mpv / key-input modules | `packages/mpv-player`, `packages/key-input` |
 
 ---

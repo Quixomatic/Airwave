@@ -6,10 +6,11 @@ description: "What Airwave runs on — the client platform matrix (native apps v
 
 Airwave's viewer app is a full **10-foot TV experience** — an Aurora channel-guide grid, a native-first
 player with a DVR scrubber, channel up/down, and the "Up Next" bumper card. It's the **same app** across
-platforms, delivered three ways: as a **native binary** (`tv-native`) for the living-room streaming boxes,
-as a **web player** (`tv-web`) for browsers and packaged webOS, and as a **native Roku channel** (`tv-roku`)
-built directly in Roku's SceneGraph. The web/native builds share a codebase; Roku is its own codebase held
-to the same design and server contract — so the experience matches everywhere.
+platforms, delivered four ways: as a **native binary** (`tv-native`) for the living-room streaming boxes,
+as a **web player** (`tv-web`) for browsers and packaged webOS, as a **native desktop app** (`tv-tauri`)
+for Windows, macOS, and Linux (built on Tauri with our own **mpv** engine), and as a **native Roku channel**
+(`tv-roku`) built directly in Roku's SceneGraph. The web/native/desktop builds share the React UI; Roku is
+its own codebase held to the same design and server contract — so the experience matches everywhere.
 
 ## The 10-foot / large-tablet stance
 
@@ -23,10 +24,12 @@ a 6-inch screen.
 <PlatformMatrix />
 
 > **Store status vs. what runs today.** The native apps are **built and running on real hardware now**
-> (iPad, Apple TV 4K, Android TV, Fire TV), webOS runs daily on a real LG C2, and the **Roku** channel runs
-> on a real Roku Streaming Stick 4K. Publishing them to the App Store / Google Play / Amazon Appstore / LG
-> Content Store / Roku Channel Store is a **prerequisite still being completed** — iPad and Apple TV first,
-> then the rest. The intended store-by-store distribution is
+> (iPad, Apple TV 4K, Android TV, Fire TV), webOS runs daily on a real LG C2, the **Roku** channel runs
+> on a real Roku Streaming Stick 4K, and the **desktop app** runs on **Windows** (macOS and Linux use the
+> same Tauri + mpv core — those build targets are next). Publishing them to the App Store / Google Play /
+> Amazon Appstore / LG Content Store / Roku Channel Store — and shipping signed desktop installers — is a
+> **prerequisite still being completed** — iPad and Apple TV first, then the rest. The intended
+> store-by-store distribution is
 > listed in the project [README's availability table](https://github.com/Quixomatic/Airwave#platform-availability).
 > Because Airwave is source-available, you can also **build and sideload** any native app yourself.
 
@@ -55,6 +58,25 @@ TV clients sign in with a **device-code flow** — scan a QR or enter a short co
 with Plex" or any Airwave account.
 
 ![Signing in to the web player with a QR code](/screenshots/tvweb-qrcode.webp)
+
+## Desktop (`tv-tauri`)
+
+The desktop client is a native **Tauri** app for **Windows, macOS, and Linux** that reuses the `tv-web`
+React UI (guide, DVR player, settings) inside a native shell — with **its own bundled `libmpv`** as the
+playback engine, exactly like the living-room native apps. That's what lets the desktop app **direct-play
+wide codecs** (4K HDR HEVC, TrueHD/DTS) with no server transcode, which a browser's `<video>` can't do.
+The video renders on a native surface behind a transparent web view, so the Aurora glass chrome composites
+right over it.
+
+Beyond the shared 10-foot experience it adds proper **desktop affordances**: full **mouse** support
+(hover-to-focus, click-to-tune), a **picture-in-picture mini feed** that keeps playing in the guide, a
+custom window titlebar with **true fullscreen** (F11, covers the taskbar), spacebar play/pause, and
+channel entry via the number row or `[` / `]`. Sign-in is the same **device-code flow** (Plex or an
+Airwave account), it runs the same **capability diagnostic** (mpv-measured), and it talks to the identical
+`/api/v1` server contract.
+
+**Windows** is built and running today; **macOS and Linux** share the same Tauri + mpv core and are the
+next build targets. Distributed as a small signed installer per OS, or built from source.
 
 ## Roku (`tv-roku`)
 

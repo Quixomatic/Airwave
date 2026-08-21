@@ -7,8 +7,8 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "turbo run dev --filter=!desktop --filter=!@airwave/desktop-setup --filter=!tv-desktop",
-    "build": "turbo run build --filter=!tv-desktop --filter=!tv-tauri",
+    "dev": "turbo run dev --filter=!desktop --filter=!@airwave/desktop-setup",
+    "build": "turbo run build --filter=!tv-tauri",
     "check-types": "turbo run check-types",
     "dev:web": "turbo run dev -F web",
     "dev:server": "turbo run dev -F server",
@@ -37,8 +37,7 @@
       "@expo/dom-webview": "55.0.6"
     },
     "patchedDependencies": {
-      "react-native-tvos@0.83.6-0": "patches/react-native-tvos@0.83.6-0.patch",
-      "@native-sdk/cli@0.9.5": "patches/@native-sdk__cli@0.9.5.patch"
+      "react-native-tvos@0.83.6-0": "patches/react-native-tvos@0.83.6-0.patch"
     },
     "onlyBuiltDependencies": [
       "@embedded-postgres/windows-x64",
