@@ -455,6 +455,13 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
     // Windows; on macOS the window itself is transparent (tauri.macos.conf `transparent: true`).
     let _ = window.set_background_color(Some(tauri::utils::config::Color(0, 0, 0, 0)));
 
+    // macOS: extend the webview content under a transparent titlebar so the NATIVE traffic lights
+    // float over our chrome (top-left). Must run before the Metal layer is inserted (below).
+    #[cfg(target_os = "macos")]
+    if let Err(e) = configure_macos_titlebar(&window) {
+        log::warn!("macOS titlebar setup failed: {e}");
+    }
+
     let mpv = Arc::new(mpv::Mpv::new()?);
     // `wid` is a pre-init option — set it, then initialize. The surface is per-platform (see
     // `resolve_video_wid`): Windows = the main window HWND; macOS = a CAMetalLayer inserted behind
@@ -533,4 +540,24 @@ fn resolve_video_wid(window: &tauri::WebviewWindow) -> Result<i64, String> {
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
 fn resolve_video_wid(_window: &tauri::WebviewWindow) -> Result<i64, String> {
     Err("video render-attach not implemented on this platform yet".into())
+}
+
+/// macOS: put the window in "full-size content view" with a transparent, title-less titlebar so the
+/// **native traffic lights** (close/miniaturize/zoom, top-left) float over our React chrome — the
+/// green zoom button gives native fullscreen. `TitleBar.tsx` hides our custom window buttons on macOS
+/// and pads the brand right to clear the lights. Mirrors soia's `apply_window_appearance` (compact).
+/// Must run on the main thread (called from Tauri's `setup`).
+#[cfg(target_os = "macos")]
+fn configure_macos_titlebar(window: &tauri::WebviewWindow) -> Result<(), String> {
+    use objc2_app_kit::{NSWindow, NSWindowStyleMask, NSWindowTitleVisibility};
+    let ns_window = window.ns_window().map_err(|e| e.to_string())?;
+    // SAFETY: setup runs on the main thread; the pointer is a live NSWindow owned by the window.
+    let ns_window = unsafe { (ns_window as *mut NSWindow).as_ref() }.ok_or("null NSWindow")?;
+    unsafe {
+        ns_window.setTitleVisibility(NSWindowTitleVisibility::Hidden);
+        ns_window.setTitlebarAppearsTransparent(true);
+        let mask = ns_window.styleMask() | NSWindowStyleMask::FullSizeContentView;
+        ns_window.setStyleMask(mask);
+    }
+    Ok(())
 }

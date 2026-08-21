@@ -165,6 +165,15 @@ body {
   transition: transform 0.25s ease, opacity 0.25s ease;
 }
 
+/* macOS: the window keeps native decorations (traffic lights) + a full-size content view, so we hide
+   our custom min/max/close and shift the brand right to clear the lights (top-left ~70px). */
+html.platform-mac .tb-controls {
+  display: none;
+}
+html.platform-mac .titlebar {
+  padding-left: 78px;
+}
+
 /* Fullscreen player: the titlebar slides away with the rest of the chrome (FullChrome toggles this
    class from its `panelOpen`), so the window controls only appear on mouse-move over the video. */
 html.chrome-hidden .titlebar {

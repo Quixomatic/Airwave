@@ -4,9 +4,9 @@ name: TV Desktop (tv-tauri) Build & Release
 # updater artifacts (latest.json + .sig) to the GitHub Release. Triggers on `v*` tags (same as the
 # server's desktop-release.yml — a tag fires both) or manually.
 #
-# STATUS: only the WINDOWS row is a real build today. macOS/Linux are intentional NO-OPS until their
-# mpv render-attach lands (the Windows `wid`=HWND embed has no macOS Metal-layer / Linux X11 equivalent
-# yet — see .plans/tv-tauri.md Phase 6). Their matrix rows stay so the shape is ready to flip on.
+# STATUS: WINDOWS (signed NSIS + updater) and macOS (Apple Silicon + Intel, .app/.dmg) are real builds.
+# macOS is UNSIGNED for now — signing/notarization + a merged latest.json are the finalize pass (Phase
+# 8C). LINUX stays a NO-OP until its X11/wayland embed lands. See .plans/tv-tauri.md Phase 8.
 #
 # The big libmpv runtime DLLs are NOT committed — this fetches them from the `libmpv-latest` release
 # (built by libmpv-windows.yml) into vendor/. The tiny MSVC import lib (windows-x64/lib/mpv.lib) IS
@@ -40,12 +40,18 @@ jobs:
             arch: x64
             libmpv: windows-x64
             supported: true
-          # macOS Apple Silicon — Phase 8 (render-attach = CAMetalLayer-as-wid). Unsigned for now
-          # (8A/8B); signing + notarization + latest.json entry come in 8C. First run compile-checks
-          # the objc2 render-attach.
+          # macOS Apple Silicon — Phase 8 (render-attach = CAMetalLayer-as-wid). `updaterarch` is the
+          # Tauri/darwin arch slug for latest.json (`darwin-aarch64` / `darwin-x86_64`).
           - os: macos-14
             arch: arm64
             libmpv: macos-arm64
+            updaterarch: aarch64
+            supported: true
+          # macOS Intel — native x86_64 on the macos-13 runner (no cross-compile).
+          - os: macos-13
+            arch: x64
+            libmpv: macos-x64
+            updaterarch: x86_64
             supported: true
           # NO-OP until the Linux X11/wayland embed lands.
           - os: ubuntu-24.04
@@ -198,20 +204,21 @@ jobs:
         env:
           OUT: artifacts
 
-      # ── macOS (Apple Silicon) — Phase 8A/8B, UNSIGNED. First run compile-checks the objc2
-      # render-attach; signing + notarization + latest.json entry come in Phase 8C. ─────────────────
-      - name: Build (Tauri .app/.dmg)
+      # ── macOS (Apple Silicon + Intel) — Phase 8. Build the .app ONLY, make it self-contained by
+      # bundling the libmpv dylibs into Contents/Frameworks + flattening install_names to @rpath, THEN
+      # build the DMG from the FIXED .app. (Building `app,dmg` together packages the .app BEFORE the
+      # dylibs land → the DMG's app can't find libmpv.) UNSIGNED for now; signing + notarization +
+      # latest.json come in the finalize pass (8C). First run also compile-checks the objc2
+      # render-attach + the native-traffic-lights window setup. ────────────────────────────────────
+      - name: Build (Tauri .app)
         if: matrix.supported && runner.os == 'macOS'
         working-directory: apps/tv-tauri
         shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
-        run: pnpm exec tauri build --bundles app,dmg
+        run: pnpm exec tauri build --bundles app
 
-      # Make the .app self-contained: copy every vendored libmpv dylib into Contents/Frameworks and
-      # flatten install_names to @rpath (all in one dir + @loader_path rpath). Belt-and-suspenders vs
-      # build.rs's rpath. (Codesigning of the leaves happens in 8C.)
       - name: Bundle libmpv dylibs into the .app
         if: matrix.supported && runner.os == 'macOS'
         working-directory: apps/tv-tauri
@@ -220,9 +227,14 @@ jobs:
           set -euo pipefail
           APP="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' | head -1)"
           [ -n "$APP" ] || { echo "no .app built"; exit 1; }
+          echo "app: $APP"
           FW="$APP/Contents/Frameworks"; mkdir -p "$FW"
-          cp -L "src-tauri/vendor/libmpv/${{ matrix.libmpv }}/lib/"*.dylib "$FW/" 2>/dev/null || true
+          # -RL dereferences the libmpv.dylib symlink into a real file; drop that dup (the soname
+          # libmpv.2.dylib is what's linked) so we don't ship the same lib twice.
+          cp -RL "src-tauri/vendor/libmpv/${{ matrix.libmpv }}/lib/"*.dylib "$FW/" 2>/dev/null || true
+          if [ -f "$FW/libmpv.dylib" ] && [ -f "$FW/libmpv.2.dylib" ]; then rm -f "$FW/libmpv.dylib"; fi
           for d in "$FW"/*.dylib; do
+            [ -e "$d" ] || continue
             b="$(basename "$d")"
             install_name_tool -id "@rpath/$b" "$d" 2>/dev/null || true
             install_name_tool -add_rpath "@loader_path" "$d" 2>/dev/null || true
@@ -231,22 +243,30 @@ jobs:
                 *) install_name_tool -change "$dep" "@rpath/$(basename "$dep")" "$d" 2>/dev/null || true ;; esac
             done
           done
-          BIN="$APP/Contents/MacOS/$(basename "$APP" .app)"
+          # Find the ACTUAL Mach-O main binary — its name may differ from the .app basename and can
+          # contain a space ("Airwave Client"), so don't derive it via basename; just take the file.
+          BIN="$(find "$APP/Contents/MacOS" -maxdepth 1 -type f | head -1)"
+          [ -n "$BIN" ] || { echo "no main binary"; ls -la "$APP/Contents/MacOS"; exit 1; }
+          echo "binary: $BIN"
           otool -L "$BIN" | tail -n +2 | awk '{print $1}' | grep -i libmpv | while read -r dep; do
             case "$dep" in @rpath/*) ;; *) install_name_tool -change "$dep" "@rpath/$(basename "$dep")" "$BIN" 2>/dev/null || true ;; esac
           done
           echo "== binary libmpv refs =="; otool -L "$BIN" | grep -i libmpv || true
+          echo "== Frameworks =="; ls "$FW"
 
-      - name: Stage mac artifacts
+      - name: Create DMG from the bundled .app
         if: matrix.supported && runner.os == 'macOS'
         working-directory: apps/tv-tauri
         shell: bash
         run: |
           set -euo pipefail
-          OUT=artifacts; mkdir -p "$OUT"
+          APP="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' | head -1)"
           VER="$(node -p "require('./package.json').version")"
-          DMG="$(find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' | head -1 || true)"
-          if [ -n "$DMG" ]; then cp "$DMG" "$OUT/Airwave-Client_${VER}_aarch64.dmg"; fi
+          OUT=artifacts; mkdir -p "$OUT"
+          DMG="$OUT/Airwave-Client_${VER}_${{ matrix.updaterarch }}.dmg"
+          # Stage the .app + an /Applications symlink in a temp dir for a drag-to-install DMG.
+          STAGE="$(mktemp -d)"; cp -R "$APP" "$STAGE/"; ln -s /Applications "$STAGE/Applications"
+          hdiutil create -volname "Airwave Client" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
           ls -la "$OUT"
 
       - name: Upload build artifacts

@@ -2,6 +2,29 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.52] - 2026-08-21
+
+tv-tauri Phase 8 — **macOS native traffic lights + Intel builds + a self-contained DMG**.
+
+### macOS window (native traffic lights)
+- The mac window now keeps **native decorations** with a full-size content view: `configure_macos_titlebar`
+  (objc2, mirrors soia's `apply_window_appearance`) sets `FullSizeContentView` + `titlebarAppearsTransparent`
+  + hidden title, so the **native traffic lights** float over our chrome (top-left) and the green button
+  gives native fullscreen. `TitleBar.tsx` hides our custom min/max/close on macOS (tags `<html>.platform-mac`)
+  and pads the brand right to clear the lights; **F11** still toggles fullscreen. `tauri.macos.conf.json`
+  flips `decorations` on (kept `transparent`).
+
+### macOS CI (Intel + a launchable DMG)
+- Added a **macOS Intel** matrix row (`macos-13`, native x86_64) alongside Apple Silicon — each fetches its
+  own libmpv (`macos-arm64` / `macos-x64`).
+- Fixed the DMG so the app can actually launch: build the **`.app` only**, bundle the libmpv dylibs into
+  `Contents/Frameworks` (+ flatten install_names to `@rpath`/`@loader_path`), and only THEN build the DMG
+  from the fixed app via `hdiutil`. Previously `--bundles app,dmg` packaged the app *before* the dylibs
+  landed, so the DMG's app had no libmpv. The Frameworks step now locates the Mach-O binary by `find`
+  (its name contains a space, "Airwave Client"), fixing the earlier bundling failure.
+
+Still **unsigned** — Developer-ID signing + notarization + a merged `latest.json` are the next (finalize) pass.
+
 ## [0.11.51] - 2026-08-21
 
 tv-tauri Phase 8 — **macOS client foundation** (Apple Silicon; WIP toward a real build).
