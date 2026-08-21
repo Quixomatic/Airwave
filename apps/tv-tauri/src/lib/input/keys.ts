@@ -18,6 +18,7 @@ export type SemanticKey =
   | "left"
   | "right"
   | "ok"
+  | "playpause"
   | "back"
   | "chUp"
   | "chDown"
@@ -77,6 +78,9 @@ export function toKeyEvent(raw: KeyboardEvent, repeat: boolean): KeyEvent {
   // Desktop: Escape is Back (tv-web deliberately omits it — no TV remote has Escape — but on a
   // desktop keyboard it's the natural "back/close").
   if (raw.key === "Escape") return { key: "back", raw, repeat };
+  // Desktop: Spacebar is the universal play/pause (and reveals the chrome if it's hidden). A TV
+  // remote has no Space; on a keyboard it's the reflex people reach for to pause.
+  if (raw.key === " " || code === 32) return { key: "playpause", raw, repeat };
   if (BACK_CODES.has(code) || BACK_NAMES.has(raw.key)) return { key: "back", raw, repeat };
   if (CH_UP_CODES.has(code)) return { key: "chUp", raw, repeat };
   if (CH_DOWN_CODES.has(code)) return { key: "chDown", raw, repeat };

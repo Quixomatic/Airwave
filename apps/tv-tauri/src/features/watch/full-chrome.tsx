@@ -78,6 +78,12 @@ export function FullChrome({
         case "back":
           onBack();
           return true;
+        case "playpause":
+          // Spacebar with the chrome hidden: toggle play/pause AND reveal the chrome, so you see the
+          // state you just changed (the reflex desktop behavior).
+          controls.togglePause();
+          setPanelOpen(true);
+          return true;
         case "ok":
         case "up":
         case "down":

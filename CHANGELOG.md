@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.38] - 2026-08-20
+
+tv-tauri — **Spacebar now plays/pauses** the full-screen player (it was genuinely unbound). New
+`playpause` semantic key mapped to Space in `lib/input/keys.ts`. With the chrome open it toggles
+play/pause from either focus row; with the chrome hidden it toggles play/pause AND reveals the
+chrome so you see the state you just changed — the reflex desktop behavior. Channel-surf / open
+dropdowns still own their keys, so Space is scoped to the player.
+
 ## [0.11.37] - 2026-08-20
 
 tv-tauri full-player chrome — **desktop-right button sizing**. The chrome was authored at 10-foot/TV

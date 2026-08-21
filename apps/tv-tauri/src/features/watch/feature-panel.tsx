@@ -159,6 +159,11 @@ export function FeaturePanel({
       armHide();
       if (infoMode) return false; // details view — Back exits it; no nav
       if (openMenu) return false; // base-ui owns keys while a dropdown is open
+      // Spacebar = play/pause from anywhere in the open chrome (either focus row).
+      if (e.key === "playpause") {
+        onPlayPause();
+        return true;
+      }
       if (focus.row === 0) {
         switch (e.key) {
           case "left":
