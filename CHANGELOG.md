@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.41] - 2026-08-20
+
+tv-tauri — the fullscreen titlebar peek stays down longer before re-hiding (400ms → 1600ms), so it
+no longer slides away almost immediately after you reveal it at the top edge.
+
 ## [0.11.40] - 2026-08-20
 
 tv-tauri — **true fullscreen** (covers the taskbar), ported from soia and set up for all three OSes.

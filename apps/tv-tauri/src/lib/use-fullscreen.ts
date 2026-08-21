@@ -43,7 +43,7 @@ export function useFullscreen() {
         el.classList.add("fs-peek");
       } else if (e.clientY > 48) {
         window.clearTimeout(hideTimer);
-        hideTimer = window.setTimeout(() => el.classList.remove("fs-peek"), 400);
+        hideTimer = window.setTimeout(() => el.classList.remove("fs-peek"), 1600);
       }
     };
     window.addEventListener("mousemove", onMove);
