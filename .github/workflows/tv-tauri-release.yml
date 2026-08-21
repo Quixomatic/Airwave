@@ -272,6 +272,17 @@ jobs:
             install_name_tool -change "$CUR" "@rpath/$MPVSONAME" "$BIN" 2>/dev/null || true
           fi
           echo "== binary libmpv refs =="; otool -L "$BIN" | grep -i libmpv || true
+          # Ship the MoltenVK Vulkan ICD manifest so mpv's gpu-context=moltenvk can find the driver at
+          # runtime (the app sets VK_ICD_FILENAMES to this). Its library_path is the bare
+          # "libMoltenVK.dylib", resolved via libvulkan's @loader_path rpath into Frameworks/.
+          ICD="src-tauri/vendor/libmpv/${{ matrix.libmpv }}/lib/MoltenVK_icd.json"
+          if [ -f "$ICD" ]; then
+            mkdir -p "$APP/Contents/Resources/vulkan/icd.d"
+            cp "$ICD" "$APP/Contents/Resources/vulkan/icd.d/"
+            echo "bundled MoltenVK_icd.json"
+          else
+            echo "WARN: MoltenVK_icd.json not in vendor lib — macOS video will not render"; ls "$(dirname "$ICD")"
+          fi
           echo "== Frameworks =="; ls "$FW"
 
       # Developer-ID sign (hardened runtime) — AFTER the dylib surgery (which changes the Mach-O content,

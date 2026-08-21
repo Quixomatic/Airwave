@@ -57,6 +57,12 @@ fn main() {
         }
         println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_dir.display());
         println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path/../Frameworks");
+        // Dev (`cargo run`, no .app bundle): compile in the vendored MoltenVK ICD path so the app can
+        // set VK_ICD_FILENAMES to it (the packaged app finds the ICD in Contents/Resources instead).
+        println!(
+            "cargo:rustc-env=AIRWAVE_DEV_VK_ICD={}",
+            lib_dir.join("MoltenVK_icd.json").display()
+        );
     }
 
     // mpv.lib (Windows, references libmpv-2.dll) / libmpv.dylib / libmpv.so → "mpv".

@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.55] - 2026-08-21
+
+tv-tauri — **macOS video, wired end-to-end**: bundle + point Vulkan at the MoltenVK ICD.
+
+0.11.54 selected `gpu-context=moltenvk` but never told the Vulkan loader where the MoltenVK driver is, so
+`mpv_initialize` failed and nothing played at all. The rest of soia's recipe is now in place:
+- **Bundle the ICD** — CI copies `MoltenVK_icd.json` into `Contents/Resources/vulkan/icd.d/` (its
+  `library_path` is the bare `libMoltenVK.dylib`, resolved via `libvulkan`'s `@loader_path` rpath into
+  `Frameworks/`).
+- **Point Vulkan at it** — before mpv init, macOS sets `VK_ICD_FILENAMES`/`VK_DRIVER_FILES` to that
+  manifest (packaged app) or the vendored copy (a path `build.rs` compiles in, for `cargo run`).
+- **Diagnostics** — mpv writes a verbose `log-file` to `~/Library/Logs/airwave-mpv.log` so any remaining
+  render failure is readable, not guessed.
+
+Windows is unaffected (its child-HWND path never used Vulkan).
+
 ## [0.11.54] - 2026-08-21
 
 tv-tauri — **macOS video now renders** (the CAMetalLayer render-attach's missing GPU context).
