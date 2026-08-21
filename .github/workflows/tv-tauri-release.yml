@@ -443,6 +443,24 @@ jobs:
         with:
           name: airwave-client-latest-json
           path: release/latest.json
+      # Compose the "Airwave Client" section (appended to the release body — so each component describes
+      # itself instead of a wall of repeated "Full Changelog" lines).
+      - name: Compose client release notes
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
+        id: notes
+        shell: bash
+        run: |
+          VER="$(node -p "require('./apps/tv-tauri/package.json').version")"
+          {
+            echo 'body<<NOTES'
+            echo '## 📺 Airwave Client (desktop viewer)'
+            echo ''
+            echo 'The 10-foot TV / DVR viewer — channel guide, glass player, bumpers — direct-playing from your Plex via bundled libmpv. Signed, notarized, and self-updating.'
+            echo "- **Windows** — \`Airwave-Client_${VER}_x64-setup.exe\`"
+            echo "- **macOS** — \`Airwave-Client_${VER}_aarch64.dmg\` (Apple Silicon) · \`Airwave-Client_${VER}_x86_64.dmg\` (Intel)"
+            echo 'NOTES'
+          } >> "$GITHUB_OUTPUT"
+
       # Attach ONLY on a real release (v* tag push or a `release_tag` dispatch) — never on a plain build.
       - name: Attach to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
@@ -451,6 +469,7 @@ jobs:
           tag_name: ${{ inputs.release_tag || github.ref_name }}
           files: release/*
           draft: false
-          generate_release_notes: true
+          append_body: true
+          body: ${{ steps.notes.outputs.body }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

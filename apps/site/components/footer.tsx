@@ -66,7 +66,7 @@ function FooterLinkItem({ link }: { link: FooterLink }) {
 export function Footer() {
   const year = new Date().getFullYear();
   return (
-    <footer className="mt-24 border-t border-fd-border bg-fd-card/40">
+    <footer className="mt-12 border-t border-fd-border bg-fd-card/40">
       <div className="mx-auto w-full max-w-6xl px-6 py-14">
         <div className="grid grid-cols-2 gap-10 md:grid-cols-6">
           {/* Brand block */}

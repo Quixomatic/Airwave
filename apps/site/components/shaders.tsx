@@ -29,7 +29,8 @@ const HERO_GRAIN_LIGHT = ["#93c5fd", "#4a9fe0", "#dbeafe00"];
  * (`speed: 0`) whenever it scrolls off-screen so it isn't burning GPU.
  */
 export function HeroShaders() {
-  const dark = useIsDark();
+  // Pinned dark: the hero is always dark-themed regardless of the site light/dark toggle.
+  const dark = true;
   const ref = useRef<HTMLDivElement | null>(null);
   const visible = useIsVisible(ref);
   const show = useDeferredShow();
@@ -62,7 +63,7 @@ export function HeroShaders() {
           size={2.5}
           fit="contain"
           speed={0}
-          className="absolute animate-fd-fade-in duration-400 max-lg:-right-6 max-lg:-bottom-6 max-lg:opacity-60 lg:top-[7%] lg:right-[4%]"
+          className="absolute animate-fd-fade-in duration-400 max-md:-right-6 max-md:-bottom-6 max-md:opacity-60 md:top-[7%] md:right-[4%]"
           minPixelRatio={1}
         />
       )}
@@ -84,7 +85,8 @@ export function ShaderCta({
   subtitle?: ReactNode;
   children: ReactNode;
 }) {
-  const dark = useIsDark();
+  // Pinned dark: the CTA sits on a dark shader panel, so it stays dark-themed even in site light mode.
+  const dark = true;
   const ref = useRef<HTMLDivElement | null>(null);
   const visible = useIsVisible(ref);
   const show = useDeferredShow();
@@ -92,7 +94,7 @@ export function ShaderCta({
   return (
     <div
       ref={ref}
-      className="relative flex min-h-[240px] flex-col justify-center overflow-hidden rounded-2xl border px-8 py-12 md:px-12"
+      className="dark relative isolate flex min-h-[240px] flex-col justify-center overflow-hidden rounded-2xl border bg-fd-background px-8 py-12 text-landing-foreground md:px-12"
     >
       <div className="absolute inset-0 -z-1 overflow-hidden">
         {show && (

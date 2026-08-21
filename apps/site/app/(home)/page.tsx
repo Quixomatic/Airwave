@@ -4,7 +4,7 @@ import { ServerCodeBlock } from "fumadocs-ui/components/codeblock.rsc";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tv, Rewind, Clapperboard, MonitorPlay, ShieldCheck, Sparkles, TerminalIcon, Globe } from "lucide-react";
 import { SiApple, SiAndroid, SiLg, SiGooglechrome, SiRoku, SiSamsung } from "react-icons/si";
-import { FaAmazon } from "react-icons/fa";
+import { FaAmazon, FaWindows, FaLinux } from "react-icons/fa";
 import { cn } from "@/lib/cn";
 import { button, card, heading, Wide } from "@/components/landing";
 import { ClipCarousel } from "@/components/clip-carousel";
@@ -28,17 +28,21 @@ const FEATURES = [
   { icon: Sparkles, title: "Build channels fast", body: "Author channels from metadata filters, auto-generate a whole lineup, or let a bring-your-own-key AI assistant draft one for you." },
 ];
 
-const PLATFORMS: { name: string; Icon: ComponentType<{ className?: string }> }[] = [
-  { name: "Apple TV", Icon: SiApple },
-  { name: "iPad", Icon: SiApple },
-  { name: "LG webOS", Icon: SiLg },
-  { name: "Android TV", Icon: SiAndroid },
-  { name: "Fire TV", Icon: FaAmazon },
-  { name: "Any browser", Icon: Globe },
+// Fully-supported first (green "Ready"), then partial (amber "WIP"); COMING_SOON renders after (muted "Soon").
+const PLATFORMS: { name: string; Icon: ComponentType<{ className?: string }>; badge: "Ready" | "WIP" }[] = [
+  { name: "Apple TV", Icon: SiApple, badge: "Ready" },
+  { name: "iPad", Icon: SiApple, badge: "Ready" },
+  { name: "macOS", Icon: SiApple, badge: "Ready" },
+  { name: "Windows", Icon: FaWindows, badge: "Ready" },
+  { name: "LG webOS", Icon: SiLg, badge: "Ready" },
+  { name: "Roku", Icon: SiRoku, badge: "Ready" },
+  { name: "Any browser", Icon: Globe, badge: "Ready" },
+  { name: "Android TV", Icon: SiAndroid, badge: "WIP" },
+  { name: "Fire TV", Icon: FaAmazon, badge: "WIP" },
 ];
 
 const COMING_SOON: { name: string; Icon: ComponentType<{ className?: string }> }[] = [
-  { name: "Roku", Icon: SiRoku },
+  { name: "Linux", Icon: FaLinux },
   { name: "Samsung (Tizen)", Icon: SiSamsung },
 ];
 
@@ -53,7 +57,11 @@ export default function HomePage() {
   return (
     <main className="pt-4 pb-6 text-landing-foreground md:pb-12">
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
-      <div className="relative mx-auto flex h-[76vh] max-h-[900px] min-h-[620px] w-full max-w-[1400px] overflow-hidden rounded-2xl border">
+      {/* Force the dark palette here regardless of the site theme: the hero sits on a dark shader
+          background, so its text/badge/border tokens must stay dark-mode values even in light mode.
+          `.dark` re-scopes --color-fd-*, --brand*, and --landing-foreground for this subtree. */}
+      <Wide>
+      <div className="dark relative isolate flex h-[76vh] max-h-[900px] min-h-[620px] w-full overflow-hidden rounded-2xl border bg-fd-background text-landing-foreground">
         <HeroShaders />
         {/* Hero shot anchored lower-right, bleeding off the panel. Starts as the guide screenshot (poster),
             then quietly cycles the demo clips (bare carousel, no controls). z-1 keeps it above the shaders
@@ -62,7 +70,7 @@ export default function HomePage() {
           variant="bare"
           poster="/screenshots/appletv-guide.webp"
           clips={HERO_REEL}
-          className="pointer-events-none absolute top-[62%] left-[34%] z-1 hidden w-[980px] max-w-none rounded-xl border-2 border-fd-border shadow-2xl shadow-black/40 lg:top-[56%] lg:block xl:left-[38%]"
+          className="pointer-events-none absolute top-[60%] left-1/2 z-1 w-[680px] max-w-none -translate-x-1/2 rounded-xl border-2 border-fd-border shadow-2xl shadow-black/40 md:top-[58%] md:left-[30%] md:w-[760px] md:translate-x-0 lg:top-[56%] lg:left-[34%] lg:w-[900px] xl:left-[38%] xl:w-[980px]"
         />
         <div className="z-2 flex size-full flex-col px-4 max-md:items-center max-md:text-center md:p-12">
           <p className="mt-12 w-fit rounded-full border border-brand/50 bg-fd-background/50 px-3 py-1.5 text-xs font-medium text-brand backdrop-blur-md">
@@ -93,6 +101,7 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+      </Wide>
 
       {/* ── Intro statement ──────────────────────────────────────────────────── */}
       <Wide className="mt-16 lg:mt-28">
@@ -193,39 +202,50 @@ export default function HomePage() {
               10-foot native apps for the living room, plus a browser player you serve from the same stack —
               the same app everywhere.
             </p>
-            <div className="mb-8 flex flex-row flex-wrap items-center gap-3">
+            {/* Square tiles — icon stacked over the platform name, like an app grid. */}
+            <div className="mb-8 grid grid-cols-4 gap-2.5">
               {PLATFORMS.map((p) => (
-                <span
+                <div
                   key={p.name}
-                  className="inline-flex items-center gap-2.5 rounded-full border bg-fd-secondary px-5 py-3 text-base font-medium text-landing-foreground"
+                  className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border bg-fd-secondary p-3 text-center transition-colors hover:bg-fd-accent"
                 >
-                  <p.Icon className="size-5 shrink-0" />
-                  {p.name}
-                </span>
+                  <span
+                    className={cn(
+                      "absolute top-2 right-2 rounded-full px-1.5 py-0.5 text-[9px] font-semibold tracking-wide uppercase",
+                      p.badge === "Ready"
+                        ? "bg-emerald-500/15 text-emerald-500"
+                        : "bg-amber-500/15 text-amber-500",
+                    )}
+                  >
+                    {p.badge}
+                  </span>
+                  <p.Icon className="size-9 shrink-0 text-landing-foreground" />
+                  <span className="text-xs font-medium text-landing-foreground sm:text-sm">{p.name}</span>
+                </div>
               ))}
-
-              {/* separator between what ships today and what's coming */}
-              <span aria-hidden className="mx-1 hidden h-8 w-px self-center bg-fd-border sm:block" />
 
               {COMING_SOON.map((p) => (
-                <span
+                <div
                   key={p.name}
-                  className="inline-flex items-center gap-2.5 rounded-full border border-dashed bg-transparent px-5 py-3 text-base font-medium text-fd-muted-foreground"
+                  className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border bg-fd-secondary p-3 text-center opacity-55"
                 >
-                  <p.Icon className="size-5 shrink-0 opacity-70" />
-                  {p.name}
-                  <span className="ml-0.5 rounded-full bg-fd-muted-foreground/15 px-2 py-0.5 text-[11px] font-semibold tracking-wide uppercase">
+                  <span className="absolute top-2 right-2 rounded-full bg-fd-muted-foreground/20 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-fd-muted-foreground uppercase">
                     Soon
                   </span>
-                </span>
+                  <p.Icon className="size-9 shrink-0 text-fd-muted-foreground" />
+                  <span className="text-xs font-medium text-fd-muted-foreground sm:text-sm">{p.name}</span>
+                </div>
               ))}
             </div>
-            <Link
-              href="/docs/platforms"
-              className="mt-auto w-fit text-sm font-medium text-brand hover:underline"
-            >
-              See the full platform matrix →
-            </Link>
+            {/* Card footer — flush to the card edges, a muted bar over the shader. */}
+            <div className="relative z-2 -mx-6 -mb-6 mt-auto border-t border-fd-border/60 bg-fd-muted px-6 py-4">
+              <Link
+                href="/docs/platforms"
+                className="text-sm font-medium text-brand hover:underline"
+              >
+                See the full platform matrix →
+              </Link>
+            </div>
             <AgnosticBackground />
           </div>
 
@@ -288,6 +308,7 @@ export default function HomePage() {
       </Wide>
 
       {/* ── Final CTA ────────────────────────────────────────────────────────── */}
+      {/* ShaderCta pins itself dark (dark shader panel), so no wrapper needed here. */}
       <Wide className="mt-16 lg:mt-28">
         <ShaderCta
           title="Turn your library into a channel you leave on."

@@ -42,8 +42,12 @@ jobs:
         include:
           - os: macos-14 # Apple Silicon
             arch: arm64
-          # macOS Intel (macos-13) dropped for now — the runner is very slow/scarce (20+ min vs ~5 on arm64) and
-          # Intel Macs are a shrinking slice. Apple-Silicon coverage proves macOS builds work. Re-add if needed.
+          # macOS Intel — NATIVE x64 on `macos-15-intel`, GitHub's new STANDARD (free) Intel runner that
+          # replaces the deprecated macos-13. Electrobun CANNOT cross-compile arch (its build always
+          # targets the host; the CLI has no --target, only --env; even Electrobun's OWN release CI ships
+          # arm64-only Mac), so a native Intel runner is the only way — and this is a real, supported one.
+          - os: macos-15-intel
+            arch: x64
           - os: windows-2025
             arch: x64
           - os: ubuntu-24.04
@@ -126,7 +130,7 @@ jobs:
           # macOS + signing secrets present → tell electrobun.config to skip its own (unsigned) DMG; the signing
           # step below builds + signs + notarizes its own. Empty on every other runner / when the cert secret is
           # absent (forks, no secrets), so electrobun behaves exactly as before and the build stays green.
-          AIRWAVE_MAC_SIGN: ${{ (matrix.os == 'macos-14' && env.MAC_SIGN_AVAILABLE == 'true') && '1' || '' }}
+          AIRWAVE_MAC_SIGN: ${{ (runner.os == 'macOS' && env.MAC_SIGN_AVAILABLE == 'true') && '1' || '' }}
         run: pnpm run build:${{ steps.ch.outputs.channel }}
 
       # macOS only: electrobun's own codesign can't handle our nested embedded-Postgres binaries (it walks only
@@ -135,7 +139,7 @@ jobs:
       # with the hardened runtime + entitlements, builds the DMG, notarizes via the App Store Connect API key, and
       # staples. Gated on the cert secret existing (skipped on forks / before secrets are set).
       - name: Sign + notarize macOS (Developer ID)
-        if: matrix.os == 'macos-14' && env.MAC_SIGN_AVAILABLE == 'true'
+        if: runner.os == 'macOS' && env.MAC_SIGN_AVAILABLE == 'true'
         working-directory: apps/desktop
         shell: bash
         env:
@@ -220,24 +224,23 @@ jobs:
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
 
-      # Linux artifacts come straight from electrobun as `stable-linux-<arch>-Airwave-*` (Windows/mac are
-      # named Airwave-Server-… by our own installer/DMG scripts). Rename the Linux ones to match, and
-      # patch the update.json's tarball reference so the (electrobun) updater still resolves.
-      - name: Rename Linux artifacts to Airwave-Server
+      # Linux artifacts come from electrobun as `<channel>-linux-<arch>-Airwave-*` ("Airwave" buried in the
+      # middle). Rename to the SAME shape as Windows/mac — `Airwave-Server-<ver>-linux-<arch>-*` (brand
+      # first) — and patch the update.json's tarball reference so the (electrobun) updater still resolves.
+      - name: Rename Linux artifacts to Airwave-Server-<ver>-linux-<arch>
         if: runner.os == 'Linux'
         working-directory: apps/desktop/artifacts
         shell: bash
         run: |
           set -euo pipefail
-          for f in *Airwave*; do
-            [ -e "$f" ] || continue
-            new="${f/Airwave/Airwave-Server}"
-            [ "$f" = "$new" ] && continue
-            mv "$f" "$new"
-          done
+          VER="$(node -p "require('$GITHUB_WORKSPACE/apps/desktop/package.json').version")"
+          PREFIX="Airwave-Server-${VER}-linux-${{ matrix.arch }}"
+          for f in *Airwave-Setup.tar.gz; do [ -e "$f" ] && mv "$f" "${PREFIX}-Setup.tar.gz"; done
+          for f in *Airwave.tar.zst;     do [ -e "$f" ] && mv "$f" "${PREFIX}.tar.zst"; done
+          # Point the updater manifest at the renamed tarball (any `…Airwave.tar.zst` → the new name).
           for j in *update.json; do
             [ -e "$j" ] || continue
-            sed -i 's/Airwave\.tar\.zst/Airwave-Server.tar.zst/g; s/Airwave-Setup/Airwave-Server-Setup/g' "$j"
+            sed -i "s#[A-Za-z0-9._-]*Airwave\.tar\.zst#${PREFIX}.tar.zst#g" "$j"
           done
           echo "renamed:"; ls -la
 
@@ -252,6 +255,25 @@ jobs:
           path: apps/desktop/artifacts/*
           if-no-files-found: warn
 
+      # Compose the "Airwave Server" section ONCE (on the arm64 mac job) so it's appended a single time —
+      # every matrix job attaches its own files, but only this one carries the body (others append empty).
+      - name: Compose server release notes
+        if: startsWith(github.ref, 'refs/tags/v') && matrix.os == 'macos-14'
+        id: notes
+        shell: bash
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          {
+            echo 'body<<NOTES'
+            echo '## 🖥️ Airwave Server (desktop app)'
+            echo ''
+            echo 'The self-contained Airwave server + admin, installed next to Plex — embedded Postgres, a tray supervisor, the browser as the UI. No Docker, no NAS.'
+            echo "- **Windows** — \`Airwave-Server-${VER}-windows-x64-Setup.exe\`"
+            echo "- **macOS** — \`Airwave-Server-${VER}-macos-arm64.dmg\` (Apple Silicon) · \`Airwave-Server-${VER}-macos-x64.dmg\` (Intel)"
+            echo "- **Linux** — \`Airwave-Server-${VER}-linux-x64-Setup.tar.gz\` · \`Airwave-Server-${VER}-linux-arm64-Setup.tar.gz\`"
+            echo 'NOTES'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Attach to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
@@ -259,7 +281,8 @@ jobs:
           files: apps/desktop/artifacts/*
           draft: false
           prerelease: ${{ steps.ch.outputs.channel == 'canary' }}
-          generate_release_notes: true
+          append_body: true
+          body: ${{ steps.notes.outputs.body }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

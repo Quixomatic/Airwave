@@ -31,7 +31,7 @@ jobs:
   build-and-push:
     runs-on: ubuntu-24.04
     permissions:
-      contents: read
+      contents: write # append the Docker section to the GitHub Release body on tag
       packages: write
     steps:
       - name: Checkout
@@ -104,3 +104,33 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
+
+      # On a tag, append a "Docker image" section to the GitHub Release body (no files — GHCR hosts the
+      # image), so the release describes the image alongside the client + server sections.
+      - name: Compose Docker release notes
+        if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+        id: notes
+        shell: bash
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          {
+            echo 'body<<NOTES'
+            echo '## 🐳 Docker image (self-host)'
+            echo ''
+            echo 'The self-hostable Airwave server — one image, two roles (`app` / `tvweb`). Point it at a Postgres, pull the tag, and bring it up:'
+            echo '```'
+            echo "ghcr.io/quixomatic/airwave:${VER}"
+            echo 'docker compose pull && docker compose up -d'
+            echo '```'
+            echo 'NOTES'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Append Docker section to release
+        if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          append_body: true
+          body: ${{ steps.notes.outputs.body }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

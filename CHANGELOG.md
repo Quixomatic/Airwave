@@ -2,6 +2,29 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.61] - 2026-08-21
+
+getairwave.tv polish + release-pipeline improvements.
+
+### Marketing site
+- **Hero + final CTA now stay dark in light mode** — they sit on dark shader panels, so pinning them dark
+  (explicit dark background + forced-dark shader + `isolate` stacking) keeps the shader visible and the text
+  readable regardless of the site theme.
+- **Platform section reworked into square app-grid tiles** with status badges: **Ready** (green), **WIP**
+  (amber, Android TV / Fire TV — partial HDR), **Soon** (muted, Linux / Samsung). Windows, macOS, and Roku
+  moved into the working set; tiles ordered Ready → WIP → Soon.
+- Hero clip is now responsive (shows + repositions from mobile through xl instead of vanishing below
+  1024px); the "See the full platform matrix" link became a muted footer bar; tightened the footer gap.
+
+### Release pipeline
+- **macOS Intel server build restored** — the Airwave **Server** (Electrobun) can't cross-compile arch, so
+  the Intel build now runs natively on GitHub's new standard **`macos-15-intel`** runner (replacing the
+  retired `macos-13`); mac signing/notarization applies to both arches.
+- **Linux server assets renamed** to the brand-first `Airwave-Server-<ver>-linux-<arch>-*` shape (matching
+  Windows/macOS) instead of `stable-linux-<arch>-Airwave-*`.
+- **Release notes** — each workflow now appends a component section (📺 Client, 🖥️ Server, 🐳 Docker) to the
+  GitHub Release body instead of five repeated "Full Changelog" lines.
+
 ## [0.11.60] - 2026-08-21
 
 tv-tauri — macOS **HDR-EDR passthrough** on HDR-capable displays (full quality), bundled with the centered
