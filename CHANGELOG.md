@@ -2,6 +2,32 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.53] - 2026-08-21
+
+tv-tauri Phase 8 (finalize) — **macOS Developer-ID signing + notarization, Intel via cross-compile, and a
+merged multi-platform `latest.json`**.
+
+### macOS signing + notarization
+- After the dylib bundling (which must precede signing, or the signature is invalid), CI now Developer-ID
+  signs the app with the **hardened runtime** — leaf-first: each Framework dylib, the main binary, then the
+  bundle — using a new `entitlements.plist` (allow-jit + unsigned-executable-memory +
+  disable-library-validation for the bundled libmpv). Then it **notarizes** the DMG via the App Store
+  Connect API key and **staples** the ticket to both the DMG and the `.app`. Gated on the Apple cert secret
+  (still builds unsigned without it); reuses the desktop-server Apple secrets.
+
+### Intel via cross-compile (not a second runner)
+- The Intel build now **cross-compiles on the Apple-Silicon `macos-14` runner** (`--target
+  x86_64-apple-darwin`) instead of a `macos-13` row — `macos-14` is always available and fast, while the
+  public macOS-Intel runner queue backs up. The mac steps are target-aware (bundle path + `--target`).
+
+### One updater manifest across platforms
+- Each build job emits an updater **fragment** (`frag-<key>.json`) + its distributable; a new **`finalize`
+  job** merges them into a single `latest.json` (`windows-x86_64` + `darwin-aarch64` + `darwin-x86_64`) and
+  attaches every installer / DMG / updater-tarball to the release. The merge runs on any dispatch (with a
+  `latest.json` inspection artifact); the release attach only fires on a `v*` tag or a `release_tag`
+  dispatch, so plain builds never mutate a release. The mac updater ships a signed `.app.tar.gz`; the
+  Windows path is unchanged (same `latest.json` URL — backward-compatible for installed clients).
+
 ## [0.11.52] - 2026-08-21
 
 tv-tauri Phase 8 — **macOS native traffic lights + Intel builds + a self-contained DMG**.

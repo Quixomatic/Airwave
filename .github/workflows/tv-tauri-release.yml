@@ -40,18 +40,23 @@ jobs:
             arch: x64
             libmpv: windows-x64
             supported: true
-          # macOS Apple Silicon — Phase 8 (render-attach = CAMetalLayer-as-wid). `updaterarch` is the
-          # Tauri/darwin arch slug for latest.json (`darwin-aarch64` / `darwin-x86_64`).
+          # macOS Apple Silicon — native build (render-attach = CAMetalLayer-as-wid). `updaterarch` is
+          # the Tauri/darwin arch slug for latest.json (`darwin-aarch64` / `darwin-x86_64`); `target` is
+          # empty → native aarch64.
           - os: macos-14
             arch: arm64
             libmpv: macos-arm64
             updaterarch: aarch64
+            target: ""
             supported: true
-          # macOS Intel — native x86_64 on the macos-13 runner (no cross-compile).
-          - os: macos-13
+          # macOS Intel — CROSS-COMPILED on the same Apple-Silicon runner (`--target x86_64-apple-darwin`).
+          # macos-14 is always available + fast; the public macOS Intel (macos-13) runner queue is backed
+          # up. The arm64 host links the x86_64 libmpv → an Intel .app (we bundle, never run it here).
+          - os: macos-14
             arch: x64
             libmpv: macos-x64
             updaterarch: x86_64
+            target: x86_64-apple-darwin
             supported: true
           # NO-OP until the Linux X11/wayland embed lands.
           - os: ubuntu-24.04
@@ -64,6 +69,7 @@ jobs:
       DATABASE_URL: "postgresql://build:build@localhost:5432/build?schema=public"
       # `secrets` can't be used in a step `if:`, so evaluate signing availability once here.
       WIN_SIGN_AVAILABLE: ${{ secrets.AZURE_CREDENTIALS != '' }}
+      MAC_SIGN_AVAILABLE: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 != '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -177,8 +183,10 @@ jobs:
           EXE="$(ls src-tauri/target/release/bundle/nsis/*_x64-setup.exe)"
           pnpm exec tauri signer sign -p "" "$EXE"
 
-      # Stage the installer + .sig under space-free names and build latest.json (the updater manifest).
-      - name: Stage release artifacts + latest.json
+      # Stage the installer + .sig under a space-free name, and drop an updater FRAGMENT
+      # (frag-windows-x86_64.json = {key,signature,url}) that the finalize job merges into one latest.json
+      # spanning every platform. (Per-job latest.json would clobber the other platforms' entries.)
+      - name: Stage installer + updater fragment (Windows)
         if: matrix.supported && runner.os == 'Windows'
         working-directory: apps/tv-tauri
         shell: bash
@@ -193,23 +201,20 @@ jobs:
           cp "$SRC_EXE.sig" "$OUT/$ASSET.sig"
           export SIG="$(cat "$OUT/$ASSET.sig")"
           export URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/${ASSET}"
-          export VER
           node -e "
             const fs=require('fs');
-            const m={version:process.env.VER,notes:'Airwave Client '+process.env.VER,pub_date:new Date().toISOString(),
-              platforms:{'windows-x86_64':{signature:process.env.SIG,url:process.env.URL}}};
-            fs.writeFileSync(process.env.OUT+'/latest.json', JSON.stringify(m,null,2));
+            fs.writeFileSync('artifacts/frag-windows-x86_64.json', JSON.stringify(
+              {key:'windows-x86_64', signature:process.env.SIG, url:process.env.URL}));
           "
-          cat "$OUT/latest.json"
-        env:
-          OUT: artifacts
+          cat artifacts/frag-windows-x86_64.json; echo
 
-      # ── macOS (Apple Silicon + Intel) — Phase 8. Build the .app ONLY, make it self-contained by
-      # bundling the libmpv dylibs into Contents/Frameworks + flattening install_names to @rpath, THEN
-      # build the DMG from the FIXED .app. (Building `app,dmg` together packages the .app BEFORE the
-      # dylibs land → the DMG's app can't find libmpv.) UNSIGNED for now; signing + notarization +
-      # latest.json come in the finalize pass (8C). First run also compile-checks the objc2
-      # render-attach + the native-traffic-lights window setup. ────────────────────────────────────
+      # ── macOS (Apple Silicon native + Intel cross-compiled) — Phase 8. Build the .app ONLY, make it
+      # self-contained by bundling the libmpv dylibs into Contents/Frameworks + flattening install_names
+      # to @rpath, Developer-ID SIGN it (hardened runtime), build the DMG from the FIXED+SIGNED .app,
+      # then NOTARIZE + staple. (Building `app,dmg` together packages the .app BEFORE the dylibs land →
+      # broken DMG; signing must come AFTER the dylib surgery or the signature is invalid.) Signing is
+      # gated on the Apple cert secret — without it the app is unsigned (Gatekeeper warns) but still
+      # builds. The updater `.sig` (minisign) is independent of Apple signing. ──────────────────────
       - name: Build (Tauri .app)
         if: matrix.supported && runner.os == 'macOS'
         working-directory: apps/tv-tauri
@@ -217,7 +222,12 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
-        run: pnpm exec tauri build --bundles app
+        run: |
+          set -euo pipefail
+          TARGET="${{ matrix.target }}"
+          # Intel row cross-compiles on the arm64 runner — install the target first. Empty → native.
+          if [ -n "$TARGET" ]; then rustup target add "$TARGET"; fi
+          pnpm exec tauri build --bundles app ${TARGET:+--target "$TARGET"}
 
       - name: Bundle libmpv dylibs into the .app
         if: matrix.supported && runner.os == 'macOS'
@@ -225,7 +235,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          APP="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' | head -1)"
+          # With `--target`, Tauri emits under target/<triple>/release/bundle; native builds under target/release/bundle.
+          TARGET="${{ matrix.target }}"
+          BASE="src-tauri/target${TARGET:+/$TARGET}/release/bundle"
+          APP="$(find "$BASE/macos" -maxdepth 1 -name '*.app' | head -1)"
           [ -n "$APP" ] || { echo "no .app built"; exit 1; }
           echo "app: $APP"
           FW="$APP/Contents/Frameworks"; mkdir -p "$FW"
@@ -254,19 +267,115 @@ jobs:
           echo "== binary libmpv refs =="; otool -L "$BIN" | grep -i libmpv || true
           echo "== Frameworks =="; ls "$FW"
 
+      # Developer-ID sign (hardened runtime) — AFTER the dylib surgery (which changes the Mach-O content,
+      # so any earlier signature would be invalid). Imports the cert into a throwaway keychain on the
+      # ephemeral runner (mirrors desktop-release.yml), then signs leaf-first: every Framework dylib, the
+      # main binary, then the bundle — with our entitlements. Gated on the cert secret; unsigned otherwise.
+      - name: Sign macOS app (Developer ID + hardened runtime)
+        if: matrix.supported && runner.os == 'macOS' && env.MAC_SIGN_AVAILABLE == 'true'
+        working-directory: apps/tv-tauri
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          TARGET="${{ matrix.target }}"
+          BASE="src-tauri/target${TARGET:+/$TARGET}/release/bundle"
+          APP="$(find "$BASE/macos" -maxdepth 1 -name '*.app' | head -1)"
+          KEYCHAIN="$RUNNER_TEMP/airwave-signing.keychain-db"
+          KPW="$(openssl rand -base64 24)"
+          security create-keychain -p "$KPW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KPW" "$KEYCHAIN"
+          echo "$APPLE_CERTIFICATE_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security -f pkcs12
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KPW" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed s/\"//g)
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" | awk -F'"' '/Developer ID Application/{print $2; exit}')"
+          [ -n "$IDENTITY" ] || { echo "no Developer ID Application identity"; exit 1; }
+          echo "signing identity: $IDENTITY"
+          ENT="src-tauri/entitlements.plist"
+          # Leaf-first: dylibs, then the main binary, then the bundle.
+          find "$APP/Contents/Frameworks" -name '*.dylib' -print0 | while IFS= read -r -d '' d; do
+            codesign --force --timestamp --options runtime -s "$IDENTITY" "$d"
+          done
+          BIN="$(find "$APP/Contents/MacOS" -maxdepth 1 -type f | head -1)"
+          codesign --force --timestamp --options runtime --entitlements "$ENT" -s "$IDENTITY" "$BIN"
+          codesign --force --timestamp --options runtime --entitlements "$ENT" -s "$IDENTITY" "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          rm -f "$RUNNER_TEMP/cert.p12"
+
       - name: Create DMG from the bundled .app
         if: matrix.supported && runner.os == 'macOS'
         working-directory: apps/tv-tauri
         shell: bash
         run: |
           set -euo pipefail
-          APP="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' | head -1)"
+          TARGET="${{ matrix.target }}"
+          BASE="src-tauri/target${TARGET:+/$TARGET}/release/bundle"
+          APP="$(find "$BASE/macos" -maxdepth 1 -name '*.app' | head -1)"
           VER="$(node -p "require('./package.json').version")"
           OUT=artifacts; mkdir -p "$OUT"
           DMG="$OUT/Airwave-Client_${VER}_${{ matrix.updaterarch }}.dmg"
           # Stage the .app + an /Applications symlink in a temp dir for a drag-to-install DMG.
           STAGE="$(mktemp -d)"; cp -R "$APP" "$STAGE/"; ln -s /Applications "$STAGE/Applications"
           hdiutil create -volname "Airwave Client" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+          ls -la "$OUT"
+
+      # Notarize the DMG (contains the signed app) via the App Store Connect API key, then staple the
+      # ticket to BOTH the DMG and the .app (so the updater's tar'd app also passes Gatekeeper offline).
+      - name: Notarize + staple macOS (Developer ID)
+        if: matrix.supported && runner.os == 'macOS' && env.MAC_SIGN_AVAILABLE == 'true'
+        working-directory: apps/tv-tauri
+        shell: bash
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+        run: |
+          set -euo pipefail
+          TARGET="${{ matrix.target }}"
+          BASE="src-tauri/target${TARGET:+/$TARGET}/release/bundle"
+          APP="$(find "$BASE/macos" -maxdepth 1 -name '*.app' | head -1)"
+          VER="$(node -p "require('./package.json').version")"
+          DMG="artifacts/Airwave-Client_${VER}_${{ matrix.updaterarch }}.dmg"
+          echo "$APPLE_API_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          xcrun notarytool submit "$DMG" --key "$RUNNER_TEMP/AuthKey.p8" \
+            --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID" --wait
+          xcrun stapler staple "$DMG"
+          xcrun stapler staple "$APP"
+          rm -f "$RUNNER_TEMP/AuthKey.p8"
+
+      # The updater artifact: tar the (signed, stapled) .app → `.app.tar.gz`, minisign it (the updater's
+      # OWN signature — independent of Apple codesigning), and drop the fragment for the finalize merge.
+      - name: Stage updater tarball + fragment (macOS)
+        if: matrix.supported && runner.os == 'macOS'
+        working-directory: apps/tv-tauri
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: |
+          set -euo pipefail
+          TARGET="${{ matrix.target }}"
+          BASE="src-tauri/target${TARGET:+/$TARGET}/release/bundle"
+          APP="$(find "$BASE/macos" -maxdepth 1 -name '*.app' | head -1)"
+          VER="$(node -p "require('./package.json').version")"
+          ARCH="${{ matrix.updaterarch }}"
+          OUT=artifacts; mkdir -p "$OUT"
+          TAR="$OUT/Airwave-Client_${VER}_${ARCH}.app.tar.gz"
+          # Tar just the .app (the updater extracts + swaps it). -C into its dir so the archive has no path prefix.
+          tar czf "$TAR" -C "$(dirname "$APP")" "$(basename "$APP")"
+          pnpm exec tauri signer sign -p "" "$TAR"
+          export SIG="$(cat "$TAR.sig")"
+          export URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/$(basename "$TAR")"
+          node -e "
+            const fs=require('fs');
+            fs.writeFileSync('artifacts/frag-darwin-${ARCH}.json', JSON.stringify(
+              {key:'darwin-${ARCH}', signature:process.env.SIG, url:process.env.URL}));
+          "
+          cat "artifacts/frag-darwin-${ARCH}.json"; echo
           ls -la "$OUT"
 
       - name: Upload build artifacts
@@ -277,14 +386,52 @@ jobs:
           path: apps/tv-tauri/artifacts/*
           if-no-files-found: warn
 
-      # Attach to the release on a v* tag push, OR when dispatched with a `release_tag` input (the latter
-      # lets us land the installer on an existing release without re-tagging / re-firing docker+desktop).
+  # ── Finalize: merge every platform's updater fragment into ONE latest.json and attach all the
+  # distributables to the release. Runs after ALL matrix builds (so every platform's signature is in
+  # hand — a per-job latest.json would clobber the others). The merge + a latest.json inspection
+  # artifact run on ANY dispatch; the release ATTACH only fires on a v* tag or a `release_tag` dispatch,
+  # so a plain build never mutates a release. Inherits `contents: write` from the workflow. ───────────
+  finalize:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dl
+      - name: Assemble latest.json + collect release files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          # Gather the distributables + updater sigs (NOT the frag-*.json).
+          find dl -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.app.tar.gz' -o -name '*.sig' \) \
+            -exec cp {} release/ \;
+          VER="$(node -p "require('./apps/tv-tauri/package.json').version")"
+          export VER
+          node -e '
+            const fs=require("fs"), cp=require("child_process");
+            const frags=cp.execSync("find dl -name \"frag-*.json\"").toString().trim().split("\n").filter(Boolean);
+            const platforms={};
+            for (const f of frags){ const j=JSON.parse(fs.readFileSync(f,"utf8")); platforms[j.key]={signature:j.signature,url:j.url}; }
+            const m={version:process.env.VER, notes:"Airwave Client "+process.env.VER, pub_date:new Date().toISOString(), platforms};
+            fs.writeFileSync("release/latest.json", JSON.stringify(m,null,2));
+          '
+          echo "== latest.json =="; cat release/latest.json
+          echo "== release files =="; ls -la release
+      - name: Upload merged latest.json (inspection)
+        uses: actions/upload-artifact@v4
+        with:
+          name: airwave-client-latest-json
+          path: release/latest.json
+      # Attach ONLY on a real release (v* tag push or a `release_tag` dispatch) — never on a plain build.
       - name: Attach to GitHub Release
-        if: matrix.supported && (startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != '')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.release_tag || github.ref_name }}
-          files: apps/tv-tauri/artifacts/*
+          files: release/*
           draft: false
           generate_release_notes: true
         env:
