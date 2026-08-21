@@ -2,6 +2,12 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.59] - 2026-08-21
+
+tv-tauri — macOS titlebar polish: **center the Airwave brand** in the window header (was shifted right of
+the native traffic lights, where its slightly-larger mark read as off-balance). macOS-only CSS
+(`html.platform-mac`); the native traffic lights stay top-left and never overlap the centered brand.
+
 ## [0.11.58] - 2026-08-21
 
 tv-tauri — macOS video **embedded via mpv's render API** (soia's approach; the real fix). mpv 0.41 has no

@@ -165,13 +165,17 @@ body {
   transition: transform 0.25s ease, opacity 0.25s ease;
 }
 
-/* macOS: the window keeps native decorations (traffic lights) + a full-size content view, so we hide
-   our custom min/max/close and shift the brand right to clear the lights (top-left ~70px). */
+/* macOS: the window keeps native decorations (traffic lights, top-left) + a full-size content view, so
+   we hide our custom min/max/close and CENTER the brand in the window header (it reads better centered
+   than shifted right of the lights). The native lights sit far left, so a centered brand never overlaps
+   them. Symmetric padding so "center" is the true window center. */
 html.platform-mac .tb-controls {
   display: none;
 }
 html.platform-mac .titlebar {
-  padding-left: 78px;
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 /* Fullscreen player: the titlebar slides away with the rest of the chrome (FullChrome toggles this
