@@ -2,6 +2,12 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.42] - 2026-08-20
+
+tv-tauri — the fullscreen titlebar is much easier to peek: the reveal zone grew from the top 4px to
+the **top ~80px** of the screen (with hysteresis — it only starts hiding once the cursor drops past
+110px — so it doesn't flicker at the edge). Moving the mouse anywhere near the top now slides it in.
+
 ## [0.11.41] - 2026-08-20
 
 tv-tauri — the fullscreen titlebar peek stays down longer before re-hiding (400ms → 1600ms), so it

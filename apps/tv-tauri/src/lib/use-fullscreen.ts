@@ -36,12 +36,14 @@ export function useFullscreen() {
       el.classList.remove("fs-peek");
       return;
     }
+    // Generous reveal zone — anywhere near the top of the screen peeks the titlebar in. Hysteresis
+    // (reveal ≤80, hide-timer only past 110) so it doesn't flip-flop when the cursor hovers the edge.
     let hideTimer = 0;
     const onMove = (e: MouseEvent) => {
-      if (e.clientY <= 4) {
+      if (e.clientY <= 80) {
         window.clearTimeout(hideTimer);
         el.classList.add("fs-peek");
-      } else if (e.clientY > 48) {
+      } else if (e.clientY > 110) {
         window.clearTimeout(hideTimer);
         hideTimer = window.setTimeout(() => el.classList.remove("fs-peek"), 1600);
       }
