@@ -149,8 +149,14 @@ A Postgres database and [`docker-compose.yml`](./docker-compose.yml) wire it tog
 ## Clients
 
 The TV app is a full 10-foot experience: an Aurora channel-guide grid, a native-first player with a DVR
-scrubber, channel up/down, and the "Up Next" bumper card. It's the **same app** across platforms (Expo /
-React Native + **mpv** for wide-codec native playback), so features land everywhere at once.
+scrubber, channel up/down, and the "Up Next" bumper card. The **same app** ships four ways, so features
+land everywhere at once:
+
+- **`tv-native`** — Expo / React Native + **mpv** for the living-room boxes (Apple TV, iPad, Android TV, Fire TV).
+- **`tv-web`** — the same React app as a **browser player** and packaged for **LG webOS**.
+- **`tv-tauri`** — a native **desktop** app (Windows/macOS/Linux) that reuses the `tv-web` React UI in a
+  Tauri shell with its own bundled **libmpv**, plus desktop mouse / picture-in-picture / true fullscreen.
+- **`tv-roku`** — an independent native Roku channel (BrighterScript + SceneGraph) held to strict parity.
 
 ### Platform availability
 
@@ -161,9 +167,11 @@ React Native + **mpv** for wide-codec native playback), so features land everywh
 | **Android TV** | ✅ Available | Google Play |
 | **Fire TV** | ✅ Available | Amazon Appstore |
 | **LG webOS** | ✅ Available | LG Content Store |
+| **Windows** | ✅ Available | native **desktop app** (Tauri + mpv) — a signed installer |
+| **Roku** | ✅ Built | native Roku channel (running on real hardware; Channel Store submission to come) |
 | **Any browser** | ✅ Live now | the `tvweb` Docker role — an auth-gated web player (this is what runs at [tv.turboforge.io](https://tv.turboforge.io), served from the compose stack) |
+| **macOS / Linux** | 🔜 Coming soon | the same desktop app (Tauri + mpv) — build targets next |
 | **Samsung (Tizen)** | 🔜 Coming soon | — |
-| **Roku** | 🔜 Coming soon | — |
 
 The native apps are distributed through their platform stores (a small paid download — see
 [Why I built this](#why-i-built-this)). Because Airwave is source-available, you can also **build and
@@ -183,9 +191,20 @@ and preview lineups.
 
 ---
 
-## Self-hosting (Docker)
+## Self-hosting
 
-### Quick start (Dockge or `docker compose`)
+Two ways to run the Airwave **server** (they host the exact same thing — pick whichever fits):
+
+- **🖥️ One-click desktop installer** — the easiest path, no Docker. **Airwave Desktop** (`apps/desktop`) is
+  a native tray app that bundles the server, admin UI, browser TV player, and an **embedded PostgreSQL**
+  into a single signed installer for Windows / macOS / Linux — install it next to Plex and it just runs.
+  Grab it from the [Releases](https://github.com/Quixomatic/Airwave/releases).
+- **🐳 Docker / compose** — the flexible path for a NAS, home server, or VPS (below).
+
+> Not to be confused with the desktop **client** (`tv-tauri`) in the platform table above — that's a
+> *viewer* app you install to watch. Airwave Desktop here is the *server*.
+
+### Docker — quick start (Dockge or `docker compose`)
 
 1. **Grab the stack files** — [`docker-compose.yml`](./docker-compose.yml) and [`.env.example`](./.env.example).
    In Dockge: create a stack, paste the compose, then the env.
@@ -259,8 +278,12 @@ airwave/
 ├── apps/
 │   ├── server/      # API (Hono, tRPC + REST), scheduling engine, jobs, Plex integration
 │   ├── web/         # Admin web app (React + TanStack Router)
-│   ├── tv-web/      # 10-foot TV app for webOS + browser (Vite)
-│   └── tv-native/   # Native TV app (Expo/React Native): Apple TV, iPad, Android TV, Fire TV
+│   ├── tv-web/      # 10-foot TV app for webOS + browser (Vite) — also reused by tv-tauri
+│   ├── tv-native/   # Native TV app (Expo/React Native): Apple TV, iPad, Android TV, Fire TV
+│   ├── tv-tauri/    # Native desktop client (Tauri + React/Vite + libmpv): Windows/macOS/Linux
+│   ├── tv-roku/     # Native Roku channel (BrighterScript + SceneGraph) — its own codebase
+│   ├── desktop/     # Airwave Desktop: one-click server installer (Electrobun + embedded Postgres)
+│   └── site/        # getairwave.tv marketing + docs site (Next.js)
 └── packages/
     ├── api/         # Business logic / services (scheduling, plex, bumpers, access, …)
     ├── auth/        # Better-Auth config (Plex OAuth + roles, device-code login)
@@ -304,6 +327,7 @@ More subsystem docs (the apps + stacks, the scheduling engine, playback) are on 
 - **Auth:** [Better-Auth](https://www.better-auth.com) (Plex OAuth + roles, TV device-code login)
 - **Web:** React, TanStack Router/Query, TailwindCSS, shadcn/ui
 - **Native TV:** Expo / React Native (react-native-tvos) with an **mpv** playback engine
+- **Desktop client:** Tauri (Rust) + React/Vite + **libmpv**; **Roku:** BrighterScript + SceneGraph
 - **Monorepo:** pnpm workspaces + Turborepo
 
 ---
@@ -319,13 +343,15 @@ Built and proven in real use:
 - Per-user access control + admin-only admin UI
 - Capability diagnostic + native-first playback (mpv); off-network local/remote/relay
 - Lineup import/export between instances
-- Native apps running on iPad, Apple TV 4K, Android TV, Fire TV, and LG webOS; self-host on TrueNAS
+- Native apps running on iPad, Apple TV 4K, Android TV, Fire TV, LG webOS, **Roku**, and a **Windows desktop**
+  client (Tauri + libmpv, with a self-updating signed installer)
+- Self-host on TrueNAS **or** the one-click **Airwave Desktop** installer (bundled server + embedded Postgres)
 
 On the roadmap / in progress:
 
 - Rotation **weighting + freshness** (make a show air more/less often; surface just-added episodes)
 - **Jellyfin / Emby** media-server support
-- **Samsung (Tizen)** and **Roku** clients
+- **macOS / Linux** desktop client + **Samsung (Tizen)** client; **Roku** Channel Store submission
 - A manual schedule editor and general pre-1.0 polish
 
 ---
