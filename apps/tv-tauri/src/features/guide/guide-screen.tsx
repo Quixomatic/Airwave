@@ -42,15 +42,15 @@ export function GuideScreen({
     if (error instanceof ApiError && error.status === 401) onSignOut();
   }, [error, onSignOut]);
 
-  // Only a genuine first-load (no data AND no error yet) shows the spinner.
-  if (!data && !error) return <Centered>Loading…</Centered>;
-
-  // NO early return for an error OR an empty channel list. AuroraGrid renders the full interface
-  // (sidebar + featured chrome + its own context-aware GuideGhost empty state) even with zero
-  // channels, so a fresh install — OR a server that's unreachable/down — still gets the sidebar to
-  // reach Settings/scan (change server / sign out). A plain "Couldn't load the guide." card here would
-  // strand the user with no navigation. `serverTime` falls back to the client clock when the fetch
-  // failed. (A 401 is handled in the effect above → forced sign-out.)
+  // NO early return for loading, an error, OR an empty channel list. AuroraGrid renders the full
+  // interface (sidebar + featured chrome + its own context-aware GuideGhost) in every case: a
+  // first-load shows the ghost skeleton with a "Loading channels…" message, a fetch error shows an
+  // "unreachable server" message, and a fresh install / empty filter shows the empty state — all with
+  // the sidebar reachable so the user can get to Settings (change server / sign out) and is never
+  // stranded on a bare spinner. `serverTime` falls back to the client clock when there's no data yet.
+  // (A 401 is handled in the effect above → forced sign-out.)
+  const loading = !data && !error;
+  const errored = !data && !!error;
   return (
     <AuroraGrid
       channels={data?.channels ?? []}
@@ -58,14 +58,8 @@ export function GuideScreen({
       onTune={onTune}
       onSettings={onSettings}
       onAccount={onAccount}
+      loading={loading}
+      errored={errored}
     />
-  );
-}
-
-function Centered({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ position: "absolute", inset: 0, background: "#060a14", color: "#94a3b8" }} className="flex items-center justify-center text-2xl">
-      {children}
-    </div>
   );
 }

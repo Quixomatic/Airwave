@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.34] - 2026-08-20
+
+tv-tauri — a proper **GhostGuide** for loading + empty states, modelled on the apps/web `/guide`
+skeleton so it reads as "the guide, about to appear" (no jump when the data lands). The guide's
+first load now shows the ghost skeleton with a centered **"Loading channels…"** card (spinner)
+instead of bare "Loading…" text; a fetch error shows an **"unreachable server"** card; and empty
+lenses keep their context messages (no favorites / nothing watched / no channels in this filter /
+no channels yet).
+
+### What ships
+
+- **`GuideGhost` rewritten** to mirror the REAL loaded layout using the SAME sizing helpers — the
+  `fv = vw(px·FEATURE_SCALE)` featured-panel blocks (icon · number · name · genre · divider · title +
+  badges · meta · summary · time/status · progress), the REAL `TimeHeader` time axis, and rail
+  circle+number+name + lane program blocks off the real `laneW`/`railPx`/`rowPx`. A floating centered
+  card (icon + message + sub) sits over the ghosted grid.
+- **Loading / error / empty variants** (`loading`/`errored` threaded from `GuideScreen`): spinner +
+  "Loading channels…", `WifiOff` + "Couldn't load the guide", or the lens-aware empty message. The
+  sidebar stays reachable in every case so you're never stranded.
+- **Rows reach the edge** — ghost lane patterns now sum to >1 so the last block runs past the right
+  edge (clipped like a real program still airing), and 16 tiled rows fill any screen height.
+
 ## [0.11.33] - 2026-08-20
 
 tv-tauri Phase 5 — **the settings screen**, ported from tv-web as real nested TanStack routes

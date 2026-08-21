@@ -1,7 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { AnimatePresence, motion } from "framer-motion";
 import * as LucideIcons from "lucide-react";
-import { Heart, Star } from "lucide-react";
+import { Heart, Loader2, Star, Tv, WifiOff } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { GuideGridChannel, GuideGridProgram } from "../../lib/api";
@@ -102,6 +102,8 @@ export function AuroraGrid({
   onTune,
   onSettings,
   onAccount,
+  loading = false,
+  errored = false,
 }: {
   channels: GuideGridChannel[];
   serverTime: string;
@@ -109,6 +111,10 @@ export function AuroraGrid({
   onSettings: () => void;
   /** The sidebar's Account circle — opens the User settings page (where you can sign out). */
   onAccount: () => void;
+  /** First-load: no data yet → the GuideGhost shows a "loading" message instead of an empty one. */
+  loading?: boolean;
+  /** The guide fetch failed (non-401) → the GuideGhost shows an "unreachable server" message. */
+  errored?: boolean;
 }) {
   const now = useMemo(() => new Date(serverTime), [serverTime]);
   const T0 = useMemo(() => {
@@ -568,26 +574,37 @@ export function AuroraGrid({
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
         {channels.length === 0 && (
           <GuideGhost
+            T0={T0}
             railPx={railPx}
             rowPx={rowPx}
             laneW={laneW}
+            laneX={laneX}
+            variant={loading ? "loading" : errored ? "error" : "empty"}
             message={
-              lens.type === "favorites"
-                ? "No favorites yet"
-                : lens.type === "recents"
-                  ? "Nothing watched yet"
-                  : lens.type === "packages"
-                    ? "No channels in this filter"
-                    : "No channels yet"
+              loading
+                ? "Loading channels…"
+                : errored
+                  ? "Couldn't load the guide"
+                  : lens.type === "favorites"
+                    ? "No favorites yet"
+                    : lens.type === "recents"
+                      ? "Nothing watched yet"
+                      : lens.type === "packages"
+                        ? "No channels in this filter"
+                        : "No channels yet"
             }
             sub={
-              lens.type === "favorites"
-                ? "Highlight a channel and press the heart to add it here."
-                : lens.type === "recents"
-                  ? "Channels you tune into show up here, most recent first."
-                  : lens.type === "packages"
-                    ? "Try another filter, or press ◄ to open the sidebar and clear it."
-                    : "Once channels are set up on your server, they'll appear here."
+              loading
+                ? "Fetching your guide…"
+                : errored
+                  ? "Your server may be unreachable — press ◄ to open the sidebar and check Settings."
+                  : lens.type === "favorites"
+                    ? "Highlight a channel and press the heart to add it here."
+                    : lens.type === "recents"
+                      ? "Channels you tune into show up here, most recent first."
+                      : lens.type === "packages"
+                        ? "Try another filter, or press ◄ to open the sidebar and clear it."
+                        : "Once channels are set up on your server, they'll appear here."
             }
           />
         )}
@@ -712,67 +729,138 @@ function GBlock({
 }
 
 // Program-block widths per ghost row (fractions of the lane), varied so it reads like a real grid.
+// Each row's fractions SUM TO >1 so the last block runs PAST the right edge (clipped by the lane's
+// overflow) — exactly like a real program still airing beyond the visible window, so the ghosted rows
+// reach the edge instead of stopping short.
 const GHOST_ROWS = [
-  [0.3, 0.32, 0.28],
-  [0.46, 0.26, 0.22],
-  [0.22, 0.5, 0.24],
-  [0.36, 0.3, 0.28],
-  [0.5, 0.24, 0.2],
-  [0.26, 0.38, 0.3],
+  [0.3, 0.34, 0.5],
+  [0.5, 0.28, 0.42],
+  [0.22, 0.46, 0.5],
+  [0.4, 0.3, 0.48],
+  [0.26, 0.38, 0.28, 0.35],
+  [0.55, 0.32, 0.38],
 ];
 
+/** How many tiled skeleton rows the ghost lays down — more than any screen shows, clipped by overflow,
+ *  so the ghosted grid always reaches the bottom edge. */
+const GHOST_ROW_COUNT = 16;
+
 /**
- * The guide's OWN structure rendered as static skeletons, behind a centered message. Shown when the
- * (filtered) channel list is empty — a fresh install, or a favorites/recents/package filter with
- * nothing in it — so the screen reads as "the guide, but empty" instead of a broken blank (and the
- * D-pad can still Left back to the sidebar; see the empty-grid handler in the key nav).
+ * The guide's OWN structure rendered as static skeletons (featured panel + the REAL time axis + tiled
+ * program rows), behind a centered message card. Deliberately mirrors the loaded layout — the same
+ * `fv()`-scaled featured blocks, the same `TimeHeader`, rail circle+number+name and lane program
+ * blocks — so it reads as "the guide, about to appear" and doesn't jump when the data lands (the
+ * apps/web `/guide` treatment, ported to the 10-foot layout). Shown while the guide is LOADING, on a
+ * fetch ERROR, or when the (filtered) channel list is EMPTY (fresh install / favorites / recents /
+ * package filter with nothing in it). The D-pad can still Left back to the sidebar (see the empty-grid
+ * key handler), so the user is never trapped.
  */
 function GuideGhost({
+  T0,
   railPx,
   rowPx,
   laneW,
+  laneX,
+  variant,
   message,
   sub,
 }: {
+  T0: Date;
   railPx: number;
   rowPx: number;
   laneW: number;
+  laneX: (iso: string | Date) => number;
+  variant: "loading" | "error" | "empty";
   message: string;
   sub?: string;
 }) {
+  const fv = (px: number) => vw(px * FEATURE_SCALE);
+  const Icon = variant === "loading" ? Loader2 : variant === "error" ? WifiOff : Tv;
   return (
-    <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
-      {/* the skeleton itself — dimmed so the message reads on top */}
-      <div style={{ position: "absolute", inset: 0, opacity: 0.55 }}>
-        {/* featured-panel ghost */}
-        <div style={{ display: "flex", gap: vw(30), padding: `${vw(44)} ${vw(48)}`, height: vw(520) }}>
-          <GBlock w={vw(64)} h={vw(64)} r="50%" />
-          <div style={{ display: "flex", flexDirection: "column", gap: vw(18), flex: 1, minWidth: 0 }}>
-            <GBlock w={vw(560)} h={vw(58)} />
-            <GBlock w={vw(320)} h={vw(34)} />
-            <GBlock w={vw(820)} h={vw(30)} style={{ marginTop: vw(14) }} />
-            <GBlock w={vw(700)} h={vw(30)} />
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      {/* Featured-panel skeleton — mirrors FeaturedPanel's blocks/paddings so it lands where the real
+          panel will (header icon+number+name · genre · divider · title+badges · meta · summary ·
+          time/status · progress). */}
+      <div style={{ display: "flex", gap: fv(56), alignItems: "flex-start", padding: `${fv(40)} ${fv(64)} 0`, flexShrink: 0 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: fv(22) }}>
+            <GBlock w={fv(64)} h={fv(64)} r="50%" />
+            <GBlock w={fv(64)} h={fv(44)} />
+            <GBlock w={fv(340)} h={fv(44)} style={{ maxWidth: "50%" }} />
+          </div>
+          <GBlock w={fv(280)} h={fv(30)} style={{ marginTop: fv(14), maxWidth: "40%" }} />
+          <div style={{ height: 1, background: C.border, margin: `${fv(22)} 0 ${fv(26)}` }} />
+          <div style={{ display: "flex", alignItems: "center", gap: fv(28) }}>
+            <GBlock w={fv(760)} h={fv(60)} style={{ flex: 1, maxWidth: "70%" }} />
+            <div style={{ display: "flex", gap: fv(14), flexShrink: 0 }}>
+              <GBlock w={fv(70)} h={fv(44)} />
+              <GBlock w={fv(90)} h={fv(44)} />
+            </div>
+          </div>
+          <GBlock w={fv(240)} h={fv(34)} style={{ marginTop: fv(22) }} />
+          <GBlock w="100%" h={fv(34)} style={{ marginTop: fv(22) }} />
+          <GBlock w="82%" h={fv(34)} style={{ marginTop: fv(12) }} />
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: fv(26) }}>
+            <GBlock w={fv(220)} h={fv(34)} />
+            <GBlock w={fv(120)} h={fv(34)} />
+          </div>
+          <GBlock w="100%" h={fv(8)} r={999} style={{ marginTop: fv(16) }} />
+        </div>
+      </div>
+
+      {/* The real time axis — it needs no channels, and anchoring the skeleton to it looks intentional. */}
+      <TimeHeader T0={T0} railPx={railPx} laneX={laneX} />
+
+      {/* Tiled skeleton rows, with the centered message card floating over them. */}
+      <div style={{ position: "relative", flex: 1, minHeight: 0, overflow: "hidden" }}>
+        {Array.from({ length: GHOST_ROW_COUNT }, (_, i) => {
+          const pattern = GHOST_ROWS[i % GHOST_ROWS.length]!;
+          let acc = 0;
+          return (
+            <div key={i} style={{ display: "flex", height: rowPx, borderTop: `1px solid ${C.rowBorder}` }}>
+              {/* rail: channel circle + number (top), name (bottom) — matches Row's rail */}
+              <div style={{ width: railPx, flexShrink: 0, boxSizing: "border-box", padding: `${vw(18)} ${vw(20)}`, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                  <GBlock w={vw(64 * FEATURE_SCALE)} h={vw(64 * FEATURE_SCALE)} r="50%" />
+                  <GBlock w={vw(40)} h={vw(30)} />
+                </div>
+                <GBlock w="82%" h={vw(24)} />
+              </div>
+              {/* lane: tiled program blocks (left-accumulating fractions of the lane) */}
+              <div style={{ position: "relative", flex: 1, overflow: "hidden" }}>
+                {pattern.map((frac, j) => {
+                  const left = acc * laneW + (acc === 0 ? 0 : 3);
+                  const width = frac * laneW - 6;
+                  acc += frac;
+                  if (width < MIN_VISIBLE_PX) return null;
+                  return <GBlock key={j} w={width} h={`calc(100% - ${vw(12)})`} style={{ position: "absolute", top: vw(6), left }} />;
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Centered message card, floating over the ghosted grid (apps/web treatment). */}
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: vw(48), pointerEvents: "none" }}>
+          <div
+            style={{
+              pointerEvents: "auto",
+              maxWidth: vw(1100),
+              textAlign: "center",
+              background: "rgba(6,10,20,0.82)",
+              border: `1px solid ${C.border}`,
+              borderRadius: vw(28),
+              padding: `${vw(40)} ${vw(60)}`,
+              backdropFilter: "blur(3px)",
+              WebkitBackdropFilter: "blur(3px)",
+              boxShadow: "0 24px 60px rgba(0,0,0,0.45)",
+            }}
+          >
+            <Icon className={variant === "loading" ? "animate-spin" : undefined} color="#94a3b8" strokeWidth={1.5} style={{ width: vw(56), height: vw(56), margin: "0 auto" }} />
+            <div style={{ fontSize: vw(48), fontWeight: 700, letterSpacing: "-0.5px", color: "#e2e8f0", marginTop: vw(16) }}>{message}</div>
+            {sub && <div style={{ marginTop: vw(14), fontSize: vw(30), color: "#94a3b8", lineHeight: 1.45 }}>{sub}</div>}
           </div>
         </div>
-        {/* channel-row ghosts (rail icon + number, then program blocks) */}
-        {GHOST_ROWS.map((pattern, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", height: rowPx, gap: vw(12), padding: `0 ${vw(16)}` }}>
-            <div style={{ width: railPx, display: "flex", alignItems: "center", gap: vw(14), flexShrink: 0 }}>
-              <GBlock w={vw(60)} h={vw(60)} r="50%" />
-              <GBlock w={vw(52)} h={vw(38)} />
-            </div>
-            <div style={{ display: "flex", gap: vw(12), flex: 1, overflow: "hidden" }}>
-              {pattern.map((f, j) => (
-                <GBlock key={j} w={Math.max(1, laneW * f)} h={vw(90)} />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-      {/* the centered empty-state message */}
-      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: vw(48) }}>
-        <div style={{ fontSize: vw(56), fontWeight: 800, letterSpacing: "-0.5px", color: "#e2e8f0" }}>{message}</div>
-        {sub && <div style={{ marginTop: vw(16), fontSize: vw(30), color: "#94a3b8", maxWidth: vw(1200), lineHeight: 1.45 }}>{sub}</div>}
       </div>
     </div>
   );
