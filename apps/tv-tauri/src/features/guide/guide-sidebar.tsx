@@ -91,18 +91,18 @@ export function lensEquals(a: Lens | undefined, b: Lens): boolean {
 
 /** Layout reservation: the collapsed rail (COLLAPSED_W) + its left inset + a gap before the grid. The
  *  grid reserves exactly this; expanding is a pure overlay (the sidebar grows over the grid). */
-const COLLAPSED_W = 56;
-const EXPANDED_W = 240;
-const INSET = 12;
+export const COLLAPSED_W = 56;
+export const EXPANDED_W = 240;
+export const INSET = 12;
 const GAP = 16;
 export const SIDEBAR_SLIVER_W = INSET + COLLAPSED_W + GAP;
 
-const hexA = (hex: string, a: number) => {
+export const hexA = (hex: string, a: number) => {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 };
 
-function SidebarRow({
+export function SidebarRow({
   item,
   open,
   focused,

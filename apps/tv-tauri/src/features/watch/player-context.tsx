@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useRouterState } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { Maximize2, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -43,6 +44,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [subtitleStreamId, setSubtitleStreamId] = useState<string | undefined>(undefined);
 
   const tvPlayer = useTvPlayer(channelId, { quality, audioStreamId, subtitleStreamId }, layout === "full");
+
+  // The mini feed docks into the GUIDE's featured-panel slot, which only exists on the guide route. On
+  // any other authed route (settings, diagnostic) that slot is gone, so we hide the mini overlays and
+  // let the route's own opaque page cover the (still-playing) full-window mpv surface behind it. The
+  // full player is route-independent (it fills the window), so this only gates the mini layout.
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const onGuide = pathname === "/";
+  const showMini = layout === "mini" && onGuide;
 
   const tune = useCallback((id: string) => {
     setChannelId(id);
@@ -126,13 +135,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (layout === "full") {
       void mpv.fillWindow();
-    } else if (layout === "mini") {
+    } else if (layout === "mini" && onGuide) {
+      // Re-runs when returning to the guide (onGuide flips true) so mpv re-docks into the slot.
       syncMini();
-    } else {
+    } else if (layout === "off") {
       setMiniRect(null);
       void mpv.fillWindow(); // reset margins (mpv is stopped in `off`)
     }
-  }, [layout, syncMini]);
+    // layout === "mini" && !onGuide: leave mpv where it is (covered by the route's opaque page).
+  }, [layout, onGuide, syncMini]);
 
   // Keep the mini feed glued to the slot as the window/guide reflows.
   useEffect(() => {
@@ -181,9 +192,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       {/* Global channel-number entry + CH▲/▼ (armed on the "/" route: guide + player + mini feed). */}
       <ChannelNumberEntry />
 
-      {/* Backdrop behind the guide: full navy (off), a rounded HOLE at the slot (mini), nothing (full). */}
+      {/* Backdrop behind the guide: full navy (off / mini-but-off-guide), a rounded HOLE at the slot
+          (mini ON the guide), nothing (full). */}
       {layout !== "full" &&
-        (layout === "mini" && miniRect ? (
+        (showMini && miniRect ? (
           <div
             style={{
               position: "fixed",
@@ -208,7 +220,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
       {/* Mini feed: the compact "Up next" BumperCard during a bumper (the docked video is paused on the
           last frame), pinned over the slot — under the controls so hover still reveals them. */}
-      {layout === "mini" && miniRect && channelId && tvPlayer.status.state === "bumper" && tvPlayer.status.guide && (
+      {showMini && miniRect && channelId && tvPlayer.status.state === "bumper" && tvPlayer.status.guide && (
         <div style={{ position: "fixed", left: miniRect.x, top: miniRect.y, width: miniRect.w, height: miniRect.h, borderRadius: 14, overflow: "hidden", zIndex: 4 }}>
           <BumperCard
             channelId={channelId}
@@ -224,7 +236,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
       {/* Mini feed controls — over the slot; a footer hint when idle, the two buttons on hover or when
           navigated into (`miniFocused`). */}
-      {layout === "mini" && miniRect && (
+      {showMini && miniRect && (
         <MiniControls rect={miniRect} focused={miniFocused} sel={miniSel} accent={accent} onExpand={goFull} onClose={stop} />
       )}
 

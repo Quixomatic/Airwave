@@ -218,4 +218,10 @@ html.chrome-hidden .titlebar {
   background: #e01b24;
   color: #fff;
 }
+/* Settings rows: a mouse-hover highlight (inline bg wins, so override with !important). The D-pad
+   focus ring is inline on the row and takes precedence via the `focused` prop. */
+.settings-row-hoverable:hover {
+  background: rgba(148, 163, 184, 0.11) !important;
+}
+
 /* Onboarding (ServerSetup) is fully inline-styled — a faithful port of tv-web's inline styles. */

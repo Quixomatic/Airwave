@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.33] - 2026-08-20
+
+tv-tauri Phase 5 — **the settings screen**, ported from tv-web as real nested TanStack routes
+(`/settings` · `/settings/user` · `/settings/server` · `/settings/device` · `/settings/about`) under a
+master-detail shell. The left rail is the **same desktop sidebar as the guide** (collapse-to-rail +
+hover/keyboard expand, the shared `SidebarRow` + sizing) driving the sections; the right pane is the
+selected subpage with its **header pinned sticky** while the body scrolls. Full keyboard parity (rail
+▲/▼ + OK/► into content, per-page option focus, ◄/Back to the rail) alongside mouse (hover, click).
+
+### What ships
+
+- **Sections** (faithful ports): **General**, **User** (better-auth session avatar/name/role + two-tap sign out), **Server** (address + media-connection readout, re-probe, **force-connection Auto→Remote→Relay** for testing off-network from the LAN, change-server), **Device** (device info + capability grid with per-codec force on/off, override/forced pills, reset-to-diagnostic, recent playback issues, run-diagnostic), **About** (logo + version).
+- **`features/settings/`** — `settings-ui.tsx` (sticky `PageHeader`, `SettingRow`/`SectionLabel`/`Pill`/`Toggle`, `useSettingsPage` D-pad zone hook, `useArmedAction` two-tap confirm that works for mouse + D-pad), `settings-sidebar.tsx` (reuses the guide rail; **scrim blur toggled off** via a `SCRIM_BLUR` boolean per request — the dim stays), `settings-pages.tsx` (the five bodies).
+- **Mini feed is now guide-scoped** — the PiP feed + its backdrop cutout only render on `/`; on settings/diagnostic the opaque page covers the still-playing full-window mpv surface, and returning to the guide re-docks it. No more mini video floating over other screens.
+- Sidebar `SidebarRow` + sizing constants exported for reuse; `lib/app-info.ts` gains `APP_VERSION` (from package.json).
+
 ## [0.11.32] - 2026-08-20
 
 tv-tauri Phase 4.6 — **channel-number entry + CH ▲/▼**. Typing a digit anywhere on the guide / full player / mini feed arms a glass channel-number pad (top-center); **OK/Enter** commits it (tunes full-screen, or flashes red for no-such-channel), Back cancels, an arrow passes through to navigation, and 6s of inactivity quietly dismisses it — never a stray tune. On a desktop keyboard **`]` / `[` step the channel up/down** (a keyboard has no CH▲/▼; PageUp/Down would scroll), stepping the ordered lineup one at a time, clamped at the ends, behind an in-flight lock (a real lock released by the mpv `loaded` event, not a debounce) so rapid presses don't thrash the reload. Also: the full-player top chrome (Back circle + channel chip) and the number pad now drop **below the custom window titlebar** (`--titlebar-h`) so nothing sits over the min/max/close controls.
