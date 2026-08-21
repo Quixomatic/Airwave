@@ -1,6 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Maximize, Minimize } from "lucide-react";
 
+import { setFullscreen } from "../lib/fullscreen";
 import { Logo } from "../lib/logo";
 import { useFullscreen } from "../lib/use-fullscreen";
 
@@ -26,11 +27,32 @@ export function TitleBar() {
         >
           {full ? <Minimize size={13} /> : <Maximize size={13} />}
         </button>
-        {/* Minimize + maximize are meaningless in fullscreen — disabled there (exit fullscreen first). */}
-        <button className="tb-btn" onClick={() => win.minimize()} disabled={full} aria-label="Minimize" title="Minimize">
+        {/* Minimize + maximize stay enabled in fullscreen — they break OUT of fullscreen first, then
+            do their thing (minimize the window / go to maximized windowed). */}
+        <button
+          className="tb-btn"
+          onClick={async () => {
+            if (full) await setFullscreen(false);
+            await win.minimize();
+          }}
+          aria-label="Minimize"
+          title="Minimize"
+        >
           <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="5.5" width="8" height="1" fill="currentColor" /></svg>
         </button>
-        <button className="tb-btn" onClick={() => win.toggleMaximize()} disabled={full} aria-label="Maximize" title="Maximize">
+        <button
+          className="tb-btn"
+          onClick={async () => {
+            if (full) {
+              await setFullscreen(false);
+              await win.maximize();
+            } else {
+              await win.toggleMaximize();
+            }
+          }}
+          aria-label="Maximize"
+          title="Maximize"
+        >
           <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" fill="none" stroke="currentColor" strokeWidth="1" /></svg>
         </button>
         <button className="tb-btn tb-close" onClick={() => win.close()} aria-label="Close" title="Close">

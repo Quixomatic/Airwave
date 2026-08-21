@@ -2,6 +2,12 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.45] - 2026-08-20
+
+tv-tauri — minimize + maximize stay **enabled** in fullscreen and now **break out of fullscreen
+first**, then act: minimize exits fullscreen then minimizes; maximize exits fullscreen then goes to
+maximized windowed. (Replaces the disabled-in-fullscreen behavior from 0.11.44.)
+
 ## [0.11.44] - 2026-08-20
 
 tv-tauri — in fullscreen the titlebar's **minimize + maximize buttons are now disabled** (dimmed,
