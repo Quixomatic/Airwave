@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.57] - 2026-08-21
+
+tv-tauri — macOS video embedding experiment: try mpv's `macvk` Vulkan context into a CAMetalLayer `wid`.
+0.11.56 rendered but in mpv's own separate window (the cocoa backend can't embed via `--wid`). Upstream
+exposes the macOS Vulkan-into-CAMetalLayer path as `macvk` (`moltenvk` is the iOS name our build rejects).
+This sets `gpu-api=vulkan` + `gpu-context=macvk` and restores the CAMetalLayer-as-`wid` surface (sublayer 0,
+behind the webview). If `macvk` isn't compiled into our libmpv it errors clearly (guiding a libmpv rebuild).
+Windows unaffected.
+
 ## [0.11.56] - 2026-08-21
 
 tv-tauri — **macOS video: embed into an NSView (cocoa backend), not a CAMetalLayer**.
