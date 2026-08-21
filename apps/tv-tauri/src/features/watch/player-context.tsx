@@ -4,11 +4,13 @@ import { Maximize2, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "../../lib/api";
+import { useChannels } from "../../hooks/use-channels";
 import { useGuide } from "../../hooks/use-guide";
 import { useFullBleed } from "../../lib/full-bleed";
 import { BumperCard } from "./bumper-card";
+import { ChannelNumberEntry } from "./channel-number-entry";
 import { accentForChannel, FullChrome } from "./full-chrome";
-import { mpv } from "./mpv";
+import { mpv, mpvEvents } from "./mpv";
 import { Ctx, type Layout, type PlayerCtx } from "./player-ctx";
 import { useTvPlayer } from "./use-tv-player";
 
@@ -64,7 +66,51 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (miniSel === 0) goFull();
     else stop();
   }, [miniSel, goFull, stop]);
-  const channelStep = useCallback(() => {}, []); // CH▲/▼ — a later refinement
+
+  // Remote channel navigation (CH▲/▼ — desktop `]`/`[`): step the ORDERED lineup by one, clamped at
+  // the ends (no wrap), behind an IN-FLIGHT LOCK. A press fires immediately and blocks any further
+  // channel change until the new channel has actually loaded (the mpv `loaded` event releases the
+  // lock; a 5s timeout backs it out if a channel errors and never plays) — James's spec: NOT a
+  // debounce, a real lock so rapid presses don't thrash the reload. Faithful port of tv-web.
+  const { data: channels } = useChannels();
+  const lineup = useMemo(
+    () => [...(channels ?? [])].sort((a, b) => (a.number ?? 0) - (b.number ?? 0)),
+    [channels],
+  );
+  const lineupRef = useRef(lineup);
+  lineupRef.current = lineup;
+  const playingRef = useRef(channelId);
+  playingRef.current = channelId;
+  const chLockRef = useRef(false);
+  const chLockTimer = useRef(0);
+  const channelStep = useCallback(
+    (dir: 1 | -1) => {
+      if (chLockRef.current) return; // a change is still in flight — ignore
+      const list = lineupRef.current;
+      const idx = list.findIndex((c) => c.id === playingRef.current);
+      if (idx < 0) return; // nothing playing → CH▲/▼ is a while-watching gesture, so no-op
+      const target = list[idx + dir];
+      if (!target) return; // clamp at the first / last channel (no wrap)
+      chLockRef.current = true;
+      window.clearTimeout(chLockTimer.current);
+      chLockTimer.current = window.setTimeout(() => {
+        chLockRef.current = false;
+      }, 5000);
+      tune(target.id);
+    },
+    [tune],
+  );
+
+  // Release the CH lock the instant the new channel's media loads in mpv (or on the timeout backstop).
+  useEffect(() => {
+    const un = mpvEvents.onLoaded(() => {
+      chLockRef.current = false;
+      window.clearTimeout(chLockTimer.current);
+    });
+    return () => {
+      void un.then((f) => f());
+    };
+  }, []);
 
   // Read the featured-panel slot's rect and position mpv into it (+ track it for the backdrop hole).
   const syncMini = useCallback(() => {
@@ -132,6 +178,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider value={value}>
+      {/* Global channel-number entry + CH▲/▼ (armed on the "/" route: guide + player + mini feed). */}
+      <ChannelNumberEntry />
+
       {/* Backdrop behind the guide: full navy (off), a rounded HOLE at the slot (mini), nothing (full). */}
       {layout !== "full" &&
         (layout === "mini" && miniRect ? (

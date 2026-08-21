@@ -151,7 +151,8 @@ export function FullChrome({
             aria-label="Back to guide"
             style={{
               position: "absolute",
-              top: 28,
+              // Dropped below the custom window titlebar so it clears the min/max/close controls.
+              top: "calc(var(--titlebar-h) + 14px)",
               left: 40,
               width: 56,
               height: 56,
@@ -183,7 +184,8 @@ export function FullChrome({
             transition={{ duration: 0.25, ease: "easeOut" }}
             style={{
               position: "absolute",
-              top: 28,
+              // Dropped below the custom window titlebar so it clears the min/max/close controls.
+              top: "calc(var(--titlebar-h) + 14px)",
               right: 40,
               display: "flex",
               alignItems: "center",

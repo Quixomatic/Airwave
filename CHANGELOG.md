@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.32] - 2026-08-20
+
+tv-tauri Phase 4.6 — **channel-number entry + CH ▲/▼**. Typing a digit anywhere on the guide / full player / mini feed arms a glass channel-number pad (top-center); **OK/Enter** commits it (tunes full-screen, or flashes red for no-such-channel), Back cancels, an arrow passes through to navigation, and 6s of inactivity quietly dismisses it — never a stray tune. On a desktop keyboard **`]` / `[` step the channel up/down** (a keyboard has no CH▲/▼; PageUp/Down would scroll), stepping the ordered lineup one at a time, clamped at the ends, behind an in-flight lock (a real lock released by the mpv `loaded` event, not a debounce) so rapid presses don't thrash the reload. Also: the full-player top chrome (Back circle + channel chip) and the number pad now drop **below the custom window titlebar** (`--titlebar-h`) so nothing sits over the min/max/close controls.
+
+### What ships
+
+- **`features/watch/channel-number-entry.tsx`** (faithful port of tv-web) — the OVERLAY-layer number pad + CH-step handler, rendered once by the `PlayerProvider`, armed on the `/` route (guide + player + mini), guarded off text fields and open dropdowns.
+- **`channelStep(dir)`** implemented in the `PlayerProvider` (was a no-op): ordered lineup from `useChannels`, clamp, and the in-flight lock released on `mpv:loaded` (5s timeout backstop). New `hooks/use-channels.ts` + `features/watch/use-channel-nav.ts` (`byNumber` / `maxNumber` / `tune`).
+- **Key map:** `]` → chUp, `[` → chDown in `lib/input/keys.ts` (alongside the existing PageUp/Down + Tizen CH codes).
+- **Chrome offset:** the Back button, channel chip (full-chrome), and the number pad move to `calc(var(--titlebar-h) + 14px)` so they clear the window header.
+
 ## [0.11.31] - 2026-08-20
 
 tv-tauri Phase 4.3 — connection probing (local/remote/relay). At launch the `_auth` guard probes the media server's Plex connections (`/api/v1/connections`) local→remote→relay and remembers the first reachable one; `/media` stamps it as `?network=` so off-network playback streams from the right base. `lib/plex-connection.ts` (store-backed, sync `getNetwork`); a Rust `probe_reachable(url,timeout)` command does the reachability GET (arbitrary Plex URLs the webview can't reach). This is the off-network path native mpv enables that a browser can't.

@@ -80,6 +80,10 @@ export function toKeyEvent(raw: KeyboardEvent, repeat: boolean): KeyEvent {
   if (BACK_CODES.has(code) || BACK_NAMES.has(raw.key)) return { key: "back", raw, repeat };
   if (CH_UP_CODES.has(code)) return { key: "chUp", raw, repeat };
   if (CH_DOWN_CODES.has(code)) return { key: "chDown", raw, repeat };
+  // Desktop keyboard: a physical keyboard has no CH▲/▼ (PageUp/Down scroll), so `]`/`[` step the
+  // channel up/down — the bracket pair reads as "next/previous" and sits under one hand.
+  if (raw.key === "]") return { key: "chUp", raw, repeat };
+  if (raw.key === "[") return { key: "chDown", raw, repeat };
   if (COLOR[code]) return { key: COLOR[code]!, raw, repeat };
 
   switch (raw.key) {
