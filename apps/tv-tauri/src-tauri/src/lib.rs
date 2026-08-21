@@ -474,17 +474,19 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
     // initialize() (the Vulkan instance is created during mpv init). Creation-only mpv options too.
     #[cfg(target_os = "macos")]
     {
+        // Point Vulkan at the bundled MoltenVK ICD in case a vulkan path is used (harmless otherwise).
         set_vulkan_icd_env();
-        // Diagnostic: mpv's own verbose log (incl. Vulkan/MoltenVK init) to a predictable file, so a
-        // render failure is readable instead of guessed. Non-fatal.
+        // Diagnostic: mpv's own verbose log (vo/gpu-context selection + any render error) to a
+        // predictable file, so failures are readable instead of guessed. Non-fatal.
         if let Ok(home) = std::env::var("HOME") {
             let logp = format!("{home}/Library/Logs/airwave-mpv.log");
             let _ = mpv.set_option_string("log-file", &logp);
             let _ = mpv.set_option_string("msg-level", "all=v");
             log::info!("mpv log-file: {logp}");
         }
-        mpv.set_option_string("gpu-api", "vulkan")?;
-        mpv.set_option_string("gpu-context", "moltenvk")?;
+        // NOTE: NOT gpu-context=moltenvk — that context is iOS-oriented and our libmpv rejects it
+        // (mpv PR #7857). On macOS mpv's cocoa backend embeds into an NSVIEW (see resolve_video_wid),
+        // not a CAMetalLayer, and picks its own Metal context via gpu-api=auto (set in Mpv::new()).
     }
     let wid = resolve_video_wid(&window)?;
     mpv.set_option_i64("wid", wid)?;
@@ -531,28 +533,25 @@ fn resolve_video_wid(window: &tauri::WebviewWindow) -> Result<i64, String> {
         if content_view.is_null() {
             return Err("no contentView".into());
         }
-        let _: () = msg_send![content_view, setWantsLayer: true];
-        let super_layer: *mut AnyObject = msg_send![content_view, layer];
-        if super_layer.is_null() {
-            return Err("no content-view layer".into());
-        }
-        // A CAMetalLayer for mpv, sized to the content view, behind the (transparent) webview.
-        let metal_layer: *mut AnyObject = msg_send![class!(CAMetalLayer), layer];
-        if metal_layer.is_null() {
-            return Err("CAMetalLayer alloc failed".into());
-        }
-        let _: *mut AnyObject = msg_send![metal_layer, retain]; // outlive scope for mpv's wid
         let bounds: objc2_foundation::NSRect = msg_send![content_view, bounds];
-        let scale: f64 = msg_send![ns_window, backingScaleFactor];
-        let _: () = msg_send![metal_layer, setFrame: bounds];
-        let _: () = msg_send![metal_layer, setContentsScale: scale];
-        let _: () = msg_send![metal_layer, setFramebufferOnly: true];
-        let _: () = msg_send![metal_layer, setOpaque: true];
-        // kCALayerWidthSizable (2) | kCALayerHeightSizable (16) so it follows window resizes.
-        let _: () = msg_send![metal_layer, setAutoresizingMask: 18u64];
-        // Insert BEHIND the webview.
-        let _: () = msg_send![super_layer, insertSublayer: metal_layer, atIndex: 0u32];
-        Ok(metal_layer as i64)
+        // mpv's macOS (cocoa) backend embeds into an NSVIEW passed as `wid` (NOT a CAMetalLayer — that
+        // path is iOS-only in our libmpv). Create a layer-backed host view sized to the content view and
+        // insert it as the BACKMOST subview, behind the transparent WKWebView, so mpv's video renders
+        // under our glass chrome. mpv creates + drives its own Metal layer inside this view.
+        let view: *mut AnyObject = msg_send![class!(NSView), alloc];
+        let view: *mut AnyObject = msg_send![view, initWithFrame: bounds];
+        if view.is_null() {
+            return Err("NSView alloc failed".into());
+        }
+        let _: () = msg_send![view, setWantsLayer: true];
+        // NSViewWidthSizable (2) | NSViewHeightSizable (16) so it tracks window resizes.
+        let _: () = msg_send![view, setAutoresizingMask: 18u64];
+        let _: *mut AnyObject = msg_send![view, retain]; // outlive scope for mpv's wid
+        // addSubview:positioned:relativeTo: with NSWindowBelow (-1) + nil → add at the very back.
+        let below: isize = -1; // NSWindowBelow
+        let nil: *mut AnyObject = std::ptr::null_mut();
+        let _: () = msg_send![content_view, addSubview: view, positioned: below, relativeTo: nil];
+        Ok(view as i64)
     }
 }
 

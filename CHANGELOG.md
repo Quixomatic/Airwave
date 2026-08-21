@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.56] - 2026-08-21
+
+tv-tauri — **macOS video: embed into an NSView (cocoa backend), not a CAMetalLayer**.
+
+The `CAMetalLayer`-as-`wid` + `gpu-context=moltenvk` path is iOS-oriented (mpv PR #7857) and our libmpv
+rejects that context (`-7`) — which is why 0.11.54/55 played nothing. mpv's macOS **cocoa** backend (our
+build has `-Dswift-build`) instead embeds into an **NSView** passed as `wid` and drives its own Metal layer.
+`resolve_video_wid` now creates a layer-backed NSView inserted as the backmost subview (behind the
+transparent WKWebView) and hands mpv that; the moltenvk mpv options are dropped (`gpu-api` stays `auto`).
+Verbose mpv logging stays on (`~/Library/Logs/airwave-mpv.log`). Windows unaffected.
+
 ## [0.11.55] - 2026-08-21
 
 tv-tauri — **macOS video, wired end-to-end**: bundle + point Vulkan at the MoltenVK ICD.
