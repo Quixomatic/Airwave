@@ -172,23 +172,6 @@ html.chrome-hidden .titlebar {
   opacity: 0;
   pointer-events: none;
 }
-
-/* App-wide TRUE fullscreen (the titlebar fullscreen button / F11): content fills to the very top and
-   the custom titlebar is tucked away, revealed only when the mouse hits the top edge (`.fs-peek`).
-   `!important` so this wins over the player's `.chrome-hidden` rule regardless of chrome state. */
-:root.fs {
-  --content-top: 0;
-}
-html.fs .titlebar {
-  transform: translateY(-100%) !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
-html.fs.fs-peek .titlebar {
-  transform: none !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-}
 /* Brand mark in the titlebar. Children are non-interactive so drags pass to the drag-region;
    -webkit-user-drag:none stops the browser's native image-drag from hijacking the window move. */
 .tb-brand {

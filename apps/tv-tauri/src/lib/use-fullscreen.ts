@@ -5,11 +5,13 @@ import { isFullscreen, toggleFullscreen } from "./fullscreen";
 
 /**
  * Fullscreen state + behavior for the whole app (mounted once, in the TitleBar):
- *  - tracks `full` (synced from the window, so it reflects our button, F11, and OS-driven changes),
- *  - reflects it in the DOM: `html.fs` hides the custom titlebar and fills the content to the top
- *    edge (`--content-top: 0`); moving the mouse to the very top edge adds `html.fs-peek` to reveal
- *    the titlebar (the standard fullscreen menu-bar reveal),
+ *  - tracks `full` (synced from the window, so it reflects our button, F11, and OS-driven changes)
+ *    for the button's icon,
  *  - binds **F11** anywhere to toggle.
+ *
+ * The custom titlebar stays VISIBLE in fullscreen (there's room for it) — we don't hide/peek it. The
+ * full-screen PLAYER already tucks the titlebar away with its own chrome (`.chrome-hidden`), which is
+ * the only place it should disappear.
  */
 const win = getCurrentWindow();
 
@@ -26,34 +28,6 @@ export function useFullscreen() {
     });
     return () => unlisten?.();
   }, []);
-
-  // Reflect fullscreen in the DOM (hide the titlebar + fill to the top; peek the titlebar on hover
-  // at the very top edge).
-  useEffect(() => {
-    const el = document.documentElement;
-    el.classList.toggle("fs", full);
-    if (!full) {
-      el.classList.remove("fs-peek");
-      return;
-    }
-    // Generous reveal zone — anywhere near the top of the screen peeks the titlebar in. Hysteresis
-    // (reveal ≤80, hide-timer only past 110) so it doesn't flip-flop when the cursor hovers the edge.
-    let hideTimer = 0;
-    const onMove = (e: MouseEvent) => {
-      if (e.clientY <= 80) {
-        window.clearTimeout(hideTimer);
-        el.classList.add("fs-peek");
-      } else if (e.clientY > 110) {
-        window.clearTimeout(hideTimer);
-        hideTimer = window.setTimeout(() => el.classList.remove("fs-peek"), 1600);
-      }
-    };
-    window.addEventListener("mousemove", onMove);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.clearTimeout(hideTimer);
-    };
-  }, [full]);
 
   // F11 toggles fullscreen from anywhere (outside the app's semantic-key dispatcher — it's a
   // window-level chrome action, not a screen navigation key).

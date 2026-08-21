@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.43] - 2026-08-20
+
+tv-tauri — drop the fullscreen titlebar hide/peek entirely. The custom titlebar now just **stays
+visible in fullscreen** (there's room for it), instead of tucking away and being fiddly to reveal /
+covering the guide sidebar. The fullscreen button + F11 still toggle true fullscreen; the full-screen
+PLAYER still tucks the titlebar away with its own chrome (`.chrome-hidden`), which is the one place it
+should disappear — that behavior is unchanged.
+
 ## [0.11.42] - 2026-08-20
 
 tv-tauri — the fullscreen titlebar is much easier to peek: the reveal zone grew from the top 4px to
