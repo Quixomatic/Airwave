@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.37] - 2026-08-20
+
+tv-tauri full-player chrome — **desktop-right button sizing**. The chrome was authored at 10-foot/TV
+scale (fixed px), so on a monitor the buttons read oversized. Dialed them down without touching the
+layout or glass styling: the top-left **Back** circle 56→44 (icon 24→20); the top-right **channel
+badge** pill 56→44, its icon circle 36→28 (Tv 20→16), number + name 22→17; the **control pills below
+the scrubber** 54→40 tall with 17→14 text, 20→18 icons, tighter padding/gaps; and the Audio/Subs/
+Quality **circle dropdowns** 54→40. Program title + scrubber left as-is.
+
 ## [0.11.36] - 2026-08-20
 
 tv-tauri — the collapsed sidebar rail is a touch wider (`COLLAPSED_W` 56→60) so a collapsed menu

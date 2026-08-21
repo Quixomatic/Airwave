@@ -53,7 +53,7 @@ const fmt = (s: number) => {
     : `${m}:${String(sec).padStart(2, "0")}`;
 };
 
-const ICON = 20;
+const ICON = 18;
 
 export function FeaturePanel({
   guide,
@@ -197,10 +197,10 @@ export function FeaturePanel({
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: circle ? 0 : 9,
-    height: 54,
-    width: circle ? 54 : undefined,
-    padding: circle ? 0 : "0 20px",
+    gap: circle ? 0 : 8,
+    height: 40,
+    width: circle ? 40 : undefined,
+    padding: circle ? 0 : "0 15px",
     borderRadius: circle ? "50%" : 999,
     outline: "none",
     border: `1px solid rgba(255,255,255,${focused(i) ? 0.4 : 0.12})`,
@@ -208,7 +208,7 @@ export function FeaturePanel({
     backdropFilter: "blur(20px)",
     WebkitBackdropFilter: "blur(20px)",
     color: "#f1f5f9",
-    fontSize: 17,
+    fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",
     whiteSpace: "nowrap",
@@ -382,7 +382,7 @@ export function FeaturePanel({
           </button>
 
           {/* Controls */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18 }}>
             <button ref={(el) => { ctlRefs.current[0] = el; }} style={glass(0)} onClick={onPlayPause}>
               {paused ? <Play size={ICON} /> : <Pause size={ICON} />} {paused ? "Play" : "Pause"}
             </button>
@@ -403,7 +403,7 @@ export function FeaturePanel({
               {atLive ? <Clapperboard size={ICON} /> : <Radio size={ICON} />} {atLive ? "Continue Watching" : "Jump to Live"}
             </button>
 
-            <div style={{ marginLeft: "auto", display: "flex", gap: 12 }}>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
               {circleSelector("audio", 5, AudioLines, audioStreamId ?? "", audioItems, onSelectAudio)}
               {circleSelector("subs", 6, Captions, subtitleStreamId && subtitleStreamId !== "off" ? subtitleStreamId : "off", subItems, onSelectSub)}
               {circleSelector("quality", 7, SlidersHorizontal, quality, qualityItems, onSelectQuality)}

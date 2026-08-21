@@ -154,8 +154,8 @@ export function FullChrome({
               // Dropped below the custom window titlebar so it clears the min/max/close controls.
               top: "calc(var(--titlebar-h) + 14px)",
               left: 40,
-              width: 56,
-              height: 56,
+              width: 44,
+              height: 44,
               borderRadius: "50%",
               display: "flex",
               alignItems: "center",
@@ -168,7 +168,7 @@ export function FullChrome({
               cursor: "pointer",
             }}
           >
-            <ArrowLeft size={24} />
+            <ArrowLeft size={20} />
           </motion.button>
         )}
       </AnimatePresence>
@@ -189,9 +189,9 @@ export function FullChrome({
               right: 40,
               display: "flex",
               alignItems: "center",
-              gap: 12,
-              height: 56,
-              padding: "0 22px 0 12px",
+              gap: 10,
+              height: 44,
+              padding: "0 18px 0 10px",
               borderRadius: 999,
               border: "1px solid rgba(255,255,255,0.12)",
               background: "rgba(18,24,38,0.55)",
@@ -199,11 +199,11 @@ export function FullChrome({
               WebkitBackdropFilter: "blur(20px)",
             }}
           >
-            <span style={{ width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: `${accent}33`, color: accent }}>
-              <Tv size={20} />
+            <span style={{ width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: `${accent}33`, color: accent }}>
+              <Tv size={16} />
             </span>
-            <span style={{ fontSize: 22, fontWeight: 700, color: accent }}>{channel?.number}</span>
-            <span style={{ fontSize: 22, fontWeight: 600, color: "#e6eaf1" }}>{channel?.name}</span>
+            <span style={{ fontSize: 17, fontWeight: 700, color: accent }}>{channel?.number}</span>
+            <span style={{ fontSize: 17, fontWeight: 600, color: "#e6eaf1" }}>{channel?.name}</span>
           </motion.div>
         )}
       </AnimatePresence>
