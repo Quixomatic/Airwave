@@ -40,10 +40,14 @@ jobs:
             arch: x64
             libmpv: windows-x64
             supported: true
-          # NO-OPS until the per-OS mpv render-attach exists (macOS Metal layer / Linux X11 embed).
+          # macOS Apple Silicon — Phase 8 (render-attach = CAMetalLayer-as-wid). Unsigned for now
+          # (8A/8B); signing + notarization + latest.json entry come in 8C. First run compile-checks
+          # the objc2 render-attach.
           - os: macos-14
             arch: arm64
-            supported: false
+            libmpv: macos-arm64
+            supported: true
+          # NO-OP until the Linux X11/wayland embed lands.
           - os: ubuntu-24.04
             arch: x64
             supported: false
@@ -94,22 +98,25 @@ jobs:
         run: |
           set -euo pipefail
           DEST="apps/tv-tauri/src-tauri/vendor/libmpv/${{ matrix.libmpv }}"
-          # Use RELATIVE dirs — a Windows drive path (D:\...) makes tar treat "D:" as a remote host
-          # ("Cannot connect to D:"). --force-local also guards the colon. The archive unpacks bin/ (the
-          # runtime DLLs) + lib/ (the MSVC import lib mpv.lib, emitted by libmpv-windows.yml) at its root;
-          # we take BOTH — the build links against lib/mpv.lib and stages bin/*.dll beside the exe.
+          # RELATIVE dirs + --force-local — a Windows drive path (D:\...) makes tar treat "D:" as a
+          # remote host ("Cannot connect to D:"). Windows archive = bin/ (DLLs) + lib/mpv.lib; macOS
+          # archive = lib/ (dylibs) only.
           mkdir -p "$DEST" _libmpv
           gh release download libmpv-latest --repo "$GITHUB_REPOSITORY" \
             --pattern "libmpv-airwave-${{ matrix.libmpv }}.tar.gz" --dir _libmpv
           tar --force-local -xzf "_libmpv/libmpv-airwave-${{ matrix.libmpv }}.tar.gz" -C _libmpv
-          BIN_SRC="$(find _libmpv -type d -name bin | head -1)"
           LIB_SRC="$(find _libmpv -type d -name lib | head -1)"
-          [ -n "$BIN_SRC" ] && [ -n "$LIB_SRC" ] || { echo "missing bin/ or lib/ in archive"; find _libmpv | head -40; exit 1; }
-          ls "$LIB_SRC"/mpv.lib >/dev/null || { echo "mpv.lib not in the libmpv tarball (re-run libmpv-windows.yml)"; ls "$LIB_SRC"; exit 1; }
-          rm -rf "$DEST/bin" "$DEST/lib"
-          cp -r "$BIN_SRC" "$DEST/bin"
-          cp -r "$LIB_SRC" "$DEST/lib"
-          echo "libmpv DLLs:"; ls "$DEST/bin" | head; echo "libmpv lib:"; ls "$DEST/lib"
+          [ -n "$LIB_SRC" ] || { echo "no lib/ in archive"; find _libmpv | head -40; exit 1; }
+          rm -rf "$DEST/lib"; cp -r "$LIB_SRC" "$DEST/lib"
+          BIN_SRC="$(find _libmpv -type d -name bin | head -1)"
+          if [ -n "$BIN_SRC" ]; then rm -rf "$DEST/bin"; cp -r "$BIN_SRC" "$DEST/bin"; fi
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            ls "$DEST/lib/mpv.lib" >/dev/null || { echo "mpv.lib missing (re-run libmpv-windows.yml)"; ls "$DEST/lib"; exit 1; }
+          else
+            # macOS: the linker wants `libmpv.dylib`; symlink to the soname (`libmpv.2.dylib`).
+            ( cd "$DEST/lib" && { [ -e libmpv.dylib ] || ln -s libmpv.*.dylib libmpv.dylib; } )
+          fi
+          echo "libmpv lib:"; ls "$DEST/lib" | head
 
       - name: Install dependencies
         if: matrix.supported
@@ -118,7 +125,7 @@ jobs:
       # Build the NSIS installer + updater artifacts (createUpdaterArtifacts + the signing key produce
       # the .sig). The .sig here is over the UNSIGNED exe; it's regenerated after Azure signing below.
       - name: Build (Tauri NSIS + updater artifacts)
-        if: matrix.supported
+        if: matrix.supported && runner.os == 'Windows'
         working-directory: apps/tv-tauri
         shell: bash
         env:
@@ -127,7 +134,7 @@ jobs:
         run: pnpm bundle:win
 
       - name: Azure login (for Windows signing)
-        if: matrix.supported && env.WIN_SIGN_AVAILABLE == 'true'
+        if: matrix.supported && runner.os == 'Windows' && env.WIN_SIGN_AVAILABLE == 'true'
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -135,7 +142,7 @@ jobs:
       # Authenticode-sign the NSIS installer IN PLACE so Windows doesn't SmartScreen-warn "unknown
       # publisher" (reuses the server's Azure Artifact Signing account). Gated on the Azure secret.
       - name: Sign Windows installer (Azure Artifact Signing)
-        if: matrix.supported && env.WIN_SIGN_AVAILABLE == 'true'
+        if: matrix.supported && runner.os == 'Windows' && env.WIN_SIGN_AVAILABLE == 'true'
         uses: azure/artifact-signing-action@v2
         with:
           endpoint: https://eus.codesigning.azure.net/
@@ -150,7 +157,7 @@ jobs:
       # Regenerate the updater .sig OVER the now-signed installer (the build's .sig was over the unsigned
       # exe → would mismatch). Only when Azure signing actually ran.
       - name: Re-sign updater signature (over signed installer)
-        if: matrix.supported && env.WIN_SIGN_AVAILABLE == 'true'
+        if: matrix.supported && runner.os == 'Windows' && env.WIN_SIGN_AVAILABLE == 'true'
         working-directory: apps/tv-tauri
         shell: bash
         env:
@@ -163,7 +170,7 @@ jobs:
 
       # Stage the installer + .sig under space-free names and build latest.json (the updater manifest).
       - name: Stage release artifacts + latest.json
-        if: matrix.supported
+        if: matrix.supported && runner.os == 'Windows'
         working-directory: apps/tv-tauri
         shell: bash
         run: |
@@ -187,6 +194,57 @@ jobs:
           cat "$OUT/latest.json"
         env:
           OUT: artifacts
+
+      # ── macOS (Apple Silicon) — Phase 8A/8B, UNSIGNED. First run compile-checks the objc2
+      # render-attach; signing + notarization + latest.json entry come in Phase 8C. ─────────────────
+      - name: Build (Tauri .app/.dmg)
+        if: matrix.supported && runner.os == 'macOS'
+        working-directory: apps/tv-tauri
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: pnpm exec tauri build --bundles app,dmg
+
+      # Make the .app self-contained: copy every vendored libmpv dylib into Contents/Frameworks and
+      # flatten install_names to @rpath (all in one dir + @loader_path rpath). Belt-and-suspenders vs
+      # build.rs's rpath. (Codesigning of the leaves happens in 8C.)
+      - name: Bundle libmpv dylibs into the .app
+        if: matrix.supported && runner.os == 'macOS'
+        working-directory: apps/tv-tauri
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' | head -1)"
+          [ -n "$APP" ] || { echo "no .app built"; exit 1; }
+          FW="$APP/Contents/Frameworks"; mkdir -p "$FW"
+          cp -L "src-tauri/vendor/libmpv/${{ matrix.libmpv }}/lib/"*.dylib "$FW/" 2>/dev/null || true
+          for d in "$FW"/*.dylib; do
+            b="$(basename "$d")"
+            install_name_tool -id "@rpath/$b" "$d" 2>/dev/null || true
+            install_name_tool -add_rpath "@loader_path" "$d" 2>/dev/null || true
+            otool -L "$d" | tail -n +2 | awk '{print $1}' | while read -r dep; do
+              case "$dep" in /System/*|/usr/lib/*|@rpath/*|@loader_path/*|@executable_path/*) ;; \
+                *) install_name_tool -change "$dep" "@rpath/$(basename "$dep")" "$d" 2>/dev/null || true ;; esac
+            done
+          done
+          BIN="$APP/Contents/MacOS/$(basename "$APP" .app)"
+          otool -L "$BIN" | tail -n +2 | awk '{print $1}' | grep -i libmpv | while read -r dep; do
+            case "$dep" in @rpath/*) ;; *) install_name_tool -change "$dep" "@rpath/$(basename "$dep")" "$BIN" 2>/dev/null || true ;; esac
+          done
+          echo "== binary libmpv refs =="; otool -L "$BIN" | grep -i libmpv || true
+
+      - name: Stage mac artifacts
+        if: matrix.supported && runner.os == 'macOS'
+        working-directory: apps/tv-tauri
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT=artifacts; mkdir -p "$OUT"
+          VER="$(node -p "require('./package.json').version")"
+          DMG="$(find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' | head -1 || true)"
+          if [ -n "$DMG" ]; then cp "$DMG" "$OUT/Airwave-Client_${VER}_aarch64.dmg"; fi
+          ls -la "$OUT"
 
       - name: Upload build artifacts
         if: matrix.supported

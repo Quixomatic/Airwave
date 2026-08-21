@@ -2,6 +2,23 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.51] - 2026-08-21
+
+tv-tauri Phase 8 — **macOS client foundation** (Apple Silicon; WIP toward a real build).
+- **Render-attach:** `setup_player` → `resolve_video_wid(&window)` — Windows HWND unchanged; **macOS
+  branch** creates a **`CAMetalLayer`**, inserts it as sublayer 0 of the window's contentView (behind
+  the transparent WKWebView) via objc2, and passes its pointer as mpv `wid` (soia's layer-setup +
+  plezy's `wid`). Mac objc2 deps added (`objc2`/`-app-kit`/`-foundation`/`-quartz-core`, soia's versions);
+  all mac code is cfg-gated so the Windows build is untouched.
+- **Config/link:** `tauri.macos.conf.json` (`transparent: true` window + `app`/`dmg` targets); `build.rs`
+  macOS symlinks `libmpv.dylib` → `libmpv.2.dylib` and adds rpaths (vendor lib for dev,
+  `@executable_path/../Frameworks` for the bundle).
+- **CI:** `tv-tauri-release.yml` gains a real **`macos-14`** row — OS-aware libmpv fetch (mac `lib/`
+  dylibs + `libmpv.dylib` symlink), `tauri build --bundles app,dmg`, and a **dylib-into-`.app/Frameworks`
+  bundling step** (`install_name_tool` → `@rpath` + `@loader_path`). **Unsigned** for now; the first mac
+  run compile-checks the objc2 render-attach. Signing + notarization + Intel + `latest.json` entry are
+  Phase 8C (see `.plans/tv-tauri.md`). Windows path is per-OS-gated and unchanged.
+
 ## [0.11.50] - 2026-08-21
 
 tv-tauri Phase 7 — **self-updater + Windows release CI + code signing**.
