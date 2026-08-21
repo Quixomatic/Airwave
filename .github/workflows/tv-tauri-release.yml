@@ -95,17 +95,21 @@ jobs:
           set -euo pipefail
           DEST="apps/tv-tauri/src-tauri/vendor/libmpv/${{ matrix.libmpv }}"
           # Use RELATIVE dirs — a Windows drive path (D:\...) makes tar treat "D:" as a remote host
-          # ("Cannot connect to D:"). --force-local also guards the colon. The archive unpacks bin/+lib/
-          # at its root; we only take bin/ (the tiny lib/mpv.lib import lib is committed).
+          # ("Cannot connect to D:"). --force-local also guards the colon. The archive unpacks bin/ (the
+          # runtime DLLs) + lib/ (the MSVC import lib mpv.lib, emitted by libmpv-windows.yml) at its root;
+          # we take BOTH — the build links against lib/mpv.lib and stages bin/*.dll beside the exe.
           mkdir -p "$DEST" _libmpv
           gh release download libmpv-latest --repo "$GITHUB_REPOSITORY" \
             --pattern "libmpv-airwave-${{ matrix.libmpv }}.tar.gz" --dir _libmpv
           tar --force-local -xzf "_libmpv/libmpv-airwave-${{ matrix.libmpv }}.tar.gz" -C _libmpv
           BIN_SRC="$(find _libmpv -type d -name bin | head -1)"
-          [ -n "$BIN_SRC" ] || { echo "no bin/ dir in libmpv archive"; find _libmpv | head; exit 1; }
-          rm -rf "$DEST/bin"
+          LIB_SRC="$(find _libmpv -type d -name lib | head -1)"
+          [ -n "$BIN_SRC" ] && [ -n "$LIB_SRC" ] || { echo "missing bin/ or lib/ in archive"; find _libmpv | head -40; exit 1; }
+          ls "$LIB_SRC"/mpv.lib >/dev/null || { echo "mpv.lib not in the libmpv tarball (re-run libmpv-windows.yml)"; ls "$LIB_SRC"; exit 1; }
+          rm -rf "$DEST/bin" "$DEST/lib"
           cp -r "$BIN_SRC" "$DEST/bin"
-          echo "libmpv DLLs:"; ls "$DEST/bin" | head
+          cp -r "$LIB_SRC" "$DEST/lib"
+          echo "libmpv DLLs:"; ls "$DEST/bin" | head; echo "libmpv lib:"; ls "$DEST/lib"
 
       - name: Install dependencies
         if: matrix.supported
