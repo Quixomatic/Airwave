@@ -101,6 +101,33 @@ jobs:
         shell: msys2 {0}
         run: bash ./build-mingw64.sh
 
+      # Emit an MSVC import lib (mpv.lib) so the release tarball is SELF-CONTAINED. MinGW only produces
+      # a GNU `libmpv.dll.a`, but the MSVC-toolchain tv-tauri build links against `mpv.lib`. Generate it
+      # from the built DLL (dumpbin exports → .def → lib.exe) into buildout, so the package script's
+      # `copy_root_mpv_link_libs` copies it into the package's lib/.
+      - name: Setup MSVC (lib.exe / dumpbin)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Generate MSVC import lib (mpv.lib)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $dll = Get-ChildItem -Path "vendor/mpv/buildout" -Filter "libmpv*.dll" | Select-Object -First 1
+          if (-not $dll) { throw "no libmpv*.dll in vendor/mpv/buildout" }
+          Write-Host "DLL: $($dll.Name)"
+          $names = & dumpbin /nologo /exports $dll.FullName | ForEach-Object {
+            if ($_ -match '^\s+\d+\s+[0-9A-Fa-f]+\s+[0-9A-Fa-f]+\s+(\w\S*)') { $matches[1] }
+          }
+          if (-not $names -or $names.Count -eq 0) { throw "no exports parsed from $($dll.Name)" }
+          Write-Host ("exports: " + $names.Count)
+          $def = "LIBRARY $($dll.Name)`r`nEXPORTS`r`n" + ($names -join "`r`n") + "`r`n"
+          Set-Content -Path "vendor/mpv/buildout/mpv.def" -Value $def -Encoding Ascii
+          & lib /nologo "/def:vendor/mpv/buildout/mpv.def" "/out:vendor/mpv/buildout/mpv.lib" /machine:x64
+          if ($LASTEXITCODE -ne 0) { throw "lib.exe failed ($LASTEXITCODE)" }
+          Write-Host ("mpv.lib bytes: " + (Get-Item 'vendor/mpv/buildout/mpv.lib').Length)
+
       - name: Package runtime
         shell: msys2 {0}
         run: bash ./package-mingw64-runtime.sh --pkg-name "libmpv-airwave-windows-x64"
