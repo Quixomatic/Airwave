@@ -15,6 +15,7 @@ import {
   type Network,
 } from "../../lib/plex-connection";
 import { clearStoredServerUrl, getStoredServerUrl, hasBakedServer } from "../../lib/server-url";
+import { checkForUpdates, type UpdateStatus } from "../../lib/updater";
 import {
   InfoStat,
   PageHeader,
@@ -34,9 +35,36 @@ import {
  */
 
 // ── General ──────────────────────────────────────────────────────────────────
+function updateSublabel(s: UpdateStatus): string {
+  switch (s.state) {
+    case "checking":
+      return "Checking for updates…";
+    case "downloading":
+      return `Downloading ${s.version}… the app will restart to finish.`;
+    case "uptodate":
+      return `You're on the latest version (${APP_VERSION}).`;
+    case "error":
+      return "Couldn't check for updates right now — try again later.";
+    default:
+      return `Currently on ${APP_VERSION} — click to check for a newer build.`;
+  }
+}
+
 export function GeneralPage() {
   const navigate = useNavigate();
-  const rows = [{ label: "Back to guide", sublabel: "Return to live TV", onClick: () => void navigate({ to: "/" }) }];
+  const [upd, setUpd] = useState<UpdateStatus>({ state: "idle" });
+  const busy = upd.state === "checking" || upd.state === "downloading";
+
+  const rows = [
+    {
+      label: "Check for updates",
+      sublabel: updateSublabel(upd),
+      onClick: () => {
+        if (!busy) void checkForUpdates(setUpd);
+      },
+    },
+    { label: "Back to guide", sublabel: "Return to live TV", onClick: () => void navigate({ to: "/" }) },
+  ];
   const { sel } = useSettingsPage(rows.length, (i) => rows[i]!.onClick());
 
   return (

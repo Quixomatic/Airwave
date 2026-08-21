@@ -16,6 +16,8 @@
     "core:window:allow-is-fullscreen",
     "store:default",
     "log:default",
+    "updater:default",
+    "process:default",
     {
       "identifier": "http:default",
       "allow": [{ "url": "http://**" }, { "url": "https://**" }]

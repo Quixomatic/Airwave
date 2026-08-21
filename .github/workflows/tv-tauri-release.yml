@@ -1,0 +1,195 @@
+name: TV Desktop (tv-tauri) Build & Release
+
+# Builds the Airwave DESKTOP CLIENT (apps/tv-tauri, Tauri + libmpv) and attaches the installer +
+# updater artifacts (latest.json + .sig) to the GitHub Release. Triggers on `v*` tags (same as the
+# server's desktop-release.yml — a tag fires both) or manually.
+#
+# STATUS: only the WINDOWS row is a real build today. macOS/Linux are intentional NO-OPS until their
+# mpv render-attach lands (the Windows `wid`=HWND embed has no macOS Metal-layer / Linux X11 equivalent
+# yet — see .plans/tv-tauri.md Phase 6). Their matrix rows stay so the shape is ready to flip on.
+#
+# The big libmpv runtime DLLs are NOT committed — this fetches them from the `libmpv-latest` release
+# (built by libmpv-windows.yml) into vendor/. The tiny MSVC import lib (windows-x64/lib/mpv.lib) IS
+# committed, so linking needs no dumpbin/lib dance on the runner.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: tv-tauri-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # attach artifacts to the GitHub Release
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            arch: x64
+            libmpv: windows-x64
+            supported: true
+          # NO-OPS until the per-OS mpv render-attach exists (macOS Metal layer / Linux X11 embed).
+          - os: macos-14
+            arch: arm64
+            supported: false
+          - os: ubuntu-24.04
+            arch: x64
+            supported: false
+    runs-on: ${{ matrix.os }}
+
+    env:
+      # `pnpm install` runs prisma generate across the monorepo; a throwaway URL satisfies it (never connects).
+      DATABASE_URL: "postgresql://build:build@localhost:5432/build?schema=public"
+      # `secrets` can't be used in a step `if:`, so evaluate signing availability once here.
+      WIN_SIGN_AVAILABLE: ${{ secrets.AZURE_CREDENTIALS != '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Not yet supported (${{ matrix.os }})
+        if: ${{ !matrix.supported }}
+        shell: bash
+        run: echo "tv-tauri ${{ matrix.os }} is a no-op until its mpv render-attach lands (Phase 6). Skipping."
+
+      - uses: pnpm/action-setup@v4
+        if: matrix.supported
+        with:
+          version: 10.11.0
+
+      - uses: actions/setup-node@v4
+        if: matrix.supported
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Rust toolchain
+        if: matrix.supported
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        if: matrix.supported
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/tv-tauri/src-tauri
+
+      # Fetch the prebuilt libmpv runtime DLLs from the libmpv-latest release into vendor/<plat>/bin/.
+      # (windows-x64/lib/mpv.lib is committed, so we only need the DLLs.)
+      - name: Fetch libmpv runtime
+        if: matrix.supported
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DEST="apps/tv-tauri/src-tauri/vendor/libmpv/${{ matrix.libmpv }}"
+          mkdir -p "$DEST"
+          gh release download libmpv-latest --repo "$GITHUB_REPOSITORY" \
+            --pattern "libmpv-airwave-${{ matrix.libmpv }}.tar.gz" --dir "$RUNNER_TEMP"
+          tar -xzf "$RUNNER_TEMP/libmpv-airwave-${{ matrix.libmpv }}.tar.gz" -C "$RUNNER_TEMP"
+          BIN_SRC="$(find "$RUNNER_TEMP" -type d -name bin -path '*libmpv-airwave*' | head -1)"
+          [ -n "$BIN_SRC" ] || { echo "no bin/ dir in libmpv archive"; exit 1; }
+          rm -rf "$DEST/bin"
+          cp -r "$BIN_SRC" "$DEST/bin"
+          echo "libmpv DLLs:"; ls "$DEST/bin" | head
+
+      - name: Install dependencies
+        if: matrix.supported
+        run: pnpm install --frozen-lockfile
+
+      # Build the NSIS installer + updater artifacts (createUpdaterArtifacts + the signing key produce
+      # the .sig). The .sig here is over the UNSIGNED exe; it's regenerated after Azure signing below.
+      - name: Build (Tauri NSIS + updater artifacts)
+        if: matrix.supported
+        working-directory: apps/tv-tauri
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: pnpm bundle:win
+
+      - name: Azure login (for Windows signing)
+        if: matrix.supported && env.WIN_SIGN_AVAILABLE == 'true'
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Authenticode-sign the NSIS installer IN PLACE so Windows doesn't SmartScreen-warn "unknown
+      # publisher" (reuses the server's Azure Artifact Signing account). Gated on the Azure secret.
+      - name: Sign Windows installer (Azure Artifact Signing)
+        if: matrix.supported && env.WIN_SIGN_AVAILABLE == 'true'
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: https://eus.codesigning.azure.net/
+          signing-account-name: airwave
+          certificate-profile-name: airwave-ci-signing
+          files-folder: ${{ github.workspace }}\apps\tv-tauri\src-tauri\target\release\bundle\nsis
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      # Regenerate the updater .sig OVER the now-signed installer (the build's .sig was over the unsigned
+      # exe → would mismatch). Only when Azure signing actually ran.
+      - name: Re-sign updater signature (over signed installer)
+        if: matrix.supported && env.WIN_SIGN_AVAILABLE == 'true'
+        working-directory: apps/tv-tauri
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: |
+          set -euo pipefail
+          EXE="$(ls src-tauri/target/release/bundle/nsis/*_x64-setup.exe)"
+          pnpm exec tauri signer sign -p "" "$EXE"
+
+      # Stage the installer + .sig under space-free names and build latest.json (the updater manifest).
+      - name: Stage release artifacts + latest.json
+        if: matrix.supported
+        working-directory: apps/tv-tauri
+        shell: bash
+        run: |
+          set -euo pipefail
+          NSIS="src-tauri/target/release/bundle/nsis"
+          OUT="artifacts"; mkdir -p "$OUT"
+          VER="$(node -p "require('./package.json').version")"
+          SRC_EXE="$(ls "$NSIS"/*_x64-setup.exe)"
+          ASSET="Airwave-Client_${VER}_x64-setup.exe"
+          cp "$SRC_EXE" "$OUT/$ASSET"
+          cp "$SRC_EXE.sig" "$OUT/$ASSET.sig"
+          export SIG="$(cat "$OUT/$ASSET.sig")"
+          export URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/${ASSET}"
+          export VER
+          node -e "
+            const fs=require('fs');
+            const m={version:process.env.VER,notes:'Airwave Client '+process.env.VER,pub_date:new Date().toISOString(),
+              platforms:{'windows-x86_64':{signature:process.env.SIG,url:process.env.URL}}};
+            fs.writeFileSync(process.env.OUT+'/latest.json', JSON.stringify(m,null,2));
+          "
+          cat "$OUT/latest.json"
+        env:
+          OUT: artifacts
+
+      - name: Upload build artifacts
+        if: matrix.supported
+        uses: actions/upload-artifact@v4
+        with:
+          name: airwave-client-${{ matrix.os }}-${{ matrix.arch }}
+          path: apps/tv-tauri/artifacts/*
+          if-no-files-found: warn
+
+      - name: Attach to GitHub Release
+        if: matrix.supported && startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apps/tv-tauri/artifacts/*
+          draft: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

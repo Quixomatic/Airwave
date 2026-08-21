@@ -6,10 +6,11 @@ src-tauri/target/
 src-tauri/gen/
 
 # Vendored libmpv binaries — big + reproducible from our CI (tools/libmpv + the
-# libmpv-latest release). Fetched per os-arch; NOT committed. Headers (include/)
-# ARE tracked (small, stable).
+# libmpv-latest release). The big runtime DLLs (bin/) are fetched per os-arch in
+# CI; NOT committed. Headers (include/) + the tiny Windows MSVC import lib
+# (windows-x64/lib/mpv.lib+def, ~15K) ARE tracked so CI links without regenerating.
 src-tauri/resources/lib/
-src-tauri/vendor/libmpv/windows-*/
+src-tauri/vendor/libmpv/windows-*/bin/
 src-tauri/vendor/libmpv/macos-*/
 src-tauri/vendor/libmpv/linux-*/
 routeTree.gen.ts

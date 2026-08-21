@@ -2,6 +2,32 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.50] - 2026-08-21
+
+tv-tauri Phase 7 — **self-updater + Windows release CI + code signing**.
+
+### Auto-updater
+- Wired `tauri-plugin-updater` (+ `tauri-plugin-process` for relaunch): `bundle.createUpdaterArtifacts`,
+  `plugins.updater` (minisign pubkey + the GitHub `releases/latest/download/latest.json` endpoint,
+  Windows `installMode: passive`), the `updater`/`process` capabilities, and the Rust plugins.
+- **Settings → General → "Check for updates"** (`lib/updater.ts`): checks the endpoint, and on a newer
+  signed build downloads + installs it and relaunches. Lights up once the repo/releases are public.
+
+### CI + signing (`.github/workflows/tv-tauri-release.yml`)
+- A `v*`-tag / manual workflow, matrix-shaped: **Windows builds** (fetch the `libmpv-airwave-windows-x64`
+  DLLs from the `libmpv-latest` release → `pnpm bundle:win` → NSIS installer + updater `.sig`); **macOS +
+  Linux are intentional no-ops** until their mpv render-attach lands (Phase 6).
+- **Azure Artifact Signing** of the installer (reuses the server's account/secret), then the updater
+  `.sig` is regenerated over the *signed* installer, and a `latest.json` is built and attached to the
+  release alongside the `Airwave-Client_<ver>_x64-setup.exe`.
+- The tiny Windows MSVC import lib (`vendor/libmpv/windows-x64/lib/mpv.lib`) is now committed so CI
+  links without regenerating it; only the big runtime DLLs are fetched. (`mpv.lib` is Windows-only —
+  macOS/Linux link `libmpv.dylib`/`.so` directly.)
+
+### Action required
+- Add repo secret **`TAURI_SIGNING_PRIVATE_KEY`** (the updater signing key). `AZURE_CREDENTIALS` +
+  the Azure signing account already exist from the desktop-server release.
+
 ## [0.11.49] - 2026-08-20
 
 tv-tauri — rename the desktop **client** product to **"Airwave Client"** (`productName`) so its Windows

@@ -1,6 +1,6 @@
 [package]
 name = "airwave"
-version = "0.11.49"
+version = "0.11.50"
 description = "Airwave desktop client (Tauri + libmpv)"
 authors = ["Airwave"]
 license = ""
@@ -32,6 +32,10 @@ tauri-plugin-window-state = "2"
 # File-backed key-value store (server URL, token, settings) in the app-data dir —
 # survives webview-cache clears; readable from Rust (@tauri-apps/plugin-store on JS).
 tauri-plugin-store = "2"
+# Self-update from the GitHub release's latest.json (signed with our minisign key).
+tauri-plugin-updater = "2"
+# Relaunch the app after an update installs.
+tauri-plugin-process = "2"
 # The native window handle (mpv `--wid` embed) + per-platform windowing.
 raw-window-handle = "0.6"
 # Enumerate LAN interfaces natively for onboarding's server scan — the webview's WebRTC
