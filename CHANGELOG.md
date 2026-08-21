@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.62] - 2026-08-21
+
+getairwave.tv — a **Download** section on the home page (below the intro, above the compose block): inline
+platform pills split into a **Server** row (Windows / macOS / Linux installers) and a **Client** row (Apple
+TV + iPad App Store stubs, then Windows / macOS desktop). Download URLs resolve to the latest GitHub
+Release's real assets at request time (`lib/releases.ts`, cached hourly), so they auto-update every release;
+a hero **Download** button jumps to `#download`. App Store product URLs are stubs (the `APPSTORE` constant)
+to fill in once live.
+
 ## [0.11.61] - 2026-08-21
 
 getairwave.tv polish + release-pipeline improvements.
