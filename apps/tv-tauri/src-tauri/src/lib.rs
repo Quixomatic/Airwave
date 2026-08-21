@@ -467,6 +467,15 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
     // `resolve_video_wid`): Windows = the main window HWND; macOS = a CAMetalLayer inserted behind
     // the transparent WKWebView. Setup runs on the main thread, so the macOS AppKit calls are safe.
     mpv.set_option_string("hwdec", "auto")?; // hardware decode (soia baseline)
+    // macOS: gpu-next must render through MoltenVK/Vulkan to draw into the CAMetalLayer we pass as
+    // `wid`. Without an explicit vulkan + moltenvk context mpv decodes fine but produces NO visible
+    // video (audio plays, the layer stays blank). plezy's proven Metal recipe. Creation-only options,
+    // so set them before `initialize()`.
+    #[cfg(target_os = "macos")]
+    {
+        mpv.set_option_string("gpu-api", "vulkan")?;
+        mpv.set_option_string("gpu-context", "moltenvk")?;
+    }
     let wid = resolve_video_wid(&window)?;
     mpv.set_option_i64("wid", wid)?;
     mpv.initialize()?;

@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.54] - 2026-08-21
+
+tv-tauri — **macOS video now renders** (the CAMetalLayer render-attach's missing GPU context).
+
+On macOS, mpv's `vo=gpu-next` was left on `gpu-api=auto` with no `gpu-context`, so it couldn't draw into the
+`CAMetalLayer` we pass as `wid` — it decoded and played audio but the video layer stayed blank (in both the
+full player and the mini feed). Now, before init, macOS sets `gpu-api=vulkan` + `gpu-context=moltenvk` (the
+MoltenVK backend is already bundled in `Contents/Frameworks`), matching plezy's proven Metal recipe. Windows
+is unaffected (its child-HWND path already renders).
+
 ## [0.11.53] - 2026-08-21
 
 tv-tauri Phase 8 (finalize) — **macOS Developer-ID signing + notarization, Intel via cross-compile, and a
