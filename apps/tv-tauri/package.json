@@ -1,6 +1,6 @@
 {
   "name": "tv-tauri",
-  "version": "0.11.47",
+  "version": "0.11.48",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,6 +8,8 @@
     "dev:vite": "vite dev",
     "build": "tauri build",
     "build:vite": "vite build",
+    "bundle:win": "tauri build --bundles nsis",
+    "bundle:win:debug": "tauri build --debug --bundles nsis",
     "check-types": "tsc --noEmit",
     "tauri": "tauri"
   },

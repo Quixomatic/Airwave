@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.48] - 2026-08-20
+
+tv-tauri Phase 7.1 — **Windows installer packaging**. Added `tauri.windows.conf.json` that bundles the
+vendored libmpv runtime DLLs **next to the exe** (`resources: { "vendor/libmpv/windows-x64/bin/*.dll":
+"" }`, soia's proven mapping) and targets **NSIS**, plus `bundle:win` / `bundle:win:debug` scripts.
+Build a real installer with `cd apps/tv-tauri && pnpm bundle:win` → `src-tauri/target/release/bundle/
+nsis/Airwave_<version>_x64-setup.exe`. (macOS/Linux bundling + a CI matrix are the next steps.)
+
 ## [0.11.47] - 2026-08-20
 
 tv-tauri GhostGuide — the centered message card now overlays the **whole ghost** (featured panel +
