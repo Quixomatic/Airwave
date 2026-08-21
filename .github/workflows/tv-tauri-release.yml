@@ -242,10 +242,12 @@ jobs:
           [ -n "$APP" ] || { echo "no .app built"; exit 1; }
           echo "app: $APP"
           FW="$APP/Contents/Frameworks"; mkdir -p "$FW"
-          # -RL dereferences the libmpv.dylib symlink into a real file; drop that dup (the soname
-          # libmpv.2.dylib is what's linked) so we don't ship the same lib twice.
+          # -RL dereferences the libmpv.dylib dev-symlink into a real file; we ship the versioned soname
+          # (libmpv.2.dylib) and drop the bare libmpv.dylib dup so there's one copy.
           cp -RL "src-tauri/vendor/libmpv/${{ matrix.libmpv }}/lib/"*.dylib "$FW/" 2>/dev/null || true
-          if [ -f "$FW/libmpv.dylib" ] && [ -f "$FW/libmpv.2.dylib" ]; then rm -f "$FW/libmpv.dylib"; fi
+          MPVSONAME="$(cd "$FW" && ls libmpv.*.dylib 2>/dev/null | grep -v '^libmpv\.dylib$' | head -1)"
+          [ -n "$MPVSONAME" ] || { echo "no libmpv soname in Frameworks"; ls "$FW"; exit 1; }
+          rm -f "$FW/libmpv.dylib"
           for d in "$FW"/*.dylib; do
             [ -e "$d" ] || continue
             b="$(basename "$d")"
@@ -261,9 +263,14 @@ jobs:
           BIN="$(find "$APP/Contents/MacOS" -maxdepth 1 -type f | head -1)"
           [ -n "$BIN" ] || { echo "no main binary"; ls -la "$APP/Contents/MacOS"; exit 1; }
           echo "binary: $BIN"
-          otool -L "$BIN" | tail -n +2 | awk '{print $1}' | grep -i libmpv | while read -r dep; do
-            case "$dep" in @rpath/*) ;; *) install_name_tool -change "$dep" "@rpath/$(basename "$dep")" "$BIN" 2>/dev/null || true ;; esac
-          done
+          # CRASH FIX: point the binary's libmpv dependency at the soname file we actually SHIP
+          # (@rpath/libmpv.2.dylib). It's recorded as `libmpv.dylib` (linked via the dev symlink), and the
+          # old code left it as @rpath/libmpv.dylib while we ship only libmpv.2.dylib → dyld "Library not
+          # loaded" at launch. Rewrite whatever the current libmpv ref is to the real soname.
+          CUR="$(otool -L "$BIN" | tail -n +2 | awk '{print $1}' | grep -i libmpv | head -1 || true)"
+          if [ -n "$CUR" ] && [ "$CUR" != "@rpath/$MPVSONAME" ]; then
+            install_name_tool -change "$CUR" "@rpath/$MPVSONAME" "$BIN" 2>/dev/null || true
+          fi
           echo "== binary libmpv refs =="; otool -L "$BIN" | grep -i libmpv || true
           echo "== Frameworks =="; ls "$FW"
 
