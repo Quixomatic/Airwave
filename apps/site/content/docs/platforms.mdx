@@ -25,8 +25,9 @@ a 6-inch screen.
 
 > **Store status vs. what runs today.** The native apps are **built and running on real hardware now**
 > (iPad, Apple TV 4K, Android TV, Fire TV), webOS runs daily on a real LG C2, the **Roku** channel runs
-> on a real Roku Streaming Stick 4K, and the **desktop app** runs on **Windows** (macOS and Linux use the
-> same Tauri + mpv core — those build targets are next). Publishing them to the App Store / Google Play /
+> on a real Roku Streaming Stick 4K, and the **desktop app** ships on **Windows and macOS** (Apple Silicon
+> + Intel) as signed, self-updating installers — validated on real hardware; Linux shares the same Tauri +
+> mpv core and is next. Publishing them to the App Store / Google Play /
 > Amazon Appstore / LG Content Store / Roku Channel Store — and shipping signed desktop installers — is a
 > **prerequisite still being completed** — iPad and Apple TV first, then the rest. The intended
 > store-by-store distribution is
@@ -75,8 +76,12 @@ channel entry via the number row or `[` / `]`. Sign-in is the same **device-code
 Airwave account), it runs the same **capability diagnostic** (mpv-measured), and it talks to the identical
 `/api/v1` server contract.
 
-**Windows** is built and running today; **macOS and Linux** share the same Tauri + mpv core and are the
-next build targets. Distributed as a small signed installer per OS, or built from source.
+**Windows and macOS** (Apple Silicon + Intel) ship today as signed, self-updating installers — the macOS
+builds are Developer-ID signed **and notarized**. On Windows mpv renders into a child window behind the
+web view; on macOS it renders through mpv's **render API** into a GL surface behind the transparent web
+view (with **HDR-EDR passthrough** on HDR-capable displays), so the glass chrome composites over the video
+either way. **Linux** shares the same core and is the next build target. Distributed as a small signed
+installer per OS, or built from source.
 
 ## Roku (`tv-roku`)
 
