@@ -2,6 +2,12 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.44] - 2026-08-20
+
+tv-tauri — in fullscreen the titlebar's **minimize + maximize buttons are now disabled** (dimmed,
+non-interactive), since they don't apply there; the fullscreen toggle (now the exit-fullscreen icon)
+and close stay live. Rounds out the "titlebar just stays put in fullscreen" approach.
+
 ## [0.11.43] - 2026-08-20
 
 tv-tauri — drop the fullscreen titlebar hide/peek entirely. The custom titlebar now just **stays

@@ -214,6 +214,10 @@ html.chrome-hidden .titlebar {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
 }
+.tb-btn:disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
 .tb-close:hover {
   background: #e01b24;
   color: #fff;
