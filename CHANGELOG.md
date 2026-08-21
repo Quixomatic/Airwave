@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.35] - 2026-08-20
+
+tv-tauri guide — **click-to-focus-the-rail, click-again-to-favorite**, the rail mirror of the
+program click-to-focus/click-to-tune gesture. Clicking a channel's rail (the circle / number /
+name cell) now **focuses** that rail first — it lights up and the circle becomes the favorite
+heart, exactly like keyboarding Left into the rail — and a **second click on the already-focused
+rail toggles favorite**. So a mouse can land on a channel without a stray click flipping a
+favorite. Keyboard navigation is untouched; the rail's `onClick` stops propagation so it no longer
+falls through to the row's focus-live-program handler. The circle's tooltip reflects the step
+("Focus channel" → "Add/Remove favorite").
+
 ## [0.11.34] - 2026-08-20
 
 tv-tauri — a proper **GhostGuide** for loading + empty states, modelled on the apps/web `/guide`

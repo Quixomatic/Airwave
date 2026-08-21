@@ -353,6 +353,23 @@ export function AuroraGrid({
     setFp(pi);
   };
 
+  // Mouse on the RAIL — the same two-step as programs, but for the channel rail: click a rail to FOCUS
+  // it (first click → the rail lights + its circle becomes the favorite heart, exactly like keyboard
+  // Left-into-rail), and a SECOND click on the already-focused rail TOGGLES favorite. So you can land
+  // on a channel's rail with the mouse without a stray click flipping a favorite.
+  const handleRailClick = (channelIndex: number) => {
+    if (player.miniFocused) return;
+    const ch = channels[channelIndex];
+    if (!ch) return;
+    const alreadyRailFocused = zone === "rail" && fc === channelIndex;
+    if (alreadyRailFocused) {
+      toggleFavorite(ch.id);
+      return;
+    }
+    setZone("rail");
+    setFc(channelIndex);
+  };
+
   // The guide's zone machine. Off the stack entirely while the full-screen player is up (which is
   // what the old `if (player.layout === "full") return` did by hand).
   //
@@ -643,7 +660,7 @@ export function AuroraGrid({
                     focusedProgramId={vi.index === fc && zone === "grid" && !player.miniFocused ? focusedProgram?.id : undefined}
                     railFocused={vi.index === fc && zone === "rail" && !player.miniFocused}
                     favorited={favoriteIds.has(c.id)}
-                    onToggleFavorite={() => toggleFavorite(c.id)}
+                    onRailClick={() => handleRailClick(vi.index)}
                     onProgramClick={(id) => handleProgramClick(vi.index, id)}
                     now={now}
                     rowPx={rowPx}
@@ -905,7 +922,7 @@ function Row({
   focusedProgramId,
   railFocused,
   favorited,
-  onToggleFavorite,
+  onRailClick,
   onProgramClick,
   now,
   rowPx,
@@ -922,7 +939,8 @@ function Row({
   /** Focus is on this channel's RAIL cell → reveal the favorite heart. */
   railFocused: boolean;
   favorited: boolean;
-  onToggleFavorite: () => void;
+  /** Mouse: click the rail to focus it (first click) or toggle favorite (second click, already focused). */
+  onRailClick: () => void;
   /** Mouse: click a program to focus it (first click) or tune it (second click, already focused). */
   onProgramClick: (programId: string) => void;
   now: Date;
@@ -945,6 +963,13 @@ function Row({
       }}
     >
       <div
+        // Click the rail to FOCUS it (first click), or toggle favorite (second click, already focused)
+        // — the two-step mirror of program click-to-focus/click-to-tune. stopPropagation so it doesn't
+        // fall through to the row's focus-live-program handler.
+        onClick={(e) => {
+          e.stopPropagation();
+          onRailClick();
+        }}
         style={{
           // Fixed px (viewport-derived), NOT a % of the row — so the rail keeps its width when the
           // sidebar expands and the column narrows; the time lane absorbs the difference.
@@ -957,6 +982,7 @@ function Row({
           justifyContent: "space-between",
           background: focused ? hexA(accent, 0.12) : "transparent",
           boxShadow: focused ? `inset 4px 0 0 ${accent}` : "none",
+          cursor: "pointer",
         }}
       >
         {/* top: the tinted channel-icon circle (left) + channel number (right).
@@ -970,15 +996,17 @@ function Row({
             Number is align-items:flex-start so it stays put no matter how tall the circle is. */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
           {/* role=button, not <button>: on the C2's Chrome 108 `display:flex` on a real <button>
-              mis-centers its child, so a div is used for the centered glyph/heart. */}
+              mis-centers its child, so a div is used for the centered glyph/heart. Click routes through
+              the rail two-step (onRailClick): first click focuses the rail (the glyph becomes the
+              heart), a second click on the focused rail toggles favorite — matching a keyboard OK. */}
           <div
             role="button"
             tabIndex={-1}
             onClick={(e) => {
               e.stopPropagation();
-              onToggleFavorite();
+              onRailClick();
             }}
-            title={favorited ? "Remove favorite" : "Add favorite"}
+            title={railFocused ? (favorited ? "Remove favorite" : "Add favorite") : "Focus channel"}
             style={{
               position: "relative",
               // Identical to the featured panel's tile: it renders fv(64)=vw(64*FEATURE_SCALE),
