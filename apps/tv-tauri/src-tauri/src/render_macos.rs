@@ -79,6 +79,9 @@ struct RenderState {
     mpv_render_ctx: *mut c_void,
     gl_context: *mut AnyObject,
     cgl: CGLContextObj,
+    /// The FBO's GL internal format we report to mpv. `GL_RGBA16F` on an HDR/EDR display (so mpv keeps
+    /// values > 1.0 for HDR passthrough), else 0 (auto, 8-bit — mpv tone-maps to SDR as before).
+    internal_format: c_int,
 }
 unsafe impl Send for RenderState {}
 unsafe impl Sync for RenderState {}
@@ -97,7 +100,7 @@ fn render(state: &RenderState) {
     unsafe {
         CGLLockContext(state.cgl);
         let _: () = msg_send![state.gl_context, makeCurrentContext];
-        let mut fbo = ffi::MpvOpenglFbo { fbo: 0, w, h, internal_format: 0 };
+        let mut fbo = ffi::MpvOpenglFbo { fbo: 0, w, h, internal_format: state.internal_format };
         let mut flip: c_int = 1;
         let mut params = [
             ffi::MpvRenderParam {
@@ -134,9 +137,11 @@ extern "C" fn display_link_cb(
 
 // NSOpenGLPixelFormatAttribute values (AppKit).
 const NSOPENGL_PFA_DOUBLE_BUFFER: u32 = 5;
+const NSOPENGL_PFA_COLOR_FLOAT: u32 = 58; // extended-range float framebuffer (HDR/EDR)
 const NSOPENGL_PFA_ACCELERATED: u32 = 73;
 const NSOPENGL_PFA_OPENGL_PROFILE: u32 = 99;
 const NSOPENGL_PROFILE_VERSION_4_1_CORE: u32 = 0x4100;
+const GL_RGBA16F: c_int = 0x881A;
 
 /// Insert a layer-backed GL host view behind the webview, attach an NSOpenGLContext, create mpv's
 /// OpenGL render context, and start a CVDisplayLink. Call AFTER `mpv_initialize` (with `vo=libmpv`),
@@ -154,6 +159,23 @@ pub fn setup(window: &tauri::WebviewWindow, mpv: &Arc<mpv::Mpv>) -> Result<(), S
         let bounds: objc2_foundation::NSRect = msg_send![content_view, bounds];
         let scale: f64 = msg_send![ns_window, backingScaleFactor];
 
+        // HDR: if the window's screen reports EDR headroom (> 1.0), use a float framebuffer + report
+        // GL_RGBA16F to mpv so values > 1.0 survive (HDR passthrough). On SDR displays keep the 8-bit
+        // path — mpv tone-maps to SDR (the proven-good behavior; a float buffer on SDR risks the
+        // compositor clipping HDR highlights). Re-evaluated only at setup (not on display change).
+        let screen: *mut AnyObject = msg_send![ns_window, screen];
+        let headroom: f64 = if screen.is_null() {
+            1.0
+        } else {
+            msg_send![screen, maximumPotentialExtendedDynamicRangeColorComponentValue]
+        };
+        let hdr = headroom > 1.0;
+        let internal_format = if hdr { GL_RGBA16F } else { 0 };
+        log::info!(
+            "macOS display EDR headroom {headroom:.2} → {}",
+            if hdr { "HDR passthrough (RGBA16F)" } else { "SDR (tone-map)" }
+        );
+
         // Backmost, layer-backed host view for the GL drawable (behind the transparent webview).
         let view: *mut AnyObject = msg_send![class!(NSView), alloc];
         let view: *mut AnyObject = msg_send![view, initWithFrame: bounds];
@@ -164,18 +186,24 @@ pub fn setup(window: &tauri::WebviewWindow, mpv: &Arc<mpv::Mpv>) -> Result<(), S
         let nil: *mut AnyObject = ptr::null_mut();
         let _: () = msg_send![content_view, addSubview: view, positioned: below, relativeTo: nil];
 
-        // Pixel format: accelerated, double-buffered, GL 4.1 core (mpv gpu-next needs a modern core ctx).
-        let attrs: [u32; 5] = [
-            NSOPENGL_PFA_ACCELERATED,
-            NSOPENGL_PFA_DOUBLE_BUFFER,
-            NSOPENGL_PFA_OPENGL_PROFILE,
-            NSOPENGL_PROFILE_VERSION_4_1_CORE,
-            0,
-        ];
+        // Pixel format: accelerated, double-buffered, GL 4.1 core (mpv gpu-next needs a modern core
+        // ctx); + ColorFloat (extended-range) on HDR displays so the framebuffer holds HDR values.
+        let mut attrs: Vec<u32> = vec![NSOPENGL_PFA_ACCELERATED, NSOPENGL_PFA_DOUBLE_BUFFER];
+        if hdr {
+            attrs.push(NSOPENGL_PFA_COLOR_FLOAT);
+        }
+        attrs.extend_from_slice(&[NSOPENGL_PFA_OPENGL_PROFILE, NSOPENGL_PROFILE_VERSION_4_1_CORE, 0]);
         let pf: *mut AnyObject = msg_send![class!(NSOpenGLPixelFormat), alloc];
         let pf: *mut AnyObject = msg_send![pf, initWithAttributes: attrs.as_ptr()];
         if pf.is_null() {
             return Err("NSOpenGLPixelFormat init failed".into());
+        }
+        // Signal extended-range content to the compositor so EDR engages on capable displays.
+        if hdr {
+            let cs: *mut AnyObject = msg_send![class!(NSColorSpace), extendedSRGBColorSpace];
+            if !cs.is_null() {
+                let _: () = msg_send![ns_window, setColorSpace: cs];
+            }
         }
         let glc: *mut AnyObject = msg_send![class!(NSOpenGLContext), alloc];
         let glc: *mut AnyObject = msg_send![glc, initWithFormat: pf, shareContext: nil];
@@ -224,6 +252,7 @@ pub fn setup(window: &tauri::WebviewWindow, mpv: &Arc<mpv::Mpv>) -> Result<(), S
             mpv_render_ctx: render_ctx,
             gl_context: glc,
             cgl,
+            internal_format,
         }));
         STATE.store(state, Ordering::Release);
 

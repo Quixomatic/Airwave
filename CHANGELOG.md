@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.60] - 2026-08-21
+
+tv-tauri — macOS **HDR-EDR passthrough** on HDR-capable displays (full quality), bundled with the centered
+titlebar brand (0.11.59). The render path checks the window screen's EDR headroom
+(`maximumPotentialExtendedDynamicRangeColorComponentValue`): on an HDR display it uses a **float
+extended-range framebuffer** and reports `GL_RGBA16F` to mpv so HDR values > 1.0 survive (passthrough via
+`target-colorspace-hint`), and sets an extended-range window colorspace so the compositor engages EDR. On
+SDR displays it keeps the proven 8-bit path (mpv tone-maps) — so SDR panels (incl. the 5K iMac) render
+exactly as before. HDR peak brightness only appears on HDR Macs (Pro Display XDR / recent MacBook Pro /
+HDR externals); it can't be shown on an SDR display.
+
 ## [0.11.59] - 2026-08-21
 
 tv-tauri — macOS titlebar polish: **center the Airwave brand** in the window header (was shifted right of
