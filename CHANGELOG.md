@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.49] - 2026-08-20
+
+tv-tauri — rename the desktop **client** product to **"Airwave Client"** (`productName`) so its Windows
+installer doesn't collide with the Airwave **server** (`apps/desktop`, product "Airwave"), which already
+installs to `%LOCALAPPDATA%\Airwave`. The client now installs to `%LOCALAPPDATA%\Airwave Client\`
+(exe `Airwave Client.exe`, installer `Airwave Client_<version>_x64-setup.exe`); identifier stays the
+distinct `com.airwave.tvdesktop`. First real Windows installer verified — 24 MB NSIS, libmpv-2.dll + 51
+runtime DLLs bundled next to the exe.
+
 ## [0.11.48] - 2026-08-20
 
 tv-tauri Phase 7.1 — **Windows installer packaging**. Added `tauri.windows.conf.json` that bundles the
