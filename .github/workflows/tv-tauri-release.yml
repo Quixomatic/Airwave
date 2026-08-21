@@ -89,12 +89,15 @@ jobs:
         run: |
           set -euo pipefail
           DEST="apps/tv-tauri/src-tauri/vendor/libmpv/${{ matrix.libmpv }}"
-          mkdir -p "$DEST"
+          # Use RELATIVE dirs — a Windows drive path (D:\...) makes tar treat "D:" as a remote host
+          # ("Cannot connect to D:"). --force-local also guards the colon. The archive unpacks bin/+lib/
+          # at its root; we only take bin/ (the tiny lib/mpv.lib import lib is committed).
+          mkdir -p "$DEST" _libmpv
           gh release download libmpv-latest --repo "$GITHUB_REPOSITORY" \
-            --pattern "libmpv-airwave-${{ matrix.libmpv }}.tar.gz" --dir "$RUNNER_TEMP"
-          tar -xzf "$RUNNER_TEMP/libmpv-airwave-${{ matrix.libmpv }}.tar.gz" -C "$RUNNER_TEMP"
-          BIN_SRC="$(find "$RUNNER_TEMP" -type d -name bin -path '*libmpv-airwave*' | head -1)"
-          [ -n "$BIN_SRC" ] || { echo "no bin/ dir in libmpv archive"; exit 1; }
+            --pattern "libmpv-airwave-${{ matrix.libmpv }}.tar.gz" --dir _libmpv
+          tar --force-local -xzf "_libmpv/libmpv-airwave-${{ matrix.libmpv }}.tar.gz" -C _libmpv
+          BIN_SRC="$(find _libmpv -type d -name bin | head -1)"
+          [ -n "$BIN_SRC" ] || { echo "no bin/ dir in libmpv archive"; find _libmpv | head; exit 1; }
           rm -rf "$DEST/bin"
           cp -r "$BIN_SRC" "$DEST/bin"
           echo "libmpv DLLs:"; ls "$DEST/bin" | head
