@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Hardened-runtime entitlements for the notarized macOS client. The WKWebview's JS engine needs JIT +
-     executable memory; disable-library-validation lets the app load our bundled libmpv dylibs (signed with
-     our own Developer-ID identity, not Apple's). Passed to `codesign --entitlements` in the CI signing step. -->
 <plist version="1.0">
 <dict>
   <key>com.apple.security.cs.allow-jit</key>
