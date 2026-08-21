@@ -33,6 +33,32 @@ fn main() {
     }
 
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
+
+    // macOS: the runtime ships as `libmpv.2.dylib` (soname) but the linker wants `libmpv.dylib` for
+    // `-l mpv`. Create the dev symlink if missing. Add rpaths: the vendor lib dir (so `cargo run` finds
+    // the dylibs in dev) + `@executable_path/../Frameworks` (the bundled `.app`, where the bundling step
+    // copies + `@rpath`-rewrites the dylibs — see plan Phase 8A).
+    if target_os == "macos" {
+        let link = lib_dir.join("libmpv.dylib");
+        if !link.exists() {
+            if let Some(real) = fs::read_dir(&lib_dir).ok().and_then(|rd| {
+                rd.flatten().map(|e| e.path()).find(|p| {
+                    p.file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|n| n.starts_with("libmpv.") && n.ends_with(".dylib"))
+                        .unwrap_or(false)
+                })
+            }) {
+                #[cfg(unix)]
+                let _ = std::os::unix::fs::symlink(real.file_name().unwrap(), &link);
+                #[cfg(not(unix))]
+                let _ = real;
+            }
+        }
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_dir.display());
+        println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path/../Frameworks");
+    }
+
     // mpv.lib (Windows, references libmpv-2.dll) / libmpv.dylib / libmpv.so → "mpv".
     println!("cargo:rustc-link-lib=dylib=mpv");
 
