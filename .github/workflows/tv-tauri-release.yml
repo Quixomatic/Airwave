@@ -104,7 +104,10 @@ jobs:
           mkdir -p "$DEST" _libmpv
           gh release download libmpv-latest --repo "$GITHUB_REPOSITORY" \
             --pattern "libmpv-airwave-${{ matrix.libmpv }}.tar.gz" --dir _libmpv
-          tar --force-local -xzf "_libmpv/libmpv-airwave-${{ matrix.libmpv }}.tar.gz" -C _libmpv
+          # --force-local is a GNU-tar flag needed only on Windows git-bash (D:\ → host); macOS bsdtar
+          # rejects it.
+          if [ "$RUNNER_OS" = "Windows" ]; then FL="--force-local"; else FL=""; fi
+          tar $FL -xzf "_libmpv/libmpv-airwave-${{ matrix.libmpv }}.tar.gz" -C _libmpv
           LIB_SRC="$(find _libmpv -type d -name lib | head -1)"
           [ -n "$LIB_SRC" ] || { echo "no lib/ in archive"; find _libmpv | head -40; exit 1; }
           rm -rf "$DEST/lib"; cp -r "$LIB_SRC" "$DEST/lib"
