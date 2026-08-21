@@ -2,6 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.40] - 2026-08-20
+
+tv-tauri — **true fullscreen** (covers the taskbar), ported from soia and set up for all three OSes.
+A new fullscreen button in the custom titlebar (leftmost of min/max/close, `Maximize`↔`Minimize`
+icon) plus **F11** toggle it. The mechanism is Tauri's own `setFullscreen`, which abstracts each OS
+(Windows borderless-over-taskbar, macOS native fullscreen Space, Linux WM); the one per-OS wrinkle —
+Windows glitching when going fullscreen straight from a maximized window — is handled by a Rust
+`prepare_window_for_fullscreen` command that unmaximizes first and re-maximizes on exit (no-op on
+mac/Linux). In fullscreen the custom titlebar tucks away and content fills to the top edge, revealed
+by moving the mouse to the very top (the standard menu-bar peek). Window capabilities already granted.
+
+### What ships
+
+- `src-tauri`: async `prepare_window_for_fullscreen` command (cfg-gated Windows unmaximize; false elsewhere), registered.
+- `lib/fullscreen.ts`: the cross-OS `toggleFullscreen`/`setFullscreen`/`isFullscreen` (Windows prepare→settle→setFullscreen; restore maximize on exit/error).
+- `lib/use-fullscreen.ts`: state synced from the window (covers the button, F11, OS gestures), `html.fs`/`.fs-peek` DOM reflection, F11 binding.
+- `TitleBar.tsx`: the fullscreen button; `styles.css`: `.fs` hides the titlebar + `--content-top:0`, `.fs-peek` reveals it.
+
 ## [0.11.39] - 2026-08-20
 
 tv-tauri player chrome — **hover now drives the same focus styling as the keyboard**. Mousing over a

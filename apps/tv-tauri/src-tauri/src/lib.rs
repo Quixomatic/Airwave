@@ -92,6 +92,28 @@ fn mpv_fill_window(mpv: State<'_, Arc<mpv::Mpv>>) -> Result<(), String> {
     Ok(())
 }
 
+/// Pre-fullscreen prep (soia's cross-OS recipe). Windows glitches going fullscreen straight from a
+/// MAXIMIZED window, so the JS `toggleFullscreen` calls this first to unmaximize; the returned bool
+/// tells it to re-maximize on exit. No-op (returns false) on macOS/Linux, where Tauri's
+/// `setFullscreen` handles any prior window state cleanly. Async so it runs off the main thread (a
+/// sync command would block the event loop the unmaximize needs).
+#[tauri::command]
+async fn prepare_window_for_fullscreen(window: tauri::WebviewWindow) -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        if !window.is_maximized().unwrap_or(false) {
+            return Ok(false);
+        }
+        window.unmaximize().map_err(|e| e.to_string())?;
+        Ok(true)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = window;
+        Ok(false)
+    }
+}
+
 /// The mpv event-loop thread: observe the properties the player UI needs and forward every change as
 /// a Tauri event (`mpv:*`). Routes property changes on `reply_userdata` (the id we passed to
 /// `observe_property`) rather than parsing the event payload union. Ends on mpv shutdown.
@@ -403,7 +425,8 @@ pub fn run() {
             mpv_set_subtitle_track,
             mpv_stop,
             mpv_set_region,
-            mpv_fill_window
+            mpv_fill_window,
+            prepare_window_for_fullscreen
         ])
         .setup(|app| {
             if let Err(e) = setup_player(app) {
