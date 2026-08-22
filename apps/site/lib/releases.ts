@@ -14,6 +14,33 @@ export type LatestRelease = {
   find: (re: RegExp) => string;
 };
 
+/** Per-OS download URLs for the hero's OS-aware buttons (resolved server-side; the client picks by OS). */
+export type HeroDownloads = {
+  version: string | null;
+  releases: string;
+  server: { windows: string; macos: string; macosIntel: string; linux: string };
+  client: { windows: string; macos: string; macosIntel: string };
+};
+
+export async function getHeroDownloads(): Promise<HeroDownloads> {
+  const rel = await getLatestRelease();
+  return {
+    version: rel.version,
+    releases: RELEASES_PAGE,
+    server: {
+      windows: rel.find(/^Airwave-Server-.*-windows-x64-Setup\.exe$/),
+      macos: rel.find(/^Airwave-Server-.*-macos-arm64\.dmg$/),
+      macosIntel: rel.find(/^Airwave-Server-.*-macos-x64\.dmg$/),
+      linux: rel.find(/^Airwave-Server-.*-linux-x64-Setup\.tar\.gz$/),
+    },
+    client: {
+      windows: rel.find(/^Airwave-Client_.*_x64-setup\.exe$/),
+      macos: rel.find(/^Airwave-Client_.*_aarch64\.dmg$/),
+      macosIntel: rel.find(/^Airwave-Client_.*_x86_64\.dmg$/),
+    },
+  };
+}
+
 export async function getLatestRelease(): Promise<LatestRelease> {
   try {
     const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {

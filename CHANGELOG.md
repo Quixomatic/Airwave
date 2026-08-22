@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.63] - 2026-08-21
+
+getairwave.tv — replaced the downloads section with **OS-aware split-button downloads in the hero**. Two
+pills — **Server** and **Client** — each a cohesive button plus a caret that opens a dropdown to switch
+platform. The **Server** button leads with **Docker** (→ self-hosting docs); the **Client** button
+auto-detects the visitor's OS and defaults its main download to the matching installer (with Apple TV /
+iPad App Store, Windows, and macOS Apple Silicon / Intel in the menu). All installer links resolve to the
+latest GitHub Release's real assets at request time. Also: "Get started" is a full button again alongside a
+round GitHub icon button, and the hero clip was repositioned + resized responsively.
+
 ## [0.11.62] - 2026-08-21
 
 getairwave.tv — a **Download** section on the home page (below the intro, above the compose block): inline

@@ -4,11 +4,12 @@ import { ServerCodeBlock } from "fumadocs-ui/components/codeblock.rsc";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tv, Rewind, Clapperboard, MonitorPlay, ShieldCheck, Sparkles, TerminalIcon, Globe } from "lucide-react";
 import { SiApple, SiAndroid, SiLg, SiGooglechrome, SiRoku, SiSamsung } from "react-icons/si";
-import { FaAmazon, FaWindows, FaLinux } from "react-icons/fa";
+import { FaAmazon, FaWindows, FaLinux, FaGithub } from "react-icons/fa";
 import { cn } from "@/lib/cn";
 import { button, card, heading, Wide } from "@/components/landing";
 import { ClipCarousel } from "@/components/clip-carousel";
-import { DownloadSection } from "@/components/downloads";
+import { HeroDownloadButtons } from "@/components/hero-downloads";
+import { getHeroDownloads } from "@/lib/releases";
 import { AgnosticBackground, HeroShaders, ShaderCta } from "@/components/shaders";
 import { COMPOSE } from "./compose";
 import { PreviewImages } from "./page.client";
@@ -54,7 +55,8 @@ const HERO_REEL = [
   { src: "/demos/lenses.mp4" },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const dl = await getHeroDownloads();
   return (
     <main className="pt-4 pb-6 text-landing-foreground md:pb-12">
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
@@ -71,7 +73,7 @@ export default function HomePage() {
           variant="bare"
           poster="/screenshots/appletv-guide.webp"
           clips={HERO_REEL}
-          className="pointer-events-none absolute top-[60%] left-1/2 z-1 w-[680px] max-w-none -translate-x-1/2 rounded-xl border-2 border-fd-border shadow-2xl shadow-black/40 md:top-[58%] md:left-[30%] md:w-[760px] md:translate-x-0 lg:top-[56%] lg:left-[34%] lg:w-[900px] xl:left-[38%] xl:w-[980px]"
+          className="pointer-events-none absolute top-[74%] left-1/2 z-1 w-[560px] max-w-none -translate-x-1/2 rounded-xl border-2 border-fd-border shadow-2xl shadow-black/40 md:top-[66%] md:left-[38%] md:w-[760px] md:translate-x-0 lg:top-[56%] lg:left-[42%] lg:w-[900px] xl:left-[46%] xl:w-[980px]"
         />
         <div className="z-2 flex size-full flex-col px-4 max-md:items-center max-md:text-center md:p-12">
           <p className="mt-12 w-fit rounded-full border border-brand/50 bg-fd-background/50 px-3 py-1.5 text-xs font-medium text-brand backdrop-blur-md">
@@ -87,10 +89,8 @@ export default function HomePage() {
             Airwave turns your own media into always-on, channel-surfable live TV — a real guide, DVR, and
             bumpers — streamed straight from your Plex to native apps on every big screen you own.
           </p>
-          <div className="flex w-fit flex-row flex-wrap items-center justify-center gap-4">
-            <a href="#download" className={cn(button(), "max-sm:text-sm")}>
-              Download
-            </a>
+          <HeroDownloadButtons dl={dl} />
+          <div className="mt-5 flex flex-row flex-wrap items-center gap-2.5">
             <Link href="/docs/getting-started" className={cn(button("secondary"), "max-sm:text-sm")}>
               Get started
             </Link>
@@ -98,9 +98,11 @@ export default function HomePage() {
               href="https://github.com/Quixomatic/Airwave"
               target="_blank"
               rel="noreferrer noopener"
-              className={cn(button("secondary"), "max-sm:text-sm")}
+              aria-label="GitHub"
+              title="GitHub"
+              className="inline-flex size-[46px] items-center justify-center rounded-full border bg-fd-secondary text-fd-secondary-foreground transition-colors hover:bg-fd-accent"
             >
-              GitHub
+              <FaGithub className="size-5" />
             </a>
           </div>
         </div>
@@ -116,9 +118,6 @@ export default function HomePage() {
           leave on, not another grid of posters to scroll. You own the server, the content, and the data.
         </p>
       </Wide>
-
-      {/* ── Downloads (Server + Client, inline pills) ────────────────────────── */}
-      <DownloadSection />
 
       {/* ── Get running ──────────────────────────────────────────────────────── */}
       <Wide className="mt-16 grid grid-cols-1 items-start gap-10 lg:mt-28 lg:grid-cols-2">
