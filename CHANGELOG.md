@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.66] - 2026-08-21
+
+getairwave.tv — reposition the hero clip across breakpoints. On **sm** the clip now scales with the hero
+panel (`w-[560px]` → `w-[90%]`) instead of a fixed width, so it shrinks with the layout rather than
+overflowing; **lg** drops lower (`top-56%` → `top-62%`) and **xl** nudges right (`left-46%` → `left-49%`)
+so it sits better beside the copy. Purely positional CSS on the hero `<HeroReel>`; no logic changes.
+
 ## [0.11.65] - 2026-08-21
 
 Fix the getairwave.tv favicon build. The icons copied from apps/web were **RGB**, which Next/Turbopack

@@ -73,7 +73,7 @@ export default async function HomePage() {
           variant="bare"
           poster="/screenshots/appletv-guide.webp"
           clips={HERO_REEL}
-          className="pointer-events-none absolute top-[74%] left-1/2 z-1 w-[560px] max-w-none -translate-x-1/2 rounded-xl border-2 border-fd-border shadow-2xl shadow-black/40 md:top-[66%] md:left-[38%] md:w-[760px] md:translate-x-0 lg:top-[56%] lg:left-[42%] lg:w-[900px] xl:left-[46%] xl:w-[980px]"
+          className="pointer-events-none absolute top-[74%] left-1/2 z-1 w-[90%] max-w-none -translate-x-1/2 rounded-xl border-2 border-fd-border shadow-2xl shadow-black/40 md:top-[66%] md:left-[38%] md:w-[760px] md:translate-x-0 lg:top-[62%] lg:left-[42%] lg:w-[900px] xl:left-[49%] xl:w-[980px]"
         />
         <div className="z-2 flex size-full flex-col px-4 max-md:items-center max-md:text-center md:p-12">
           <p className="mt-12 w-fit rounded-full border border-brand/50 bg-fd-background/50 px-3 py-1.5 text-xs font-medium text-brand backdrop-blur-md">
