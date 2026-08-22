@@ -2,6 +2,25 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.68] - 2026-08-22
+
+tv-tauri — settings + device polish, plus a macOS titlebar seam fix.
+
+### What ships
+- **macOS titlebar seam fixed** — inside the authed app the custom titlebar is now transparent on macOS
+  (`html.platform-mac.in-app`), so the single full-window navy backdrop paints both the top strip and the
+  guide instead of two separately-composited same-color layers seaming on the transparent macOS window.
+  Windows (opaque window) and non-auth routes keep the opaque titlebar.
+- **Settings rail is now persistent** — expanded by default and part of the layout (it pushes the content
+  pane over instead of overlaying it with a scrim); a Collapse/Expand toggle pinned at the bottom folds it
+  to the slim icon rail.
+- **Device page shows the OS** — added `@tauri-apps/plugin-os`; the info card now shows the OS name with its
+  brand logo (Windows / Apple / Linux, via `react-icons`) plus the OS version and CPU arch.
+- **Device page uses the real `@airwave/ui` Switch** for the per-codec capability toggles (read-only,
+  row-driven), replacing the custom toggle visual.
+- **Settings sticky header** — replaced the full-width hairline divider (which overhung the padded content)
+  with a soft top-navy → transparent gradient.
+
 ## [0.11.67] - 2026-08-22
 
 getairwave.tv — a **reusable section system** + a display font. Added a `--font-display` token (a system

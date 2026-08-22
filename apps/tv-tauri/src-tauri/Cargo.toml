@@ -1,6 +1,6 @@
 [package]
 name = "airwave"
-version = "0.11.67"
+version = "0.11.68"
 description = "Airwave desktop client (Tauri + libmpv)"
 authors = ["Airwave"]
 license = ""
@@ -36,6 +36,7 @@ tauri-plugin-store = "2"
 tauri-plugin-updater = "2"
 # Relaunch the app after an update installs.
 tauri-plugin-process = "2"
+tauri-plugin-os = "2"
 # The native window handle (mpv `--wid` embed) + per-platform windowing.
 raw-window-handle = "0.6"
 # Enumerate LAN interfaces natively for onboarding's server scan — the webview's WebRTC

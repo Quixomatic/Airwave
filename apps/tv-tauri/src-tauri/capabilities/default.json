@@ -18,6 +18,7 @@
     "log:default",
     "updater:default",
     "process:default",
+    "os:default",
     {
       "identifier": "http:default",
       "allow": [{ "url": "http://**" }, { "url": "https://**" }]

@@ -177,6 +177,14 @@ html.platform-mac .titlebar {
   padding-left: 0;
   padding-right: 0;
 }
+/* macOS, authed app only (`.in-app`, set by PlayerProvider): the full-window navy backdrop already
+   paints the top strip behind the titlebar, so make the titlebar transparent rather than double-paint
+   its own #060a14 fill — on the transparent macOS window two same-color layers seam slightly at the
+   boundary. One continuous backdrop reads as a single surface. Windows (opaque window) is untouched;
+   non-auth routes (no backdrop) keep the opaque titlebar. */
+html.platform-mac.in-app .titlebar {
+  background: transparent;
+}
 
 /* Fullscreen player: the titlebar slides away with the rest of the chrome (FullChrome toggles this
    class from its `panelOpen`), so the window controls only appear on mouse-move over the video. */

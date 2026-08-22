@@ -1,5 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { Switch } from "@airwave/ui/components/switch";
+import { arch, platform, version } from "@tauri-apps/plugin-os";
+import { FaApple, FaLinux, FaWindows } from "react-icons/fa";
 import { useState } from "react";
 
 import { api, type CapKind, type CapTokenState, type DeviceCapView } from "../../lib/api";
@@ -23,7 +26,6 @@ import {
   SectionLabel,
   SETTINGS_ACCENT,
   SettingRow,
-  Toggle,
   useArmedAction,
   useSettingsPage,
 } from "./settings-ui";
@@ -250,6 +252,13 @@ function withOverride(view: DeviceCapView | undefined, kind: CapKind, token: str
   return { ...view, groups, hasOverrides };
 }
 
+const OS_LABEL: Record<string, string> = { windows: "Windows", macos: "macOS", linux: "Linux" };
+const OS_ICON: Record<string, React.ReactNode> = {
+  windows: <FaWindows size={16} />,
+  macos: <FaApple size={17} />,
+  linux: <FaLinux size={17} />,
+};
+
 export function DevicePage() {
   const navigate = useNavigate();
   const dev = deviceId();
@@ -299,14 +308,12 @@ export function DevicePage() {
     <>
       <PageHeader title="Device" subtitle="This device's playback capabilities and tools." />
       <Body>
-        {data?.device && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 28, padding: "16px 22px", borderRadius: 14, background: "rgba(148,163,184,0.06)", marginBottom: 8 }}>
-            <InfoStat label="Model" value={data.device.model ?? "—"} />
-            <InfoStat label="System" value={data.device.osVersion ?? "—"} />
-            <InfoStat label="Resolution" value={data.device.screenWidth ? `${data.device.screenWidth}×${data.device.screenHeight}` : "—"} />
-            <InfoStat label="HDR" value={data.device.hdr ? "Yes" : "No"} />
-          </div>
-        )}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 28, padding: "16px 22px", borderRadius: 14, background: "rgba(148,163,184,0.06)", marginBottom: 8 }}>
+          <InfoStat label="OS" value={OS_LABEL[platform()] ?? platform()} icon={OS_ICON[platform()]} />
+          <InfoStat label="System" value={`${version()} · ${arch()}`} />
+          <InfoStat label="Resolution" value={data?.device?.screenWidth ? `${data.device.screenWidth}×${data.device.screenHeight}` : "—"} />
+          <InfoStat label="HDR" value={data?.device?.hdr ? "Yes" : "No"} />
+        </div>
 
         <SectionLabel small>Tools</SectionLabel>
         {tools.map((r, i) => (
@@ -382,7 +389,14 @@ function TokenRow({ t, focused, onClick }: { t: CapTokenState; focused: boolean;
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {forcedRisky && <Pill tone="warn">Forced</Pill>}
           {t.override !== null && !forcedRisky && <Pill tone="accent">Override</Pill>}
-          <Toggle on={t.effective} warn={forcedRisky} />
+          {/* Real @airwave/ui Switch, read-only + pointer-events-off: the SettingRow's OK/click is the
+              single toggle path (D-pad model). `forcedRisky` tints it amber to match the "Forced" pill. */}
+          <Switch
+            checked={t.effective}
+            readOnly
+            tabIndex={-1}
+            className={forcedRisky ? "pointer-events-none data-checked:bg-[#f0a92a]" : "pointer-events-none"}
+          />
         </div>
       }
     />

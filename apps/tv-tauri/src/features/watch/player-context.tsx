@@ -45,6 +45,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const tvPlayer = useTvPlayer(channelId, { quality, audioStreamId, subtitleStreamId }, layout === "full");
 
+  // macOS only: inside the authed app the full-window navy backdrop below already paints the top strip
+  // (behind the titlebar), so tag <html> and let CSS make the custom titlebar TRANSPARENT here instead
+  // of painting its own #060a14 fill. On the transparent macOS window two same-color layers can seam at
+  // the boundary; one continuous backdrop can't. Non-auth routes (login/onboarding) have no such
+  // backdrop, so they keep the opaque titlebar. Windows uses an opaque window and is unaffected.
+  useEffect(() => {
+    const el = document.documentElement;
+    el.classList.add("in-app");
+    return () => el.classList.remove("in-app");
+  }, []);
+
   // The mini feed docks into the GUIDE's featured-panel slot, which only exists on the guide route. On
   // any other authed route (settings, diagnostic) that slot is gone, so we hide the mini overlays and
   // let the route's own opaque page cover the (still-playing) full-window mpv surface behind it. The

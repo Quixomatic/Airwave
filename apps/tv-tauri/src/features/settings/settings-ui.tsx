@@ -95,15 +95,14 @@ export function useArmedAction(action: () => void, ms = 4000) {
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div
+      // Opaque navy at the top (masks rows scrolling up) fading to transparent at the bottom — a soft
+      // grounding instead of a hard, full-width divider that overhung the padded content.
+      className="bg-linear-to-b from-[#060a14] from-70% to-transparent"
       style={{
         position: "sticky",
         top: 0,
         zIndex: 5,
-        // Span the full column width (the column has no horizontal padding — header + body supply it),
-        // opaque so rows scrolling up vanish behind it.
-        background: "#060a14",
-        padding: "36px 64px 16px",
-        borderBottom: "1px solid rgba(148,163,184,0.10)",
+        padding: "36px 64px 28px",
       }}
     >
       <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.5px" }}>{title}</h1>
@@ -188,32 +187,18 @@ export function Pill({ children, tone = "accent" }: { children: React.ReactNode;
   );
 }
 
-/** A read-only switch visual (the D-pad OK / click on the row flips it — we don't rely on native focus). */
-export function Toggle({ on, warn }: { on: boolean; warn?: boolean }) {
-  const color = warn ? "#f0a92a" : SETTINGS_ACCENT;
-  return (
-    <span
-      style={{
-        width: 46,
-        height: 26,
-        borderRadius: 999,
-        background: on ? color : "rgba(148,163,184,0.3)",
-        position: "relative",
-        flexShrink: 0,
-        transition: "background .15s",
-      }}
-    >
-      <span style={{ position: "absolute", top: 3, left: on ? 23 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
-    </span>
-  );
-}
+/* The device page's cap toggles now use the real `@airwave/ui` Switch (read-only, row-driven) — the old
+   custom `Toggle` visual was removed. */
 
 /** Small info column used by the Server + Device summary cards. */
-export function InfoStat({ label, value }: { label: string; value: string }) {
+export function InfoStat({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
     <div style={{ minWidth: 0 }}>
       <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#64748b", marginBottom: 3 }}>{label}</div>
-      <div style={{ fontSize: 17, fontWeight: 600, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 17, fontWeight: 600, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis" }}>
+        {icon}
+        {value}
+      </div>
     </div>
   );
 }

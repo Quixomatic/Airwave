@@ -2,7 +2,7 @@ import { Outlet, createFileRoute, useNavigate, useRouterState } from "@tanstack/
 import { ArrowLeft, Cpu, Info, Server, SlidersHorizontal, UserRound } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { SIDEBAR_SLIVER_W } from "../../../features/guide/guide-sidebar";
+import { COLLAPSED_W, EXPANDED_W, SIDEBAR_SLIVER_W } from "../../../features/guide/guide-sidebar";
 import { SettingsSidebar } from "../../../features/settings/settings-sidebar";
 import { SettingsCtx } from "../../../features/settings/settings-ui";
 import { LAYER, useKeyLayer } from "../../../lib/input";
@@ -42,8 +42,11 @@ function SettingsShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const activeKey = keyForPath(pathname);
 
-  // Land straight in the content (General focused, rail collapsed to a sliver) — ◄/Back opens the rail.
+  // Land straight in the content (General focused) — ◄/Back moves keyboard focus onto the rail.
   const [zone, setZone] = useState<"rail" | "content">("content");
+  // The rail is PERSISTENT + expanded by default and pushes the content over (it no longer overlays);
+  // the rail's bottom toggle folds it to a slim icon rail. This is width only, independent of focus.
+  const [collapsed, setCollapsed] = useState(false);
   const [sel, setSel] = useState(() => Math.max(1, NAV.findIndex((n) => n.key === activeKey)));
 
   // Keep the rail highlight on the current route if it changes from elsewhere.
@@ -94,20 +97,26 @@ function SettingsShell() {
     },
   });
 
-  const expanded = zone === "rail";
+  // The rail sits in the layout, so reserve its width: the slim sliver when collapsed, else the sliver
+  // plus the extra expanded width. Animates in step with the rail's own width spring.
+  const contentLeft = collapsed ? SIDEBAR_SLIVER_W : SIDEBAR_SLIVER_W + (EXPANDED_W - COLLAPSED_W);
 
   return (
     <div style={{ position: "absolute", inset: 0, background: "#060a14", color: "#f1f5f9", overflow: "hidden" }}>
       <SettingsSidebar
         items={NAV.map((n) => ({ key: n.key, label: n.label, icon: n.icon }))}
         activeKey={activeKey}
-        expanded={expanded}
-        focused={expanded}
+        collapsed={collapsed}
+        focused={zone === "rail"}
         sel={sel}
         onActivate={activate}
+        onToggleCollapse={() => setCollapsed((c) => !c)}
       />
 
-      <div className="cg-grid-scroll" style={{ marginLeft: SIDEBAR_SLIVER_W, height: "100%", overflowY: "auto" }}>
+      <div
+        className="cg-grid-scroll"
+        style={{ marginLeft: contentLeft, height: "100%", overflowY: "auto", transition: "margin-left 0.28s ease" }}
+      >
         <div style={{ maxWidth: 1024, margin: "0 auto" }}>
           <SettingsCtx.Provider value={{ active: zone === "content", returnToRail }}>
             <Outlet />
