@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.71] - 2026-08-22
+
+tv-tauri — settings styling cleanup: converted the static inline styles in the settings pages
+(`settings-ui.tsx` + `settings-pages.tsx`) to standard Tailwind utility classes, mapping exact-match
+colors to the Aurora theme tokens (`text-foreground`, `text-muted-foreground`, `bg-frame`, …) and keeping
+every non-token color/size exact via arbitrary classes. Focus/tone-dependent styling (the `SettingRow`
+focus surface + ring, `Pill` tone colors) and the capability grid's row-count math stay inline;
+`settings-sidebar.tsx` (motion/layout math) was left as-is. No visual change — purely a mechanical
+translation so the styles flow through the token system.
+
 ## [0.11.70] - 2026-08-22
 
 tv-tauri — device-page summary as icon tiles.

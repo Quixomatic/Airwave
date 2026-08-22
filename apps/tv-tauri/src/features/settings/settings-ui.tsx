@@ -1,3 +1,4 @@
+import { cn } from "@airwave/ui/lib/utils";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 
 import { LAYER, useKeyLayer } from "../../lib/input";
@@ -9,7 +10,7 @@ import { LAYER, useKeyLayer } from "../../lib/input";
  * live in `settings-screen.tsx`; pages just render their options and call `useSettingsPage`.
  *
  * tv-tauri seam: `PageHeader` is STICKY (the "main header section stays put while the rest scrolls" —
- * James's ask). Everything else is the tv-web port; the desktop cleanup pass tightens the sizing later.
+ * James's ask). Static styling is Tailwind; only focus/tone-dependent styling stays inline.
  */
 
 export const SETTINGS_ACCENT = "#4a9fe0";
@@ -97,16 +98,10 @@ export function PageHeader({ title, subtitle }: { title: string; subtitle?: stri
     <div
       // Opaque navy at the top (masks rows scrolling up) fading to transparent at the bottom — a soft
       // grounding instead of a hard, full-width divider that overhung the padded content.
-      className="bg-linear-to-b from-[#060a14] from-90% to-transparent"
-      style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 5,
-        padding: "36px 64px 28px",
-      }}
+      className="sticky top-0 z-[5] bg-linear-to-b from-[#060a14] from-90% to-transparent px-16 pt-9 pb-7"
     >
-      <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.5px" }}>{title}</h1>
-      {subtitle && <p style={{ fontSize: 16, color: "#94a3b8", marginTop: 6 }}>{subtitle}</p>}
+      <h1 className="text-3xl font-extrabold tracking-[-0.5px]">{title}</h1>
+      {subtitle && <p className="mt-1.5 text-base text-muted-foreground">{subtitle}</p>}
     </div>
   );
 }
@@ -134,25 +129,21 @@ export function SettingRow({
       ref={ref}
       role="button"
       onClick={onClick}
-      className={onClick && !focused ? "settings-row-hoverable" : undefined}
+      className={cn(
+        "mb-3 flex scroll-my-7 items-center justify-between gap-5 rounded-[14px] px-5 py-[15px]",
+        onClick ? "cursor-pointer" : "cursor-default",
+        onClick && !focused && "settings-row-hoverable",
+      )}
+      // Focus-dependent surface + ring stay inline.
       style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 20,
-        padding: "15px 20px",
-        borderRadius: 14,
-        cursor: onClick ? "pointer" : "default",
         background: focused ? "rgba(74,159,224,0.10)" : "rgba(148,163,184,0.06)",
         outline: focused ? `2px solid ${SETTINGS_ACCENT}` : "none",
         outlineOffset: -2,
-        marginBottom: 12,
-        scrollMarginBlock: 28,
       }}
     >
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 17, fontWeight: 600, color: "#f1f5f9" }}>{label}</div>
-        {sublabel && <div style={{ fontSize: 14, color: "#94a3b8", marginTop: 2 }}>{sublabel}</div>}
+      <div className="min-w-0">
+        <div className="text-[17px] font-semibold text-foreground">{label}</div>
+        {sublabel && <div className="mt-0.5 text-sm text-muted-foreground">{sublabel}</div>}
       </div>
       {right}
     </div>
@@ -162,14 +153,10 @@ export function SettingRow({
 export function SectionLabel({ children, small }: { children: React.ReactNode; small?: boolean }) {
   return (
     <div
-      style={{
-        fontSize: small ? 13 : 15,
-        fontWeight: 700,
-        letterSpacing: 1,
-        textTransform: "uppercase",
-        color: "#64748b",
-        margin: small ? "20px 0 10px" : "30px 0 14px",
-      }}
+      className={cn(
+        "font-bold uppercase tracking-[1px] text-[#64748b]",
+        small ? "mt-5 mb-2.5 text-[13px]" : "mt-[30px] mb-3.5 text-[15px]",
+      )}
     >
       {children}
     </div>
@@ -181,7 +168,10 @@ export function Pill({ children, tone = "accent" }: { children: React.ReactNode;
   const c =
     tone === "warn" ? { bg: "rgba(240,169,42,0.16)", fg: "#f0a92a" } : tone === "muted" ? { bg: "rgba(148,163,184,0.16)", fg: "#94a3b8" } : { bg: "rgba(74,159,224,0.16)", fg: SETTINGS_ACCENT };
   return (
-    <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", padding: "3px 9px", borderRadius: 999, background: c.bg, color: c.fg, whiteSpace: "nowrap" }}>
+    <span
+      className="whitespace-nowrap rounded-full px-[9px] py-[3px] text-[11px] font-bold uppercase tracking-[0.5px]"
+      style={{ background: c.bg, color: c.fg }}
+    >
       {children}
     </span>
   );
@@ -193,9 +183,9 @@ export function Pill({ children, tone = "accent" }: { children: React.ReactNode;
 /** Small info column used by the Server + Device summary cards. */
 export function InfoStat({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
-    <div style={{ minWidth: 0 }}>
-      <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#64748b", marginBottom: 3 }}>{label}</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 17, fontWeight: 600, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis" }}>
+    <div className="min-w-0">
+      <div className="mb-[3px] text-xs uppercase tracking-[1px] text-[#64748b]">{label}</div>
+      <div className="flex items-center gap-2 overflow-hidden text-ellipsis text-[17px] font-semibold text-foreground">
         {icon}
         {value}
       </div>
