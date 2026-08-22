@@ -41,15 +41,18 @@ interface MpvCoreDelegate {
 class MpvCore(private val appContext: Context) {
   var delegate: MpvCoreDelegate? = null
 
-  // The video output. gpu-next is the SDR-safe default (mpv's own renderer). NOTE: on Android, gpu-next's
-  // OpenGL-ES path CANNOT do HDR passthrough — it ALWAYS tone-maps HDR→SDR (findroid #645, mpv-android #874,
-  // libplacebo author), so HDR currently plays as (acceptable-but-not-final) tone-mapped SDR. THE FIX — switch
-  // HDR programs to `vo=mediacodec_embed` (MediaCodec renders straight to the SurfaceView = real HDR
-  // passthrough), chosen DYNAMICALLY per program by reading `video-params/gamma` on load, exactly like the
-  // Apple side (`ios/MpvCore.swift`) reads gamma to drive the display switch — is the NEXT ARC, fully
-  // specified in `.plans/tv-native.md` §13.5. Deliberately deferred; do NOT global-force `mediacodec_embed`
-  // (tried in v0.9.1, reverted v0.9.2 — it regresses SDR, which must stay on the mpv renderer).
-  private val vo = "gpu-next"
+  // The video output, chosen DYNAMICALLY per program (§13.5). `gpu-next` is the SDR default (mpv's own
+  // renderer). On Android, gpu-next's OpenGL-ES path CANNOT passthrough HDR — it ALWAYS tone-maps HDR→SDR
+  // (findroid #645, mpv-android #874, libplacebo author). So on the first decoded frame we detect HDR
+  // (`video-params/sig-peak`/`max-luma`) and, for HDR content, switch to `vo=mediacodec_embed` (MediaCodec
+  // renders straight to the SurfaceView = real HDR10/HLG passthrough + full frame rate) and re-open the file
+  // at the same offset — exactly mirroring the Apple side, which reads gamma on first frame to drive its
+  // display switch. `currentVo` is a var because it changes at runtime; `attachSurface` restores IT (not a
+  // const) so an HDR program survives a surface reposition. (Do NOT global-force `mediacodec_embed` — tried
+  // v0.9.1, reverted v0.9.2: it regresses SDR, which must stay on mpv's renderer.)
+  private var currentVo = "gpu-next"
+  // One HDR probe per user load (reset in load()); the internal re-open under the new VO must NOT re-probe.
+  private var hdrChecked = false
 
   // A single scope drives create + all Flow collectors. MpvPlayer's suspend calls submit through its own
   // internal single-threaded native dispatcher, so ordering (options → loadfile) is preserved for us.
@@ -76,8 +79,9 @@ class MpvCore(private val appContext: Context) {
     scope.launch {
       val p = try {
         MpvPlayer.create(appContext) {
-          // Android render path — the mpv-android / findroid recipe.
-          setOption("vo", vo)
+          // Android render path — the mpv-android / findroid recipe. Starts on gpu-next (SDR); HDR content
+          // is detected on first frame and re-opened under mediacodec_embed (see maybeSwitchHdr).
+          setOption("vo", currentVo)
           setOption("gpu-context", "android")
           setOption("opengl-es", "yes")
           setOption("hwdec", "mediacodec,mediacodec-copy")
@@ -144,13 +148,24 @@ class MpvCore(private val appContext: Context) {
   fun load(url: String, startTime: Double, mode: String = "video") {
     loadedEmitted = false
     firstFrameEmitted = false
+    hdrChecked = false
     fadeJob?.cancel()
     pendingLoadUrl = url
     pendingLoadStart = startTime
     pendingLoadMode = mode
     // If the player is already up, load immediately; otherwise setup()'s create() runs it on completion.
     val p = player ?: return
-    scope.launch { doLoad(p, url, startTime, mode) }
+    scope.launch {
+      // Always probe HDR on mpv's own renderer: if a prior HDR program left us on mediacodec_embed, reset
+      // to gpu-next for a clean, reliable detect (its video-params are guaranteed). SDR then stays on
+      // gpu-next; HDR re-switches to embed on first frame (§13.5). Skipped for audio-only (vid=no) loads.
+      if (mode != "audio" && currentVo != "gpu-next") {
+        currentVo = "gpu-next"
+        p.setProperty("hwdec", "mediacodec,mediacodec-copy")
+        p.setProperty("vo", "gpu-next")
+      }
+      doLoad(p, url, startTime, mode)
+    }
   }
 
   /**
@@ -270,9 +285,10 @@ class MpvCore(private val appContext: Context) {
   private suspend fun attachSurfaceInternal(p: MpvPlayer, surface: Surface) {
     p.attachSurface(surface)
     // Force a window + bring the VO back (it is "null" after any prior detach). Order matters: surface
-    // first, then the VO is pointed at it.
+    // first, then the VO is pointed at it. Restore `currentVo` — NOT a const — so an HDR program on
+    // mediacodec_embed survives a surface reposition (mini↔full) instead of dropping back to gpu-next.
     p.setProperty("force-window", "yes")
-    p.setProperty("vo", vo)
+    p.setProperty("vo", currentVo)
   }
 
   fun attachSurface(surface: Surface) {
@@ -325,9 +341,11 @@ class MpvCore(private val appContext: Context) {
     when (event) {
       is MpvEvent.FileLoaded -> scope.launch { maybeEmitLoad() }
       is MpvEvent.PlaybackRestart -> {
-        // A frame is now decoded → width/height are guaranteed. Emit onLoad (in case file-loaded didn't
-        // have dimensions yet), then the first-frame signal.
+        // A frame is now decoded → width/height AND the HDR color params are guaranteed. Emit onLoad (in
+        // case file-loaded didn't have dimensions yet), run the one-shot HDR probe (may re-open under
+        // mediacodec_embed), then the first-frame signal.
         scope.launch { maybeEmitLoad() }
+        scope.launch { maybeSwitchHdr() }
         if (!firstFrameEmitted) {
           firstFrameEmitted = true
           delegate?.mpvFirstFrame()
@@ -364,5 +382,45 @@ class MpvCore(private val appContext: Context) {
       loadedEmitted = true
       delegate?.mpvDidLoad(dur, w, h)
     }
+  }
+
+  /**
+   * The Android HDR switch (§13.5) — mirrors how `ios/MpvCore.swift` reads the video's gamma on first
+   * frame to drive its display switch. mpv's OpenGL-ES `gpu-next` path can't passthrough HDR (it tone-maps
+   * HDR→SDR), so for HDR content we swap to `vo=mediacodec_embed` (+ zero-copy `hwdec=mediacodec`) — the
+   * MediaCodec→SurfaceView path that IS real HDR10/HLG passthrough — and RE-OPEN the file at the same
+   * offset (a clean reload, not a fragile live VO flip). SDR stays on gpu-next (mpv's full renderer).
+   *
+   * Detection is numeric via `getDouble` (the AAR's confirmed getter): `video-params/sig-peak` (SDR ≈ 1.0;
+   * PQ/HLG > 1) with `video-params/max-luma` (mastering peak in cd/m², set for HDR10) as a hedge. Runs once
+   * per user load (`hdrChecked`); the internal re-open must not re-probe or it would loop.
+   */
+  private suspend fun maybeSwitchHdr() {
+    if (hdrChecked) return
+    val p = player ?: return
+    // Audio-only loads (bumper bed / radio) have no video — never touch the VO.
+    if (pendingLoadMode == "audio") { hdrChecked = true; return }
+    hdrChecked = true
+
+    val sigPeak = p.getDouble("video-params/sig-peak") ?: 0.0
+    val maxLuma = p.getDouble("video-params/max-luma") ?: 0.0
+    val isHdr = sigPeak > 1.5 || maxLuma > 100.0
+    val neededVo = if (isHdr) "mediacodec_embed" else "gpu-next"
+    android.util.Log.i(
+      "MpvCore",
+      "HDR probe: sig-peak=$sigPeak max-luma=$maxLuma isHdr=$isHdr currentVo=$currentVo neededVo=$neededVo",
+    )
+    if (neededVo == currentVo) return
+
+    // Re-open at the current offset under the new render path. `keep-open` holds the last frame, so read
+    // the live position now; fall back to the requested start if unavailable.
+    val pos = p.getDouble("time-pos") ?: pendingLoadStart
+    currentVo = neededVo
+    // Embed needs the direct (zero-copy) mediacodec decoder; gpu-next uses the copy fallback too.
+    p.setProperty("hwdec", if (isHdr) "mediacodec" else "mediacodec,mediacodec-copy")
+    p.setProperty("vo", neededVo)
+    pendingLoadStart = pos
+    android.util.Log.i("MpvCore", "HDR switch → re-opening on $neededVo at ${pos}s")
+    pendingLoadUrl?.let { doLoad(p, it, pos, pendingLoadMode) }
   }
 }

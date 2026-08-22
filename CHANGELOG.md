@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.73] - 2026-08-22
+
+tv-native (Android) — **HDR passthrough via dynamic `mediacodec_embed`** (Path A). mpv's OpenGL-ES
+`gpu-next` path on Android can't passthrough HDR (it always tone-maps HDR→SDR, which also tanked the frame
+rate), so `MpvCore.kt` now detects HDR on the first decoded frame (`video-params/sig-peak` / `max-luma` via
+the AAR's `getDouble`) and, for HDR content, switches to **`vo=mediacodec_embed` + zero-copy
+`hwdec=mediacodec`** — MediaCodec renders straight to the SurfaceView (real HDR10/HLG passthrough + full
+frame rate) — re-opening the file at the same offset (a clean reload, not a fragile live VO flip). SDR
+stays on `gpu-next` (mpv's full renderer). The switch mirrors the Apple side (read the video's color params
+on first frame → switch), converges via a one-shot `hdrChecked` guard, and `attachSurface` restores the
+active VO so HDR survives a mini↔full reposition.
+
+Entirely inside the Android native `packages/mpv-player/android/.../MpvCore.kt` — **zero shared-JS
+changes, zero Apple involvement** (the proven iPad/Apple TV builds are untouched). Pending validation on a
+real Android TV / Fire TV via an EAS `preview-androidtv` build. Plan: `.plans/tv-native.md` §13.
+
 ## [0.11.72] - 2026-08-22
 
 tv-tauri — device-page frame fixes.
