@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.72] - 2026-08-22
+
+tv-tauri — device-page frame fixes.
+
+### What ships
+- The **Recent playback issues** frame now uses `bg-frame` to match the Playback capabilities frame above
+  it (it had been missed).
+- `@airwave/ui` `FrameHeader` gained a small `gap-1` between the title and description (applies wherever
+  Frame is used, including the admin web).
+
 ## [0.11.71] - 2026-08-22
 
 tv-tauri — settings styling cleanup: converted the static inline styles in the settings pages

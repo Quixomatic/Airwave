@@ -381,7 +381,7 @@ export function DevicePage() {
           </Frame>
 
           {data?.recentErrors?.length ? (
-            <Frame>
+            <Frame className="bg-frame">
               <FrameHeader>
                 <FrameTitle>Recent playback issues</FrameTitle>
               </FrameHeader>
