@@ -2,6 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.67] - 2026-08-22
+
+getairwave.tv — a **reusable section system** + a display font. Added a `--font-display` token (a system
+stack — Avenir Next / SF Pro Display / Segoe UI Variable, no web-font load) so Tailwind generates a
+`font-display` utility, and three reusable primitives (`components/landing.tsx` + `scroll-reveal.tsx`):
+**`SectionHeader`** (a muted label pill + a large `font-display` heading at `clamp(2.5rem,7vw,4.75rem)`
+with tight tracking + a `titleCh` width cap for clean line-wraps + a muted description), **`Section`**
+(a `clamp(4rem,9vw,8rem)` vertical rhythm), and **`ScrollReveal`** (fade + `translateY(24px→0)`, 600ms
+ease-out, IntersectionObserver, respects `prefers-reduced-motion`). All colors stay on the existing theme
+tokens — this only introduces the larger type scale.
+
+### What ships
+- **Home** — the hero heading now uses `font-display` at the section-header size (lighter weight); the
+  "Self-host it in minutes." (top-left grid cell), "Everything a channel needs.", and "Built for the living
+  room." sections converted to `SectionHeader` + `ScrollReveal`.
+- **Features** — the four group headers (Watching / Building / Playback / Access & privacy) converted.
+- **Channel guide** — the three editorial block headers + the admin-preview header converted.
+
 ## [0.11.66] - 2026-08-21
 
 getairwave.tv — reposition the hero clip across breakpoints. On **sm** the clip now scales with the hero

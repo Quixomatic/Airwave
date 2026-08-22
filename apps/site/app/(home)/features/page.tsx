@@ -4,7 +4,8 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { heading, Pill, Wide } from "@/components/landing";
+import { Pill, SectionHeader, Wide } from "@/components/landing";
+import { ScrollReveal } from "@/components/scroll-reveal";
 import { ClipCarousel } from "@/components/clip-carousel";
 import { InViewVideo } from "@/components/motion-video";
 import { ShaderCta } from "@/components/shaders";
@@ -120,13 +121,19 @@ export default function FeaturesPage() {
       {/* Groups — alternating media / feature list */}
       {GROUPS.map((group, i) => (
         <Wide key={group.eyebrow} className="mt-16 lg:mt-28">
-          <h2 className={heading("h2", "mb-10 text-center text-brand")}>{group.title}</h2>
+          <ScrollReveal>
+            <SectionHeader
+              label={group.eyebrow}
+              title={group.title}
+              titleCh={18}
+              className="mb-[clamp(2.5rem,6vw,4.5rem)]"
+            />
+          </ScrollReveal>
           <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2 lg:gap-12">
             <div className={cn(i % 2 === 1 && "lg:order-2")}>
               <Media media={group.media} />
             </div>
             <div className={cn("flex flex-col gap-6", i % 2 === 1 && "lg:order-1")}>
-              <p className="text-xs font-semibold tracking-wide text-brand uppercase">{group.eyebrow}</p>
               {group.features.map((f) => (
                 <FeatureRow key={f.title} {...f} />
               ))}

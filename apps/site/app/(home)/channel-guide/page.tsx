@@ -1,5 +1,6 @@
 import { cn } from "@/lib/cn";
-import { card, heading, Pill, Wide } from "@/components/landing";
+import { card, Pill, SectionHeader, Wide } from "@/components/landing";
+import { ScrollReveal } from "@/components/scroll-reveal";
 import { ClipCarousel, type Clip } from "@/components/clip-carousel";
 import { ShaderCta } from "@/components/shaders";
 
@@ -89,8 +90,9 @@ function SplitBlock({ block, reverse }: { block: Block; reverse: boolean }) {
     <Wide className="mt-16 lg:mt-28">
       <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
         <div className={cn(reverse && "lg:order-2")}>
-          <p className="mb-4 text-xs font-semibold tracking-widest text-brand uppercase">{block.eyebrow}</p>
-          <h2 className={heading("h2", "mb-5")}>{block.title}</h2>
+          <ScrollReveal>
+            <SectionHeader label={block.eyebrow} title={block.title} titleCh={14} className="mb-5" />
+          </ScrollReveal>
           {block.paras.map((p, i) => (
             <p
               key={i}
@@ -147,12 +149,15 @@ export default function ChannelGuidePage() {
       <Wide className="mt-16 lg:mt-28">
         <div className={cn(card(), "grid grid-cols-1 items-center gap-8 p-8 lg:grid-cols-2 lg:p-10")}>
           <div>
-            <p className="mb-3 text-xs font-semibold tracking-wide text-brand uppercase">In the admin</p>
-            <h2 className={heading("h2", "mb-3")}>Preview the guide before anyone tunes in.</h2>
-            <p className="mb-6 text-fd-muted-foreground">
-              The admin's guide preview shows the same materialized timeline your viewers get, so you can
-              sanity-check a lineup — channel order, what's on, and the bumper breaks — before it ships.
-            </p>
+            <ScrollReveal>
+              <SectionHeader
+                label="In the admin"
+                title="Preview the guide before anyone tunes in."
+                titleCh={18}
+                description="The admin's guide preview shows the same materialized timeline your viewers get, so you can sanity-check a lineup — channel order, what's on, and the bumper breaks — before it ships."
+                className="mb-6"
+              />
+            </ScrollReveal>
             <Pill href="/docs/channels/schedule" className="text-sm">How the schedule works</Pill>
           </div>
           <div className="overflow-hidden rounded-xl border shadow-lg">

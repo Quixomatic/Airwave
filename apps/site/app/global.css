@@ -5,6 +5,14 @@
 /* Tailwind v4 needs to scan fumadocs-ui's compiled classes so its utilities aren't purged. */
 @source "../node_modules/fumadocs-ui/dist/**/*.js";
 
+/* Display face — a system stack (no web-font load; the device supplies Avenir Next / SF Pro /
+   Segoe UI Variable, falling back to ui-sans-serif). Registering it in the `--font-*` namespace
+   makes Tailwind v4 auto-generate the `font-display` utility. Body text stays on Inter. */
+@theme {
+  --font-display: "Avenir Next", "Segoe UI Variable Display", "SF Pro Display", ui-sans-serif,
+    system-ui, sans-serif;
+}
+
 /* ────────────────────────────────────────────────────────────────────────────
    Airwave brand theme
 

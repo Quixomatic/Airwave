@@ -6,7 +6,8 @@ import { Tv, Rewind, Clapperboard, MonitorPlay, ShieldCheck, Sparkles, TerminalI
 import { SiApple, SiAndroid, SiLg, SiGooglechrome, SiRoku, SiSamsung } from "react-icons/si";
 import { FaAmazon, FaWindows, FaLinux, FaGithub } from "react-icons/fa";
 import { cn } from "@/lib/cn";
-import { button, card, heading, Wide } from "@/components/landing";
+import { button, card, heading, SectionHeader, Wide } from "@/components/landing";
+import { ScrollReveal } from "@/components/scroll-reveal";
 import { ClipCarousel } from "@/components/clip-carousel";
 import { HeroDownloadButtons } from "@/components/hero-downloads";
 import { getHeroDownloads } from "@/lib/releases";
@@ -79,7 +80,7 @@ export default async function HomePage() {
           <p className="mt-12 w-fit rounded-full border border-brand/50 bg-fd-background/50 px-3 py-1.5 text-xs font-medium text-brand backdrop-blur-md">
             The live-TV layer for your Plex library.
           </p>
-          <h1 className="my-8 text-4xl leading-tight font-medium text-fd-foreground [text-shadow:0_2px_18px_rgb(3_7_18_/_0.6)] xl:mb-10 xl:text-6xl">
+          <h1 className="my-8 font-display text-[clamp(2.5rem,7vw,4.75rem)] leading-none font-medium tracking-[-0.045em] text-fd-foreground [text-shadow:0_2px_18px_rgb(3_7_18_/_0.6)] xl:mb-10">
             Your library,
             <br className="md:hidden" /> always on.
             <br />
@@ -122,12 +123,22 @@ export default async function HomePage() {
       {/* ── Get running ──────────────────────────────────────────────────────── */}
       <Wide className="mt-16 grid grid-cols-1 items-start gap-10 lg:mt-28 lg:grid-cols-2">
         <div className="flex flex-col rounded-2xl p-6 md:p-8">
-          <h2 className={heading("h2", "mb-4")}>Self-host it in minutes.</h2>
-          <p className="mb-6 text-fd-muted-foreground">
-            One image, two roles, a Postgres. Drop this <code className="text-brand">compose.yaml</code>, point
-            it at your database, and pull updates by re-pulling the tag. No transcoder to babysit — Airwave is
-            the channel brain, your Plex does the streaming.
-          </p>
+          <ScrollReveal>
+            <SectionHeader
+              label="Self-host"
+              title="Self-host it in minutes."
+              titleCh={12}
+              description={
+                <>
+                  One image, two roles, a Postgres. Drop this{" "}
+                  <code className="text-brand">compose.yaml</code>, point it at your database, and pull
+                  updates by re-pulling the tag. No transcoder to babysit — Airwave is the channel brain,
+                  your Plex does the streaming.
+                </>
+              }
+              className="mb-6"
+            />
+          </ScrollReveal>
           <div className="flex flex-row flex-wrap gap-3">
             <Link href="/docs/self-hosting" className={button("primary", "text-sm")}>
               Self-hosting guide
@@ -178,11 +189,15 @@ export default async function HomePage() {
 
       {/* ── Features ─────────────────────────────────────────────────────────── */}
       <Wide className="mt-16 lg:mt-28">
-        <h2 className={heading("h2", "text-center text-brand")}>Everything a channel needs.</h2>
-        <p className="mx-auto mt-4 mb-12 max-w-2xl text-center text-fd-muted-foreground">
-          Not a media browser — a channel you leave on. All of it runs from your own Plex, on your own
-          hardware.
-        </p>
+        <ScrollReveal>
+          <SectionHeader
+            label="Features"
+            title="Everything a channel needs."
+            titleCh={12}
+            description="Not a media browser — a channel you leave on. All of it runs from your own Plex, on your own hardware."
+            className="mb-[clamp(2.5rem,6vw,4.5rem)]"
+          />
+        </ScrollReveal>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
             <div key={f.title} className={cn(card(), "flex flex-col")}>
@@ -196,10 +211,15 @@ export default async function HomePage() {
 
       {/* ── Living-room grid (fumadocs "For Engineers"-style grid) ───────────── */}
       <Wide className="mt-16 lg:mt-28">
-        <h2 className={heading("h2", "mb-3 text-center text-brand")}>Built for the living room.</h2>
-        <p className="mx-auto mb-12 max-w-2xl text-center text-fd-muted-foreground">
-          One app on every big screen, and a three-step path from your library to a channel you leave on.
-        </p>
+        <ScrollReveal>
+          <SectionHeader
+            label="Platforms"
+            title="Built for the living room."
+            titleCh={14}
+            description="One app on every big screen, and a three-step path from your library to a channel you leave on."
+            className="mb-[clamp(2.5rem,6vw,4.5rem)]"
+          />
+        </ScrollReveal>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Works on most platforms — dithered-warp background, like fumadocs' "Framework Agnostic" card */}
           <div className={cn(card(), "relative z-2 flex flex-col overflow-hidden")}>
