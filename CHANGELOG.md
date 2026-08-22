@@ -2,6 +2,12 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.64] - 2026-08-21
+
+getairwave.tv — set the site favicon / app icons. Added the Airwave `favicon.ico`, `icon.png` (32×32), and
+`apple-icon.png` under `apps/site/app/` (Next App Router file conventions, auto-detected), matching the
+other apps — the site was showing the default Next icon.
+
 ## [0.11.63] - 2026-08-21
 
 getairwave.tv — replaced the downloads section with **OS-aware split-button downloads in the hero**. Two
