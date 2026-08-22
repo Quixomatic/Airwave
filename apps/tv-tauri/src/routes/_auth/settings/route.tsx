@@ -81,10 +81,12 @@ function SettingsShell() {
           setSel((s) => Math.max(0, s - 1));
           return true;
         case "down":
-          setSel((s) => Math.min(NAV.length - 1, s + 1));
+          // NAV.length (one past the last section) is the Collapse/Expand toggle row at the rail's bottom.
+          setSel((s) => Math.min(NAV.length, s + 1));
           return true;
         case "ok":
-          activate(sel);
+          if (sel === NAV.length) setCollapsed((c) => !c);
+          else activate(sel);
           return true;
         case "right":
           if (activeKey) setZone("content");

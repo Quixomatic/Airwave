@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from "@airwave/ui/components/frame";
 import { Switch } from "@airwave/ui/components/switch";
 import { arch, platform, version } from "@tauri-apps/plugin-os";
 import { FaApple, FaLinux, FaWindows } from "react-icons/fa";
@@ -320,52 +321,61 @@ export function DevicePage() {
           <SettingRow key={r.label} label={r.label} sublabel={r.sublabel} focused={sel === i} onClick={r.onClick} />
         ))}
 
-        <SectionLabel>Playback capabilities</SectionLabel>
-        <p style={{ fontSize: 14, color: "#64748b", marginTop: -6, marginBottom: 18, maxWidth: 640 }}>
-          Force a codec on or off for this device. Overrides win over what the diagnostic measured — forcing on something it can't
-          actually decode may break playback.
-        </p>
-        {groups.map((g) => {
-          const rowsCount = Math.ceil(g.tokens.length / 2);
-          return (
-            <div key={g.kind}>
-              <SectionLabel small>{GROUP_LABEL[g.kind]}</SectionLabel>
-              <div style={{ display: "grid", gridTemplateRows: `repeat(${rowsCount}, auto)`, gridAutoFlow: "column", columnGap: 20 }}>
-                {g.tokens.map((t) => {
-                  const idx = tokIdx++;
-                  return <TokenRow key={t.token} t={t} focused={sel === idx} onClick={() => void toggle(g.kind, t)} />;
-                })}
-              </div>
-            </div>
-          );
-        })}
-
-        {hasOverrides && (
-          <div style={{ marginTop: 20 }}>
-            <SettingRow label="Reset to diagnostic" sublabel="Clear all overrides — revert to what the diagnostic found" focused={sel === resetIndex} onClick={() => void reset()} />
-          </div>
-        )}
-
-        {data?.recentErrors?.length ? (
-          <>
-            <SectionLabel>Recent playback issues</SectionLabel>
-            <div style={{ borderRadius: 14, background: "rgba(148,163,184,0.06)", padding: "6px 22px" }}>
-              {data.recentErrors.map((e, i) => (
-                <div key={i} style={{ padding: "12px 0", borderTop: i ? "1px solid rgba(148,163,184,0.1)" : "none" }}>
-                  <div style={{ fontSize: 15, color: "#e6eaf1" }}>
-                    {e.channelName ?? e.title ?? "—"}
-                    <span style={{ color: "#64748b" }}>
-                      {" · "}
-                      {[e.sourceContainer, e.sourceVideoCodec, e.sourceAudioCodec].filter(Boolean).join("/") || "—"}
-                      {e.mode ? ` · ${e.mode}` : ""}
-                    </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 24 }}>
+          <Frame>
+            <FrameHeader>
+              <FrameTitle>Playback capabilities</FrameTitle>
+              <FrameDescription>
+                Force a codec on or off for this device. Overrides win over what the diagnostic measured — forcing
+                on something it can't actually decode may break playback.
+              </FrameDescription>
+            </FrameHeader>
+            <FramePanel>
+              {groups.map((g) => {
+                const rowsCount = Math.ceil(g.tokens.length / 2);
+                return (
+                  <div key={g.kind}>
+                    <SectionLabel small>{GROUP_LABEL[g.kind]}</SectionLabel>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gridTemplateRows: `repeat(${rowsCount}, auto)`, gridAutoFlow: "column", columnGap: 20 }}>
+                      {g.tokens.map((t) => {
+                        const idx = tokIdx++;
+                        return <TokenRow key={t.token} t={t} focused={sel === idx} onClick={() => void toggle(g.kind, t)} />;
+                      })}
+                    </div>
                   </div>
-                  {e.error && <div style={{ fontSize: 13, color: "#f87171", marginTop: 2 }}>{e.error}</div>}
+                );
+              })}
+              {hasOverrides && (
+                <div style={{ marginTop: 8 }}>
+                  <SettingRow label="Reset to diagnostic" sublabel="Clear all overrides — revert to what the diagnostic found" focused={sel === resetIndex} onClick={() => void reset()} />
                 </div>
-              ))}
-            </div>
-          </>
-        ) : null}
+              )}
+            </FramePanel>
+          </Frame>
+
+          {data?.recentErrors?.length ? (
+            <Frame>
+              <FrameHeader>
+                <FrameTitle>Recent playback issues</FrameTitle>
+              </FrameHeader>
+              <FramePanel>
+                {data.recentErrors.map((e, i) => (
+                  <div key={i} style={{ padding: "12px 0", borderTop: i ? "1px solid rgba(148,163,184,0.1)" : "none" }}>
+                    <div style={{ fontSize: 15, color: "#e6eaf1" }}>
+                      {e.channelName ?? e.title ?? "—"}
+                      <span style={{ color: "#64748b" }}>
+                        {" · "}
+                        {[e.sourceContainer, e.sourceVideoCodec, e.sourceAudioCodec].filter(Boolean).join("/") || "—"}
+                        {e.mode ? ` · ${e.mode}` : ""}
+                      </span>
+                    </div>
+                    {e.error && <div style={{ fontSize: 13, color: "#f87171", marginTop: 2 }}>{e.error}</div>}
+                  </div>
+                ))}
+              </FramePanel>
+            </Frame>
+          ) : null}
+        </div>
       </Body>
     </>
   );

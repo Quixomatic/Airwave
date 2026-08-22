@@ -97,7 +97,7 @@ export function PageHeader({ title, subtitle }: { title: string; subtitle?: stri
     <div
       // Opaque navy at the top (masks rows scrolling up) fading to transparent at the bottom — a soft
       // grounding instead of a hard, full-width divider that overhung the padded content.
-      className="bg-linear-to-b from-[#060a14] from-70% to-transparent"
+      className="bg-linear-to-b from-[#060a14] from-90% to-transparent"
       style={{
         position: "sticky",
         top: 0,

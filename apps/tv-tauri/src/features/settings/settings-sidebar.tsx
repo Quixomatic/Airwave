@@ -137,7 +137,7 @@ export function SettingsSidebar({
           accent: SETTINGS_ACCENT,
         }}
         open={open}
-        focused={false}
+        focused={focused && sel === items.length}
         active={false}
         onClick={onToggleCollapse}
       />

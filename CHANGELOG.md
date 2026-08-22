@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.69] - 2026-08-22
+
+tv-tauri — settings device-page polish.
+
+### What ships
+- **Codec toggle grid no longer shifts** — the 2-column capability grid is now `repeat(2, minmax(0, 1fr))`,
+  so adding an Override/Forced badge to a row can't widen its column and shrink the other; the columns stay
+  exactly half-and-half.
+- **`Frame` grouping** — adopted the admin settings `@airwave/ui` Frame pattern for the sections that read
+  as real groups: **Playback capabilities** and **Recent playback issues** (header + description + panel).
+  Left "This device" and Tools as plain sections (not everything needs a frame).
+- **Collapse/Expand is D-pad reachable** — the settings rail's bottom toggle now sits at the end of the
+  keyboard nav (▼ past the last section → OK toggles), not mouse-only.
+- **Sticky header gradient** stays opaque through the subtitle now (fades in the last ~10% instead of ~30%).
+
 ## [0.11.68] - 2026-08-22
 
 tv-tauri — settings + device polish, plus a macOS titlebar seam fix.
