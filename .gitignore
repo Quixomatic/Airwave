@@ -14,6 +14,13 @@ build
 .next
 .expo
 
+# Rust build output (apps/tv-tauri/src-tauri/target) — ignored only by Tauri's NESTED .gitignore, which
+# the EAS build archive doesn't honor (root only). Without this, `eas build` tries to pack the ~36GB Rust
+# target dir → "Compressing project files" hangs forever. Same class of fix as `.next` above. `target/`
+# (trailing slash, no leading slash) matches any Rust target dir at any depth; no tracked source lives
+# under one, so this is safe.
+target/
+
 # Generated files
 apps/web/src/routeTree.gen.ts
 apps/tv-web/src/routeTree.gen.ts
