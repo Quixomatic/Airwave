@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.65] - 2026-08-21
+
+Fix the getairwave.tv favicon build. The icons copied from apps/web were **RGB**, which Next/Turbopack
+rejects when processing `app/favicon.ico` ("Ico: The PNG is not in RGBA format"), failing the Vercel build.
+Regenerated `favicon.ico` / `icon.png` / `apple-icon.png` as **RGBA** from the 180px master; verified with a
+full `next build`.
+
 ## [0.11.64] - 2026-08-21
 
 getairwave.tv — set the site favicon / app icons. Added the Airwave `favicon.ico`, `icon.png` (32×32), and
