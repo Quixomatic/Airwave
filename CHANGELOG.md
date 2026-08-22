@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.70] - 2026-08-22
+
+tv-tauri — device-page summary as icon tiles.
+
+### What ships
+- The device summary row (OS / System / Resolution / HDR) is now a **grid of tiles**, each with a category
+  icon: System (Cpu), Resolution (MonitorPlay), HDR (Sparkles), and **OS** showing its **brand logo next
+  to the name** (Windows / Apple / Linux) rather than a category icon.
+- Added a reusable **`bg-frame`** utility (a `--color-frame` theme token = the faint `#94a3b8 @ 6%` tile
+  wash) and applied it to the stat tiles and the device-page **Frame** containers, so a Frame's outer
+  surface matches the tiles (its panel/border/shadow are unchanged). Use `className="bg-frame"` on any
+  future Frame to match.
+
 ## [0.11.69] - 2026-08-22
 
 tv-tauri — settings device-page polish.

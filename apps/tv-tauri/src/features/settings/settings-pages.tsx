@@ -3,6 +3,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from "@airwave/ui/components/frame";
 import { Switch } from "@airwave/ui/components/switch";
 import { arch, platform, version } from "@tauri-apps/plugin-os";
+import { Cpu, MonitorPlay, Sparkles } from "lucide-react";
+import type React from "react";
 import { FaApple, FaLinux, FaWindows } from "react-icons/fa";
 import { useState } from "react";
 
@@ -255,10 +257,37 @@ function withOverride(view: DeviceCapView | undefined, kind: CapKind, token: str
 
 const OS_LABEL: Record<string, string> = { windows: "Windows", macos: "macOS", linux: "Linux" };
 const OS_ICON: Record<string, React.ReactNode> = {
-  windows: <FaWindows size={16} />,
-  macos: <FaApple size={17} />,
-  linux: <FaLinux size={17} />,
+  windows: <FaWindows size={15} />,
+  macos: <FaApple size={16} />,
+  linux: <FaLinux size={16} />,
 };
+
+/** A labelled info tile — an optional category icon by the label, the label, and the value (with an
+ *  optional icon shown next to the value, e.g. the OS brand mark). Used for the device summary. */
+function StatTile({
+  icon,
+  label,
+  value,
+  valueIcon,
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  value: string;
+  valueIcon?: React.ReactNode;
+}) {
+  return (
+    <div className="bg-frame" style={{ display: "flex", flexDirection: "column", gap: 10, padding: "16px 18px", borderRadius: 14, minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#64748b", fontSize: 12, textTransform: "uppercase", letterSpacing: 1 }}>
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 18, fontWeight: 600, color: "#f1f5f9", minWidth: 0 }}>
+        {valueIcon}
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</span>
+      </div>
+    </div>
+  );
+}
 
 export function DevicePage() {
   const navigate = useNavigate();
@@ -309,11 +338,11 @@ export function DevicePage() {
     <>
       <PageHeader title="Device" subtitle="This device's playback capabilities and tools." />
       <Body>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 28, padding: "16px 22px", borderRadius: 14, background: "rgba(148,163,184,0.06)", marginBottom: 8 }}>
-          <InfoStat label="OS" value={OS_LABEL[platform()] ?? platform()} icon={OS_ICON[platform()]} />
-          <InfoStat label="System" value={`${version()} · ${arch()}`} />
-          <InfoStat label="Resolution" value={data?.device?.screenWidth ? `${data.device.screenWidth}×${data.device.screenHeight}` : "—"} />
-          <InfoStat label="HDR" value={data?.device?.hdr ? "Yes" : "No"} />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 8 }}>
+          <StatTile label="OS" value={OS_LABEL[platform()] ?? platform()} valueIcon={OS_ICON[platform()]} />
+          <StatTile icon={<Cpu size={14} />} label="System" value={`${version()} · ${arch()}`} />
+          <StatTile icon={<MonitorPlay size={14} />} label="Resolution" value={data?.device?.screenWidth ? `${data.device.screenWidth}×${data.device.screenHeight}` : "—"} />
+          <StatTile icon={<Sparkles size={14} />} label="HDR" value={data?.device?.hdr ? "Yes" : "No"} />
         </div>
 
         <SectionLabel small>Tools</SectionLabel>
@@ -322,7 +351,7 @@ export function DevicePage() {
         ))}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 24 }}>
-          <Frame>
+          <Frame className="bg-frame">
             <FrameHeader>
               <FrameTitle>Playback capabilities</FrameTitle>
               <FrameDescription>

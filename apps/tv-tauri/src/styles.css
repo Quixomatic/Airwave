@@ -4,6 +4,13 @@
    down-leveling like tv-web needs. `pnpm dlx shadcn add <c>` drops components into @airwave/ui. */
 @import "@airwave/ui/globals.css";
 
+/* A faint slate surface wash — the shared subtle surface for the device stat tiles + settings Frames.
+   Deliberately much lighter than `bg-muted` (#1e293b, used for badge fills): registering it as a theme
+   color makes `bg-frame` a first-class, reusable utility. */
+@theme {
+  --color-frame: rgba(148, 163, 184, 0.06);
+}
+
 :root {
   color-scheme: dark;
   /* Height of the custom titlebar; the app content region sits below it. */
