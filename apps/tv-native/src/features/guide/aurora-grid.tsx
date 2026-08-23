@@ -27,6 +27,7 @@ import {
   fmtTime,
   hexA,
   LEAD_MIN,
+  line,
   liveProgramIndex,
   MIN,
   PROGRESS_FILL_ELAPSED_STRONGER,
@@ -484,7 +485,7 @@ function Row({
       <Pressable onPress={() => onRailTap(index)} focusable={!Platform.isTV} style={{ width: railPx, paddingVertical: vw(18), paddingHorizontal: vw(20), justifyContent: "space-between", backgroundColor: focused ? hexA(accent, 0.12) : "transparent" }}>
         {focused && <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: vw(4), backgroundColor: accent }} />}
         <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
-          <View style={{ width: circle, height: circle, borderRadius: circle / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, 0.2), borderWidth: railFocused ? 2 : 1, borderColor: railFocused ? C.ring : hexA(accent, 0.35) }}>
+          <View style={{ width: circle, height: circle, borderRadius: circle / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, 0.2), borderWidth: railFocused ? line(2) : line(1), borderColor: railFocused ? C.ring : hexA(accent, 0.35) }}>
             {railFocused ? (
               <Heart size={vw(34 * FEATURE_SCALE)} color={favorited ? C.fav : "#c3c9d4"} fill={favorited ? C.fav : "none"} />
             ) : (
@@ -535,7 +536,7 @@ function Row({
                 height: rowPx - vw(12),
                 borderRadius: cs(8),
                 overflow: "hidden",
-                borderWidth: selected ? 2 : 1,
+                borderWidth: selected ? line(2) : line(1),
                 borderColor: selected ? C.ring : C.cellBorder,
                 backgroundColor: live ? "transparent" : "rgba(148,163,184,0.05)",
                 zIndex: selected ? 4 : 1,
@@ -550,7 +551,7 @@ function Row({
                   style={{ position: "absolute", inset: 0 }}
                 />
               )}
-              {live && <View style={{ position: "absolute", left: 3, top: 10, bottom: 10, width: 3, borderRadius: 4, backgroundColor: accent }} />}
+              {live && <View style={{ position: "absolute", left: vw(3), top: vw(10), bottom: vw(10), width: line(3), borderRadius: line(4), backgroundColor: accent }} />}
               <View style={{ paddingTop: vw(20), paddingHorizontal: vw(20) }}>
                 <Text numberOfLines={1} style={{ fontSize: vw(34), fontWeight: "600", color: "#f1f5f9" }}>
                   {p.guide.showTitle ?? p.guide.title}
@@ -635,7 +636,7 @@ function FeaturedPanel({ channel, program, now, accent, vw, onTune }: { channel:
     <Pressable onPress={onTune} focusable={!Platform.isTV} style={{ flexDirection: "row", alignItems: "flex-start", paddingTop: fv(40), paddingHorizontal: fv(64) }}>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: fv(22) }}>
-          <View style={{ width: tile, height: tile, borderRadius: tile / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, 0.2), borderWidth: 1, borderColor: hexA(accent, 0.35) }}>
+          <View style={{ width: tile, height: tile, borderRadius: tile / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, 0.2), borderWidth: line(1), borderColor: hexA(accent, 0.35) }}>
             <Icon size={fv(34)} color={accent} />
           </View>
           <Text style={{ fontSize: fv(44), fontWeight: "700", color: hexA(accent, 0.75) }}>{channel.number}</Text>

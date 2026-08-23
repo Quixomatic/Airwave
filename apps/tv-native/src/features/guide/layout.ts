@@ -1,6 +1,6 @@
 import * as LucideIcons from "lucide-react-native";
 import type { ComponentType } from "react";
-import { Dimensions, Platform } from "react-native";
+import { Dimensions, PixelRatio, Platform } from "react-native";
 import type { TextStyle } from "react-native";
 
 import type { GuideGridProgram } from "@/lib/api";
@@ -43,6 +43,17 @@ export const CHROME_SCALE =
   Platform.OS === "android" && Platform.isTV ? clamp(Dimensions.get("window").width / 1920, 0.5, 1) : 1;
 /** Scale a raw-dp chrome value. Identity everywhere except Android TV (≈0.5 at 960dp). */
 export const cs = (px: number) => px * CHROME_SCALE;
+
+/**
+ * Thin-line / hairline scaler — for the grid's crisp lines: the focused-program outline, the on-now
+ * left-edge indicator, small circle borders. Plain `vw()`/`cs()` would leave a raw `1` reading ~2× too
+ * thick on Android TV (its 960dp layout is ~half-scale) or land it on a blurry half-pixel. `line()`
+ * scales by `CHROME_SCALE` AND snaps to a whole PHYSICAL pixel (floored at 1px so it can never vanish),
+ * so a hardcoded `1` renders as a single crisp 1px hairline on Android instead of a doubled 2px one.
+ * Identity on iPad / Apple TV / Android tablets (`CHROME_SCALE === 1`) — their hand-tuned dp is untouched.
+ */
+export const line = (px: number) =>
+  CHROME_SCALE === 1 ? px : Math.max(1 / PixelRatio.get(), PixelRatio.roundToNearestPixel(px * CHROME_SCALE));
 
 /**
  * Style-object chrome scaler — the ergonomic form of `cs()` for whole screens authored in raw dp (watch

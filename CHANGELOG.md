@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.77] - 2026-08-23
+
+tv-native (Android TV) — **crisp, pixel-snapped guide hairlines**. The guide grid scales with screen
+width via `vw()`, but a handful of thin lines were hardcoded raw dp and never scaled, so on Android TV's
+half-scale 960dp layout they rendered ~2× too thick (and could land on blurry half-pixels). Added a
+`line()` helper to `layout.ts` that scales by `CHROME_SCALE` **and snaps to a whole physical pixel**
+(floored at 1px so it can't vanish) — a hardcoded `1` now reads as a single crisp 1px hairline on Android
+instead of a doubled 2px one. Routed the **focused-program outline**, the **on-now left-edge indicator**,
+and the rail-circle / featured-tile borders through it. Identity on iPad / Apple TV / Android tablets
+(`CHROME_SCALE === 1`) — their hand-tuned look is untouched.
+
 ## [0.11.76] - 2026-08-23
 
 tv-web — the browser TV player's About page now shows the **real app version**. It had been reading a
