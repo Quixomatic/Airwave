@@ -5,7 +5,12 @@ const {
   createRunOncePlugin,
 } = require("@expo/config-plugins");
 
-const MPV_GRADLE_PROJECT = ":Airwave-mpv-player";
+// Expo Android autolinking names a local module's gradle project after its npm package, stripping `@`
+// and replacing `/` with `-`, PRESERVING case — so `@airwave/mpv-player` → `:airwave-mpv-player`
+// (LOWERCASE scope). Must match exactly or gradle fails with "Project with path ':…' could not be
+// found". (The Airwave rename wrongly capitalized this to `:Airwave-mpv-player`, breaking Android builds;
+// pre-rename it was `:ChannelGuide-mpv-player`, matching the `@ChannelGuide` scope's case.)
+const MPV_GRADLE_PROJECT = ":airwave-mpv-player";
 
 const MPVKIT_URL = "https://github.com/edde746/MPVKit";
 const MPVKIT_VERSION = "1.0.12";

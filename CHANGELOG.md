@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.74] - 2026-08-22
+
+tv-native (Android) — **fix the mpv-player gradle project name broken by the Airwave rename**, which had
+been failing every Android build with `Project with path ':Airwave-mpv-player' could not be found`. Expo
+Android autolinking names a local module's gradle project after its npm package (strip `@`, `/`→`-`,
+**case preserved**), so `@airwave/mpv-player` → `:airwave-mpv-player` (lowercase scope). The rename had
+capitalized the constant in `packages/mpv-player/app.plugin.js` to `:Airwave-mpv-player`; corrected to
+lowercase. This was the first tv-native Android build since the rename, so it surfaced now — it also
+unblocks the v0.11.73 Android HDR work.
+
 ## [0.11.73] - 2026-08-22
 
 tv-native (Android) — **HDR passthrough via dynamic `mediacodec_embed`** (Path A). mpv's OpenGL-ES
