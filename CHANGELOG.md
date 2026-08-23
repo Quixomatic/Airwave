@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.79] - 2026-08-23
+
+tv-native (Android) — **keep the screen awake during video playback**. Android has no automatic idle-timer
+hold like iOS/tvOS, so a channel could dim and even sleep mid-playback. `MpvPlayerView` now sets
+`keepScreenOn` on the mpv `SurfaceView` while a video is playing (sets the window's `FLAG_KEEP_SCREEN_ON`),
+and releases it on pause/stop/unmount so the device can still sleep when idle. Matches how the references
+do it (plezy → `wakelock_plus`, streamyfin → `expo-keep-awake`, both gated on the playing state), done the
+Android-native way so there's **zero iOS/Apple TV impact**.
+
 ## [0.11.78] - 2026-08-23
 
 tv-native (Android) — **fix the capability-diagnostic freeze** + re-enable HDR.

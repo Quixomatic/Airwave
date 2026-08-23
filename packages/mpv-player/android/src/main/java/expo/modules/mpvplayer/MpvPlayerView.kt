@@ -31,6 +31,9 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   private var lastLoadedSource: String? = null
   private var applyScheduled = false
   private var disposed = false
+  // True while a VIDEO clip is loaded — gates keepScreenOn (below). Android has no automatic idle-timer
+  // hold during playback like iOS/tvOS, so without this a playing channel dims + sleeps.
+  private var videoActive = false
 
   var options: Map<String, String> = emptyMap()
   // "auto" = full negotiated multichannel layout (default); "stereo" = force a fold-down. Merged into the
@@ -89,7 +92,13 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   }
 
   fun setContentFit(fit: String) = core.setContentFit(fit)
-  fun setPaused(paused: Boolean) = core.setPaused(paused)
+  fun setPaused(paused: Boolean) {
+    // Keep the screen awake only while a video is actually playing; release it on pause so the device can
+    // still sleep when paused. `keepScreenOn` sets the window's FLAG_KEEP_SCREEN_ON while the view is
+    // attached, and clears automatically on unmount. Android-only — iOS/tvOS hold the idle timer natively.
+    surfaceView.keepScreenOn = videoActive && !paused
+    core.setPaused(paused)
+  }
   fun setMuted(muted: Boolean) = core.setMuted(muted)
   fun setVolume(v: Double) = core.setVolume(v)
   fun setAudioTrack(id: Int) = core.setAudioTrack(id)
@@ -134,9 +143,14 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
     val src = pendingSource
     if (src.isNullOrEmpty()) {
       core.stop()
+      videoActive = false
+      surfaceView.keepScreenOn = false
       return
     }
     core.load(src, pendingStartTime, pendingMode)
+    // Video playback keeps the screen awake (audio-only bumper/radio doesn't); paused state refines it.
+    videoActive = pendingMode != "audio"
+    surfaceView.keepScreenOn = videoActive
   }
 
   // MARK: MpvCoreDelegate → JS events
