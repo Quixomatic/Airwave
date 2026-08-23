@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.76] - 2026-08-23
+
+tv-web — the browser TV player's About page now shows the **real app version**. It had been reading a
+static `public/appinfo.json` (stuck at 0.11.9); switched `lib/app-info.ts` to import the version from
+`package.json` (bumped in lockstep every release, like tv-tauri does), so it auto-updates and there's no
+separate file to keep in sync. Removed the stale `appinfo.json`.
+
 ## [0.11.75] - 2026-08-23
 
 tv-native (Android) — **isolation build: gate the HDR switch OFF** to diagnose a capability-diagnostic
