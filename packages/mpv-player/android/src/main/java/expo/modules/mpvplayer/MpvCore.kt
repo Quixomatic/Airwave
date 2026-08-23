@@ -39,6 +39,12 @@ interface MpvCoreDelegate {
  * (whose Android HDR lives on its ExoPlayer path, not mpv).
  */
 class MpvCore(private val appContext: Context) {
+  companion object {
+    // Master switch for the dynamic HDR (mediacodec_embed) path. Gated OFF (v0.11.75) while we isolate a
+    // per-clip-teardown hang in the capability diagnostic; flip back to true once cleared/made safe.
+    private const val HDR_SWITCH_ENABLED = false
+  }
+
   var delegate: MpvCoreDelegate? = null
 
   // The video output, chosen DYNAMICALLY per program (§13.5). `gpu-next` is the SDR default (mpv's own
@@ -345,7 +351,10 @@ class MpvCore(private val appContext: Context) {
         // case file-loaded didn't have dimensions yet), run the one-shot HDR probe (may re-open under
         // mediacodec_embed), then the first-frame signal.
         scope.launch { maybeEmitLoad() }
-        scope.launch { maybeSwitchHdr() }
+        // ISOLATION (v0.11.75): HDR probe temporarily gated OFF to test whether its `getDouble` reads,
+        // which fire on PlaybackRestart exactly as the diagnostic unmounts + destroys the mpv instance,
+        // are what deadlocks per-clip teardown. Flip HDR_SWITCH_ENABLED back to true once cleared/fixed.
+        if (HDR_SWITCH_ENABLED) scope.launch { maybeSwitchHdr() }
         if (!firstFrameEmitted) {
           firstFrameEmitted = true
           delegate?.mpvFirstFrame()

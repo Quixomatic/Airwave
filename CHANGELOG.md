@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.75] - 2026-08-23
+
+tv-native (Android) — **isolation build: gate the HDR switch OFF** to diagnose a capability-diagnostic
+freeze on the Google TV Streamer. The diagnostic mounts a fresh mpv per clip and destroys it between
+clips; it hangs at the clip-2→3 teardown (JS thread pegged, no crash). The HDR probe is proven a no-op on
+the SDR test clips, but its two `video-params` `getDouble` reads fire on `PlaybackRestart` at the exact
+moment the view unmounts + `mpv_terminate_destroy` runs — a plausible teardown race. `HDR_SWITCH_ENABLED`
+(new `MpvCore` flag) is set to `false` so this build reverts to the pre-HDR behavior (vo always
+`gpu-next`, no probe); if the diagnostic then completes, the probe is confirmed as the cause and gets
+re-added teardown-safe. Android-only (`packages/mpv-player/android/MpvCore.kt`) — zero iOS/Apple TV
+impact.
+
 ## [0.11.74] - 2026-08-22
 
 tv-native (Android) — **fix the mpv-player gradle project name broken by the Airwave rename**, which had
