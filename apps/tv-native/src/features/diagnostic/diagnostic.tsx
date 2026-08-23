@@ -144,12 +144,19 @@ export function Diagnostic({ onExit }: { onExit: () => void }) {
         } else {
           auto = await runOne(test);
           console.log(`[caps] ✓ ${test.id} → ${auto.decoded ? `decoded ${auto.decodedWidth}x${auto.decodedHeight}${auto.audioTrackPresent ? " +audio" : ""}` : `FAIL: ${auto.error ?? "?"}`}`);
-          // Release this clip before the next (source=null → mpv stop) so cycling ~49 clips doesn't
-          // accumulate decoders. The pause lets teardown complete before the next loadfile.
-          setSource(null);
-          // Let the just-unmounted instance's async mpv_terminate_destroy fully release
-          // (VideoToolbox sessions + surfaces) before the next clip's instance is created.
-          await new Promise((r) => setTimeout(r, 400));
+          // Per-clip lifecycle is OPPOSITE on the two platforms:
+          //  • Apple: REUSING one mpv instance across clips stacks VideoToolbox decoder sessions → OOM
+          //    (~clip 8), so we destroy per clip — null the source (→ unmount → mpv_terminate_destroy) and
+          //    let the async teardown settle before the next instance is created.
+          //  • Android: DESTROYING per clip leaks the MediaCodec session + surface + 4K buffers each cycle
+          //    (native RES climbs → GC death-spiral → freeze after only a few clips, device-dependent), so
+          //    we KEEP the one instance mounted and let the next runOne's setSource reload it in place
+          //    (core.load → mpv `loadfile replace`, which cleanly swaps the decoder — only ~1 alive at a
+          //    time). No per-clip teardown, no thrash.
+          if (Platform.OS === "ios") {
+            setSource(null);
+            await new Promise((r) => setTimeout(r, 400));
+          }
         }
         if (cancelled) return;
         results[test.id] = auto;

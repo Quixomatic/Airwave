@@ -40,9 +40,10 @@ interface MpvCoreDelegate {
  */
 class MpvCore(private val appContext: Context) {
   companion object {
-    // Master switch for the dynamic HDR (mediacodec_embed) path. Gated OFF (v0.11.75) while we isolate a
-    // per-clip-teardown hang in the capability diagnostic; flip back to true once cleared/made safe.
-    private const val HDR_SWITCH_ENABLED = false
+    // Master switch for the dynamic HDR (mediacodec_embed) path. Was briefly gated off (v0.11.75) to rule
+    // it out of a diagnostic freeze — the HDR-off build still froze, so HDR is cleared (the freeze was the
+    // diagnostic's per-clip mpv teardown leak, fixed separately by reusing one instance). Back ON.
+    private const val HDR_SWITCH_ENABLED = true
   }
 
   var delegate: MpvCoreDelegate? = null
@@ -351,9 +352,6 @@ class MpvCore(private val appContext: Context) {
         // case file-loaded didn't have dimensions yet), run the one-shot HDR probe (may re-open under
         // mediacodec_embed), then the first-frame signal.
         scope.launch { maybeEmitLoad() }
-        // ISOLATION (v0.11.75): HDR probe temporarily gated OFF to test whether its `getDouble` reads,
-        // which fire on PlaybackRestart exactly as the diagnostic unmounts + destroys the mpv instance,
-        // are what deadlocks per-clip teardown. Flip HDR_SWITCH_ENABLED back to true once cleared/fixed.
         if (HDR_SWITCH_ENABLED) scope.launch { maybeSwitchHdr() }
         if (!firstFrameEmitted) {
           firstFrameEmitted = true

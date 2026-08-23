@@ -2,6 +2,27 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.78] - 2026-08-23
+
+tv-native (Android) — **fix the capability-diagnostic freeze** + re-enable HDR.
+
+The diagnostic mounted a fresh mpv instance per clip and destroyed it between clips (`setSource(null)` →
+`mpv_terminate_destroy`). On Android that leaks the MediaCodec session + surface + 4K buffers every cycle
+— native memory climbs → GC death-spiral → the app freezes after only a few clips (device-dependent: ~clip
+2 on the Streamer's MediaTek, ~8 on the emulator). **Fix (Android only): reuse ONE mpv instance for the
+whole run** — keep the `MpvPlayerView` mounted and let each clip's `source` change reload it in place
+(`core.load` → mpv `loadfile replace`, which closes the old `h264_mediacodec` decoder before opening the
+next, so ~1 is alive at a time). No per-clip teardown, so nothing to leak. **iOS/Apple TV is byte-for-byte
+unchanged** — it keeps destroying per clip, gated by `Platform.OS === "ios"`, because Apple has the
+*opposite* failure (v0.7.20: reusing one instance stacked **VideoToolbox** sessions → OOM ~clip 8, which is
+why per-clip-destroy was adopted there). That VT-reuse OOM was Apple-specific (MPVKit's avfoundation VO
+holding sessions); mpv-Android's `loadfile` is expected to release the MediaCodec cleanly between clips —
+**being validated on-device** (RES must stay flat across all 49). If Android reuse also stacks, the
+fallback is deterministic per-clip destroy (wait for a real teardown-complete signal before the next clip).
+
+Also re-enabled the Android dynamic-HDR switch (`HDR_SWITCH_ENABLED = true`): the isolation build (v0.11.75)
+with it gated off still froze, proving HDR was never the cause.
+
 ## [0.11.77] - 2026-08-23
 
 tv-native (Android TV) — **crisp, pixel-snapped guide hairlines**. The guide grid scales with screen
