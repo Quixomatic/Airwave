@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.11.80] - 2026-08-23
+
+tv-native (Android) — **fix the ANR-kill when closing the SDR mini player**. Pressing Back to close the
+mini player crashed the whole app on SDR content (`ANR in com.airwave.tv — Input dispatching timed out,
+Waited 5002ms for KeyEvent`). `MpvCore.detachSurface()` runs on the main thread (surfaceDestroyed) and did
+an **unbounded** `runBlocking { setProperty("vo","null") … }` to stop rendering before the surface dies;
+for `vo=gpu-next` (SDR) the GL/`aimagereader` teardown stalls waiting for MediaCodec frames that never
+arrive once paused (`Waiting for frame timed out`), hanging the main thread past the 5s ANR threshold →
+SIGKILL. HDR was unaffected (`mediacodec_embed` has no GL path). Fixed by **bounding that wait**
+(`withTimeoutOrNull(1500)`): `vo=null` lands in a few ms normally; if the teardown stalls it bails well
+under the ANR threshold and detaches anyway. Android-only (`MpvCore`) — pre-existing gpu-next teardown
+code, zero iOS/Apple TV impact.
+
 ## [0.11.79] - 2026-08-23
 
 tv-native (Android) — **keep the screen awake during video playback**. Android has no automatic idle-timer
