@@ -65,6 +65,14 @@
         "EXPO_TV": "1"
       }
     },
+    "production-firetv": {
+      "autoIncrement": true,
+      "distribution": "store",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_TV": "1"
+      }
+    },
     "preview-tvos": {
       "distribution": "internal",
       "env": {
