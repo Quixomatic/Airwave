@@ -13,6 +13,7 @@ import { RELEASES_PAGE } from "@/lib/releases";
 // Stable, non-versioned links. Fill the store URLs as each store listing goes live.
 const GHCR = "https://github.com/Quixomatic/Airwave/pkgs/container/airwave";
 const PLAY = "https://play.google.com/store/apps/details?id=com.airwave.tv";
+const REPO = "https://github.com/Quixomatic/Airwave";
 const SELF_HOST = "/docs/self-hosting";
 // const APP_STORE_TV = "";  // TODO: paste the Apple TV App Store URL once you have it
 // const APP_STORE_IPAD = ""; // TODO: paste the iPad App Store URL once you have it
@@ -101,8 +102,8 @@ export function ClientDownloads() {
     { platform: "iPad", sub: "iPadOS", Icon: FaApple, delivery: "Native app", getLabel: "App Store", status: "beta", statusLabel: "In review" },
     { platform: "Android TV / Google TV", Icon: FaAndroid, delivery: "Native app", href: PLAY, getLabel: "Google Play", external: true, status: "beta", statusLabel: "In testing" },
     { platform: "Fire TV", Icon: FaAndroid, delivery: "Native app", getLabel: "Amazon Appstore", status: "beta", statusLabel: "In review" },
-    { platform: "LG webOS", Icon: FaChrome, delivery: "Packaged web app", getLabel: "LG Content Store", status: "planned", statusLabel: "Coming" },
-    { platform: "Roku", Icon: FaChrome, delivery: "Native channel", getLabel: "Roku Channel Store", status: "planned", statusLabel: "Coming" },
+    { platform: "LG webOS", Icon: FaChrome, delivery: "Packaged web app", href: REPO, getLabel: "Sideload / from source", external: true, status: "available", statusLabel: "Sideload" },
+    { platform: "Roku", Icon: FaChrome, delivery: "Native channel", href: REPO, getLabel: "Sideload / from source", external: true, status: "available", statusLabel: "Sideload" },
     { platform: "Windows", Icon: FaWindows, delivery: "Desktop app (Tauri)", href: RELEASES_PAGE, getLabel: "Download (.exe)", external: true, status: "available" },
     { platform: "macOS", sub: "Apple Silicon + Intel", Icon: FaApple, delivery: "Desktop app (Tauri)", href: RELEASES_PAGE, getLabel: "Download (.dmg)", external: true, status: "available" },
     { platform: "Linux", Icon: FaLinux, delivery: "Desktop app (Tauri)", getLabel: "From source", status: "planned", statusLabel: "Next" },

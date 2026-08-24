@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.5] - 2026-08-24
+
+apps/site — reflect that webOS + Roku are usable now via sideload.
+
+### What ships
+- Downloads table: **LG webOS** and **Roku** moved from "Coming" to **Available (Sideload / from source)** —
+  both apps run today; only their store submissions are still pending.
+- Matching copy on the reddit-facing messaging (webOS + Roku work now via sideload; store submissions a WIP).
+
 ## [0.12.4] - 2026-08-24
 
 apps/site — Downloads page tweaks.
