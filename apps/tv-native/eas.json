@@ -57,6 +57,14 @@
         "EXPO_TV": "1"
       }
     },
+    "production-androidtv": {
+      "autoIncrement": true,
+      "distribution": "store",
+      "android": { "buildType": "app-bundle" },
+      "env": {
+        "EXPO_TV": "1"
+      }
+    },
     "preview-tvos": {
       "distribution": "internal",
       "env": {
@@ -91,6 +99,13 @@
   },
   "submit": {
     "production": {},
-    "production-tvos": {}
+    "production-tvos": {},
+    "production-androidtv": {
+      "android": {
+        "serviceAccountKeyPath": "./google-play-service-account.json",
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    }
   }
 }

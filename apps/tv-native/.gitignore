@@ -25,3 +25,6 @@ expo-env.d.ts
 
 # Local-only App Store submission copy / cert artifacts
 cert/
+
+# Google Play service-account key for EAS Submit (secret — never commit)
+google-play-service-account.json
