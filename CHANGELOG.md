@@ -2,6 +2,23 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.2] - 2026-08-24
+
+tv-native (Android) — **restrict the Google Play release to Android TV / Google TV only** (no phones or
+tablets).
+
+### What ships
+- Added `androidTVRequired: true` to the `@react-native-tvos/config-tv` plugin in `apps/tv-native/app.json`.
+  This marks `android.software.leanback` as **required** (and touchscreen not required) in the Android
+  manifest, so Google Play only lists and installs the app on TV devices — the previous config left leanback
+  optional, which would have made the app available to phones/tablets too. Android-only; zero iOS/Apple TV
+  impact.
+
+### Required for release
+- Needs a fresh `production-androidtv` build (the manifest changed) — the next EAS build picks up the new
+  versionCode. In Play Console, enable the **Android TV** form factor only; leave phone/tablet, Wear,
+  Android XR (a separate VR/AR platform, not TV), Auto, and ChromeOS off.
+
 ## [0.12.1] - 2026-08-24
 
 apps/site — flesh out the "Introducing Airwave" blog post.

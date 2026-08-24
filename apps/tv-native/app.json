@@ -2,7 +2,7 @@
   "expo": {
     "name": "Airwave",
     "slug": "airwave",
-    "version": "0.12.1",
+    "version": "0.12.2",
     "scheme": "airwave",
     "orientation": "landscape",
     "userInterfaceStyle": "dark",
@@ -37,6 +37,7 @@
       [
         "@react-native-tvos/config-tv",
         {
+          "androidTVRequired": true,
           "showVerboseWarnings": false,
           "androidTVBanner": "./assets/icons/android-tv-banner.png",
           "androidTVIcon": "./assets/icons/android-tv-icon.png",
