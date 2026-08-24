@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.1] - 2026-08-24
+
+apps/site — flesh out the "Introducing Airwave" blog post.
+
+### What ships
+- Rewrote `content/blog/introducing-airwave.mdx` from a stub into a full post in the project's voice — the
+  personal "I miss TV" framing, the kids'-channel and stumble-into-a-movie anecdotes, the server-first
+  model, and an honest note on the AI-assisted build.
+- Wove in five existing product screenshots (Apple TV guide, channel surfing, full-screen DVR playback, the
+  admin channel-filter builder, and the schedule preview), each auto-rendered as an optimized,
+  click-to-zoom image via the existing MDX pipeline — no schema or component changes.
+
 ## [0.12.0] - 2026-08-23
 
 tv-native (Android) — **properly fix the mini-player ANR** + version-source cleanup.
