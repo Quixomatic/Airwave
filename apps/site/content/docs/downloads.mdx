@@ -37,7 +37,11 @@ small paid convenience**; the server, browser player, and desktop app are free, 
 
 - **TV apps** roll out store-by-store — Apple TV and iPad first, then Android TV / Google TV, Fire TV,
   webOS, and Roku. "In testing / In review / Coming" reflects each store's current state.
-- **Desktop app** (Windows, macOS, Linux) — download from the
+- **Sideload before the store** — you don't have to wait for a store listing. The **Roku**, **Android TV**,
+  **Fire TV**, and **LG webOS** apps can be installed from source today: Roku via **Developer Mode**,
+  Android TV / Fire TV via `adb install` of the APK, and webOS via the **`ares-install`** CLI. Every native
+  app is buildable from the [GitHub repo](https://github.com/Quixomatic/Airwave).
+- **Desktop app** (Windows and macOS; Linux next) — download from the
   [latest release](https://github.com/Quixomatic/Airwave/releases/latest); it reuses the web UI with a
   native **mpv** engine for 4K HDR direct-play.
 - **Browser player** — no download: enable the **`tvweb`** role in your compose stack and open it in any

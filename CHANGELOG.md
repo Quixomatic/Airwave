@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.4] - 2026-08-24
+
+apps/site — Downloads page tweaks.
+
+### What ships
+- Fire TV moved from "Coming" to **"In review"** (Amazon Appstore submission is in review).
+- Added a **"Sideload before the store"** note: the Roku, Android TV, Fire TV, and LG webOS apps can be
+  installed from source today (Roku Developer Mode, Android TV / Fire TV `adb install`, webOS `ares-install`).
+- Corrected the desktop-client line — Windows + macOS available, **Linux next** (was implying Linux shipped).
+
 ## [0.12.3] - 2026-08-24
 
 apps/site — add a dedicated **Downloads** page to the docs.

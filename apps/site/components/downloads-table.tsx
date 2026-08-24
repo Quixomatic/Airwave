@@ -100,7 +100,7 @@ export function ClientDownloads() {
     { platform: "Apple TV", sub: "tvOS", Icon: FaApple, delivery: "Native app", getLabel: "App Store", status: "available" },
     { platform: "iPad", sub: "iPadOS", Icon: FaApple, delivery: "Native app", getLabel: "App Store", status: "beta", statusLabel: "In review" },
     { platform: "Android TV / Google TV", Icon: FaAndroid, delivery: "Native app", href: PLAY, getLabel: "Google Play", external: true, status: "beta", statusLabel: "In testing" },
-    { platform: "Fire TV", Icon: FaAndroid, delivery: "Native app", getLabel: "Amazon Appstore", status: "planned", statusLabel: "Coming" },
+    { platform: "Fire TV", Icon: FaAndroid, delivery: "Native app", getLabel: "Amazon Appstore", status: "beta", statusLabel: "In review" },
     { platform: "LG webOS", Icon: FaChrome, delivery: "Packaged web app", getLabel: "LG Content Store", status: "planned", statusLabel: "Coming" },
     { platform: "Roku", Icon: FaChrome, delivery: "Native channel", getLabel: "Roku Channel Store", status: "planned", statusLabel: "Coming" },
     { platform: "Windows", Icon: FaWindows, delivery: "Desktop app (Tauri)", href: RELEASES_PAGE, getLabel: "Download (.exe)", external: true, status: "available" },
