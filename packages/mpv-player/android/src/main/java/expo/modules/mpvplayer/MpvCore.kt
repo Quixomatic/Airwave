@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 
 /** Events surfaced from the mpv flows up to the Expo view (mirrors the iOS `MpvCoreDelegate`). */
@@ -309,25 +308,29 @@ class MpvCore(private val appContext: Context) {
     pendingSurface = null
     val p = player ?: return
     // Disable the VO + force-window BEFORE detaching so mpv stops rendering to the surface instead of
-    // holding a dangling pointer. This runs on the MAIN thread (surfaceDestroyed), and the surface is
-    // invalid the instant surfaceDestroyed() returns, so vo=null must land first.
+    // holding a dangling pointer — but do it OFF the main thread.
     //
-    // BUT the wrapper's setProperty is a suspend call on mpv's single-threaded dispatcher, and gpu-next's
-    // GL/`aimagereader` teardown can stall it (it waits for MediaCodec frames that never arrive once the
-    // clip is paused → "Waiting for frame timed out"). An UNBOUNDED runBlocking then hangs the main thread
-    // past Android's 5s input-dispatch timeout → ANR → SIGKILL — reproduced closing the SDR mini player
-    // (mediacodec_embed/HDR has no GL path, so it never stalled). Bound the wait: vo=null normally lands in
-    // a few ms; if the GL teardown is stuck, bail well under the ANR threshold and detach anyway (mpv's own
-    // detachSurface handles the surface going away — a rare cosmetic glitch beats killing the app).
-    runBlocking {
+    // surfaceDestroyed() runs on the MAIN thread and must return promptly. The wrapper's setProperty
+    // round-trips through mpv's core, and gpu-next's GL/`aimagereader` teardown STALLS that round-trip on
+    // some devices (MediaTek / Google TV Streamer) — it waits for MediaCodec frames that never arrive once
+    // the clip is paused ("Waiting for frame timed out"). Doing it inline hangs the main thread past
+    // Android's 5s input-dispatch timeout → ANR → SIGKILL (reproduced closing the SDR mini player; a
+    // coroutine `withTimeoutOrNull` did NOT help — the stall is inside a non-cancellable native call;
+    // mediacodec_embed/HDR has no GL path so it never stalled). So run the ordered teardown
+    // (vo=null → force-window=no → detach) on a BACKGROUND thread: the main thread returns instantly and
+    // the teardown can block there as long as the GL deinit needs. The video is paused when the mini
+    // closes, so mpv isn't rendering and there's no live frame to hit the just-destroyed surface. This is
+    // mpv-android's fire-and-forget teardown (it uses fast JNI on the main thread; our wrapper's
+    // setProperty blocks, so we move it off-thread instead).
+    Thread {
       runCatching {
-        withTimeoutOrNull(1500) {
+        runBlocking {
           p.setProperty("vo", "null")
           p.setProperty("force-window", "no")
         }
       }
-    }
-    runCatching { p.detachSurface() }
+      runCatching { p.detachSurface() }
+    }.start()
   }
 
   fun setSurfaceSize(width: Int, height: Int) = launchOnPlayer {

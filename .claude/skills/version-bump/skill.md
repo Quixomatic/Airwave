@@ -40,6 +40,18 @@ The root `package.json` is not part of the lockstep bump.
 
 No `v` prefix in `package.json` (`"version": "1.1.0"`, not `"v1.1.0"`).
 
+**ALSO bump these NON-`package.json` version files in the same lockstep** — they feed store manifests /
+About pages and silently drift stale if missed (each has burned us once):
+- `apps/tv-native/app.json` → `expo.version` (Expo app version + `Constants.expoConfig.version` About page).
+- `apps/tv-web/public/appinfo.json` → `version` (the **webOS** app manifest; required for the `.ipk`
+  build + store submission, read at runtime by `webOSTV.js`). Do NOT delete this file.
+- `apps/tv-tauri/src-tauri/`: `Cargo.toml` `version`, `tauri.conf.json` `version`, and the `airwave`
+  package entry in `Cargo.lock`.
+- `apps/tv-roku/manifest` → `major_version` / `minor_version` / `build_version` (e.g. `0.12.3` →
+  `major_version=0`, `minor_version=12`, `build_version=3`) + the `Mirrors package.json <ver>` comment.
+
+After bumping, verify they all match `apps/*/package.json` before committing.
+
 ## Instructions
 
 1. **Read `CHANGELOG.md`** to find the most recent version (top entry). If it doesn't exist

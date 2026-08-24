@@ -1,6 +1,6 @@
 {
   "name": "@airwave/desktop-setup",
-  "version": "0.11.80",
+  "version": "0.12.0",
   "private": true,
   "type": "module",
   "description": "Airwave Desktop first-run onboarding / settings UI — a small Vite + React app built with @airwave/ui (shadcn + oklch theme), rendered in the desktop app's native webview and driven by the supervisor's /config, /save, /status endpoints.",

@@ -2,6 +2,35 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.0] - 2026-08-23
+
+tv-native (Android) — **properly fix the mini-player ANR** + version-source cleanup.
+
+### Fixed
+- **Mini-player close no longer ANR-kills the app on real hardware.** v0.11.80's `withTimeoutOrNull(1500)`
+  guard didn't help on the Google TV Streamer (MediaTek) — the gpu-next GL/`aimagereader` teardown stalls
+  inside a **non-cancellable native call**, so the coroutine timeout never fired and the main thread still
+  blocked past Android's 5s input-dispatch limit → SIGKILL. Now `MpvCore.detachSurface()` runs the whole
+  ordered teardown (`vo=null` → `force-window=no` → detach) on a **background thread**, so `surfaceDestroyed`
+  (main thread) returns instantly and the GL deinit can take as long as it needs off-thread. The video is
+  paused when the mini closes, so mpv isn't rendering and there's no live frame to hit the destroyed surface
+  (this mirrors mpv-android's fire-and-forget teardown; it uses fast JNI on the main thread, our wrapper's
+  `setProperty` blocks so we move it off-thread). Android-only (`packages/mpv-player/android`), zero iOS
+  impact. Verified on the emulator; needs a real-Streamer confirm.
+- **tv-native version no longer stuck at 0.11.9.** `app.json`'s `expo.version` was never part of the
+  lockstep bump, so the About page (`Constants.expoConfig.version`) and the built app's versionName drifted
+  stale. `app.json` is now bumped in lockstep with `package.json` every release.
+- **Restored the webOS app manifest** `apps/tv-web/public/appinfo.json` (accidentally removed in v0.11.76
+  while chasing the same stale-version issue). It's the webOS packaging/submission manifest (`id`,
+  `version`, `title`, `icon`, …) and is read at runtime by `webOSTV.js` — removing it would have broken the
+  webOS `.ipk` build. It's now bumped in lockstep too.
+
+### Versioning
+- The `/version-bump` flow now bumps **every** version file in lockstep, not just `apps/*/package.json`:
+  `apps/tv-native/app.json` (`expo.version`), `apps/tv-web/public/appinfo.json` (webOS manifest),
+  `apps/tv-tauri/src-tauri/{Cargo.toml,tauri.conf.json,Cargo.lock}`, and `apps/tv-roku/manifest`. Skill
+  updated so none can drift again.
+
 ## [0.11.80] - 2026-08-23
 
 tv-native (Android) — **fix the ANR-kill when closing the SDR mini player**. Pressing Back to close the
