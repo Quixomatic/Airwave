@@ -1,0 +1,53 @@
+---
+icon: Download
+title: "Downloads"
+description: "Every Airwave build in one place — the client apps (TV, desktop, browser) and the self-hosted server, which OS each is for, and where to get it."
+---
+
+Everything you can install, in one place. Airwave is **two pieces**: the **server** you self-host next to
+Plex (it owns your channels, schedules, and users), and the **client** apps that tune into it. Set up the
+server once, then install whichever clients your household uses.
+
+New here? Start with [Getting started](/docs/getting-started) for the server, or the
+[platform overview](/docs/platforms) for how each client works.
+
+## Server
+
+The server is the brain — run **one** of these next to your media. **Docker is the recommended path**
+(smallest, easiest to update); the one-click desktop installers bundle the server, admin, browser player,
+and database together if you'd rather not touch Docker.
+
+<ServerDownloads />
+
+- **Docker** — pull `ghcr.io/quixomatic/airwave` and follow the [self-hosting guide](/docs/self-hosting)
+  (compose file + `.env`). The image is a [package on GitHub](https://github.com/Quixomatic/Airwave/pkgs/container/airwave);
+  track `:latest` or pin a version. See [updating](/docs/self-hosting/updating) for the release loop.
+- **Desktop installers** — grab the build for your OS from the
+  [latest release](https://github.com/Quixomatic/Airwave/releases/latest). They install like any app and
+  run the full stack locally.
+
+## Clients
+
+The viewer app — the 10-foot channel guide, DVR player, and channel surfing — comes four ways: native TV
+apps, a native desktop app, the packaged webOS app, and the browser player. The **native store apps are a
+small paid convenience**; the server, browser player, and desktop app are free, and any native app can be
+**built and sideloaded from source**.
+
+<ClientDownloads />
+
+- **TV apps** roll out store-by-store — Apple TV and iPad first, then Android TV / Google TV, Fire TV,
+  webOS, and Roku. "In testing / In review / Coming" reflects each store's current state.
+- **Desktop app** (Windows, macOS, Linux) — download from the
+  [latest release](https://github.com/Quixomatic/Airwave/releases/latest); it reuses the web UI with a
+  native **mpv** engine for 4K HDR direct-play.
+- **Browser player** — no download: enable the **`tvweb`** role in your compose stack and open it in any
+  browser. See [self-hosting](/docs/self-hosting).
+
+> **Source-available.** Prefer to build it yourself? Every client and the server are in the
+> [GitHub repo](https://github.com/Quixomatic/Airwave) — you can build and sideload any native app instead
+> of using the store version.
+
+---
+
+See also: [Platforms](/docs/platforms) · [Getting started](/docs/getting-started) ·
+[Self-hosting](/docs/self-hosting)

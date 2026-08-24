@@ -3,6 +3,7 @@ import { ImageZoom } from "fumadocs-ui/components/image-zoom";
 import type { MDXComponents } from "mdx/types";
 import type { ComponentProps } from "react";
 import { PlatformMatrix } from "@/components/platform-matrix";
+import { ClientDownloads, ServerDownloads } from "@/components/downloads-table";
 import { Mermaid } from "@/components/mdx/mermaid";
 
 /**
@@ -41,6 +42,8 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
     img: (props) => <ImageZoom {...(props as ComponentProps<typeof ImageZoom>)} />,
     Video,
     PlatformMatrix,
+    ClientDownloads,
+    ServerDownloads,
     Mermaid,
     ...components,
   };

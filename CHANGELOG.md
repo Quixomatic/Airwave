@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.3] - 2026-08-24
+
+apps/site — add a dedicated **Downloads** page to the docs.
+
+### What ships
+- New `/docs/downloads` page listing every client and server build, which OS each is for, and where to get
+  it — mirroring the platforms table's style. Previously downloads were only reachable from the homepage.
+- New `components/downloads-table.tsx` (`ClientDownloads` + `ServerDownloads`) — static, PlatformMatrix-style
+  tables with status badges, linking to the GitHub releases/latest page (desktop installers), store pages,
+  and the GHCR container package (`ghcr.io/quixomatic/airwave`) for Docker. Registered in the MDX component
+  map; added to the docs nav after Platforms.
+
 ## [0.12.2] - 2026-08-24
 
 tv-native (Android) — **restrict the Google Play release to Android TV / Google TV only** (no phones or
