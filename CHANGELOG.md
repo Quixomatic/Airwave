@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.6] - 2026-08-24
+
+Fix a `42P01` error on the observability page when the workflow SDK is disabled (GitHub issue #1).
+
+### Fixed
+- The workflow engine is opt-in (`WORKFLOW_ENABLED=1` on Docker; onboarding/tray toggle on desktop), and
+  when it's off the `workflow.*` schema is never bootstrapped. The four observability read functions
+  (`listLineupRuns` / `listLineupRunSteps` / `listImportRuns` / `listImportRunSteps`) queried
+  `workflow.workflow_runs` / `workflow.workflow_steps` **without** the same gate the runners and the Import
+  button use, so opening the AI-lineup or import observability page polled a table that didn't exist →
+  `Raw query failed. Code: 42P01. relation "workflow.workflow_runs" does not exist`. They now short-circuit
+  to an empty result when `WORKFLOW_ENABLED !== "1"`, so the page renders an empty state instead of
+  throwing. Enabling the workflow SDK remains the way to actually use it; this just stops the read path from
+  erroring when it's off.
+
 ## [0.12.5] - 2026-08-24
 
 apps/site — reflect that webOS + Roku are usable now via sideload.

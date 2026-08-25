@@ -38,6 +38,9 @@ export type ImportRunStep = {
 
 /** Every step of one import run, oldest first — the fan-out breakdown (metadata only). */
 export async function listImportRunSteps(prisma: PrismaClient, runId: string): Promise<ImportRunStep[]> {
+  // Workflows are opt-in (WORKFLOW_ENABLED=1). When off, the `workflow.*` schema is never bootstrapped,
+  // so querying it throws Postgres 42P01 (undefined_table). There are no runs: return empty.
+  if (process.env.WORKFLOW_ENABLED !== "1") return [];
   const rows = await prisma.$queryRawUnsafe<
     {
       step_id: string;
@@ -73,6 +76,8 @@ export async function listImportRunSteps(prisma: PrismaClient, runId: string): P
 
 /** Recent import runs, newest first — filtered to our workflow by name. */
 export async function listImportRuns(prisma: PrismaClient, limit = 20): Promise<ImportRunSummary[]> {
+  // See listImportRunSteps: no `workflow.*` schema when the engine is disabled → return empty.
+  if (process.env.WORKFLOW_ENABLED !== "1") return [];
   const rows = await prisma.$queryRawUnsafe<RunRow[]>(
     `
     SELECT r.id,

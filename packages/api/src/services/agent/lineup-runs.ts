@@ -59,6 +59,10 @@ export async function listLineupRunSteps(
   prisma: PrismaClient,
   runId: string,
 ): Promise<LineupRunStep[]> {
+  // Workflows are opt-in (WORKFLOW_ENABLED=1). When off, the `workflow.*` schema is never
+  // bootstrapped, so querying it throws Postgres 42P01 (undefined_table) — which is what the
+  // observability page hit for users who never enabled the engine. There are no runs: return empty.
+  if (process.env.WORKFLOW_ENABLED !== "1") return [];
   const rows = await prisma.$queryRawUnsafe<
     {
       step_id: string;
@@ -101,6 +105,8 @@ export async function listLineupRuns(
   prisma: PrismaClient,
   limit = 20,
 ): Promise<LineupRunSummary[]> {
+  // See listLineupRunSteps: no `workflow.*` schema when the engine is disabled → return empty.
+  if (process.env.WORKFLOW_ENABLED !== "1") return [];
   const rows = await prisma.$queryRawUnsafe<RunRow[]>(
     `
     SELECT r.id,
