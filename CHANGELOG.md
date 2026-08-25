@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.12] - 2026-08-25
+
+Desktop app — one-click **Report to developer** on the setup failure screen.
+
+### Added
+- When first-run provisioning fails, the setup UI now shows a **Report to developer** button next to Try again.
+  It copies your **secret-scrubbed** `desktop.log` (Plex tokens + the home-dir username redacted) to the
+  clipboard and opens a **prefilled GitHub issue** in your browser — the bug form with area = Server, the exact
+  install/platform (Windows / macOS Intel or Apple Silicon / Linux), and the app version already filled — so you
+  just paste the logs and submit. The repo is public, so there's **no backend and no telemetry**: nothing is sent
+  automatically; it only acts on your click.
+- New supervisor endpoints: `GET /diagnostics` (scrubbed log tail + the platform's install label) and
+  `POST /open-url` (restricted to the repo's New-Issue links so it can't be an open redirect). The setup app bakes
+  its version via a Vite `define` to prefill the form.
+- Pairs with the new `.github/ISSUE_TEMPLATE` bug form, whose dropdown options these values match exactly.
+
 ## [0.12.11] - 2026-08-25
 
 Desktop app — restore a working **macOS Intel** build: signed, notarized, and boots.

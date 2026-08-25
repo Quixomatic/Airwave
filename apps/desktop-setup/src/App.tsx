@@ -64,6 +64,8 @@ export function App() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState("");
   const [failed, setFailed] = useState(false);
+  const [report, setReport] = useState<"idle" | "copied" | "manual">("idle");
+  const [diagText, setDiagText] = useState("");
   const [phase, setPhase] = useState("idle");
   const [media, setMedia] = useState<Media | null>(null);
 
@@ -134,10 +136,47 @@ export function App() {
   function retry() {
     setError("");
     setFailed(false);
+    setReport("idle");
     setPhase("idle");
     fetch("/retry", { method: "POST" })
       .then(() => pollStatus())
       .catch(() => pollStatus());
+  }
+
+  // "Report to developer": copy the scrubbed log to the clipboard, then open a prefilled GitHub issue in the
+  // browser (public repo → no backend needed; the user just pastes their logs into the Logs box).
+  async function reportIssue() {
+    let scrubbed = "";
+    let install = "Server — Desktop app";
+    try {
+      const d = (await fetch("/diagnostics").then((r) => r.json())) as { scrubbed?: string; install?: string };
+      scrubbed = d.scrubbed ?? "";
+      install = d.install ?? install;
+    } catch {
+      /* no diagnostics — still open the form */
+    }
+    try {
+      await navigator.clipboard.writeText(scrubbed);
+      setReport("copied");
+    } catch {
+      // Clipboard blocked (rare in the webview) — surface the text so they can copy it by hand.
+      setDiagText(scrubbed);
+      setReport("manual");
+    }
+    const failedLabel = PHASES.find((p) => p.key === phase)?.label ?? "startup";
+    const params = new URLSearchParams({
+      template: "bug_report.yml",
+      area: "Server (admin + backend)",
+      install,
+      version: __APP_VERSION__,
+      "what-happened": `Setup failed while "${failedLabel}".\nError: ${error || "(see logs below)"}\n\nLogs are on my clipboard — pasting them below.`,
+    });
+    const issueUrl = `https://github.com/Quixomatic/Airwave/issues/new?${params.toString()}`;
+    fetch("/open-url", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: issueUrl }),
+    }).catch(() => {});
   }
 
   async function submit() {
@@ -350,11 +389,31 @@ export function App() {
                   {error && <p className="mt-1 break-words font-mono text-xs text-muted-foreground">{error}</p>}
                 </div>
                 <p className="mt-4 text-xs text-muted-foreground">
-                  The full log is at <span className="font-mono">Airwave/desktop.log</span> in your user-data folder. If this
-                  keeps happening, another Postgres may be using the data folder, or your antivirus may be blocking it.
+                  If this keeps happening, another Postgres may be using the data folder, or your antivirus may be
+                  blocking it. <b>Report to developer</b> copies your (secret-scrubbed) log and opens a prefilled
+                  issue — just paste.
                 </p>
+                {report === "copied" && (
+                  <p className="mt-3 text-xs text-primary">
+                    Logs copied to your clipboard + a prefilled issue opened in your browser — paste the logs into the
+                    “Logs” box and submit.
+                  </p>
+                )}
+                {report === "manual" && (
+                  <div className="mt-3">
+                    <p className="text-xs text-muted-foreground">Couldn’t auto-copy — select all and copy this into the issue’s “Logs” box:</p>
+                    <textarea
+                      readOnly
+                      value={diagText}
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="mt-1 h-28 w-full resize-none rounded-md border border-border bg-muted/30 p-2 font-mono text-[11px] text-muted-foreground"
+                    />
+                  </div>
+                )}
                 <Footer>
-                  <span />
+                  <Button variant="ghost" onClick={reportIssue}>
+                    Report to developer
+                  </Button>
                   <Button onClick={retry}>Try again</Button>
                 </Footer>
               </Card>

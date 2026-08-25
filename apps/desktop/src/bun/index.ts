@@ -938,6 +938,37 @@ async function ensureStackUp(): Promise<boolean> {
   }
 }
 
+// ── Diagnostics (the setup UI's "Report to developer" button) ────────────────────────────────────────────
+/** The last N lines of desktop.log (the whole file is append-only across runs; the tail is what matters). */
+function readLogTail(maxLines = 600): string {
+  try {
+    return readFileSync(LOG_PATH, "utf8").split(/\r?\n/).slice(-maxLines).join("\n");
+  } catch {
+    return "(no desktop.log found)";
+  }
+}
+/** Redact secrets before a user shares logs on a PUBLIC issue: the home dir (username) → `~`, and any
+ * token/secret/password/key value. Best-effort — better to over-redact than leak a Plex token. */
+function scrubLog(text: string): string {
+  let s = text;
+  const home = homedir();
+  if (home && home.length > 3) s = s.split(home).join("~");
+  s = s.replace(
+    /((?:x-plex-token|plex[_-]?token|token|secret|password|passwd|api[_-]?key|authorization|better[_-]?auth[_-]?secret)\s*["']?\s*[:=]\s*["']?)([^\s"'&,}]+)/gi,
+    (_m, k: string) => `${k}[redacted]`,
+  );
+  return s;
+}
+/** The exact `install` dropdown option (must match apps/../.github/ISSUE_TEMPLATE/bug_report.yml) for prefill. */
+function platformInstallLabel(): string {
+  if (process.platform === "win32") return "Server — Desktop app, Windows";
+  if (process.platform === "darwin")
+    return process.arch === "arm64"
+      ? "Server — Desktop app, macOS (Apple Silicon / M-series)"
+      : "Server — Desktop app, macOS (Intel)";
+  return "Server — Desktop app, Linux";
+}
+
 // ── /setup page — first-run config (admin account + the docker-compose exposure knobs), served in the browser ──
 function startSetupServer(): void {
   Bun.serve({
@@ -1031,6 +1062,24 @@ function startSetupServer(): void {
       if (req.method === "POST" && url.pathname === "/retry") {
         if (!attach && stackState !== "up") void ensureStackUp();
         return Response.json({ ok: true });
+      }
+
+      // Diagnostics for the "Report to developer" button: the scrubbed log (the UI copies it to the clipboard)
+      // + the exact `install` dropdown option so the setup UI can prefill the GitHub issue form.
+      if (url.pathname === "/diagnostics") {
+        return Response.json({ scrubbed: scrubLog(readLogTail()), install: platformInstallLabel() });
+      }
+
+      // Open a URL in the user's real browser (the setup UI runs in a webview; window.open there can't reach the
+      // system browser). Restricted to our own repo's New-Issue links so it can't be turned into an open redirect.
+      if (req.method === "POST" && url.pathname === "/open-url") {
+        const body = (await req.json().catch(() => ({}))) as { url?: string };
+        const u = (body.url ?? "").trim();
+        if (u.startsWith("https://github.com/Quixomatic/Airwave/")) {
+          openBrowser(u);
+          return Response.json({ ok: true });
+        }
+        return Response.json({ ok: false, error: "url not allowed" }, { status: 400 });
       }
 
       // Static: serve the built onboarding/settings UI (@airwave/desktop-setup) with SPA fallback.
