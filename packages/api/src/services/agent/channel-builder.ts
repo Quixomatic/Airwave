@@ -239,8 +239,9 @@ export async function buildPlannedChannel(
       icon: channel.icon,
       tint: channel.accent,
       ordering: channel.ordering,
-      sortField: channel.sortField,
-      sortDir: channel.sortDir,
+      // planner emits these NULLABLE now (OpenAI-strict); createChannel wants `undefined` for "unset".
+      sortField: channel.sortField ?? undefined,
+      sortDir: channel.sortDir ?? undefined,
       mediaTypes: channel.mediaTypes,
       filter: channel.filter as never,
       enabled: false,

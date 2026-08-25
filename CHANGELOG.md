@@ -2,6 +2,26 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.7] - 2026-08-25
+
+AI lineup generation on **OpenAI / non-Anthropic providers** — fix the `Invalid schema for response_format`
+error (candidate fix, under verification).
+
+### Fixed
+- The AI lineup **planner** (`services/agent/lineup-plan.ts`) builds its channels with `generateObject`,
+  which `@ai-sdk/openai` runs in **strict** structured-output mode by default. Strict mode requires every
+  property to appear in the schema's `required` array, so the `.optional()` fields added during the
+  strategy/sorting work (`sortField`, `sortDir`, `callsign`, and the package `existingKey`) made OpenAI
+  reject the request with `Invalid schema for response_format … 'required' … Missing 'sortField'`. This
+  never surfaced on Anthropic because that path uses a lenient tool-based route. Those four fields are now
+  `.nullable()` (still "optional" for the model — it may return null — but present in `required`), and the
+  reserve step converts the now-nullable `sortField`/`sortDir` back to `undefined` before persisting.
+  Anthropic behaviour is unchanged; the planner keeps strict enforcement.
+- Audited the other AI-facing schemas (chat `create_channel`/`update_channel`, the WDK builder): they run
+  through non-strict `tool()` calls and already work on OpenAI, and their executes persist all
+  sorting/ordering fields correctly. `strategy` remains intentionally absent from the AI (deferred per the
+  channel-strategies plan). No changes needed there.
+
 ## [0.12.6] - 2026-08-24
 
 Fix a `42P01` error on the observability page when the workflow SDK is disabled (GitHub issue #1).

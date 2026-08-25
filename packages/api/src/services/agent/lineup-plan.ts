@@ -105,16 +105,20 @@ const plannedChannelSchema = z.object({
     .number()
     .int()
     .describe("Roughly how many items you expect to match. Used to sanity-check the built filter."),
-  sortField: z.string().optional().describe("Plex sort field, e.g. 'title', 'year', 'originallyAvailableAt'."),
-  sortDir: z.enum(["asc", "desc"]).optional(),
+  // NULLABLE, not optional: OpenAI's strict structured outputs require every property to be listed in
+  // `required` — an `.optional()` field is dropped from `required` and rejected ("missing 'sortField'").
+  // `.nullable()` keeps the key required but lets the model return null, which the create path already
+  // treats as "unset" (`?? "title"` / `?? "asc"`). Anthropic is unaffected (behaviour-identical).
+  sortField: z.string().nullable().describe("Plex sort field, e.g. 'title', 'year', 'originallyAvailableAt'. null = default."),
+  sortDir: z.enum(["asc", "desc"]).nullable(),
   ordering: z
     .enum(["SHUFFLE", "IN_ORDER", "BY_AIR_DATE"])
     .describe("SHUFFLE for most channels; IN_ORDER/BY_AIR_DATE for a channel meant to be watched in sequence."),
   callsign: z
     .string()
     .max(6)
-    .optional()
-    .describe("Short broadcast-style callsign, uppercase, <=6 chars. e.g. 'TOONS', 'BOND', 'KAIJU'."),
+    .nullable()
+    .describe("Short broadcast-style callsign, uppercase, <=6 chars. e.g. 'TOONS', 'BOND', 'KAIJU'. null = none."),
   icon: z.string().describe(iconDescription),
   mediaTypes: z
     .array(z.enum(["movie", "show"]))
@@ -130,9 +134,9 @@ const plannedPackageSchema = z.object({
   key: z.string().describe("Stable kebab-case slug for the package."),
   existingKey: z
     .string()
-    .optional()
+    .nullable()
     .describe(
-      "Set this to the `key` of an EXISTING package to file these channels into it instead of creating a new one. Leave unset to create a new package. When set, the existing package keeps its own name/description/icon/accent — the ones you give here are ignored.",
+      "Set this to the `key` of an EXISTING package to file these channels into it instead of creating a new one. null = create a new package. When set, the existing package keeps its own name/description/icon/accent — the ones you give here are ignored.",
     ),
   name: z.string().describe("Short package name shown in the guide sidebar."),
   description: z.string(),
