@@ -2,6 +2,25 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.8] - 2026-08-25
+
+Desktop app — **migrate to Electrobun v2** to fix the macOS launcher crash (candidate; macOS build being
+verified).
+
+### Fixed
+- The v1 Electrobun launcher segfaulted at startup on macOS (SIGSEGV in the Zig launcher's `fs.path.resolve`,
+  *before* our supervisor runs), so the desktop server never launched on an Intel iMac — it self-extracts a
+  `.tar.zst` payload, and the crash was in that path-resolution/extraction step. Upgraded `electrobun`
+  `^1.15.1` → `^2.0.1` (now Hutch-orchestrated). Config migration: added `build.mainProcess: "bun"`; we use
+  none of the removed v1 fields and already use `--env=stable`/`canary`. v2's dev/build eagerly process the
+  `copy` sources, so `prebuild` is now chained into the `dev`/`start` scripts. `.hutch/` + `.cottontail-tmp/`
+  gitignored.
+
+### Verification
+- `pnpm -F desktop dev` boots the full stack on Windows under v2 (no regression). The macOS build is being
+  verified via `workflow_dispatch` before this ships — watch `build-mac-signed.ts` (`.app` layout) and the
+  SHALLOW pg-native layout (the v1 self-extractor long-name workaround may no longer be needed).
+
 ## [0.12.7] - 2026-08-25
 
 AI lineup generation on **OpenAI / non-Anthropic providers** — fix the `Invalid schema for response_format`
