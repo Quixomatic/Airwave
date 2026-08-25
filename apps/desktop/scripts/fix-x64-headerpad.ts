@@ -19,6 +19,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 const MH_MAGIC_64_LE = 0xfeedfacf;
 const CPU_TYPE_X86_64 = 0x01000007;
+const CPU_TYPE_ARM64 = 0x0100000c;
 const LC_SEGMENT_64 = 0x19;
 const LC_UUID = 0x1b;
 const LC_CODE_SIGNATURE = 0x1d;
@@ -88,6 +89,49 @@ function removeLoadCommand(buf: Buffer, target: { offset: number; size: number }
  *  - "fixed":   removed an expendable load command to free 16 bytes (writes the file).
  *  - "failed":  needs padding but has no removable load command — signing WOULD corrupt it; caller must abort.
  */
+/**
+ * Read-only headerpad probe for ANY thin 64-bit Mach-O (x64 OR arm64). Purely diagnostic — used by the signer
+ * to LOG which binaries are headerpad-starved before signing, so we can tell whether arm64 (which #485 claims is
+ * immune) actually has room on a given electrobun build. Returns null for fat/non-Mach-O/other. Does NOT modify.
+ */
+export function inspectHeaderpad(filePath: string): { arch: "x64" | "arm64"; signed: boolean; headerpad: number } | null {
+  let buf: Buffer;
+  try {
+    buf = Buffer.from(readFileSync(filePath));
+  } catch {
+    return null;
+  }
+  if (buf.length < MACHO_HEADER_SIZE) return null;
+  if (buf.readUInt32LE(0) !== MH_MAGIC_64_LE) return null;
+  const cpu = buf.readUInt32LE(4);
+  const arch = cpu === CPU_TYPE_X86_64 ? "x64" : cpu === CPU_TYPE_ARM64 ? "arm64" : null;
+  if (!arch) return null;
+
+  const ncmds = buf.readUInt32LE(16);
+  const sizeofcmds = buf.readUInt32LE(20);
+  let signed = false;
+  let minContentOffset = Number.MAX_SAFE_INTEGER;
+  let offset = MACHO_HEADER_SIZE;
+  for (let i = 0; i < ncmds; i++) {
+    const cmd = buf.readUInt32LE(offset);
+    const cmdsize = buf.readUInt32LE(offset + 4);
+    if (cmd === LC_CODE_SIGNATURE) signed = true;
+    if (cmd === LC_SEGMENT_64) {
+      const nsects = buf.readUInt32LE(offset + 64);
+      let so = offset + 72;
+      for (let s = 0; s < nsects; s++) {
+        const secSize = Number(buf.readBigUInt64LE(so + 40));
+        const secOff = buf.readUInt32LE(so + 48);
+        if (secOff > 0 && secSize > 0) minContentOffset = Math.min(minContentOffset, secOff);
+        so += 80;
+      }
+    }
+    offset += cmdsize;
+  }
+  const headerpad = minContentOffset === Number.MAX_SAFE_INTEGER ? 0 : minContentOffset - (MACHO_HEADER_SIZE + sizeofcmds);
+  return { arch, signed, headerpad };
+}
+
 export function ensureHeaderpad(filePath: string): "fixed" | "ok" | "skipped" | "failed" {
   const buf = Buffer.from(readFileSync(filePath));
   const info = analyze(buf);

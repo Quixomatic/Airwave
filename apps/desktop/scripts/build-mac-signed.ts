@@ -24,7 +24,7 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, sy
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ensureHeaderpad } from "./fix-x64-headerpad";
+import { ensureHeaderpad, inspectHeaderpad } from "./fix-x64-headerpad";
 
 if (process.platform !== "darwin") {
   console.error("[mac-sign] this script only runs on macOS.");
@@ -152,7 +152,17 @@ function findMachO(dir: string): MachO[] {
 
 const machos = findMachO(appPath).sort((a, b) => b.path.split("/").length - a.path.split("/").length);
 console.log(`[mac-sign] signing ${machos.length} nested Mach-O binaries (leaf-first)…`);
+let starvedArm64 = 0;
 for (const { path, exe } of machos) {
+  // DIAGNOSTIC (both arches, read-only): flag any unsigned binary WITHOUT room for codesign's LC_CODE_SIGNATURE.
+  // On x64 the fix below repairs it; on arm64 this tells us whether v2's core is actually headerpad-safe (#485
+  // claims arm64 is immune — this verifies it per-build instead of assuming). A signed binary re-signs in place.
+  const probe = inspectHeaderpad(path);
+  if (probe && !probe.signed && probe.headerpad < 16) {
+    console.warn(`[mac-sign] ⚠️ headerpad-starved: ${path.replace(appPath + "/", "")} — ${probe.arch}, headerpad ${probe.headerpad} (<16; codesign would corrupt __text, #485)`);
+    if (probe.arch === "arm64") starvedArm64++;
+  }
+
   // #485: electrobun's darwin-x64 launcher/extractor ship with ZERO Mach-O headerpad, so codesigning them
   // overwrites the start of __text → the app segfaults at fs.path.resolve on launch. Free 16 bytes FIRST (drop an
   // expendable LC_SOURCE_VERSION/LC_UUID) so codesign has room for its LC_CODE_SIGNATURE. No-op on arm64 (not
@@ -174,6 +184,14 @@ for (const { path, exe } of machos) {
     console.error(`[mac-sign] failed to sign ${path.replace(appPath + "/", "")}: ${(err as Error).message}`);
     process.exit(1);
   }
+}
+
+if (arch === "arm64") {
+  console.log(
+    starvedArm64 === 0
+      ? "[mac-sign] arm64 headerpad check: OK — 0 starved binaries (this electrobun build's arm64 core is headerpad-safe; #485 does not apply)."
+      : `[mac-sign] ⚠️ arm64 headerpad check: ${starvedArm64} STARVED binaries — arm64 ALSO needs the #485 fix (extend ensureHeaderpad to arm64).`,
+  );
 }
 
 // Seal the app bundle last (with entitlements on the top-level executable).
