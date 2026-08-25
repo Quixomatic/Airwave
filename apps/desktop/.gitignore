@@ -2,3 +2,7 @@ node_modules/
 build/
 dist/
 views/
+
+# Electrobun v2 (Hutch) generated toolchain/devkit + temp
+.hutch/
+.cottontail-tmp/
