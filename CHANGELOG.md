@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.10] - 2026-08-25
+
+Build/CI + dev tooling — try to restore a native macOS Intel desktop build via an Electrobun version split, and
+move the docs site's dev port off a collision.
+
+### Changed
+- **Desktop CI: pin Electrobun 1.18.1 for the `macos-15-intel` job only.** Electrobun v2 is Hutch-orchestrated
+  and Hutch has no Darwin x86_64 build, so `electrobun build` aborts on the Intel runner
+  (`hutch installer: unsupported platform: Darwin x86_64`). That one matrix job now downgrades to the last
+  pre-Hutch line (1.18.1) *after* install (v2 installs fine — Hutch only runs at build time) and strips the
+  v2-only `build.mainProcess` config key; every other job stays on v2 (`^2.0.1`). This lets the Intel `.app` +
+  signed DMG build again, as it did at v0.12.6. ⚠️ It remains unverified whether v1.18's launcher fixes the
+  Intel *runtime* segfault — a green build proves it compiles + signs, not that it launches.
+- **`apps/site` dev/start port 3003 → 3004** so it stops colliding with `apps/tv-tauri` (3003) when `pnpm dev`
+  boots the whole monorepo.
+
 ## [0.12.9] - 2026-08-25
 
 Desktop app — harden embedded-Postgres startup so a leftover database process can't brick onboarding, and surface

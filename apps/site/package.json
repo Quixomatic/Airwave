@@ -1,12 +1,12 @@
 {
   "name": "site",
-  "version": "0.12.9",
+  "version": "0.12.10",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev -p 3003",
+    "dev": "next dev -p 3004",
     "build": "next build",
-    "start": "next start -p 3003",
+    "start": "next start -p 3004",
     "postinstall": "fumadocs-mdx",
     "check-types": "tsc --noEmit"
   },

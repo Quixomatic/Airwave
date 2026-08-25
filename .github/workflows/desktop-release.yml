@@ -46,6 +46,13 @@ jobs:
           # replaces the deprecated macos-13. Electrobun CANNOT cross-compile arch (its build always
           # targets the host; the CLI has no --target, only --env; even Electrobun's OWN release CI ships
           # arm64-only Mac), so a native Intel runner is the only way — and this is a real, supported one.
+          #
+          # ⚠️ ELECTROBUN VERSION SPLIT: v2 is Hutch-orchestrated and Hutch has NO Darwin x86_64 build, so
+          # `electrobun build` aborts on Intel with "hutch installer: unsupported platform: Darwin x86_64".
+          # v1.18.1 is the last pre-Hutch line and DOES build a native Intel .app. So this ONE job pins
+          # electrobun 1.18.1 (see the "Pin Electrobun 1.18 (macOS Intel)" step); every other matrix job
+          # stays on v2 (^2.0.1). NOTE: this only proves the Intel app BUILDS — it's still unverified whether
+          # v1.18's launcher fixes the Intel runtime segfault (v1.15.1 built fine but crashed at launch).
           - os: macos-15-intel
             arch: x64
           - os: windows-2025
@@ -101,6 +108,21 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # macOS Intel ONLY: downgrade electrobun to the last pre-Hutch line (1.18.1) so `electrobun build` can
+      # actually target x86_64 (v2/Hutch refuses Darwin x86_64). The frozen install above put v2 in place on every
+      # runner; here we override it for THIS job. install succeeds under v2 (Hutch only runs at build time), so
+      # this runs post-install. Also strip the v2-only `build.mainProcess` key — the v1.18 config loader doesn't
+      # know it. Every other matrix job is untouched and stays on v2.
+      - name: Pin Electrobun 1.18 (macOS Intel)
+        if: matrix.os == 'macos-15-intel'
+        working-directory: apps/desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm add electrobun@1.18.1
+          sed -i.bak '/mainProcess: "bun",/d' electrobun.config.ts && rm -f electrobun.config.ts.bak
+          echo "electrobun pinned to: $(node -e "console.log(require('electrobun/package.json').version)")"
 
       - name: Determine build channel
         id: ch
