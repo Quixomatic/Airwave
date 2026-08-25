@@ -24,6 +24,8 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, sy
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { ensureHeaderpad } from "./fix-x64-headerpad";
+
 if (process.platform !== "darwin") {
   console.error("[mac-sign] this script only runs on macOS.");
   process.exit(1);
@@ -151,6 +153,18 @@ function findMachO(dir: string): MachO[] {
 const machos = findMachO(appPath).sort((a, b) => b.path.split("/").length - a.path.split("/").length);
 console.log(`[mac-sign] signing ${machos.length} nested Mach-O binaries (leaf-first)…`);
 for (const { path, exe } of machos) {
+  // #485: electrobun's darwin-x64 launcher/extractor ship with ZERO Mach-O headerpad, so codesigning them
+  // overwrites the start of __text → the app segfaults at fs.path.resolve on launch. Free 16 bytes FIRST (drop an
+  // expendable LC_SOURCE_VERSION/LC_UUID) so codesign has room for its LC_CODE_SIGNATURE. No-op on arm64 (not
+  // thin-x86_64) and on already-signed/padded binaries; a "failed" means signing would corrupt it — abort.
+  if (arch === "x64") {
+    const r = ensureHeaderpad(path);
+    if (r === "fixed") console.log(`[mac-sign] headerpad: freed 16 bytes in ${path.replace(appPath + "/", "")} (#485)`);
+    if (r === "failed") {
+      console.error(`[mac-sign] ${path.replace(appPath + "/", "")} has no headerpad and no removable load command — signing would corrupt it (electrobun#485).`);
+      process.exit(1);
+    }
+  }
   const args = ["--force", "--timestamp", "--options", "runtime", "--sign", identity];
   if (exe) args.push("--entitlements", entitlements);
   args.push(path);

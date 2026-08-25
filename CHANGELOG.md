@@ -2,6 +2,30 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.11] - 2026-08-25
+
+Desktop app — restore a working **macOS Intel** build: signed, notarized, and boots.
+
+### Fixed
+- Every prior macOS Intel desktop build crashed at launch (`EXC_BAD_ACCESS`/SIGSEGV in electrobun's launcher at
+  `fs.path.resolve`, before our code runs). Root cause is [electrobun#485](https://github.com/blackboardsh/electrobun/issues/485):
+  electrobun's darwin-x64 core binaries (launcher/extractor) ship with **zero Mach-O headerpad**, so codesigning
+  them — required to notarize — makes `codesign` silently overwrite the start of `__text` and corrupt the binary.
+  (arm64 is immune; it always reserves the code-signature load command.) The upstream fix exists only in
+  Hutch-based betas, which can't build x86_64 at all — so no electrobun version both builds Intel *and* is safe to
+  sign.
+- Fix: `apps/desktop/scripts/fix-x64-headerpad.ts`, called from `build-mac-signed.ts` before each `codesign`. For
+  every unsigned thin-x86_64 Mach-O with headerpad < 16, it drops an expendable 16-byte load command
+  (`LC_SOURCE_VERSION`, else `LC_UUID`) to make room for `codesign`'s `LC_CODE_SIGNATURE`, so signing no longer
+  corrupts `__text`. No-op on arm64 and on already-signed/padded binaries. (Mach-O technique adapted from
+  deer-flow/llm-space#29.)
+- The Intel CI job pins electrobun `1.18.1` (the last line with the classic `electrobun build` CLI that targets
+  x86_64); every other matrix job stays on v2. Net result: a fully signed + notarized Intel DMG that launches.
+
+### Notes
+- Desktop macOS only; arm64 / Windows / Linux and iOS / Apple TV are unaffected (the headerpad step is a no-op
+  off the Intel job).
+
 ## [0.12.10] - 2026-08-25
 
 Build/CI + dev tooling — try to restore a native macOS Intel desktop build via an Electrobun version split, and

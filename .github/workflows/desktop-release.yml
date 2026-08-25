@@ -49,11 +49,12 @@ jobs:
           #
           # ⚠️ ELECTROBUN VERSION SPLIT: v2 is Hutch-orchestrated and Hutch has NO Darwin x86_64 build, so
           # `electrobun build` aborts on Intel with "hutch installer: unsupported platform: Darwin x86_64".
-          # The pre-Hutch 1.18 line DOES build a native Intel .app, so this ONE job pins electrobun
-          # 1.18.4-beta.25 (see the "Pin Electrobun 1.18.4-beta.25" step) while every other matrix job stays on
-          # v2 (^2.0.1). We use that beta specifically because it carries the #485 headerpad fix: earlier 1.18.x
-          # (1.15.1, 1.18.1) BUILT the Intel app but codesigning corrupted the zero-headerpad launcher → runtime
-          # segfault at fs.path.resolve. beta.25 adds headerpad so the signed+notarized Intel app boots.
+          # 1.18.1 is the last line with the classic `electrobun build` CLI that produces a native Intel .app, so
+          # this ONE job pins 1.18.1 (see the "Pin Electrobun 1.18.1" step) while every other matrix job stays on
+          # v2 (^2.0.1). NOTE: the #485 headerpad fix only exists in Hutch-based betas (beta.17+), which can't
+          # build Intel — so 1.18.1's x64 launcher still has zero headerpad. We fix it OURSELVES at sign time
+          # (scripts/fix-x64-headerpad.ts, called from build-mac-signed.ts): free 16 bytes before codesign so it
+          # doesn't overwrite __text. Result: a fully SIGNED + NOTARIZED Intel app that boots. arm64 untouched.
           - os: macos-15-intel
             arch: x64
           - os: windows-2025
@@ -110,22 +111,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # macOS Intel ONLY: pin the last pre-Hutch line so `electrobun build` can target x86_64 (v2/Hutch refuses
-      # Darwin x86_64). We use 1.18.4-beta.25 SPECIFICALLY (not 1.18.1): its x64 launcher/extractor now ship with
-      # headerpad, which is the fix for the codesign-corrupts-__text segfault at `fs.path.resolve`
-      # (blackboardsh/electrobun#485 — maintainer closed it "fixed in the next stable release" 2026-08-02; this
-      # beta is 2026-08-10). So the signed+notarized Intel app BOOTS instead of crashing. The frozen install above
-      # put v2 in place on every runner; here we override it for THIS job (install is fine under v2 — Hutch only
-      # runs at build time). Also strip the v2-only `build.mainProcess` key the v1.18 config loader doesn't know.
-      # Every other matrix job is untouched and stays on v2. NOTE: it's a beta because there is no 1.18.4 STABLE —
-      # the fix line only ships as 1.18.4-beta.N (the "next stable" was 2.0/Hutch, which dropped Intel entirely).
-      - name: Pin Electrobun 1.18.4-beta.25 (macOS Intel — #485 headerpad fix)
+      # macOS Intel ONLY: pin 1.18.1 — the last electrobun with the classic `electrobun build` CLI that targets
+      # x86_64 (v2/Hutch refuses Darwin x86_64; and every beta with the #485 headerpad fix already dropped the CLI
+      # for Hutch, so it can't build Intel either). The zero-headerpad launcher that 1.18.1 ships is patched at
+      # sign time by scripts/fix-x64-headerpad.ts (freeing 16 bytes so codesign doesn't corrupt __text), so the
+      # Intel app is still fully signed + notarized. The frozen install above put v2 in place on every runner;
+      # here we override it for THIS job (install is fine under v2 — Hutch only runs at build time). Also strip the
+      # v2-only `build.mainProcess` key the v1.18 config loader doesn't know. Every other matrix job stays on v2.
+      - name: Pin Electrobun 1.18.1 (macOS Intel — classic build CLI)
         if: matrix.os == 'macos-15-intel'
         working-directory: apps/desktop
         shell: bash
         run: |
           set -euo pipefail
-          pnpm add electrobun@1.18.4-beta.25
+          pnpm add electrobun@1.18.1
           sed -i.bak '/mainProcess: "bun",/d' electrobun.config.ts && rm -f electrobun.config.ts.bak
           echo "electrobun pinned to: $(node -e "console.log(require('electrobun/package.json').version)")"
 
@@ -157,8 +156,8 @@ jobs:
           # macOS + signing secrets present → tell electrobun.config to skip its own (unsigned) DMG; the signing
           # step below builds + signs + notarizes its own. Empty on every other runner / when the cert secret is
           # absent (forks, no secrets), so electrobun behaves exactly as before and the build stays green.
-          # (Intel included: the 1.18.4-beta.25 launcher has headerpad now — see the pin step — so signing no
-          # longer corrupts it; blackboardsh/electrobun#485.)
+          # (Intel included: build-mac-signed.ts frees Mach-O headerpad before codesign — see
+          # scripts/fix-x64-headerpad.ts — so signing 1.18.1's x64 launcher no longer corrupts it; #485.)
           AIRWAVE_MAC_SIGN: ${{ (runner.os == 'macOS' && env.MAC_SIGN_AVAILABLE == 'true') && '1' || '' }}
         run: pnpm run build:${{ steps.ch.outputs.channel }}
 
