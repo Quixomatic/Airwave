@@ -2,6 +2,34 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.9] - 2026-08-25
+
+Desktop app — harden embedded-Postgres startup so a leftover database process can't brick onboarding, and surface
+start failures instead of hanging silently on "starting the database."
+
+### Fixed
+- **An orphaned Postgres bricked "starting the database."** If the desktop app was force-quit or crashed (or, on a
+  developer's machine, a `pnpm -F desktop dev` instance was left running), the embedded `postgres` stayed attached
+  to the data directory. On the next launch the supervisor's port-probe picked a *different* free port and started
+  a *second* postmaster on the same `pgdata`, which Postgres rejects with `FATAL: pre-existing shared memory block
+  is still in use` — surfacing to the user as a permanent hang. The supervisor now reaps any live postmaster still
+  attached to its `pgdata` (via `postmaster.pid`, killing the whole process tree on Windows so backend children
+  die too) and clears the stale pid file before starting.
+- **Dev and packaged no longer share a data directory.** Both defaulted embedded Postgres to the same port and
+  `Airwave/pgdata`, so a running `pnpm dev` instance and the installed app fought over one data folder (the
+  collision above). Dev now uses a separate `Airwave-Dev` user-data tree; the packaged app keeps `Airwave`
+  unchanged (existing installs' data is untouched).
+- **Start failures are shown, not swallowed.** A boot error used to leave the onboarding UI polling forever on the
+  phase it died in, logging a useless `{}`. The supervisor now captures a real per-phase error and exposes it via
+  `/status`; the setup UI shows which phase failed, the message, and a **Try again** button (`/retry`). A
+  configured app that fails to start on relaunch now opens its window with that error instead of sitting silently
+  in the tray.
+
+### Notes
+- Desktop-only (`apps/desktop` + `apps/desktop-setup`); no server, TV-client, or iOS/Apple TV impact.
+- The fix paths run against the bundled embedded Postgres, so they validate in a packaged build — verify via a
+  `workflow_dispatch` desktop build.
+
 ## [0.12.8] - 2026-08-25
 
 Desktop app — **migrate to Electrobun v2** to fix the macOS launcher crash (candidate; macOS build being

@@ -63,6 +63,7 @@ export function App() {
   const [extraCorsOrigins, setExtraCorsOrigins] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState("");
+  const [failed, setFailed] = useState(false);
   const [phase, setPhase] = useState("idle");
   const [media, setMedia] = useState<Media | null>(null);
 
@@ -82,7 +83,24 @@ export function App() {
         setWebAddress(c.webAddress ?? "");
         setExtraCorsOrigins(c.extraCorsOrigins ?? "");
         setShowAdvanced(Boolean(c.serverAddress || c.webAddress || c.extraCorsOrigins));
-        setStep(c.configured ? "options" : "welcome");
+        if (!c.configured) {
+          setStep("welcome");
+          return;
+        }
+        // Already configured → normally the Settings screen. But if the supervisor failed to start the stack on
+        // this launch (e.g. a leftover Postgres it couldn't clear, or antivirus), peek at /status and jump to the
+        // provisioning error view with a Retry instead of a settings form over a dead stack.
+        setStep("options");
+        fetch("/status")
+          .then((r) => r.json())
+          .then((s: { error?: string | null }) => {
+            if (s.error) {
+              setError(s.error);
+              setFailed(true);
+              setStep("provisioning");
+            }
+          })
+          .catch(() => {});
       })
       .catch(() => setCfg({ configured: false, expose: false, tvwebEnabled: true, workflowEnabled: false, adminEmail: "" }));
   }, []);
@@ -90,9 +108,16 @@ export function App() {
   function pollStatus() {
     fetch("/status")
       .then((r) => r.json())
-      .then((j: { phase?: string; up?: boolean; media?: Media }) => {
+      .then((j: { phase?: string; up?: boolean; error?: string | null; media?: Media }) => {
         if (j.phase) setPhase(j.phase);
         if (j.media) setMedia(j.media);
+        // The supervisor hit a fatal error provisioning — stop polling and show it with a Retry (no more
+        // silent forever-spinner on the phase it died in).
+        if (j.error) {
+          setError(j.error);
+          setFailed(true);
+          return;
+        }
         // Wait for BOTH the stack to be up AND the capability-media step to reach a terminal state, so the user
         // sees the download finish (it runs in parallel with the stack boot).
         const mediaDone = !j.media || ["ready", "skipped", "failed"].includes(j.media.state);
@@ -106,8 +131,18 @@ export function App() {
       .catch(() => setTimeout(pollStatus, 1500));
   }
 
+  function retry() {
+    setError("");
+    setFailed(false);
+    setPhase("idle");
+    fetch("/retry", { method: "POST" })
+      .then(() => pollStatus())
+      .catch(() => pollStatus());
+  }
+
   async function submit() {
     setError("");
+    setFailed(false);
     try {
       const res = await fetch("/save", {
         method: "POST",
@@ -302,7 +337,30 @@ export function App() {
               </Card>
             )}
 
-            {step === "provisioning" && (
+            {step === "provisioning" && failed && (
+              <Card>
+                <Header
+                  title="Setup didn't finish"
+                  subtitle={`Something went wrong while ${(PHASES.find((p) => p.key === phase)?.label ?? "starting Airwave").toLowerCase()}.`}
+                />
+                <div className="mt-5 rounded-lg border border-destructive/40 bg-destructive/10 p-3">
+                  <p className="text-sm font-medium text-destructive">
+                    {PHASES.find((p) => p.key === phase)?.label ?? "Startup"} failed
+                  </p>
+                  {error && <p className="mt-1 break-words font-mono text-xs text-muted-foreground">{error}</p>}
+                </div>
+                <p className="mt-4 text-xs text-muted-foreground">
+                  The full log is at <span className="font-mono">Airwave/desktop.log</span> in your user-data folder. If this
+                  keeps happening, another Postgres may be using the data folder, or your antivirus may be blocking it.
+                </p>
+                <Footer>
+                  <span />
+                  <Button onClick={retry}>Try again</Button>
+                </Footer>
+              </Card>
+            )}
+
+            {step === "provisioning" && !failed && (
               <Card>
                 <Header title="Setting up Airwave" subtitle="Hang tight — the first run can take a few minutes." />
                 <Progress phase={phase} />

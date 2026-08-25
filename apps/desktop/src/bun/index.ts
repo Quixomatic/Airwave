@@ -101,7 +101,12 @@ const DEFAULT_CONFIG: Config = {
 
 // TODO: prefer Electrobun's `Paths` API for the per-OS user-data dir; this is a safe fallback.
 function userDataDir(): string {
-  const app = "Airwave";
+  // Dev (`pnpm -F desktop dev`) and the PACKAGED install must NOT share a data dir — they both default embedded
+  // Postgres to the same port + `pgdata`, so a running dev instance and the installed app fight over one data
+  // directory (→ `FATAL: pre-existing shared memory block is still in use`, a silent hang). Give dev its own
+  // `Airwave-Dev` tree so the two can run side-by-side on a developer's machine. Packaged stays `Airwave`
+  // (never rename it — that would orphan real users' data).
+  const app = PACKAGED ? "Airwave" : "Airwave-Dev";
   if (process.platform === "win32")
     return join(process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"), app);
   if (process.platform === "darwin") return join(homedir(), "Library", "Application Support", app);
@@ -491,6 +496,74 @@ let pg: EmbeddedPostgresLike | null = null;
 const servers: { stop(): void }[] = [];
 const children: Subprocess[] = [];
 
+/** True if a process with `pid` currently exists (signal 0 probes liveness without killing it). */
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    // ESRCH = no such process (dead). EPERM = it exists but we can't signal it (still alive).
+    return (err as NodeJS.ErrnoException)?.code === "EPERM";
+  }
+}
+
+/** Kill a process AND its descendants. Windows has no process groups, so TerminateProcess of a postmaster would
+ * orphan its backend children (leaving them attached to the shared-memory segment) — `taskkill /T` walks the tree
+ * while they're still children of the live postmaster. On POSIX, SIGTERM the postmaster (PG takes its children
+ * down), escalating to SIGKILL if it lingers. */
+async function killTree(pid: number): Promise<void> {
+  if (process.platform === "win32") {
+    await run(["taskkill", "/PID", String(pid), "/T", "/F"], {});
+    await Bun.sleep(300);
+    return;
+  }
+  try {
+    process.kill(pid);
+  } catch {
+    /* already gone */
+  }
+  for (let i = 0; i < 40 && isAlive(pid); i++) await Bun.sleep(100); // up to 4s for a graceful exit
+  if (isAlive(pid)) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      /* ignore */
+    }
+    await Bun.sleep(300);
+  }
+}
+
+/** Reap a Postgres still attached to OUR `pgdata` before starting our own. A hard quit / crash leaves the
+ * embedded `postgres` running against `pgdata`; because our port-probe then picks a DIFFERENT free port,
+ * `pg.start()` would launch a SECOND postmaster on the same data dir and die with `FATAL: pre-existing shared
+ * memory block is still in use` (surfacing to the user as a silent hang on "starting the database"). The owning
+ * PID is in `postmaster.pid`'s first line — this is a single-instance app, so that postmaster is ours: stop it
+ * (whole tree) and clear the stale pid file so we start clean. Best-effort; never throws. */
+async function reapStalePostgres(): Promise<void> {
+  const pidFile = join(PG_DATA_DIR, "postmaster.pid");
+  if (!existsSync(pidFile)) return;
+  let pid = 0;
+  try {
+    pid = Number.parseInt(readFileSync(pidFile, "utf8").split("\n")[0]?.trim() ?? "", 10);
+  } catch {
+    /* unreadable — treat as stale */
+  }
+  if (Number.isInteger(pid) && pid > 0 && isAlive(pid)) {
+    console.warn(`[desktop] a leftover Postgres (pid ${pid}) is still attached to ${PG_DATA_DIR} — stopping it before start.`);
+    try {
+      await killTree(pid);
+    } catch (err) {
+      console.warn(`[desktop] could not stop leftover Postgres (pid ${pid}):`, errText(err));
+    }
+  }
+  // Remove the (now) stale pid file so Postgres doesn't refuse to start on a dead-owner file.
+  try {
+    rmSync(pidFile, { force: true });
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Start embedded Postgres (or skip if an external DATABASE_URL is configured); returns the DATABASE_URL. */
 async function startPostgres(): Promise<string> {
   if (config.databaseUrl) {
@@ -499,6 +572,7 @@ async function startPostgres(): Promise<string> {
   }
   setPhase("database");
   mkdirSync(DATA_DIR, { recursive: true });
+  await reapStalePostgres(); // clear any orphaned postmaster on our pgdata (crash / hard-quit leftover)
   const EmbeddedPostgres = await loadEmbeddedPostgres();
   pg = new EmbeddedPostgres({
     databaseDir: PG_DATA_DIR,
@@ -510,11 +584,17 @@ async function startPostgres(): Promise<string> {
     // (e.g. `Ō`) fails to insert — "no equivalent in encoding WIN1252". Force a UTF8 cluster (C collation).
     initdbFlags: ["--encoding=UTF8", "--locale=C"],
   });
-  if (!existsSync(join(PG_DATA_DIR, "PG_VERSION"))) {
-    console.log("[desktop] initialising embedded Postgres…");
-    await pg.initialise();
+  try {
+    if (!existsSync(join(PG_DATA_DIR, "PG_VERSION"))) {
+      console.log("[desktop] initialising embedded Postgres…");
+      await pg.initialise();
+    }
+    await pg.start();
+  } catch (err) {
+    // embedded-postgres can reject with a bare object (→ the useless `{}` we used to log). Wrap it so the boot
+    // catch surfaces an actionable message (which port / data dir) to the setup UI instead of a blank hang.
+    throw new Error(`embedded Postgres failed to start (port ${config.ports.pg}, data ${PG_DATA_DIR}): ${errText(err)}`);
   }
-  await pg.start();
   try {
     await pg.createDatabase("channelguide");
   } catch {
@@ -818,15 +898,32 @@ let stackState: "idle" | "starting" | "up" = "idle";
 // Granular provisioning phase for the onboarding UI's progress bar (surfaced via /status).
 // Ordered keys: building-server → building-admin → building-tvweb → database → migrating → server → ready.
 let stackPhase = "idle";
+// The last boot failure, surfaced to the onboarding UI via /status so it shows an actionable error + Retry
+// instead of polling forever on the phase it died in. Cleared when a new start attempt begins.
+let phaseError: string | null = null;
 function setPhase(p: string): void {
   stackPhase = p;
   console.log(`[desktop] phase: ${p}`);
+}
+/** Extract a human message from an unknown throw — embedded-postgres (and others) can reject with a bare object
+ * that would otherwise stringify to a useless `{}`. */
+function errText(err: unknown): string {
+  if (err instanceof Error) return err.message || err.name || "Error";
+  if (typeof err === "string") return err;
+  try {
+    const s = JSON.stringify(err);
+    if (s && s !== "{}" && s !== "null") return s;
+  } catch {
+    /* not serialisable */
+  }
+  return String(err);
 }
 /** Start the supervised stack once; safe to call repeatedly. Returns whether the stack is up. */
 async function ensureStackUp(): Promise<boolean> {
   if (stackState === "up") return true;
   if (stackState === "starting") return false;
   stackState = "starting";
+  phaseError = null; // a fresh attempt clears any prior failure
   try {
     await startStack();
     stackState = "up";
@@ -834,7 +931,9 @@ async function ensureStackUp(): Promise<boolean> {
     return true;
   } catch (err) {
     stackState = "idle";
-    console.error("[desktop] failed to start the stack:", err);
+    phaseError = errText(err);
+    // Record which phase we died in so the log (and the UI, via /status) pinpoint it — no more blank `{}`.
+    console.error(`[desktop] failed to start the stack (phase=${stackPhase}): ${phaseError}`);
     return false;
   }
 }
@@ -921,9 +1020,17 @@ function startSetupServer(): void {
           state: attach ? "attached" : stackState,
           phase: up ? "ready" : stackPhase,
           up,
+          error: up ? null : phaseError, // set → the boot failed at `phase`; the UI shows it + a Retry button
           adminUrl: adminUrl(),
           media: mediaProgress, // {state, downloaded, total} — the onboarding UI shows a capability-media step
         });
+      }
+
+      // Retry a failed provisioning run (the setup UI's "Try again" after a /status error). Config is already
+      // saved by this point, so just kick the stack again — ensureStackUp clears the prior error.
+      if (req.method === "POST" && url.pathname === "/retry") {
+        if (!attach && stackState !== "up") void ensureStackUp();
+        return Response.json({ ok: true });
       }
 
       // Static: serve the built onboarding/settings UI (@airwave/desktop-setup) with SPA fallback.
@@ -1014,6 +1121,12 @@ function setupHtml(): string {
   function poll(){
     fetch('/status').then(function(r){return r.json();}).then(function(j){
       if(j.up){st.textContent='Ready — opening the admin…';setTimeout(function(){location.href=j.adminUrl;},700);return;}
+      if(j.error){
+        st.className='err';
+        st.textContent='Setup failed at "'+(j.phase||'startup')+'": '+j.error+' — check the log, then retry.';
+        var b=document.getElementById('save');if(b){b.disabled=false;b.textContent='Try again';}
+        return;
+      }
       setTimeout(poll,2000);
     }).catch(function(){setTimeout(poll,2000);});
   }
@@ -1149,7 +1262,13 @@ if (attach) {
   await openSetupWindow();
 } else {
   console.log("[desktop] supervising the full Airwave stack (embedded PG + server + admin + tv-web).");
+  // Already configured — auto-start. ensureStackUp re-runs the stale-Postgres reap, so a crash/hard-quit leftover
+  // self-heals here. If it STILL fails, don't die silently in the tray: open the window so the error + Retry show.
   if (await ensureStackUp()) onStackReady();
+  else {
+    console.warn("[desktop] stack failed to start on launch — opening the window to surface the error.");
+    await openSetupWindow();
+  }
 }
 
 console.log(`[desktop] supervisor up. data=${DATA_DIR} attach=${attach} admin=${adminUrl()} setup=${setupUrl()}`);
