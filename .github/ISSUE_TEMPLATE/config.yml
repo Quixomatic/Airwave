@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Docs & setup guides
+    url: https://getairwave.tv/docs
+    about: "Setup, self-hosting, and platform guides — check here first for how-to questions."
+  - name: 💬 Questions & help
+    url: https://github.com/Quixomatic/Airwave/discussions
+    about: "For usage questions and general discussion (open a bug report only for actual bugs)."

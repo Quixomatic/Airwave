@@ -1,0 +1,112 @@
+name: "🐞 Bug report"
+description: "Something isn't working — a crash, wrong behavior, or an error."
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! A few structured questions so we can pinpoint it fast.
+        Airwave has **two halves** — the **server** (the admin + backend, run via Docker or the desktop app) and
+        the **clients** (the TV / player apps). Please tell us which one, and how you installed it.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of Airwave?
+      description: The server hosts channels + the admin; a client is a TV/player app that connects to it.
+      options:
+        - "Server (admin + backend)"
+        - "Client (a TV or player app)"
+        - "Both / not sure"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How is it installed / which platform?
+      description: Pick the exact build you're using. This is the single most useful field.
+      options:
+        - "Server — Docker / self-host image (ghcr.io/quixomatic/airwave)"
+        - "Server — Desktop app, Windows"
+        - "Server — Desktop app, macOS (Apple Silicon / M-series)"
+        - "Server — Desktop app, macOS (Intel)"
+        - "Server — Desktop app, Linux"
+        - "Client — Apple TV (App Store)"
+        - "Client — iPhone / iPad (App Store)"
+        - "Client — Android TV / Google TV (Google Play)"
+        - "Client — Fire TV (Amazon Appstore)"
+        - "Client — LG webOS (sideloaded)"
+        - "Client — Roku"
+        - "Client — TV web player (in a browser)"
+        - "Client — Desktop viewer app (tv-tauri)"
+        - "Other / not sure"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Airwave version
+      description: >
+        e.g. `0.12.11`. Server desktop app: tray → About, or the installer filename. Docker: the image tag you
+        pulled. Native TV apps: the app's Settings/About screen. If unsure, say so.
+      placeholder: "0.12.11"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What went wrong, and what you expected instead.
+      placeholder: "When I open a channel it shows a black screen instead of playing…"
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact steps so we can hit it too.
+      placeholder: |
+        1. Go to '…'
+        2. Click '…'
+        3. See the error
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / error output
+      description: |
+        Paste any error text or logs — this speeds things up enormously. Where to find them:
+        - **Desktop app (Windows):** `%APPDATA%\Airwave\desktop.log`
+        - **Desktop app (macOS):** `~/Library/Application Support/Airwave/desktop.log`
+        - **Desktop app (Linux):** `~/.config/Airwave/desktop.log`
+        - **Docker:** `docker logs <container>` (or `docker compose logs`)
+        - **TV web player / browser:** the browser DevTools Console (F12 → Console)
+        - **Native TV apps:** describe the on-screen error / symptom (logs aren't easily accessible)
+      render: shell
+    validations:
+      required: false
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS + version, your Plex Media Server version, and the device/model if it's a TV app.
+      placeholder: "macOS 15.5 · Plex 1.41 · LG C2 (webOS 9)"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and didn't find a duplicate.
+          required: true
+        - label: I'm on the latest version I can install for my platform (or noted why not above).
+          required: false

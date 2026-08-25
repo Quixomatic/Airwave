@@ -1,0 +1,36 @@
+name: "✨ Feature request"
+description: "Suggest an idea or improvement."
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: "Thanks for the idea! Keep it focused on one thing so it's easy to discuss."
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of Airwave is this for?
+      options:
+        - "Server / admin (channels, scheduling, AI lineup, imports)"
+        - "A TV / player client (Apple TV, Fire TV, Android TV, Roku, webOS, browser)"
+        - "Desktop server app (Windows / macOS / Linux)"
+        - "Docs / website (getairwave.tv)"
+        - "Other / not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: The use case or frustration behind the request. "I'm always trying to X and Y gets in the way…"
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to see?
+      description: Your proposed solution, and any alternatives you've considered.
+    validations:
+      required: false
