@@ -83,6 +83,8 @@ export default {
     exitOnLastWindowClosed: false,
   },
   build: {
+    // v2: the main process runtime is explicit. We're a Bun supervisor (no Cottontail).
+    mainProcess: "bun",
     bun: {
       entrypoint: "src/bun/index.ts",
     },
