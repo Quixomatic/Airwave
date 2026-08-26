@@ -45,7 +45,7 @@ jobs:
           else
             TAG="${{ github.event.inputs.tag }}"
             [ -z "$TAG" ] && TAG="$(gh release view -R "$REPO" --json tagName -q .tagName)"
-            echo "Downloading arm64 DMG from release $TAG…"
+            echo "Downloading arm64 DMG from release ${TAG}"
             gh release download "$TAG" -R "$REPO" --pattern '*macos-arm64.dmg' -D dmg
           fi
           ls -la dmg/
