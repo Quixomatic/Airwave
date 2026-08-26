@@ -10,6 +10,7 @@ import { getFilterValues } from "../services/plex/client";
 import { FILTER_FIELDS, OPS_FOR_KIND, fieldMeta } from "../services/plex/filter-fields";
 import { resolveChannel } from "../services/plex/resolve";
 import { decryptToken } from "../services/plex/token";
+import { getSourceReadiness, notReadyReason } from "../services/sources/readiness";
 import { previewItems } from "../services/agent/tools";
 import { SORT_FIELDS } from "../services/plex/sort-fields";
 import { normalizeCallsign } from "../services/generator/callsign";
@@ -258,27 +259,14 @@ export const channelsRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Gate creation on source readiness (also enforced in the UI): a channel can only be built
-      // from a source that's CONNECTED to a media server and has had a metadata SYNC run — without
-      // synced media there's nothing to resolve, filter, or schedule against.
-      const source = await ctx.prisma.mediaSource.findUnique({
-        where: { id: input.mediaSourceId },
-        select: { enabled: true, baseUrl: true, _count: { select: { mediaItems: true } } },
-      });
-      if (!source) {
+      // Gate creation on source readiness — the ONE shared check (services/sources/readiness): a channel
+      // can only be built from a CONNECTED source whose metadata SYNC has COMPLETED (syncStatus="synced").
+      const readiness = await getSourceReadiness(ctx.prisma, input.mediaSourceId);
+      if (!readiness) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Media source not found." });
       }
-      if (!source.enabled || !source.baseUrl) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "This media source isn't connected to a media server. Connect it before creating channels.",
-        });
-      }
-      if (source._count.mediaItems === 0) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "Run a metadata sync on this source before creating channels — there's no synced media to build from yet.",
-        });
+      if (!readiness.ready) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: notReadyReason(readiness.fields, "create channels")! });
       }
 
       const number =

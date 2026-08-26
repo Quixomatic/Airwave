@@ -9,7 +9,7 @@ import {
 } from "@airwave/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Plus, Server as ServerIcon } from "lucide-react";
+import { Loader2, Plus, Server as ServerIcon } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { TopHeaderRight } from "@/context/header-provider";
@@ -72,13 +72,22 @@ function SourcesList() {
                       <Badge variant="outline" className="border-red-500/30 text-red-600">
                         Disconnected
                       </Badge>
-                    ) : !s.synced ? (
-                      <Badge variant="outline" className="border-amber-500/30 text-amber-600">
-                        Not synced
+                    ) : s.syncing ? (
+                      <Badge variant="outline" className="border-sky-500/30 text-sky-600">
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        Syncing
                       </Badge>
-                    ) : (
+                    ) : s.synced ? (
                       <Badge variant="outline" className="border-emerald-500/30 text-emerald-600">
                         Ready
+                      </Badge>
+                    ) : s.failed ? (
+                      <Badge variant="outline" className="border-red-500/30 text-red-600">
+                        Sync failed
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-amber-500/30 text-amber-600">
+                        Not synced
                       </Badge>
                     )}
                     <span className="text-muted-foreground text-xs uppercase">{s.type}</span>

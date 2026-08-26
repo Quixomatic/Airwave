@@ -77,45 +77,82 @@ export async function syncMediaItems(
   const token = decryptToken(source.token);
   const scanStart = new Date();
 
-  let shows = 0;
-  let items = 0;
-  for (const lib of source.libraries) {
-    onProgress?.({ current: 0, total: 0, label: `Fetching ${lib.title}…` });
-    if (lib.type === "show") {
-      const showItems = await getAllSectionItems(baseUrl, token, lib.key, 2);
-      const showIds = await upsertShows(prisma, source.id, showItems);
-      shows += showItems.length;
-
-      const episodes = await getAllSectionItems(baseUrl, token, lib.key, 4);
-      await upsertMany(
-        prisma,
-        source.id,
-        episodes.map((item) => ({
-          item,
-          parentId: item.guide.showRatingKey
-            ? (showIds.get(item.guide.showRatingKey) ?? null)
-            : null,
-        })),
-        (done, total) => onProgress?.({ current: done, total, label: lib.title }),
-      );
-      items += episodes.length;
-    } else {
-      const movies = await getAllSectionItems(baseUrl, token, lib.key, 1);
-      await upsertMany(
-        prisma,
-        source.id,
-        movies.map((item) => ({ item, parentId: null })),
-        (done, total) => onProgress?.({ current: done, total, label: lib.title }),
-      );
-      items += movies.length;
-    }
+  // Per-source sync state — the HONEST "ready" signal (drives the gate, the source badge, and the
+  // onboarding spinner). Set here so it's correct no matter who triggered the sync (scheduled job,
+  // manual run, or on-connect). NOTE: the 5-min recently-added scan calls a DIFFERENT function
+  // (syncRecentlyAdded) and deliberately never touches this, so a partial scan can't fake "synced".
+  //
+  // CRUCIAL: only show "syncing" for the FIRST sync (never/failed → syncing → synced). The metadata-sync
+  // job re-runs nightly; a routine re-sync of an ALREADY-synced source must NOT regress it to "syncing" —
+  // that would drop it out of "ready" and block channel creation during every refresh. It stays "synced"
+  // throughout; live re-sync progress is surfaced separately via the job's own progress on the source page.
+  const firstSync = source.syncStatus !== "synced";
+  if (firstSync) {
+    await prisma.mediaSource.update({
+      where: { id: source.id },
+      data: { syncStatus: "syncing", lastSyncError: null },
+    });
   }
 
-  // Removal detection: anything not refreshed this pass is gone from the server.
-  const { count: removed } = await prisma.mediaItem.updateMany({
-    where: { mediaSourceId: source.id, available: true, lastSyncedAt: { lt: scanStart } },
-    data: { available: false },
-  });
+  try {
+    let shows = 0;
+    let items = 0;
+    for (const lib of source.libraries) {
+      onProgress?.({ current: 0, total: 0, label: `Fetching ${lib.title}…` });
+      if (lib.type === "show") {
+        const showItems = await getAllSectionItems(baseUrl, token, lib.key, 2);
+        const showIds = await upsertShows(prisma, source.id, showItems);
+        shows += showItems.length;
 
-  return { libraries: source.libraries.length, shows, items, removed };
+        const episodes = await getAllSectionItems(baseUrl, token, lib.key, 4);
+        await upsertMany(
+          prisma,
+          source.id,
+          episodes.map((item) => ({
+            item,
+            parentId: item.guide.showRatingKey
+              ? (showIds.get(item.guide.showRatingKey) ?? null)
+              : null,
+          })),
+          (done, total) => onProgress?.({ current: done, total, label: lib.title }),
+        );
+        items += episodes.length;
+      } else {
+        const movies = await getAllSectionItems(baseUrl, token, lib.key, 1);
+        await upsertMany(
+          prisma,
+          source.id,
+          movies.map((item) => ({ item, parentId: null })),
+          (done, total) => onProgress?.({ current: done, total, label: lib.title }),
+        );
+        items += movies.length;
+      }
+    }
+
+    // Removal detection: anything not refreshed this pass is gone from the server.
+    const { count: removed } = await prisma.mediaItem.updateMany({
+      where: { mediaSourceId: source.id, available: true, lastSyncedAt: { lt: scanStart } },
+      data: { available: false },
+    });
+
+    // A full sync COMPLETED — this is the only place that marks a source "synced".
+    await prisma.mediaSource.update({
+      where: { id: source.id },
+      data: { syncStatus: "synced", lastSyncedAt: new Date(), lastSyncError: null },
+    });
+
+    return { libraries: source.libraries.length, shows, items, removed };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    // Only regress to "failed" if this was the FIRST sync (there's genuinely no usable media yet). A failed
+    // RE-sync of an already-synced source keeps its "synced" state (the previously-cached media is still
+    // there, so it stays "ready") but records the error so the UI can surface a warning.
+    await prisma.mediaSource
+      .update({
+        where: { id: source.id },
+        data: { syncStatus: firstSync ? "failed" : "synced", lastSyncError: message.slice(0, 500) },
+      })
+      .catch(() => {});
+    throw err;
+  }
 }

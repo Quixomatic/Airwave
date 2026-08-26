@@ -5,6 +5,7 @@ import { bumpersRouter } from "./bumpers";
 import { channelsRouter } from "./channels";
 import { generatorRouter } from "./generator";
 import { jobsRouter } from "./jobs";
+import { onboardingRouter } from "./onboarding";
 import { packagesRouter } from "./packages";
 import { playbackRouter } from "./playback";
 import { plexRouter } from "./plex";
@@ -28,6 +29,7 @@ export const appRouter = router({
   channels: channelsRouter,
   generator: generatorRouter,
   jobs: jobsRouter,
+  onboarding: onboardingRouter,
   packages: packagesRouter,
   playback: playbackRouter,
   plex: plexRouter,

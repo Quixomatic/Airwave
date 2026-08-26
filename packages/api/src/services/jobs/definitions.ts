@@ -9,6 +9,7 @@ import { getGlobalBumperConfig } from "../bumpers/bumper-config";
 import { generateLineup } from "../generator/generate";
 import { syncMediaItems } from "../media/sync-media";
 import { syncRecentlyAdded } from "../media/sync-recent";
+import { firstReadySource } from "../sources/readiness";
 import { getPlexUser, resolveConnectionUrls, stopTranscode } from "../plex/client";
 import { syncLibraries } from "../plex/sync-libraries";
 import { decryptToken, withDecryptedToken } from "../plex/token";
@@ -256,8 +257,10 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
       const runner = getLineupRunner();
       if (!runner) throw new Error("Workflow engine isn't running — set WORKFLOW_ENABLED=1 and restart the server.");
 
-      const source = (await enabledSources())[0];
-      if (!source) throw new Error("No enabled media source.");
+      // A lineup can only be built from a source whose metadata sync has COMPLETED (the shared readiness
+      // check — previously this only required "any enabled source", so it could run against unsynced media).
+      const source = await firstReadySource(prisma);
+      if (!source) throw new Error("Connect a media source and let its metadata sync finish before building an AI lineup.");
 
       // AI must be configured — planner + worker fall back to the chat connection, so at least one
       // connection has to resolve for both, else the run would fail mid-plan.

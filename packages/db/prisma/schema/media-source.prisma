@@ -24,6 +24,18 @@ model MediaSource {
   enabled           Boolean         @default(true)
   isDefault         Boolean         @default(false)
 
+  // Metadata-sync state (the HONEST "is this source ready" signal, replacing the old
+  // "mediaItems > 0" heuristic — which was true mid-sync or after a partial 5-min scan).
+  // Set by syncMediaItems() around every run (scheduled job, manual, or on-connect), so it
+  // reflects a COMPLETED full sync. The 5-min recently-added scan leaves it untouched.
+  //   never   — connected but a full metadata sync has never completed
+  //   syncing — a full sync is currently running
+  //   synced  — a full sync completed successfully (source is "ready")
+  //   failed  — the last full sync errored (see lastSyncError)
+  syncStatus    String    @default("never")
+  lastSyncedAt  DateTime? // when a full sync last COMPLETED successfully
+  lastSyncError String?   // message from the last failed sync (null when synced/never)
+
   ownerUserId String?
   owner       User?   @relation("MediaSourceOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
 

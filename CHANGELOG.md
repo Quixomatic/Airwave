@@ -2,6 +2,33 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.15] - 2026-08-26
+
+Admin — an onboarding checklist, honest per-source sync state, and one consistent "source ready" gate.
+
+### Added
+- **"Get set up" onboarding checklist** in the admin sidebar: a collapsible card with a donut progress ring
+  and five steps (Connect a source → Sync media metadata → Create your first channel → Create your first
+  package → Import Plex users). The sync step shows a **live spinner** while a first sync runs. Progress is
+  computed live from the data (no stored state) and the card stays visible — celebrating "You're all set!" at
+  5/5 — until dismissed with the **Hide** button (persisted locally). New `onboarding.status` endpoint.
+- A subtle Airwave mark + version in the sidebar footer, linking to the repo.
+
+### Fixed / Changed
+- **Honest per-source sync state.** New `MediaSource.syncStatus` (`never | syncing | synced | failed`) +
+  `lastSyncedAt` / `lastSyncError`, set by `syncMediaItems` around every sync. Previously "synced" meant
+  "has ≥1 cached media item" — which was true mid-sync or after a partial 5-minute scan, so channel creation
+  could open before a full sync had ever finished. A nightly re-sync of an already-synced source keeps it
+  "synced" (the gate never regresses during routine refreshes). Migration backfills existing synced sources.
+- **One shared readiness gate.** Channel creation, `sources.list`, channel import, and the AI lineup (both the
+  job and the tRPC entry) now all gate through a single `sourceReadiness` helper — "ready" means one honest
+  thing everywhere (connected + a completed sync), replacing three subtly different ad-hoc checks (the AI
+  lineup previously only required "any enabled source").
+- **Auto-sync on connect.** Connecting a source now kicks off a full metadata sync automatically, so it flows
+  never → syncing → synced without hunting for a button.
+- **Honest sync-status badges** on the sources list *and* the source detail page: Disconnected / Syncing
+  (spinner) / Ready / Sync failed / Not synced.
+
 ## [0.12.14] - 2026-08-26
 
 Desktop CI — fix the **macOS Intel** installer failing to build (`hdiutil: No space left on device`).

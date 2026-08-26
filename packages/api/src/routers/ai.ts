@@ -15,6 +15,8 @@ import { deleteConversation, getConversationMessages, listConversations } from "
 import { listLineupRunSteps, listLineupRuns } from "../services/agent/lineup-runs";
 import { isLineupRunnerAvailable, requireLineupRunner } from "../services/agent/lineup-runner";
 import { listRunTraces, summarizeRunUsage } from "../services/agent/lineup-trace";
+import { getSourceReadiness, notReadyReason } from "../services/sources/readiness";
+import { TRPCError } from "@trpc/server";
 
 const connectionInput = z.object({
   name: z.string().min(1),
@@ -76,9 +78,18 @@ export const aiRouter = router({
         limit: z.number().int().positive().optional(),
       }),
     )
-    .mutation(({ ctx, input }) =>
-      requireLineupRunner().start({ ...input, userId: ctx.session.user.id }),
-    ),
+    .mutation(async ({ ctx, input }) => {
+      // Same shared gate as channel creation: the lineup builds channels, so the target source must be
+      // connected + fully synced. (Backstops the source-agnostic ai-lineup-build job's own check.)
+      const readiness = await getSourceReadiness(ctx.prisma, input.sourceId);
+      if (!readiness?.ready) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: readiness ? notReadyReason(readiness.fields, "build an AI lineup")! : "Media source not found.",
+        });
+      }
+      return requireLineupRunner().start({ ...input, userId: ctx.session.user.id });
+    }),
 
   /** Recent AI lineup runs for the observability page (metadata + step counts). */
   lineupRuns: adminProcedure

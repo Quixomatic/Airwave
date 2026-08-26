@@ -1,3 +1,4 @@
+import { Badge } from "@airwave/ui/components/badge";
 import { Button } from "@airwave/ui/components/button";
 import { Card } from "@airwave/ui/components/card";
 import {
@@ -103,12 +104,42 @@ function SourceDetail() {
     return <div className="text-muted-foreground mx-auto max-w-3xl text-sm">Loading…</div>;
   }
 
+  const src = source.data;
+  // `syncing` (from the live metadata-sync job) covers a re-sync of an already-synced source too, since its
+  // persisted syncStatus stays "synced" during routine refreshes.
+  const isSyncing = syncing || src.syncing;
+  const statusBadge = !src.connected ? (
+    <Badge variant="outline" className="border-red-500/30 text-red-600">
+      Disconnected
+    </Badge>
+  ) : isSyncing ? (
+    <Badge variant="outline" className="border-sky-500/30 text-sky-600">
+      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+      Syncing
+    </Badge>
+  ) : src.synced ? (
+    <Badge variant="outline" className="border-emerald-500/30 text-emerald-600">
+      Ready
+    </Badge>
+  ) : src.failed ? (
+    <Badge variant="outline" className="border-red-500/30 text-red-600">
+      Sync failed
+    </Badge>
+  ) : (
+    <Badge variant="outline" className="border-amber-500/30 text-amber-600">
+      Not synced
+    </Badge>
+  );
+
   return (
     <div className="space-y-6">
       <Frame>
-        <FrameHeader>
-          <FrameTitle>Connection</FrameTitle>
-          <FrameDescription>How this media server is labelled and reached.</FrameDescription>
+        <FrameHeader className="flex-row items-start justify-between">
+          <div>
+            <FrameTitle>Connection</FrameTitle>
+            <FrameDescription>How this media server is labelled and reached.</FrameDescription>
+          </div>
+          {statusBadge}
         </FrameHeader>
         <FramePanel className="space-y-4">
           <div className="space-y-2">

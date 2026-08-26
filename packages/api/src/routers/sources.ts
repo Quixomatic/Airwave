@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
 import { syncLibraries } from "../services/plex/sync-libraries";
+import { sourceReadiness } from "../services/sources/readiness";
 
 export const sourcesRouter = router({
   list: adminProcedure.query(async ({ ctx }) => {
@@ -15,16 +16,20 @@ export const sourcesRouter = router({
         baseUrl: true,
         machineIdentifier: true,
         enabled: true,
+        syncStatus: true,
+        lastSyncedAt: true,
+        lastSyncError: true,
         _count: { select: { mediaItems: true } },
       },
     });
-    // Derive readiness for channel creation: a source is usable only once it's CONNECTED (enabled +
-    // a resolved baseUrl) and SYNCED (its metadata cache has at least one item to build from).
-    return sources.map(({ _count, ...s }) => {
-      const connected = s.enabled && s.baseUrl != null;
-      const synced = _count.mediaItems > 0;
-      return { ...s, itemCount: _count.mediaItems, connected, synced, ready: connected && synced };
-    });
+    // Derive readiness from the ONE shared helper: CONNECTED (enabled + resolved baseUrl) and SYNCED
+    // (a full metadata sync has COMPLETED — syncStatus, not a raw item count). Exposes connected /
+    // syncing / synced / failed / ready so the UI can show the right badge + a live "syncing" spinner.
+    return sources.map(({ _count, ...s }) => ({
+      ...s,
+      itemCount: _count.mediaItems,
+      ...sourceReadiness(s),
+    }));
   }),
 
   get: adminProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
@@ -38,6 +43,9 @@ export const sourcesRouter = router({
         machineIdentifier: true,
         webAppUrl: true,
         enabled: true,
+        syncStatus: true,
+        lastSyncedAt: true,
+        lastSyncError: true,
         libraries: {
           orderBy: { title: "asc" },
           select: {
@@ -52,7 +60,8 @@ export const sourcesRouter = router({
       },
     });
     if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "Source not found." });
-    return source;
+    // Same derived readiness as `list` so the detail page shows the honest status badge.
+    return { ...source, ...sourceReadiness(source) };
   }),
 
   updateLabel: adminProcedure

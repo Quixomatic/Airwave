@@ -6,6 +6,7 @@ import { type ResolveSource, resolveFilter } from "../plex/resolve";
 import { channelSortParam } from "../plex/sort-fields";
 import { decryptToken } from "../plex/token";
 import { INITIAL_WINDOW_SECONDS, generateChannelSchedule } from "../schedule/generate";
+import { sourceReadiness } from "../sources/readiness";
 import { LINEUP_EXPORT_VERSION } from "./export";
 
 /**
@@ -216,7 +217,7 @@ export async function previewImport(
 ): Promise<ImportPreview> {
   const source = await prisma.mediaSource.findUnique({
     where: { id: targetSourceId },
-    select: { id: true, name: true, enabled: true, baseUrl: true, _count: { select: { mediaItems: true } } },
+    select: { id: true, name: true, enabled: true, baseUrl: true, syncStatus: true, _count: { select: { mediaItems: true } } },
   });
   const [existingNumbers, existingKeys, libraries, existingSignatures] = await Promise.all([
     prisma.channel.findMany({ select: { number: true } }),
@@ -270,7 +271,7 @@ export async function previewImport(
   return {
     version: data.version,
     supported: data.version === LINEUP_EXPORT_VERSION,
-    source: source ? { id: source.id, name: source.name, ready: source.enabled && !!source.baseUrl && source._count.mediaItems > 0 } : null,
+    source: source ? { id: source.id, name: source.name, ready: sourceReadiness(source).ready } : null,
     packages,
     ungrouped,
     totals: { packages: data.packages.length, channels: data.channels.length, duplicates },

@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
+import { runJob } from "../services/jobs/scheduler";
 import * as plex from "../services/plex/client";
 import { importPlexUsers } from "../services/plex/import-users";
 import { syncLibraries } from "../services/plex/sync-libraries";
@@ -70,6 +71,11 @@ export const plexRouter = router({
         ? await ctx.prisma.mediaSource.update({ where: { id: existing.id }, data })
         : await ctx.prisma.mediaSource.create({ data });
       await syncLibraries(ctx.prisma, source);
+      // Auto-start a full metadata sync in the background so a freshly connected source flows
+      // never → syncing → synced on its own (the source page + onboarding checklist show the spinner
+      // live). Fire-and-forget: runJob no-ops if the sync is already running, and it syncs every
+      // enabled source — including the one we just added — through the normal job path.
+      void runJob("metadata-sync");
       return { id: source.id, name: source.name };
     }),
 
