@@ -1,0 +1,133 @@
+name: Desktop Smoke Test (macOS Apple Silicon)
+
+# Install-tests the arm64 desktop SERVER DMG on a REAL Apple Silicon runner (macos-14 = M1). Answers the two
+# questions we can't test on an Intel dev machine:
+#   1. Does Gatekeeper accept it? (the reporter's "the application cannot be installed") — via `spctl` assessment.
+#   2. Does embedded Postgres actually START on Apple Silicon? (Apple Silicon refuses to run unsigned executables,
+#      and v2 packs pg compressed inside a self-extractor, so the extracted pg might be unsigned → "Killed: 9").
+#
+# It downloads a built DMG (from a release tag OR a desktop-release run's artifact), mounts it, assesses it, copies
+# it to /Applications, SEEDS a `configured` state so the supervisor boots the stack headlessly (no onboarding UI),
+# launches it, and captures desktop.log. Manual-only; nothing here touches the build/release pipeline.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to test (blank = latest release). Ignored if run_id is set."
+        type: string
+        default: ""
+      run_id:
+        description: "Optional: a desktop-release run ID to pull the arm64 artifact from instead of a release."
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  smoke:
+    runs-on: macos-14 # Apple Silicon (M1)
+    env:
+      REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      APP_SUPPORT: /Users/runner/Library/Application Support/Airwave
+    steps:
+      - name: Fetch the arm64 DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dmg
+          if [ -n "${{ github.event.inputs.run_id }}" ]; then
+            echo "Downloading artifact from run ${{ github.event.inputs.run_id }}…"
+            gh run download "${{ github.event.inputs.run_id }}" -R "$REPO" -n airwave-desktop-macos-14-arm64 -D dmg
+          else
+            TAG="${{ github.event.inputs.tag }}"
+            [ -z "$TAG" ] && TAG="$(gh release view -R "$REPO" --json tagName -q .tagName)"
+            echo "Downloading arm64 DMG from release $TAG…"
+            gh release download "$TAG" -R "$REPO" --pattern '*macos-arm64.dmg' -D dmg
+          fi
+          ls -la dmg/
+          echo "DMG=$(ls dmg/*.dmg | head -1)" >> "$GITHUB_ENV"
+
+      - name: Gatekeeper assessment + mount (the "cannot be installed" check)
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "== DMG file =="; ls -la "$DMG"
+          # A stapled notarization ticket lets spctl accept OFFLINE. Assess the DMG, then the .app inside.
+          echo "== spctl assess DMG (type open) =="
+          spctl -a -vvv -t open --context context:primary-signature "$DMG" 2>&1 || echo "(spctl DMG assessment returned non-zero)"
+          hdiutil attach "$DMG" -nobrowse -mountpoint /Volumes/AirwaveTest
+          APP="/Volumes/AirwaveTest/Airwave.app"
+          echo "== spctl assess app (type exec) — this is the Gatekeeper 'can it open/install' verdict =="
+          spctl -a -vvv -t exec "$APP" 2>&1 || echo "(spctl app assessment returned non-zero → would be BLOCKED)"
+          echo "== codesign verify =="
+          codesign --verify --deep --strict --verbose=2 "$APP" 2>&1 || echo "(codesign verify FAILED)"
+          echo "== stapled ticket? =="
+          xcrun stapler validate "$APP" 2>&1 || echo "(no stapled ticket on the .app — DMG may still be stapled)"
+
+      - name: Install (copy to /Applications) + seed a configured state
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "/Applications/Airwave.app"
+          cp -R "/Volumes/AirwaveTest/Airwave.app" "/Applications/Airwave.app"
+          echo "Installed to /Applications/Airwave.app"
+          # Seed onboarding-complete config so the supervisor boots the stack headlessly (no setup window needed).
+          mkdir -p "$APP_SUPPORT"
+          printf '%s' '{ "configured": true, "expose": false, "workflowEnabled": false, "tvwebEnabled": false, "autoStart": true, "ports": { "server": 36020, "admin": 36021, "tvweb": 36022, "pg": 54329, "setup": 36029 } }' > "$APP_SUPPORT/airwave-desktop.json"
+          printf '%s' '{ "email": "ci@example.com", "password": "citestpassword" }' > "$APP_SUPPORT/admin-credentials.json"
+          rm -f "$APP_SUPPORT/desktop.log"
+
+      - name: Launch + watch for Postgres / stack boot
+        shell: bash
+        run: |
+          set -uo pipefail
+          LOG="$APP_SUPPORT/desktop.log"
+          echo "Launching Airwave.app…"
+          open "/Applications/Airwave.app" || "/Applications/Airwave.app/Contents/MacOS/launcher" &
+          RESULT="timeout"
+          for i in $(seq 1 60); do
+            if [ -f "$LOG" ]; then
+              if grep -qE "stack up|phase: ready|phase: server|phase: migrating" "$LOG"; then RESULT="pg-started"; break; fi
+              if grep -qiE "failed to start the stack|Killed: 9|code signature|invalid signature|cannot be executed|embedded Postgres failed" "$LOG"; then RESULT="failed"; break; fi
+            fi
+            sleep 3
+          done
+          echo "RESULT=$RESULT" >> "$GITHUB_ENV"
+          echo "== postgres processes =="; pgrep -fl postgres || echo "(no postgres process running)"
+
+      - name: Report
+        shell: bash
+        run: |
+          set -uo pipefail
+          LOG="$APP_SUPPORT/desktop.log"
+          echo "======================= desktop.log ======================="
+          [ -f "$LOG" ] && cat "$LOG" || echo "(no desktop.log was written — the app may not have launched)"
+          echo "==========================================================="
+          echo ""
+          case "${RESULT:-unknown}" in
+            pg-started) echo "✅ RESULT: the stack reached the database/migrate phase — embedded Postgres RUNS on Apple Silicon." ;;
+            failed)     echo "❌ RESULT: the stack FAILED to start (see log above — look for 'Killed: 9' / signature errors = unsigned pg on Apple Silicon)." ;;
+            timeout)    echo "⚠️ RESULT: timed out with no clear success/failure — inspect the log (may be a headless-GUI issue, not necessarily pg)." ;;
+            *)          echo "⚠️ RESULT: unknown." ;;
+          esac
+
+      - name: Upload desktop.log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: airwave-smoke-desktop-log
+          path: /Users/runner/Library/Application Support/Airwave/desktop.log
+          if-no-files-found: warn
+
+      - name: Cleanup
+        if: always()
+        shell: bash
+        run: |
+          pkill -f Airwave.app 2>/dev/null || true
+          pkill -f "com.airwave" 2>/dev/null || true
+          pkill -f postgres 2>/dev/null || true
+          hdiutil detach /Volumes/AirwaveTest 2>/dev/null || true
