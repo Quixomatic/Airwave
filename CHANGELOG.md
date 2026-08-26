@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.16] - 2026-08-26
+
+Website — a public **Roadmap** on getairwave.tv with login-less upvoting, plus a dynamically generated
+sitemap so the whole site is crawlable.
+
+### Added
+- **Roadmap page (`/roadmap`)** — a public, ranked list of what's coming to Airwave, backed entirely by a
+  GitHub Project (no separate database). Visitors **upvote** the features they want with **no login required**;
+  the list is ranked by votes, highest first. Each row carries a Status badge (Planned / In Progress /
+  Exploring / Shipped). Voting is optimistic, and a row only changes rank on reload — it never jumps while
+  you're looking at it. Content is authored directly in the GitHub Project (draft items with a Description +
+  Status field), so there's no admin UI to maintain.
+- **Dynamic `sitemap.xml`** covering every marketing, docs, blog, and roadmap URL, generated from the fumadocs
+  content sources so newly added pages are crawlable automatically.
+- "Roadmap" links in the site header and footer.
+
+### How it works
+- Votes are stored as salted, hashed voter ids inside each roadmap item's body — a per-browser `rmv_id` cookie
+  plus IP, sha256'd — so there's no personal data and no backend database. All GitHub calls run server-side
+  through a `project`-scoped token the browser never sees, and a per-IP rate limit guards the vote endpoint.
+- Scoped entirely to `apps/site`; the API, database, and every other app are untouched.
+
 ## [0.12.15] - 2026-08-26
 
 Admin — an onboarding checklist, honest per-source sync state, and one consistent "source ready" gate.

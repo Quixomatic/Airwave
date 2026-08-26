@@ -23,6 +23,7 @@ export function baseOptions(context: "home" | "docs" = "home"): BaseLayoutProps 
       { text: "Documentation", url: "/docs", on },
       { text: "Features", url: "/features", on },
       { text: "Channel guide", url: "/channel-guide", on },
+      { text: "Roadmap", url: "/roadmap", on },
       { text: "FAQ", url: "/faq", on },
       {
         type: "menu",
