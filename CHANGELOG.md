@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.14] - 2026-08-26
+
+Desktop CI — fix the **macOS Intel** installer failing to build (`hdiutil: No space left on device`).
+
+### Fixed
+- The signed macOS DMG step failed on the Intel runner with `hdiutil: create failed - No space left on device`
+  even though the runner had ~110 GB free. `hdiutil create -srcfolder … -format ULFO` auto-sizes the temporary
+  volume it mounts to stage the bundle, and that estimate under-provisioned for our incompressible ~116 MB
+  `tar.zst` payload, so the copy into `/Volumes/Airwave` ran out of room (on the volume, not the disk) — borderline
+  enough that it tipped over on Intel. We now build an explicitly oversized read-write image (staging size +
+  400 MB) and `convert` it to the compressed ULFO we ship, so it no longer relies on hdiutil's estimate. Applies
+  to both Mac arches.
+- No app changes — this only unblocks the macOS Intel installer. The rest of 0.12.13 (including the
+  self-hosted / OpenAI-compatible model AI fix, GitHub #3) already shipped.
+
 ## [0.12.13] - 2026-08-26
 
 AI assistant on **self-hosted / OpenAI-compatible models** (LM Studio, Ollama, vLLM, OpenRouter) — fix the

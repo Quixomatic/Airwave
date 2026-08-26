@@ -209,7 +209,16 @@ mkdirSync(staging, { recursive: true });
 run("cp", ["-R", appPath, join(staging, "Airwave.app")]);
 symlinkSync("/Applications", join(staging, "Applications"));
 const dmg = join(outDir, `Airwave-Server-${version}-macos-${arch}.dmg`);
-run("hdiutil", ["create", "-volname", "Airwave", "-srcfolder", staging, "-ov", "-format", "ULFO", dmg]);
+// hdiutil's auto-sizing of a `-srcfolder` compressed image UNDER-provisions the temporary volume it mounts at
+// /Volumes/Airwave to populate — so copying the bundle in (esp. the incompressible ~116MB tar.zst + filesystem
+// overhead) fails with "No space left on device" ON THAT VOLUME even with 100+GB free on `/`. It's borderline, so
+// it tipped over on the Intel runner. Fix: don't trust the auto-size — build an EXPLICITLY oversized read-write
+// image (content size + generous headroom), then `convert` it to the compressed ULFO we actually ship.
+const stagingMb = Number.parseInt(run("du", ["-sm", staging], { capture: true }).trim().split(/\s+/)[0] ?? "", 10) || 300;
+const rwDmg = join(outDir, "airwave-rw.dmg");
+run("hdiutil", ["create", "-volname", "Airwave", "-srcfolder", staging, "-ov", "-fs", "HFS+", "-format", "UDRW", "-size", `${stagingMb + 400}m`, rwDmg]);
+run("hdiutil", ["convert", rwDmg, "-format", "ULFO", "-ov", "-o", dmg]);
+rmSync(rwDmg, { force: true });
 run("codesign", ["--force", "--timestamp", "--sign", identity, dmg]);
 console.log(`[mac-sign] DMG built + signed: ${dmg}`);
 
