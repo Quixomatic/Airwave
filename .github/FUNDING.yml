@@ -1,3 +1,2 @@
-# Renders a "Sponsor" button on the repo (top bar + sidebar) linking to each platform below.
-github: Quixomatic   # GitHub Sponsors → github.com/sponsors/Quixomatic
-ko_fi: quixomatic    # Ko-fi → ko-fi.com/quixomatic
+github: Quixomatic
+ko_fi: quixomatic
