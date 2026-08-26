@@ -1,4 +1,6 @@
 mod mpv;
+#[cfg(target_os = "linux")]
+mod render_linux;
 #[cfg(target_os = "macos")]
 mod render_macos;
 
@@ -54,11 +56,39 @@ fn mpv_stop(mpv: State<'_, Arc<mpv::Mpv>>) -> Result<(), String> {
     mpv.command(&["stop"])
 }
 
-/// Render the video into a sub-rectangle of the window — the guide's featured-panel slot — for the
-/// MINI FEED. The single full-window mpv surface stays put; `video-margin-ratio-*` scales the video
-/// into `(x,y,w,h)` (physical px within a `win_w`×`win_h` window). The guide punches only that slot
-/// transparent, so the positioned video shows there and the black margins are covered by the opaque
-/// guide. No child HWND, so no airspace problem — it builds on the proven full-window compositing.
+fn clear_video_margins(mpv: &mpv::Mpv) -> Result<(), String> {
+    for p in [
+        "video-margin-ratio-left",
+        "video-margin-ratio-right",
+        "video-margin-ratio-top",
+        "video-margin-ratio-bottom",
+    ] {
+        mpv.set_property_double(p, 0.0)?;
+    }
+    Ok(())
+}
+
+/// Linux native airspace must physically occupy only the mini-player slot;
+/// WebKitGTK cannot cover a full-size X11 video child with the guide.
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn mpv_set_region(
+    mpv: State<'_, Arc<mpv::Mpv>>,
+    host: State<'_, Arc<render_linux::LinuxVideoHost>>,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+    win_w: f64,
+    win_h: f64,
+) -> Result<(), String> {
+    clear_video_margins(&mpv)?;
+    host.show_region(x, y, w, h, win_w, win_h)
+}
+
+/// Windows/macOS keep one full-window render surface and position the mini
+/// video inside it with mpv margins; their compositor can paint UI above it.
+#[cfg(not(target_os = "linux"))]
 #[tauri::command]
 fn mpv_set_region(
     mpv: State<'_, Arc<mpv::Mpv>>,
@@ -81,17 +111,38 @@ fn mpv_set_region(
     Ok(())
 }
 
-/// Reset the video to fill the whole window (fullscreen player) — clears the mini-feed margins.
+/// Full player: reset mpv margins and map the Linux native host across the
+/// content area. `win_w`/`win_h` are CSS pixels (XWayland uses the same space).
+#[cfg(target_os = "linux")]
 #[tauri::command]
-fn mpv_fill_window(mpv: State<'_, Arc<mpv::Mpv>>) -> Result<(), String> {
-    for p in [
-        "video-margin-ratio-left",
-        "video-margin-ratio-right",
-        "video-margin-ratio-top",
-        "video-margin-ratio-bottom",
-    ] {
-        mpv.set_property_double(p, 0.0)?;
-    }
+fn mpv_fill_window(
+    mpv: State<'_, Arc<mpv::Mpv>>,
+    host: State<'_, Arc<render_linux::LinuxVideoHost>>,
+    win_w: f64,
+    win_h: f64,
+) -> Result<(), String> {
+    clear_video_margins(&mpv)?;
+    host.show_region(0.0, 0.0, win_w, win_h, win_w, win_h)
+}
+
+#[cfg(not(target_os = "linux"))]
+#[tauri::command]
+fn mpv_fill_window(mpv: State<'_, Arc<mpv::Mpv>>, win_w: f64, win_h: f64) -> Result<(), String> {
+    let _ = (win_w, win_h);
+    clear_video_margins(&mpv)
+}
+
+/// Hide native video completely while stopped or while a non-guide route is
+/// covering mini playback. Non-Linux render paths do not need a native unmap.
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn mpv_hide_window(host: State<'_, Arc<render_linux::LinuxVideoHost>>) -> Result<(), String> {
+    host.hide()
+}
+
+#[cfg(not(target_os = "linux"))]
+#[tauri::command]
+fn mpv_hide_window() -> Result<(), String> {
     Ok(())
 }
 
@@ -432,6 +483,7 @@ pub fn run() {
             mpv_stop,
             mpv_set_region,
             mpv_fill_window,
+            mpv_hide_window,
             prepare_window_for_fullscreen
         ])
         .setup(|app| {
@@ -463,8 +515,9 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
         .ok_or("no main window")?;
 
     // Transparent webview so the video composites behind the UI (Windows: WebView2/DComp over the
-    // child HWND; macOS: transparent WKWebView over the Metal layer). NOT window transparency on
-    // Windows; on macOS the window itself is transparent (tauri.macos.conf `transparent: true`).
+    // child HWND; Linux: WebKitGTK over a dedicated GTK/X11 host; macOS: WKWebView over the Metal layer).
+    // The Linux/macOS platform configs also create the native window as transparent; Windows keeps
+    // the window itself opaque and only makes the webview transparent.
     let _ = window.set_background_color(Some(tauri::utils::config::Color(0, 0, 0, 0)));
 
     // macOS: extend the webview content under a transparent titlebar so the NATIVE traffic lights
@@ -477,9 +530,9 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
     let mpv = Arc::new(mpv::Mpv::new()?);
     mpv.set_option_string("hwdec", "auto")?; // hardware decode (soia baseline)
 
-    // Video attach is per-platform. Windows/Linux: mpv renders itself into a native surface passed as
-    // `wid` (Windows = the main window HWND under the WebView2 DComp visual) — a pre-init option. macOS:
-    // mpv 0.41 has no embed window context (cocoa/macvk make their own window — see
+    // Video attach is per-platform. Windows/Linux: mpv renders itself into a native surface passed
+    // as `wid` (Windows = HWND; Linux = dedicated GTK drawing-area XID) — a pre-init option. macOS: mpv 0.41 has no embed
+    // window context (cocoa/macvk make their own window — see
     // project-tv-tauri-macos-render), so we use the RENDER API: `vo=libmpv`, then create + drive an
     // OpenGL render context into a view behind the transparent webview.
     #[cfg(target_os = "macos")]
@@ -497,10 +550,22 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
     }
     #[cfg(not(target_os = "macos"))]
     {
+        #[cfg(target_os = "windows")]
         let wid = resolve_video_wid(&window)?;
+        #[cfg(target_os = "linux")]
+        let linux_host = Arc::new(render_linux::setup(&window)?);
+        #[cfg(target_os = "linux")]
+        let wid = linux_host.xid();
         mpv.set_option_i64("wid", wid)?;
+        // A Wayland desktop still exports WAYLAND_DISPLAY while this window is running through
+        // XWayland. Keep libmpv on an X11 context too, otherwise its automatic probe can select a
+        // native Wayland context that cannot attach to the XID. Prefer EGL, with GLX as fallback.
+        #[cfg(target_os = "linux")]
+        mpv.set_option_string("gpu-context", "x11egl,x11")?;
         mpv.initialize()?;
         log::info!("mpv attached (wid={wid})");
+        #[cfg(target_os = "linux")]
+        app.manage(linux_host);
     }
 
     // mpv stays IDLE (attached, initialized, ready) — no autoplay. The watch route drives it via the
@@ -518,6 +583,7 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
 
 /// Resolve the native surface mpv renders into (`--wid`), per platform.
 ///  - **Windows:** the main window's HWND (video is a child HWND under the WebView2 DComp visual).
+///  - **Linux:** handled by `render_linux`: a dedicated GTK drawing-area XID below WebKitGTK.
 ///  - **macOS:** a **CAMetalLayer** inserted as sublayer 0 of the window's contentView (behind the
 ///    transparent WKWebView), returned as its pointer — mpv accepts a CAMetalLayer\* as `wid`
 ///    (soia's open layer-setup + plezy's `wid` attach). Must be called on the main thread.
@@ -529,7 +595,7 @@ fn resolve_video_wid(window: &tauri::WebviewWindow) -> Result<i64, String> {
     }
 }
 
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
 fn resolve_video_wid(_window: &tauri::WebviewWindow) -> Result<i64, String> {
     Err("video render-attach not implemented on this platform yet".into())
 }
