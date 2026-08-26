@@ -40,21 +40,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # ⚠️ BOTH macOS jobs pin electrobun 1.18.1 (see the "Pin Electrobun 1.18.1 (macOS…)" step); Windows +
-          # Linux stay on v2 (^2.0.1). Two reasons the Mac needs v1:
-          #  • Intel: v2 is Hutch-orchestrated and Hutch has NO Darwin x86_64 build (`electrobun build` aborts
-          #    "unsupported platform: Darwin x86_64"). 1.18.1 is the last line with the classic CLI that targets
-          #    x86_64. Its zero-headerpad launcher is patched at sign time by scripts/fix-x64-headerpad.ts (free 16
-          #    bytes so codesign can't corrupt __text — #485; the fix only exists in Hutch betas that can't build
-          #    Intel, so we do it ourselves). Result: a signed+notarized Intel app that boots.
-          #  • arm64: v2's mac `.app` is a SELF-EXTRACTOR (only the launcher is a loose Mach-O; embedded Postgres
-          #    is packed compressed), so our signer never signs the pg binaries → they ship unsigned → Apple
-          #    Silicon's kernel refuses to run them → pg can't start. 1.18.1 emits the PLAIN app (pg loose) so every
-          #    nested binary is signed — the layout that shipped working v0.10.8→v0.12.6. (headerpad is a no-op on
-          #    arm64; measured 0 starved binaries.) macos-14 is Apple Silicon; macos-15-intel is the native x64
-          #    runner (electrobun can't cross-compile arch, so a native runner per arch is the only way).
-          - os: macos-14 # Apple Silicon
+          - os: macos-14 # Apple Silicon (electrobun v2)
             arch: arm64
+          # macOS Intel — NATIVE x64 on `macos-15-intel`, GitHub's STANDARD (free) Intel runner (replaces the
+          # deprecated macos-13). Electrobun CANNOT cross-compile arch (its build always targets the host), so a
+          # native Intel runner is the only way.
+          #
+          # ⚠️ ELECTROBUN VERSION SPLIT: v2 is Hutch-orchestrated and Hutch has NO Darwin x86_64 build, so
+          # `electrobun build` aborts on Intel ("unsupported platform: Darwin x86_64"). 1.18.1 is the last line
+          # with the classic `electrobun build` CLI that produces a native Intel .app, so THIS job pins 1.18.1
+          # (see the "Pin Electrobun 1.18.1" step) while every other matrix job (incl. macos-14 arm64) stays on
+          # v2 (^2.0.1). The #485 headerpad fix only exists in Hutch betas that can't build Intel, so 1.18.1's x64
+          # launcher still has zero headerpad — we fix it at sign time (scripts/fix-x64-headerpad.ts: free 16 bytes
+          # before codesign). Result: a fully SIGNED + NOTARIZED Intel app that boots.
           - os: macos-15-intel
             arch: x64
           - os: windows-2025
@@ -111,18 +109,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # BOTH macOS jobs (arm64 + Intel): pin 1.18.1 — the last electrobun with the classic `electrobun build` CLI.
-      # Why not just Intel? v2 changed the mac `.app` into a SELF-EXTRACTOR (only `Contents/MacOS/launcher` is a
-      # loose Mach-O; the embedded Postgres binaries are packed compressed inside), so our signer only signs the
-      # launcher and the pg binaries ship UNSIGNED — and Apple Silicon's kernel refuses to run unsigned executables,
-      # so Postgres couldn't start. 1.18.1 produces the PLAIN app (pg loose) so build-mac-signed.ts signs every
-      # nested binary — the layout that shipped working from v0.10.8→v0.12.6. (The v2 migration was to fix a "mac
-      # launcher crash" that turned out to be #485 — our signing corrupting the zero-headerpad x64 launcher — an
-      # INTEL-only bug now fixed at sign time by scripts/fix-x64-headerpad.ts, a no-op on arm64.) The frozen install
-      # above put v2 in place; we override it here (install is fine under v2 — Hutch only runs at build time) and
-      # strip the v2-only `build.mainProcess` key. Windows + Linux stay on v2.
-      - name: Pin Electrobun 1.18.1 (macOS — plain app + classic build CLI)
-        if: runner.os == 'macOS'
+      # macOS Intel ONLY: pin 1.18.1 — the last electrobun with the classic `electrobun build` CLI that targets
+      # x86_64 (v2/Hutch refuses Darwin x86_64; and every beta with the #485 headerpad fix already dropped the CLI
+      # for Hutch, so it can't build Intel either). The zero-headerpad launcher that 1.18.1 ships is patched at
+      # sign time by scripts/fix-x64-headerpad.ts (freeing 16 bytes so codesign doesn't corrupt __text), so the
+      # Intel app is still fully signed + notarized. The frozen install above put v2 in place on every runner;
+      # here we override it for THIS job (install is fine under v2 — Hutch only runs at build time). Also strip the
+      # v2-only `build.mainProcess` key the v1.18 config loader doesn't know. Every other matrix job stays on v2.
+      # (arm64 stays on v2: pinning it to 1.18.1 produced the same self-extractor `.app`, so there was no benefit —
+      # both arches ship a single signed launcher with Postgres packed inside; Intel runs the unsigned pg fine,
+      # arm64's behaviour there is unverified and awaits an Apple Silicon test.)
+      - name: Pin Electrobun 1.18.1 (macOS Intel — classic build CLI)
+        if: matrix.os == 'macos-15-intel'
         working-directory: apps/desktop
         shell: bash
         run: |
