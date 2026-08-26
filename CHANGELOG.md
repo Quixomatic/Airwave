@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.13] - 2026-08-26
+
+AI assistant on **self-hosted / OpenAI-compatible models** (LM Studio, Ollama, vLLM, OpenRouter) — fix the
+`Invalid type for 'input'` error (GitHub #3).
+
+### Fixed
+- The `compatible` AI provider used the Vercel AI SDK's default OpenAI route, which now targets OpenAI's newer
+  **Responses API** (`/v1/responses`, `input` field). Self-hosted OpenAI-compatible servers implement only the
+  **Chat Completions API** (`/v1/chat/completions`, `messages`), so the chat failed with `Invalid type for
+  'input'` as soon as tools were attached (the connection *test* passed because a trivial prompt slipped
+  through). The compatible provider now explicitly uses Chat Completions (`.chat()`) — chat history and tool
+  calls work exactly as before, and being the universally-supported path, more reliably. Cloud OpenAI
+  (Responses API), Anthropic, and Google are untouched.
+
 ## [0.12.12] - 2026-08-25
 
 Desktop app — one-click **Report to developer** on the setup failure screen.

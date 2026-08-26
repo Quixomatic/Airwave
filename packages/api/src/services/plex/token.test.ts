@@ -42,7 +42,7 @@ describe("plex token encryption at rest", () => {
 
   test("a tampered ciphertext throws (never silently returns garbage)", () => {
     const enc = encryptToken(PLAIN);
-    const [iv, tag, ct] = enc.split(":");
+    const [iv, tag] = enc.split(":");
     // Flip the ciphertext so the GCM auth tag no longer matches.
     const tampered = [iv, tag, Buffer.from("totally-different-bytes").toString("base64")].join(":");
     expect(() => decryptToken(tampered)).toThrow();

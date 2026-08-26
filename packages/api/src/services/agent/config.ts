@@ -28,7 +28,12 @@ export function getModel(cfg: ResolvedConnection): LanguageModel {
     case "google":
       return createGoogleGenerativeAI({ apiKey })(cfg.model);
     case "compatible":
-      return createOpenAI({ apiKey, baseURL: cfg.baseUrl ?? undefined })(cfg.model);
+      // OpenAI-COMPATIBLE servers (LM Studio, Ollama, vLLM, OpenRouter) implement only the Chat Completions API
+      // (`/v1/chat/completions`, `messages`) — NOT OpenAI's newer Responses API (`/v1/responses`, `input`) that the
+      // default `createOpenAI(...)(model)` callable now uses. Force `.chat()` so we send `messages`; otherwise these
+      // servers reject the request with `Invalid type for 'input'` once tools are attached (GitHub #3). Real OpenAI
+      // (the `openai` case above) keeps the default Responses route, which it supports.
+      return createOpenAI({ apiKey, baseURL: cfg.baseUrl ?? undefined }).chat(cfg.model);
     default:
       throw new Error(`Unknown AI provider: ${cfg.provider}`);
   }
