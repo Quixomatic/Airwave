@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.22] - 2026-08-27
+
+Apple TV (tv-native) — fix the audio / subtitle / quality pickers doing nothing when you select an item.
+**Needs a new build.**
+
+### Fixed
+- **Picker selections now apply on Apple TV.** The pickers were rendered in a native `<Modal>`, which on
+  tvOS presents in its own view controller with no TV remote handler — so `useTVEventHandler` (the source
+  that feeds the whole app's zone-machine input) goes deaf while the modal is open, and D-pad/Select never
+  reached the picker (react-native-tvos#609). Android was unaffected because its modals get their own handler
+  (#628), which is why this was Apple-TV-only. The picker is now a **full-screen in-tree overlay** rendered
+  at the player-chrome root (lifted out of the feature panel into a small picker context), so the root
+  `useTVEventHandler` stays live and the picker is driven by the same key-layer system as everything else. No
+  native `<Modal>`; visually identical; touch on iPad unchanged.
+
 ## [0.12.21] - 2026-08-27
 
 Android TV (tv-native) — HDR on the HLS transcode path now switches **live** (no reload), so seeking keeps

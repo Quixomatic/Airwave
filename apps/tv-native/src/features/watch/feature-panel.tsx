@@ -1,8 +1,7 @@
-import { AudioLines, Captions, Check, Clapperboard, Info, Pause, Play, Radio, RotateCcw, SlidersHorizontal, Star, Tv } from "lucide-react-native";
+import { AudioLines, Captions, Clapperboard, Info, Pause, Play, Radio, RotateCcw, SlidersHorizontal, Star, Tv } from "lucide-react-native";
 import type { ComponentType } from "react";
 import { useEffect, useRef, useState } from "react";
-import { Modal, Platform, ScrollView, Text, useWindowDimensions, View } from "react-native";
-import { BlurView } from "expo-blur";
+import { Platform, ScrollView, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 import { TvPressable as Pressable } from "@/components/tv-pressable";
@@ -10,6 +9,7 @@ import type { GuideChannel } from "@/lib/api";
 import { cs, hexA, scaled } from "@/features/guide/layout";
 import { LAYER, onInputActivity, useKeyLayer } from "@/lib/input";
 
+import { usePicker } from "./picker";
 import type { Delivery, useTvPlayer } from "./use-tv-player";
 
 /**
@@ -19,7 +19,6 @@ import type { Delivery, useTvPlayer } from "./use-tv-player";
  * menu → close). D-pad nav (row 0 scrubber ⇄ row 1 controls) and touch (tap a control) both drive it.
  */
 type Player = ReturnType<typeof useTvPlayer>;
-type PickerKey = "audio" | "subtitle" | "quality" | null;
 
 const SEEK = 10;
 const CTL_COUNT = 8;
@@ -36,73 +35,33 @@ export function FeaturePanel({
   channel,
   player,
   accent,
-  quality,
-  audioStreamId,
-  subtitleStreamId,
-  qualities,
-  onSelectQuality,
-  onSelectAudio,
-  onSelectSub,
   onClose,
   onOpenSurf,
 }: {
   channel?: GuideChannel;
   player: Player;
   accent: string;
-  quality: string;
-  audioStreamId?: string;
-  subtitleStreamId?: string;
-  qualities: { id: string; label: string }[];
-  onSelectQuality: (id: string) => void;
-  onSelectAudio: (id?: string) => void;
-  onSelectSub: (id?: string) => void;
   onClose: () => void;
   onOpenSurf: () => void;
 }) {
-  const { status, controls, tracks } = player;
+  const { status, controls } = player;
   const g = status.guide;
   const sc = status.scrubber;
   const delivery = status.delivery;
+  const { open: openPicker, openKind } = usePicker();
 
   const [focus, setFocus] = useState<{ row: 0 | 1; col: number }>({ row: 0, col: 0 });
   const [infoMode, setInfoMode] = useState(false);
-  const [picker, setPicker] = useState<PickerKey>(null);
-  const [pickerSel, setPickerSel] = useState(0);
-
-  // Items + current value for whichever picker is open — shared by the modal render and the D-pad nav.
-  const pickerItems =
-    picker === "audio"
-      ? [{ value: "", label: "Default" }, ...tracks.audio.map((t) => ({ value: t.id, label: t.label }))]
-      : picker === "subtitle"
-        ? [{ value: "off", label: "Off" }, ...tracks.subtitle.map((t) => ({ value: t.id, label: t.label }))]
-        : picker === "quality"
-          ? qualities.map((q) => ({ value: q.id, label: q.label }))
-          : [];
-  const pickerCurrent = picker === "audio" ? audioStreamId ?? "" : picker === "subtitle" ? subtitleStreamId ?? "off" : quality;
-  const pickerTitle = picker === "audio" ? "Audio" : picker === "subtitle" ? "Subtitles" : "Quality";
-  const applyPick = (v: string) => {
-    if (picker === "audio") onSelectAudio(v || undefined);
-    else if (picker === "subtitle") onSelectSub(v);
-    else if (picker === "quality") onSelectQuality(v);
-    setPicker(null);
-  };
-  // When a picker opens, focus its current selection.
-  useEffect(() => {
-    if (!picker) return;
-    const idx = pickerItems.findIndex((it) => it.value === pickerCurrent);
-    setPickerSel(idx >= 0 ? idx : 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [picker]);
 
   const isEpisode = !!g?.showTitle && g?.season != null && g?.episode != null;
   const title = isEpisode ? g?.showTitle : g?.title;
   const subTitle = isEpisode ? `S${g?.season}, E${g?.episode}${g?.title ? ` · ${g.title}` : ""}` : undefined;
 
   // Auto-hide the panel after inactivity (tv-web parity) — reset on ANY input (key OR touch) via the
-  // shared input-activity notifier, same signal the mini-player idle timer rides. NOT while a picker is
-  // open (it owns the interaction). Back is handled by the key layer below, independent of this timer.
+  // shared input-activity notifier, same signal the mini-player idle timer rides. NOT while the picker
+  // overlay is open (it owns the interaction). Back is handled by the key layer below, independent of this.
   useEffect(() => {
-    if (picker) return;
+    if (openKind) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const reset = () => {
       if (timer) clearTimeout(timer);
@@ -115,7 +74,7 @@ export function FeaturePanel({
       unsub();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [picker]);
+  }, [openKind]);
 
   const activateControl = (col: number) => {
     switch (col) {
@@ -135,43 +94,26 @@ export function FeaturePanel({
         controls.jumpToLive();
         return;
       case 5:
-        setPicker("audio");
+        openPicker("audio");
         return;
       case 6:
-        setPicker("subtitle");
+        openPicker("subtitle");
         return;
       case 7:
-        setPicker("quality");
+        openPicker("quality");
         return;
     }
   };
 
-  // Owns the keys while the panel is open (CHROME layer). Back peels info → picker → close.
+  // Owns the keys while the panel is open (CHROME layer). Back peels info → close. The picker overlay
+  // registers its OWN higher-priority (LAYER.MODAL) key layer while open, so it intercepts before this.
   useKeyLayer({
     id: "feature-panel",
     priority: LAYER.CHROME,
     onKey(e) {
       if (e.key === "back") {
         if (infoMode) setInfoMode(false);
-        else if (picker) setPicker(null);
         else onClose();
-        return true;
-      }
-      // Picker open — D-pad/keyboard navigates the list (Back, handled above, closes it).
-      if (picker) {
-        if (e.key === "up") {
-          setPickerSel((s) => Math.max(0, s - 1));
-          return true;
-        }
-        if (e.key === "down") {
-          setPickerSel((s) => Math.min(pickerItems.length - 1, s + 1));
-          return true;
-        }
-        if (e.key === "ok") {
-          const it = pickerItems[pickerSel];
-          if (it) applyPick(it.value);
-          return true;
-        }
         return true;
       }
       if (infoMode) return true; // details view owns the keys; Back (above) exits it
@@ -215,9 +157,9 @@ export function FeaturePanel({
   const liveInWindow = sc?.liveVisible ?? true;
   const atLive = sc?.atLive ?? true;
   const behind = sc?.behindS ?? 0;
-  const scrubFocused = focus.row === 0 && !infoMode && !picker;
+  const scrubFocused = focus.row === 0 && !infoMode && !openKind;
 
-  const ctlFocused = (i: number) => focus.row === 1 && focus.col === i && !picker && !infoMode;
+  const ctlFocused = (i: number) => focus.row === 1 && focus.col === i && !openKind && !infoMode;
 
   return (
     <LinearGradient colors={["transparent", "rgba(6,10,20,0.4)", "rgba(6,10,20,0.92)"]} locations={[0, 0.35, 0.75]} style={scaled({ paddingTop: 96, paddingHorizontal: 56, paddingBottom: 40 })}>
@@ -296,20 +238,6 @@ export function FeaturePanel({
             </View>
           </View>
         </>
-      )}
-
-      {/* picker — a centered glass modal (same treatment as channel-number entry): scrollable, D-pad /
-          keyboard navigable (up/down move focus, OK selects, Back closes), and touch. */}
-      {picker !== null && (
-        <PickerModal
-          title={pickerTitle}
-          items={pickerItems}
-          current={pickerCurrent}
-          sel={pickerSel}
-          onPick={applyPick}
-          onClose={() => setPicker(null)}
-          accent={accent}
-        />
       )}
     </LinearGradient>
   );
@@ -396,54 +324,3 @@ function DeliveryReadout({ delivery, accent }: { delivery: Delivery; accent: str
   );
 }
 
-const PICKER_ITEM_H = cs(62); // approx row height (padding + margin + text) — for auto-scroll to the focus
-
-/** Centered glass picker modal — the same blur + border treatment as the channel-number entry, with
- *  generous padding. Scrollable; the D-pad-focused row is accent-filled and the current selection is
- *  check-marked. Nav comes from the panel's key layer (up/down/OK/Back); a row tap picks; an outside
- *  tap closes. Conditionally mounted (no visible-toggle stacking); the card claims its own touches. */
-function PickerModal({ title, items, current, sel, onPick, onClose, accent }: { title: string; items: { value: string; label: string }[]; current: string; sel: number; onPick: (v: string) => void; onClose: () => void; accent: string }) {
-  const { height } = useWindowDimensions();
-  const scrollRef = useRef<ScrollView>(null);
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ y: Math.max(0, sel * PICKER_ITEM_H - 2 * PICKER_ITEM_H), animated: true });
-  }, [sel]);
-  return (
-    <Modal transparent visible animationType="fade" onRequestClose={onClose}>
-      <Pressable onPress={onClose} focusable={!Platform.isTV} style={scaled({ flex: 1, backgroundColor: "rgba(4,6,12,0.6)", alignItems: "center", justifyContent: "center", padding: 40 })}>
-        <View
-          onStartShouldSetResponder={() => true}
-          style={scaled({ width: 460, maxWidth: "92%", borderRadius: 22, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", shadowColor: "#000", shadowOffset: { width: 0, height: 20 }, shadowRadius: 44, shadowOpacity: 0.55, elevation: 24 })}
-        >
-          <BlurView intensity={60} tint="dark" style={scaled({ backgroundColor: "rgba(15,21,35,0.72)", paddingBottom: 6 })}>
-            <Text style={scaled({ fontSize: 14, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: "rgba(255,255,255,0.62)", paddingTop: 26, paddingHorizontal: 30, paddingBottom: 12 })}>{title}</Text>
-            <ScrollView ref={scrollRef} style={{ maxHeight: height * 0.56 }} contentContainerStyle={scaled({ paddingHorizontal: 14, paddingBottom: 6 })} showsVerticalScrollIndicator={false}>
-              {items.length === 0 && <Text style={scaled({ color: "#94a3b8", fontSize: 17, paddingVertical: 22, textAlign: "center" })}>None available</Text>}
-              {items.map((it, i) => {
-                const isSel = it.value === current;
-                const isFocus = i === sel;
-                return (
-                  <Pressable
-                    key={it.value}
-                    onPress={() => onPick(it.value)}
-                    focusable={!Platform.isTV}
-                    style={scaled({ borderRadius: 14, marginVertical: 3, paddingVertical: 15, paddingHorizontal: 18, backgroundColor: isFocus ? accent : isSel ? hexA(accent, 0.16) : "transparent" })}
-                  >
-                    {/* explicit row (don't rely on Pressable's own flex): leading check slot + label */}
-                    <View style={scaled({ flexDirection: "row", alignItems: "center", gap: 14 })}>
-                      <View style={scaled({ width: 24, alignItems: "center", justifyContent: "center" })}>{isSel && <Check size={cs(20)} color={isFocus ? "#04060c" : accent} />}</View>
-                      <Text numberOfLines={1} style={scaled({ flex: 1, fontSize: 18, fontWeight: isFocus || isSel ? "700" : "500", color: isFocus ? "#04060c" : isSel ? accent : "#f1f5f9" })}>
-                        {it.label}
-                      </Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-            <Text style={scaled({ fontSize: 13, color: "rgba(255,255,255,0.4)", paddingTop: 10, paddingHorizontal: 30, paddingBottom: 8 })}>OK to select · Back to cancel</Text>
-          </BlurView>
-        </View>
-      </Pressable>
-    </Modal>
-  );
-}

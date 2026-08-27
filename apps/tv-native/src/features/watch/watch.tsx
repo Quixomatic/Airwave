@@ -13,6 +13,7 @@ import { channelVivid } from "@/lib/tint";
 
 import { ChannelSurf } from "./channel-surf";
 import { FeaturePanel } from "./feature-panel";
+import { PickerOverlay, PickerProvider } from "./picker";
 import { usePlayer } from "./player-ctx";
 import type { useTvPlayer } from "./use-tv-player";
 
@@ -82,6 +83,7 @@ export function FullChrome({
   });
 
   return (
+    <PickerProvider>
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {/* panel closed → tap the video to bring the panel back (no static chrome burns in) */}
       {!panelOpen && !surfOpen && <Pressable style={StyleSheet.absoluteFill} onPress={() => setPanelOpen(true)} />}
@@ -115,13 +117,6 @@ export function FullChrome({
               channel={channel}
               player={player}
               accent={accent}
-              quality={quality}
-              audioStreamId={audioStreamId}
-              subtitleStreamId={subtitleStreamId}
-              qualities={qualities}
-              onSelectQuality={onSelectQuality}
-              onSelectAudio={onSelectAudio}
-              onSelectSub={onSelectSub}
               onClose={() => setPanelOpen(false)}
               onOpenSurf={() => {
                 setPanelOpen(false);
@@ -140,6 +135,21 @@ export function FullChrome({
           onClose={() => setSurfOpen(false)}
         />
       )}
+
+      {/* Audio/Subtitle/Quality picker — a full-screen in-tree overlay at the chrome root (NOT a native
+          Modal, which severs tvOS remote input). Opened by FeaturePanel via the picker context. */}
+      <PickerOverlay
+        tracks={player.tracks}
+        qualities={qualities}
+        quality={quality}
+        audioStreamId={audioStreamId}
+        subtitleStreamId={subtitleStreamId}
+        onSelectQuality={onSelectQuality}
+        onSelectAudio={onSelectAudio}
+        onSelectSub={onSelectSub}
+        accent={accent}
+      />
     </View>
+    </PickerProvider>
   );
 }
