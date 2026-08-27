@@ -48,13 +48,6 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   private var videoW = 0
   private var videoH = 0
   private var contentFit = "contain"
-  // Aspect-fit is DISABLED for HLS transcode streams. The HDR switch re-opens the URL (`loadfile replace`)
-  // to change VO, and on a Plex transcode session that re-open + the aspect resize's surface reconfig makes
-  // Plex restart the transcode from the beginning (losing the seek offset — it works fine on direct-play,
-  // whose URL is a real file). So for transcode we leave the surface full (accepting the minor HDR stretch)
-  // to keep seeking rock-solid. Detected from the URL — every Plex transcode session URL contains
-  // "/transcode/". Direct-play (raw file) keeps the full aspect-fit.
-  private var isTranscode = false
 
   var options: Map<String, String> = emptyMap()
   // "auto" = full negotiated multichannel layout (default); "stereo" = force a fold-down. Merged into the
@@ -111,8 +104,7 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
    * `setAspectRatio` only re-lays-out when the ratio actually changes (once per video), so no per-event churn.
    */
   private fun applyAspect() {
-    // Transcode → always fill (no container resize → no surface churn → HDR seeking stays intact).
-    val fill = isTranscode || contentFit == "cover" || contentFit == "fill" || videoW <= 0 || videoH <= 0
+    val fill = contentFit == "cover" || contentFit == "fill" || videoW <= 0 || videoH <= 0
     videoContainer.setAspectRatio(if (fill) 0f else videoW.toFloat() / videoH.toFloat())
   }
 
@@ -120,9 +112,8 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
 
   fun setPendingSource(source: String?) {
     pendingSource = source
-    isTranscode = source?.contains("/transcode/") == true
-    // New program → dims unknown until its first frame; reset so applyAspect re-fits (or fills, for
-    // transcode) once mpvDidLoad reports the new dimensions, rather than reusing the previous program's.
+    // New program → dims unknown until its first frame; reset so applyAspect re-fits once mpvDidLoad reports
+    // the new dimensions, rather than reusing the previous program's.
     videoW = 0
     videoH = 0
     applyAspect()

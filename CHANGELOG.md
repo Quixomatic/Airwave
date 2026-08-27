@@ -2,6 +2,23 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.21] - 2026-08-27
+
+Android TV (tv-native) — HDR on the HLS transcode path now switches **live** (no reload), so seeking keeps
+its offset, and the aspect-fit is re-enabled for transcode. **Needs a new Android build.**
+
+### Fixed
+- **Transcode HDR no longer restarts the program on the HDR switch.** HDR requires switching to
+  `vo=mediacodec_embed` + direct `hwdec=mediacodec`. Previously that was done with a `loadfile replace`
+  reload — fine for direct-play (a real file re-seeks cleanly) but destructive for a Plex HLS transcode:
+  re-requesting the session URL un-anchors it (Plex restarts from the program beginning) and resets mpv's
+  `time-pos`, which the channel clock depends on. Now, **for transcode we switch the VO/decoder live on the
+  running stream and never reload** — mpv reconfigures the video chain in place at the current position, so
+  the HLS session, the seek offset, and `time-pos` are all left untouched (mirroring how iOS switches the
+  tvOS display without reloading). Direct-play HDR keeps its clean reload.
+- **Aspect-fit re-enabled for transcode HDR** (0.12.20 had disabled it): with no reload there's no surface
+  churn to worry about, so the letterbox applies everywhere.
+
 ## [0.12.20] - 2026-08-26
 
 Android TV (tv-native) — disable the HDR aspect-fit on the HLS transcode path so seeking stays intact

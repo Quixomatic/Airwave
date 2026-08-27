@@ -434,16 +434,25 @@ class MpvCore(private val appContext: Context) {
     )
     if (neededVo == currentVo) return
 
-    // Re-open at the current offset under the new render path. Clamp to at least the ORIGINAL requested
-    // start: the HDR probe can fire on an early playback-restart before mpv's seek-to-`start` has settled
-    // (observed time-pos ≈ 0.04s on a mid-program tune-in), and re-opening there would throw away the seek
-    // offset and restart the program from the beginning. `maxOf` keeps the resume point ≥ the offset while
-    // still honoring genuine forward progress (live edge) past it.
-    val pos = maxOf(p.getDouble("time-pos") ?: 0.0, pendingLoadStart)
     currentVo = neededVo
     // Embed needs the direct (zero-copy) mediacodec decoder; gpu-next uses the copy fallback too.
     p.setProperty("hwdec", if (isHdr) "mediacodec" else "mediacodec,mediacodec-copy")
     p.setProperty("vo", neededVo)
+
+    // TRANSCODE (Plex HLS): switch the VO/decoder LIVE on the running stream — do NOT reload. Re-requesting
+    // the Plex session URL (`loadfile replace`) un-anchors it (offset lost) AND resets mpv's `time-pos`,
+    // which the JS channel clock depends on (it must stay session-relative + continuous). This mirrors how
+    // iOS switches the tvOS display for HDR without reloading. The live vo/hwdec set above reconfigures the
+    // output on the ongoing stream, leaving the stream — and thus the offset + time-pos + clock — untouched.
+    val isTranscode = pendingLoadUrl?.contains("/transcode/") == true
+    if (isTranscode) {
+      android.util.Log.i("MpvCore", "HDR switch (transcode) → live VO=$neededVo, no reload")
+      return
+    }
+
+    // DIRECT-PLAY: the URL is a real file, so `loadfile … start=` re-seeks it cleanly. Clamp to ≥ the
+    // originally requested start so an early HDR probe (time-pos not yet settled) can't regress the offset.
+    val pos = maxOf(p.getDouble("time-pos") ?: 0.0, pendingLoadStart)
     pendingLoadStart = pos
     android.util.Log.i("MpvCore", "HDR switch → re-opening on $neededVo at ${pos}s")
     pendingLoadUrl?.let { doLoad(p, it, pos, pendingLoadMode) }
