@@ -1,22 +1,25 @@
 import { Check, Clock } from "lucide-react";
 import type { ReactNode } from "react";
 import { FaWindows, FaApple, FaLinux, FaDocker, FaAndroid, FaChrome } from "react-icons/fa";
-import { RELEASES_PAGE } from "@/lib/releases";
+import { getHeroDownloads } from "@/lib/releases";
+import { APP_STORE_APPLE, PLAY_STORE } from "@/lib/store-links";
 
 /**
  * Airwave's download matrix for the /docs/downloads page — a scannable table of every client and server
- * build, which OS each is for, where to get it, and its status. Mirrors PlatformMatrix's styling. Static
- * on purpose (links point at the GitHub releases/latest page, store pages, or GHCR — all stable URLs), so
- * it never needs a per-release edit. The homepage keeps the OS-aware one-click download buttons.
+ * build, which OS each is for, where to get it, and its status. Mirrors PlatformMatrix's styling. Desktop
+ * + server rows resolve the **exact** versioned asset off the latest GitHub Release (same `getHeroDownloads`
+ * the homepage hero uses, cached hourly) so a click downloads the right file directly instead of dumping
+ * the visitor on the releases page; if an asset is ever missing it falls back to the releases page. Store /
+ * sideload rows point at their stable listing URLs.
  */
 
 // Stable, non-versioned links. Fill the store URLs as each store listing goes live.
 const GHCR = "https://github.com/Quixomatic/Airwave/pkgs/container/airwave";
-const PLAY = "https://play.google.com/store/apps/details?id=com.airwave.tv";
 const REPO = "https://github.com/Quixomatic/Airwave";
 const SELF_HOST = "/docs/self-hosting";
-// const APP_STORE_TV = "";  // TODO: paste the Apple TV App Store URL once you have it
-// const APP_STORE_IPAD = ""; // TODO: paste the iPad App Store URL once you have it
+// Apple TV + iPad share one universal App Store listing; Play covers Android TV / Google TV / Fire TV.
+// Both come from lib/store-links.ts. `href: APP_STORE_APPLE || undefined` → a plain-text cell until the
+// App ID is filled in, then a live link.
 
 type Status = "available" | "beta" | "planned";
 
@@ -96,29 +99,32 @@ function DownloadTable({ caption, rows }: { caption: string; rows: Row[] }) {
   );
 }
 
-export function ClientDownloads() {
+export async function ClientDownloads() {
+  const dl = await getHeroDownloads();
   const rows: Row[] = [
-    { platform: "Apple TV", sub: "tvOS", Icon: FaApple, delivery: "Native app", getLabel: "App Store", status: "available" },
-    { platform: "iPad", sub: "iPadOS", Icon: FaApple, delivery: "Native app", getLabel: "App Store", status: "beta", statusLabel: "In review" },
-    { platform: "Android TV / Google TV", Icon: FaAndroid, delivery: "Native app", href: PLAY, getLabel: "Google Play", external: true, status: "beta", statusLabel: "In testing" },
+    { platform: "Apple TV", sub: "tvOS", Icon: FaApple, delivery: "Native app", href: APP_STORE_APPLE || undefined, getLabel: "App Store", external: true, status: "available" },
+    { platform: "iPad", sub: "iPadOS", Icon: FaApple, delivery: "Native app", href: APP_STORE_APPLE || undefined, getLabel: "App Store", external: true, status: "beta", statusLabel: "In review" },
+    { platform: "Android TV / Google TV", Icon: FaAndroid, delivery: "Native app", href: PLAY_STORE, getLabel: "Google Play", external: true, status: "beta", statusLabel: "In testing" },
     { platform: "Fire TV", Icon: FaAndroid, delivery: "Native app", getLabel: "Amazon Appstore", status: "beta", statusLabel: "In review" },
     { platform: "LG webOS", Icon: FaChrome, delivery: "Packaged web app", href: REPO, getLabel: "Sideload / from source", external: true, status: "available", statusLabel: "Sideload" },
     { platform: "Roku", Icon: FaChrome, delivery: "Native channel", href: REPO, getLabel: "Sideload / from source", external: true, status: "available", statusLabel: "Sideload" },
-    { platform: "Windows", Icon: FaWindows, delivery: "Desktop app (Tauri)", href: RELEASES_PAGE, getLabel: "Download (.exe)", external: true, status: "available" },
-    { platform: "macOS", sub: "Apple Silicon + Intel", Icon: FaApple, delivery: "Desktop app (Tauri)", href: RELEASES_PAGE, getLabel: "Download (.dmg)", external: true, status: "available" },
+    { platform: "Windows", sub: "x64", Icon: FaWindows, delivery: "Desktop app (Tauri)", href: dl.client.windows, getLabel: "Download (.exe)", external: true, status: "available" },
+    { platform: "macOS", sub: "Apple Silicon", Icon: FaApple, delivery: "Desktop app (Tauri)", href: dl.client.macos, getLabel: "Download (.dmg)", external: true, status: "available" },
+    { platform: "macOS", sub: "Intel", Icon: FaApple, delivery: "Desktop app (Tauri)", href: dl.client.macosIntel, getLabel: "Download (.dmg)", external: true, status: "available" },
     { platform: "Linux", Icon: FaLinux, delivery: "Desktop app (Tauri)", getLabel: "From source", status: "planned", statusLabel: "Next" },
     { platform: "Any browser", Icon: FaChrome, delivery: "Web player", href: SELF_HOST, getLabel: "Self-host (tvweb role)", status: "available" },
   ];
   return <DownloadTable caption="Airwave client downloads by platform" rows={rows} />;
 }
 
-export function ServerDownloads() {
+export async function ServerDownloads() {
+  const dl = await getHeroDownloads();
   const rows: Row[] = [
     { platform: "Docker", sub: "any OS", Icon: FaDocker, delivery: "Container image", href: GHCR, getLabel: "ghcr.io/quixomatic/airwave", external: true, status: "available", statusLabel: "Recommended" },
-    { platform: "Windows", sub: "x64", Icon: FaWindows, delivery: "One-click installer", href: RELEASES_PAGE, getLabel: "Download (.exe)", external: true, status: "available" },
-    { platform: "macOS", sub: "Apple Silicon", Icon: FaApple, delivery: "One-click installer", href: RELEASES_PAGE, getLabel: "Download (.dmg)", external: true, status: "available" },
-    { platform: "macOS", sub: "Intel", Icon: FaApple, delivery: "One-click installer", href: RELEASES_PAGE, getLabel: "Download (.dmg)", external: true, status: "available" },
-    { platform: "Linux", sub: "x64", Icon: FaLinux, delivery: "One-click installer", href: RELEASES_PAGE, getLabel: "Download (.tar.gz)", external: true, status: "available" },
+    { platform: "Windows", sub: "x64", Icon: FaWindows, delivery: "One-click installer", href: dl.server.windows, getLabel: "Download (.exe)", external: true, status: "available" },
+    { platform: "macOS", sub: "Apple Silicon", Icon: FaApple, delivery: "One-click installer", href: dl.server.macos, getLabel: "Download (.dmg)", external: true, status: "available" },
+    { platform: "macOS", sub: "Intel", Icon: FaApple, delivery: "One-click installer", href: dl.server.macosIntel, getLabel: "Download (.dmg)", external: true, status: "available" },
+    { platform: "Linux", sub: "x64", Icon: FaLinux, delivery: "One-click installer", href: dl.server.linux, getLabel: "Download (.tar.gz)", external: true, status: "available" },
   ];
   return <DownloadTable caption="Airwave server downloads by OS" rows={rows} />;
 }

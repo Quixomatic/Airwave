@@ -4,9 +4,12 @@ import { useEffect, useRef, useState, type ComponentType } from "react";
 import { FaWindows, FaApple, FaLinux, FaDocker, FaChevronDown } from "react-icons/fa";
 import { cn } from "@/lib/cn";
 import type { HeroDownloads } from "@/lib/releases";
+import { APP_STORE_APPLE } from "@/lib/store-links";
 
-// TODO: swap these stubs for the real App Store product URLs once the apps are live.
-const APPSTORE = { appleTv: "#", ipad: "#" };
+// Apple TV + iPad share ONE universal App Store listing (same bundle id). Until the App ID is set,
+// fall back to the downloads docs page rather than a dead link.
+const appleHref = APP_STORE_APPLE || "/docs/downloads";
+const appleExternal = Boolean(APP_STORE_APPLE);
 
 type OS = "windows" | "macos" | "linux" | "apple" | "other";
 
@@ -130,8 +133,8 @@ export function HeroDownloadButtons({ dl }: { dl: HeroDownloads }) {
     { id: "linux", short: "Linux", label: "Linux (x64)", Icon: FaLinux, href: dl.server.linux, os: "linux" },
   ];
   const client: Item[] = [
-    { id: "appletv", short: "Apple TV", label: "Apple TV (App Store)", Icon: FaApple, href: APPSTORE.appleTv, os: "apple", external: true },
-    { id: "ipad", short: "iPad", label: "iPad (App Store)", Icon: FaApple, href: APPSTORE.ipad, external: true },
+    { id: "appletv", short: "Apple TV", label: "Apple TV (App Store)", Icon: FaApple, href: appleHref, os: "apple", external: appleExternal },
+    { id: "ipad", short: "iPad", label: "iPad (App Store)", Icon: FaApple, href: appleHref, external: appleExternal },
     { id: "win", short: "Windows", label: "Windows (x64)", Icon: FaWindows, href: dl.client.windows, os: "windows" },
     { id: "mac", short: "macOS", label: "macOS (Apple Silicon)", Icon: FaApple, href: dl.client.macos, os: "macos" },
     { id: "mac-intel", short: "macOS", label: "macOS (Intel)", Icon: FaApple, href: dl.client.macosIntel },

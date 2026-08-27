@@ -44,13 +44,13 @@ Business logic stays in `@airwave/api` services; the routers in `apps/server` ar
 
 ## How the pieces talk
 
-```
-  Admin web  ──tRPC (cookie)──┐
-                              ├──►  Server (Hono/Bun)  ──Prisma──►  PostgreSQL
-  Viewer apps  ──REST────────┘         │
-  (tv-web · tv-native ·                └──owner token──►  Plex Media Server
-   tv-tauri · tv-roku)
-       └────────────── streams media directly from Plex ─────────┘
+```mermaid
+graph LR
+  admin(["Admin web"]) -->|"tRPC · cookie"| server["Server · Hono/Bun"]
+  viewers(["Viewer apps<br/>tv-web · tv-native · tv-tauri · tv-roku"]) -->|"REST · bearer"| server
+  server -->|"Prisma"| db[("PostgreSQL")]
+  server -->|"owner token"| plex["Plex Media Server"]
+  viewers -.->|"stream media directly"| plex
 ```
 
 - **Viewers (`tv-web`, `tv-native`, `tv-tauri`, `tv-roku`) use the REST API** at `/api/v1`, authenticated

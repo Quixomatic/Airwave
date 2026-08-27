@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.17] - 2026-08-26
+
+Website — App Store links go live, the downloads page one-click-downloads the right file, and the
+architecture diagram becomes a real rendered diagram.
+
+### Added / Changed
+- **Apple App Store links.** The homepage hero and the downloads page now link Apple TV and iPad to the
+  live App Store listing (one universal app). Apple TV shows **Available**; iPad shows **In review**.
+- **The downloads page downloads the exact right file directly.** Desktop and server rows now resolve the
+  current versioned asset off the latest GitHub Release (the same resolver the homepage hero uses, cached
+  hourly) instead of dropping you on the releases page to hunt for it — and gracefully fall back to the
+  releases page if an asset is ever missing.
+- **Separate macOS Apple Silicon and Intel rows** in both the client and server download tables.
+- **Architecture docs.** Replaced the ASCII "How the pieces talk" diagram with a rendered **Mermaid**
+  diagram, matching the self-hosting page.
+
 ## [0.12.16] - 2026-08-26
 
 Website — a public **Roadmap** on getairwave.tv with login-less upvoting, plus a dynamically generated
