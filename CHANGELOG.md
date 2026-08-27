@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.20] - 2026-08-26
+
+Android TV (tv-native) — disable the HDR aspect-fit on the HLS transcode path so seeking stays intact
+there. **Needs a new Android build.**
+
+### Fixed
+- **HDR seeking on the HLS-transcode path no longer restarts the program from the beginning.** The HDR
+  switch re-opens the stream URL (`loadfile replace`, required to change the video output for HDR
+  passthrough); on a **Plex transcode session** that re-open plus the aspect-fit's surface reconfig makes
+  Plex restart the transcode from 0, dropping the seek offset. So the view now **disables the aspect-fit for
+  transcode streams** (detected by `/transcode/` in the URL) — the surface stays full, seeking is rock-solid,
+  and we accept the minor HDR stretch on that fallback path. **Direct-play HDR keeps the full aspect-fit**
+  (its URL is a real file, so the re-open re-seeks cleanly) — confirmed working: correct letterbox + correct
+  offset on seek.
+
 ## [0.12.19] - 2026-08-26
 
 Android TV (tv-native) — the HDR aspect fix, done right (no offset regression). **Needs a new Android
