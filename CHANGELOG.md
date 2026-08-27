@@ -2,10 +2,33 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.19] - 2026-08-26
+
+Android TV (tv-native) — the HDR aspect fix, done right (no offset regression). **Needs a new Android
+build.** Supersedes 0.12.18's aspect approach.
+
+### Fixed
+- **HDR content no longer restarts from the beginning after the HDR switch.** 0.12.18's aspect fix resized
+  the video surface imperatively, which triggered an early surface reconfig that made the one-shot HDR probe
+  read the *pre-seek* position (~0.04s on a mid-program tune-in) and re-open there — throwing away the seek
+  offset. Two fixes: (1) the HDR re-open now clamps its resume point to **≥ the original seek offset**
+  (`maxOf(time-pos, start)`), so it can never regress behind where you tuned in; (2) aspect is now handled by
+  an **AspectRatioFrameLayout** container (the ExoPlayer pattern) that applies the ratio once, declaratively,
+  in the layout pass — instead of mutating the surface on every event — eliminating the churn.
+- **HDR video aspect is correct (no vertical stretch).** `vo=mediacodec_embed` (HDR10/HLG passthrough) fills
+  the surface and ignores mpv's keepaspect, so non-16:9 content (e.g. 3840×2076 cinema) stretched ~4% taller
+  on a 16:9 panel. The container now letterboxes it to the content's PAR-correct display aspect. SDR
+  (gpu-next) is unchanged. iOS / Apple TV / iPad are untouched.
+
+### Kept from 0.12.18
+- **Device Settings shows the panel's real resolution** (4K reads 3840×2160 + HDR) via native display-mode
+  detection (`mpvDisplay`), Android-only.
+
 ## [0.12.18] - 2026-08-26
 
 Android TV (tv-native) — fix HDR video zoom/stretch, and report the real 4K panel resolution in Device
-Settings. **Needs a new Android build to take effect (native module change).**
+Settings. **Needs a new Android build to take effect (native module change).** *(Superseded by 0.12.19 —
+the aspect approach here caused an HDR offset regression.)*
 
 ### Fixed
 - **HDR content no longer zooms/stretches on Android TV / Google TV.** HDR plays through

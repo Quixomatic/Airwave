@@ -395,9 +395,8 @@ class MpvCore(private val appContext: Context) {
   private suspend fun maybeEmitLoad() {
     if (loadedEmitted) return
     val p = player ?: return
-    // Prefer mpv's DISPLAY size (`dwidth`/`dheight`: post-aspect-correction, so PAR/anamorphic-correct) and
-    // fall back to the decoded `width`/`height`. Used both for the JS onLoad report and for the view's
-    // aspect-fit letterbox (see MpvPlayerView.applyVideoLayout) — the HDR mediacodec_embed VO needs it.
+    // Prefer mpv's DISPLAY size (`dwidth`/`dheight`: post-aspect-correction, so PAR/anamorphic-correct),
+    // fall back to the decoded `width`/`height`. Used for the JS onLoad report + the view's aspect-fit.
     val w = (p.getDouble("dwidth") ?: 0.0).toInt().takeIf { it > 0 } ?: (p.getDouble("width") ?: 0.0).toInt()
     val h = (p.getDouble("dheight") ?: 0.0).toInt().takeIf { it > 0 } ?: (p.getDouble("height") ?: 0.0).toInt()
     val dur = p.getDouble("duration") ?: 0.0
@@ -435,9 +434,12 @@ class MpvCore(private val appContext: Context) {
     )
     if (neededVo == currentVo) return
 
-    // Re-open at the current offset under the new render path. `keep-open` holds the last frame, so read
-    // the live position now; fall back to the requested start if unavailable.
-    val pos = p.getDouble("time-pos") ?: pendingLoadStart
+    // Re-open at the current offset under the new render path. Clamp to at least the ORIGINAL requested
+    // start: the HDR probe can fire on an early playback-restart before mpv's seek-to-`start` has settled
+    // (observed time-pos ≈ 0.04s on a mid-program tune-in), and re-opening there would throw away the seek
+    // offset and restart the program from the beginning. `maxOf` keeps the resume point ≥ the offset while
+    // still honoring genuine forward progress (live edge) past it.
+    val pos = maxOf(p.getDouble("time-pos") ?: 0.0, pendingLoadStart)
     currentVo = neededVo
     // Embed needs the direct (zero-copy) mediacodec decoder; gpu-next uses the copy fallback too.
     p.setProperty("hwdec", if (isHdr) "mediacodec" else "mediacodec,mediacodec-copy")
