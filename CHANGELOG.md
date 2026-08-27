@@ -2,6 +2,26 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.18] - 2026-08-26
+
+Android TV (tv-native) — fix HDR video zoom/stretch, and report the real 4K panel resolution in Device
+Settings. **Needs a new Android build to take effect (native module change).**
+
+### Fixed
+- **HDR content no longer zooms/stretches on Android TV / Google TV.** HDR plays through
+  `vo=mediacodec_embed` (MediaCodec → SurfaceView, for real HDR10/HLG passthrough), which renders the decode
+  surface directly and **ignores mpv's aspect handling** (`keepaspect`/`panscan`) — so a full-screen surface
+  stretched HDR content, most visibly as "everything slightly taller" after the HDR switch. The video surface
+  is now letterboxed to the content's display aspect at the view layer (the same fix ExoPlayer's
+  `AspectRatioFrameLayout`, findroid, and plezy use — no mpv option does it, mpv-android#486). SDR (gpu-next)
+  is unchanged, and aspect uses mpv's PAR-correct display dimensions (`dwidth`/`dheight`).
+- **Device Settings now shows the panel's real resolution.** Android TV renders its UI at 1080p even on 4K
+  panels, so we were reporting the 1080p UI surface as the panel — a 4K Sony showed as 1080p. We now read the
+  display's supported modes (max physical width×height) + HDR capability natively (new `mpvDisplay` in
+  `@airwave/mpv-player`, mirroring jellyfin-androidtv), so a 4K TV reads 3840×2160. **iOS / Apple TV / iPad
+  are unaffected** (their UI surface equals the panel). Note: playback was never capped by this — 4K always
+  direct-played at native resolution via mpv's hardware surface; this only corrects the reported number.
+
 ## [0.12.17] - 2026-08-26
 
 Website — App Store links go live, the downloads page one-click-downloads the right file, and the

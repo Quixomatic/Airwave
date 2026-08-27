@@ -395,8 +395,11 @@ class MpvCore(private val appContext: Context) {
   private suspend fun maybeEmitLoad() {
     if (loadedEmitted) return
     val p = player ?: return
-    val w = (p.getDouble("width") ?: 0.0).toInt()
-    val h = (p.getDouble("height") ?: 0.0).toInt()
+    // Prefer mpv's DISPLAY size (`dwidth`/`dheight`: post-aspect-correction, so PAR/anamorphic-correct) and
+    // fall back to the decoded `width`/`height`. Used both for the JS onLoad report and for the view's
+    // aspect-fit letterbox (see MpvPlayerView.applyVideoLayout) — the HDR mediacodec_embed VO needs it.
+    val w = (p.getDouble("dwidth") ?: 0.0).toInt().takeIf { it > 0 } ?: (p.getDouble("width") ?: 0.0).toInt()
+    val h = (p.getDouble("dheight") ?: 0.0).toInt().takeIf { it > 0 } ?: (p.getDouble("height") ?: 0.0).toInt()
     val dur = p.getDouble("duration") ?: 0.0
     if (w > 0 && h > 0 && !loadedEmitted) {
       loadedEmitted = true

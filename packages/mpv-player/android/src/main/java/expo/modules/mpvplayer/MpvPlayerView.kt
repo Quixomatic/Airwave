@@ -3,6 +3,7 @@ package expo.modules.mpvplayer
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
+import android.view.Gravity
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.widget.FrameLayout
@@ -34,6 +35,16 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   // True while a VIDEO clip is loaded — gates keepScreenOn (below). Android has no automatic idle-timer
   // hold during playback like iOS/tvOS, so without this a playing channel dims + sleeps.
   private var videoActive = false
+
+  // Intrinsic video dimensions (from mpvDidLoad) + the requested fit — used to letterbox the SurfaceView so
+  // the HDR path can't stretch the picture. `vo=mediacodec_embed` (our HDR10/HLG passthrough VO) renders the
+  // MediaCodec surface DIRECTLY and does NOT honor mpv's keepaspect/panscan (confirmed: no mpv option fixes
+  // it — mpv-android#486 closed unsolved; findroid/jellyfin resize the view instead), so a MATCH_PARENT
+  // surface stretches non-panel-aspect or display-mode-switched HDR content. Sizing the SurfaceView to the
+  // content aspect fixes it. Harmless on the SDR gpu-next path (mpv already letterboxes into the surface).
+  private var videoW = 0
+  private var videoH = 0
+  private var contentFit = "contain"
 
   var options: Map<String, String> = emptyMap()
   // "auto" = full negotiated multichannel layout (default); "stereo" = force a fold-down. Merged into the
@@ -76,6 +87,48 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
     core.detachSurface()
   }
 
+  // The container's on-screen size changes (initial layout, mini↔full reposition, or an HDR display-mode
+  // switch) → re-fit the video surface.
+  override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+    super.onSizeChanged(w, h, oldw, oldh)
+    applyVideoLayout()
+  }
+
+  /**
+   * Letterbox the SurfaceView to the video's aspect, centered in this (black) view — the app-layer aspect fix
+   * that ExoPlayer's `AspectRatioFrameLayout` (RESIZE_MODE_FIT) and findroid/plezy use, because the HDR
+   * `vo=mediacodec_embed` path scales the decoded frame to fill the surface and ignores mpv's keepaspect. On
+   * the SDR gpu-next path the result is identical (mpv already letterboxes into the surface). Only for
+   * "contain"/default; "cover"/"fill" keep MATCH_PARENT (crop/stretch by intent, handled by panscan on SDR).
+   */
+  private fun applyVideoLayout() {
+    val lp = surfaceView.layoutParams as? FrameLayout.LayoutParams ?: return
+    val cw = width
+    val ch = height
+    val fill = contentFit == "cover" || contentFit == "fill" || videoW <= 0 || videoH <= 0 || cw <= 0 || ch <= 0
+    var newW = FrameLayout.LayoutParams.MATCH_PARENT
+    var newH = FrameLayout.LayoutParams.MATCH_PARENT
+    if (!fill) {
+      val videoAspect = videoW.toDouble() / videoH.toDouble()
+      val viewAspect = cw.toDouble() / ch.toDouble()
+      if (viewAspect > videoAspect) {
+        // Container is wider than the video → limit by height, bars on the sides.
+        newH = ch
+        newW = Math.round(ch * videoAspect).toInt()
+      } else {
+        // Container is taller → limit by width, bars top/bottom.
+        newW = cw
+        newH = Math.round(cw / videoAspect).toInt()
+      }
+    }
+    if (lp.width != newW || lp.height != newH || lp.gravity != Gravity.CENTER) {
+      lp.width = newW
+      lp.height = newH
+      lp.gravity = Gravity.CENTER
+      surfaceView.layoutParams = lp // triggers surfaceChanged → core.setSurfaceSize keeps android-surface-size in sync
+    }
+  }
+
   // MARK: props
 
   fun setPendingSource(source: String?) {
@@ -91,7 +144,11 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
     pendingMode = if (mode == "audio") "audio" else "video"
   }
 
-  fun setContentFit(fit: String) = core.setContentFit(fit)
+  fun setContentFit(fit: String) {
+    contentFit = fit
+    core.setContentFit(fit) // keepaspect/panscan for the SDR gpu-next path
+    applyVideoLayout() // letterbox the surface for the HDR mediacodec_embed path
+  }
   fun setPaused(paused: Boolean) {
     // Keep the screen awake only while a video is actually playing; release it on pause so the device can
     // still sleep when paused. `keepScreenOn` sets the window's FLAG_KEEP_SCREEN_ON while the view is
@@ -156,6 +213,12 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   // MARK: MpvCoreDelegate → JS events
 
   override fun mpvDidLoad(duration: Double, width: Int, height: Int) {
+    if (width > 0 && height > 0 && (width != videoW || height != videoH)) {
+      videoW = width
+      videoH = height
+      // Delegate fires on the core's Main scope, but post to be safe about touching the view tree.
+      post { applyVideoLayout() }
+    }
     onLoad(mapOf("duration" to duration, "width" to width, "height" to height))
   }
 

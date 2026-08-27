@@ -6,4 +6,5 @@ export {
   type MpvAudioBuffering,
   type AudioOutputInfo,
 } from "./MpvAudio";
+export { mpvDisplay, type DisplayInfo } from "./MpvDisplay";
 export * from "./MpvPlayer.types";

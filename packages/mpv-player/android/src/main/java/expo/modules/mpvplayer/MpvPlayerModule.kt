@@ -1,8 +1,11 @@
 package expo.modules.mpvplayer
 
 import android.content.Context
+import android.hardware.display.DisplayManager
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.os.Build
+import android.view.Display
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
@@ -51,6 +54,31 @@ class MpvPlayerModule : Module() {
         }
       }
       mapOf("maxChannels" to maxCh, "currentChannels" to 0, "routeName" to routeName, "routeType" to routeType)
+    }
+
+    // The PHYSICAL panel resolution + HDR capability, for Settings → Device. Android TV renders its UI at
+    // 1080p on 4K panels, so RN's `Dimensions` (the UI surface) under-reports the panel; the display's
+    // supported modes carry the true pixel dimensions. Pattern mirrors jellyfin-androidtv's PlaybackController
+    // (getSupportedModes → max physicalWidth×physicalHeight) + deviceProfileReport (HDR types). View-less;
+    // uses the default display via DisplayManager (no Activity needed). Synchronous `Function` so the JS
+    // device report can read it inline. Android-only — iOS/tvOS keep RN Dimensions (UI surface == panel).
+    Function("getDisplayInfo") {
+      val ctx = appContext.reactContext?.applicationContext
+      val dm = ctx?.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager
+      val display = dm?.getDisplay(Display.DEFAULT_DISPLAY)
+      var w = 0
+      var h = 0
+      display?.supportedModes?.forEach { m ->
+        if (m.physicalWidth.toLong() * m.physicalHeight.toLong() > w.toLong() * h.toLong()) {
+          w = m.physicalWidth
+          h = m.physicalHeight
+        }
+      }
+      val hdrTypes = runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) display?.mode?.supportedHdrTypes
+        else @Suppress("DEPRECATION") display?.hdrCapabilities?.supportedHdrTypes
+      }.getOrNull()
+      mapOf("width" to w, "height" to h, "hdr" to (hdrTypes?.isNotEmpty() == true))
     }
 
     OnDestroy {

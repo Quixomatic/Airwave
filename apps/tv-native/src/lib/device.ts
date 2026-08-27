@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { mpvDisplay } from "@airwave/mpv-player";
 import { Dimensions, Platform, PixelRatio } from "react-native";
 
 import { getServerUrl } from "./auth";
@@ -49,16 +50,27 @@ export async function markCapsDone(): Promise<void> {
 export function gatherDeviceReport() {
   const { width, height } = Dimensions.get("screen");
   const scale = PixelRatio.get();
+  // Default: the UI surface size in physical px. On Android TV this is the 1080p UI surface even on a 4K
+  // panel, so prefer the native panel resolution (Display supported modes) when available — see mpvDisplay.
+  let screenWidth = Math.round(width * scale);
+  let screenHeight = Math.round(height * scale);
+  let hdr = false;
+  const panel = mpvDisplay.getInfo(); // null off Android
+  if (panel && panel.width > 0 && panel.height > 0) {
+    screenWidth = panel.width;
+    screenHeight = panel.height;
+    hdr = panel.hdr;
+  }
   return {
     deviceId: _deviceId,
     userAgent: `expo/${Platform.OS} ${Platform.Version}`,
     platform: Platform.OS,
     model: Platform.OS === "ios" ? "iOS device" : "Android device",
     osVersion: String(Platform.Version),
-    screenWidth: Math.round(width * scale),
-    screenHeight: Math.round(height * scale),
+    screenWidth,
+    screenHeight,
     pixelRatio: scale,
-    hdr: false,
+    hdr,
     colorGamut: "srgb",
     capabilities: { video: {}, audio: {}, containers: {} },
     raw: { isTV: Platform.isTV, native: true },
