@@ -2,6 +2,29 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.29] - 2026-08-28
+
+Roku (tv-roku) — add **on-device email/password sign-in**, the fix for the Roku Channel Store rejection.
+
+### Added
+- Roku rejected the store submission (not exemptable): apps must not include *any* off-device sign-in flows, and
+  our two login paths (Plex PIN, better-auth device code) both finish in a browser on a second device. The Roku
+  login now leads with an **on-device email/password form** (on-screen keyboard, primary), with the Plex and code
+  flows kept behind a "More sign-in options" expander (jellyfin-roku ships both and is certified). Smooth-typing
+  polish: auto-advance focus (email → password → Sign in), a show/hide-password toggle, remember-email, and inline
+  errors.
+- New server endpoint `POST /api/tv/auth/password` (`services/auth/tv-password-link.ts`): verifies the credentials
+  with better-auth's `signInEmail` and returns the same bearer the Plex/device-code flows do (in the response body,
+  so the TV client's existing token handling is reused). A generic "invalid" for every auth failure (no account
+  enumeration); real faults answer 502. Password hashing, verification, and rate limiting stay with better-auth.
+- Real test `apps/server/scripts/test-tv-password-login.ts` (mints a throwaway user, proves the bearer validates via
+  get-session, checks every failure mode). No schema change; verified on a real Roku device.
+
+### Unchanged / next
+- Roku-only plus one additive server endpoint — the Plex-first login on tv-web / tv-native / webOS is untouched.
+  Plex-imported users (who have no password) will get an admin "set password" flow in a later release so they can
+  use the Roku app too.
+
 ## [0.12.28] - 2026-08-28
 
 Desktop app — the supervisor now **reclaims its own ports across restarts** instead of drifting to new ones, and

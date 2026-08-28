@@ -2,68 +2,120 @@ import "pkg:/source/lib/serverUrl.bs"
 import "pkg:/source/lib/auth.bs"
 import "pkg:/source/lib/api.bs"
 import "pkg:/source/lib/log.bs"
+import "pkg:/source/lib/registry.bs"
 import "pkg:/source/input/keys.bs"
 import "pkg:/source/theme.bs"
 
-' Login code-behind — port of tv-web features/auth/login.tsx (two device-code flows).
+' Login code-behind. On-device email/password is PRIMARY (the Roku Channel Store forbids off-device sign-in);
+' the two device-code flows (Plex PIN, better-auth code) are kept as SECONDARY, behind "More sign-in options".
+' See .plans/roku.md Phase 13. Three modes: "form" | "chooser" | "pending".
 
 sub init()
-
-
     m.serverLabel.text = "Server: " + ServerUrl.get()
 
     ' Fonts via the mutation path (custom TTFs render blank via <Font role> / new Font node on Roku).
     Theme.setFont(m.subtitle, Theme.FONT_REG, 18)
+    Theme.setFont(m.emailCap, Theme.FONT_REG, 14)
+    Theme.setFont(m.pwCap, Theme.FONT_REG, 14)
     Theme.setFont(m.pHeading, Theme.FONT_SEMI, 26)
     Theme.setFont(m.pInstruction, Theme.FONT_REG, 18)
     Theme.setFont(m.pCode, Theme.FONT_MONO, 40)
     Theme.setFont(m.error, Theme.FONT_REG, 18)
     Theme.setFont(m.serverLabel, Theme.FONT_REG, 14)
 
-    m.mode = "chooser"   ' "chooser" | "pending"
+    m.mode = "form"         ' "form" | "chooser" | "pending"
     m.sel = 0
-    m.pollType = ""      ' "plex" | "device"
+    m.items = []
+
+    ' Form state
+    m.email = Registry.read(RegKey.EMAIL)   ' remember the last email
+    m.password = ""
+    m.showPw = false
+    m.kbd = invalid
+    m.kbdFor = ""
+
+    ' Secondary-flow poll state
+    m.pollType = ""         ' "plex" | "device"
     m.pinId = ""
     m.deviceCode = ""
     m.pollCount = 0
-
-    ' Polling cadence only — the HTTP itself is promise-based via Api.* (see onPollTick).
     m.timer = CreateObject("roSGNode", "Timer")
     m.timer.repeat = true
     m.timer.observeField("fire", "onPollTick")
     m.top.appendChild(m.timer)
 
-    showChooser()
+    renderFields()
+    showForm()
     m.top.setFocus(true)
 end sub
 
 ' ---- view state ---------------------------------------------------------------
 
+sub showForm()
+    m.mode = "form"
+    m.timer.control = "stop"
+    m.form.visible = true
+    m.chooser.visible = false
+    m.pending.visible = false
+    m.error.text = ""
+    buildFormItems()
+    setSel(0)
+end sub
+
 sub showChooser()
     m.mode = "chooser"
     m.timer.control = "stop"
-    m.pending.visible = false
+    m.form.visible = false
     m.chooser.visible = true
+    m.pending.visible = false
+    m.error.text = ""
+    buildChooserItems()
     setSel(0)
 end sub
 
 sub showPending(heading as string, instruction as string, code as string, qrValue as string)
     m.mode = "pending"
+    m.form.visible = false
+    m.chooser.visible = false
+    m.pending.visible = true
     m.pHeading.text = heading
     m.pInstruction.text = instruction
     m.pCode.text = code
-    m.qr.text = qrValue   ' QRCode extends Poster — setting text renders the QR to itself
-    m.chooser.visible = false
-    m.pending.visible = true
+    m.qr.text = qrValue     ' QRCode extends Poster — setting text renders the QR to itself
     m.error.text = ""
     m.backBtn.focused = true
 end sub
 
+' ---- focus / nav (item-list pattern, like ServerSetup) ------------------------
+
+sub buildFormItems()
+    items = []
+    items.push({ node: m.emailField, action: "email" })
+    items.push({ node: m.pwField, action: "password" })
+    items.push({ node: m.showBtn, action: "toggleShow" })
+    items.push({ node: m.signInBtn, action: "signin" })
+    items.push({ node: m.moreBtn, action: "more" })
+    items.push({ node: m.changeBtn, action: "change" })
+    m.items = items
+end sub
+
+sub buildChooserItems()
+    items = []
+    items.push({ node: m.plexBtn, action: "plex" })
+    items.push({ node: m.codeBtn, action: "device" })
+    items.push({ node: m.backToFormBtn, action: "backToForm" })
+    m.items = items
+end sub
+
 sub setSel(i as integer)
+    if i < 0 then i = 0
+    if i > m.items.count() - 1 then i = m.items.count() - 1
     m.sel = i
-    m.plexBtn.focused = (i = 0)
-    m.codeBtn.focused = (i = 1)
-    m.changeBtn.focused = (i = 2)
+    idx = 0
+    for each it in m.items
+        it.node.focused = (idx = i)
+        idx = idx + 1
+    end for
 end sub
 
 ' ---- input --------------------------------------------------------------------
@@ -79,29 +131,175 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return key = Keys.UP or key = Keys.DOWN   ' swallow nav while pending
     end if
 
-    ' chooser (Plex 0 / code 1 / change-server 2)
     if key = Keys.UP
-        if m.sel > 0 then setSel(m.sel - 1)
+        setSel(m.sel - 1)
         return true
     else if key = Keys.DOWN
-        if m.sel < 2 then setSel(m.sel + 1)
+        setSel(m.sel + 1)
         return true
     else if key = Keys.OK
-        if m.sel = 0
-            startPlex()
-        else if m.sel = 1
-            startDevice()
-        else
-            ' Drop the onboarded server URL and return to setup — MainScene observes this + re-routes.
-            Log.info("change server requested")
-            m.top.changeServer = true
-        end if
+        dispatch()
         return true
+    else if key = Keys.BACK
+        ' From the secondary chooser, Back returns to the primary form; on the form, let it bubble.
+        if m.mode = "chooser"
+            showForm()
+            return true
+        end if
     end if
     return false
 end function
 
-' ---- flows --------------------------------------------------------------------
+sub dispatch()
+    if m.sel < 0 or m.sel > m.items.count() - 1 then return
+    a = m.items[m.sel].action
+    if a = "email"
+        openKbd("email")
+    else if a = "password"
+        openKbd("password")
+    else if a = "toggleShow"
+        toggleShow()
+    else if a = "signin"
+        doLogin()
+    else if a = "more"
+        showChooser()
+    else if a = "change"
+        Log.info("change server requested")
+        m.top.changeServer = true
+    else if a = "plex"
+        startPlex()
+    else if a = "device"
+        startDevice()
+    else if a = "backToForm"
+        showForm()
+    end if
+end sub
+
+' ---- form: fields, keyboard, show-toggle, sign-in -----------------------------
+
+sub renderFields()
+    if m.email <> ""
+        m.emailField.text = m.email
+    else
+        m.emailField.text = "Email"
+    end if
+
+    if m.password = ""
+        m.pwField.text = "Password"
+    else if m.showPw
+        m.pwField.text = m.password
+    else
+        m.pwField.text = maskOf(m.password)
+    end if
+end sub
+
+function maskOf(s as string) as string
+    out = ""
+    for i = 1 to Len(s)
+        out = out + "•"
+    end for
+    return out
+end function
+
+' The keyboard CAPTURES into the field only — signing in is the explicit Sign-in button. On OK we auto-advance
+' focus (email → password → Sign in) so remote entry flows without hunting for the next control.
+sub openKbd(which as string)
+    dlg = CreateObject("roSGNode", "StandardKeyboardDialog")
+    m.kbdFor = which
+    if which = "email"
+        dlg.title = "Enter your email"
+        if m.email <> "" then dlg.text = m.email
+    else
+        dlg.title = "Enter your password"
+        if m.password <> "" then dlg.text = m.password
+    end if
+    dlg.buttons = ["OK", "Cancel"]
+    dlg.palette = CreateObject("roSGNode", "RSGPalette")
+    m.kbd = dlg
+    dlg.observeField("buttonSelected", "onKbdButton")
+    dlg.observeField("wasClosed", "onKbdClosed")   ' catch a raw Back-dismiss too
+    m.top.getScene().dialog = dlg
+end sub
+
+sub onKbdButton()
+    if m.kbd = invalid then return
+    okPressed = (m.kbd.buttonSelected = 0)
+    captureKbd(m.kbd.text, okPressed)
+    closeKeyboard()
+end sub
+
+sub onKbdClosed()
+    if m.kbd = invalid then return   ' already handled by the button press
+    captureKbd(m.kbd.text, false)
+    closeKeyboard()
+end sub
+
+sub captureKbd(text as string, advance as boolean)
+    if m.kbdFor = "email"
+        if text <> "" then m.email = text
+        if m.email <> "" then Registry.write(RegKey.EMAIL, m.email)
+        renderFields()
+        if advance then setSel(1)      ' → password
+    else if m.kbdFor = "password"
+        m.password = text
+        renderFields()
+        if advance then setSel(3)      ' → Sign in
+    end if
+end sub
+
+sub closeKeyboard()
+    if m.kbd <> invalid then m.kbd.close = true
+    m.kbd = invalid
+    m.kbdFor = ""
+    m.top.setFocus(true)
+end sub
+
+sub toggleShow()
+    m.showPw = not m.showPw
+    if m.showPw
+        m.showBtn.text = "Hide"
+    else
+        m.showBtn.text = "Show"
+    end if
+    renderFields()
+end sub
+
+sub doLogin()
+    if m.email = "" or m.password = ""
+        m.error.text = "Enter your email and password."
+        return
+    end if
+    m.error.text = ""
+    m.signInBtn.text = "Signing in…"
+    Log.info("password login for " + Log.trunc(m.email))
+    p = Api.passwordLogin(m.email, m.password)
+    onThen(p, onLoginOk, m)
+    onCatch(p, onLoginErr, m)
+end sub
+
+sub onLoginOk(b as object, _ctx as object)
+    m.signInBtn.text = "Sign in"
+    if b <> invalid and b.status = "ok" and b.token <> invalid
+        finishLogin(b.token)
+    else
+        m.error.text = "Invalid email or password."
+    end if
+end sub
+
+sub onLoginErr(err as object, _ctx as object)
+    m.signInBtn.text = "Sign in"
+    st = 0
+    if err <> invalid and err.status <> invalid then st = err.status
+    ' 401 (invalid creds) / 400 (missing) → credential message; anything else → a reachability message.
+    if st = 401 or st = 400
+        m.error.text = "Invalid email or password."
+    else
+        m.error.text = "Could not reach the server."
+    end if
+    Log.warn("password login failed http=" + Str(st).Trim())
+end sub
+
+' ---- secondary flows: Plex PIN + better-auth device code ----------------------
 
 sub startPlex()
     m.error.text = ""

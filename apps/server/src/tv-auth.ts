@@ -1,4 +1,5 @@
 import { pollPlexLink, startPlexLink } from "@airwave/api/services/auth/tv-plex-link";
+import { passwordLogin } from "@airwave/api/services/auth/tv-password-link";
 import prisma from "@airwave/db";
 import { Hono } from "hono";
 
@@ -34,6 +35,29 @@ tvAuth.post("/plex/poll", async (c) => {
   } catch (err) {
     console.error("[tv-auth] poll failed:", err);
     return c.json({ error: "Could not check Plex link." }, 502);
+  }
+});
+
+/**
+ * On-device email/password sign-in (Roku — the Channel Store forbids off-device flows). Returns the same
+ * bearer the Plex/device-code flows do, in the body. A generic `invalid` (401) for any auth failure so the
+ * response can't enumerate accounts; a real fault answers 502.
+ */
+tvAuth.post("/password", async (c) => {
+  const body = (await c.req.json().catch(() => null)) as { email?: string; password?: string } | null;
+  const email = typeof body?.email === "string" ? body.email : "";
+  const password = typeof body?.password === "string" ? body.password : "";
+  if (!email || !password) return c.json({ status: "invalid", error: "Email and password are required." }, 400);
+
+  try {
+    const result = await passwordLogin(email, password);
+    if (result.status === "invalid") {
+      return c.json({ status: "invalid", error: "Invalid email or password." }, 401);
+    }
+    return c.json(result);
+  } catch (err) {
+    console.error("[tv-auth] password login failed:", err);
+    return c.json({ error: "Could not sign in." }, 502);
   }
 });
 

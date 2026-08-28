@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!--
-  Login — port of tv-web/tv-native login. Static LogoLockup header (markWidth 100, matching tv-native's
-  <Logo width={100}>), then the chooser (amber Plex + outlined code button) OR a pending panel: a vertical
-  divider with heading/instruction/Back on the left, and a CENTERED white QR card + mono code on the right.
+  Login — on-device email/password is the PRIMARY path (Roku Channel Store forbids off-device sign-in;
+  see .plans/roku.md Phase 13). Three views: `form` (email + password, the landing view), `chooser`
+  (the secondary Plex / code flows, revealed by "More sign-in options"), and `pending` (the QR/code panel
+  for those secondary flows — unchanged). Static LogoLockup header (markWidth 100, matching tv-native).
 -->
 <component name="Login" extends="Group">
     <interface>
@@ -13,25 +14,48 @@
     <children>
         <Rectangle id="bg" width="1920" height="1080" color="0x060A14FF" />
 
-        <LogoLockup id="logo" markWidth="100" centerY="185" animate="false" />
-        <Label id="subtitle" text="Sign in to start watching." translation="[510,240]" width="900"
+        <LogoLockup id="logo" markWidth="100" centerY="150" animate="false" />
+        <Label id="subtitle" text="Sign in to start watching." translation="[510,205]" width="900"
             horizAlign="center" color="0xA1A1AAFF" />
 
-        <!-- Chooser -->
-        <Group id="chooser">
+        <!-- Form (primary, on-device) -->
+        <Group id="form">
+            <Label id="emailCap" text="Email" translation="[706,286]" width="520" color="0x71717AFF" />
+            <RoundedButton id="emailField" translation="[700,310]" w="520" h="72" radius="12" outlined="true"
+                fillColor="0x0E121CFF" textColor="0xE4E4E7FF" focusFill="0x161B28FF" focusInk="0xFFFFFFFF"
+                fontUri="pkg:/fonts/Inter-Regular.ttf" fontSize="22" text="Email" />
+
+            <Label id="pwCap" text="Password" translation="[706,398]" width="520" color="0x71717AFF" />
+            <RoundedButton id="pwField" translation="[700,422]" w="392" h="72" radius="12" outlined="true"
+                fillColor="0x0E121CFF" textColor="0xE4E4E7FF" focusFill="0x161B28FF" focusInk="0xFFFFFFFF"
+                fontUri="pkg:/fonts/Inter-Regular.ttf" fontSize="22" text="Password" />
+            <RoundedButton id="showBtn" translation="[1104,422]" w="116" h="72" radius="12" outlined="true"
+                fillColor="0x0E121CFF" textColor="0xA1A1AAFF" focusFill="0x161B28FF" focusInk="0xFFFFFFFF"
+                fontUri="pkg:/fonts/Inter-Medium.ttf" fontSize="18" text="Show" />
+
+            <RoundedButton id="signInBtn" translation="[700,520]" w="520" h="80" radius="12"
+                fillColor="0xF59E0BFF" textColor="0x000000FF" focusFill="0xFBBF24FF" focusInk="0x000000FF"
+                fontUri="pkg:/fonts/Inter-SemiBold.ttf" fontSize="24" text="Sign in" />
+
+            <RoundedButton id="moreBtn" translation="[730,656]" w="460" h="52" radius="10" outlined="true"
+                fillColor="0x27272AFF" textColor="0xA1A1AAFF" focusFill="0x27272AFF" focusInk="0xE4E4E7FF"
+                fontUri="pkg:/fonts/Inter-Medium.ttf" fontSize="16" text="More sign-in options ›" />
+        </Group>
+
+        <!-- Chooser (secondary — Plex / code; hidden until "More sign-in options") -->
+        <Group id="chooser" visible="false">
             <RoundedButton id="plexBtn" translation="[700,330]" w="520" h="84" radius="12"
                 fillColor="0xF59E0BFF" textColor="0x000000FF" focusFill="0xFBBF24FF" focusInk="0x000000FF"
                 fontUri="pkg:/fonts/Inter-SemiBold.ttf" fontSize="22" text="Log in with Plex" />
             <RoundedButton id="codeBtn" translation="[700,434]" w="520" h="84" radius="12" outlined="true"
                 fillColor="0x3F3F46FF" textColor="0xE4E4E7FF" focusFill="0x27272AFF" focusInk="0xE4E4E7FF"
                 fontUri="pkg:/fonts/Inter-SemiBold.ttf" fontSize="22" text="Log in with a code" />
-            <!-- Subtle ghost: drop the onboarded server URL and return to setup (no way back otherwise). -->
-            <RoundedButton id="changeBtn" translation="[830,548]" w="260" h="56" radius="10" outlined="true"
+            <RoundedButton id="backToFormBtn" translation="[830,548]" w="260" h="56" radius="10" outlined="true"
                 fillColor="0x27272AFF" textColor="0xA1A1AAFF" focusFill="0x27272AFF" focusInk="0xE4E4E7FF"
-                fontUri="pkg:/fonts/Inter-Medium.ttf" fontSize="16" text="Change server" />
+                fontUri="pkg:/fonts/Inter-Medium.ttf" fontSize="16" text="← Email &amp; password" />
         </Group>
 
-        <!-- Pending (hidden until a flow starts) -->
+        <!-- Pending (hidden until a secondary flow starts) -->
         <Group id="pending" visible="false">
             <Poster id="panelBg" translation="[420,320]" width="1080" height="380"
                 uri="pkg:/images/np/fill-16.9.png" blendColor="0x181B24E6" />
@@ -56,8 +80,11 @@
             <Label id="pCode" translation="[1080,590]" width="300" horizAlign="center" color="0xF1F5F9FF" />
         </Group>
 
-        <Label id="error" translation="[510,760]" width="900" height="40" horizAlign="center"
+        <Label id="error" translation="[510,742]" width="900" height="40" horizAlign="center"
             color="0xF87171FF" />
+        <RoundedButton id="changeBtn" translation="[830,806]" w="260" h="52" radius="10" outlined="true"
+            fillColor="0x27272AFF" textColor="0xA1A1AAFF" focusFill="0x27272AFF" focusInk="0xE4E4E7FF"
+            fontUri="pkg:/fonts/Inter-Medium.ttf" fontSize="16" text="Change server" />
         <Label id="serverLabel" translation="[510,900]" width="900" horizAlign="center" color="0x52525BFF" />
     </children>
 </component>

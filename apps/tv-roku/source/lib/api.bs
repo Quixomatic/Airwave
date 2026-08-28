@@ -165,6 +165,14 @@ namespace Api
         return Api.post("/api/tv/auth/plex/poll", Api.jsonBody([["pinId", pinId]]))
     end function
 
+    ' ---- On-device email/password login (/api/tv/auth/password) -----------------
+    ' The Roku Channel Store forbids off-device sign-in, so this is the on-device path: the server verifies
+    ' the credentials (better-auth) and returns the SAME bearer the Plex/device-code flows do, in the body
+    ' ({ status:"ok", token, user } | { status:"invalid" }). See .plans/roku.md Phase 13.
+    function passwordLogin(email as string, password as string) as object
+        return Api.post("/api/tv/auth/password", Api.jsonBody([["email", email], ["password", password]]))
+    end function
+
     ' ---- better-auth device code (/api/auth/device/*) ---------------------------
 
     function deviceCode() as object

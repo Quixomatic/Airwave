@@ -26,6 +26,7 @@ end namespace
 namespace RegKey
     const SERVER_URL = "cg-tv-server-url"
     const TOKEN = "cg-tv-token"
+    const EMAIL = "cg-tv-email"   ' remember the last email typed on the on-device login (Phase 13)
     const DEVICE_ID = "cg-device-id"
     const CAPS_DONE = "cg-caps-done"
     const RESUME = "cg-tv-resume"
