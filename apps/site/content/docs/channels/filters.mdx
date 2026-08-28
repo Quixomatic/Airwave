@@ -17,11 +17,25 @@ and their operators (`OPS_FOR_KIND`):
 | Kind | Operators | Notes |
 |---|---|---|
 | `tag` | is / is not | Value picked from a dropdown of real library values (genre, studio, network, actor, collection, content rating, resolution, …) |
-| `text` | contains / does not contain | Title, episode title — substring match |
+| `text` | contains / does not contain / is exactly / is not exactly / begins with / ends with | Title, episode title. `contains` (the default) is a substring match; `is exactly` is an exact whole-title match |
 | `int` | is / ≥ / ≤ | Year, decade, ratings, duration (minutes), play count, … |
 | `date` | ≥ / ≤ | Release / air date, last watched — a date picker |
 | `recency` | is | "Added within N days" |
 | `bool` | is | true/false — unwatched, in progress, HDR, Dolby Vision, … |
+
+### Matching titles: substring vs exact
+
+Text fields (Title, Episode title) support both loose and precise matching:
+
+- **`contains`** is a substring match (the default) — `Title contains "Star"` matches *Star Wars*, *A Star
+  is Born*, and everything else with "Star" in the title. Best for franchises and broad themes.
+- **`begins with` / `ends with`** anchor the substring to the start or end of the title.
+- **`is exactly`** is a full-title match — it matches only the title you type, nothing more.
+
+One thing to watch with **`is exactly`**: your media server often stores the year as part of the title
+(a show may be catalogued as `Bluey (2018)`, not `Bluey`). Exact match compares the whole stored title,
+so `is exactly "Bluey"` returns nothing there, while `is exactly "Bluey (2018)"` matches. When in doubt,
+use **`contains`** or **`begins with`**, and check the **Preview** to confirm the pool is right.
 
 For a **tag** field the value box becomes a dropdown populated live from your libraries — the
 `channels.filterValues` endpoint unions the distinct tag titles across the enabled libraries of the

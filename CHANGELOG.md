@@ -2,6 +2,12 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.27] - 2026-08-28
+
+Docs (getairwave.tv) — document the new text-filter operators on the Channels → Filters page: the
+`text` operator row now lists contains / does not contain / is exactly / is not exactly / begins with /
+ends with, plus a "substring vs exact" note (including the year-in-title caveat, e.g. "Bluey (2018)").
+
 ## [0.12.26] - 2026-08-28
 
 AI channel builder — corrected stale guidance about the title operator (worker prompt still said
