@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.26] - 2026-08-28
+
+AI channel builder — corrected stale guidance about the title operator (worker prompt still said
+`title is` was a substring match, from before exact-match existed). Now: `contains` = substring,
+`equals` = exact, and a note that Plex titles often carry the year. No behavior change to resolution —
+the AI chat, the lineup planner, and the workflow-SDK workers all already resolve and preview filters
+through the same `buildParam` path as the admin UI.
+
 ## [0.12.25] - 2026-08-28
 
 Channels — fix: **"is exactly" / "is not exactly" returned no results.**
