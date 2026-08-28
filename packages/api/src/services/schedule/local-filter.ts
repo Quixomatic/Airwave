@@ -24,13 +24,34 @@ export function matchesLocalFilter(item: PlexItem, node: FilterNode | null | und
 function matchCondition(item: PlexItem, c: FilterCondition): boolean {
   const g = item.guide;
   const v = (c.value ?? "").toLowerCase();
-  const contains = (s?: string) => (s ?? "").toLowerCase().includes(v);
   const eq = (s?: string) => (s ?? "").toLowerCase() === v;
   const inList = (arr?: string[]) => (arr ?? []).some((x) => x.toLowerCase() === v);
   const year = item.year ?? g.year;
   const n = Number(c.value);
 
-  const text = (hit: boolean) => (c.op === "notContains" ? !hit : hit);
+  // Text/string ops, mirroring the Plex query builder (filter-fields OP_SUFFIX): contains (`=`), equals
+  // (`==`), beginsWith (`<=`), endsWith (`>=`), and the negations. `textAffirm` is the affirmative form of
+  // the op (a "not" op's affirmative is its positive twin); combine candidates with OR, then negate for the
+  // "not" variants so `notContains "X"` means NEITHER candidate contains X.
+  const textAffirm = (s?: string) => {
+    const t = (s ?? "").toLowerCase();
+    switch (c.op) {
+      case "equals":
+      case "notEquals":
+        return t === v;
+      case "beginsWith":
+        return t.startsWith(v);
+      case "endsWith":
+        return t.endsWith(v);
+      default: // contains / notContains
+        return t.includes(v);
+    }
+  };
+  const textNeg = c.op === "notContains" || c.op === "notEquals";
+  const text = (...candidates: (string | undefined)[]) => {
+    const hit = candidates.some(textAffirm);
+    return textNeg ? !hit : hit;
+  };
   const tag = (hit: boolean) => (c.op === "isNot" ? !hit : hit);
   const int = (actual: number | undefined) => {
     if (actual == null || Number.isNaN(n)) return false;
@@ -50,9 +71,9 @@ function matchCondition(item: PlexItem, c: FilterCondition): boolean {
 
   switch (c.field) {
     case "title":
-      return text(contains(item.title) || contains(g.showTitle));
+      return text(item.title, g.showTitle);
     case "episodeTitle":
-      return text(contains(item.title));
+      return text(item.title);
     case "genre":
       return tag(inList(g.genres));
     case "director":

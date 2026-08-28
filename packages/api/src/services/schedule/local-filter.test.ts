@@ -21,6 +21,24 @@ describe("matchesLocalFilter", () => {
     expect(matchesLocalFilter(it, { type: "condition", field: "title", op: "contains", value: "trek" })).toBe(false);
   });
 
+  test("title exact ops: equals / notEquals / beginsWith / endsWith", () => {
+    const it = item({ title: "Star Wars: A New Hope" });
+    // equals is EXACT, not substring
+    expect(matchesLocalFilter(it, { type: "condition", field: "title", op: "equals", value: "star wars: a new hope" })).toBe(true);
+    expect(matchesLocalFilter(it, { type: "condition", field: "title", op: "equals", value: "star wars" })).toBe(false);
+    expect(matchesLocalFilter(it, { type: "condition", field: "title", op: "notEquals", value: "star wars" })).toBe(true);
+    expect(matchesLocalFilter(it, { type: "condition", field: "title", op: "beginsWith", value: "star" })).toBe(true);
+    expect(matchesLocalFilter(it, { type: "condition", field: "title", op: "beginsWith", value: "hope" })).toBe(false);
+    expect(matchesLocalFilter(it, { type: "condition", field: "title", op: "endsWith", value: "hope" })).toBe(true);
+  });
+
+  test("title exact ops also match the show title (episodes) and negate across both candidates", () => {
+    const ep = item({ title: "Chapter 1", showTitle: "Andor" });
+    expect(matchesLocalFilter(ep, { type: "condition", field: "title", op: "equals", value: "andor" })).toBe(true);
+    // notEquals must be false when EITHER candidate equals the value
+    expect(matchesLocalFilter(ep, { type: "condition", field: "title", op: "notEquals", value: "andor" })).toBe(false);
+  });
+
   test("genre tag is / isNot", () => {
     const it = item({ genres: ["Sci-Fi", "Adventure"] });
     expect(matchesLocalFilter(it, { type: "condition", field: "genre", op: "is", value: "sci-fi" })).toBe(true);

@@ -24,10 +24,12 @@ You have TOOLS to inspect the real library and build channels/packages. Work is 
   not a wall of episodes. If a filter returns 0 or looks wrong, refine it — don't create it.
 - Filters are a tree of conditions (field, op, value as a string) combined by and/or groups. TV/show
   filtering uses show-scoped fields; check appliesTo.
-- IMPORTANT — Plex operator semantics: on the "title" field the "is" operator is a SUBSTRING (contains)
-  match, NOT exact: title is "Bear" matches ANY title containing "Bear". So to include a show, use a
-  short distinctive substring (e.g. "Bluey", "Sesame") — but beware over-matching (e.g. "Bear" would also
-  match "Berenstain Bears"), and verify with preview_filter before creating.
+- IMPORTANT: Plex string-operator semantics on text fields (e.g. "title"). "contains" is a SUBSTRING match
+  (title contains "Bear" matches ANY title containing "Bear"); "equals" is EXACT (title equals "Bear" matches
+  only the title "Bear"). To include a show loosely use a short distinctive substring with "contains" (e.g.
+  "Bluey", "Sesame") but beware over-matching ("Bear" also matches "Berenstain Bears"); use "equals" when you
+  want one precise title and nothing else. "beginsWith"/"endsWith" and the negations
+  ("notContains"/"notEquals") are also available. Verify with preview_filter before creating.
 - Writes (create/update/delete channel or package) require the admin's approval — propose them and
   they'll be confirmed. To change one thing (a number, a package, enabled), use update_channel with
   just that field.

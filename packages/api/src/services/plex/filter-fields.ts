@@ -9,7 +9,17 @@
  * see `tvScope`. Movies are self-contained and unprefixed.
  */
 
-export type FilterOp = "is" | "isNot" | "gte" | "lte" | "contains" | "notContains";
+export type FilterOp =
+  | "is"
+  | "isNot"
+  | "gte"
+  | "lte"
+  | "contains"
+  | "notContains"
+  | "equals"
+  | "notEquals"
+  | "beginsWith"
+  | "endsWith";
 
 export type FilterCondition = {
   type: "condition";
@@ -141,8 +151,12 @@ export const FILTER_FIELDS: FieldMeta[] = [
 
 export const OPS_FOR_KIND: Record<FieldKind, FilterOp[]> = {
   tag: ["is", "isNot"],
-  string: ["is", "isNot"],
-  text: ["contains", "notContains"],
+  // Plex string ops (from the OpenAPI "Media Queries" spec — the =-count IS the operator): `=` contains,
+  // `==` equals, `<=` begins-with, `>=` ends-with, plus the `!` negations. So a text field supports BOTH
+  // fuzzy (contains) AND exact (equals) matching. `contains` stays first = the default op, so existing
+  // channels keep their current substring behavior; the exact-match ops are new, additive capability.
+  string: ["equals", "notEquals", "contains", "notContains", "beginsWith", "endsWith"],
+  text: ["contains", "notContains", "equals", "notEquals", "beginsWith", "endsWith"],
   int: ["is", "gte", "lte"],
   date: ["gte", "lte"],
   recency: ["is"],
@@ -150,12 +164,16 @@ export const OPS_FOR_KIND: Record<FieldKind, FilterOp[]> = {
 };
 
 const OP_SUFFIX: Record<FilterOp, string> = {
-  is: "=",
+  is: "=", // tag "is" / int equals (Plex tag `=` = is)
   isNot: "!=",
   gte: ">=",
   lte: "<=",
-  contains: "=", // Plex `title=value` is a substring/contains match
-  notContains: "!=",
+  contains: "=", // Plex string `=value` is a substring/contains match
+  notContains: "!=", // string `!=value` does not contain
+  equals: "==", // string `==value` is EXACT equals ("is"); a single `=` is contains
+  notEquals: "!==", // string `!==value` is exact "is not"
+  beginsWith: "<=", // string `<=value` begins-with (same chars as int lte; text kind never uses lte)
+  endsWith: ">=", // string `>=value` ends-with
 };
 
 export function fieldMeta(field: string): FieldMeta | undefined {

@@ -2,6 +2,23 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.23] - 2026-08-28
+
+Channels — **exact-match text filtering** (is / is not / begins with / ends with), alongside the existing
+contains.
+
+### Added
+- Text filter fields (Title, Episode title) now support the full set of Plex string operators, not just
+  substring: **contains** / **does not contain** (the existing `=` / `!=` behavior), plus **is exactly**
+  (`==`), **is not exactly** (`!==`), **begins with** (`<=`), and **ends with** (`>=`). Discovered from
+  Plex's OpenAPI media-query spec, where the operator is encoded by the number of `=` signs (a single `=`
+  is contains; `==` is exact equality). Previously the system assumed string fields could only do contains.
+- Purely additive: `contains` stays the default operator, so every existing channel keeps its exact current
+  behavior. No schema change (filters are stored as JSON) and no migration.
+- Wired through the whole stack: the Plex query builder, the local (in-code) filter matcher used by grouping
+  strategies, the admin filter-builder UI, and the AI channel-builder's field catalog + guidance. Added bun
+  tests for both the query builder and the local matcher.
+
 ## [0.12.22] - 2026-08-27
 
 Apple TV (tv-native) — fix the audio / subtitle / quality pickers doing nothing when you select an item.

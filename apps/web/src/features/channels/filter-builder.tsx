@@ -7,7 +7,17 @@ import { Plus, X } from "lucide-react";
 import { trpc } from "@/utils/trpc";
 import { uuid } from "@/lib/uuid";
 
-export type FilterOp = "is" | "isNot" | "gte" | "lte" | "contains" | "notContains";
+export type FilterOp =
+  | "is"
+  | "isNot"
+  | "gte"
+  | "lte"
+  | "contains"
+  | "notContains"
+  | "equals"
+  | "notEquals"
+  | "beginsWith"
+  | "endsWith";
 export type FilterCondition = {
   type: "condition";
   id: string;
@@ -75,6 +85,10 @@ const OP_LABEL: Record<FilterOp, string> = {
   lte: "≤",
   contains: "contains",
   notContains: "does not contain",
+  equals: "is exactly",
+  notEquals: "is not exactly",
+  beginsWith: "begins with",
+  endsWith: "ends with",
 };
 
 type SharedProps = {

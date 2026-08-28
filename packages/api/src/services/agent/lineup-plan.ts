@@ -53,7 +53,7 @@ const accentSchema = z.enum(ACCENT_KEYS);
 const conditionSchema = z.object({
   type: z.literal("condition"),
   field: z.string().describe("A filterable field, e.g. genre / studio / title / year / decade / contentRating / audienceRating / duration."),
-  op: z.string().describe("e.g. is / isNot / contains / gte / lte."),
+  op: z.string().describe("e.g. is / isNot / contains / notContains / equals / notEquals / gte / lte. On text fields, contains=substring and equals=exact."),
   value: z.string(),
 });
 
