@@ -145,16 +145,27 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (layout === "full") {
-      void mpv.fillWindow();
+      void mpv.fillWindow(window.innerWidth, window.innerHeight);
     } else if (layout === "mini" && onGuide) {
       // Re-runs when returning to the guide (onGuide flips true) so mpv re-docks into the slot.
       syncMini();
+    } else if (layout === "mini") {
+      // Linux video is native airspace, so remove it while another route is in front.
+      void mpv.hideWindow();
     } else if (layout === "off") {
       setMiniRect(null);
-      void mpv.fillWindow(); // reset margins (mpv is stopped in `off`)
+      void mpv.hideWindow();
     }
-    // layout === "mini" && !onGuide: leave mpv where it is (covered by the route's opaque page).
   }, [layout, onGuide, syncMini]);
+
+  // The Linux video host is a real native child, so keep full playback sized to
+  // the webview when the user resizes/maximizes the window.
+  useEffect(() => {
+    if (layout !== "full") return;
+    const on = () => void mpv.fillWindow(window.innerWidth, window.innerHeight);
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, [layout]);
 
   // Keep the mini feed glued to the slot as the window/guide reflows.
   useEffect(() => {
@@ -225,7 +236,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         ))}
 
       {/* The routed content (guide). Hidden when full so mpv fills the window. */}
-      <div style={{ position: "absolute", inset: 0, opacity: hidden ? 0 : 1, pointerEvents: hidden ? "none" : "auto" }}>
+      <div style={{ position: "absolute", inset: 0, zIndex: 1, opacity: hidden ? 0 : 1, pointerEvents: hidden ? "none" : "auto" }}>
         {children}
       </div>
 

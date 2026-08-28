@@ -22,7 +22,10 @@ name = "airwave"
 version = "0.12.29"
 dependencies = [
  "futures",
+ "gdkx11",
+ "gtk",
  "if-addrs",
+ "libc",
  "log",
  "objc2",
  "objc2-app-kit",

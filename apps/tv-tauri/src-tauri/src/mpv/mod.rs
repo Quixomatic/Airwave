@@ -15,14 +15,37 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 use std::ptr;
 use std::sync::atomic::{AtomicPtr, Ordering};
+#[cfg(target_os = "linux")]
+use std::sync::OnceLock;
 
 pub use ffi::MpvFormat;
-pub use ffi::{MPV_EVENT_END_FILE, MPV_EVENT_FILE_LOADED, MPV_EVENT_PROPERTY_CHANGE, MPV_EVENT_SHUTDOWN};
+pub use ffi::{
+    MPV_EVENT_END_FILE, MPV_EVENT_FILE_LOADED, MPV_EVENT_PROPERTY_CHANGE, MPV_EVENT_SHUTDOWN,
+};
 
 /// Owns a libmpv context. `Send`/`Sync`: libmpv's client API is thread-safe for
 /// the calls we make, and the context is guarded by an atomic pointer.
 pub struct Mpv {
     ctx: AtomicPtr<c_void>,
+}
+
+#[cfg(target_os = "linux")]
+fn ensure_c_numeric_locale() -> Result<(), String> {
+    static RESULT: OnceLock<Result<(), String>> = OnceLock::new();
+
+    RESULT
+        .get_or_init(|| {
+            const C_LOCALE: &[u8] = b"C\0";
+            let locale = unsafe {
+                libc::setlocale(libc::LC_NUMERIC, C_LOCALE.as_ptr().cast::<libc::c_char>())
+            };
+            if locale.is_null() {
+                Err("failed to set LC_NUMERIC=C before creating libmpv".into())
+            } else {
+                Ok(())
+            }
+        })
+        .clone()
 }
 
 unsafe impl Send for Mpv {}
@@ -33,9 +56,18 @@ impl Mpv {
     /// Call [`Mpv::set_option_string`] for pre-init options BEFORE this if
     /// needed; here we set them then `mpv_initialize`.
     pub fn new() -> Result<Self, String> {
+        // GTK initializes the process locale from the desktop before Tauri's setup callback.
+        // libmpv deliberately refuses to create a client unless LC_NUMERIC is exactly `C`
+        // (C.UTF-8 is not accepted), so reset only that category immediately before mpv_create.
+        #[cfg(target_os = "linux")]
+        ensure_c_numeric_locale()?;
+
         let ctx = unsafe { ffi::mpv_create() };
         if ctx.is_null() {
-            return Err("mpv_create() returned null (libmpv missing or LC_NUMERIC not C)".into());
+            #[cfg(target_os = "linux")]
+            return Err("mpv_create() returned null after setting LC_NUMERIC=C".into());
+            #[cfg(not(target_os = "linux"))]
+            return Err("mpv_create() returned null (libmpv missing or invalid runtime)".into());
         }
         let mpv = Mpv {
             ctx: AtomicPtr::new(ctx),

@@ -34,6 +34,13 @@ fn main() {
 
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
 
+    // Linux creates a dedicated X11 child below WebKitGTK for libmpv's `wid`.
+    // The gtk/gdk link set does not expose the Xlib symbols used to create and
+    // resize that child, so link the X11 client library explicitly.
+    if target_os == "linux" {
+        println!("cargo:rustc-link-lib=X11");
+    }
+
     // macOS: the runtime ships as `libmpv.2.dylib` (soname) but the linker wants `libmpv.dylib` for
     // `-l mpv`. Create the dev symlink if missing. Add rpaths: the vendor lib dir (so `cargo run` finds
     // the dylibs in dev) + `@executable_path/../Frameworks` (the bundled `.app`, where the bundling step

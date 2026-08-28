@@ -37,13 +37,24 @@ tauri-plugin-updater = "2"
 # Relaunch the app after an update installs.
 tauri-plugin-process = "2"
 tauri-plugin-os = "2"
-# The native window handle (mpv `--wid` embed) + per-platform windowing.
+# The native window handle (mpv `--wid` embed on Win32 and Linux/X11) + per-platform windowing.
 raw-window-handle = "0.6"
 # Enumerate LAN interfaces natively for onboarding's server scan — the webview's WebRTC
 # subnet trick (tv-web) gets mDNS-obfuscated inside WebView2, so we read interfaces in Rust.
 if-addrs = "0.13"
 # Concurrent health probes in the server scan. reqwest comes from tauri-plugin-http (re-exported).
 futures = "0.3"
+
+# libmpv requires the process-wide numeric locale to be exactly `C` when its
+# client context is created. GTK applies the desktop locale before Tauri's
+# setup callback, so reset LC_NUMERIC through libc immediately before
+# `mpv_create()` on Linux.
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+# Put libmpv in a dedicated GTK/X11 host underneath WebKitGTK. Passing the
+# top-level window XID lets mpv's child window cover the webview on X11.
+gtk = "0.18"
+gdkx11 = "0.18"
 
 # Windows: Win32 for the child-HWND video surface + WS_CLIPCHILDREN + resize.
 [target.'cfg(target_os = "windows")'.dependencies]
