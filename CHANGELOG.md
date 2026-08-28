@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.25] - 2026-08-28
+
+Channels — fix: **"is exactly" / "is not exactly" returned no results.**
+
+### Fixed
+- The exact-match operators (0.12.23) sent Plex a raw `title==value`, but Plex splits the query string on
+  the first `=`, so that became field `title` = value `=value` — a substring search for the literal "=value",
+  which matches nothing. Verified against a real library (new `scripts/test-filter-ops.ts`): the operator's
+  own `=` must be URL-encoded as `%3D`, leaving the final `=` as the separator. So **equals** now sends
+  `title%3D=value` and **is not exactly** sends `title!%3D=value`; `contains` / `does not contain` /
+  `begins with` / `ends with` were already correct (their only `=` is the separator). Exact match now works
+  (e.g. `equals "3 Ninjas"` returns only the base film, not the sequels).
+- Note: Plex titles often include the year (a show may be stored as "Bluey (2018)"), so an exact match needs
+  the full stored title; use "begins with" or "contains" for looser matching.
+
 ## [0.12.24] - 2026-08-28
 
 Channels — fix: the new exact-match operators from 0.12.23 couldn't be **saved**.

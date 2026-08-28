@@ -175,10 +175,15 @@ const OP_SUFFIX: Record<FilterOp, string> = {
   lte: "<=",
   contains: "=", // Plex string `=value` is a substring/contains match
   notContains: "!=", // string `!=value` does not contain
-  equals: "==", // string `==value` is EXACT equals ("is"); a single `=` is contains
-  notEquals: "!==", // string `!==value` is exact "is not"
-  beginsWith: "<=", // string `<=value` begins-with (same chars as int lte; text kind never uses lte)
-  endsWith: ">=", // string `>=value` ends-with
+  // ⚠️ EMPIRICALLY VERIFIED against a real Plex (scripts/test-filter-ops.ts): Plex splits the querystring on
+  // the FIRST `=`, so a raw `title==value` becomes field `title` = value `=value` (a contains for "=value")
+  // and returns NOTHING. The operator's `=` must be URL-encoded (`%3D`) so it lands in the KEY after the
+  // split, leaving the final literal `=` as the separator: `title%3D=value` → Plex reads field-key `title=`
+  // = EXACT equals. The single-`=` operators (=, !=, <=, >=) work raw because their only `=` IS the separator.
+  equals: "%3D=", // EXACT equals ("is exactly") — NOT "==" (that silently degrades to contains-of-"=value")
+  notEquals: "!%3D=", // exact "is not"
+  beginsWith: "<=", // begins-with (raw; same chars as int lte, but text kind never uses lte)
+  endsWith: ">=", // ends-with (raw)
 };
 
 export function fieldMeta(field: string): FieldMeta | undefined {
