@@ -2,7 +2,7 @@ import type { PrismaClient } from "@airwave/db";
 import { tool } from "ai";
 import { z } from "zod";
 
-import type { FilterNode } from "../plex/filter-fields";
+import { FILTER_OPS, type FilterNode } from "../plex/filter-fields";
 import {
   clearAiGenerated,
   createChannel,
@@ -33,7 +33,7 @@ import {
  */
 
 const mediaType = z.enum(["movie", "show"]);
-const op = z.enum(["is", "isNot", "gte", "lte", "contains", "notContains"]);
+const op = z.enum(FILTER_OPS);
 const detail = z
   .enum(["quick", "default", "verbose"])
   .optional()

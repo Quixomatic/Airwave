@@ -9,17 +9,22 @@
  * see `tvScope`. Movies are self-contained and unprefixed.
  */
 
-export type FilterOp =
-  | "is"
-  | "isNot"
-  | "gte"
-  | "lte"
-  | "contains"
-  | "notContains"
-  | "equals"
-  | "notEquals"
-  | "beginsWith"
-  | "endsWith";
+/** All filter operators — the single source of truth. The `FilterOp` type AND the Zod validators
+ *  (`z.enum(FILTER_OPS)` in the routers/agent tools) both derive from this array, so a new operator can
+ *  never be added to the model but rejected by validation (the bug that shipped `equals` unsavable). */
+export const FILTER_OPS = [
+  "is",
+  "isNot",
+  "gte",
+  "lte",
+  "contains",
+  "notContains",
+  "equals",
+  "notEquals",
+  "beginsWith",
+  "endsWith",
+] as const;
+export type FilterOp = (typeof FILTER_OPS)[number];
 
 export type FilterCondition = {
   type: "condition";

@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.24] - 2026-08-28
+
+Channels — fix: the new exact-match operators from 0.12.23 couldn't be **saved**.
+
+### Fixed
+- Saving a channel with an `equals` / `notEquals` / `beginsWith` / `endsWith` condition failed validation
+  (`Invalid option: expected one of is|isNot|gte|lte|contains|notContains`). The create/update-channel Zod
+  schema (and the AI tool schema) hardcoded the old operator list. The filter operators are now a **single
+  source of truth** (`FILTER_OPS` in `filter-fields.ts`): both the `FilterOp` type and every `z.enum(...)`
+  validator derive from it, so an operator can never again exist in the model but be rejected on save.
+
 ## [0.12.23] - 2026-08-28
 
 Channels — **exact-match text filtering** (is / is not / begins with / ends with), alongside the existing

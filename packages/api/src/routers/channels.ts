@@ -7,7 +7,7 @@ import { toAccentKey } from "../services/accents";
 import { getGuideGrid } from "../services/guide";
 import { runJob } from "../services/jobs/scheduler";
 import { getFilterValues } from "../services/plex/client";
-import { FILTER_FIELDS, OPS_FOR_KIND, fieldMeta } from "../services/plex/filter-fields";
+import { FILTER_FIELDS, FILTER_OPS, OPS_FOR_KIND, fieldMeta } from "../services/plex/filter-fields";
 import { resolveChannel } from "../services/plex/resolve";
 import { decryptToken } from "../services/plex/token";
 import { getSourceReadiness, notReadyReason } from "../services/sources/readiness";
@@ -25,7 +25,7 @@ import {
 const orderingEnum = z.enum(["SHUFFLE", "IN_ORDER", "BY_AIR_DATE"]);
 const mediaTypeEnum = z.enum(["movie", "show"]);
 const bumperModeEnum = z.enum(["INHERIT", "OFF", "INTERSTITIAL_ONLY", "FULL"]);
-const opEnum = z.enum(["is", "isNot", "gte", "lte", "contains", "notContains"]);
+const opEnum = z.enum(FILTER_OPS);
 
 const conditionSchema = z.object({
   type: z.literal("condition"),
