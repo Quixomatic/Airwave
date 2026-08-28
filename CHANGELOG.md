@@ -2,6 +2,35 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.28] - 2026-08-28
+
+Desktop app — the supervisor now **reclaims its own ports across restarts** instead of drifting to new ones, and
+enforces a **single running instance**. Fixes the report where closing and reopening (or changing a setting, which
+restarts the server) left the previous process holding the ports, so the app moved to new ones and the admin URL
+changed.
+
+### Fixed
+- **Ports no longer drift on restart.** The supervisor records the server child it spawned (and the ports it
+  bound) in a small `runtime.json`. On the next launch — before anything binds — it reaps that recorded server if
+  it's still alive from an unclean exit (crash / force-quit) and reclaims the same ports, so the admin URL and the
+  tray "Server:" line stay stable. This mirrors the existing embedded-Postgres reap (`postmaster.pid`), extended
+  to the server process.
+- **Settings → Save no longer races the old server.** Stopping the stack now waits for the server child's whole
+  process tree to actually exit (`killTree` + await) before restarting, instead of firing a kill and moving on —
+  so the immediate restart can't collide with a still-draining server on the same port.
+- **Only one instance runs.** A second launch that finds a live prior supervisor (verified — see below) opens that
+  running instance's admin and exits, instead of spinning up a parallel stack on shifted ports.
+
+### Safety
+- **Only ever kills a process we started AND that provably still holds the port.** Ownership is verified with
+  `netstat` (Windows) / `lsof` → `ss` fallback (macOS/Linux) before any kill, so a recycled PID or an unrelated
+  app that happens to hold the port is never touched. If a probe is unavailable it returns "no match" and nothing
+  is reaped.
+- **Cannot break startup.** A missing `runtime.json` (every fresh install / first update), a corrupt or partial
+  one, a wedged probe command (4s timeout), or any unexpected error all fall through to the previous behavior:
+  resolve to nearby free ports. New pure parsers (`apps/desktop/src/bun/port-probe.ts`) with unit tests; the
+  Windows reap cycle and the boot-safety fallbacks are verified end-to-end.
+
 ## [0.12.27] - 2026-08-28
 
 Docs (getairwave.tv) — document the new text-filter operators on the Channels → Filters page: the

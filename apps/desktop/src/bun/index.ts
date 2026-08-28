@@ -15,6 +15,7 @@ import {
 import { homedir, networkInterfaces } from "node:os";
 import { dirname, join, normalize, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { netstatOwnsPort, lsofOwnsPort, ssOwnsPort } from "./port-probe";
 
 /**
  * Airwave Desktop — a tray-only Electrobun supervisor.
@@ -263,6 +264,50 @@ function saveConfig(c: Config): void {
 
 let config = loadConfig();
 
+// ── Runtime state (who we spawned + on which ports) — the "reclaim our own ports" ledger ─────────────────
+// Mirrors reapStalePostgres's postmaster.pid idea, but for the SERVER CHILD (and the supervisor itself). On a
+// crash / force-quit, stopStack never runs, so the server child orphans and keeps holding its port; the next
+// launch reads this file and — after PROVING the recorded pid still owns that exact port (pidOwnsPort) — reaps
+// it and reclaims the stable port instead of drifting upward. It's also the single-instance guard: a second
+// launch that finds a LIVE recorded supervisor (verified by port ownership) defers to it and exits.
+const RUNTIME_PATH = join(DATA_DIR, "runtime.json");
+type RuntimeState = {
+  supervisorPid: number;
+  serverPid?: number;
+  ports: Config["ports"];
+  startedAt: string;
+};
+let runtime: RuntimeState | null = null;
+function readRuntime(): RuntimeState | null {
+  try {
+    const r = JSON.parse(readFileSync(RUNTIME_PATH, "utf8")) as Partial<RuntimeState>;
+    const p = r?.ports;
+    // Validate the fields we actually dereference (supervisorPid + the ports we probe), so a truncated/corrupt
+    // file becomes a clean `null` (→ normal startup) instead of a `prior.ports.setup` throw during boot.
+    if (
+      typeof r?.supervisorPid !== "number" ||
+      !p ||
+      typeof p.server !== "number" ||
+      typeof p.admin !== "number" ||
+      typeof p.setup !== "number"
+    ) {
+      return null;
+    }
+    return r as RuntimeState;
+  } catch {
+    return null;
+  }
+}
+function persistRuntime(): void {
+  if (!runtime) return;
+  try {
+    mkdirSync(DATA_DIR, { recursive: true });
+    writeFileSync(RUNTIME_PATH, JSON.stringify(runtime, null, 2));
+  } catch {
+    /* best-effort */
+  }
+}
+
 /** `attach` = a `pnpm dev` stack is already listening (probed at startup) → don't supervise, just point the
  * tray at the running dev servers (localhost:3000/1/2). Otherwise we're fully self-contained: build whatever's
  * missing, boot embedded Postgres + the server, and serve admin/tv-web on our OWN ports. This same code path
@@ -496,6 +541,36 @@ let pg: EmbeddedPostgresLike | null = null;
 const servers: { stop(): void }[] = [];
 const children: Subprocess[] = [];
 
+/** Run a command and capture its stdout (best-effort; empty string on any failure). `timeout` kills a wedged
+ * system tool (netstat/lsof/ss) so a probe can never hang boot — a timeout just yields "" → we don't reap. */
+async function execCapture(cmd: string[]): Promise<string> {
+  try {
+    const p = spawn(cmd, { stdout: "pipe", stderr: "ignore", timeout: 4000 });
+    const out = await new Response(p.stdout).text();
+    await p.exited;
+    return out;
+  } catch {
+    return "";
+  }
+}
+
+/** True if `pid` is the process currently LISTENING on `port` — the ownership proof before we reap or defer.
+ * This guards against PID reuse (a recycled pid that isn't ours) AND against killing an unrelated app that
+ * happens to hold the port: we only act when the recorded pid AND the live port-holder are the same process.
+ * If NONE of the probes are available (rare) the result is `false` → we conservatively DON'T reap (ports drift
+ * as they did before this feature, but we never kill the wrong thing). */
+async function pidOwnsPort(pid: number, port: number): Promise<boolean> {
+  if (process.platform === "win32") {
+    return netstatOwnsPort(await execCapture(["netstat", "-ano", "-p", "tcp"]), pid, port);
+  }
+  // macOS + most Linux: lsof, filtered to the port and to LISTENers, terse (pids only). Authoritative when it
+  // produces ANY output (that output is already scoped to this port). Empty output = nothing on the port OR
+  // lsof isn't installed — so fall through to ss, which covers the minimal-Linux case (iproute2 is near-ubiquitous).
+  const viaLsof = await execCapture(["lsof", "-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-t"]);
+  if (viaLsof.trim()) return lsofOwnsPort(viaLsof, pid);
+  return ssOwnsPort(await execCapture(["ss", "-Htlnp"]), pid, port);
+}
+
 /** True if a process with `pid` currently exists (signal 0 probes liveness without killing it). */
 function isAlive(pid: number): boolean {
   try {
@@ -561,6 +636,25 @@ async function reapStalePostgres(): Promise<void> {
     rmSync(pidFile, { force: true });
   } catch {
     /* ignore */
+  }
+}
+
+/** Reap OUR OWN orphaned server child from a prior unclean exit (crash / force-quit), so we can reclaim its
+ * stable port instead of drifting upward. Only kills a pid we recorded spawning AND that provably still owns
+ * that port (pidOwnsPort) — never a blind "whoever holds this port." Postgres orphans are handled separately,
+ * anchored to pgdata's postmaster.pid (reapStalePostgres). Best-effort; never throws. */
+async function reapStaleStack(prior: RuntimeState): Promise<void> {
+  const spid = prior.serverPid;
+  if (!spid || !isAlive(spid)) return;
+  if (await pidOwnsPort(spid, prior.ports.server)) {
+    console.warn(`[desktop] reaping orphaned server (pid ${spid}) still holding port ${prior.ports.server} (unclean prior exit).`);
+    try {
+      await killTree(spid);
+    } catch (err) {
+      console.warn(`[desktop] could not reap orphaned server (pid ${spid}):`, errText(err));
+    }
+  } else {
+    console.log(`[desktop] recorded server pid ${spid} no longer owns port ${prior.ports.server} — leaving it (pid likely reused).`);
   }
 }
 
@@ -844,6 +938,10 @@ async function startStack(): Promise<void> {
     pipeToLog(srv.stdout);
     pipeToLog(srv.stderr);
     children.push(srv);
+    if (runtime && typeof srv.pid === "number") {
+      runtime.serverPid = srv.pid; // record the port-holder so the next launch can reap it after an unclean exit
+      persistRuntime();
+    }
   }
 
   // Admin + tv-web static SPAs. Both bake VITE_SERVER_URL at BUILD time in dev/Docker, but the packaged bundles
@@ -877,12 +975,19 @@ async function stopStack(): Promise<void> {
   servers.length = 0;
   for (const c of children) {
     try {
-      c.kill();
+      // AWAIT the whole tree's death (not a fire-and-forget c.kill()) so a fast restart — e.g. Settings → Save,
+      // which stops then immediately restarts the stack — doesn't race a still-draining server on the same port.
+      if (typeof c.pid === "number") await killTree(c.pid);
+      else c.kill();
     } catch {
       /* ignore */
     }
   }
   children.length = 0;
+  if (runtime) {
+    runtime.serverPid = undefined; // the server child is gone — don't let the next launch try to reap a dead pid
+    persistRuntime();
+  }
   if (pg) {
     try {
       await pg.stop();
@@ -1295,8 +1400,45 @@ saveConfig(config);
 // Attach to a running `pnpm dev` stack if one's up; otherwise supervise our own full stack.
 attach = await detectAttach();
 
+// Single-instance + reclaim-our-own-ports, BEFORE anything binds. Only when we'd supervise our own stack (an
+// attached dev stack owns 3000/1/2 and never writes runtime.json). Wrapped so NOTHING here can break boot: on
+// a fresh install runtime.json doesn't exist yet (readRuntime → null → both branches skipped), and any
+// unexpected failure just falls through to the normal "resolve to nearby free ports" path below.
+if (!attach) {
+  try {
+    const prior = readRuntime();
+    if (
+      prior &&
+      prior.supervisorPid !== process.pid &&
+      isAlive(prior.supervisorPid) &&
+      (await pidOwnsPort(prior.supervisorPid, prior.ports.setup))
+    ) {
+      // Another Airwave desktop is already running (its supervisor still owns the setup port) — true single
+      // instance: surface the running one (open its admin) and exit instead of spinning up a parallel stack.
+      console.log(`[desktop] another instance is already running (pid ${prior.supervisorPid}) — opening its admin and exiting.`);
+      openBrowser(`http://localhost:${prior.ports.admin}`);
+      await Bun.sleep(300); // let the detached browser launch dispatch before we exit
+      process.exit(0);
+    }
+    if (prior) {
+      await reapStaleStack(prior); // kill our own crash-orphan server child (verified by port ownership)
+      config.ports = { ...config.ports, ...prior.ports }; // prefer the last-used ports so the admin URL stays stable across restarts
+    }
+  } catch (err) {
+    // Belt-and-suspenders: never let the reclaim logic break startup — worst case we resolve nearby ports as before.
+    console.warn("[desktop] single-instance/reap check failed (continuing to normal startup):", errText(err));
+  }
+}
+
 // Resolve to actually-free ports before anything binds or bakes a URL (no container network to isolate us).
 await resolvePorts(!attach);
+
+// Record this run so the NEXT launch can detect us (single-instance) or reap our orphan (crash). !attach only —
+// an attached dev stack isn't ours to supervise.
+if (!attach) {
+  runtime = { supervisorPid: process.pid, ports: config.ports, startedAt: new Date().toISOString() };
+  persistRuntime();
+}
 
 startSetupServer();
 buildTray(); // show the tray immediately — builds/PG can take a while on first run.
