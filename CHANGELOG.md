@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.31] - 2026-08-29
+
+Roku (tv-roku) — on-device login screen polish.
+
+### Changed
+- More prominent field borders on the email / password / show controls (the unfocused outline was nearly the
+  background color, so it read as borderless).
+- Left-aligned the email + password text so the fields read like real inputs — via a new `align` prop on
+  `RoundedButton` (default stays `center`, so nothing else changes).
+- "More sign-in options" now matches the "Change server" button's width + styling, and sits a uniform gap below
+  Sign in.
+- "Change server" is reachable from **every** view now — the form, the secondary chooser, and the QR/code pending
+  view (which previously swallowed navigation).
+
 ## [0.12.30] - 2026-08-29
 
 Admin (apps/web) — polish the TV device-approval page (`/device`) with a proper OTP field.

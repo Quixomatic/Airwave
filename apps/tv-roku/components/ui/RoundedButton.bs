@@ -40,8 +40,18 @@ sub render()
     m.ring.translation = [-gap, -gap]
 
     m.label.text = m.top.text
-    m.label.width = w
     m.label.height = h
+    ' Alignment: "left" indents the label (like a text input); "center" (default) fills the width.
+    if m.top.align = "left"
+        padX = 20
+        m.label.horizAlign = "left"
+        m.label.translation = [padX, 0]
+        m.label.width = w - padX * 2
+    else
+        m.label.horizAlign = "center"
+        m.label.translation = [0, 0]
+        m.label.width = w
+    end if
     ' jellyfin pattern: mutate the label's existing font object (uri+size), don't assign a new Font node.
     m.label.font.uri = m.top.fontUri
     m.label.font.size = m.top.fontSize

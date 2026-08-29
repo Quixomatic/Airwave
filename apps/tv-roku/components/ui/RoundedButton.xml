@@ -17,6 +17,7 @@
         <field id="fontUri" type="string" value="pkg:/fonts/Inter-SemiBold.ttf" onChange="render" />
         <field id="fontSize" type="integer" value="26" onChange="render" />
         <field id="outlined" type="boolean" value="false" onChange="render" />
+        <field id="align" type="string" value="center" onChange="render" />   <!-- "center" | "left" -->
         <field id="focused" type="boolean" value="false" onChange="render" />
     </interface>
     <children>

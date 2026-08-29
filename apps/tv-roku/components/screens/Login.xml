@@ -22,22 +22,22 @@
         <Group id="form">
             <Label id="emailCap" text="Email" translation="[706,286]" width="520" color="0x71717AFF" />
             <RoundedButton id="emailField" translation="[700,310]" w="520" h="72" radius="12" outlined="true"
-                fillColor="0x0E121CFF" textColor="0xE4E4E7FF" focusFill="0x161B28FF" focusInk="0xFFFFFFFF"
-                fontUri="pkg:/fonts/Inter-Regular.ttf" fontSize="22" text="Email" />
+                fillColor="0x52525BFF" textColor="0xE4E4E7FF" focusFill="0x161B28FF" focusInk="0xFFFFFFFF"
+                fontUri="pkg:/fonts/Inter-Regular.ttf" fontSize="22" text="Email" align="left" />
 
             <Label id="pwCap" text="Password" translation="[706,398]" width="520" color="0x71717AFF" />
             <RoundedButton id="pwField" translation="[700,422]" w="392" h="72" radius="12" outlined="true"
-                fillColor="0x0E121CFF" textColor="0xE4E4E7FF" focusFill="0x161B28FF" focusInk="0xFFFFFFFF"
-                fontUri="pkg:/fonts/Inter-Regular.ttf" fontSize="22" text="Password" />
+                fillColor="0x52525BFF" textColor="0xE4E4E7FF" focusFill="0x161B28FF" focusInk="0xFFFFFFFF"
+                fontUri="pkg:/fonts/Inter-Regular.ttf" fontSize="22" text="Password" align="left" />
             <RoundedButton id="showBtn" translation="[1104,422]" w="116" h="72" radius="12" outlined="true"
-                fillColor="0x0E121CFF" textColor="0xA1A1AAFF" focusFill="0x161B28FF" focusInk="0xFFFFFFFF"
+                fillColor="0x52525BFF" textColor="0xA1A1AAFF" focusFill="0x161B28FF" focusInk="0xFFFFFFFF"
                 fontUri="pkg:/fonts/Inter-Medium.ttf" fontSize="18" text="Show" />
 
             <RoundedButton id="signInBtn" translation="[700,520]" w="520" h="80" radius="12"
                 fillColor="0xF59E0BFF" textColor="0x000000FF" focusFill="0xFBBF24FF" focusInk="0x000000FF"
                 fontUri="pkg:/fonts/Inter-SemiBold.ttf" fontSize="24" text="Sign in" />
 
-            <RoundedButton id="moreBtn" translation="[730,656]" w="460" h="52" radius="10" outlined="true"
+            <RoundedButton id="moreBtn" translation="[830,626]" w="260" h="52" radius="10" outlined="true"
                 fillColor="0x27272AFF" textColor="0xA1A1AAFF" focusFill="0x27272AFF" focusInk="0xE4E4E7FF"
                 fontUri="pkg:/fonts/Inter-Medium.ttf" fontSize="16" text="More sign-in options ›" />
         </Group>

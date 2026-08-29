@@ -83,7 +83,8 @@ sub showPending(heading as string, instruction as string, code as string, qrValu
     m.pCode.text = code
     m.qr.text = qrValue     ' QRCode extends Poster — setting text renders the QR to itself
     m.error.text = ""
-    m.backBtn.focused = true
+    buildPendingItems()
+    setSel(0)
 end sub
 
 ' ---- focus / nav (item-list pattern, like ServerSetup) ------------------------
@@ -104,6 +105,15 @@ sub buildChooserItems()
     items.push({ node: m.plexBtn, action: "plex" })
     items.push({ node: m.codeBtn, action: "device" })
     items.push({ node: m.backToFormBtn, action: "backToForm" })
+    items.push({ node: m.changeBtn, action: "change" })   ' reachable here too (it's always visible)
+    m.items = items
+end sub
+
+sub buildPendingItems()
+    ' While waiting on a QR/code approval: Back (to the chooser) + Change server (both below the panel).
+    items = []
+    items.push({ node: m.backBtn, action: "backToChooser" })
+    items.push({ node: m.changeBtn, action: "change" })
     m.items = items
 end sub
 
@@ -124,11 +134,20 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
 
     if m.mode = "pending"
-        if key = Keys.OK or key = Keys.BACK
+        if key = Keys.BACK
             showChooser()
             return true
+        else if key = Keys.UP
+            setSel(m.sel - 1)
+            return true
+        else if key = Keys.DOWN
+            setSel(m.sel + 1)
+            return true
+        else if key = Keys.OK
+            dispatch()
+            return true
         end if
-        return key = Keys.UP or key = Keys.DOWN   ' swallow nav while pending
+        return false
     end if
 
     if key = Keys.UP
@@ -165,7 +184,10 @@ sub dispatch()
         showChooser()
     else if a = "change"
         Log.info("change server requested")
+        m.timer.control = "stop"   ' pending flow may be polling; stop before we leave the scene
         m.top.changeServer = true
+    else if a = "backToChooser"
+        showChooser()
     else if a = "plex"
         startPlex()
     else if a = "device"
