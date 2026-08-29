@@ -1,9 +1,15 @@
 import { Button } from "@airwave/ui/components/button";
 import { Card } from "@airwave/ui/components/card";
-import { Input } from "@airwave/ui/components/input";
+import { OTPField, OTPFieldInput } from "@airwave/ui/components/otp-field";
 import { createFileRoute } from "@tanstack/react-router";
 import { Tv } from "lucide-react";
 import { useState } from "react";
+
+// The TV user code is 4 chars of better-auth's unambiguous charset (see the deviceAuthorization plugin).
+const CODE_LENGTH = 4;
+// Large slots, held at this size across breakpoints (the base component shrinks on `sm:` — override it).
+const SLOT_CLASS =
+  "size-16 rounded-xl text-3xl leading-[4rem] sm:size-16 sm:text-3xl sm:leading-[4rem]";
 
 import { authClient } from "@/lib/auth-client";
 
@@ -25,7 +31,7 @@ type Status = "idle" | "working" | "approved" | "denied" | "error";
  */
 function DevicePage() {
   const { user_code } = Route.useSearch();
-  const [code, setCode] = useState(user_code ?? "");
+  const [code, setCode] = useState((user_code ?? "").toUpperCase());
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string | null>(null);
 
@@ -73,26 +79,39 @@ function DevicePage() {
           <p className="text-lg font-medium">Request denied.</p>
         </Card>
       ) : (
-        <Card className="flex w-full flex-col gap-4 p-6">
-          <Input
+        <Card className="flex w-full flex-col items-center gap-5 p-8">
+          <OTPField
+            size="lg"
+            length={CODE_LENGTH}
             value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="Enter the code"
-            className="text-center font-mono text-2xl tracking-[0.3em]"
-            autoFocus
-          />
+            onValueChange={(value) => setCode(value)}
+            validationType="alphanumeric"
+            normalizeValue={(value) => value.toUpperCase()}
+            className="justify-center gap-3 font-mono"
+          >
+            {Array.from({ length: CODE_LENGTH }, (_, i) => (
+              // Base UI derives each input's index from render order — no index prop. aria-invalid on the
+              // input (not the root) is what turns the slot red via the component's own styling.
+              <OTPFieldInput
+                key={i}
+                className={SLOT_CLASS}
+                autoFocus={i === 0}
+                aria-invalid={status === "error"}
+              />
+            ))}
+          </OTPField>
           {message && <p className="text-sm text-red-500">{message}</p>}
-          <div className="flex gap-3">
+          <div className="flex w-full gap-3">
             <Button
               onClick={() => submit("approve")}
-              disabled={status === "working" || !code.trim()}
+              disabled={status === "working" || code.length < CODE_LENGTH}
               className="flex-1"
             >
               {status === "working" ? "Approving…" : "Approve"}
             </Button>
             <Button
               onClick={() => submit("deny")}
-              disabled={status === "working" || !code.trim()}
+              disabled={status === "working" || code.length < CODE_LENGTH}
               variant="outline"
             >
               Deny

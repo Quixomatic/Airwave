@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.30] - 2026-08-29
+
+Admin (apps/web) — polish the TV device-approval page (`/device`) with a proper OTP field.
+
+### Changed
+- The `/device` page now uses a dedicated **4-slot OTP field** instead of a single text input: large slots,
+  obviously four alphanumeric characters, auto-uppercased, with per-slot invalid styling on a bad/expired code. The
+  QR pre-fill (`?user_code=`) still populates it and the approve/deny flow is unchanged.
+- Added the coss **`@coss/otp-field`** component (built on Base UI) to `@airwave/ui`
+  (`components/otp-field.tsx`). Only its imports were adapted to our aliases; the existing `separator.tsx` is
+  untouched, and the caret-blink keyframe it uses was already in `globals.css`.
+
 ## [0.12.29] - 2026-08-28
 
 Roku (tv-roku) — add **on-device email/password sign-in**, the fix for the Roku Channel Store rejection.
