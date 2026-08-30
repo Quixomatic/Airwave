@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.34] - 2026-08-30
+
+Docs site (getairwave.tv) — add a generated Open Graph / Twitter share image + social metadata.
+
+### Added
+- `scripts/gen-og-image.py` (Pillow, mirrors the tv-native/roku brand generators) produces the 1200×630
+  share image — the Airwave mark + wordmark with a tight "Turn your Plex library into live TV" subtext on the
+  navy radial gradient — into `app/opengraph-image.png` + `app/twitter-image.png` (Next's file convention wires
+  `og:image` / `twitter:image` with dimensions automatically).
+- `openGraph` + `twitter` (`summary_large_image`) metadata in `app/layout.tsx` so a shared getairwave.tv link
+  renders a rich card.
+
 ## [0.12.33] - 2026-08-30
 
 Docs site (getairwave.tv) — add a `robots.txt` so Google (and other crawlers) can index the site properly.

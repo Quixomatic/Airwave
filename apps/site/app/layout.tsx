@@ -14,6 +14,22 @@ export const metadata: Metadata = {
   description:
     "Airwave is a self-hostable service that turns your Plex library into custom, always-on live-TV channels — watch on webOS, Apple TV, iPad, Android TV, and Fire TV.",
   metadataBase: new URL("https://getairwave.tv"),
+  // Social/rich-share cards. The og:image / twitter:image come from app/opengraph-image.png +
+  // app/twitter-image.png (Next's file convention adds them with dimensions); this fills in the rest.
+  openGraph: {
+    type: "website",
+    siteName: "Airwave",
+    url: "https://getairwave.tv",
+    title: "Airwave — your Plex library as custom live TV",
+    description:
+      "Turn your Plex library into custom, always-on live-TV channels — watch on webOS, Apple TV, iPad, Android TV, and Fire TV.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Airwave — your Plex library as custom live TV",
+    description:
+      "Turn your Plex library into custom, always-on live-TV channels — watch on webOS, Apple TV, iPad, Android TV, and Fire TV.",
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
