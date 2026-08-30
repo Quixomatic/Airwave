@@ -2,6 +2,25 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.35] - 2026-08-30
+
+Docs site (getairwave.tv) — blog revamp + an App Store launch post.
+
+### Added
+- Rebuilt the blog list as a magazine-style feed: horizontal cards with a **required featured image**, a 2-line
+  excerpt, `date · author · reading time`, a hover wash + animated title underline, and a newsletter sidebar slot.
+  `image` is now a required field on the blog schema; both existing posts point at their hero screenshot.
+- Blog post pages: a **centered header** (meta / title / subtitle) with a soft radial glow that fades into the
+  page, a **featured image wider than the prose**, reading time, **prev/next post tiles**, and per-post
+  og:image / Twitter share cards.
+- Reading-time helper (`lib/reading-time.ts`, ~200 wpm from the raw MDX) and an **RSS feed** at `/blog/rss.xml`
+  (linked from the blog metadata).
+- New post: **"Airwave is now on the Apple TV App Store."**
+
+### Changed
+- Added section headings to the "I missed channel surfing" post so its table of contents is complete, and dated
+  "Introducing Airwave" a few days earlier so the feed orders correctly.
+
 ## [0.12.34] - 2026-08-30
 
 Docs site (getairwave.tv) — add a generated Open Graph / Twitter share image + social metadata.

@@ -15,6 +15,9 @@ export const blog = defineDocs({
     schema: frontmatterSchema.extend({
       author: z.string(),
       date: z.string(),
+      // Required featured image (a path under /public, e.g. "/blog/my-post.png"), shown on the blog list
+      // cards + the post header. Generate a branded default with scripts/gen-blog-image.py, or drop a real one.
+      image: z.string(),
     }),
   },
 });
