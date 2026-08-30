@@ -1,4 +1,5 @@
 import "pkg:/source/lib/serverUrl.bs"
+import "pkg:/source/lib/registry.bs"
 import "pkg:/source/lib/log.bs"
 
 ' Dev-only conveniences. Everything here is gated on roAppInfo.IsDev() — which is true ONLY for a
@@ -21,5 +22,13 @@ namespace Dev
         if ServerUrl.has() then return
         ServerUrl.set(Dev.SEED_SERVER_URL)
         Log.info("[dev] seeded server url -> " + Dev.SEED_SERVER_URL)
+    end sub
+
+    ' Inverse of seedRegistry for the login email: on a sideloaded build, wipe the remembered email on
+    ' every boot so the on-device login form always starts empty while testing (remember-email otherwise
+    ' persists it in the registry). Store install = no-op. Remove the call in main.bs to restore remembering.
+    sub clearRememberedEmail()
+        if not Dev.isDev() then return
+        Registry.delete(RegKey.EMAIL)
     end sub
 end namespace

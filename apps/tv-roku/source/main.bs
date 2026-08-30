@@ -5,7 +5,13 @@ sub Main(args as object)
 
     ' Dev-only: pre-seed the server URL on a sideloaded build (no-op on a store install) so a
     ' re-sideload doesn't force re-onboarding. See source/lib/dev.bs.
-    Dev.seedRegistry()
+    ' TEMPORARILY OFF (2026-08-29) — the seed kept re-populating the stored server URL; re-enable
+    ' when back to iterating against the dev server.
+    ' Dev.seedRegistry()
+
+    ' Dev-only: wipe the remembered login email each boot so the form starts empty while testing the
+    ' sign-in flow. Uncomment to re-enable; leave commented to keep remember-email working.
+    ' Dev.clearRememberedEmail()
 
     screen = CreateObject("roSGScreen")
     m.port = CreateObject("roMessagePort")
