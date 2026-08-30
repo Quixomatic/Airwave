@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.33] - 2026-08-30
+
+Docs site (getairwave.tv) — add a `robots.txt` so Google (and other crawlers) can index the site properly.
+
+### Added
+- `app/robots.ts` (a Next metadata route → served at `/robots.txt`): allows crawling, points at the dynamic
+  `sitemap.xml`, sets the canonical host, and excludes `/api/` (the roadmap vote endpoint isn't content). Pairs
+  with the existing `sitemap.ts` now that the site is verified in Google Search Console.
+
 ## [0.12.32] - 2026-08-30
 
 Server — keep Plex HLS-transcode sessions alive so Plex can't reap them mid-playback (GitHub #13).
