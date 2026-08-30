@@ -993,6 +993,35 @@ export async function stopTranscode(
   }
 }
 
+/** Keep a Plex transcode session alive. Plex reaps a transcode as "Playback has been paused for too long"
+ * (~5½ min) unless it receives a periodic liveness signal — actively fetching segments does NOT count (GitHub
+ * #13). This is the transcode-scoped `universal/ping`: NO ratingKey and NO progress, so unlike `/:/timeline` it
+ * never marks episodes watched / populates Continue Watching / updates on-deck under the owner's account — the
+ * "minimal session ping (no progress)" from .docs/playback-model.md §8a. Called ~every 10s from the watch-session
+ * heartbeat while a transcode is live. Best-effort (never throws) — a missed ping falls back to the client's
+ * resume-stall watchdog. */
+export async function pingTranscode(
+  baseUrl: string,
+  token: string,
+  clientId: string,
+  session: string,
+): Promise<void> {
+  const params = new URLSearchParams({
+    session,
+    "X-Plex-Client-Identifier": clientId,
+    "X-Plex-Token": token,
+  });
+  try {
+    await fetch(`${baseUrl}/video/:/transcode/universal/ping?${params.toString()}`, {
+      headers: pmsHeaders(token),
+      // Bound it — this fires every ~10s per live transcode, so a hung Plex must never leave sockets piling up.
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+    // Best-effort — a missed ping just risks Plex reaping the session early.
+  }
+}
+
 /** Available values for a tag filter field (genre/studio/director/actor/…). */
 export async function getFilterValues(
   baseUrl: string,

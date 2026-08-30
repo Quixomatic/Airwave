@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@airwave/db";
 
-import { type GuideMeta, stopTranscode } from "../plex/client";
+import { type GuideMeta, pingTranscode, stopTranscode } from "../plex/client";
 import { decryptToken } from "../plex/token";
 
 /** A session is "active" while it's heartbeated within this window. */
@@ -43,6 +43,16 @@ export async function heartbeatSession(
     update: data,
   });
 
+  // Keep the Plex transcode session alive. Plex reaps a transcode as "paused for too long" (~5½ min) unless it
+  // gets a periodic liveness ping — active segment fetching does NOT count (GitHub #13). `transcodeSession` is
+  // set ONLY on the HLS-transcode path (direct-play returns a null session), so its presence is the gate. We use
+  // the transcode-scoped `universal/ping` (no ratingKey / no progress) so it never pollutes the owner's watch
+  // history — see `.docs/playback-model.md` §8a. Fire-and-forget so the heartbeat stays fast; a missed ping just
+  // falls back to the client's resume-stall watchdog.
+  if (input.transcodeSession && input.channelId) {
+    void keepTranscodeAlive(prisma, input.channelId, input.transcodeSession);
+  }
+
   // Also record PER-CHANNEL watch state. `WatchSession` is one row per user (the *current*
   // session), so it carries no history — this table is the history: its @@unique([userId,
   // channelId]) dedupes to one row per channel and `updatedAt` orders them, which is exactly the
@@ -61,6 +71,28 @@ export async function heartbeatSession(
     });
   }
   return { ok: true as const };
+}
+
+/** Ping the Plex transcode session for `channelId`'s media source to keep it alive (see the call site in
+ * heartbeatSession + `pingTranscode`). Best-effort: resolves the source, decrypts the token, pings; any failure
+ * is swallowed. */
+async function keepTranscodeAlive(prisma: PrismaClient, channelId: string, session: string): Promise<void> {
+  try {
+    const channel = await prisma.channel.findUnique({
+      where: { id: channelId },
+      include: { mediaSource: true },
+    });
+    const src = channel?.mediaSource;
+    if (!src?.baseUrl) return;
+    await pingTranscode(
+      src.baseUrl,
+      decryptToken(src.token),
+      src.clientIdentifier ?? "channelguide-server",
+      session,
+    );
+  } catch {
+    // best-effort — the client's resume-stall watchdog is the backstop
+  }
 }
 
 /** End the user's session (+ best-effort stop its Plex transcode). */

@@ -2,6 +2,23 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.32] - 2026-08-30
+
+Server — keep Plex HLS-transcode sessions alive so Plex can't reap them mid-playback (GitHub #13).
+
+### Fixed
+- On the HLS-transcode path, the server now sends Plex a liveness ping (`/video/:/transcode/universal/ping`)
+  ~every 10s, driven off the watch-session heartbeat whenever a transcode session is active. Without it, Plex
+  classified the stream as **paused** — Airwave intentionally sends no `/:/timeline` progress, to avoid polluting
+  the owner's watch history — and on servers where **"Terminate Sessions Paused for Longer Than"**
+  (`MinutesAllowedPaused`) is a non-zero value, killed the transcode after that many minutes ("Playback has been
+  paused for too long"), even while the client was actively fetching segments. Playback then stalled until a skip
+  forced a fresh session. Servers with that setting at 0 were unaffected, which is why it only hit some users.
+- The ping is transcode-scoped (no ratingKey, no progress), so it keeps the session alive **without** reporting
+  watch state to Plex (no Continue Watching / on-deck pollution) — see `.docs/playback-model.md` §8a. It runs at
+  Plex's own documented 10s liveness cadence, and is fire-and-forget with a 5s timeout so it never adds latency to
+  the heartbeat. New `apps/server/scripts/test-transcode-keepalive.ts` (a real A/B probe against the live Plex).
+
 ## [0.12.31] - 2026-08-29
 
 Roku (tv-roku) — on-device login screen polish.
