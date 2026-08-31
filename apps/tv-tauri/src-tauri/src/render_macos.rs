@@ -100,7 +100,12 @@ fn render(state: &RenderState) {
     unsafe {
         CGLLockContext(state.cgl);
         let _: () = msg_send![state.gl_context, makeCurrentContext];
-        let mut fbo = ffi::MpvOpenglFbo { fbo: 0, w, h, internal_format: state.internal_format };
+        let mut fbo = ffi::MpvOpenglFbo {
+            fbo: 0,
+            w,
+            h,
+            internal_format: state.internal_format,
+        };
         let mut flip: c_int = 1;
         let mut params = [
             ffi::MpvRenderParam {
@@ -111,7 +116,10 @@ fn render(state: &RenderState) {
                 type_: ffi::MPV_RENDER_PARAM_FLIP_Y,
                 data: &mut flip as *mut _ as *mut c_void,
             },
-            ffi::MpvRenderParam { type_: ffi::MPV_RENDER_PARAM_INVALID, data: ptr::null_mut() },
+            ffi::MpvRenderParam {
+                type_: ffi::MPV_RENDER_PARAM_INVALID,
+                data: ptr::null_mut(),
+            },
         ];
         ffi::mpv_render_context_render(state.mpv_render_ctx, params.as_mut_ptr());
         let _: () = msg_send![state.gl_context, flushBuffer];
@@ -167,13 +175,20 @@ pub fn setup(window: &tauri::WebviewWindow, mpv: &Arc<mpv::Mpv>) -> Result<(), S
         let headroom: f64 = if screen.is_null() {
             1.0
         } else {
-            msg_send![screen, maximumPotentialExtendedDynamicRangeColorComponentValue]
+            msg_send![
+                screen,
+                maximumPotentialExtendedDynamicRangeColorComponentValue
+            ]
         };
         let hdr = headroom > 1.0;
         let internal_format = if hdr { GL_RGBA16F } else { 0 };
         log::info!(
             "macOS display EDR headroom {headroom:.2} → {}",
-            if hdr { "HDR passthrough (RGBA16F)" } else { "SDR (tone-map)" }
+            if hdr {
+                "HDR passthrough (RGBA16F)"
+            } else {
+                "SDR (tone-map)"
+            }
         );
 
         // Backmost, layer-backed host view for the GL drawable (behind the transparent webview).
@@ -192,7 +207,11 @@ pub fn setup(window: &tauri::WebviewWindow, mpv: &Arc<mpv::Mpv>) -> Result<(), S
         if hdr {
             attrs.push(NSOPENGL_PFA_COLOR_FLOAT);
         }
-        attrs.extend_from_slice(&[NSOPENGL_PFA_OPENGL_PROFILE, NSOPENGL_PROFILE_VERSION_4_1_CORE, 0]);
+        attrs.extend_from_slice(&[
+            NSOPENGL_PFA_OPENGL_PROFILE,
+            NSOPENGL_PROFILE_VERSION_4_1_CORE,
+            0,
+        ]);
         let pf: *mut AnyObject = msg_send![class!(NSOpenGLPixelFormat), alloc];
         let pf: *mut AnyObject = msg_send![pf, initWithAttributes: attrs.as_ptr()];
         if pf.is_null() {
@@ -240,10 +259,17 @@ pub fn setup(window: &tauri::WebviewWindow, mpv: &Arc<mpv::Mpv>) -> Result<(), S
                 type_: ffi::MPV_RENDER_PARAM_ADVANCED_CONTROL,
                 data: &mut adv as *mut _ as *mut c_void,
             },
-            ffi::MpvRenderParam { type_: ffi::MPV_RENDER_PARAM_INVALID, data: ptr::null_mut() },
+            ffi::MpvRenderParam {
+                type_: ffi::MPV_RENDER_PARAM_INVALID,
+                data: ptr::null_mut(),
+            },
         ];
         let mut render_ctx: *mut c_void = ptr::null_mut();
-        let rc = ffi::mpv_render_context_create(&mut render_ctx, mpv.ctx_raw(), create_params.as_mut_ptr());
+        let rc = ffi::mpv_render_context_create(
+            &mut render_ctx,
+            mpv.ctx_raw(),
+            create_params.as_mut_ptr(),
+        );
         if rc < 0 || render_ctx.is_null() {
             return Err(format!("mpv_render_context_create failed: {rc}"));
         }
@@ -263,7 +289,11 @@ pub fn setup(window: &tauri::WebviewWindow, mpv: &Arc<mpv::Mpv>) -> Result<(), S
         }
         CVDisplayLinkSetOutputCallback(dl, display_link_cb, state as *mut c_void);
         CVDisplayLinkStart(dl);
-        log::info!("macOS render context up (GL {}x{})", RENDER_W.load(Ordering::Relaxed), RENDER_H.load(Ordering::Relaxed));
+        log::info!(
+            "macOS render context up (GL {}x{})",
+            RENDER_W.load(Ordering::Relaxed),
+            RENDER_H.load(Ordering::Relaxed)
+        );
         Ok(())
     }
 }
@@ -275,7 +305,9 @@ pub fn on_resize(window: &tauri::WebviewWindow) {
     if state.is_null() {
         return;
     }
-    let Ok(ns_window) = window.ns_window() else { return };
+    let Ok(ns_window) = window.ns_window() else {
+        return;
+    };
     let ns_window = ns_window as *mut AnyObject;
     if ns_window.is_null() {
         return;

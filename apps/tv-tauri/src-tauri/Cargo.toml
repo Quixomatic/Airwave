@@ -1,6 +1,6 @@
 [package]
 name = "airwave"
-version = "0.12.36"
+version = "0.12.37"
 description = "Airwave desktop client (Tauri + libmpv)"
 authors = ["Airwave"]
 license = ""
@@ -60,3 +60,10 @@ objc2 = "0.6.1"
 objc2-app-kit = { version = "0.3.1", features = ["NSWindow", "NSView", "NSResponder"] }
 objc2-foundation = { version = "0.3.1", features = ["NSString", "NSGeometry"] }
 objc2-quartz-core = { version = "0.3.1", features = ["CALayer", "CAMetalLayer"] }
+
+# Keep the machine + display awake while video plays (desktop only). Tauri has no first-class API
+# (tauri#3697), so we mirror our Tauri+libmpv reference (soia): hold an OS wake assertion during playback.
+# keepawake → IOPMAssertion (macOS) / SetThreadExecutionState (Windows) / D-Bus·systemd (Linux). Scoped to
+# desktop so any mobile build (the staticlib/cdylib crate-types) doesn't try to pull it.
+[target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
+keepawake = "0.6.0"

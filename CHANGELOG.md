@@ -2,6 +2,23 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.37] - 2026-08-31
+
+tv-tauri (desktop client) — keep the computer awake while video is playing, on macOS, Windows, and Linux
+(GitHub #17).
+
+### Fixed
+- The desktop client no longer lets the machine or display sleep while a channel is playing. Reported on macOS
+  (#17), fixed for all three desktop targets. Tauri has no first-class sleep-inhibition API, so the app now holds
+  an OS wake assertion during playback via the `keepawake` crate — **IOPMAssertion** (macOS, the same mechanism
+  our references use), **SetThreadExecutionState** (Windows), and **D-Bus / systemd-inhibit** (Linux). Keeps the
+  **display** awake, not just the system.
+- Rule: awake while a program is loaded and **not** user-paused — buffering counts as playing — and released the
+  moment playback is paused, stopped, goes idle, or the app shuts down (so a paused/idle player sleeps normally).
+  Driven off mpv's `pause` + `idle-active` in the event loop, on the same thread that owns the assertion.
+  Fail-soft: a wake-assert failure only logs a warning and never affects playback. New `src-tauri/src/wakelock.rs`;
+  desktop-scoped dependency so a mobile build won't pull it.
+
 ## [0.12.36] - 2026-08-31
 
 tv-native (Android) — fix a flat purple screen for SDR video on the NVIDIA Shield.

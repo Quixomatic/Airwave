@@ -199,23 +199,66 @@ extern "C" {
     pub fn mpv_command(ctx: *mut c_void, args: *const *const c_char) -> c_int;
     pub fn mpv_command_string(ctx: *mut c_void, args: *const c_char) -> c_int;
     pub fn mpv_command_node(ctx: *mut c_void, args: *mut MpvNode, result: *mut MpvNode) -> c_int;
-    pub fn mpv_command_async(ctx: *mut c_void, reply_userdata: u64, args: *const *const c_char) -> c_int;
+    pub fn mpv_command_async(
+        ctx: *mut c_void,
+        reply_userdata: u64,
+        args: *const *const c_char,
+    ) -> c_int;
     pub fn mpv_abort_async_command(ctx: *mut c_void, reply_userdata: u64);
 
     // ── Options ──────────────────────────────────────────────────────────────
-    pub fn mpv_set_option(ctx: *mut c_void, name: *const c_char, format: c_int, data: *mut c_void) -> c_int;
-    pub fn mpv_set_option_string(ctx: *mut c_void, name: *const c_char, data: *const c_char) -> c_int;
+    pub fn mpv_set_option(
+        ctx: *mut c_void,
+        name: *const c_char,
+        format: c_int,
+        data: *mut c_void,
+    ) -> c_int;
+    pub fn mpv_set_option_string(
+        ctx: *mut c_void,
+        name: *const c_char,
+        data: *const c_char,
+    ) -> c_int;
 
     // ── Properties ───────────────────────────────────────────────────────────
-    pub fn mpv_set_property(ctx: *mut c_void, name: *const c_char, format: c_int, data: *mut c_void) -> c_int;
-    pub fn mpv_set_property_string(ctx: *mut c_void, name: *const c_char, data: *const c_char) -> c_int;
-    pub fn mpv_set_property_async(ctx: *mut c_void, reply_userdata: u64, name: *const c_char, format: c_int, data: *mut c_void) -> c_int;
+    pub fn mpv_set_property(
+        ctx: *mut c_void,
+        name: *const c_char,
+        format: c_int,
+        data: *mut c_void,
+    ) -> c_int;
+    pub fn mpv_set_property_string(
+        ctx: *mut c_void,
+        name: *const c_char,
+        data: *const c_char,
+    ) -> c_int;
+    pub fn mpv_set_property_async(
+        ctx: *mut c_void,
+        reply_userdata: u64,
+        name: *const c_char,
+        format: c_int,
+        data: *mut c_void,
+    ) -> c_int;
     pub fn mpv_del_property(ctx: *mut c_void, name: *const c_char) -> c_int;
-    pub fn mpv_get_property(ctx: *mut c_void, name: *const c_char, format: c_int, data: *mut c_void) -> c_int;
+    pub fn mpv_get_property(
+        ctx: *mut c_void,
+        name: *const c_char,
+        format: c_int,
+        data: *mut c_void,
+    ) -> c_int;
     pub fn mpv_get_property_string(ctx: *mut c_void, name: *const c_char) -> *mut c_char;
     pub fn mpv_get_property_osd_string(ctx: *mut c_void, name: *const c_char) -> *mut c_char;
-    pub fn mpv_get_property_async(ctx: *mut c_void, reply_userdata: u64, name: *const c_char, format: c_int) -> c_int;
-    pub fn mpv_observe_property(ctx: *mut c_void, reply_userdata: u64, name: *const c_char, format: c_int) -> c_int;
+    pub fn mpv_get_property_async(
+        ctx: *mut c_void,
+        reply_userdata: u64,
+        name: *const c_char,
+        format: c_int,
+    ) -> c_int;
+    pub fn mpv_observe_property(
+        ctx: *mut c_void,
+        reply_userdata: u64,
+        name: *const c_char,
+        format: c_int,
+    ) -> c_int;
     pub fn mpv_unobserve_property(ctx: *mut c_void, registered_reply_userdata: u64) -> c_int;
 
     // ── Events / wakeup ──────────────────────────────────────────────────────

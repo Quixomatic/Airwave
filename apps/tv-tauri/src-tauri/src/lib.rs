@@ -1,6 +1,7 @@
 mod mpv;
 #[cfg(target_os = "macos")]
 mod render_macos;
+mod wakelock;
 
 use std::sync::Arc;
 
@@ -20,7 +21,13 @@ use tauri_plugin_http::reqwest;
 #[tauri::command]
 fn mpv_load(mpv: State<'_, Arc<mpv::Mpv>>, url: String, start_at: f64) -> Result<(), String> {
     if start_at > 0.0 {
-        mpv.command(&["loadfile", &url, "replace", "0", &format!("start={start_at}")])
+        mpv.command(&[
+            "loadfile",
+            &url,
+            "replace",
+            "0",
+            &format!("start={start_at}"),
+        ])
     } else {
         mpv.command(&["loadfile", &url, "replace"])
     }
@@ -127,50 +134,71 @@ fn spawn_mpv_event_loop(app: tauri::AppHandle, mpv: Arc<mpv::Mpv>) {
     let _ = mpv.observe_property(3, "duration", MpvFormat::Double);
     let _ = mpv.observe_property(4, "core-idle", MpvFormat::Flag);
     let _ = mpv.observe_property(5, "eof-reached", MpvFormat::Flag);
+    let _ = mpv.observe_property(6, "idle-active", MpvFormat::Flag);
 
-    std::thread::spawn(move || loop {
-        let (id, _err, reply) = mpv.poll_event(1.0);
-        if id == mpv::MPV_EVENT_SHUTDOWN {
-            break;
-        }
-        if id == mpv::MPV_EVENT_PROPERTY_CHANGE {
-            match reply {
-                1 => {
-                    if let Some(t) = mpv.get_property_double("time-pos") {
-                        let _ = app.emit("mpv:time-pos", t);
-                    }
-                }
-                2 => {
-                    if let Some(p) = mpv.get_property_flag("pause") {
-                        let _ = app.emit("mpv:pause", p);
-                    }
-                }
-                3 => {
-                    if let Some(d) = mpv.get_property_double("duration") {
-                        let _ = app.emit("mpv:duration", d);
-                    }
-                }
-                4 => {
-                    if let Some(idle) = mpv.get_property_flag("core-idle") {
-                        let _ = app.emit("mpv:idle", idle);
-                    }
-                }
-                5 => {
-                    if mpv.get_property_flag("eof-reached") == Some(true) {
-                        let _ = app.emit("mpv:eof", ());
-                    }
-                }
-                _ => {}
+    std::thread::spawn(move || {
+        // Keep the machine + display awake while a program is playing. Rule (matches soia + plezy): awake
+        // while a file is loaded and NOT user-paused — buffering counts as playing. Released on pause / stop /
+        // idle, and on shutdown (the manager drops when this thread exits). Created INSIDE the thread so the OS
+        // wake-assertion handle never crosses a thread boundary (matches soia). `mpv` starts idle → released.
+        let mut wake = wakelock::WakeLockManager::new();
+        let mut paused = false;
+        let mut idle_active = true;
+
+        loop {
+            let (id, _err, reply) = mpv.poll_event(1.0);
+            if id == mpv::MPV_EVENT_SHUTDOWN {
+                break;
             }
-        } else if id == mpv::MPV_EVENT_FILE_LOADED {
-            let payload = serde_json::json!({
-                "width": mpv.get_property_i64("dwidth").unwrap_or(0),
-                "height": mpv.get_property_i64("dheight").unwrap_or(0),
-                "duration": mpv.get_property_double("duration").unwrap_or(0.0),
-            });
-            let _ = app.emit("mpv:loaded", payload);
-        } else if id == mpv::MPV_EVENT_END_FILE {
-            let _ = app.emit("mpv:end", ());
+            if id == mpv::MPV_EVENT_PROPERTY_CHANGE {
+                match reply {
+                    1 => {
+                        if let Some(t) = mpv.get_property_double("time-pos") {
+                            let _ = app.emit("mpv:time-pos", t);
+                        }
+                    }
+                    2 => {
+                        if let Some(p) = mpv.get_property_flag("pause") {
+                            let _ = app.emit("mpv:pause", p);
+                            paused = p;
+                            wake.update(!paused && !idle_active);
+                        }
+                    }
+                    3 => {
+                        if let Some(d) = mpv.get_property_double("duration") {
+                            let _ = app.emit("mpv:duration", d);
+                        }
+                    }
+                    4 => {
+                        if let Some(idle) = mpv.get_property_flag("core-idle") {
+                            let _ = app.emit("mpv:idle", idle);
+                        }
+                    }
+                    5 => {
+                        if mpv.get_property_flag("eof-reached") == Some(true) {
+                            let _ = app.emit("mpv:eof", ());
+                        }
+                    }
+                    6 => {
+                        // Playback core went idle (stopped / no file) or resumed. Not emitted to JS (which uses
+                        // `core-idle` above); used only to gate the wake lock so a stopped player can sleep.
+                        if let Some(i) = mpv.get_property_flag("idle-active") {
+                            idle_active = i;
+                            wake.update(!paused && !idle_active);
+                        }
+                    }
+                    _ => {}
+                }
+            } else if id == mpv::MPV_EVENT_FILE_LOADED {
+                let payload = serde_json::json!({
+                    "width": mpv.get_property_i64("dwidth").unwrap_or(0),
+                    "height": mpv.get_property_i64("dheight").unwrap_or(0),
+                    "duration": mpv.get_property_double("duration").unwrap_or(0.0),
+                });
+                let _ = app.emit("mpv:loaded", payload);
+            } else if id == mpv::MPV_EVENT_END_FILE {
+                let _ = app.emit("mpv:end", ());
+            }
         }
     });
 }
@@ -203,7 +231,9 @@ async fn probe_health(urls: Vec<String>) -> Vec<String> {
                     // text and parse with serde_json (already a dep). Health = `{ "ok": true }`.
                     match resp.text().await {
                         Ok(text) => match serde_json::from_str::<serde_json::Value>(&text) {
-                            Ok(v) if v.get("ok").and_then(|b| b.as_bool()) == Some(true) => Some(base),
+                            Ok(v) if v.get("ok").and_then(|b| b.as_bool()) == Some(true) => {
+                                Some(base)
+                            }
                             _ => None,
                         },
                         Err(_) => None,
@@ -261,7 +291,12 @@ fn probe_blocking(url: &str, timeout_ms: u64) -> ProbeResult {
         Err(e) => return fail(format!("mpv create: {e}")),
     };
     // Headless software-decode probe — override the visible instance's gpu-next baseline.
-    for (k, v) in [("vo", "null"), ("ao", "null"), ("hwdec", "no"), ("keep-open", "no")] {
+    for (k, v) in [
+        ("vo", "null"),
+        ("ao", "null"),
+        ("hwdec", "no"),
+        ("keep-open", "no"),
+    ] {
         if let Err(e) = mpv.set_option_string(k, v) {
             return fail(format!("set {k}: {e}"));
         }
@@ -345,8 +380,8 @@ struct ApiResponse {
 /// is a secure context, so a webview `fetch` to a plain-`http://` LAN server would be refused).
 #[tauri::command]
 async fn api_request(req: ApiRequest) -> Result<ApiResponse, String> {
-    let method =
-        reqwest::Method::from_bytes(req.method.to_uppercase().as_bytes()).map_err(|e| e.to_string())?;
+    let method = reqwest::Method::from_bytes(req.method.to_uppercase().as_bytes())
+        .map_err(|e| e.to_string())?;
     let mut rb = http_client().request(method, &req.url);
     for (k, v) in &req.headers {
         rb = rb.header(k.as_str(), v.as_str());
@@ -362,7 +397,11 @@ async fn api_request(req: ApiRequest) -> Result<ApiResponse, String> {
         .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap_or("").to_string()))
         .collect();
     let body = resp.text().await.map_err(|e| e.to_string())?;
-    Ok(ApiResponse { status, headers, body })
+    Ok(ApiResponse {
+        status,
+        headers,
+        body,
+    })
 }
 
 /// LAN discovery for onboarding — return the /24 prefixes (e.g. `"192.168.1"`) of this machine's
@@ -376,7 +415,12 @@ fn local_subnets() -> Vec<String> {
         Ok(ifaces) => {
             for iface in ifaces {
                 let ip = iface.ip();
-                log::info!("local_subnets: iface {} -> {} (loopback={})", iface.name, ip, iface.is_loopback());
+                log::info!(
+                    "local_subnets: iface {} -> {} (loopback={})",
+                    iface.name,
+                    ip,
+                    iface.is_loopback()
+                );
                 if iface.is_loopback() {
                     continue;
                 }
@@ -458,9 +502,7 @@ pub fn run() {
 /// video via WebView2/DComp) + the native window handle + a `wid` embed (the
 /// one piece we do ourselves in place of soia's closed `soia_utils`).
 fn setup_player(app: &mut tauri::App) -> Result<(), String> {
-    let window = app
-        .get_webview_window("main")
-        .ok_or("no main window")?;
+    let window = app.get_webview_window("main").ok_or("no main window")?;
 
     // Transparent webview so the video composites behind the UI (Windows: WebView2/DComp over the
     // child HWND; macOS: transparent WKWebView over the Metal layer). NOT window transparency on

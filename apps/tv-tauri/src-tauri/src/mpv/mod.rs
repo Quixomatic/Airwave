@@ -17,7 +17,9 @@ use std::ptr;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
 pub use ffi::MpvFormat;
-pub use ffi::{MPV_EVENT_END_FILE, MPV_EVENT_FILE_LOADED, MPV_EVENT_PROPERTY_CHANGE, MPV_EVENT_SHUTDOWN};
+pub use ffi::{
+    MPV_EVENT_END_FILE, MPV_EVENT_FILE_LOADED, MPV_EVENT_PROPERTY_CHANGE, MPV_EVENT_SHUTDOWN,
+};
 
 /// Owns a libmpv context. `Send`/`Sync`: libmpv's client API is thread-safe for
 /// the calls we make, and the context is guarded by an atomic pointer.
@@ -79,7 +81,9 @@ impl Mpv {
         let rc =
             unsafe { ffi::mpv_set_option_string(self.ctx(), c_name.as_ptr(), c_value.as_ptr()) };
         if rc < 0 {
-            Err(format!("mpv_set_option_string({name}={value}) failed: {rc}"))
+            Err(format!(
+                "mpv_set_option_string({name}={value}) failed: {rc}"
+            ))
         } else {
             Ok(())
         }
@@ -267,7 +271,9 @@ impl Mpv {
         let rc =
             unsafe { ffi::mpv_set_property_string(self.ctx(), c_name.as_ptr(), c_value.as_ptr()) };
         if rc < 0 {
-            Err(format!("mpv_set_property_string({name}={value}) failed: {rc}"))
+            Err(format!(
+                "mpv_set_property_string({name}={value}) failed: {rc}"
+            ))
         } else {
             Ok(())
         }
@@ -277,9 +283,8 @@ impl Mpv {
     /// `reply_userdata` is `id` (we route on that instead of parsing the event payload union).
     pub fn observe_property(&self, id: u64, name: &str, format: MpvFormat) -> Result<(), String> {
         let c_name = CString::new(name).map_err(|_| "property name has null byte")?;
-        let rc = unsafe {
-            ffi::mpv_observe_property(self.ctx(), id, c_name.as_ptr(), format as i32)
-        };
+        let rc =
+            unsafe { ffi::mpv_observe_property(self.ctx(), id, c_name.as_ptr(), format as i32) };
         if rc < 0 {
             Err(format!("mpv_observe_property({name}) failed: {rc}"))
         } else {
