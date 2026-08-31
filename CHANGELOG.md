@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.38] - 2026-08-31
+
+Docs site (getairwave.tv) — add a Changelog page generated from this file.
+
+### Added
+- A **`/docs/changelog`** page listing the 20 most recent releases, generated at build time from the root
+  `CHANGELOG.md` (`scripts/gen-changelog-doc.mjs`, invoked from `next.config.mjs` so it runs on every dev/build,
+  Vercel included). It's a real fumadocs MDX page, so it gets the automatic version **table of contents**, search
+  indexing, and docs styling, and appears in the sidebar under a new **"Release notes"** group with a link to the
+  full history on GitHub. The generated `content/docs/changelog.mdx` is gitignored — the root `CHANGELOG.md` stays
+  the single source of truth, and every release refreshes the page on the next build.
+
 ## [0.12.37] - 2026-08-31
 
 tv-tauri (desktop client) — keep the computer awake while video is playing, on macOS, Windows, and Linux

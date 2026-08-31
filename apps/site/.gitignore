@@ -5,6 +5,9 @@
 # fumadocs-mdx generated content source
 /.source/
 
+# generated from the root CHANGELOG.md by scripts/gen-changelog-doc.mjs (see next.config.mjs)
+/content/docs/changelog.mdx
+
 # production
 /build
 
