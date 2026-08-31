@@ -2,6 +2,26 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.36] - 2026-08-31
+
+tv-native (Android) — fix a flat purple screen for SDR video on the NVIDIA Shield.
+
+### Fixed
+- On **NVIDIA Shield** models, SDR H.264/HEVC content rendered as a solid purple screen with working audio. The
+  Shield's custom Android 11 GPU/driver can't composite hardware-MediaCodec-decoded SDR frames through mpv's
+  `gpu-next` (libplacebo) video output — a known upstream gpu-next + hwdec issue (mpv-android #1081, mpv #14934,
+  findroid #686). Reported by two Shield users (issue #15); the tell was that MPEG4 SDR (software-decoded) and all
+  HDR content played fine, and only hardware-decoded SDR broke.
+- The SDR video output is now the classic `vo=gpu` on Shield models only (`Build.MANUFACTURER == NVIDIA` **and**
+  `MODEL` contains "SHIELD"), and stays on the proven `gpu-next` everywhere else (Google TV Streamer, Sony Bravia,
+  Fire TV, tablets, emulator — byte-for-byte unchanged). HDR is untouched: it uses `mediacodec_embed`, which
+  already works on the Shield. Fixing the SDR renderer also clears the same purple on the bumper card (it shows
+  the previous program's last frame) and the mini player (the same mpv player, scaled down).
+
+### Scope
+- `packages/mpv-player/android/.../MpvCore.kt` only — one `sdrVo` field gated on the Shield model; no JS, server,
+  or schema change. iOS / tvOS / iPad / webOS / desktop are unaffected. Needs an Android build to reach devices.
+
 ## [0.12.35] - 2026-08-30
 
 Docs site (getairwave.tv) — blog revamp + an App Store launch post.

@@ -1,6 +1,7 @@
 package expo.modules.mpvplayer
 
 import android.content.Context
+import android.os.Build
 import android.view.Surface
 import dev.jdtech.mpv.EndFileReason
 import dev.jdtech.mpv.MpvEvent
@@ -48,16 +49,27 @@ class MpvCore(private val appContext: Context) {
 
   var delegate: MpvCoreDelegate? = null
 
-  // The video output, chosen DYNAMICALLY per program (§13.5). `gpu-next` is the SDR default (mpv's own
-  // renderer). On Android, gpu-next's OpenGL-ES path CANNOT passthrough HDR — it ALWAYS tone-maps HDR→SDR
-  // (findroid #645, mpv-android #874, libplacebo author). So on the first decoded frame we detect HDR
-  // (`video-params/sig-peak`/`max-luma`) and, for HDR content, switch to `vo=mediacodec_embed` (MediaCodec
-  // renders straight to the SurfaceView = real HDR10/HLG passthrough + full frame rate) and re-open the file
-  // at the same offset — exactly mirroring the Apple side, which reads gamma on first frame to drive its
-  // display switch. `currentVo` is a var because it changes at runtime; `attachSurface` restores IT (not a
-  // const) so an HDR program survives a surface reposition. (Do NOT global-force `mediacodec_embed` — tried
-  // v0.9.1, reverted v0.9.2: it regresses SDR, which must stay on mpv's renderer.)
-  private var currentVo = "gpu-next"
+  // The SDR video output. gpu-next (libplacebo, mpv's own renderer) is the default and is better everywhere
+  // we've tested (Google TV Streamer, Sony Bravia, emulator). BUT the NVIDIA Shield's custom Android 11
+  // GPU/driver renders a flat purple frame when gpu-next composites hardware-MediaCodec-decoded SDR frames
+  // (issue #15, confirmed by two Shield users; a known upstream gpu-next+hwdec issue — mpv-android #1081,
+  // mpv #14934, findroid #686). The classic `gpu` renderer keeps hardware decoding and renders correctly
+  // there. HDR is unaffected — it uses mediacodec_embed (a different path that already works on the Shield),
+  // so ONLY the SDR VO changes, and ONLY on the Shield. HDR was never gpu-next's job on Android (that VO
+  // can't passthrough HDR — it tone-maps; the real HDR path is mediacodec_embed, see maybeSwitchHdr).
+  private val sdrVo = if (isNvidiaShield()) "gpu" else "gpu-next"
+
+  // The video output, chosen DYNAMICALLY per program (§13.5). `sdrVo` is the SDR default (mpv's own renderer:
+  // gpu-next everywhere, `gpu` on the Shield — see above). On Android, gpu-next's OpenGL-ES path CANNOT
+  // passthrough HDR — it ALWAYS tone-maps HDR→SDR (findroid #645, mpv-android #874, libplacebo author). So on
+  // the first decoded frame we detect HDR (`video-params/sig-peak`/`max-luma`) and, for HDR content, switch to
+  // `vo=mediacodec_embed` (MediaCodec renders straight to the SurfaceView = real HDR10/HLG passthrough + full
+  // frame rate) and re-open the file at the same offset — exactly mirroring the Apple side, which reads gamma
+  // on first frame to drive its display switch. `currentVo` is a var because it changes at runtime;
+  // `attachSurface` restores IT (not a const) so an HDR program survives a surface reposition. (Do NOT
+  // global-force `mediacodec_embed` — tried v0.9.1, reverted v0.9.2: it regresses SDR, which must stay on
+  // mpv's renderer.)
+  private var currentVo = sdrVo
   // One HDR probe per user load (reset in load()); the internal re-open under the new VO must NOT re-probe.
   private var hdrChecked = false
 
@@ -164,12 +176,13 @@ class MpvCore(private val appContext: Context) {
     val p = player ?: return
     scope.launch {
       // Always probe HDR on mpv's own renderer: if a prior HDR program left us on mediacodec_embed, reset
-      // to gpu-next for a clean, reliable detect (its video-params are guaranteed). SDR then stays on
-      // gpu-next; HDR re-switches to embed on first frame (§13.5). Skipped for audio-only (vid=no) loads.
-      if (mode != "audio" && currentVo != "gpu-next") {
-        currentVo = "gpu-next"
+      // to the SDR VO (`sdrVo`: gpu-next, or `gpu` on the Shield) for a clean, reliable detect (its
+      // video-params are guaranteed). SDR then stays on `sdrVo`; HDR re-switches to embed on first frame
+      // (§13.5). Skipped for audio-only (vid=no) loads.
+      if (mode != "audio" && currentVo != sdrVo) {
+        currentVo = sdrVo
         p.setProperty("hwdec", "mediacodec,mediacodec-copy")
-        p.setProperty("vo", "gpu-next")
+        p.setProperty("vo", sdrVo)
       }
       doLoad(p, url, startTime, mode)
     }
@@ -353,6 +366,16 @@ class MpvCore(private val appContext: Context) {
 
   // MARK: internals
 
+  /**
+   * NVIDIA Shield MODELS specifically — NOT all NVIDIA devices. Shields report MODEL "SHIELD Android TV".
+   * Used only to pick the SDR video output (`sdrVo`): the Shield's custom Android 11 GPU/driver renders a flat
+   * purple frame under gpu-next for hardware-decoded SDR (issue #15), so those models fall back to the classic
+   * `gpu` renderer. Every other device — including any hypothetical non-Shield NVIDIA device — keeps gpu-next.
+   */
+  private fun isNvidiaShield(): Boolean =
+    Build.MANUFACTURER.equals("NVIDIA", ignoreCase = true) &&
+      Build.MODEL.contains("SHIELD", ignoreCase = true)
+
   private inline fun launchOnPlayer(crossinline block: suspend (MpvPlayer) -> Unit) {
     scope.launch { player?.let { block(it) } }
   }
@@ -427,7 +450,7 @@ class MpvCore(private val appContext: Context) {
     val sigPeak = p.getDouble("video-params/sig-peak") ?: 0.0
     val maxLuma = p.getDouble("video-params/max-luma") ?: 0.0
     val isHdr = sigPeak > 1.5 || maxLuma > 100.0
-    val neededVo = if (isHdr) "mediacodec_embed" else "gpu-next"
+    val neededVo = if (isHdr) "mediacodec_embed" else sdrVo
     android.util.Log.i(
       "MpvCore",
       "HDR probe: sig-peak=$sigPeak max-luma=$maxLuma isHdr=$isHdr currentVo=$currentVo neededVo=$neededVo",
