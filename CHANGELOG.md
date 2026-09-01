@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.39] - 2026-09-01
+
+tv-native (iOS / Apple TV) — bind the remote's **Play/Pause** button to the playing channel (GitHub #16).
+
+### Added
+- The dedicated **Play/Pause** button on the Apple TV Siri remote (and any media remote / the iOS Remote app) now
+  toggles the currently playing channel. It was previously unbound. The tvOS `playPause` event is normalized in
+  `tvEventToKey` and routed through the **same centralized zoned dispatcher** as every other key; a top-priority
+  `media-play-pause` key layer in the persistent player claims only `playPause` (letting all other keys fall
+  through), so it works across the feature panel, channel surf, the audio/subtitle/quality picker, and the mini
+  feed. Same toggle as the on-screen Pause control; active only while a program or bumper is playing.
+
+### Notes
+- iOS / tvOS only for now (Android TV's `KEYCODE_MEDIA_PLAY_PAUSE` comes through a different native path and would
+  map to the same `playPause` key in a later follow-up).
+
 ## [0.12.38] - 2026-08-31
 
 Docs site (getairwave.tv) — add a Changelog page generated from this file.

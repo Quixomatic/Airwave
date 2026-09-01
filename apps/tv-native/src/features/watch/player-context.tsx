@@ -9,7 +9,7 @@ import { cs, scaled } from "@/features/guide/layout";
 import { useGuide } from "@/hooks/queries";
 import { api } from "@/lib/api";
 import { useAudioMode } from "@/lib/audio-pref";
-import { onInputActivity } from "@/lib/input";
+import { LAYER, onInputActivity, useKeyLayer } from "@/lib/input";
 import { C } from "@/lib/theme";
 
 import { BumperCard } from "./bumper-card";
@@ -185,6 +185,22 @@ function PlayerHost({
   // work while a mini feed is docked / off.
   const tv = useTvPlayer(channelId, { quality, audioStreamId, subtitleStreamId, audioMode }, layout === "full");
   const { status } = tv;
+
+  // The remote's dedicated PLAY/PAUSE button (Apple TV Siri remote; any media remote) toggles the playing
+  // channel. Routed through the SAME centralized zoned dispatcher as every other key: a top-priority layer
+  // (above the chrome / surf / picker / mini layers) that claims ONLY `playPause` and lets every other key
+  // fall through untouched — so it works in every sub-state and in the mini feed, without a side channel.
+  // Active only while something is actually playing (togglePause handles both program + bumper).
+  useKeyLayer({
+    id: "media-play-pause",
+    priority: LAYER.MODAL + 1,
+    active: status.state === "program" || status.state === "bumper",
+    onKey(e) {
+      if (e.key !== "playPause") return false;
+      tv.controls.togglePause();
+      return true;
+    },
+  });
 
   // Ambient music bed under bumpers (§7.14 Phase B) now plays on the SINGLE hybrid engine, driven inside
   // useTvPlayer (source swaps to the music track in audio mode during a bumper; the fade is DVR-derived).
