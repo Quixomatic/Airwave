@@ -280,6 +280,7 @@ const RUNTIME_PATH = join(DATA_DIR, "runtime.json");
 type RuntimeState = {
   supervisorPid: number;
   serverPid?: number;
+  pgPid?: number; // the embedded postmaster's PID (read from postmaster.pid after start) — reaped by port on next launch
   ports: Config["ports"];
   startedAt: string;
 };
@@ -679,8 +680,14 @@ function isAlive(pid: number): boolean {
  * down), escalating to SIGKILL if it lingers. */
 async function killTree(pid: number): Promise<void> {
   if (process.platform === "win32") {
-    await run(["taskkill", "/PID", String(pid), "/T", "/F"], {});
-    await Bun.sleep(300);
+    // `run` returns the exit code (never throws), and a single taskkill can silently miss (a race, or /T can't
+    // reach a backend that just got reparented off a dying postmaster). VERIFY the process is actually gone and
+    // retry — a swallowed miss here is exactly what previously stranded a live orphan postmaster.
+    for (let attempt = 0; attempt < 3 && isAlive(pid); attempt++) {
+      await run(["taskkill", "/PID", String(pid), "/T", "/F"], {});
+      for (let i = 0; i < 10 && isAlive(pid); i++) await Bun.sleep(100); // up to 1s to observe the tree exit
+    }
+    if (isAlive(pid)) console.warn(`[desktop] taskkill could not terminate pid ${pid} (tree) after retries.`);
     return;
   }
   try {
@@ -721,12 +728,69 @@ async function reapStalePostgres(): Promise<void> {
     } catch (err) {
       console.warn(`[desktop] could not stop leftover Postgres (pid ${pid}):`, errText(err));
     }
+    if (isAlive(pid)) {
+      console.warn(`[desktop] leftover Postgres (pid ${pid}) survived the kill — start may fail with 'shared memory block still in use'.`);
+    }
   }
-  // Remove the (now) stale pid file so Postgres doesn't refuse to start on a dead-owner file.
-  try {
-    rmSync(pidFile, { force: true });
-  } catch {
-    /* ignore */
+  // We intentionally do NOT delete postmaster.pid. Postgres owns that file: it removes a stale one itself on start
+  // when the recorded owner is dead, and while the owner is ALIVE this file is the only breadcrumb to it. Deleting
+  // it here unconditionally (even when the kill above silently failed) is exactly what previously stranded a live
+  // orphan with no pid file — after which every later launch early-returned above and never reaped it. The
+  // ledger-based reapStalePg (port-verified, runs before resolvePorts) is now the primary reap path.
+}
+
+/** Windows: PIDs of `postgres.exe` processes whose recorded PARENT is `ppid`. PG18 spawns `io_worker` (and backend)
+ * children that can OUTLIVE a killed/crashed postmaster and keep holding pgdata's shared-memory block + its inherited
+ * listening socket (netstat then still stale-attributes the port to the dead postmaster). Win32_Process retains
+ * ParentProcessId after the parent exits, so we can find these orphans by the dead postmaster's pid. Empty on any
+ * failure (no CIM, timeout) so a probe can never hang or break boot. */
+async function postgresChildPids(ppid: number): Promise<number[]> {
+  if (process.platform !== "win32") return [];
+  const out = await execCapture([
+    "powershell",
+    "-NoProfile",
+    "-Command",
+    `Get-CimInstance Win32_Process -Filter "Name='postgres.exe' AND ParentProcessId=${ppid}" | ForEach-Object { $_.ProcessId }`,
+  ]);
+  return out
+    .split(/\r?\n/)
+    .map((s) => Number.parseInt(s.trim(), 10))
+    .filter((n) => Number.isInteger(n) && n > 0);
+}
+
+/** Reap OUR OWN orphaned embedded Postgres from a prior unclean exit (the dev watcher SIGKILLs the supervisor, so
+ * stopStack's graceful pg.stop() never runs and the postmaster orphans). Mirrors reapStaleStack: kill the recorded
+ * postmaster pid when it's alive AND provably owns the recorded pg port (pidOwnsPort — safe against PID reuse).
+ * Runs BEFORE resolvePorts so the freed port is reclaimed (no upward drift), and doesn't depend on postmaster.pid
+ * (the very thing that goes missing). Best-effort; never throws.
+ *
+ * Two shapes of orphan, both handled:
+ *  1) Postmaster still alive — killTree(/T) takes it AND its children in one shot.
+ *  2) Postmaster DEAD but a PG18 io_worker/backend child lives on, still holding pgdata's shared-memory block (the
+ *     block is keyed to the DATA DIR, so a fresh port doesn't dodge it — this is the "shared memory block still in
+ *     use" restart failure). isAlive(ppid) is false here, so we find the survivors by their recorded parent pid and
+ *     kill them. */
+async function reapStalePg(prior: RuntimeState): Promise<void> {
+  const ppid = prior.pgPid;
+  if (!ppid) return;
+  const pport = prior.ports.pg;
+  // (1) Live postmaster still holding our port → kill the whole tree.
+  if (isAlive(ppid) && (await pidOwnsPort(ppid, pport))) {
+    console.warn(`[desktop] reaping orphaned embedded Postgres (pid ${ppid}) still holding port ${pport} (unclean prior exit).`);
+    try {
+      await killTree(ppid);
+    } catch (err) {
+      console.warn(`[desktop] could not reap orphaned Postgres (pid ${ppid}):`, errText(err));
+    }
+  }
+  // (2) Orphaned children of a dead (or just-killed) postmaster — the io_worker/backend that actually pins pgdata.
+  for (const cpid of await postgresChildPids(ppid)) {
+    console.warn(`[desktop] reaping orphaned Postgres child (pid ${cpid}) of postmaster ${ppid} — still holding pgdata's shared memory.`);
+    try {
+      await killTree(cpid);
+    } catch (err) {
+      console.warn(`[desktop] could not reap orphaned Postgres child (pid ${cpid}):`, errText(err));
+    }
   }
 }
 
@@ -779,6 +843,17 @@ async function startPostgres(): Promise<string> {
     // embedded-postgres can reject with a bare object (→ the useless `{}` we used to log). Wrap it so the boot
     // catch surfaces an actionable message (which port / data dir) to the setup UI instead of a blank hang.
     throw new Error(`embedded Postgres failed to start (port ${config.ports.pg}, data ${PG_DATA_DIR}): ${errText(err)}`);
+  }
+  // Record the postmaster's real PID (postgres just wrote it to postmaster.pid) so the NEXT launch can reap THIS
+  // exact cluster by port even after the pid file is gone — the same ledger idea as serverPid. Best-effort.
+  try {
+    const ppid = Number.parseInt(readFileSync(join(PG_DATA_DIR, "postmaster.pid"), "utf8").split("\n")[0]?.trim() ?? "", 10);
+    if (runtime && Number.isInteger(ppid) && ppid > 0) {
+      runtime.pgPid = ppid;
+      persistRuntime();
+    }
+  } catch {
+    /* best-effort — reapStalePostgres's pid-file path still covers a crash if this record is missing */
   }
   try {
     await pg.createDatabase("channelguide");
@@ -1086,6 +1161,10 @@ async function stopStack(): Promise<void> {
       /* ignore */
     }
     pg = null;
+    if (runtime) {
+      runtime.pgPid = undefined; // postmaster stopped cleanly — don't let the next launch try to reap a dead pid
+      persistRuntime();
+    }
   }
 }
 
@@ -1524,6 +1603,7 @@ if (!attach) {
     }
     if (prior) {
       await reapStaleStack(prior); // kill our own crash-orphan server child (verified by port ownership)
+      await reapStalePg(prior); // kill our own crash-orphan embedded Postgres (verified by port ownership) — frees pgdata + its port
       config.ports = { ...config.ports, ...prior.ports }; // prefer the last-used ports so the admin URL stays stable across restarts
     }
   } catch (err) {

@@ -2,6 +2,31 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.42] - 2026-09-01
+
+Desktop app (Airwave Desktop supervisor) — reliably reap an orphaned embedded Postgres on startup so
+`pnpm dev` / relaunch never dies on "shared memory block still in use".
+
+### Fixed
+- The supervisor could fail to start the database with `FATAL: pre-existing shared memory block is still in
+  use` after an unclean exit (the dev watcher SIGKILLs the supervisor, so the graceful `pg.stop()` never
+  runs and Postgres is left attached to the data directory). The old reap keyed off `postmaster.pid`, which
+  is exactly the file that goes missing: our own reap deleted it unconditionally even when the kill silently
+  failed, and on Windows a PG18 `io_worker` child can outlive a dead postmaster while still holding the
+  shared-memory block. Because that block is keyed to the **data directory** (not the port), picking a fresh
+  port only guaranteed the collision.
+- The supervisor now records the postmaster's PID in its runtime ledger (the same pattern already used for
+  the server child) and, before binding any port, reaps a prior embedded Postgres by that PID + verified
+  port ownership. It no longer deletes `postmaster.pid` (Postgres owns that file), `killTree` verifies the
+  process actually died on Windows (`taskkill` can silently miss) and retries, and any orphaned `io_worker` /
+  backend child of a dead postmaster is found by its recorded parent PID and killed. The freed port is
+  reclaimed so the admin URL stays stable across restarts.
+
+### Scope
+- `apps/desktop/src/bun/index.ts` only. The Windows-specific child reap is a no-op on macOS/Linux, where
+  Postgres already cleans up (the port frees when the postmaster dies and a fresh postmaster clears stale
+  shared memory). No schema or server change.
+
 ## [0.12.41] - 2026-09-01
 
 Desktop app (Airwave Desktop supervisor) — sensible first-run defaults, run at login, and a silent
