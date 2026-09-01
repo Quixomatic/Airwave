@@ -4,6 +4,7 @@ import { adminProcedure, router } from "../index";
 import { exportLineup } from "../services/transfer/export";
 import { type ImportedLineup, previewImport } from "../services/transfer/import";
 import { isImportRunnerAvailable, requireImportRunner } from "../services/transfer/import-runner";
+import { getAppSettings } from "../services/settings";
 import { listImportRuns, listImportRunSteps } from "../services/transfer/import-runs";
 import { listImportRunTraces } from "../services/transfer/import-trace";
 
@@ -82,15 +83,17 @@ export const transferRouter = router({
         dryRun: z.boolean().optional(),
       }),
     )
-    .mutation(({ ctx, input }) =>
-      requireImportRunner().start({
+    .mutation(async ({ ctx, input }) => {
+      const settings = await getAppSettings(ctx.prisma);
+      return requireImportRunner().start({
         data: input.data as ImportedLineup,
         selectedNumbers: input.selectedNumbers,
         targetSourceId: input.targetSourceId,
         dryRun: input.dryRun,
         userId: ctx.session.user.id,
-      }),
-    ),
+        concurrency: settings.importConcurrency,
+      });
+    }),
 
   /** Recent import runs for the observability page (metadata + step counts). */
   importRuns: adminProcedure

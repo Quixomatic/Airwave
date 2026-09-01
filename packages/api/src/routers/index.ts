@@ -9,6 +9,7 @@ import { onboardingRouter } from "./onboarding";
 import { packagesRouter } from "./packages";
 import { playbackRouter } from "./playback";
 import { plexRouter } from "./plex";
+import { settingsRouter } from "./settings";
 import { sourcesRouter } from "./sources";
 import { transferRouter } from "./transfer";
 import { usersRouter } from "./users";
@@ -33,6 +34,7 @@ export const appRouter = router({
   packages: packagesRouter,
   playback: playbackRouter,
   plex: plexRouter,
+  settings: settingsRouter,
   sources: sourcesRouter,
   transfer: transferRouter,
   users: usersRouter,

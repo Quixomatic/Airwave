@@ -25,6 +25,7 @@ import type { PrismaClient } from "@airwave/db";
 import { generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 
+import { aiFilterSchema } from "./ai-filter-schema";
 import { getConnectionForRole, getModel } from "./config";
 import type { PlannedChannel } from "./lineup-plan";
 import { recordTrace, type TraceContext } from "./lineup-trace";
@@ -91,29 +92,10 @@ const MAX_STEPS = 24;
 
 const mediaTypesSchema = z.array(z.enum(["movie", "show"])).min(1);
 
-// The recursive predicate tree, matching the real FilterNode shape.
-const conditionSchema = z.object({
-  type: z.literal("condition"),
-  field: z.string(),
-  op: z.string(),
-  value: z.string(),
-});
-// Groups combine with `combinator`; conditions compare with `op`. The resolver reads
-// `node.combinator` and silently falls back to AND when it's absent, so getting this wrong
-// turns every OR into an AND with no error — see the note in lineup-plan.ts.
-type FilterNodeInput =
-  | z.infer<typeof conditionSchema>
-  | { type: "group"; combinator: "and" | "or"; children: FilterNodeInput[] };
-const filterNodeSchema: z.ZodType<FilterNodeInput> = z.lazy(() =>
-  z.union([
-    conditionSchema,
-    z.object({
-      type: z.literal("group"),
-      combinator: z.enum(["and", "or"]),
-      children: z.array(filterNodeSchema),
-    }),
-  ]),
-);
+// One-level, string-tolerant filter schema for the worker's tools (see ai-filter-schema.ts + GitHub #3).
+// `op` stays a loose `z.string()` here (as before); the resolver still accepts arbitrary depth, but the
+// admin builder + planner cap authoring at one level, so the worker is held to the same shape.
+const filterNodeSchema = aiFilterSchema();
 
 const SYSTEM = `You BUILD one live-TV channel. A planner has drafted a candidate filter from the library's real tag vocabulary — treat it as a STARTING POINT to refine, not a proposal to accept or reject.
 

@@ -22,6 +22,9 @@ export type LineupRunArgs = {
   mode?: "quality" | "fast";
   /** Cap the run for testing — build at most this many channels. */
   limit?: number;
+  /** Max channel builds in parallel (from AppSettings.channelBuildConcurrency); the workflow falls back to
+   *  its own default when absent. */
+  concurrency?: number;
 };
 
 export type LineupRunStatus = {

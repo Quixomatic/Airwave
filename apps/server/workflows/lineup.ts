@@ -154,8 +154,9 @@ export async function aiLineupWorkflow(args: LineupRunArgs): Promise<LineupRepor
   // only the unfinished ones. The cap keeps us under the provider's rate limit — every
   // build is an agent loop with several tool calls of its own.
   const built: ChannelBuildResult[] = [];
-  for (let i = 0; i < jobs.length; i += BUILD_CONCURRENCY) {
-    const wave = jobs.slice(i, i + BUILD_CONCURRENCY);
+  const concurrency = args.concurrency ?? BUILD_CONCURRENCY; // AppSettings.channelBuildConcurrency, else default
+  for (let i = 0; i < jobs.length; i += concurrency) {
+    const wave = jobs.slice(i, i + concurrency);
     const results = await Promise.all(
       wave.map((job) =>
         buildChannel(

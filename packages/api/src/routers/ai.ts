@@ -15,6 +15,7 @@ import { deleteConversation, getConversationMessages, listConversations } from "
 import { listLineupRunSteps, listLineupRuns } from "../services/agent/lineup-runs";
 import { isLineupRunnerAvailable, requireLineupRunner } from "../services/agent/lineup-runner";
 import { listRunTraces, summarizeRunUsage } from "../services/agent/lineup-trace";
+import { getAppSettings } from "../services/settings";
 import { getSourceReadiness, notReadyReason } from "../services/sources/readiness";
 import { TRPCError } from "@trpc/server";
 
@@ -88,7 +89,8 @@ export const aiRouter = router({
           message: readiness ? notReadyReason(readiness.fields, "build an AI lineup")! : "Media source not found.",
         });
       }
-      return requireLineupRunner().start({ ...input, userId: ctx.session.user.id });
+      const settings = await getAppSettings(ctx.prisma);
+      return requireLineupRunner().start({ ...input, userId: ctx.session.user.id, concurrency: settings.channelBuildConcurrency });
     }),
 
   /** Recent AI lineup runs for the observability page (metadata + step counts). */

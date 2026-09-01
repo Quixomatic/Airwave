@@ -1,0 +1,20 @@
+/// General-purpose, app-wide settings — a **singleton** (one row; upsert-by-key returns it). Add a column
+/// here for any global config that isn't tied to a specific entity. Read/created via `getAppSettings`.
+model AppSettings {
+  id  String @id @default(cuid())
+  /// Singleton guard: always "global" so upsert-by-key returns the one row.
+  key String @unique @default("global")
+
+  /// Max channels the AI lineup builder builds in parallel. Lower it (down to 1) for slow local models
+  /// that can't keep up with parallel agent loops; default 6 (the previous hardcoded value).
+  channelBuildConcurrency Int @default(6)
+
+  /// Max channels the lineup importer resolves/creates in parallel. Less demanding than the AI builder
+  /// (no LLM), but still capped; default 4 (the previous hardcoded value).
+  importConcurrency Int @default(4)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}

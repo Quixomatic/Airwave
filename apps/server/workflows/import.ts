@@ -61,8 +61,9 @@ export async function importLineupWorkflow(args: ImportRunArgs): Promise<ImportR
   // Fan out only the channels we'll actually create; duplicates were traced in the plan step.
   const jobs = plan.channels.filter((c) => c.action === "create");
   const built: ChannelImportResult[] = [];
-  for (let i = 0; i < jobs.length; i += BUILD_CONCURRENCY) {
-    const wave = jobs.slice(i, i + BUILD_CONCURRENCY);
+  const concurrency = args.concurrency ?? BUILD_CONCURRENCY; // AppSettings.importConcurrency, else default
+  for (let i = 0; i < jobs.length; i += concurrency) {
+    const wave = jobs.slice(i, i + concurrency);
     const results = await Promise.all(wave.map((c) => buildChannelStep(c, packageIds, args)));
     built.push(...results);
   }

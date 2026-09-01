@@ -2,7 +2,7 @@ import type { PrismaClient } from "@airwave/db";
 import { tool } from "ai";
 import { z } from "zod";
 
-import { FILTER_OPS, type FilterNode } from "../plex/filter-fields";
+import { aiFilterSchema } from "./ai-filter-schema";
 import {
   clearAiGenerated,
   createChannel,
@@ -33,19 +33,14 @@ import {
  */
 
 const mediaType = z.enum(["movie", "show"]);
-const op = z.enum(FILTER_OPS);
 const detail = z
   .enum(["quick", "default", "verbose"])
   .optional()
   .describe("Preview depth: 'quick' = trimmed metadata, 'default' = full item metadata with episodes coalesced into their show, 'verbose' = every matched episode as a full item.");
 
-// The real recursive filter tree the resolver accepts (condition | and/or group).
-const filterNode: z.ZodType<FilterNode> = z.lazy(() =>
-  z.union([
-    z.object({ type: z.literal("condition"), field: z.string(), op, value: z.string() }),
-    z.object({ type: z.literal("group"), combinator: z.enum(["and", "or"]), children: z.array(filterNode) }),
-  ]),
-);
+// One-level, string-tolerant filter schema for the AI tools (see ai-filter-schema.ts + GitHub #3). The
+// resolver still accepts arbitrary depth; the admin builder + planner already cap authoring at one level.
+const filterNode = aiFilterSchema();
 
 const channelInput = z.object({
   name: z.string().min(1),

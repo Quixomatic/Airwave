@@ -2,6 +2,31 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.40] - 2026-09-01
+
+AI channel building — fix filter tool calls on local models, and add configurable build/import concurrency
+(GitHub #3).
+
+### Fixed
+- **AI channel filters now work on local models** (LM Studio, Ollama, vLLM, and other OpenAI-compatible servers).
+  With `tool_choice: "auto"` (what the agent uses), those servers free-form the tool call and return the nested
+  `filter` as a JSON **string**, so it failed validation (`expected object, received string`) while cloud models
+  (guided decoding) were fine. The filter schema the AI sees is now **one level deep and non-recursive** — removing
+  the `z.lazy` self-`$ref` that free-form parsers choke on, matching what the planner already does and the admin
+  builder's real one-level cap — and **tolerant of a stringified filter** (it parses + re-validates against the
+  same schema). Cloud models send an object and are unaffected. New `services/agent/ai-filter-schema.ts`, applied
+  to both the chat tools and the workflow worker; the operator field is standardized to the canonical enum.
+
+### Added
+- **Configurable parallelism for AI lineup builds and imports** (#3). A new **Settings → General** section with
+  two knobs — "Max parallel AI channel builds" (default 6) and "Max parallel channel imports" (default 4) — lets
+  you dial concurrency down (to 1) for slow local models / hardware that can't keep up with parallel runs. Stored
+  in a new singleton `AppSettings` row (general-purpose, room for future server-wide settings) and threaded into
+  both WDK workflows. Adds the `@coss/number-field` component to `@airwave/ui` for the inputs.
+
+### Migration
+- Adds the `app_settings` table (one singleton row). No data migration.
+
 ## [0.12.39] - 2026-09-01
 
 tv-native (iOS / Apple TV) — bind the remote's **Play/Pause** button to the playing channel (GitHub #16).

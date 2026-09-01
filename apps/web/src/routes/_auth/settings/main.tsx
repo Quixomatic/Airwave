@@ -8,12 +8,21 @@ import {
 } from "@airwave/ui/components/frame";
 import { Input } from "@airwave/ui/components/input";
 import { Label } from "@airwave/ui/components/label";
+import {
+  NumberField,
+  NumberFieldDecrement,
+  NumberFieldGroup,
+  NumberFieldIncrement,
+  NumberFieldInput,
+} from "@airwave/ui/components/number-field";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { authClient, useSession } from "@/lib/auth-client";
+import { trpc, trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/settings/main")({
   staticData: { breadcrumb: "General" },
@@ -47,6 +56,34 @@ function SettingsGeneral() {
       toast.error(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Server-wide app settings (parallelism knobs for the AI lineup builder + importer). The NumberField
+  // component enforces the 1–16 bounds itself; `null` = the field was cleared.
+  const settingsQ = useQuery(trpc.settings.get.queryOptions());
+  const [buildConc, setBuildConc] = useState<number | null>(null);
+  const [importConc, setImportConc] = useState<number | null>(null);
+  const [savingSettings, setSavingSettings] = useState(false);
+  useEffect(() => {
+    if (settingsQ.data) {
+      setBuildConc(settingsQ.data.channelBuildConcurrency);
+      setImportConc(settingsQ.data.importConcurrency);
+    }
+  }, [settingsQ.data]);
+  const saveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      await trpcClient.settings.update.mutate({
+        channelBuildConcurrency: buildConc ?? 6,
+        importConcurrency: importConc ?? 4,
+      });
+      await settingsQ.refetch();
+      toast.success("Settings saved.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -86,14 +123,53 @@ function SettingsGeneral() {
       </Frame>
 
       <Frame>
-        <FrameHeader>
-          <FrameTitle>General</FrameTitle>
-          <FrameDescription>Server-wide preferences.</FrameDescription>
+        <FrameHeader className="flex-row items-center justify-between gap-4">
+          <div>
+            <FrameTitle>General</FrameTitle>
+            <FrameDescription>Server-wide preferences.</FrameDescription>
+          </div>
+          <Button
+            size="sm"
+            className="shrink-0"
+            onClick={() => void saveSettings()}
+            disabled={savingSettings || !settingsQ.data}
+          >
+            {savingSettings && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save
+          </Button>
         </FrameHeader>
-        <FramePanel>
-          <p className="text-muted-foreground text-sm">
-            General server settings will live here — playback defaults, IPTV output, and appearance.
-          </p>
+        <FramePanel className="space-y-4">
+          <div className="grid grid-cols-[1fr_auto] items-center gap-4">
+            <div className="min-w-0">
+              <Label>Max parallel AI channel builds</Label>
+              <p className="text-muted-foreground text-xs">
+                How many channels the AI lineup builder works on at once. Lower it (1–2) for slow local models
+                that can&apos;t keep up with parallel runs. Default 6.
+              </p>
+            </div>
+            <NumberField value={buildConc} onValueChange={setBuildConc} min={1} max={16} className="w-32 shrink-0">
+              <NumberFieldGroup>
+                <NumberFieldDecrement />
+                <NumberFieldInput />
+                <NumberFieldIncrement />
+              </NumberFieldGroup>
+            </NumberField>
+          </div>
+          <div className="grid grid-cols-[1fr_auto] items-center gap-4">
+            <div className="min-w-0">
+              <Label>Max parallel channel imports</Label>
+              <p className="text-muted-foreground text-xs">
+                How many channels the lineup importer resolves at once. Less demanding than AI builds. Default 4.
+              </p>
+            </div>
+            <NumberField value={importConc} onValueChange={setImportConc} min={1} max={16} className="w-32 shrink-0">
+              <NumberFieldGroup>
+                <NumberFieldDecrement />
+                <NumberFieldInput />
+                <NumberFieldIncrement />
+              </NumberFieldGroup>
+            </NumberField>
+          </div>
         </FramePanel>
       </Frame>
     </div>

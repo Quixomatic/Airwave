@@ -19,6 +19,9 @@ export type ImportRunArgs = {
   userId: string;
   /** Validate + resolve + trace but write NOTHING (validate the deploy / preview for real). */
   dryRun?: boolean;
+  /** Max channels resolved/created in parallel (from AppSettings.importConcurrency); the workflow falls back
+   *  to its own default when absent. */
+  concurrency?: number;
 };
 
 export type ImportRunStatus = {
