@@ -76,6 +76,10 @@ type Config = {
   workflowEnabled: boolean;
   tvwebEnabled: boolean;
   autoStart: boolean;
+  /** Register an OS login item so the supervisor launches at user login (packaged only). */
+  runOnStartup: boolean;
+  /** On a configured boot, DON'T auto-open the admin in the browser — start quietly to the tray instead. */
+  silentStartup: boolean;
   /** First-run setup completed (admin account + options chosen in the browser). */
   configured: boolean;
   /** Public base URL the admin + TVs reach the SERVER at — e.g. a Cloudflare tunnel `https://tv.example.com`
@@ -93,10 +97,12 @@ type Config = {
 const DEFAULT_CONFIG: Config = {
   // Supervise (prod) ports = the docker-published range, so they don't clash with dev servers on 3000/1/2.
   ports: { server: 36020, admin: 36021, tvweb: 36022, pg: 54329, setup: 36029 },
-  expose: false,
-  workflowEnabled: false,
+  expose: true,
+  workflowEnabled: true,
   tvwebEnabled: true,
   autoStart: true,
+  runOnStartup: false,
+  silentStartup: false,
   configured: false,
 };
 
@@ -372,6 +378,91 @@ function openBrowser(url: string): void {
         ? ["open", url]
         : ["xdg-open", url];
   spawn(cmd, { stdout: "ignore", stderr: "ignore" });
+}
+
+/**
+ * The user-facing launcher to register for login-item autostart (NOT `process.execPath` — that's the inner
+ * bundled Bun runtime). Derived from the bundle layout: `APP_ROOT` is `<bundle>/Resources/app`, so the launcher
+ * lives two levels up. The resolved path is logged so it can be verified from a packaged install.
+ *   Windows: `<install>\bin\launcher.exe`   macOS: `Airwave.app` (launched via `open`)   Linux: `<dir>/bin/launcher`
+ */
+function launcherPath(): string {
+  // …/Airwave.app/Contents/Resources/app → up 3 = Airwave.app
+  if (process.platform === "darwin") return dirname(dirname(dirname(APP_ROOT)));
+  // …/<install>/Resources/app → up 2 = <install>; launcher under bin/
+  const exe = process.platform === "win32" ? "launcher.exe" : "launcher";
+  return join(dirname(dirname(APP_ROOT)), "bin", exe);
+}
+
+const LAUNCH_AGENT_PLIST = () => join(homedir(), "Library", "LaunchAgents", "tv.airwave.desktop.plist");
+const LINUX_AUTOSTART = () => join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "autostart", "airwave.desktop");
+
+function macLaunchAgentPlist(appPath: string): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>tv.airwave.desktop</string>
+  <key>ProgramArguments</key>
+  <array><string>/usr/bin/open</string><string>${appPath}</string></array>
+  <key>RunAtLoad</key><true/>
+</dict>
+</plist>
+`;
+}
+
+function linuxAutostartEntry(exe: string): string {
+  return `[Desktop Entry]
+Type=Application
+Name=Airwave
+Exec=${exe}
+Terminal=false
+X-GNOME-Autostart-enabled=true
+`;
+}
+
+/**
+ * Register or remove an OS login item so the tray supervisor launches at user login. Per-user (no admin):
+ * Windows = an HKCU `…\Run` value, macOS = a `~/Library/LaunchAgents` plist (GUI ⇒ LaunchAgent, launched via
+ * `open`), Linux = a `~/.config/autostart/*.desktop` entry. PACKAGED-only (dev must never autostart) and
+ * fail-soft — a login-item error must never break boot or /save.
+ */
+async function setRunOnStartup(enabled: boolean): Promise<void> {
+  if (!PACKAGED) {
+    console.log(`[desktop] runOnStartup=${enabled} — no-op in dev`);
+    return;
+  }
+  const target = launcherPath();
+  console.log(`[desktop] runOnStartup=${enabled} → ${target}`);
+  try {
+    if (process.platform === "win32") {
+      const key = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+      await run(
+        enabled
+          ? ["reg", "add", key, "/v", "Airwave", "/t", "REG_SZ", "/d", `"${target}"`, "/f"]
+          : ["reg", "delete", key, "/v", "Airwave", "/f"],
+        {},
+      );
+    } else if (process.platform === "darwin") {
+      const plist = LAUNCH_AGENT_PLIST();
+      if (enabled) {
+        mkdirSync(dirname(plist), { recursive: true });
+        writeFileSync(plist, macLaunchAgentPlist(target));
+      } else {
+        rmSync(plist, { force: true });
+      }
+    } else {
+      const entry = LINUX_AUTOSTART();
+      if (enabled) {
+        mkdirSync(dirname(entry), { recursive: true });
+        writeFileSync(entry, linuxAutostartEntry(target));
+      } else {
+        rmSync(entry, { force: true });
+      }
+    }
+  } catch (e) {
+    console.error("[desktop] setRunOnStartup failed:", e);
+  }
 }
 
 /** HEAD-probe a URL to see if something's already answering there (used to sniff a running `pnpm dev` stack). */
@@ -1089,6 +1180,8 @@ function startSetupServer(): void {
           expose?: boolean;
           tvwebEnabled?: boolean;
           workflowEnabled?: boolean;
+          runOnStartup?: boolean;
+          silentStartup?: boolean;
           serverAddress?: string;
           webAddress?: string;
           extraCorsOrigins?: string;
@@ -1110,12 +1203,15 @@ function startSetupServer(): void {
           expose: !!body.expose,
           tvwebEnabled: body.tvwebEnabled !== false,
           workflowEnabled: !!body.workflowEnabled,
+          runOnStartup: !!body.runOnStartup,
+          silentStartup: !!body.silentStartup,
           serverAddress: (body.serverAddress ?? "").trim().replace(/\/+$/, ""),
           webAddress: (body.webAddress ?? "").trim().replace(/\/+$/, ""),
           extraCorsOrigins: (body.extraCorsOrigins ?? "").trim(),
           configured: true,
         };
         saveConfig(config);
+        void setRunOnStartup(config.runOnStartup); // apply the OS login item immediately on save
         refreshTray(); // onboarding done → enable Open Admin/TV player + relabel "Set up Airwave" → "Settings"
         if (!attach) {
           if (stackState === "up") {
@@ -1142,6 +1238,8 @@ function startSetupServer(): void {
           expose: config.expose,
           tvwebEnabled: config.tvwebEnabled,
           workflowEnabled: config.workflowEnabled,
+          runOnStartup: config.runOnStartup,
+          silentStartup: config.silentStartup,
           adminEmail: loadAdminCreds()?.email ?? "",
           serverLan: serverLanUrl(),
           serverAddress: config.serverAddress ?? "",
@@ -1331,8 +1429,12 @@ function hideSetupWindow(): void {
 }
 /** Setup done + stack up: hand the admin UI off to the browser and hide (keep-alive) the onboarding window. */
 function onStackReady(): void {
-  console.log("[desktop] stack ready — opening the admin in your browser.");
-  openBrowser(adminUrl());
+  if (config.silentStartup) {
+    console.log("[desktop] stack ready — silent startup, not opening the browser (open it from the tray).");
+  } else {
+    console.log("[desktop] stack ready — opening the admin in your browser.");
+    openBrowser(adminUrl());
+  }
   hideSetupWindow();
 }
 

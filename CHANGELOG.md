@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.41] - 2026-09-01
+
+Desktop app (Airwave Desktop supervisor) — sensible first-run defaults, run at login, and a silent
+startup mode.
+
+### Changed
+- **Onboarding now defaults "Expose on the local network" and "Enable Workflow SDK" to on.** A desktop
+  Airwave is a TV server meant to be reached from the couch, so LAN exposure is the expected posture; the
+  Workflow SDK powers AI lineup builds and imports. Both remain toggles you can turn off in setup or
+  settings.
+
+### Added
+- **Run at login.** A new "Launch at login" toggle (in onboarding and settings, default off) registers the
+  supervisor to start with the OS so the server is already up when you sit down: a per-user
+  `HKCU\...\Run` entry on Windows, a `LaunchAgent` plist on macOS, and a `~/.config/autostart` desktop
+  entry on Linux. It points at the real user-facing launcher, applies immediately when toggled, and is a
+  no-op in development. Turning it off removes the entry.
+- **Silent startup.** A new "Silent startup" toggle (default off) stops the app from opening the browser to
+  the admin UI on every boot, for a quiet Plex-like background server. Paired with "Launch at login" it
+  boots straight into the tray at login with no popup. The tray "Open Admin" item (and a manual relaunch)
+  still open the browser on demand.
+
 ## [0.12.40] - 2026-09-01
 
 AI channel building — fix filter tool calls on local models, and add configurable build/import concurrency

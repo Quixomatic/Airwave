@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Check, ChevronDown, Globe, Sparkles, Tv, Wifi } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, EyeOff, Globe, Power, Sparkles, Tv, Wifi } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -15,6 +15,8 @@ type Cfg = {
   expose: boolean;
   tvwebEnabled: boolean;
   workflowEnabled: boolean;
+  runOnStartup: boolean;
+  silentStartup: boolean;
   adminEmail: string;
   serverLan?: string;
   serverAddress?: string;
@@ -55,9 +57,11 @@ export function App() {
   const [step, setStep] = useState<Step>("welcome");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [expose, setExpose] = useState(false);
+  const [expose, setExpose] = useState(true);
   const [tvweb, setTvweb] = useState(true);
-  const [workflow, setWorkflow] = useState(false);
+  const [workflow, setWorkflow] = useState(true);
+  const [runOnStartup, setRunOnStartup] = useState(false);
+  const [silentStartup, setSilentStartup] = useState(false);
   const [serverAddress, setServerAddress] = useState("");
   const [webAddress, setWebAddress] = useState("");
   const [extraCorsOrigins, setExtraCorsOrigins] = useState("");
@@ -81,6 +85,8 @@ export function App() {
         setExpose(c.expose);
         setTvweb(c.tvwebEnabled);
         setWorkflow(c.workflowEnabled);
+        setRunOnStartup(c.runOnStartup);
+        setSilentStartup(c.silentStartup);
         setServerAddress(c.serverAddress ?? "");
         setWebAddress(c.webAddress ?? "");
         setExtraCorsOrigins(c.extraCorsOrigins ?? "");
@@ -104,7 +110,9 @@ export function App() {
           })
           .catch(() => {});
       })
-      .catch(() => setCfg({ configured: false, expose: false, tvwebEnabled: true, workflowEnabled: false, adminEmail: "" }));
+      .catch(() =>
+        setCfg({ configured: false, expose: true, tvwebEnabled: true, workflowEnabled: true, runOnStartup: false, silentStartup: false, adminEmail: "" }),
+      );
   }, []);
 
   function pollStatus() {
@@ -192,6 +200,8 @@ export function App() {
           expose,
           tvwebEnabled: tvweb,
           workflowEnabled: workflow,
+          runOnStartup,
+          silentStartup,
           serverAddress,
           webAddress,
           extraCorsOrigins,
@@ -318,6 +328,20 @@ export function App() {
                     hint="Enable the durable AI channel-builder engine."
                     checked={workflow}
                     onChange={setWorkflow}
+                  />
+                  <Toggle
+                    icon={Power}
+                    label="Launch at login"
+                    hint="Start Airwave automatically when you sign in to this computer."
+                    checked={runOnStartup}
+                    onChange={setRunOnStartup}
+                  />
+                  <Toggle
+                    icon={EyeOff}
+                    label="Silent startup"
+                    hint="Don't open the admin in your browser on startup — start quietly to the tray."
+                    checked={silentStartup}
+                    onChange={setSilentStartup}
                   />
                 </div>
                 <div className="mt-2">

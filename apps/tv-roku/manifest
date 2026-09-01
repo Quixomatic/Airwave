@@ -3,7 +3,7 @@ title=Airwave
 # Version — kept in lockstep with the other apps/* (see /version-bump). Mirrors package.json 0.12.0.
 major_version=0
 minor_version=12
-build_version=40
+build_version=41
 
 # Icons = branded logo mark on the radial gradient (home-screen tile). Splash = a FLAT #060a14 fill (Roku
 # requires a splash image, but ours hands off seamlessly to the in-app animated LogoLockup, which fades the
