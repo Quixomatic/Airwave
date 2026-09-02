@@ -11,7 +11,11 @@ export const Route = createFileRoute("/_auth")({
   component: AppLayout,
   beforeLoad: async ({ location }) => {
     const session = await authClient.getSession();
-    if (!session.data) {
+    // Guard on `user`, not just `data`, to match /login + /post-login. A misconfigured VITE_SERVER_URL
+    // points the auth client at the vite dev server, whose SPA fallback returns index.html with a 200 —
+    // so `data` is a truthy HTML string with no `user`, and reading `.role` off it throws before the
+    // redirect below can run. Sending them to /login surfaces the misconfiguration instead of crashing.
+    if (!session?.data?.user) {
       // Carry the intended path so login can send them back here afterward (e.g. a viewer who followed
       // their TV's /device link before signing in). See lib/safe-redirect + the /login + /post-login loaders.
       throw redirect({ to: "/login", search: { redirect: location.href } });
