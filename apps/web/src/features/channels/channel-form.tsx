@@ -20,7 +20,7 @@ import { Textarea } from "@airwave/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ChevronDown, Info, Layers, ListFilter, SlidersHorizontal, Tv, type LucideIcon } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { HeaderRight } from "@/context/header-provider";
@@ -50,6 +50,16 @@ export type ChannelFormValues = {
   description: string | null;
   enabled: boolean;
   bumperMode: BumperMode;
+};
+
+/** The live filter state the form reports upward (via `onPreviewInputChange`) so a preview panel can resolve
+ *  the UNSAVED filter — see channels.previewFilter (GitHub #12). */
+export type ChannelPreviewInput = {
+  mediaSourceId: string;
+  mediaTypes: MediaType[];
+  filter: FilterGroup;
+  sortField: string;
+  sortDir: "asc" | "desc";
 };
 
 const BUMPER_MODE_OPTIONS: { value: BumperMode; label: string }[] = [
@@ -108,6 +118,7 @@ export function ChannelForm({
   title,
   subtitle,
   onSubmit,
+  onPreviewInputChange,
 }: {
   initial?: Partial<ChannelFormValues>;
   formId: string;
@@ -117,6 +128,9 @@ export function ChannelForm({
    *  the channel's own description field). */
   subtitle?: string;
   onSubmit: (values: ChannelFormValues & { mediaSourceId: string }) => void;
+  /** Reports the live filter/source/sort upward so a preview panel can resolve the UNSAVED filter (#12).
+   *  Pass a stable setter (e.g. a useState setter) — it's called from an effect on every relevant change. */
+  onPreviewInputChange?: (input: ChannelPreviewInput) => void;
 }) {
   const sources = useQuery(trpc.sources.list.queryOptions());
   // Only a READY source (connected + synced) can back a channel; fall back to the first ready one.
@@ -148,6 +162,14 @@ export function ChannelForm({
     ...(movies ? (["movie"] as const) : []),
     ...(tv ? (["show"] as const) : []),
   ];
+
+  // Report the live filter/source/sort upward so a preview panel can resolve the UNSAVED filter (#12). Fires
+  // whenever the builder, media types, sort, or the resolved source changes; `mediaTypes` is rebuilt inside from
+  // the `movies`/`tv` deps (it's a fresh array each render, so it can't be a dep itself).
+  useEffect(() => {
+    onPreviewInputChange?.({ mediaSourceId: sourceId, mediaTypes, filter, sortField, sortDir });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceId, movies, tv, filter, sortField, sortDir, onPreviewInputChange]);
 
   if (sources.data && !sourceId) {
     // No usable source — say exactly which step is missing so the fix is obvious.

@@ -4,7 +4,7 @@ import { runAgentChat } from "@airwave/api/services/agent/chat";
 import { createFromUpload } from "@airwave/api/services/bumper-music/library";
 import { contentTypeFor } from "@airwave/api/services/bumper-music/store";
 import { startJobs } from "@airwave/api/services/jobs/scheduler";
-import { resolveChannelSource } from "@airwave/api/services/playback/broker";
+import { resolveChannelSource, resolveMediaSource } from "@airwave/api/services/playback/broker";
 import { buildAuthUrl, createPin } from "@airwave/api/services/plex/client";
 import { encryptExistingSourceTokens } from "@airwave/api/services/plex/token";
 import prisma from "@airwave/db";
@@ -13,7 +13,7 @@ import { PLEX_CLIENT_ID } from "@airwave/auth/lib/plex-login";
 import { seedAdmin } from "@airwave/auth/lib/seed-admin";
 import { env } from "@airwave/env/server";
 import { trpcServer } from "@hono/trpc-server";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
@@ -186,25 +186,50 @@ app.use(
 // the TV can use program cover art (blurred bumper backgrounds, guide thumbnails). Only
 // proxies Plex image paths (/library, /photo) through the channel's own media source,
 // injecting the admin token. `w`/`h` optionally resize via Plex's photo transcoder.
-app.get("/img/:channelId", async (c) => {
+// Stream one Plex art path through a resolved source, injecting the admin token. Shared by the channel-keyed
+// and source-keyed proxies below. `w`/`h` optionally resize via Plex's photo transcoder.
+async function streamPlexArt(
+  c: Context,
+  // The resolvers hand back the full MediaSource; both guarantee a non-null baseUrl before returning (they throw
+  // otherwise), so accept the broader `string | null` here rather than force a narrow at each call site.
+  source: { baseUrl: string | null; token: string },
+  path: string,
+): Promise<Response> {
+  const token = encodeURIComponent(source.token);
+  const w = c.req.query("w");
+  const h = c.req.query("h");
+  const upstream =
+    w || h
+      ? `${source.baseUrl}/photo/:/transcode?url=${encodeURIComponent(path)}&width=${w ?? h}&height=${h ?? w}&minSize=1&X-Plex-Token=${token}`
+      : `${source.baseUrl}${path}${path.includes("?") ? "&" : "?"}X-Plex-Token=${token}`;
+  const res = await fetch(upstream);
+  if (!res.ok) return c.text("not found", 404);
+  const headers = new Headers();
+  headers.set("Content-Type", res.headers.get("Content-Type") ?? "image/jpeg");
+  headers.set("Cache-Control", "public, max-age=3600");
+  return new Response(res.body, { status: 200, headers });
+}
+
+// Source-keyed variant — registered FIRST (more specific: 3 segments) so it's never shadowed by the
+// channel route. Lets the admin's channel CREATE page preview artwork before a channel exists (no channelId
+// to key on yet); it resolves the token straight from the media source. See channels.previewFilter.
+app.get("/img/source/:sourceId", async (c) => {
   const path = c.req.query("path");
-  const channelId = c.req.param("channelId");
   if (!path || !/^\/(library|photo)\//.test(path)) return c.text("bad path", 400);
   try {
-    const { source } = await resolveChannelSource(prisma, channelId);
-    const token = encodeURIComponent(source.token);
-    const w = c.req.query("w");
-    const h = c.req.query("h");
-    const upstream =
-      w || h
-        ? `${source.baseUrl}/photo/:/transcode?url=${encodeURIComponent(path)}&width=${w ?? h}&height=${h ?? w}&minSize=1&X-Plex-Token=${token}`
-        : `${source.baseUrl}${path}${path.includes("?") ? "&" : "?"}X-Plex-Token=${token}`;
-    const res = await fetch(upstream);
-    if (!res.ok) return c.text("not found", 404);
-    const headers = new Headers();
-    headers.set("Content-Type", res.headers.get("Content-Type") ?? "image/jpeg");
-    headers.set("Cache-Control", "public, max-age=3600");
-    return new Response(res.body, { status: 200, headers });
+    const { source } = await resolveMediaSource(prisma, c.req.param("sourceId"));
+    return await streamPlexArt(c, source, path);
+  } catch {
+    return c.text("error", 500);
+  }
+});
+
+app.get("/img/:channelId", async (c) => {
+  const path = c.req.query("path");
+  if (!path || !/^\/(library|photo)\//.test(path)) return c.text("bad path", 400);
+  try {
+    const { source } = await resolveChannelSource(prisma, c.req.param("channelId"));
+    return await streamPlexArt(c, source, path);
   } catch {
     return c.text("error", 500);
   }

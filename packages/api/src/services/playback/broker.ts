@@ -28,6 +28,16 @@ export async function resolveChannelSource(prisma: PrismaClient, channelId: stri
   return { channel, source, clientId: source.clientIdentifier ?? "channelguide-server" };
 }
 
+/** Resolve a media source directly by id (decrypted token) — used by the public `/img/source` proxy so a
+ * pre-save channel preview (create page, where there's no channel yet) can still fetch Plex artwork. Mirrors
+ * `resolveChannelSource` but keyed on the source instead of a channel. */
+export async function resolveMediaSource(prisma: PrismaClient, mediaSourceId: string) {
+  const mediaSource = await prisma.mediaSource.findUnique({ where: { id: mediaSourceId } });
+  if (!mediaSource) throw notFound("Source not found.");
+  if (!mediaSource.baseUrl) throw preconditionFailed("Source is not connected.");
+  return { source: withDecryptedToken(mediaSource) };
+}
+
 export type ResolveMediaOptions = {
   quality?: string;
   audioStreamId?: string;

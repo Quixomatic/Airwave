@@ -20,10 +20,11 @@ import { resolveTile } from "@/features/icons/app-icon";
 import {
   ChannelForm,
   type BumperMode,
+  type ChannelPreviewInput,
   type MediaType,
   type Ordering,
 } from "@/features/channels/channel-form";
-import { ChannelPreviewTiles } from "@/features/channels/channel-preview";
+import { ChannelPreviewPanel } from "@/features/channels/channel-preview-panel";
 import type { FilterGroup } from "@/features/channels/filter-builder";
 import type { ChannelStrategy } from "@/features/channels/strategy-editor";
 import { trpc, trpcClient } from "@/utils/trpc";
@@ -53,6 +54,8 @@ function ChannelDetail() {
   const [submitting, setSubmitting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [extending, setExtending] = useState(false);
+  // Live filter/source/sort from the form — drives the unsaved-filter preview (#12).
+  const [previewInput, setPreviewInput] = useState<ChannelPreviewInput | null>(null);
 
   const refreshSchedule = async () => {
     await Promise.all([nowNext.refetch(), schedule.refetch()]);
@@ -113,7 +116,7 @@ function ChannelDetail() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-32">
       {/* Channel identity in the sub-header left: tinted icon tile · callsign · CH NN,
           each piece the same size, dot-separated. */}
       <HeaderLeft>
@@ -172,6 +175,7 @@ function ChannelDetail() {
               enabled: channel.data.enabled,
               bumperMode: channel.data.bumperMode as BumperMode,
             }}
+            onPreviewInputChange={setPreviewInput}
             onSubmit={async (v) => {
               setSubmitting(true);
               try {
@@ -203,22 +207,15 @@ function ChannelDetail() {
             }}
           />
 
-      {/* Preview — the resolved OUTPUT of the filter, its own Frame. Refresh lives in its
-          header (like Schedule's actions). */}
-      <Frame>
-        <FrameHeader className="flex-row items-center justify-between">
-          <div>
-            <FrameTitle>Preview</FrameTitle>
-            <FrameDescription>What this channel's filter currently resolves to.</FrameDescription>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => void preview.refetch()} disabled={preview.isFetching}>
-            {preview.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh preview"}
-          </Button>
-        </FrameHeader>
-        <FramePanel>
-          <ChannelPreviewTiles channelId={channelId} data={preview.data} loading={preview.isLoading} />
-        </FramePanel>
-      </Frame>
+      {/* Preview — the resolved OUTPUT of the filter, its own Frame. Shows the SAVED filter on load
+          (preview.data), then live-resolves the UNSAVED filter as you edit (debounced) + on demand (#12). */}
+      <ChannelPreviewPanel
+        input={previewInput}
+        channelId={channelId}
+        initialData={preview.data}
+        initialLoading={preview.isLoading}
+      />
+
 
       <Frame>
         <FrameHeader className="flex-row items-center justify-between">

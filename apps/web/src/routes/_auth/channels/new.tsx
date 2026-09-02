@@ -5,7 +5,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { HeaderRight } from "@/context/header-provider";
-import { ChannelForm } from "@/features/channels/channel-form";
+import { ChannelForm, type ChannelPreviewInput } from "@/features/channels/channel-form";
+import { ChannelPreviewPanel } from "@/features/channels/channel-preview-panel";
 import { trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/channels/new")({
@@ -18,9 +19,11 @@ const FORM_ID = "new-channel-form";
 function NewChannel() {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
+  // Live filter/source/sort from the form — drives the pre-save preview (#12).
+  const [previewInput, setPreviewInput] = useState<ChannelPreviewInput | null>(null);
 
   return (
-    <div>
+    <div className="space-y-6 pb-32">
       <HeaderRight>
         <Button type="submit" form={FORM_ID} size="sm" disabled={submitting}>
           {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -32,6 +35,7 @@ function NewChannel() {
         formId={FORM_ID}
         title="New channel"
         subtitle="What this channel plays, how it's ordered, and how it looks."
+        onPreviewInputChange={setPreviewInput}
         onSubmit={async (v) => {
               setSubmitting(true);
               try {
@@ -62,6 +66,9 @@ function NewChannel() {
               }
             }}
           />
+
+      {/* Pre-save preview (#12): see what the filter catches before creating the channel. */}
+      <ChannelPreviewPanel input={previewInput} />
     </div>
   );
 }

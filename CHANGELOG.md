@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.43] - 2026-09-02
+
+Channels (admin) — preview the show list from your UNSAVED filter, before saving (GitHub #12).
+
+### Added
+- The channel **Preview** now resolves the filter you're currently editing, so you can see what your
+  conditions catch **without saving first**. It updates automatically a moment after you edit (debounced),
+  and each new resolve cancels the previous in-flight request so rapid edits don't stack up or hang. There's
+  also a manual **Update preview** button. On the edit page the saved-filter preview still loads on open,
+  unchanged.
+- Preview now works on the **New channel** page too, before the channel exists, artwork included. A new
+  source-keyed artwork proxy (`/img/source/:sourceId`) serves posters when there's no channel to key on yet.
+- Layout-matched **loading skeletons** for the preview (metric line, poster tiles, title/subtitle bars) using
+  the shared `Skeleton` component. A reload shows the same number of skeletons as the results on screen; the
+  first load shows a single row. Empty and "nothing to preview yet" states use the shared `EmptyState`.
+
+### Notes
+- To avoid hammering Plex, the automatic preview only fires once a filter condition actually has a value; a
+  brand-new, empty filter (which would resolve the whole library) waits for the manual button.
+- New tRPC query `channels.previewFilter` (resolves an ad-hoc filter, reusing the same validation as save).
+  Self-hosters need the updated server image for the create-page artwork proxy and this endpoint.
+
 ## [0.12.42] - 2026-09-01
 
 Desktop app (Airwave Desktop supervisor) — reliably reap an orphaned embedded Postgres on startup so

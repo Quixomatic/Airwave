@@ -17,3 +17,13 @@ export function channelImg(channelId: string, path: string | undefined | null, w
   const base = `${serverBase()}/img/${channelId}?path=${encodeURIComponent(path)}`;
   return w == null ? base : `${base}&w=${w}`;
 }
+
+/**
+ * Like `channelImg`, but keyed on the MEDIA SOURCE instead of a channel — for the channel CREATE page, where
+ * there's no channel yet to resolve the Plex token from. Hits the `/img/source/:sourceId` proxy variant.
+ */
+export function sourceImg(sourceId: string, path: string | undefined | null, w: number | null = 200): string | null {
+  if (!path || !sourceId) return null;
+  const base = `${serverBase()}/img/source/${sourceId}?path=${encodeURIComponent(path)}`;
+  return w == null ? base : `${base}&w=${w}`;
+}

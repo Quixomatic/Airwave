@@ -11,7 +11,7 @@ import { FILTER_FIELDS, FILTER_OPS, OPS_FOR_KIND, fieldMeta } from "../services/
 import { resolveChannel } from "../services/plex/resolve";
 import { decryptToken } from "../services/plex/token";
 import { getSourceReadiness, notReadyReason } from "../services/sources/readiness";
-import { previewItems } from "../services/agent/tools";
+import { previewItems, previewFilter as resolvePreviewFilter } from "../services/agent/tools";
 import { SORT_FIELDS } from "../services/plex/sort-fields";
 import { normalizeCallsign } from "../services/generator/callsign";
 import {
@@ -419,6 +419,34 @@ export const channelsRouter = router({
       const items = await resolveChannel(ctx.prisma, input.id);
       return previewItems(ctx.prisma, channel.mediaSourceId, items, input.detail ?? "default");
     }),
+
+  /**
+   * Preview an UNSAVED filter tree — resolves an ad-hoc filter (whatever's currently in the builder) against
+   * the source, returning the same coalesced shape as `preview`. Lets the channel editor show what the current
+   * conditions catch WITHOUT saving first (GitHub #12), and powers the create page's pre-save preview. Reuses
+   * the same recursive `nodeSchema` the save mutations validate against.
+   */
+  previewFilter: adminProcedure
+    .input(
+      z.object({
+        mediaSourceId: z.string(),
+        mediaTypes: z.array(mediaTypeEnum).min(1),
+        filter: nodeSchema.optional(),
+        sortField: z.string().optional(),
+        sortDir: z.enum(["asc", "desc"]).optional(),
+        detail: z.enum(["quick", "default", "verbose"]).optional(),
+      }),
+    )
+    .query(({ ctx, input }) =>
+      resolvePreviewFilter(ctx.prisma, {
+        mediaSourceId: input.mediaSourceId,
+        mediaTypes: input.mediaTypes,
+        filter: input.filter,
+        sortField: input.sortField,
+        sortDir: input.sortDir,
+        detail: input.detail,
+      }),
+    ),
 
   /**
    * Rebuild the channel's whole lineup from now (one full pass minimum, looped to a
