@@ -9,6 +9,7 @@ import { getGlobalBumperConfig } from "../bumpers/bumper-config";
 import { generateLineup } from "../generator/generate";
 import { syncMediaItems } from "../media/sync-media";
 import { syncRecentlyAdded } from "../media/sync-recent";
+import { getAppSettings } from "../settings";
 import { firstReadySource } from "../sources/readiness";
 import { getPlexUser, resolveConnectionUrls, stopTranscode } from "../plex/client";
 import { syncLibraries } from "../plex/sync-libraries";
@@ -283,9 +284,15 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
       const raw = process.env.AI_LINEUP_BUILD_LIMIT;
       const limit = raw === undefined ? DEFAULT_AI_BUILD_LIMIT : Number(raw);
 
+      // Forward the "Max parallel AI channel builds" setting (AppSettings.channelBuildConcurrency). This job
+      // is the ACTUAL trigger for the admin "Build with AI" button — the ai.buildLineup mutation that also
+      // reads it has no caller — so without this the setting never reached the workflow (GitHub #21).
+      const settings = await getAppSettings(prisma);
+
       const { runId } = await runner.start({
         sourceId: source.id,
         userId: admin.id,
+        concurrency: settings.channelBuildConcurrency,
         ...(limit > 0 ? { limit } : {}),
       });
       console.log(

@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.46] - 2026-09-02
+
+AI lineup — actually apply the "Max parallel AI channel builds" setting (GitHub #21).
+
+### Fixed
+- The **"Max parallel AI channel builds"** setting (Settings → General, added in 0.12.40) was ignored: the
+  admin "Build with AI" button runs the `ai-lineup-build` **job**, and that job never forwarded the value to
+  the workflow, so every run fell back to the hardcoded default of 6 concurrent builds. (The `ai.buildLineup`
+  tRPC mutation that *did* forward it has no caller.) The job now reads `AppSettings.channelBuildConcurrency`
+  and passes it into the run, so lowering the setting (e.g. to 1 or 2 for a slow local model) takes effect on
+  the next run. No rebuild needed — it's a runtime argument. Thanks to @area51tazz for the precise diagnosis.
+
 ## [0.12.45] - 2026-09-02
 
 Site (getairwave.tv) — reflect the new Fire TV, Roku, and Android TV store availability.
