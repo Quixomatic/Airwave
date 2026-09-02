@@ -2,7 +2,7 @@ import { Check, Clock } from "lucide-react";
 import type { ReactNode } from "react";
 import { FaWindows, FaApple, FaLinux, FaDocker, FaAndroid, FaChrome } from "react-icons/fa";
 import { getHeroDownloads } from "@/lib/releases";
-import { APP_STORE_APPLE, PLAY_STORE } from "@/lib/store-links";
+import { APP_STORE_APPLE, PLAY_STORE, AMAZON_APPSTORE, ROKU_CHANNEL_STORE } from "@/lib/store-links";
 
 /**
  * Airwave's download matrix for the /docs/downloads page — a scannable table of every client and server
@@ -17,9 +17,9 @@ import { APP_STORE_APPLE, PLAY_STORE } from "@/lib/store-links";
 const GHCR = "https://github.com/Quixomatic/Airwave/pkgs/container/airwave";
 const REPO = "https://github.com/Quixomatic/Airwave";
 const SELF_HOST = "/docs/self-hosting";
-// Apple TV + iPad share one universal App Store listing; Play covers Android TV / Google TV / Fire TV.
-// Both come from lib/store-links.ts. `href: APP_STORE_APPLE || undefined` → a plain-text cell until the
-// App ID is filled in, then a live link.
+// Apple TV + iPad share one universal App Store listing; Google Play covers Android TV / Google TV; Fire TV
+// and Roku have their own stores (Amazon Appstore, Roku Channel Store). All come from lib/store-links.ts.
+// `href: APP_STORE_APPLE || undefined` → a plain-text cell until the App ID is filled in, then a live link.
 
 type Status = "available" | "beta" | "planned";
 
@@ -104,10 +104,10 @@ export async function ClientDownloads() {
   const rows: Row[] = [
     { platform: "Apple TV", sub: "tvOS", Icon: FaApple, delivery: "Native app", href: APP_STORE_APPLE || undefined, getLabel: "App Store", external: true, status: "available" },
     { platform: "iPad", sub: "iPadOS", Icon: FaApple, delivery: "Native app", href: APP_STORE_APPLE || undefined, getLabel: "App Store", external: true, status: "beta", statusLabel: "In review" },
-    { platform: "Android TV / Google TV", Icon: FaAndroid, delivery: "Native app", href: PLAY_STORE, getLabel: "Google Play", external: true, status: "beta", statusLabel: "In testing" },
-    { platform: "Fire TV", Icon: FaAndroid, delivery: "Native app", getLabel: "Amazon Appstore", status: "beta", statusLabel: "In review" },
+    { platform: "Android TV / Google TV", Icon: FaAndroid, delivery: "Native app", href: PLAY_STORE, getLabel: "Google Play", external: true, status: "available" },
+    { platform: "Fire TV", Icon: FaAndroid, delivery: "Native app", href: AMAZON_APPSTORE, getLabel: "Amazon Appstore", external: true, status: "available" },
+    { platform: "Roku", Icon: FaChrome, delivery: "Native channel", href: ROKU_CHANNEL_STORE, getLabel: "Roku Channel Store", external: true, status: "available" },
     { platform: "LG webOS", Icon: FaChrome, delivery: "Packaged web app", href: REPO, getLabel: "Sideload / from source", external: true, status: "available", statusLabel: "Sideload" },
-    { platform: "Roku", Icon: FaChrome, delivery: "Native channel", href: REPO, getLabel: "Sideload / from source", external: true, status: "available", statusLabel: "Sideload" },
     { platform: "Windows", sub: "x64", Icon: FaWindows, delivery: "Desktop app (Tauri)", href: dl.client.windows, getLabel: "Download (.exe)", external: true, status: "available" },
     { platform: "macOS", sub: "Apple Silicon", Icon: FaApple, delivery: "Desktop app (Tauri)", href: dl.client.macos, getLabel: "Download (.dmg)", external: true, status: "available" },
     { platform: "macOS", sub: "Intel", Icon: FaApple, delivery: "Desktop app (Tauri)", href: dl.client.macosIntel, getLabel: "Download (.dmg)", external: true, status: "available" },

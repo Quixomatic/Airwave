@@ -32,9 +32,9 @@ const ROWS: { platform: string; sub?: string; type: string; engine: string; tier
   { platform: "macOS", sub: "Apple Silicon + Intel", type: "Desktop app (Tauri)", engine: "mpv", tier: "full" },
   { platform: "LG webOS", type: "Web app (packaged)", engine: "native + hls.js", tier: "full" },
   { platform: "Any browser", type: "Web player", engine: "native + hls.js", tier: "full" },
-  { platform: "Android TV", type: "Native app", engine: "mpv", tier: "supported" },
-  { platform: "Fire TV", type: "Native app", engine: "mpv", tier: "supported" },
-  { platform: "Roku", type: "Native app", engine: "native (SceneGraph)", tier: "supported" },
+  { platform: "Android TV", type: "Native app", engine: "mpv", tier: "full" },
+  { platform: "Fire TV", type: "Native app", engine: "mpv", tier: "full" },
+  { platform: "Roku", type: "Native app", engine: "native (SceneGraph)", tier: "full" },
   { platform: "Linux", type: "Desktop app (Tauri)", engine: "mpv", tier: "planned" },
   { platform: "Samsung", sub: "Tizen", type: "Web app", engine: "—", tier: "planned" },
 ];

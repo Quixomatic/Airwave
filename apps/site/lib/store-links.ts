@@ -13,5 +13,12 @@ export const APPLE_APP_ID = "6801608850";
 /** The public App Store URL (locale-redirecting), or "" when the App ID isn't set yet. */
 export const APP_STORE_APPLE = APPLE_APP_ID ? `https://apps.apple.com/app/id${APPLE_APP_ID}` : "";
 
-/** Google Play listing (Android TV / Google TV / Fire TV share the same package). */
+/** Google Play listing (Android TV / Google TV share the same package). */
 export const PLAY_STORE = "https://play.google.com/store/apps/details?id=com.airwave.tv";
+
+/** Amazon Appstore listing (Fire TV — its own store, separate from Google Play). */
+export const AMAZON_APPSTORE = "https://www.amazon.com/dp/B0HGBHTJWF";
+
+/** Roku Channel Store listing. */
+export const ROKU_CHANNEL_STORE =
+  "https://channelstore.roku.com/details/713ffa078c7a5f05bd441a8560cc6d7e:fa378e9461337dd32c76013f8faa4154/airwave-tv";

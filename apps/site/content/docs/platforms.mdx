@@ -23,16 +23,12 @@ a 6-inch screen.
 
 <PlatformMatrix />
 
-> **Store status vs. what runs today.** The native apps are **built and running on real hardware now**
-> (iPad, Apple TV 4K, Android TV, Fire TV), webOS runs daily on a real LG C2, the **Roku** channel runs
-> on a real Roku Streaming Stick 4K, and the **desktop app** ships on **Windows and macOS** (Apple Silicon
-> + Intel) as signed, self-updating installers — validated on real hardware; Linux shares the same Tauri +
-> mpv core and is next. Publishing them to the App Store / Google Play /
-> Amazon Appstore / LG Content Store / Roku Channel Store — and shipping signed desktop installers — is a
-> **prerequisite still being completed** — iPad and Apple TV first, then the rest. The intended
-> store-by-store distribution is
-> listed in the project [README's availability table](https://github.com/Quixomatic/Airwave#platform-availability).
-> Because Airwave is source-available, you can also **build and sideload** any native app yourself.
+> **Store status.** Airwave is live on the major TV stores: **Apple TV** (App Store), **Android TV / Google
+> TV** (Google Play), **Fire TV** (Amazon Appstore), and **Roku** (Roku Channel Store), with **iPad** in App
+> Store review. **LG webOS** runs daily on a real LG C2 and installs by sideload while its store listing is in
+> progress. The **desktop app** ships on **Windows and macOS** (Apple Silicon + Intel) as signed,
+> self-updating installers; **Linux** shares the same Tauri + mpv core and is next. Because Airwave is
+> source-available, you can also **build and sideload** any native app yourself.
 
 ## Native apps (`tv-native`)
 
@@ -99,8 +95,7 @@ native player demuxes cleanly. Device capabilities come from Roku's authoritativ
 feeding the same capability model. Sign-in is the same **device-code flow** (Plex or an Airwave account),
 and it talks to the identical `/api/v1` server contract — so nothing server-side changes.
 
-Distribution is via the **Roku Channel Store** (built and running on real hardware; store submission still
-to come), or sideloaded from source in Developer Mode.
+Distribution is via the **[Roku Channel Store](https://channelstore.roku.com/details/713ffa078c7a5f05bd441a8560cc6d7e:fa378e9461337dd32c76013f8faa4154/airwave-tv)** (live), or sideloaded from source in Developer Mode.
 
 ## Also: the admin panel
 
