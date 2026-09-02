@@ -11,9 +11,9 @@ Site (getairwave.tv) — reflect the new Fire TV, Roku, and Android TV store ava
   links to `lib/store-links.ts`, and updated the downloads table so Fire TV points at the Amazon Appstore and
   Roku points at the Roku Channel Store (both "Available", no longer "In review" / "Sideload").
 - The **platforms matrix** now lists **Android TV, Fire TV, and Roku** as **Full support** (were "Supported").
-- The **home page** platform grid marks **Android TV** and **Fire TV** as Ready, and the platforms/downloads
-  docs prose was refreshed to say Airwave is live on Apple TV, Android TV / Google TV, Fire TV, and Roku
-  (iPad in review, webOS by sideload).
+- The **home page** platform grid marks **Fire TV** as Ready, and the platforms/downloads docs prose was
+  refreshed to say Airwave is live on Apple TV, Fire TV, and Roku (iPad in App Store review, Android TV /
+  Google TV in closed testing on Google Play, webOS by sideload).
 
 ## [0.12.44] - 2026-09-02
 

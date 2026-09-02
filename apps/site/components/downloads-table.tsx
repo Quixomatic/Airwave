@@ -104,7 +104,7 @@ export async function ClientDownloads() {
   const rows: Row[] = [
     { platform: "Apple TV", sub: "tvOS", Icon: FaApple, delivery: "Native app", href: APP_STORE_APPLE || undefined, getLabel: "App Store", external: true, status: "available" },
     { platform: "iPad", sub: "iPadOS", Icon: FaApple, delivery: "Native app", href: APP_STORE_APPLE || undefined, getLabel: "App Store", external: true, status: "beta", statusLabel: "In review" },
-    { platform: "Android TV / Google TV", Icon: FaAndroid, delivery: "Native app", href: PLAY_STORE, getLabel: "Google Play", external: true, status: "available" },
+    { platform: "Android TV / Google TV", Icon: FaAndroid, delivery: "Native app", href: PLAY_STORE, getLabel: "Google Play", external: true, status: "beta", statusLabel: "In testing" },
     { platform: "Fire TV", Icon: FaAndroid, delivery: "Native app", href: AMAZON_APPSTORE, getLabel: "Amazon Appstore", external: true, status: "available" },
     { platform: "Roku", Icon: FaChrome, delivery: "Native channel", href: ROKU_CHANNEL_STORE, getLabel: "Roku Channel Store", external: true, status: "available" },
     { platform: "LG webOS", Icon: FaChrome, delivery: "Packaged web app", href: REPO, getLabel: "Sideload / from source", external: true, status: "available", statusLabel: "Sideload" },
