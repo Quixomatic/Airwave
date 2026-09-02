@@ -25,6 +25,9 @@ const connectionInput = z.object({
   model: z.string().min(1),
   baseUrl: z.string().optional().nullable(),
   apiKey: z.string().optional(), // undefined = leave unchanged; "" = clear; string = set
+  // LOCAL (`compatible`) only — disable the model's thinking, and an optional extra body escape hatch.
+  disableThinking: z.boolean().optional(),
+  extraBody: z.record(z.string(), z.unknown()).nullable().optional(), // undefined = unchanged; null = clear; object = set
 });
 
 export const aiRouter = router({

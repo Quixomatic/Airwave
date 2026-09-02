@@ -1,7 +1,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
-import type { PrismaClient } from "@airwave/db";
+import { Prisma, type PrismaClient } from "@airwave/db";
 import type { LanguageModel } from "ai";
 
 import { decryptSecret, encryptSecret } from "../crypto";
@@ -16,7 +16,50 @@ import { decryptSecret, encryptSecret } from "../crypto";
 export const AI_PROVIDERS = ["anthropic", "openai", "google", "compatible"] as const;
 export type AiProvider = (typeof AI_PROVIDERS)[number];
 
-export type ResolvedConnection = { provider: string; model: string; baseUrl: string | null; apiKey: string | null };
+export type ResolvedConnection = {
+  provider: string;
+  model: string;
+  baseUrl: string | null;
+  apiKey: string | null;
+  /** LOCAL (`compatible`) only: inject the no-think fields into every request body. */
+  disableThinking?: boolean;
+  /** LOCAL only: extra JSON merged into every request body (engine-specific escape hatch). */
+  extraBody?: unknown;
+};
+
+/**
+ * A `fetch` wrapper that merges extra fields into an OpenAI-compatible request body — how we disable a local
+ * model's "thinking" without a Modelfile hack or a proxy. Every engine spells it differently and ignores fields
+ * it doesn't recognise, so when `disableThinking` is on we send ALL the known variants at once:
+ *   - Ollama:        `reasoning_effort: "none"`  (top-level; `think:false` only works on its native API, not /v1)
+ *   - vLLM / SGLang: `chat_template_kwargs: { enable_thinking: false }`
+ *   - OpenRouter:    `reasoning: { enabled: false }`
+ * `extraBody` is merged last so an admin can override or add engine-specific keys. Returns `undefined` when there's
+ * nothing to inject (→ the default fetch). Only wired for the `compatible` provider — never for cloud providers.
+ */
+function bodyInjectingFetch(cfg: ResolvedConnection): typeof fetch | undefined {
+  const extra: Record<string, unknown> = {};
+  if (cfg.disableThinking) {
+    extra.reasoning_effort = "none";
+    extra.chat_template_kwargs = { enable_thinking: false };
+    extra.reasoning = { enabled: false };
+  }
+  if (cfg.extraBody && typeof cfg.extraBody === "object") Object.assign(extra, cfg.extraBody);
+  if (Object.keys(extra).length === 0) return undefined;
+  const injector = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    if (init?.body && typeof init.body === "string") {
+      try {
+        const merged = { ...(JSON.parse(init.body) as Record<string, unknown>), ...extra };
+        init = { ...init, body: JSON.stringify(merged) };
+      } catch {
+        /* non-JSON body — leave it untouched */
+      }
+    }
+    return fetch(input, init);
+  };
+  // Cast past the `preconnect` member the lib's `typeof fetch` declares but the SDK never calls.
+  return injector as typeof fetch;
+}
 
 export function getModel(cfg: ResolvedConnection): LanguageModel {
   const apiKey = cfg.apiKey ?? undefined;
@@ -32,8 +75,17 @@ export function getModel(cfg: ResolvedConnection): LanguageModel {
       // (`/v1/chat/completions`, `messages`) — NOT OpenAI's newer Responses API (`/v1/responses`, `input`) that the
       // default `createOpenAI(...)(model)` callable now uses. Force `.chat()` so we send `messages`; otherwise these
       // servers reject the request with `Invalid type for 'input'` once tools are attached (GitHub #3). Real OpenAI
-      // (the `openai` case above) keeps the default Responses route, which it supports.
-      return createOpenAI({ apiKey, baseURL: cfg.baseUrl ?? undefined }).chat(cfg.model);
+      // (the `openai` case above) keeps the default Responses route, which it supports. The optional `fetch` wrapper
+      // injects the disable-thinking body fields (local models only).
+      //
+      // A keyless local endpoint (Ollama, LM Studio) sends no key — but `@ai-sdk/openai` THROWS "OpenAI API key is
+      // missing" when it can't load one (even though the endpoint ignores it). Pass a harmless placeholder so a
+      // keyless local connection works; a real key (e.g. OpenRouter) is used when provided.
+      return createOpenAI({
+        apiKey: apiKey ?? "no-key",
+        baseURL: cfg.baseUrl ?? undefined,
+        fetch: bodyInjectingFetch(cfg),
+      }).chat(cfg.model);
     default:
       throw new Error(`Unknown AI provider: ${cfg.provider}`);
   }
@@ -50,6 +102,8 @@ type PublicConnection = {
   isActive: boolean;
   isPlanner: boolean;
   isWorker: boolean;
+  disableThinking: boolean;
+  extraBody: unknown;
 };
 
 /** All saved connections (active first, then newest). */
@@ -65,6 +119,8 @@ export async function listConnections(prisma: PrismaClient): Promise<PublicConne
     isActive: c.isActive,
     isPlanner: c.isPlanner,
     isWorker: c.isWorker,
+    disableThinking: c.disableThinking,
+    extraBody: c.extraBody,
   }));
 }
 
@@ -72,7 +128,14 @@ export async function listConnections(prisma: PrismaClient): Promise<PublicConne
 export async function getActiveConnection(prisma: PrismaClient): Promise<ResolvedConnection | null> {
   const c = await prisma.aiConnection.findFirst({ where: { isActive: true } });
   if (!c) return null;
-  return { provider: c.provider, model: c.model, baseUrl: c.baseUrl, apiKey: c.apiKeyEnc ? decryptSecret(c.apiKeyEnc) : null };
+  return {
+    provider: c.provider,
+    model: c.model,
+    baseUrl: c.baseUrl,
+    apiKey: c.apiKeyEnc ? decryptSecret(c.apiKeyEnc) : null,
+    disableThinking: c.disableThinking,
+    extraBody: c.extraBody,
+  };
 }
 
 export async function getActiveModel(prisma: PrismaClient): Promise<LanguageModel | null> {
@@ -113,6 +176,8 @@ export async function getConnectionForRole(
     model: c.model,
     baseUrl: c.baseUrl,
     apiKey: c.apiKeyEnc ? decryptSecret(c.apiKeyEnc) : null,
+    disableThinking: c.disableThinking,
+    extraBody: c.extraBody,
   };
 }
 
@@ -139,7 +204,17 @@ export async function setConnectionRole(
   return listConnections(prisma);
 }
 
-type ConnectionInput = { name: string; provider: string; model: string; baseUrl?: string | null; apiKey?: string };
+type ConnectionInput = {
+  name: string;
+  provider: string;
+  model: string;
+  baseUrl?: string | null;
+  apiKey?: string;
+  /** LOCAL (`compatible`) only — inject the no-think body fields. */
+  disableThinking?: boolean;
+  /** LOCAL only — extra JSON merged into every request body. `null` clears it. */
+  extraBody?: unknown;
+};
 
 /**
  * Create a connection. The FIRST connection claims every role, so a single-connection setup needs
@@ -155,6 +230,8 @@ export async function createConnection(prisma: PrismaClient, input: ConnectionIn
       model: input.model,
       baseUrl: input.baseUrl ?? null,
       apiKeyEnc: input.apiKey ? encryptSecret(input.apiKey) : null,
+      disableThinking: input.disableThinking ?? false,
+      ...(input.extraBody != null ? { extraBody: input.extraBody as Prisma.InputJsonValue } : {}),
       isActive: first,
       isPlanner: first,
       isWorker: first,
@@ -166,9 +243,22 @@ export async function createConnection(prisma: PrismaClient, input: ConnectionIn
 /** Update a connection. `apiKey`: undefined = leave unchanged, "" = clear, string = set. */
 export async function updateConnection(prisma: PrismaClient, id: string, input: ConnectionInput) {
   const keyPatch = input.apiKey === undefined ? {} : { apiKeyEnc: input.apiKey ? encryptSecret(input.apiKey) : null };
+  // Json field: undefined = leave unchanged, null = clear (DbNull), object = set.
+  const extraBodyPatch =
+    input.extraBody === undefined
+      ? {}
+      : { extraBody: input.extraBody === null ? Prisma.DbNull : (input.extraBody as Prisma.InputJsonValue) };
   await prisma.aiConnection.update({
     where: { id },
-    data: { name: input.name, provider: input.provider, model: input.model, baseUrl: input.baseUrl ?? null, ...keyPatch },
+    data: {
+      name: input.name,
+      provider: input.provider,
+      model: input.model,
+      baseUrl: input.baseUrl ?? null,
+      disableThinking: input.disableThinking ?? false,
+      ...keyPatch,
+      ...extraBodyPatch,
+    },
   });
   return listConnections(prisma);
 }
@@ -202,6 +292,8 @@ export async function testConnection(prisma: PrismaClient, id: string): Promise<
     model: c.model,
     baseUrl: c.baseUrl,
     apiKey: c.apiKeyEnc ? decryptSecret(c.apiKeyEnc) : null,
+    disableThinking: c.disableThinking,
+    extraBody: c.extraBody,
   };
   try {
     const { generateText } = await import("ai");

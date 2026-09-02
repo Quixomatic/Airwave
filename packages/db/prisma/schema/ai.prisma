@@ -17,6 +17,14 @@ model AiConnection {
   baseUrl   String?
   apiKeyEnc String? // encrypted; null for a keyless local endpoint
 
+  /// LOCAL (`compatible`) connections only: disable the model's "thinking"/reasoning. When on, we inject the
+  /// known no-think fields into every request body (Ollama `reasoning_effort:none`, vLLM/SGLang
+  /// `chat_template_kwargs.enable_thinking:false`, OpenRouter `reasoning`). Ignored for cloud providers.
+  disableThinking Boolean @default(false)
+  /// LOCAL only: optional extra JSON merged into every request body — an escape hatch for engine-specific
+  /// params not covered by the toggle (e.g. a synonym like `do_reasoning`, or a new engine's flag).
+  extraBody Json?
+
   /// The admin CHAT model.
   isActive  Boolean @default(false)
   /// Heavy reasoning — the lineup PLAN step. Falls back to `isActive` when unset.

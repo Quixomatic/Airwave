@@ -4,10 +4,13 @@ import { Frame, FrameHeader, FramePanel, FrameTitle } from "@airwave/ui/componen
 import { Input } from "@airwave/ui/components/input";
 import { Label } from "@airwave/ui/components/label";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@airwave/ui/components/select";
+import { Switch } from "@airwave/ui/components/switch";
+import { Textarea } from "@airwave/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { CheckCircle2, Loader2, Pencil, Plug, Trash2, XCircle } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { EmptyState } from "@/components/empty-state";
 import { trpc, trpcClient } from "@/utils/trpc";
@@ -45,6 +48,8 @@ type Conn = {
   isActive: boolean;
   isPlanner: boolean;
   isWorker: boolean;
+  disableThinking: boolean;
+  extraBody: unknown;
 };
 
 /**
@@ -91,6 +96,9 @@ function SettingsAi() {
   const [customModel, setCustomModel] = useState(false);
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
+  // LOCAL (`compatible`) only — disable the model's thinking + an advanced extra-body JSON escape hatch.
+  const [disableThinking, setDisableThinking] = useState(false);
+  const [extraBodyText, setExtraBodyText] = useState("");
   const [busy, setBusy] = useState(false);
   const [test, setTest] = useState<Record<string, { ok: boolean; sample?: string; error?: string } | "loading">>({});
 
@@ -105,6 +113,8 @@ function SettingsAi() {
     setCustomModel(false);
     setBaseUrl("");
     setApiKey("");
+    setDisableThinking(false);
+    setExtraBodyText("");
   };
 
   const startEdit = (c: Conn) => {
@@ -115,6 +125,8 @@ function SettingsAi() {
     setCustomModel(c.provider !== "compatible" && !MODELS[c.provider as Provider]?.includes(c.model));
     setBaseUrl(c.baseUrl ?? "");
     setApiKey("");
+    setDisableThinking(c.disableThinking);
+    setExtraBodyText(c.extraBody ? JSON.stringify(c.extraBody, null, 2) : "");
   };
 
   const onProviderChange = (p: Provider) => {
@@ -124,14 +136,33 @@ function SettingsAi() {
   };
 
   const save = async () => {
+    const isCompat = provider === "compatible";
+    // Parse the advanced extra-body JSON (compatible only). Empty → clear (null); invalid → stop.
+    let extraBody: Record<string, unknown> | null | undefined;
+    if (isCompat) {
+      const raw = extraBodyText.trim();
+      if (!raw) extraBody = null;
+      else {
+        try {
+          const parsed = JSON.parse(raw) as unknown;
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
+          extraBody = parsed as Record<string, unknown>;
+        } catch {
+          toast.error("Extra request body must be a valid JSON object.");
+          return;
+        }
+      }
+    }
     setBusy(true);
     try {
       const payload = {
         name: name.trim() || `${PROVIDER_LABEL[provider]} · ${model}`,
         provider,
         model: model.trim(),
-        baseUrl: provider === "compatible" ? baseUrl.trim() || null : null,
+        baseUrl: isCompat ? baseUrl.trim() || null : null,
         apiKey: apiKey ? apiKey : undefined,
+        disableThinking: isCompat ? disableThinking : false,
+        ...(isCompat ? { extraBody } : {}),
       };
       if (editingId) await trpcClient.ai.update.mutate({ id: editingId, ...payload });
       else await trpcClient.ai.create.mutate(payload);
@@ -359,10 +390,38 @@ function SettingsAi() {
           </div>
 
           {provider === "compatible" && (
-            <div className="space-y-2">
-              <Label>Base URL</Label>
-              <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="http://localhost:11434/v1" />
-            </div>
+            <>
+              <div className="space-y-2">
+                <Label>Base URL</Label>
+                <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="http://localhost:11434/v1" />
+              </div>
+
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <Label>Disable thinking</Label>
+                  <p className="text-muted-foreground text-xs">
+                    Turn off the model's reasoning/thinking mode. Reasoning models otherwise time out the lineup
+                    planner. Sends the no-think flag for Ollama, vLLM/SGLang, and OpenRouter.
+                  </p>
+                </div>
+                <Switch checked={disableThinking} onCheckedChange={(v) => setDisableThinking(v === true)} />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Extra request body (JSON) — advanced</Label>
+                <Textarea
+                  value={extraBodyText}
+                  onChange={(e) => setExtraBodyText(e.target.value)}
+                  rows={3}
+                  className="font-mono text-xs"
+                  placeholder={'{ "chat_template_kwargs": { "do_reasoning": false } }'}
+                />
+                <p className="text-muted-foreground text-xs">
+                  Optional. Merged into every request body — an escape hatch for engine-specific params the
+                  toggle above doesn't cover. Leave blank unless you know you need it.
+                </p>
+              </div>
+            </>
           )}
 
           <div className="space-y-2">

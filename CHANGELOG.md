@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.47] - 2026-09-02
+
+AI connections — a per-connection "disable thinking" toggle for local models, and a keyless-endpoint fix.
+
+### Added
+- **Disable thinking / reasoning** toggle on OpenAI-compatible (Local) AI connections (Settings → AI
+  Assistant). Reasoning models otherwise burn the whole window "thinking" and time out the lineup planner at
+  zero output tokens. When on, Airwave injects the no-think flag every engine understands — Ollama
+  (`reasoning_effort: "none"`), vLLM / SGLang (`chat_template_kwargs.enable_thinking: false`), and OpenRouter
+  (`reasoning`) — so one switch covers them all, and cloud providers never receive it. Plus an advanced
+  **Extra request body (JSON)** field that's merged into every request, an escape hatch for engine-specific
+  params the toggle doesn't cover.
+
+### Fixed
+- **Keyless local connections now work.** A local endpoint with no API key (Ollama, LM Studio) failed with
+  "OpenAI API key is missing" because the OpenAI SDK throws when it can't load a key, even though the endpoint
+  ignores it. Compatible connections now send a harmless placeholder key when none is set — affecting both the
+  Test button and actual use.
+
+### Migration
+- Adds `disable_thinking` + `extra_body` columns to `ai_connection`. No data migration.
+
 ## [0.12.46] - 2026-09-02
 
 AI lineup — actually apply the "Max parallel AI channel builds" setting (GitHub #21).
