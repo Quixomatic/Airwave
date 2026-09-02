@@ -74,8 +74,13 @@ function Marker({ state }: { state: RowState }) {
 export function OnboardingChecklist() {
   const status = useQuery({
     ...trpc.onboarding.status.queryOptions(),
-    // Poll while onboarding is visible so the sync spinner + step ticks update live. Cheap counts query.
-    refetchInterval: 5000,
+    // Poll fast while there's still setup to do (the sync spinner + step ticks update live, and nothing else
+    // invalidates this query). Once every step is done, drop to a lazy cadence — from here the state only
+    // changes on a deliberate user action, so a tight poll is pure noise.
+    refetchInterval: (q) => {
+      const d = q.state.data;
+      return d && d.doneCount >= d.total ? 30_000 : 5_000;
+    },
   });
   const [collapsed, setCollapsed] = useState<boolean>(() => localStorage.getItem(COLLAPSE_KEY) === "1");
   useEffect(() => {

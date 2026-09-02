@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.44] - 2026-09-02
+
+Admin — stop the setup checklist from polling every 5s forever.
+
+### Fixed
+- The onboarding checklist in the sidebar polled `onboarding.status` every 5 seconds indefinitely, even after
+  every step was done (a constant trickle of requests visible in the server log at idle). It now polls fast
+  (5s) only while setup is still in progress, where the live sync spinner and step ticks need it, and drops to
+  a lazy 30s cadence once all steps are complete (from there the state only changes on a deliberate action).
+
 ## [0.12.43] - 2026-09-02
 
 Channels (admin) — preview the show list from your UNSAVED filter, before saving (GitHub #12).
