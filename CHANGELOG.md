@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.1] - 2026-09-03
+
+Docs (getairwave.tv) — a dedicated Local Development page with a screencast of the setup wizard.
+
+### Added
+- **New "Local Development" docs page** (getairwave.tv): clone → `pnpm dev:setup` → `pnpm dev:core`,
+  with an embedded screencast of the wizard, a breakdown of what it writes, the re-run / secret-safety
+  behavior, the `--dry-run` preview, the by-hand alternative, and the dev-script variants. Added to the
+  docs nav under a new "Development" section. Screencast at `public/screenshots/dev-setup.mp4` (trimmed
+  + re-encoded with ffmpeg).
+
 ## [0.13.0] - 2026-09-03
 
 Contributor onboarding — one interactive `pnpm dev:setup` wizard that takes a fresh clone to a

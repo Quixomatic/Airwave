@@ -1,0 +1,111 @@
+---
+icon: Terminal
+title: "Local Development"
+description: "Clone the repo and go from a fresh checkout to a running dev stack with one command — pnpm dev:setup."
+---
+
+> This is the path for **building Airwave from source** — contributors, and anyone who wants to run
+> the code directly instead of the packaged app. If you just want to *run* Airwave, use
+> [Self-hosting (Docker)](https://github.com/Quixomatic/Airwave#self-hosting-docker) or the desktop
+> installer on the [Downloads](/docs/downloads) page instead.
+
+Airwave is a **pnpm + Turborepo monorepo** on the [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack).
+
+## Prerequisites
+
+- [**Bun**](https://bun.sh) and [**pnpm**](https://pnpm.io), **Node 22+**
+- A reachable **PostgreSQL** — local, or any Postgres you can point a connection string at
+
+## Quick start
+
+Clone, install, and run the interactive setup wizard:
+
+```bash
+git clone https://github.com/Quixomatic/Airwave.git
+cd Airwave
+pnpm install
+pnpm dev:setup      # interactive first-run setup — add --dry-run to preview, writes nothing
+pnpm dev:core       # server + admin web + tv-web
+```
+
+- Admin web → `http://localhost:3001`
+- API → `http://localhost:3000`
+
+<Video
+  src="/screenshots/dev-setup.mp4"
+  autoPlay
+  loop
+  muted
+  className="!w-auto max-w-[460px] mx-auto"
+  caption="pnpm dev:setup — a fresh clone to a running dev stack"
+/>
+
+## What `pnpm dev:setup` does
+
+The wizard takes a fresh clone to a running stack in one pass:
+
+- **Checks prerequisites** — Node 22+, Bun, pnpm.
+- **Prompts for your Postgres** — with a live reachability probe and a `?schema=public` default
+  (added automatically only when your URL has no schema; Airwave's workflow engine lives in its own
+  schema in the same database).
+- **Seeds the first admin** — email + password. There's no public sign-up, so this is your way in.
+- **Writes the dev env files** from the `.env.example` templates — `apps/server/.env`,
+  `apps/web/.env`, `apps/tv-web/.env.local`, and `apps/tv-native/.env.local`.
+- **Generates secrets** — a fresh `BETTER_AUTH_SECRET` and a stable `PLEX_CLIENT_IDENTIFIER`.
+- **Applies migrations** and points you at `pnpm dev:core`.
+
+Two optional prompts:
+
+- **AI workflow engine** — enable the durable engine behind *Build with AI* / the AI lineup + import
+  workflows. It runs in your Postgres (its own schema, same database), so one prompt wires it up.
+- **Desktop client (tv-tauri)** — the native desktop app needs a Rust toolchain. On macOS/Linux the
+  wizard can install it via rustup for you; on Windows it points you at the installer. Not needed for
+  `pnpm dev:core`.
+
+### Re-runs are safe
+
+Run it again any time. It reads your existing `apps/server/.env`, uses those values as the defaults,
+and **keeps your stable secrets** — regenerating `BETTER_AUTH_SECRET` would make every stored
+encrypted secret (your Plex token, AI provider keys) undecryptable, so it's never touched on a re-run.
+Any existing `.env` is backed up to `.env.bak` before it's overwritten.
+
+> **Dry run.** `pnpm dev:setup --dry-run` walks the entire flow — every prompt, the Postgres probe,
+> even a simulated toolchain install — and writes nothing. Great for seeing exactly what it would do
+> first.
+
+## Doing it by hand
+
+The wizard just automates this:
+
+```bash
+pnpm install
+cp apps/server/.env.example apps/server/.env   # then fill in the values
+cp apps/web/.env.example    apps/web/.env       # set VITE_SERVER_URL
+pnpm run db:migrate     # apply committed migrations
+pnpm run dev            # start everything
+```
+
+Both `.env.example` files document every variable inline. The server's required set —
+`DATABASE_URL`, `BETTER_AUTH_SECRET` (32+ chars), `BETTER_AUTH_URL`, `CORS_ORIGIN` — is validated at
+boot, so the server refuses to start if any is missing. Set `ADMIN_EMAIL` + `ADMIN_PASSWORD` to seed
+the first admin. AI provider keys are **not** env vars — add them in the admin UI (Settings → AI
+Assistant), stored encrypted.
+
+## Dev variants
+
+| Script | Boots |
+|---|---|
+| `pnpm dev:setup` | the interactive setup wizard (`--dry-run` to preview) |
+| `pnpm dev:core` | **server + admin web + tv-web** — the day-to-day stack |
+| `pnpm dev` | *everything* — also site, tv-native, tv-tauri (heavy; `tv-tauri` needs a Rust `cargo` toolchain) |
+| `pnpm dev:desktop` | the packaged desktop supervisor (server + admin + tv-web + embedded Postgres) |
+| `pnpm dev:server` / `pnpm dev:web` | just one app |
+
+> Schema changes go through **Prisma migrations** — `pnpm db:migrate` creates and applies one.
+> `db:push` is for throwaway experiments only; Docker and production run `prisma migrate deploy`.
+
+## Where things live
+
+See the [Architecture](/docs/architecture) page for the full app + package map, and the
+[README](https://github.com/Quixomatic/Airwave#development) for the project structure and handy
+scripts.

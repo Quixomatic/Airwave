@@ -19,6 +19,8 @@
     "jobs",
     "workflows",
     "capability-diagnostic",
+    "---Development---",
+    "development",
     "---Release notes---",
     "changelog"
   ]
