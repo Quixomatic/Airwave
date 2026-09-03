@@ -261,7 +261,8 @@ Airwave is a **pnpm + Turborepo monorepo** on the [Better-T-Stack](https://githu
 
 ```bash
 pnpm install
-# configure apps/server/.env and apps/web/.env (see below), then:
+cp apps/server/.env.example apps/server/.env   # then fill in the values (see below)
+cp apps/web/.env.example    apps/web/.env       # set VITE_SERVER_URL
 pnpm run db:migrate     # apply committed migrations
 pnpm run dev            # start everything (server + admin web)
 ```
@@ -269,22 +270,15 @@ pnpm run dev            # start everything (server + admin web)
 - Admin web → http://localhost:3001
 - API → http://localhost:3000
 
-`apps/server/.env` needs `DATABASE_URL`, `BETTER_AUTH_SECRET` (32+ chars), `BETTER_AUTH_URL` and
-`CORS_ORIGIN`. Set `ADMIN_EMAIL` + `ADMIN_PASSWORD` as well to seed the first admin — there is no
-public sign-up.
+**Environment.** Both `.env.example` files document every variable inline. The server's required set —
+`DATABASE_URL`, `BETTER_AUTH_SECRET` (32+ chars), `BETTER_AUTH_URL`, `CORS_ORIGIN` — is validated at
+boot (`packages/env/src/server.ts`), so the server refuses to start if any is missing. Also set
+`ADMIN_EMAIL` + `ADMIN_PASSWORD` to seed the first admin — there's no public sign-up. The AI provider
+keys are **not** env vars; add them in the admin UI (Settings → AI Assistant), stored encrypted.
 
-`apps/web/.env` needs `VITE_SERVER_URL`:
-
-```dotenv
-VITE_SERVER_URL=http://localhost:3000
-```
-
-It is optional in the schema — the packaged desktop admin injects it at runtime — so omitting it
-fails quietly rather than loudly: the admin falls back to its own origin, calls the vite dev server
-instead of the API, and gets `index.html` back where it expects a session.
-
-> `pnpm dev` also starts `tv-tauri`, which needs a Rust toolchain; without `cargo` it fails and
-> turbo stops the other dev servers with it. `pnpm dev:core` runs the same set without it.
+> **Rust toolchain.** `pnpm dev` includes the `tv-tauri` desktop client, which needs `cargo`. If you
+> don't have a Rust toolchain, run the subset you likely want instead: `pnpm dev -F server -F web`
+> (or add `--filter=!tv-tauri` to the `dev` invocation).
 
 > Schema changes go through **Prisma migrations** (`pnpm db:migrate` creates + applies one). `db:push` is for
 > throwaway experiments only; Docker/production runs `prisma migrate deploy`.
