@@ -261,13 +261,24 @@ Airwave is a **pnpm + Turborepo monorepo** on the [Better-T-Stack](https://githu
 
 ```bash
 pnpm install
-# configure apps/server/.env with your DATABASE_URL, then:
+cp apps/server/.env.example apps/server/.env   # then fill in the values (see below)
+cp apps/web/.env.example    apps/web/.env       # set VITE_SERVER_URL
 pnpm run db:migrate     # apply committed migrations
 pnpm run dev            # start everything (server + admin web)
 ```
 
 - Admin web → http://localhost:3001
 - API → http://localhost:3000
+
+**Environment.** Both `.env.example` files document every variable inline. The server's required set —
+`DATABASE_URL`, `BETTER_AUTH_SECRET` (32+ chars), `BETTER_AUTH_URL`, `CORS_ORIGIN` — is validated at
+boot (`packages/env/src/server.ts`), so the server refuses to start if any is missing. Also set
+`ADMIN_EMAIL` + `ADMIN_PASSWORD` to seed the first admin — there's no public sign-up. The AI provider
+keys are **not** env vars; add them in the admin UI (Settings → AI Assistant), stored encrypted.
+
+> **Rust toolchain.** `pnpm dev` includes the `tv-tauri` desktop client, which needs `cargo`. If you
+> don't have a Rust toolchain, run the subset you likely want instead: `pnpm dev -F server -F web`
+> (or add `--filter=!tv-tauri` to the `dev` invocation).
 
 > Schema changes go through **Prisma migrations** (`pnpm db:migrate` creates + applies one). `db:push` is for
 > throwaway experiments only; Docker/production runs `prisma migrate deploy`.
