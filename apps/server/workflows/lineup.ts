@@ -85,6 +85,8 @@ function traceContext() {
 
 export type LineupReport = {
   sourceId: string;
+  /** True when this was a dry run — nothing below was persisted; the channels are what it WOULD have built. */
+  dryRun: boolean;
   packagesCreated: number;
   /** How many channels the planner designed — the full lineup, regardless of any build cap. */
   channelsPlanned: number;
@@ -123,11 +125,13 @@ export async function aiLineupWorkflow(args: LineupRunArgs): Promise<LineupRepor
   const existingPackages = await listExistingPackages();
 
   // The planner always plans the FULL lineup — sized to the library, not to a quota.
-  const draft = await planLineup(libraryContext, existingPackages);
+  const draft = await planLineup(libraryContext, existingPackages, args.plannerMaxOutputTokens);
 
-  // Packages first, so each channel has a real packageId to attach to. This also wipes
-  // any previous AI lineup — destructive, hence the confirmation on the admin action.
-  const packageIds = await createPackages(draft);
+  // Packages first, so each channel has a real packageId to attach to. This also wipes any previous AI
+  // lineup — destructive, hence the confirmation on the admin action. In a DRY RUN it does NEITHER (no wipe,
+  // no creates) and returns placeholder ids so the verify step can still run. See #22 dry-run.
+  const dryRun = args.dryRun ?? false;
+  const packageIds = await createPackages(draft, dryRun);
 
   // Numbering runs AFTER the wipe, so it allocates against the numbers that are actually
   // free rather than ones about to be released. Its own step, so a resumed run replays the
@@ -166,13 +170,14 @@ export async function aiLineupWorkflow(args: LineupRunArgs): Promise<LineupRepor
           args.userId,
           libraryContext,
           args.mode ?? "quality",
+          dryRun,
         ),
       ),
     );
     built.push(...results);
   }
 
-  return await reportLineup(args.sourceId, plan, built);
+  return await reportLineup(args.sourceId, plan, built, dryRun);
 }
 
 /**
@@ -297,11 +302,13 @@ async function listExistingPackages(): Promise<ExistingPackage[]> {
 async function planLineup(
   libraryContext: string,
   existingPackages: ExistingPackage[],
+  maxOutputTokens?: number,
 ): Promise<LineupPlanDraft> {
   "use step";
   const plan = await planLineupService(prisma, libraryContext, {
     existingPackages,
     trace: traceContext(),
+    maxOutputTokens,
   });
   const channels = plan.packages.reduce((n, p) => n + p.channels.length, 0);
   const reused = plan.packages.filter((p) => p.existingKey).length;
@@ -330,8 +337,16 @@ async function assignNumbers(
  * generator's `generated` rows are untouched (§5). It's destructive by design: re-runs
  * are wipe-and-rebuild, which is why the admin action must confirm first.
  */
-async function createPackages(plan: LineupPlanDraft): Promise<Record<string, string>> {
+async function createPackages(plan: LineupPlanDraft, dryRun: boolean): Promise<Record<string, string>> {
   "use step";
+  // DRY RUN: the load-bearing safety gate. Do NOT wipe the existing AI lineup and do NOT create packages —
+  // return placeholder ids so the per-channel verify step still runs. Nothing is persisted. (#22)
+  if (dryRun) {
+    const ids: Record<string, string> = {};
+    for (const pkg of plan.packages) ids[pkg.key] = `dry-run:${pkg.key}`;
+    console.log(`[lineup] createPackages: DRY RUN — ${plan.packages.length} packages NOT created (existing lineup untouched)`);
+    return ids;
+  }
   const cleared = await clearAiGenerated(prisma, "both");
   if (cleared.channelsDeleted || cleared.packagesDeleted) {
     console.log(`[lineup] cleared previous AI lineup: ${cleared.channelsDeleted} channels, ${cleared.packagesDeleted} packages`);
@@ -387,6 +402,7 @@ async function buildChannel(
   userId: string,
   libraryContext: string,
   mode: "quality" | "fast",
+  dryRun: boolean,
 ): Promise<ChannelBuildResult> {
   "use step";
   const result = await buildPlannedChannel(prisma, {
@@ -396,8 +412,15 @@ async function buildChannel(
     userId,
     libraryContext,
     mode,
+    dryRun,
     trace: traceContext(),
   });
+
+  // Dry run: the channel was verified but never persisted, so there's nothing to schedule.
+  if (dryRun) {
+    console.log(`[lineup] ${channel.number} ${channel.name}: DRY RUN — ${result.status} (pool ${result.poolSize ?? 0}), not created`);
+    return result;
+  }
 
   if (result.status === "created" && result.channelId) {
     // A full build would lay this channel's ENTIRE pool (potentially ~300 days); the
@@ -427,6 +450,7 @@ async function reportLineup(
   sourceId: string,
   plan: LineupPlan,
   built: ChannelBuildResult[],
+  dryRun: boolean,
 ): Promise<LineupReport> {
   "use step";
   const usage = built.reduce(
@@ -446,7 +470,8 @@ async function reportLineup(
 
   const report: LineupReport = {
     sourceId,
-    packagesCreated: plan.packages.length,
+    dryRun,
+    packagesCreated: dryRun ? 0 : plan.packages.length,
     // The planner always plans the FULL lineup; a testing cap limits only what gets built.
     // Surfacing both makes that gap explicit instead of looking like a shortfall.
     channelsPlanned: plan.packages.reduce((n, p) => n + p.channels.length, 0),

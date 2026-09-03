@@ -103,6 +103,14 @@ claims all three roles — chat, planner, worker — so a single-connection setu
 your provider directly; Airwave has no billing layer. Configure connections and roles under
 **Settings → AI Assistant**.
 
+> **Building with a local model?** The planner is one big call. Slow local models no longer time out (a step
+> runs to completion), but a *reasoning* model is dramatically slower and can exhaust the output budget, so
+> turn thinking down/off. Even better: point the **planner** role at a cheap cloud model — **Z.ai (GLM)** is
+> fractions of a cent, `*-flash` is free — and keep a local worker. See
+> [Local & self-hosted models](/docs/ai-assistant/local-models) and
+> [Cloud models — Z.ai (GLM)](/docs/ai-assistant/connections) for the planner/worker split, concurrency
+> tuning, and a known-good config.
+
 ## Source map
 
 | Concern | File |

@@ -25,6 +25,11 @@ model AiConnection {
   /// params not covered by the toggle (e.g. a synonym like `do_reasoning`, or a new engine's flag).
   extraBody Json?
 
+  /// Z.ai (GLM) only: reasoning-effort level sent as `reasoning_effort` ("low" | "high" | "max"). GLM-5.3 has
+  /// ALWAYS-ON thinking (can't be disabled) and defaults to `max`, which is slow and burns the output-token
+  /// budget — so this is the knob to dial it down. Null = provider default (max). Ignored by other providers.
+  reasoningEffort String?
+
   /// The admin CHAT model.
   isActive  Boolean @default(false)
   /// Heavy reasoning — the lineup PLAN step. Falls back to `isActive` when unset.

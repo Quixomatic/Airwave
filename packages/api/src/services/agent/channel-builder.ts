@@ -28,7 +28,7 @@ import { z } from "zod";
 import { aiFilterSchema } from "./ai-filter-schema";
 import { getConnectionForRole, getModel } from "./config";
 import type { PlannedChannel } from "./lineup-plan";
-import { recordTrace, type TraceContext } from "./lineup-trace";
+import { recordTrace, startTrace, updateTrace, type TraceContext } from "./lineup-trace";
 import {
   createChannel,
   discoverFieldValues,
@@ -131,6 +131,9 @@ export type BuildChannelArgs = {
   libraryContext: string;
   /** `fast` skips the agent loop; reserved for the cheaper deterministic path. */
   mode?: "quality" | "fast";
+  /** DRY RUN (#22): verify the filter for real (preview against Plex) but persist NOTHING — no reservation,
+   *  no commit write, no delete. `commit_channel` records what it WOULD create instead. */
+  dryRun?: boolean;
   /** Run/step identity, so this build's reasoning can be recorded. */
   trace?: TraceContext;
 };
@@ -176,6 +179,7 @@ export async function buildPlannedChannel(
   args: BuildChannelArgs,
 ): Promise<ChannelBuildResult> {
   const { channel, packageId, mediaSourceId, userId, libraryContext } = args;
+  const dryRun = args.dryRun ?? false;
   const base = { key: channel.key, name: channel.name, number: channel.number };
 
   /**
@@ -198,48 +202,54 @@ export async function buildPlannedChannel(
    * schedule-backfill job, and it carries the planner's proposed filter so the row is
    * meaningful even if the agent dies before committing.
    */
-  const existing = await prisma.channel.findUnique({
-    where: { number: channel.number },
-    select: { id: true, aiGenerated: true },
-  });
-  if (existing) {
-    if (!existing.aiGenerated) {
-      return { ...base, status: "skipped", reason: `Channel ${channel.number} is not AI-generated — refusing to touch it.` };
-    }
-    return { ...base, status: "created", channelId: existing.id, reason: "Already built (duplicate execution suppressed)." };
-  }
-
-  let reservedId: string;
-  try {
-    const reserved = await createChannel(prisma, userId, {
-      mediaSourceId,
-      name: channel.name,
-      number: channel.number,
-      packageId,
-      description: channel.description,
-      callsign: channel.callsign,
-      icon: channel.icon,
-      tint: channel.accent,
-      ordering: channel.ordering,
-      // planner emits these NULLABLE now (OpenAI-strict); createChannel wants `undefined` for "unset".
-      sortField: channel.sortField ?? undefined,
-      sortDir: channel.sortDir ?? undefined,
-      mediaTypes: channel.mediaTypes,
-      filter: channel.filter as never,
-      enabled: false,
-    });
-    reservedId = reserved.id;
-  } catch {
-    // Lost the race — a concurrent duplicate claimed this number between the check above
-    // and here. That attempt owns the build; this one must not repeat it.
-    const taken = await prisma.channel.findUnique({
+  // DRY RUN: no reservation and no existing-channel check — we persist nothing, so there's no row to claim and
+  // no collision to guard. The agent still verifies the filter against Plex; commit_channel records what it
+  // WOULD create. (A workflow replay may re-run an in-flight build, but with no writes that's merely wasteful,
+  // not harmful — acceptable for a capped preview.) `reservedId` stays empty and is never written in dry run.
+  let reservedId = "";
+  if (!dryRun) {
+    const existing = await prisma.channel.findUnique({
       where: { number: channel.number },
-      select: { id: true },
+      select: { id: true, aiGenerated: true },
     });
-    if (taken) {
-      return { ...base, status: "created", channelId: taken.id, reason: "Duplicate execution suppressed (lost the reservation race)." };
+    if (existing) {
+      if (!existing.aiGenerated) {
+        return { ...base, status: "skipped", reason: `Channel ${channel.number} is not AI-generated — refusing to touch it.` };
+      }
+      return { ...base, status: "created", channelId: existing.id, reason: "Already built (duplicate execution suppressed)." };
     }
-    throw new Error(`Could not reserve channel number ${channel.number}`);
+
+    try {
+      const reserved = await createChannel(prisma, userId, {
+        mediaSourceId,
+        name: channel.name,
+        number: channel.number,
+        packageId,
+        description: channel.description,
+        callsign: channel.callsign,
+        icon: channel.icon,
+        tint: channel.accent,
+        ordering: channel.ordering,
+        // planner emits these NULLABLE now (OpenAI-strict); createChannel wants `undefined` for "unset".
+        sortField: channel.sortField ?? undefined,
+        sortDir: channel.sortDir ?? undefined,
+        mediaTypes: channel.mediaTypes,
+        filter: channel.filter as never,
+        enabled: false,
+      });
+      reservedId = reserved.id;
+    } catch {
+      // Lost the race — a concurrent duplicate claimed this number between the check above
+      // and here. That attempt owns the build; this one must not repeat it.
+      const taken = await prisma.channel.findUnique({
+        where: { number: channel.number },
+        select: { id: true },
+      });
+      if (taken) {
+        return { ...base, status: "created", channelId: taken.id, reason: "Duplicate execution suppressed (lost the reservation race)." };
+      }
+      throw new Error(`Could not reserve channel number ${channel.number}`);
+    }
   }
 
   // The WORKER role: this loop runs ~50 times per lineup build and dominates the run's cost,
@@ -254,6 +264,34 @@ export async function buildPlannedChannel(
   let usage: ChannelUsage | undefined;
   let agentTrace: unknown[] = [];
   const startedAt = new Date();
+
+  // The brief recorded on the trace — NOT `libraryContext` (byte-identical across every build, stored
+  // dozens of times for nothing). `dryRun` rides along so the run page can badge a preview live.
+  const traceInputBrief = {
+    theme: channel.theme,
+    targetPoolSize: channel.targetPoolSize,
+    mediaTypes: channel.mediaTypes,
+    proposedFilter: channel.filter,
+    dryRun,
+  };
+
+  // Open the trace row NOW (status "running") so the run page shows this build filling in live, rather than
+  // it popping into existence only when the whole agent loop ends. `onStepFinish` streams each tool round-trip
+  // into it; the terminal update below finalizes it. Best-effort — a null id just means we log once at the end.
+  const traceId = args.trace
+    ? await startTrace(prisma, {
+        ...args.trace,
+        stepName: "buildChannel",
+        phase: "build",
+        channelKey: channel.key,
+        channelNumber: channel.number,
+        channelName: channel.name,
+        status: "running",
+        input: traceInputBrief,
+        usage: { model: connection.model },
+        startedAt,
+      })
+    : null;
 
   const tools = {
     list_filter_fields: tool({
@@ -317,6 +355,11 @@ export async function buildPlannedChannel(
           outcome = { ...base, status: "skipped", poolSize, reason: `Only ${poolSize} items matched.` };
           return { ok: false, message: `Pool too small (${poolSize}). Broaden the filter or give_up.` };
         }
+        // DRY RUN: record what it WOULD create — the verified pool size — but write nothing.
+        if (dryRun) {
+          outcome = { ...base, status: "created", poolSize, reason: "Dry run — would create with this verified filter." };
+          return { ok: true, number: channel.number };
+        }
         // The row already exists (reserved before the loop) — commit writes the VERIFIED
         // filter over the planner's proposal and switches the channel on. Enabling here is
         // what makes it visible in the guide and eligible for schedule-backfill, so a
@@ -337,8 +380,8 @@ export async function buildPlannedChannel(
       execute: async ({ reason }) => {
         // Release the reservation — an abandoned channel must not linger as a disabled
         // husk in the guide, and leaving it would also block a later run from reusing
-        // that number.
-        await prisma.channel.delete({ where: { id: reservedId } }).catch(() => {});
+        // that number. (No reservation exists in a dry run.)
+        if (!dryRun) await prisma.channel.delete({ where: { id: reservedId } }).catch(() => {});
         outcome = { ...base, status: "skipped", reason };
         return { ok: true };
       },
@@ -346,10 +389,24 @@ export async function buildPlannedChannel(
   };
 
   try {
+    // Accumulate steps as they finish so the open trace row reflects the agent's tool calls in real time.
+    const liveSteps: unknown[] = [];
     const result = await generateText({
       model: getModel(connection),
       tools,
       stopWhen: stepCountIs(MAX_STEPS),
+      ...(traceId
+        ? {
+            onStepFinish: (step: unknown) => {
+              liveSteps.push(step);
+              // Fire-and-forget: a trace write must never slow or fail the build (see lineup-trace header).
+              void updateTrace(prisma, traceId, {
+                trace: summarizeAgentSteps(liveSteps),
+                usage: { agentSteps: liveSteps.length },
+              });
+            },
+          }
+        : {}),
       // The static instructions. Rendered before `messages`, so it's inside the cached span.
       system: SYSTEM,
       messages: [
@@ -410,8 +467,17 @@ export async function buildPlannedChannel(
     // The agent loop threw — drop the reservation so the number is free for the retry.
     await prisma.channel.delete({ where: { id: reservedId } }).catch(() => {});
     // A throwing build is exactly the case the old accounting lost: the step retries, and
-    // whatever it already spent went unrecorded. Trace it before rethrowing upward.
-    if (args.trace) {
+    // whatever it already spent went unrecorded. Finalize the open trace row (or record one).
+    const failUsage = { model: connection.model, ...usage, agentSteps: usage?.steps };
+    if (traceId) {
+      await updateTrace(prisma, traceId, {
+        status: "failed",
+        reason: failed.reason,
+        error: failed.reason,
+        usage: failUsage,
+        finished: true,
+      });
+    } else if (args.trace) {
       await recordTrace(prisma, {
         ...args.trace,
         stepName: "buildChannel",
@@ -437,8 +503,8 @@ export async function buildPlannedChannel(
 
   // Never committed — release the reservation so an abandoned build doesn't leave a
   // disabled husk holding its number. (`give_up` already deleted it; the catch absorbs
-  // the second delete.)
-  if (!settled || settled.status !== "created") {
+  // the second delete.) No reservation exists in a dry run, so nothing to release.
+  if (!dryRun && (!settled || settled.status !== "created")) {
     await prisma.channel.delete({ where: { id: reservedId } }).catch(() => {});
   }
 
@@ -447,7 +513,29 @@ export async function buildPlannedChannel(
     usage,
   };
 
-  if (args.trace) {
+  const finalStatus =
+    result.status === "created" ? "ok" : result.status === "skipped" ? "skipped" : "failed";
+  const finalUsage = {
+    model: connection.model,
+    inputTokens: usage?.inputTokens ?? 0,
+    outputTokens: usage?.outputTokens ?? 0,
+    cacheReadTokens: usage?.cacheReadTokens ?? 0,
+    cacheWriteTokens: usage?.cacheWriteTokens ?? 0,
+    agentSteps: usage?.steps ?? 0,
+  };
+  const finalOutput = { status: result.status, poolSize: result.poolSize, channelId: result.channelId };
+
+  if (traceId) {
+    // Finalize the row we opened up front (it already carries the brief + streamed trace).
+    await updateTrace(prisma, traceId, {
+      status: finalStatus,
+      reason: result.reason,
+      output: finalOutput,
+      trace: agentTrace,
+      usage: finalUsage,
+      finished: true,
+    });
+  } else if (args.trace) {
     await recordTrace(prisma, {
       ...args.trace,
       stepName: "buildChannel",
@@ -455,7 +543,7 @@ export async function buildPlannedChannel(
       channelKey: channel.key,
       channelNumber: channel.number,
       channelName: channel.name,
-      status: result.status === "created" ? "ok" : result.status === "skipped" ? "skipped" : "failed",
+      status: finalStatus,
       reason: result.reason,
       // The brief only — NOT `libraryContext`, which is byte-identical across every build in
       // the run and would be stored dozens of times over for no added information.
@@ -465,16 +553,9 @@ export async function buildPlannedChannel(
         mediaTypes: channel.mediaTypes,
         proposedFilter: channel.filter,
       },
-      output: { status: result.status, poolSize: result.poolSize, channelId: result.channelId },
+      output: finalOutput,
       trace: agentTrace,
-      usage: {
-        model: connection.model,
-        inputTokens: usage?.inputTokens ?? 0,
-        outputTokens: usage?.outputTokens ?? 0,
-        cacheReadTokens: usage?.cacheReadTokens ?? 0,
-        cacheWriteTokens: usage?.cacheWriteTokens ?? 0,
-        agentSteps: usage?.steps ?? 0,
-      },
+      usage: finalUsage,
       startedAt,
     });
   }

@@ -1,6 +1,6 @@
 {
   "name": "server",
-  "version": "0.12.47",
+  "version": "0.12.49",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
@@ -35,6 +35,8 @@
     "@types/bun": "catalog:",
     "@types/pg": "^8.20.0",
     "@workflow/swc-plugin": "4.1.1",
+    "cbor-x": "1.6.0",
+    "devalue": "5.6.3",
     "drizzle-orm": "0.45.2",
     "graphile-worker": "0.16.6",
     "tsdown": "^0.22.3",

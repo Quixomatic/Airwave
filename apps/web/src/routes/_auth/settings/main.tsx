@@ -64,11 +64,13 @@ function SettingsGeneral() {
   const settingsQ = useQuery(trpc.settings.get.queryOptions());
   const [buildConc, setBuildConc] = useState<number | null>(null);
   const [importConc, setImportConc] = useState<number | null>(null);
+  const [plannerTokens, setPlannerTokens] = useState<number | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   useEffect(() => {
     if (settingsQ.data) {
       setBuildConc(settingsQ.data.channelBuildConcurrency);
       setImportConc(settingsQ.data.importConcurrency);
+      setPlannerTokens(settingsQ.data.plannerMaxOutputTokens);
     }
   }, [settingsQ.data]);
   const saveSettings = async () => {
@@ -77,6 +79,7 @@ function SettingsGeneral() {
       await trpcClient.settings.update.mutate({
         channelBuildConcurrency: buildConc ?? 6,
         importConcurrency: importConc ?? 4,
+        plannerMaxOutputTokens: plannerTokens ?? 32000,
       });
       await settingsQ.refetch();
       toast.success("Settings saved.");
@@ -147,7 +150,7 @@ function SettingsGeneral() {
                 that can&apos;t keep up with parallel runs. Default 6.
               </p>
             </div>
-            <NumberField value={buildConc} onValueChange={setBuildConc} min={1} max={16} className="w-32 shrink-0">
+            <NumberField value={buildConc} onValueChange={setBuildConc} min={1} max={16} className="w-44 shrink-0">
               <NumberFieldGroup>
                 <NumberFieldDecrement />
                 <NumberFieldInput />
@@ -162,7 +165,31 @@ function SettingsGeneral() {
                 How many channels the lineup importer resolves at once. Less demanding than AI builds. Default 4.
               </p>
             </div>
-            <NumberField value={importConc} onValueChange={setImportConc} min={1} max={16} className="w-32 shrink-0">
+            <NumberField value={importConc} onValueChange={setImportConc} min={1} max={16} className="w-44 shrink-0">
+              <NumberFieldGroup>
+                <NumberFieldDecrement />
+                <NumberFieldInput />
+                <NumberFieldIncrement />
+              </NumberFieldGroup>
+            </NumberField>
+          </div>
+          <div className="grid grid-cols-[1fr_auto] items-center gap-4">
+            <div className="min-w-0">
+              <Label>Planner max output tokens</Label>
+              <p className="text-muted-foreground text-xs">
+                Token budget for the AI lineup planner&apos;s single design call. Raise it for very large
+                libraries or verbose models if plans come back truncated; too high risks the planner timeout.
+                Default 32000.
+              </p>
+            </div>
+            <NumberField
+              value={plannerTokens}
+              onValueChange={setPlannerTokens}
+              min={4000}
+              max={128000}
+              step={1000}
+              className="w-44 shrink-0"
+            >
               <NumberFieldGroup>
                 <NumberFieldDecrement />
                 <NumberFieldInput />

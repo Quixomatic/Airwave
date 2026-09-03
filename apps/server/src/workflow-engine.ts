@@ -63,6 +63,38 @@ export async function startWorkflowEngine(): Promise<void> {
     fetch: () => new Response("not found", { status: 404 }),
   });
 
+  // ── Lift the 300s step ceiling (self-hosted) ────────────────────────────────────────────────
+  // Bun's `fetch()` has a NON-STANDARD default 300s idle watchdog: a request whose connection is
+  // idle (no bytes either way) for 300s is aborted. The world dispatches a step by POSTing to our
+  // loopback handler with a BARE `fetch()` (world-postgres `queue.ts`) and `await`ing the whole
+  // response — during a long step that connection is idle, so at 300s Bun aborts it, the job is
+  // re-delivered, and the step "fails" (only succeeding on the warm retry). This is the ONLY thing
+  // capping step duration for us: self-hosted has no platform function limit, world-postgres sets
+  // no step deadline (`getRuntimeDeadline` unimplemented) and no dispatch timeout of its own — unlike
+  // world-vercel, which passes an explicit `AbortSignal.timeout(getRequestTimeoutMs())`.
+  //
+  // Fix WITHOUT patching node_modules: world-postgres calls the GLOBAL `fetch` at call-time, so wrap
+  // it here to pass Bun's `timeout: false` (disables the watchdog) for loopback workflow dispatches
+  // ONLY. Every other fetch (Plex, etc.) is untouched and keeps the default. Idempotent via a flag.
+  if (!(globalThis as { __wfFetchPatched?: boolean }).__wfFetchPatched) {
+    const nativeFetch = globalThis.fetch;
+    globalThis.fetch = ((input: unknown, init?: unknown) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : (input as { url?: string })?.url;
+      if (typeof url === "string" && url.includes("/.well-known/workflow/")) {
+        // `timeout` is a Bun-specific RequestInit extension; not in the DOM types.
+        return nativeFetch(input as string, { ...(init as object), timeout: false } as RequestInit);
+      }
+      return nativeFetch(input as string, init as RequestInit);
+    }) as typeof fetch;
+    (globalThis as { __wfFetchPatched?: boolean }).__wfFetchPatched = true;
+    console.log("[workflow] loopback dispatch fetch: 300s Bun watchdog disabled (steps may run >5m)");
+  }
+
   const world = createWorld();
   await world.start();
 

@@ -16,9 +16,38 @@ Supported providers (`AI_PROVIDERS`, `config.ts:16`), each mapped to a Vercel AI
 | `anthropic` | `@ai-sdk/anthropic` | Claude models |
 | `openai` | `@ai-sdk/openai` | GPT / o-series |
 | `google` | `@ai-sdk/google` | Gemini |
+| `zai` | `@ai-sdk/openai` at the z.ai endpoint | **Z.ai (GLM)** — first-class cloud provider. Pick a GLM model, paste a z.ai key. Very cheap; the `*-flash` models are free. See below. |
 | `compatible` | `@ai-sdk/openai` with a custom `baseUrl` | Any OpenAI-compatible endpoint — Ollama, LM Studio, vLLM, OpenRouter. The key may be omitted for a keyless local endpoint. Only tool-calling-capable models drive the agent well. |
 
 The assistant is a **tool-using** agent — it only works well with a model that can call tools. A model that can't will chat but never actually discover fields, preview filters, or build anything.
+
+> **Running a local model?** The thing that matters is **tool-calling** — plus, for a *reasoning* model,
+> turning thinking down or off so the planner is fast (it no longer times out — a slow model runs to
+> completion — but heavy reasoning is slow and can exhaust the output budget). See
+> [Local & self-hosted models](/docs/ai-assistant/local-models) for the full guide and a known-good config.
+
+## Z.ai (GLM) — cheap cloud planning
+
+**Z.ai** is a first-class provider: choose it in the dropdown, pick a GLM model, and paste the API key z.ai
+issues you — exactly like Claude or GPT, no base URL to configure. It's the standout value for the AI lineup
+builder because the **planner** is a single call per build, and GLM prices it at almost nothing:
+
+- `glm-5.3-flash` — about **$0.075 / $0.25** per million in/out tokens, so a typical planner call (~20k in /
+  1.5k out) runs about **$0.002**.
+- `glm-4.7-flash` and `glm-4.5-flash` — **free**.
+
+That makes the **planner-role split** compelling: point the *planner* at a cheap/free GLM model for fast,
+seconds-not-minutes design, and keep a local (or equally cheap GLM) model on the *worker* role for the dozens of
+per-channel builds. A full dry-run lineup on `glm-5.3-flash` builders costs under a cent.
+
+**Reasoning effort.** GLM-5.3 has *always-on* thinking (it can't be disabled), and it defaults to **max**
+effort — which is slow and can exhaust the output-token budget, truncating the plan. A **Reasoning effort**
+dropdown (low / high / max) appears on z.ai connections; set it to **low** for a fast planner, raise it if you
+want deeper reasoning. This is the z.ai equivalent of the local "disable thinking" toggle.
+
+> Under the hood, z.ai's OpenAI-compatible API doesn't honor OpenAI's strict `json_schema` structured-output
+> format, so Airwave transparently converts the lineup planner's request to JSON-object mode with the schema
+> in the prompt. You don't need to do anything — GLM structured output "just works" for the planner.
 
 ## Keys are encrypted at rest
 

@@ -35,6 +35,52 @@ import {
  */
 const DEFAULT_AI_BUILD_LIMIT = 0;
 
+/**
+ * Shared dispatcher for the two AI-lineup jobs — a real build and a dry-run preview. Both do the identical
+ * setup (readiness + AI-connection + admin checks, limit, settings) and differ only by `dryRun`, which is
+ * threaded all the way to the workflow so a preview persists nothing. Returns immediately with a runId; the
+ * durable workflow outlives this call.
+ */
+async function dispatchAiLineup(dryRun: boolean): Promise<void> {
+  const runner = getLineupRunner();
+  if (!runner) throw new Error("Workflow engine isn't running — set WORKFLOW_ENABLED=1 and restart the server.");
+
+  const source = await firstReadySource(prisma);
+  if (!source) throw new Error("Connect a media source and let its metadata sync finish before building an AI lineup.");
+
+  const [planner, worker] = await Promise.all([
+    getConnectionForRole(prisma, "planner"),
+    getConnectionForRole(prisma, "worker"),
+  ]);
+  if (!planner || !worker) {
+    throw new Error("No AI connection is configured for the lineup — set one up in Settings → AI Assistant.");
+  }
+
+  const admin = await prisma.user.findFirst({ where: { role: "admin" }, orderBy: { createdAt: "asc" }, select: { id: true } });
+  if (!admin) throw new Error("No admin user found.");
+
+  const raw = process.env.AI_LINEUP_BUILD_LIMIT;
+  const limit = raw === undefined ? DEFAULT_AI_BUILD_LIMIT : Number(raw);
+
+  // Forward the concurrency + planner-token settings (the job is the ACTUAL trigger for the admin buttons;
+  // the ai.buildLineup mutation is unused — see GitHub #21).
+  const settings = await getAppSettings(prisma);
+
+  const { runId } = await runner.start({
+    sourceId: source.id,
+    userId: admin.id,
+    concurrency: settings.channelBuildConcurrency,
+    plannerMaxOutputTokens: settings.plannerMaxOutputTokens,
+    ...(dryRun ? { dryRun: true } : {}),
+    ...(limit > 0 ? { limit } : {}),
+  });
+  console.log(
+    `[jobs] ai-lineup-${dryRun ? "preview" : "build"} dispatched run ${runId}` +
+      (dryRun ? " (DRY RUN — creates nothing)" : "") +
+      (limit > 0 ? ` (${dryRun ? "previewing" : "building"} ${limit} of the planned lineup)` : " (UNCAPPED — full lineup)"),
+  );
+}
+
 export type JobInterval = "seconds" | "minutes" | "hours" | "days" | "fixed";
 
 /** Passed to a job's `run` so it can report live progress to the scheduler. */
@@ -250,56 +296,20 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
     interval: "fixed",
     defaultCron: "0 0 0 1 1 *", // manual-only; never auto-fires
     manual: true,
-    run: async () => {
-      // DISPATCHER ONLY. The real work is a durable workflow that outlives this call and
-      // survives restarts — `start()` returns a runId immediately. So this job's status
-      // means "kicked off", NOT "finished"; the Job table can't represent a multi-hour run
-      // (its state is in-memory and `runJob` awaits the function). See §3 of the plan.
-      const runner = getLineupRunner();
-      if (!runner) throw new Error("Workflow engine isn't running — set WORKFLOW_ENABLED=1 and restart the server.");
-
-      // A lineup can only be built from a source whose metadata sync has COMPLETED (the shared readiness
-      // check — previously this only required "any enabled source", so it could run against unsynced media).
-      const source = await firstReadySource(prisma);
-      if (!source) throw new Error("Connect a media source and let its metadata sync finish before building an AI lineup.");
-
-      // AI must be configured — planner + worker fall back to the chat connection, so at least one
-      // connection has to resolve for both, else the run would fail mid-plan.
-      const [planner, worker] = await Promise.all([
-        getConnectionForRole(prisma, "planner"),
-        getConnectionForRole(prisma, "worker"),
-      ]);
-      if (!planner || !worker) {
-        throw new Error("No AI connection is configured for the lineup — set one up in Settings → AI Assistant.");
-      }
-
-      const admin = await prisma.user.findFirst({ where: { role: "admin" }, orderBy: { createdAt: "asc" }, select: { id: true } });
-      if (!admin) throw new Error("No admin user found.");
-
-      // CAPPED BY DEFAULT. The planner always designs the full library-sized lineup, but
-      // only this many channels are actually built — each build is an agent loop costing
-      // ~215k tokens, so an uncapped run on a large library is a genuinely expensive
-      // operation to trigger from a button. Raise `AI_LINEUP_BUILD_LIMIT` (or set it to 0)
-      // once the per-channel cost is under control and you want the whole lineup.
-      const raw = process.env.AI_LINEUP_BUILD_LIMIT;
-      const limit = raw === undefined ? DEFAULT_AI_BUILD_LIMIT : Number(raw);
-
-      // Forward the "Max parallel AI channel builds" setting (AppSettings.channelBuildConcurrency). This job
-      // is the ACTUAL trigger for the admin "Build with AI" button — the ai.buildLineup mutation that also
-      // reads it has no caller — so without this the setting never reached the workflow (GitHub #21).
-      const settings = await getAppSettings(prisma);
-
-      const { runId } = await runner.start({
-        sourceId: source.id,
-        userId: admin.id,
-        concurrency: settings.channelBuildConcurrency,
-        ...(limit > 0 ? { limit } : {}),
-      });
-      console.log(
-        `[jobs] ai-lineup-build dispatched run ${runId}` +
-          (limit > 0 ? ` (building ${limit} of the planned lineup)` : " (UNCAPPED — full lineup)"),
-      );
-    },
+    // DISPATCHER ONLY. The real work is a durable workflow that outlives this call and survives restarts —
+    // `start()` returns a runId immediately, so "done" here means "kicked off", not "finished".
+    run: () => dispatchAiLineup(false),
+  },
+  {
+    id: "ai-lineup-preview",
+    name: "Preview AI Lineup (dry run)",
+    description:
+      "Runs the full AI lineup planner AND per-channel verification for real, but creates NOTHING — no wipe, no packages, no channels, no schedules. Use it to see what a lineup would build (and which channels it would decline) without touching your existing lineup. Watch the result on the AI Lineup page.",
+    detailHref: "/settings/workflows/ai-lineup",
+    interval: "fixed",
+    defaultCron: "0 0 0 1 1 *", // manual-only; never auto-fires
+    manual: true,
+    run: () => dispatchAiLineup(true),
   },
   {
     id: "bumper-music-scan",

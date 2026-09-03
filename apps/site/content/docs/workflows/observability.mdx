@@ -52,7 +52,18 @@ So each workflow gets a card on the **Settings → Workflows** index (one per wo
 counts) and a per-run detail page that **live-polls while a run is in flight**, correlating WDK's step
 metadata with Airwave's own trace rows.
 
-![The AI lineup workflow run page — steps correlated with per-channel traces and token cost](/screenshots/admin-ailineupworkflow-observability.webp)
+![The AI lineup run page — headline cost/token/duration tiles, stacked per-model cost bars, the plan as package tiles, and each channel build as a numbered agent transcript](/screenshots/admin-ailineupworkflow-observability.webp)
+
+### What the run page shows
+
+The AI lineup run page reads at a glance and fills in **live as the run works** — each build now streams its trace in as it happens, rather than appearing only when the step ends:
+
+- **Headline tiles** — total cost, tokens in/out, wall-clock duration (with the planner's time called out), and channels created / would-build, plus **Running** and **Dry run** badges on live/preview runs.
+- **Cost by model & phase** — a stacked token bar per model (uncached input · cache-read · cache-write · output) with hover tooltips and colour swatches, so a run's real spend — planner *and* workers, retries included — is one glance. Unpriced local models are shown as such rather than guessed.
+- **The plan** — the packages/channels as hovercard tiles (hover for the channel list) plus the full plan JSON in an interactive tree.
+- **Channel builds** — each build is a numbered **agent transcript**: the `preview_filter` → refine → `commit_channel` tool loop rendered as readable steps (the model's reasoning as markdown), with an attempt switcher when a build retried, and Brief/Outcome as expandable JSON.
+- **Step timeline** — the SDK's outside view: per-step status, duration bars, retries, and (for builds) the channel each step was for. Clicking a step jumps to and opens the matching build or the plan.
+- **Auto-refresh toggle** — polling is on by default; flip it off (next to Refresh) to stop the background requests and update only on demand.
 
 ![The lineup import workflow run page — per-package and per-channel outcomes with resolved pool sizes](/screenshots/admin-importworkflow-observability.webp)
 

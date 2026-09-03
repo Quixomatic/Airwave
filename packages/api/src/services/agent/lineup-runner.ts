@@ -25,6 +25,12 @@ export type LineupRunArgs = {
   /** Max channel builds in parallel (from AppSettings.channelBuildConcurrency); the workflow falls back to
    *  its own default when absent. */
   concurrency?: number;
+  /** Max output tokens for the planner's design call (from AppSettings.plannerMaxOutputTokens). */
+  plannerMaxOutputTokens?: number;
+  /** DRY RUN (#22): run analyze → plan → per-channel verify for real, but persist NOTHING — no wipe, no
+   *  packages, no channels, no schedules. Lets you preview what a lineup WOULD build without touching the
+   *  existing one. Mirrors the importer's dry-run. */
+  dryRun?: boolean;
 };
 
 export type LineupRunStatus = {

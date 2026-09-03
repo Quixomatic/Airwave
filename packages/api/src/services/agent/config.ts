@@ -13,8 +13,11 @@ import { decryptSecret, encryptSecret } from "../crypto";
  * LM Studio, vLLM, OpenRouter) via a custom baseUrl.
  */
 
-export const AI_PROVIDERS = ["anthropic", "openai", "google", "compatible"] as const;
+export const AI_PROVIDERS = ["anthropic", "openai", "google", "compatible", "zai"] as const;
 export type AiProvider = (typeof AI_PROVIDERS)[number];
+
+/** Z.ai (GLM) OpenAI-compatible endpoint — preset so the provider is one-click; overridable per connection. */
+export const ZAI_BASE_URL = "https://api.z.ai/api/paas/v4";
 
 export type ResolvedConnection = {
   provider: string;
@@ -25,6 +28,8 @@ export type ResolvedConnection = {
   disableThinking?: boolean;
   /** LOCAL only: extra JSON merged into every request body (engine-specific escape hatch). */
   extraBody?: unknown;
+  /** Z.ai (GLM) only: `reasoning_effort` level ("low" | "high" | "max"); null = provider default. */
+  reasoningEffort?: string | null;
 };
 
 /**
@@ -37,28 +42,69 @@ export type ResolvedConnection = {
  * `extraBody` is merged last so an admin can override or add engine-specific keys. Returns `undefined` when there's
  * nothing to inject (→ the default fetch). Only wired for the `compatible` provider — never for cloud providers.
  */
-function bodyInjectingFetch(cfg: ResolvedConnection): typeof fetch | undefined {
+/**
+ * The fetch used for local / OpenAI-compatible model calls. It does two things:
+ *
+ *  1. **Disables Bun's fetch timeout.** Bun's `fetch` has a default ~300s timeout measured as the time
+ *     BETWEEN received chunks (an idle timeout, matched to Chrome). A slow local model (e.g. a 35B
+ *     offloaded to CPU/RAM) can spend well over 300s producing NOTHING before the first token — no
+ *     chunk arrives, so Bun aborts the request at 300s and the whole step fails and retries. This was
+ *     THE cap on the planner, not any platform/SDK limit. `timeout: false` (a Bun-specific RequestInit
+ *     extension) removes it so a genuinely slow local call can finish. Harmless for fast calls.
+ *  2. **Injects extra body fields** (disable-thinking flags, `extraBody`) when configured.
+ *
+ * Always returned for the `compatible` provider (unlike before, when it was undefined with no extras),
+ * because the timeout removal must apply to every local call regardless of the thinking toggle.
+ */
+function localFetch(cfg: ResolvedConnection): typeof fetch {
   const extra: Record<string, unknown> = {};
   if (cfg.disableThinking) {
     extra.reasoning_effort = "none";
     extra.chat_template_kwargs = { enable_thinking: false };
     extra.reasoning = { enabled: false };
   }
+  // Z.ai (GLM) reasoning depth — GLM-5.3 can't disable thinking, only dial its effort (low/high/max).
+  if (cfg.reasoningEffort) extra.reasoning_effort = cfg.reasoningEffort;
   if (cfg.extraBody && typeof cfg.extraBody === "object") Object.assign(extra, cfg.extraBody);
-  if (Object.keys(extra).length === 0) return undefined;
-  const injector = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-    if (init?.body && typeof init.body === "string") {
+  const hasExtra = Object.keys(extra).length > 0;
+  const isZai = cfg.provider === "zai";
+  const wrapped = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    let nextInit = init;
+    if ((hasExtra || isZai) && init?.body && typeof init.body === "string") {
       try {
-        const merged = { ...(JSON.parse(init.body) as Record<string, unknown>), ...extra };
-        init = { ...init, body: JSON.stringify(merged) };
+        const body = JSON.parse(init.body) as Record<string, unknown>;
+        Object.assign(body, extra);
+        // z.ai (GLM) IGNORES OpenAI's strict `json_schema` response-format and free-forms prose + ```json,
+        // which `generateObject` can't parse (known SDK issue vercel/ai#9002). Convert it to `json_object`
+        // mode — which z.ai DOES honor, returning clean JSON — and move the schema into a system message so
+        // GLM still targets the exact shape; `generateObject` then validates the parsed JSON against Zod.
+        const rf = body.response_format as { type?: string; json_schema?: { schema?: unknown } } | undefined;
+        if (isZai && rf?.type === "json_schema") {
+          const schema = rf.json_schema?.schema;
+          body.response_format = { type: "json_object" };
+          if (schema && Array.isArray(body.messages)) {
+            body.messages = [
+              {
+                role: "system",
+                content:
+                  "You MUST respond with ONLY a single JSON object that conforms to this JSON Schema. " +
+                  "No prose, no explanation, no markdown code fences.\n\nJSON Schema:\n" +
+                  JSON.stringify(schema),
+              },
+              ...(body.messages as unknown[]),
+            ];
+          }
+        }
+        nextInit = { ...init, body: JSON.stringify(body) };
       } catch {
         /* non-JSON body — leave it untouched */
       }
     }
-    return fetch(input, init);
+    // `timeout` is a Bun-specific RequestInit field (not in the DOM types) — cast past the type.
+    return fetch(input, { ...(nextInit ?? {}), timeout: false } as unknown as RequestInit);
   };
   // Cast past the `preconnect` member the lib's `typeof fetch` declares but the SDK never calls.
-  return injector as typeof fetch;
+  return wrapped as typeof fetch;
 }
 
 export function getModel(cfg: ResolvedConnection): LanguageModel {
@@ -84,7 +130,22 @@ export function getModel(cfg: ResolvedConnection): LanguageModel {
       return createOpenAI({
         apiKey: apiKey ?? "no-key",
         baseURL: cfg.baseUrl ?? undefined,
-        fetch: bodyInjectingFetch(cfg),
+        fetch: localFetch(cfg),
+      }).chat(cfg.model);
+    case "zai":
+      // Z.ai (GLM) — a first-class CLOUD provider, used like Anthropic/OpenAI (pick a model, paste a key).
+      // OpenAI-compatible chat-completions, so `createOpenAI(...).chat()` at the z.ai base URL. `localFetch`
+      // adds the timeout safety + the `reasoning_effort` knob.
+      //
+      // z.ai (GLM) ignores OpenAI's strict `json_schema` response-format AND the dedicated zhipu-ai-provider
+      // doesn't inject the schema for GLM reasoning models (it warns "responseFormat not supported" and GLM
+      // then invents its own shape). So `localFetch` does the right thing: rewrites json_schema → json_object
+      // (which z.ai honors) and moves the schema into a system message so GLM targets the exact shape;
+      // `generateObject` validates the parsed JSON against Zod. Same createOpenAI path as `compatible`.
+      return createOpenAI({
+        apiKey: apiKey ?? "no-key",
+        baseURL: cfg.baseUrl ?? ZAI_BASE_URL,
+        fetch: localFetch(cfg),
       }).chat(cfg.model);
     default:
       throw new Error(`Unknown AI provider: ${cfg.provider}`);
@@ -104,6 +165,7 @@ type PublicConnection = {
   isWorker: boolean;
   disableThinking: boolean;
   extraBody: unknown;
+  reasoningEffort: string | null;
 };
 
 /** All saved connections (active first, then newest). */
@@ -121,6 +183,7 @@ export async function listConnections(prisma: PrismaClient): Promise<PublicConne
     isWorker: c.isWorker,
     disableThinking: c.disableThinking,
     extraBody: c.extraBody,
+    reasoningEffort: c.reasoningEffort,
   }));
 }
 
@@ -135,6 +198,7 @@ export async function getActiveConnection(prisma: PrismaClient): Promise<Resolve
     apiKey: c.apiKeyEnc ? decryptSecret(c.apiKeyEnc) : null,
     disableThinking: c.disableThinking,
     extraBody: c.extraBody,
+    reasoningEffort: c.reasoningEffort,
   };
 }
 
@@ -178,6 +242,7 @@ export async function getConnectionForRole(
     apiKey: c.apiKeyEnc ? decryptSecret(c.apiKeyEnc) : null,
     disableThinking: c.disableThinking,
     extraBody: c.extraBody,
+    reasoningEffort: c.reasoningEffort,
   };
 }
 
@@ -214,6 +279,8 @@ type ConnectionInput = {
   disableThinking?: boolean;
   /** LOCAL only — extra JSON merged into every request body. `null` clears it. */
   extraBody?: unknown;
+  /** Z.ai (GLM) only — `reasoning_effort` level; `null` clears it (back to provider default). */
+  reasoningEffort?: string | null;
 };
 
 /**
@@ -232,6 +299,7 @@ export async function createConnection(prisma: PrismaClient, input: ConnectionIn
       apiKeyEnc: input.apiKey ? encryptSecret(input.apiKey) : null,
       disableThinking: input.disableThinking ?? false,
       ...(input.extraBody != null ? { extraBody: input.extraBody as Prisma.InputJsonValue } : {}),
+      reasoningEffort: input.reasoningEffort ?? null,
       isActive: first,
       isPlanner: first,
       isWorker: first,
@@ -256,6 +324,7 @@ export async function updateConnection(prisma: PrismaClient, id: string, input: 
       model: input.model,
       baseUrl: input.baseUrl ?? null,
       disableThinking: input.disableThinking ?? false,
+      reasoningEffort: input.reasoningEffort ?? null,
       ...keyPatch,
       ...extraBodyPatch,
     },
@@ -294,6 +363,7 @@ export async function testConnection(prisma: PrismaClient, id: string): Promise<
     apiKey: c.apiKeyEnc ? decryptSecret(c.apiKeyEnc) : null,
     disableThinking: c.disableThinking,
     extraBody: c.extraBody,
+    reasoningEffort: c.reasoningEffort,
   };
   try {
     const { generateText } = await import("ai");

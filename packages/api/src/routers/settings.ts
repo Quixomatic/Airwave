@@ -11,6 +11,7 @@ export const settingsRouter = router({
       z.object({
         channelBuildConcurrency: z.number().int().min(1).max(16).optional(),
         importConcurrency: z.number().int().min(1).max(16).optional(),
+        plannerMaxOutputTokens: z.number().int().min(4000).max(128000).optional(),
       }),
     )
     .mutation(({ ctx, input }) => updateAppSettings(ctx.prisma, input)),

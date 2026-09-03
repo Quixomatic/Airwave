@@ -2,6 +2,78 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.49] - 2026-09-03
+
+AI lineup builder — slow/local models no longer time out (GitHub #22), Z.ai (GLM) as a first-class cloud
+provider with a reasoning-effort knob, and run-page polish.
+
+### Fixed
+- **Slow/local models no longer time out at ~300s (GitHub #22, #21).** The AI lineup planner — and any long
+  channel build — failed at ~300 seconds with a timeout at zero output tokens, which looked like the model
+  being incapable. The real cause was **Bun's default 300-second `fetch` watchdog** firing on the idle AI
+  request (and on the internal loopback workflow dispatch); both are now disabled for those calls. A step now
+  runs as long as your hardware needs — a 35B offloaded to CPU/RAM can grind for many minutes and still finish
+  — which is what finally makes the AI lineup builder complete end-to-end on modest local hardware, including
+  the concurrent per-channel builds.
+
+### Added
+- **Z.ai (GLM) — first-class cloud provider.** Pick a GLM model, paste a z.ai key — like Claude/GPT, no base
+  URL to configure. It's the cheapest way to run the planner: `glm-5.3-flash` is ~$0.002 per plan and the
+  `*-flash` models are free, so a cloud-planner + local-worker split gives fast, near-free planning with no
+  GPU. Curated GLM model dropdown, plus GLM pricing in the run cost panel.
+- **Reasoning-effort knob for Z.ai (GLM).** GLM-5.3 has always-on thinking and defaults to `max` (slow, and it
+  can exhaust the plan's token budget). A low / high / max dropdown on z.ai connections dials it; set **low**
+  for a fast planner.
+- **Auto-refresh toggle** on the AI lineup run page — turn off the live polling and update only via Refresh, so
+  the server log stays clean while you read it.
+
+### Changed
+- z.ai's OpenAI-compatible API doesn't honor OpenAI's strict `json_schema` structured-output format, so Airwave
+  transparently converts the lineup planner's request to JSON-object mode with the schema in the prompt — GLM
+  structured output "just works" for the planner.
+- Docs (getairwave.tv): local-models timeout notes corrected, a new Z.ai/GLM cloud section, and the
+  run-observability page updated for the rebuilt run detail UI (fresh screenshot).
+
+### Migration
+- Adds `reasoning_effort` to `ai_connection`. No data migration.
+
+## [0.12.48] - 2026-09-02
+
+AI lineup builder — a dry-run preview and a planner token budget (#22), a rebuilt run-observability
+page, and real-time build traces.
+
+### Added
+- **Preview AI lineup (dry run).** Runs the full pipeline — library analysis, the planner's design,
+  and every per-channel filter authoring + verification against Plex — but persists **nothing** (no
+  wipe, no packages, no channels, no schedules). Run it from Settings → Jobs → "Preview AI Lineup
+  (dry run)"; the run detail page tags it as a dry run and reports what it *would* build (and which
+  channels it would decline).
+- **Planner max output tokens** setting (Settings → General, default 32000, range 4000–128000) so a
+  large library or a verbose model doesn't truncate the plan. Applied per run, alongside the existing
+  concurrency settings.
+- **Real-time build traces.** Each channel build now opens its trace up front and streams every tool
+  call into it as it happens, so the run page shows a build filling in live instead of appearing only
+  when the step finishes. Best-effort — a trace write never slows or fails a build.
+- **New Local & self-hosted models docs page** (getairwave.tv): the two settings that decide whether a
+  local model works (tool-calling + disable-thinking), the planner's hard ~300s step-duration cap and
+  how to stay under it, concurrency tuning, and a known-good config — cross-linked from the AI pages.
+- `apps/server/scripts/report-run.ts` — a terminal, decoded report of any AI lineup run (args, final
+  report, per-step outcomes, duplicate-build detection).
+
+### Changed
+- **AI lineup run detail page, rebuilt.** Headline stat tiles (cost / tokens / duration / channels)
+  and stacked per-model token bars with hover tooltips and colour swatches; the plan as hovercard
+  package tiles; each channel build as a numbered agent-transcript stepper (readable tool calls, model
+  reasoning as markdown) with an attempt switcher; interactive JSON tree views; a clickable step
+  timeline that jumps to and opens the matching build or the plan; single-open build cards with
+  slide-open animations; run-status and dry-run badges; skeleton and empty states throughout; and
+  polling that follows the run status so it no longer stalls in the gap between the plan and build
+  steps.
+- **Settings → Jobs** now separates Manual and Scheduled jobs into their own frames.
+
+### Migration
+- Adds `plannerMaxOutputTokens` (default 32000) to `app_settings`. No data migration.
+
 ## [0.12.47] - 2026-09-02
 
 AI connections — a per-connection "disable thinking" toggle for local models, and a keyless-endpoint fix.
