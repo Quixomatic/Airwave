@@ -2,6 +2,36 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.0] - 2026-09-03
+
+Contributor onboarding — one interactive `pnpm dev:setup` wizard that takes a fresh clone to a
+running dev stack.
+
+### Added
+- **`pnpm dev:setup` — interactive dev setup wizard** (`scripts/dev-setup.ts`, built on
+  `@clack/prompts`). Checks prerequisites (Node 22+, Bun, pnpm), prompts for your Postgres (with a
+  TCP reachability probe and a `?schema=public` default), seeds the first admin, and writes all four
+  dev env files — `apps/server/.env`, `apps/web/.env`, `apps/tv-web/.env.local`,
+  `apps/tv-native/.env.local` — from the `.env.example` templates, then applies migrations and points
+  you at `pnpm dev:core`.
+  - **Generates and preserves secrets.** Generates `BETTER_AUTH_SECRET` and a stable
+    `PLEX_CLIENT_IDENTIFIER` on a fresh run, and *keeps* them (and your other values) on a re-run —
+    regenerating the auth secret would make every stored encrypted secret undecryptable. Existing
+    `.env` files are backed up to `.env.bak` before overwrite, and any extra vars you've tuned are
+    preserved.
+  - **Optional AI workflow engine** — one prompt enables it and wires `WORKFLOW_POSTGRES_URL` at the
+    same database (its own schema), with `AI_LINEUP_BUILD_LIMIT=0` (full lineup).
+  - **Optional tv-tauri desktop client** — detects the Rust toolchain and, on macOS/Linux,
+    auto-installs it via rustup behind an animated progress bar; on Windows it detects and guides
+    (rustup + MSVC/WebView2). Flags the non-Rust system deps rustup can't provide.
+  - **`--dry-run`** walks the entire flow — prompts, the Postgres probe, and a simulated Rust-install
+    progress bar — without writing a single file or touching the database.
+- README: a "first run" path leading with `pnpm dev:setup`, plus `pnpm dev:setup` / `pnpm dev:core`
+  entries in the scripts table.
+
+### Changed
+- `apps/server/.env.example`: the `AI_LINEUP_BUILD_LIMIT` example now shows `0` (full lineup) instead of `3`.
+
 ## [0.12.49] - 2026-09-03
 
 AI lineup builder — slow/local models no longer time out (GitHub #22), Z.ai (GLM) as a first-class cloud

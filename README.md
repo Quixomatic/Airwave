@@ -259,6 +259,18 @@ Airwave is a **pnpm + Turborepo monorepo** on the [Better-T-Stack](https://githu
 
 ### Setup
 
+The fastest path is the interactive setup wizard. It checks prerequisites, writes the `.env`
+files (generating `BETTER_AUTH_SECRET`), wires the workflow engine at your Postgres, applies
+migrations, and can optionally install the Rust toolchain for the desktop client:
+
+```bash
+pnpm install
+pnpm dev:setup          # interactive first-run setup (add --dry-run to preview, writes nothing)
+pnpm dev:core           # server + admin web + tv-web
+```
+
+Prefer to do it by hand? The wizard just automates this:
+
 ```bash
 pnpm install
 cp apps/server/.env.example apps/server/.env   # then fill in the values (see below)
@@ -313,7 +325,9 @@ airwave/
 
 | Script | Does |
 |---|---|
+| `pnpm dev:setup` | interactive first-run setup wizard (`--dry-run` to preview) |
 | `pnpm dev` | start all apps in dev |
+| `pnpm dev:core` | server + admin web + tv-web (day-to-day) |
 | `pnpm dev:server` / `pnpm dev:web` | start just one |
 | `pnpm build` | build all apps |
 | `pnpm check-types` | typecheck across the monorepo |
