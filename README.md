@@ -276,9 +276,11 @@ boot (`packages/env/src/server.ts`), so the server refuses to start if any is mi
 `ADMIN_EMAIL` + `ADMIN_PASSWORD` to seed the first admin — there's no public sign-up. The AI provider
 keys are **not** env vars; add them in the admin UI (Settings → AI Assistant), stored encrypted.
 
-> **Rust toolchain.** `pnpm dev` includes the `tv-tauri` desktop client, which needs `cargo`. If you
-> don't have a Rust toolchain, run the subset you likely want instead: `pnpm dev -F server -F web`
-> (or add `--filter=!tv-tauri` to the `dev` invocation).
+> **Dev variants.** `pnpm dev` boots *everything* (server, admin web, tv-web, site, tv-native, tv-tauri) —
+> heavy, and `tv-tauri` needs a Rust `cargo` toolchain (without it turbo tears the other dev servers down
+> with it). For day-to-day work use **`pnpm dev:core`**, which boots just the **server + admin web + tv-web**.
+> To test the packaged **desktop supervisor** (server + admin + tv-web + embedded Postgres in an Electrobun
+> tray), run **`pnpm dev:desktop`** — it isn't part of `pnpm dev`.
 
 > Schema changes go through **Prisma migrations** (`pnpm db:migrate` creates + applies one). `db:push` is for
 > throwaway experiments only; Docker/production runs `prisma migrate deploy`.
