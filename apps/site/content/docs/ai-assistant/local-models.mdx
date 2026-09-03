@@ -48,25 +48,29 @@ also an advanced **Extra request body (JSON)** field on the connection for anyth
 (a Modelfile / a LiteLLM `enable_thinking: false` alias), but the toggle is the simplest path. If lineup runs
 die at the planning step with no output, thinking is almost certainly still on.
 
-## The planner is the tight spot
+## Slow local models now run to completion
 
-The planner is **one large call** that designs the whole lineup, and it runs as a single durable step. On a
-self-hosted server that step has a **hard ~300-second duration cap** — a fixed limit in the workflow engine
-that Airwave can't raise — so the planner call simply has to *finish* within it. A reasoning model, or a slow
-/ cold local model, can blow past that and fail with a timeout at zero output tokens. Two different things can
-bite, with two different fixes: the call taking too long, and (once it does finish) the plan being too large
-for the output budget.
+The planner is **one large call** that designs the whole lineup. Previously a slow model — especially a
+reasoning model that thinks for minutes before emitting a token — would fail the planner (and long channel
+builds) at **~300 seconds** with a timeout at zero output tokens. That turned out to be **Bun's default
+300-second `fetch` watchdog** firing on the idle AI request, *not* a real limit — and Airwave now disables it
+for the model calls and the internal workflow dispatch. So a step can take **as long as your hardware needs**:
+a 35B offloaded to CPU/RAM can grind for many minutes and still finish. Slow-but-completes, not fast-but-fails.
 
-- **Disable thinking** — removes the vast majority of stalls at the planning step (see above). Try this first.
-- **Split the roles.** Point the **planner** role at a stronger or faster model (even a cloud one) for that
-  single design call, and keep a cheap **local** model on the **worker** role for the dozens of per-channel
-  build loops, which is where the volume and cost actually are. A fast planner is the most reliable way to stay
-  under the duration cap. See [Roles — chat, planner, worker](/docs/settings/ai-connections).
-- **Raise the token budget.** If plans come back *truncated* — a schema error at the planning step rather than
-  a timeout — raise **Planner max output tokens** under **Settings → General** (default 32000).
+That said, a local planner on modest hardware is genuinely slow (one big call over the whole library), so:
+
+- **Disable thinking** (above) — a reasoning model that thinks its way through the plan is dramatically slower
+  and can exhaust the output-token budget; turning it off is the single biggest speed win.
+- **Split the roles.** Point the **planner** role at a fast, cheap **cloud** model for that one design call, and
+  keep a local model on the **worker** role for the dozens of per-channel builds. This is the sweet spot —
+  seconds of cloud planning for a fraction of a cent, free/cheap workers for the volume, no GPU required for the
+  planner. See [Cloud models — Z.ai (GLM) & the planner/worker split](/docs/ai-assistant/connections).
+- **Raise the token budget.** If plans come back *truncated* (a schema error at the planning step), raise
+  **Planner max output tokens** under **Settings → General** (default 32000) — or reduce reasoning, which frees
+  the budget a reasoning model would otherwise spend thinking.
 - **Preview first.** Use **Preview AI lineup (dry run)** on the Channels page to run the whole plan +
   per-channel verification without creating anything — a safe way to see what a local model produces (and how
-  long it takes) before committing to a real build.
+  long it takes) before a real build.
 
 ## Tune concurrency for your hardware
 

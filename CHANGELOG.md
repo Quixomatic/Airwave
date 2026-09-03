@@ -2,6 +2,41 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.49] - 2026-09-03
+
+AI lineup builder — slow/local models no longer time out (GitHub #22), Z.ai (GLM) as a first-class cloud
+provider with a reasoning-effort knob, and run-page polish.
+
+### Fixed
+- **Slow/local models no longer time out at ~300s (GitHub #22, #21).** The AI lineup planner — and any long
+  channel build — failed at ~300 seconds with a timeout at zero output tokens, which looked like the model
+  being incapable. The real cause was **Bun's default 300-second `fetch` watchdog** firing on the idle AI
+  request (and on the internal loopback workflow dispatch); both are now disabled for those calls. A step now
+  runs as long as your hardware needs — a 35B offloaded to CPU/RAM can grind for many minutes and still finish
+  — which is what finally makes the AI lineup builder complete end-to-end on modest local hardware, including
+  the concurrent per-channel builds.
+
+### Added
+- **Z.ai (GLM) — first-class cloud provider.** Pick a GLM model, paste a z.ai key — like Claude/GPT, no base
+  URL to configure. It's the cheapest way to run the planner: `glm-5.3-flash` is ~$0.002 per plan and the
+  `*-flash` models are free, so a cloud-planner + local-worker split gives fast, near-free planning with no
+  GPU. Curated GLM model dropdown, plus GLM pricing in the run cost panel.
+- **Reasoning-effort knob for Z.ai (GLM).** GLM-5.3 has always-on thinking and defaults to `max` (slow, and it
+  can exhaust the plan's token budget). A low / high / max dropdown on z.ai connections dials it; set **low**
+  for a fast planner.
+- **Auto-refresh toggle** on the AI lineup run page — turn off the live polling and update only via Refresh, so
+  the server log stays clean while you read it.
+
+### Changed
+- z.ai's OpenAI-compatible API doesn't honor OpenAI's strict `json_schema` structured-output format, so Airwave
+  transparently converts the lineup planner's request to JSON-object mode with the schema in the prompt — GLM
+  structured output "just works" for the planner.
+- Docs (getairwave.tv): local-models timeout notes corrected, a new Z.ai/GLM cloud section, and the
+  run-observability page updated for the rebuilt run detail UI (fresh screenshot).
+
+### Migration
+- Adds `reasoning_effort` to `ai_connection`. No data migration.
+
 ## [0.12.48] - 2026-09-02
 
 AI lineup builder — a dry-run preview and a planner token budget (#22), a rebuilt run-observability

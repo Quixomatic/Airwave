@@ -21,13 +21,15 @@ import { TRPCError } from "@trpc/server";
 
 const connectionInput = z.object({
   name: z.string().min(1),
-  provider: z.enum(["anthropic", "openai", "google", "compatible"]),
+  provider: z.enum(["anthropic", "openai", "google", "compatible", "zai"]),
   model: z.string().min(1),
   baseUrl: z.string().optional().nullable(),
   apiKey: z.string().optional(), // undefined = leave unchanged; "" = clear; string = set
   // LOCAL (`compatible`) only — disable the model's thinking, and an optional extra body escape hatch.
   disableThinking: z.boolean().optional(),
   extraBody: z.record(z.string(), z.unknown()).nullable().optional(), // undefined = unchanged; null = clear; object = set
+  // Z.ai (GLM) only — reasoning-effort level. undefined = unchanged; null = clear (provider default).
+  reasoningEffort: z.enum(["low", "high", "max"]).nullable().optional(),
 });
 
 export const aiRouter = router({

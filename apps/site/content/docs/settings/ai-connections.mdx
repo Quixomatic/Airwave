@@ -20,10 +20,12 @@ The **Add connection** form (`apps/web/src/routes/_auth/settings/ai.tsx`) takes:
 | Field | Notes |
 |---|---|
 | **Name** | A label for the card (e.g. "Claude Sonnet"). Optional — defaults to `<provider> · <model>` if blank. |
-| **Provider** | One of four (below). |
+| **Provider** | One of five (below). |
 | **Model** | A curated dropdown per provider, or **Custom…** to type any model id. For a compatible endpoint it's always free-text. |
 | **Base URL** | Shown only for **OpenAI-compatible / Local** — e.g. `http://localhost:11434/v1`. |
 | **API key** | Stored **encrypted** (see below). On edit, leave blank to keep the current key; for a local endpoint it's optional. |
+| **Disable thinking** | **Local (`compatible`) only.** Injects the no-think flag each engine understands. |
+| **Reasoning effort** | **Z.ai (GLM) only.** `low` / `high` / `max` — GLM-5.3 can't disable thinking, so this dials its depth. Default is the provider default (`max`); pick **low** for a fast planner. |
 
 ### Providers
 
@@ -32,17 +34,23 @@ The **Add connection** form (`apps/web/src/routes/_auth/settings/ai.tsx`) takes:
 | Anthropic (Claude) | `anthropic` | Required |
 | OpenAI | `openai` | Required |
 | Google (Gemini) | `google` | Required |
+| Z.ai (GLM) | `zai` | Required |
 | OpenAI-compatible / Local | `compatible` | Optional — set a **Base URL** instead |
+
+**Z.ai (GLM)** is a first-class cloud provider (curated GLM model dropdown + key, base URL preset). It's
+the cheapest way to run the lineup **planner** — `glm-5.3-flash` is fractions of a cent per plan and the
+`*-flash` models are free. It's reasoning-heavy by default, so use the **Reasoning effort → low** knob for a
+fast planner. See [Cloud models — Z.ai (GLM)](/docs/ai-assistant/connections).
 
 The **compatible** provider covers any OpenAI-compatible endpoint — Ollama, LM Studio, vLLM,
 OpenRouter — via a custom base URL (`packages/api/src/services/agent/config.ts` `getModel`). Local
 models work, but **only models trained for tool-calling drive the agent well** — the assistant and the
 lineup builder both rely on tools.
 
-> **Running a local model?** Two settings decide whether it works: the model must support **tool-calling**,
-> and you should **turn OFF reasoning / "thinking" mode** (a thinking model tends to time out the planner
-> call at zero output tokens, which looks like the model being incapable when it isn't). See
-> [Local & self-hosted models](/docs/ai-assistant/local-models) for the full guide and a known-good config.
+> **Running a local model?** The model must support **tool-calling**; for a *reasoning* model, turn thinking
+> down/off so the planner is fast. (Slow local models no longer time out — a step runs to completion — but
+> heavy reasoning is slow.) See [Local & self-hosted models](/docs/ai-assistant/local-models) for the full
+> guide and a known-good config.
 
 ### Testing
 

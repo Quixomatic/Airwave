@@ -20,12 +20,13 @@ export const Route = createFileRoute("/_auth/settings/ai")({
   component: SettingsAi,
 });
 
-type Provider = "anthropic" | "openai" | "google" | "compatible";
+type Provider = "anthropic" | "openai" | "google" | "compatible" | "zai";
 
 const PROVIDERS: { value: Provider; label: string }[] = [
   { value: "anthropic", label: "Anthropic (Claude)" },
   { value: "openai", label: "OpenAI" },
   { value: "google", label: "Google (Gemini)" },
+  { value: "zai", label: "Z.ai (GLM)" },
   { value: "compatible", label: "OpenAI-compatible / Local" },
 ];
 const PROVIDER_LABEL = Object.fromEntries(PROVIDERS.map((p) => [p.value, p.label]));
@@ -34,6 +35,9 @@ const MODELS: Record<Provider, string[]> = {
   anthropic: ["claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5-20251001"],
   openai: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "o3-mini"],
   google: ["gemini-2.0-flash", "gemini-2.0-pro", "gemini-1.5-pro"],
+  // GLM (z.ai) — cheap/fast planners first. `glm-5.3-flash` is ~$0.075/$0.25 per MTok; the two `*-flash`
+  // models are free. Any other GLM id can be entered via "Custom…".
+  zai: ["glm-5.3-flash", "glm-5.3", "glm-4.7", "glm-4.6", "glm-4.5-air", "glm-4.7-flash", "glm-4.5-flash"],
   compatible: [],
 };
 const CUSTOM = "__custom__";
@@ -50,7 +54,11 @@ type Conn = {
   isWorker: boolean;
   disableThinking: boolean;
   extraBody: unknown;
+  reasoningEffort: string | null;
 };
+
+const REASONING_EFFORTS = ["low", "high", "max"] as const;
+const EFFORT_DEFAULT = "__default__";
 
 /**
  * What each connection can be used for. Roles are independent, so one connection can hold all
@@ -99,6 +107,8 @@ function SettingsAi() {
   // LOCAL (`compatible`) only — disable the model's thinking + an advanced extra-body JSON escape hatch.
   const [disableThinking, setDisableThinking] = useState(false);
   const [extraBodyText, setExtraBodyText] = useState("");
+  // Z.ai (GLM) only — reasoning-effort level. EFFORT_DEFAULT = leave to the provider default (max).
+  const [reasoningEffort, setReasoningEffort] = useState<string>(EFFORT_DEFAULT);
   const [busy, setBusy] = useState(false);
   const [test, setTest] = useState<Record<string, { ok: boolean; sample?: string; error?: string } | "loading">>({});
 
@@ -115,6 +125,7 @@ function SettingsAi() {
     setApiKey("");
     setDisableThinking(false);
     setExtraBodyText("");
+    setReasoningEffort(EFFORT_DEFAULT);
   };
 
   const startEdit = (c: Conn) => {
@@ -127,6 +138,7 @@ function SettingsAi() {
     setApiKey("");
     setDisableThinking(c.disableThinking);
     setExtraBodyText(c.extraBody ? JSON.stringify(c.extraBody, null, 2) : "");
+    setReasoningEffort(c.reasoningEffort ?? EFFORT_DEFAULT);
   };
 
   const onProviderChange = (p: Provider) => {
@@ -163,6 +175,11 @@ function SettingsAi() {
         apiKey: apiKey ? apiKey : undefined,
         disableThinking: isCompat ? disableThinking : false,
         ...(isCompat ? { extraBody } : {}),
+        // Z.ai (GLM) reasoning-effort knob; null (or "__default__") = provider default. Cleared for others.
+        reasoningEffort:
+          provider === "zai" && reasoningEffort !== EFFORT_DEFAULT
+            ? (reasoningEffort as "low" | "high" | "max")
+            : null,
       };
       if (editingId) await trpcClient.ai.update.mutate({ id: editingId, ...payload });
       else await trpcClient.ai.create.mutate(payload);
@@ -388,6 +405,32 @@ function SettingsAi() {
               )}
             </div>
           </div>
+
+          {provider === "zai" && (
+            <div className="space-y-2">
+              <Label>Reasoning effort</Label>
+              <Select value={reasoningEffort} onValueChange={(v) => setReasoningEffort(v as string)}>
+                <SelectTrigger>
+                  <SelectValue>
+                    {(v) => (v === EFFORT_DEFAULT ? "Provider default (max)" : (v as string))}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectPopup>
+                  <SelectItem value={EFFORT_DEFAULT}>Provider default (max)</SelectItem>
+                  {REASONING_EFFORTS.map((e) => (
+                    <SelectItem key={e} value={e}>
+                      {e}
+                    </SelectItem>
+                  ))}
+                </SelectPopup>
+              </Select>
+              <p className="text-muted-foreground text-xs">
+                GLM-5.3 has always-on thinking and defaults to <strong>max</strong>, which is slow and can
+                exhaust the output-token budget (truncating the lineup plan). Set <strong>low</strong> for a
+                fast planner; raise it if you want deeper reasoning. Sent as <code>reasoning_effort</code>.
+              </p>
+            </div>
+          )}
 
           {provider === "compatible" && (
             <>

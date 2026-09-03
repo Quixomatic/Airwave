@@ -30,6 +30,7 @@ import {
   PreviewCardTrigger,
 } from "@airwave/ui/components/preview-card";
 import { Skeleton } from "@airwave/ui/components/skeleton";
+import { Switch } from "@airwave/ui/components/switch";
 import {
   Tooltip,
   TooltipContent,
@@ -77,6 +78,16 @@ const PRICING: Record<string, { in: number; out: number }> = {
   "claude-sonnet-5": { in: 3, out: 15 },
   "claude-haiku-4-5": { in: 1, out: 5 },
   "claude-fable-5": { in: 10, out: 50 },
+  // Z.ai (GLM). Longer ids win the prefix match in `rateFor`, so `glm-4.7-flash` (free) beats `glm-4.7`.
+  "glm-5.3-flash": { in: 0.075, out: 0.25 },
+  "glm-5.3": { in: 1.4, out: 4.4 },
+  "glm-5": { in: 1.0, out: 3.2 },
+  "glm-4.7-flash": { in: 0, out: 0 },
+  "glm-4.7": { in: 0.6, out: 2.2 },
+  "glm-4.6": { in: 0.6, out: 2.2 },
+  "glm-4.5-flash": { in: 0, out: 0 },
+  "glm-4.5-air": { in: 0.2, out: 1.1 },
+  "glm-4.5": { in: 0.6, out: 2.2 },
 };
 
 const n = (v: number) => v.toLocaleString();
@@ -781,6 +792,9 @@ function PlanSection({ attempts }: { attempts: PlanAttempt[] }) {
 
 function RunDetail() {
   const { runId } = Route.useParams();
+  // Auto-refresh toggle. On (default) = poll live runs; off = the Refresh button is the only way to update,
+  // which keeps the server log clean (each poll is a long tRPC GET). Frontend-only; gates every interval.
+  const [autoPoll, setAutoPoll] = useState(true);
 
   // The authoritative run status + return value. Only `plan`/`build` phases write trace rows, so the
   // report (which carries `dryRun`) and the overall status live on the run itself, not in a trace.
@@ -788,6 +802,7 @@ function RunDetail() {
   const run = useQuery({
     ...trpc.ai.lineupRun.queryOptions({ runId }),
     refetchInterval: (q) => {
+      if (!autoPoll) return false;
       const s = q.state.data?.status;
       return s && TERMINAL_RUN_STATUS.has(s) ? false : 3000;
     },
@@ -803,15 +818,15 @@ function RunDetail() {
   // row type carrying Json columns, tips TS into TS2589 ("type instantiation is excessively deep").
   const steps = useQuery({
     ...trpc.ai.lineupRunSteps.queryOptions({ runId }),
-    refetchInterval: isLive ? 3000 : false,
+    refetchInterval: autoPoll && isLive ? 3000 : false,
   });
   const traces = useQuery({
     ...trpc.ai.lineupRunTraces.queryOptions({ runId }),
-    refetchInterval: isLive ? 3000 : false,
+    refetchInterval: autoPoll && isLive ? 3000 : false,
   });
   const usage = useQuery({
     ...trpc.ai.lineupRunUsage.queryOptions({ runId }),
-    refetchInterval: isLive ? 5000 : false,
+    refetchInterval: autoPoll && isLive ? 5000 : false,
   });
 
   const rows = (usage.data ?? []) as UsageRow[];
@@ -953,14 +968,20 @@ function RunDetail() {
               <Badge variant="outline">{isLive ? "Dry run" : "Dry run — created nothing"}</Badge>
             )}
           </div>
-          <Button size="sm" variant="outline" onClick={refetchAll} disabled={traces.isFetching}>
-            {traces.isFetching ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            Refresh
-          </Button>
+          <div className="flex items-center gap-3">
+            <label className="text-muted-foreground flex items-center gap-1.5 text-xs whitespace-nowrap select-none">
+              <Switch checked={autoPoll} onCheckedChange={(v) => setAutoPoll(v === true)} />
+              Auto-refresh
+            </label>
+            <Button size="sm" variant="outline" onClick={refetchAll} disabled={traces.isFetching}>
+              {traces.isFetching ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Refresh
+            </Button>
+          </div>
         </FrameHeader>
         <FramePanel className="space-y-4">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
