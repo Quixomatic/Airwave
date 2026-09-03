@@ -19,6 +19,8 @@ export type AppSettingsPatch = {
   channelBuildConcurrency?: number;
   /** Max channels the lineup importer resolves/creates in parallel (1–16). */
   importConcurrency?: number;
+  /** Max output tokens for the AI lineup planner's single design call (4000–128000). */
+  plannerMaxOutputTokens?: number;
 };
 
 export async function updateAppSettings(prisma: PrismaClient, patch: AppSettingsPatch) {

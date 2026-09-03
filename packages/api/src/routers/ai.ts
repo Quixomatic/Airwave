@@ -80,6 +80,7 @@ export const aiRouter = router({
         sourceId: z.string(),
         mode: z.enum(["quality", "fast"]).optional(),
         limit: z.number().int().positive().optional(),
+        dryRun: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -93,7 +94,12 @@ export const aiRouter = router({
         });
       }
       const settings = await getAppSettings(ctx.prisma);
-      return requireLineupRunner().start({ ...input, userId: ctx.session.user.id, concurrency: settings.channelBuildConcurrency });
+      return requireLineupRunner().start({
+        ...input,
+        userId: ctx.session.user.id,
+        concurrency: settings.channelBuildConcurrency,
+        plannerMaxOutputTokens: settings.plannerMaxOutputTokens,
+      });
     }),
 
   /** Recent AI lineup runs for the observability page (metadata + step counts). */

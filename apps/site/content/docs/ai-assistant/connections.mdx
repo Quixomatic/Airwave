@@ -20,6 +20,11 @@ Supported providers (`AI_PROVIDERS`, `config.ts:16`), each mapped to a Vercel AI
 
 The assistant is a **tool-using** agent — it only works well with a model that can call tools. A model that can't will chat but never actually discover fields, preview filters, or build anything.
 
+> **Running a local model?** Beyond tool-calling, the other thing that matters is **turning off reasoning /
+> "thinking" mode** — with it on, the planner call tends to time out at zero output tokens and look
+> incapable when it isn't. See [Local & self-hosted models](/docs/ai-assistant/local-models) for the full
+> guide, the planner-timeout notes, and a known-good local config.
+
 ## Keys are encrypted at rest
 
 A key is stored in `AiConnection.apiKeyEnc` as AES-256-GCM ciphertext, never plaintext (`config.ts:152`, `createConnection`). Encryption is app-level via `node:crypto`, with the key derived from `BETTER_AUTH_SECRET` (`packages/api/src/services/crypto.ts`). Two consequences worth knowing:

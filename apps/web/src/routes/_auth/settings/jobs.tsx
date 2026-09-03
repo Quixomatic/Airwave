@@ -67,110 +67,52 @@ function SettingsJobs() {
     }
   };
 
+  const all = jobs.data ?? [];
+  const manualJobs = all.filter((j) => j.interval === "fixed");
+  const scheduledJobs = all.filter((j) => j.interval !== "fixed");
+
   return (
     <div className="space-y-4">
+      {/* Manual jobs — run-now only, never auto-fire. In their own frame so they're easy to find. */}
       <Frame>
         <FrameHeader>
-          <FrameTitle>Jobs &amp; cache</FrameTitle>
+          <FrameTitle className="flex items-center gap-2">
+            <Hand className="size-4" /> Manual jobs
+          </FrameTitle>
           <FrameDescription>
-            Airwave runs maintenance tasks on a schedule — metadata sync, library scans, and
-            topping up channel schedules. Trigger any of them now or change how often they run.
-            Running a job manually doesn't change its schedule.
+            Run these on demand — they never fire on their own. Some (like the AI lineup builder) do
+            their real work elsewhere; follow "View runs &amp; cost" to watch progress.
           </FrameDescription>
         </FrameHeader>
         <FramePanel className="divide-border divide-y p-0">
-        {jobs.data?.map((job) => (
-          <div key={job.id} className="space-y-2.5 p-4">
-            <div className="flex items-center gap-6">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium">{job.name}</p>
-                {/* Auto = runs on a schedule; Manual = run-now only (never auto-fires). */}
-                <Badge
-                  variant="outline"
-                  className={
-                    job.interval === "fixed"
-                      ? "gap-1 border-amber-500/30 bg-amber-500/15 text-amber-600"
-                      : "gap-1 border-sky-500/30 bg-sky-500/15 text-sky-600"
-                  }
-                >
-                  {job.interval === "fixed" ? (
-                    <Hand className="size-3" />
-                  ) : (
-                    <CalendarClock className="size-3" />
-                  )}
-                  {job.interval === "fixed" ? "Manual" : "Auto"}
-                </Badge>
-                {job.running && (
-                  <span className="text-primary inline-flex items-center gap-1 text-xs">
-                    <Loader2 className="h-3 w-3 animate-spin" /> running
-                  </span>
-                )}
-                {!job.running && job.lastStatus === "failed" && (
-                  <span className="text-destructive text-xs">last run failed</span>
-                )}
-              </div>
-              <p className="text-muted-foreground mt-0.5 text-xs">{job.description}</p>
-              {/* Dispatcher jobs finish instantly but their real work lives elsewhere —
-                  without this the Jobs row is a dead end. */}
-              {job.detailHref && (
-                <Link
-                  to={job.detailHref}
-                  className="text-primary mt-1 inline-flex items-center gap-1 text-xs hover:underline"
-                >
-                  View runs &amp; cost
-                  <ArrowUpRight className="h-3 w-3" />
-                </Link>
-              )}
-              {/* Schedule details as badges. Manual (fixed) jobs never auto-fire, so no
-                  cron/"next" — just the last run if there was one. */}
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                {job.interval !== "fixed" && (
-                  <>
-                    <Badge variant="outline" className="text-muted-foreground gap-1 font-normal">
-                      <CalendarClock className="size-3" /> {describeCron(job.cronSchedule)}
-                    </Badge>
-                    <Badge variant="outline" className="text-muted-foreground gap-1 font-normal">
-                      <Clock className="size-3" /> Next {formatWhen(job.nextRunAt)}
-                    </Badge>
-                  </>
-                )}
-                {job.lastFinishedAt && (
-                  <Badge variant="outline" className="gap-1 border-emerald-500/30 bg-emerald-500/15 font-normal text-emerald-600">
-                    <History className="size-3" /> Last ran {formatWhen(job.lastFinishedAt)}
-                  </Badge>
-                )}
-              </div>
-            </div>
+          {manualJobs.map((job) => (
+            <JobRow key={job.id} job={job} onEdit={setEditing} onRun={run} onCancel={cancel} />
+          ))}
+          {jobs.data && manualJobs.length === 0 && (
+            <p className="text-muted-foreground p-4 text-sm">No manual jobs.</p>
+          )}
+        </FramePanel>
+      </Frame>
 
-            {/* Edit before Run. Manual (fixed) jobs have no schedule to edit — show the button
-                disabled rather than hiding it, so the row layout stays consistent. */}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => setEditing(job)}
-              disabled={job.interval === "fixed"}
-              title={job.interval === "fixed" ? "Manual jobs have no schedule to edit" : "Edit schedule"}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            {job.running ? (
-              <Button variant="outline" size="sm" onClick={() => cancel(job)}>
-                <X className="mr-1 h-3.5 w-3.5" /> Cancel
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => run(job)}>
-                <Play className="mr-1 h-3.5 w-3.5" /> Run now
-              </Button>
-            )}
-            </div>
-
-            {job.running && <JobProgress progress={job.progress} />}
-          </div>
-        ))}
-        {jobs.data?.length === 0 && (
-          <p className="text-muted-foreground p-4 text-sm">No jobs defined.</p>
-        )}
+      {/* Scheduled jobs — maintenance that runs automatically on a cron. */}
+      <Frame>
+        <FrameHeader>
+          <FrameTitle className="flex items-center gap-2">
+            <CalendarClock className="size-4" /> Scheduled jobs
+          </FrameTitle>
+          <FrameDescription>
+            Maintenance Airwave runs automatically — metadata sync, library scans, and topping up
+            channel schedules. Trigger any now or change how often it runs; running one manually
+            doesn't change its schedule.
+          </FrameDescription>
+        </FrameHeader>
+        <FramePanel className="divide-border divide-y p-0">
+          {scheduledJobs.map((job) => (
+            <JobRow key={job.id} job={job} onEdit={setEditing} onRun={run} onCancel={cancel} />
+          ))}
+          {jobs.data && scheduledJobs.length === 0 && (
+            <p className="text-muted-foreground p-4 text-sm">No scheduled jobs.</p>
+          )}
         </FramePanel>
       </Frame>
 
@@ -184,6 +126,109 @@ function SettingsJobs() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+/** One job's row — shared by the Manual and Scheduled frames. */
+function JobRow({
+  job,
+  onEdit,
+  onRun,
+  onCancel,
+}: {
+  job: Job;
+  onEdit: (job: Job) => void;
+  onRun: (job: Job) => void | Promise<void>;
+  onCancel: (job: Job) => void | Promise<void>;
+}) {
+  return (
+    <div className="space-y-2.5 p-4">
+      <div className="flex items-center gap-6">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium">{job.name}</p>
+            {/* Auto = runs on a schedule; Manual = run-now only (never auto-fires). */}
+            <Badge
+              variant="outline"
+              className={
+                job.interval === "fixed"
+                  ? "gap-1 border-amber-500/30 bg-amber-500/15 text-amber-600"
+                  : "gap-1 border-sky-500/30 bg-sky-500/15 text-sky-600"
+              }
+            >
+              {job.interval === "fixed" ? (
+                <Hand className="size-3" />
+              ) : (
+                <CalendarClock className="size-3" />
+              )}
+              {job.interval === "fixed" ? "Manual" : "Auto"}
+            </Badge>
+            {job.running && (
+              <span className="text-primary inline-flex items-center gap-1 text-xs">
+                <Loader2 className="h-3 w-3 animate-spin" /> running
+              </span>
+            )}
+            {!job.running && job.lastStatus === "failed" && (
+              <span className="text-destructive text-xs">last run failed</span>
+            )}
+          </div>
+          <p className="text-muted-foreground mt-0.5 text-xs">{job.description}</p>
+          {/* Dispatcher jobs finish instantly but their real work lives elsewhere —
+              without this the Jobs row is a dead end. */}
+          {job.detailHref && (
+            <Link
+              to={job.detailHref}
+              className="text-primary mt-1 inline-flex items-center gap-1 text-xs hover:underline"
+            >
+              View runs &amp; cost
+              <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          )}
+          {/* Schedule details as badges. Manual (fixed) jobs never auto-fire, so no
+              cron/"next" — just the last run if there was one. */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {job.interval !== "fixed" && (
+              <>
+                <Badge variant="outline" className="text-muted-foreground gap-1 font-normal">
+                  <CalendarClock className="size-3" /> {describeCron(job.cronSchedule)}
+                </Badge>
+                <Badge variant="outline" className="text-muted-foreground gap-1 font-normal">
+                  <Clock className="size-3" /> Next {formatWhen(job.nextRunAt)}
+                </Badge>
+              </>
+            )}
+            {job.lastFinishedAt && (
+              <Badge variant="outline" className="gap-1 border-emerald-500/30 bg-emerald-500/15 font-normal text-emerald-600">
+                <History className="size-3" /> Last ran {formatWhen(job.lastFinishedAt)}
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        {/* Edit before Run. Manual (fixed) jobs have no schedule to edit — show the button
+            disabled rather than hiding it, so the row layout stays consistent. */}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => onEdit(job)}
+          disabled={job.interval === "fixed"}
+          title={job.interval === "fixed" ? "Manual jobs have no schedule to edit" : "Edit schedule"}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+        {job.running ? (
+          <Button variant="outline" size="sm" onClick={() => void onCancel(job)}>
+            <X className="mr-1 h-3.5 w-3.5" /> Cancel
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" onClick={() => void onRun(job)}>
+            <Play className="mr-1 h-3.5 w-3.5" /> Run now
+          </Button>
+        )}
+      </div>
+
+      {job.running && <JobProgress progress={job.progress} />}
     </div>
   );
 }

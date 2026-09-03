@@ -2,6 +2,43 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.12.48] - 2026-09-02
+
+AI lineup builder — a dry-run preview and a planner token budget (#22), a rebuilt run-observability
+page, and real-time build traces.
+
+### Added
+- **Preview AI lineup (dry run).** Runs the full pipeline — library analysis, the planner's design,
+  and every per-channel filter authoring + verification against Plex — but persists **nothing** (no
+  wipe, no packages, no channels, no schedules). Run it from Settings → Jobs → "Preview AI Lineup
+  (dry run)"; the run detail page tags it as a dry run and reports what it *would* build (and which
+  channels it would decline).
+- **Planner max output tokens** setting (Settings → General, default 32000, range 4000–128000) so a
+  large library or a verbose model doesn't truncate the plan. Applied per run, alongside the existing
+  concurrency settings.
+- **Real-time build traces.** Each channel build now opens its trace up front and streams every tool
+  call into it as it happens, so the run page shows a build filling in live instead of appearing only
+  when the step finishes. Best-effort — a trace write never slows or fails a build.
+- **New Local & self-hosted models docs page** (getairwave.tv): the two settings that decide whether a
+  local model works (tool-calling + disable-thinking), the planner's hard ~300s step-duration cap and
+  how to stay under it, concurrency tuning, and a known-good config — cross-linked from the AI pages.
+- `apps/server/scripts/report-run.ts` — a terminal, decoded report of any AI lineup run (args, final
+  report, per-step outcomes, duplicate-build detection).
+
+### Changed
+- **AI lineup run detail page, rebuilt.** Headline stat tiles (cost / tokens / duration / channels)
+  and stacked per-model token bars with hover tooltips and colour swatches; the plan as hovercard
+  package tiles; each channel build as a numbered agent-transcript stepper (readable tool calls, model
+  reasoning as markdown) with an attempt switcher; interactive JSON tree views; a clickable step
+  timeline that jumps to and opens the matching build or the plan; single-open build cards with
+  slide-open animations; run-status and dry-run badges; skeleton and empty states throughout; and
+  polling that follows the run status so it no longer stalls in the gap between the plan and build
+  steps.
+- **Settings → Jobs** now separates Manual and Scheduled jobs into their own frames.
+
+### Migration
+- Adds `plannerMaxOutputTokens` (default 32000) to `app_settings`. No data migration.
+
 ## [0.12.47] - 2026-09-02
 
 AI connections — a per-connection "disable thinking" toggle for local models, and a keyless-endpoint fix.

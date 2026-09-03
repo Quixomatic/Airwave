@@ -103,6 +103,12 @@ claims all three roles — chat, planner, worker — so a single-connection setu
 your provider directly; Airwave has no billing layer. Configure connections and roles under
 **Settings → AI Assistant**.
 
+> **Building with a local model?** The planner is one big call that must finish inside a hard ~300s
+> step-duration cap (self-hosted), so local setups need care. The key thing: **turn off reasoning /
+> "thinking" mode** — with it on, the planner tends to time out at zero output tokens and look incapable. See
+> [Local & self-hosted models](/docs/ai-assistant/local-models) for the timeout notes, the planner/worker
+> split (a strong planner + a cheap local worker), concurrency tuning, and a known-good config.
+
 ## Source map
 
 | Concern | File |

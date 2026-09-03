@@ -39,6 +39,11 @@ OpenRouter — via a custom base URL (`packages/api/src/services/agent/config.ts
 models work, but **only models trained for tool-calling drive the agent well** — the assistant and the
 lineup builder both rely on tools.
 
+> **Running a local model?** Two settings decide whether it works: the model must support **tool-calling**,
+> and you should **turn OFF reasoning / "thinking" mode** (a thinking model tends to time out the planner
+> call at zero output tokens, which looks like the model being incapable when it isn't). See
+> [Local & self-hosted models](/docs/ai-assistant/local-models) for the full guide and a known-good config.
+
 ### Testing
 
 Each saved connection has a **Test** button. It runs a cheap round-trip — a one-word prompt through

@@ -258,6 +258,8 @@ export type PlanOptions = {
    * lineup to the library. Only set this if you specifically need a fixed-size lineup.
    */
   targetChannels?: number;
+  /** Max output tokens for the design call (AppSettings.plannerMaxOutputTokens). Defaults to 32000. */
+  maxOutputTokens?: number;
 };
 
 /**
@@ -464,30 +466,29 @@ export async function planLineup(
 
   try {
     ({ object, usage } = await generateObject({
-    model: getModel(connection),
-    schema: planSchema,
-    /**
-     * Pinned deliberately. A full lineup is a LOT of JSON — the last successful plan emitted
-     * 10,393 output tokens for 26 channels, and widening the field catalog invites bigger
-     * ones. Left unset, the cap is whatever the provider defaults to, and a plan that runs
-     * past it comes back as truncated JSON, which surfaces as the opaque
-     * `AI_NoObjectGeneratedError: response did not match schema` — indistinguishable from a
-     * genuine schema violation unless you inspect the raw text (see the catch below).
-     */
-    maxOutputTokens: 32_000,
-    system: SYSTEM,
-    prompt: [
-      libraryContext,
-      "",
-      "EXISTING PACKAGES — you may file channels into any of these instead of creating a new one:",
-      formatExistingPackages(opts.existingPackages ?? []),
-      "",
-      exactCount
-        ? `Propose exactly ${exactCount} channel${exactCount === 1 ? "" : "s"} — a representative sample of the lineup you would build, spread across different kinds of channel rather than ${exactCount} variations on one idea.`
-        : "Build the full lineup for this library. Use as many channels and packages as it genuinely takes to cover it — see COVERAGE below.",
-      "Give every channel a complete, working filter built from the vocabulary above.",
-    ].join("\n"),
-    providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+      model: getModel(connection),
+      schema: planSchema,
+      /**
+       * Configurable via AppSettings.plannerMaxOutputTokens (default 32000). A full lineup is a LOT of JSON —
+       * the last successful plan emitted 10,393 output tokens for 26 channels, and widening the field catalog
+       * invites bigger ones. Left unset the provider default truncates big plans, surfacing as the opaque
+       * `AI_NoObjectGeneratedError` (indistinguishable from a real schema violation without the raw text —
+       * see the catch below). Hence the knob: raise it for very large libraries / verbose models.
+       */
+      maxOutputTokens: opts.maxOutputTokens ?? 32_000,
+      system: SYSTEM,
+      prompt: [
+        libraryContext,
+        "",
+        "EXISTING PACKAGES — you may file channels into any of these instead of creating a new one:",
+        formatExistingPackages(opts.existingPackages ?? []),
+        "",
+        exactCount
+          ? `Propose exactly ${exactCount} channel${exactCount === 1 ? "" : "s"} — a representative sample of the lineup you would build, spread across different kinds of channel rather than ${exactCount} variations on one idea.`
+          : "Build the full lineup for this library. Use as many channels and packages as it genuinely takes to cover it — see COVERAGE below.",
+        "Give every channel a complete, working filter built from the vocabulary above.",
+      ].join("\n"),
+      providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
     }));
   } catch (err) {
     /**

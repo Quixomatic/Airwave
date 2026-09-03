@@ -1,0 +1,93 @@
+---
+title: "Local & self-hosted models"
+description: "Run the assistant and the AI lineup builder against a local OpenAI-compatible model (Ollama, LM Studio, vLLM, OpenRouter) — the two settings that decide whether it works, plus a known-good config."
+---
+
+Airwave's AI is bring-your-own-key and provider-agnostic: the **OpenAI-compatible / Local** connection
+type points at any OpenAI-compatible endpoint — **Ollama, LM Studio, vLLM, OpenRouter** — via a base URL,
+with the key optional for a keyless local server. Set one up under **Settings → AI Assistant** (see
+[Connections & keys](/docs/ai-assistant/connections)).
+
+Local models absolutely work for both the [assistant](/docs/ai-assistant) and the durable
+[AI lineup builder](/docs/workflows/lineup-builder). But two things decide whether a given model drives them
+well, and both are easy to get wrong in a way that looks like "this model isn't capable" when it actually is.
+
+## 1. The model must support tool-calling
+
+Everything the AI does — inspecting your library, previewing filters, creating channels — happens through
+**tools**. A model that can't reliably call tools won't drive the agent, no matter how capable it is at
+chat. Pick a tool-calling model, and start the endpoint with tool-calling enabled (on vLLM, for example,
+`--enable-auto-tool-choice` with the right `--tool-call-parser` for your model).
+
+You don't need guided decoding or forced `tool_choice`. As of v0.12.40 the filter tools tolerate the
+free-form output that OpenAI-compatible servers produce under `tool_choice: "auto"` — if the model returns
+the filter as a JSON string instead of an object, Airwave parses it. So `tool_choice: "auto"` is fine.
+
+## 2. Turn OFF reasoning / "thinking" mode
+
+**This is the single most important setting, and the one that trips everyone up.**
+
+If your model runs with reasoning / "thinking" mode **enabled**, the planner call — the one big call that
+designs your whole lineup — tends to spend the entire time window thinking and never reach an answer. It
+then fails with an opaque timeout and **zero output tokens**, which looks exactly like the model being
+incapable. It isn't. The same model with thinking **off** completes the call cleanly.
+
+The difference is stark. Same model, same library, same day, only the reasoning flag changed:
+
+| Reasoning | Planner result |
+|---|---|
+| **On** | 0 output tokens, timed out repeatedly (~270–300s each) |
+| **Off** | ~6,600 output tokens, completed in ~136s |
+
+The easiest way to disable it: **toggle "Disable thinking" on the connection** in Settings → AI Assistant
+(shown for OpenAI-compatible / Local connections). Airwave then sends the no-think flag every engine
+understands — `reasoning_effort: "none"` for Ollama, `chat_template_kwargs.enable_thinking: false` for
+vLLM / SGLang, and OpenRouter's `reasoning` — so you don't have to configure it model-side at all. There's
+also an advanced **Extra request body (JSON)** field on the connection for anything exotic (a synonym like
+`do_reasoning`, or an engine the toggle doesn't cover). Alternatively you can disable it at the source
+(a Modelfile / a LiteLLM `enable_thinking: false` alias), but the toggle is the simplest path. If lineup runs
+die at the planning step with no output, thinking is almost certainly still on.
+
+## The planner is the tight spot
+
+The planner is **one large call** that designs the whole lineup, and it runs as a single durable step. On a
+self-hosted server that step has a **hard ~300-second duration cap** — a fixed limit in the workflow engine
+that Airwave can't raise — so the planner call simply has to *finish* within it. A reasoning model, or a slow
+/ cold local model, can blow past that and fail with a timeout at zero output tokens. Two different things can
+bite, with two different fixes: the call taking too long, and (once it does finish) the plan being too large
+for the output budget.
+
+- **Disable thinking** — removes the vast majority of stalls at the planning step (see above). Try this first.
+- **Split the roles.** Point the **planner** role at a stronger or faster model (even a cloud one) for that
+  single design call, and keep a cheap **local** model on the **worker** role for the dozens of per-channel
+  build loops, which is where the volume and cost actually are. A fast planner is the most reliable way to stay
+  under the duration cap. See [Roles — chat, planner, worker](/docs/settings/ai-connections).
+- **Raise the token budget.** If plans come back *truncated* — a schema error at the planning step rather than
+  a timeout — raise **Planner max output tokens** under **Settings → General** (default 32000).
+- **Preview first.** Use **Preview AI lineup (dry run)** on the Channels page to run the whole plan +
+  per-channel verification without creating anything — a safe way to see what a local model produces (and how
+  long it takes) before committing to a real build.
+
+## Tune concurrency for your hardware
+
+The lineup builder runs many per-channel build loops in parallel. The default is 6, which can overwhelm a
+single local GPU. Under **Settings → General**, turn **Max parallel AI channel builds** down to **1 or 2**
+for a local setup that can't keep up — the setting is applied per run, so the next build honors it.
+(Turning concurrency down does more for a slow box than fiddling with timeouts.)
+
+## A known-good local setup
+
+Reported by a community self-hoster running everything locally, as a reference point rather than a guarantee:
+
+- **Model:** `Qwen/Qwen3.6-35B-A3B-FP8` on **vLLM** (`--enable-auto-tool-choice --tool-call-parser=qwen3_xml`),
+  reasoning **off**.
+- **Both roles local** (planner and worker on the same model), library ~1,270 movies / 127 shows /
+  6,800 episodes.
+- **Result:** the planner designed **37 channels across 13 packages in ~6,600 tokens / ~136s**, and a full
+  local build produced **32 channels built** in ~21 minutes at **$0**. For comparison, a top cloud model
+  planned a similar scope on the same library but used several times the tokens and wall-clock.
+
+Note the builder is designed to **verify before it commits**: if a channel's filter doesn't resolve to
+enough real content, or the pool doesn't match the theme, the agent will decline to create it rather than
+ship an empty channel. Some "skipped" or "not created" results in a run are the model exercising that
+judgment correctly, not a failure.

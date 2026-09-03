@@ -58,7 +58,7 @@ export type TraceInput = {
   channelKey?: string | null;
   channelNumber?: number | null;
   channelName?: string | null;
-  status: "ok" | "skipped" | "failed";
+  status: "running" | "ok" | "skipped" | "failed";
   reason?: string | null;
   input?: unknown;
   output?: unknown;
@@ -123,6 +123,83 @@ export async function recordTrace(prisma: PrismaClient, t: TraceInput): Promise<
     // Deliberately swallowed — see the header. Losing a trace row is a nuisance; failing a
     // completed channel build because we couldn't log it is a real cost.
     console.warn(`[trace] failed to record ${t.stepName}/${t.phase}:`, err);
+  }
+}
+
+/**
+ * Open a trace row up front (status "running", `finishedAt` null) and return its id, so a long step can
+ * stream its progress into it via `updateTrace` instead of the UI seeing nothing until the step ends.
+ * Best-effort: returns null if the write fails, and the caller falls back to a single `recordTrace` at the end.
+ */
+export async function startTrace(prisma: PrismaClient, t: TraceInput): Promise<string | null> {
+  try {
+    const row = await prisma.aiLineupTrace.create({
+      data: {
+        runId: t.runId,
+        stepId: t.stepId ?? null,
+        stepName: t.stepName,
+        attempt: t.attempt ?? 1,
+        phase: t.phase,
+        channelKey: t.channelKey ?? null,
+        channelNumber: t.channelNumber ?? null,
+        channelName: t.channelName ?? null,
+        status: t.status,
+        reason: t.reason ?? null,
+        input: toJson(t.input) as never,
+        output: toJson(t.output) as never,
+        trace: toJson(t.trace) as never,
+        model: t.usage?.model ?? null,
+        inputTokens: t.usage?.inputTokens ?? 0,
+        outputTokens: t.usage?.outputTokens ?? 0,
+        cacheReadTokens: t.usage?.cacheReadTokens ?? 0,
+        cacheWriteTokens: t.usage?.cacheWriteTokens ?? 0,
+        agentSteps: t.usage?.agentSteps ?? 0,
+        error: t.error ?? null,
+        startedAt: t.startedAt ?? new Date(),
+        finishedAt: null,
+      },
+      select: { id: true },
+    });
+    return row.id;
+  } catch (err) {
+    console.warn(`[trace] failed to start ${t.stepName}/${t.phase}:`, err);
+    return null;
+  }
+}
+
+export type TraceUpdate = {
+  status?: string;
+  reason?: string | null;
+  output?: unknown;
+  trace?: unknown;
+  usage?: TraceUsage;
+  error?: string | null;
+  /** Stamp `finishedAt` — set on the terminal update. */
+  finished?: boolean;
+};
+
+/** Patch an open trace row (from `startTrace`). Best-effort; only provided fields are written. */
+export async function updateTrace(prisma: PrismaClient, id: string, u: TraceUpdate): Promise<void> {
+  try {
+    await prisma.aiLineupTrace.update({
+      where: { id },
+      data: {
+        ...(u.status !== undefined ? { status: u.status } : {}),
+        ...(u.reason !== undefined ? { reason: u.reason } : {}),
+        ...(u.output !== undefined ? { output: toJson(u.output) as never } : {}),
+        ...(u.trace !== undefined ? { trace: toJson(u.trace) as never } : {}),
+        ...(u.error !== undefined ? { error: u.error } : {}),
+        ...(u.usage?.model !== undefined ? { model: u.usage.model } : {}),
+        ...(u.usage?.inputTokens !== undefined ? { inputTokens: u.usage.inputTokens } : {}),
+        ...(u.usage?.outputTokens !== undefined ? { outputTokens: u.usage.outputTokens } : {}),
+        ...(u.usage?.cacheReadTokens !== undefined ? { cacheReadTokens: u.usage.cacheReadTokens } : {}),
+        ...(u.usage?.cacheWriteTokens !== undefined ? { cacheWriteTokens: u.usage.cacheWriteTokens } : {}),
+        ...(u.usage?.agentSteps !== undefined ? { agentSteps: u.usage.agentSteps } : {}),
+        ...(u.finished ? { finishedAt: new Date() } : {}),
+      },
+    });
+  } catch (err) {
+    console.warn(`[trace] failed to update ${id}:`, err);
   }
 }
 

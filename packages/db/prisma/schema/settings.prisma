@@ -13,6 +13,11 @@ model AppSettings {
   /// (no LLM), but still capped; default 4 (the previous hardcoded value).
   importConcurrency Int @default(4)
 
+  /// Max output tokens for the AI lineup PLANNER's single design call. A full lineup is a lot of JSON;
+  /// too low truncates the plan (surfaces as a schema error), too high risks the step timeout. Default
+  /// 32000 (the previous hardcoded value). Raise for very large libraries / verbose models.
+  plannerMaxOutputTokens Int @default(32000)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
