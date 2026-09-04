@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Airwave hero reel (16:9)</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <link rel="stylesheet" href="brand.css" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
+      #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
+
+      /* Every scene layer is an UNTIMED wrapper we fade/scale on the timeline.
+         Videos inside carry the clip timing; captions ride their own layer. */
+      .stage { position: absolute; inset: 0; opacity: 0; will-change: opacity, transform; }
+
+      /* Full-frame hero (intro / outro) on the radial-navy backdrop. */
+      .hero {
+        display: grid; place-items: center;
+        background: radial-gradient(120% 120% at 50% 40%, var(--grad-center) 0%, var(--grad-edge) 72%);
+      }
+      .hero__inner { display: flex; flex-direction: column; align-items: center; gap: 34px; text-align: center; }
+      .wordmark-row { width: 440px; height: auto; }
+      .tagline { font-family: var(--font-display); font-weight: 600; font-size: 58px; letter-spacing: -0.02em; color: var(--fg); max-width: 1180px; line-height: 1.12; }
+      .tagline .accent { color: var(--accent); }
+      .cta { font-family: var(--font-mono); font-size: 30px; letter-spacing: 0.06em; color: var(--accent-200); }
+      .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; max-width: 1200px; margin-top: 6px; }
+
+      /* Intro lockup: mark + live "Airwave" (Inter Bold), reconstructed from apps/web's Logo
+         component (markWidth 200 → gap 0.16x, fontSize 0.66x, letter-spacing -0.01em). */
+      .lockup { display: flex; align-items: center; gap: 32px; }
+      .mark { width: 200px; height: auto; object-fit: contain; display: block; }
+      .wordtext { display: flex; font-family: "Inter", var(--font-display); font-weight: 700; font-size: 132px; letter-spacing: -0.01em; line-height: 1; color: #fff; }
+      .wordtext span { display: inline-block; white-space: pre; }
+      .lockup-glow { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; }
+      .lockup-glow::before { content: ""; width: 1040px; height: 560px; margin-top: -80px; border-radius: 50%; background: radial-gradient(closest-side, rgba(74,159,224,0.42), rgba(74,159,224,0)); filter: blur(28px); }
+      .tagline .tline { opacity: 0; }
+
+      /* Framed screenshot/video "shot" card, centered — room above for the badge, below for the title. */
+      .card {
+        position: absolute; top: 140px; left: 260px; width: 1401px; height: 788px;
+        border-radius: 18px; overflow: hidden;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        box-shadow: 0 40px 110px rgba(0,0,0,0.62), 0 0 0 1px rgba(148,163,184,0.05);
+      }
+      /* Portrait card (the dev-setup terminal recording is 964x1298). */
+      .card--portrait { top: 128px; left: 728px; width: 464px; height: 800px; }
+      .card video, .card img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+      /* Top badge — the feature label as an accent pill that slides in from above. */
+      .badge-row { position: absolute; top: 46px; left: 0; right: 0; display: flex; justify-content: center; opacity: 0; }
+      .badge {
+        font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.18em; font-size: 20px;
+        color: var(--accent-200); background: rgba(74,159,224,0.12);
+        border: 1px solid rgba(74,159,224,0.38); border-radius: 999px; padding: 13px 28px;
+      }
+
+      /* Bottom caption — the feature line, centered, readable. */
+      .cap { position: absolute; left: 160px; right: 160px; top: 958px; opacity: 0; text-align: center; }
+      .cap .title { font-family: var(--font-display); font-weight: 600; font-size: 46px; letter-spacing: -0.02em; color: var(--fg); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-width="1920" data-height="1080" data-duration="59">
+
+      <!-- S1 · INTRO -->
+      <div class="stage hero" id="s-intro">
+        <div class="lockup-glow" id="i-glow"></div>
+        <div class="hero__inner" id="i-intro">
+          <div class="lockup">
+            <img class="mark" id="mark" src="assets/brand/logo.png" alt="" />
+            <div class="wordtext" id="wordtext"><span>A</span><span>i</span><span>r</span><span>w</span><span>a</span><span>v</span><span>e</span></div>
+          </div>
+          <div class="tagline" id="tagline">
+            <div class="tline">Turn your Plex library into your</div>
+            <div class="tline">own <span class="accent">always-on live TV</span>.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- S2 · GUIDE -->
+      <div class="stage" id="s-guide"><div class="card"><video id="v-guide" class="clip" src="assets/video/guide-surf.mp4" data-start="5.0" data-duration="5.2" data-track-index="1" muted playsinline></video></div></div>
+      <div class="badge-row" id="b-guide"><div class="badge">The guide</div></div>
+      <div class="cap" id="c-guide"><span class="title">A real channel guide, from your own library.</span></div>
+
+      <!-- S3 · TUNE IN -->
+      <div class="stage" id="s-tune"><div class="card"><video id="v-tune" class="clip" src="assets/video/tune-in-info.mp4" data-start="10.2" data-duration="5.0" data-track-index="2" muted playsinline></video></div></div>
+      <div class="badge-row" id="b-tune"><div class="badge">Live TV</div></div>
+      <div class="cap" id="c-tune"><span class="title">Join what's on now, mid-program.</span></div>
+
+      <!-- S4 · DVR -->
+      <div class="stage" id="s-dvr"><div class="card"><video id="v-dvr" class="clip" src="assets/video/restart.mp4" data-start="15.2" data-duration="4.6" data-track-index="3" muted playsinline></video></div></div>
+      <div class="badge-row" id="b-dvr"><div class="badge">DVR</div></div>
+      <div class="cap" id="c-dvr"><span class="title">Rewind, restart, or jump straight to live.</span></div>
+
+      <!-- S5 · CHANNEL SURF -->
+      <div class="stage" id="s-surf"><div class="card"><video id="v-surf" class="clip" src="assets/video/channel-surf.mp4" data-start="19.8" data-duration="4.8" data-track-index="4" muted playsinline></video></div></div>
+      <div class="badge-row" id="b-surf"><div class="badge">Channel surf</div></div>
+      <div class="cap" id="c-surf"><span class="title">Flip channels like a broadcast box.</span></div>
+
+      <!-- S6 · BUMPERS -->
+      <div class="stage" id="s-bump"><div class="card"><video id="v-bump" class="clip" src="assets/video/dvr-bumper.mp4" data-start="24.6" data-duration="5.0" data-track-index="5" muted playsinline></video></div></div>
+      <div class="badge-row" id="b-bump"><div class="badge">Bumpers</div></div>
+      <div class="cap" id="c-bump"><span class="title">Clean &ldquo;Up Next&rdquo; cards between programs.</span></div>
+
+      <!-- S7 · BUILD -->
+      <div class="stage" id="s-build"><div class="card"><video id="v-build" class="clip" src="assets/video/filtered-pick.mp4" data-start="29.6" data-duration="5.0" data-track-index="6" muted playsinline></video></div></div>
+      <div class="badge-row" id="b-build"><div class="badge">Build it</div></div>
+      <div class="cap" id="c-build"><span class="title">Make a channel from a simple filter.</span></div>
+
+      <!-- S8 · ORGANIZE -->
+      <div class="stage" id="s-org"><div class="card"><video id="v-org" class="clip" src="assets/video/lenses.mp4" data-start="34.6" data-duration="5.0" data-track-index="7" muted playsinline></video></div></div>
+      <div class="badge-row" id="b-org"><div class="badge">Organize</div></div>
+      <div class="cap" id="c-org"><span class="title">Group channels into packages, share per user.</span></div>
+
+      <!-- S9 · EVERYWHERE -->
+      <div class="stage" id="s-every"><div class="card"><video id="v-every" class="clip" src="assets/video/mini-player.mp4" data-start="39.6" data-duration="3.6" data-track-index="8" muted playsinline></video></div></div>
+      <div class="badge-row" id="b-every"><div class="badge">Everywhere</div></div>
+      <div class="cap" id="c-every"><span class="title">Apple TV, mobile, web, desktop, and Roku.</span></div>
+
+      <!-- S10 · OPTIONAL AI -->
+      <div class="stage" id="s-ai"><div class="card"><img id="v-ai" class="clip" src="assets/screenshots/admin-aiassistant.webp" data-start="43.2" data-duration="5.0" data-track-index="9" alt="" /></div></div>
+      <div class="badge-row" id="b-ai"><div class="badge">Optional AI</div></div>
+      <div class="cap" id="c-ai"><span class="title">Draft lineups with your own AI key.</span></div>
+
+      <!-- S11 · SELF-HOST (dev-setup, portrait) -->
+      <div class="stage" id="s-setup"><div class="card card--portrait"><video id="v-setup" class="clip" src="assets/video/dev-setup.mp4" data-start="48.2" data-duration="5.4" data-track-index="10" muted playsinline></video></div></div>
+      <div class="badge-row" id="b-setup"><div class="badge">Self-host</div></div>
+      <div class="cap" id="c-setup"><span class="title">From clone to running in one command.</span></div>
+
+      <!-- S12 · OUTRO -->
+      <div class="stage hero" id="s-outro">
+        <div class="hero__inner" id="i-outro">
+          <img class="wordmark-row" src="assets/brand/wordmark-row-transparent.png" alt="Airwave" />
+          <div class="cta">getairwave.tv</div>
+          <div class="chips">
+            <span class="chip">Apple TV</span><span class="chip">iPad</span><span class="chip">Android TV</span>
+            <span class="chip">Fire TV</span><span class="chip">LG webOS</span><span class="chip">Roku</span>
+            <span class="chip">Windows &amp; macOS</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      // A scene = an untimed .stage layer we fade in/out (+ gentle Ken Burns).
+      function scene(stage, start, end, opts) {
+        opts = opts || {};
+        const inT = opts.inT ?? 0.55, outT = opts.outT ?? 0.45;
+        tl.fromTo(stage, { opacity: 0 }, { opacity: 1, duration: inT, ease: "power2.out" }, start);
+        if (opts.kb !== false) {
+          tl.fromTo(stage, { scale: opts.kbFrom ?? 1.03 }, { scale: opts.kbTo ?? 1.07, ease: "none", duration: end - start }, start);
+        }
+        tl.to(stage, { opacity: 0, duration: outT, ease: "power2.in" }, end - outT);
+        tl.set(stage, { visibility: "hidden" }, end); // deterministic hard-kill at the boundary
+      }
+
+      function caption(badge, cap, start, end) {
+        // Badge slides in from the top; feature line rises from the bottom.
+        tl.fromTo(badge, { opacity: 0, y: -30 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, start + 0.35);
+        tl.to(badge, { opacity: 0, y: -16, duration: 0.35, ease: "power2.in" }, end - 0.5);
+        tl.fromTo(cap, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, start + 0.5);
+        tl.to(cap, { opacity: 0, duration: 0.35, ease: "power2.in" }, end - 0.5);
+      }
+
+      // Intro: replicate apps/web's Logo splash — mark scales+fades in, "Airwave" cascades letter
+      // by letter, then the tagline lines stagger in AFTER the cascade completes.
+      tl.fromTo("#s-intro", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 0.0);
+      tl.to("#s-intro", { opacity: 0, duration: 0.45, ease: "power2.in" }, 4.55);
+      tl.set("#s-intro", { visibility: "hidden" }, 5.0);
+      tl.fromTo("#i-glow", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 1.1, ease: "power2.out" }, 0.3);
+      tl.fromTo("#mark", { opacity: 0, scale: 0.82 }, { opacity: 1, scale: 1, duration: 0.5, ease: "power4.out" }, 0.35);
+      tl.fromTo("#wordtext span", { opacity: 0, y: 46 }, { opacity: 1, y: 0, duration: 0.4, ease: "power4.out", stagger: 0.055 }, 0.70);
+      tl.fromTo("#s-intro .tline", { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out", stagger: 0.14 }, 1.55);
+
+      // Feature scenes.
+      const FEATURES = [
+        { id: "guide", start: 5.0, end: 10.2 },
+        { id: "tune",  start: 10.2, end: 15.2 },
+        { id: "dvr",   start: 15.2, end: 19.8 },
+        { id: "surf",  start: 19.8, end: 24.6 },
+        { id: "bump",  start: 24.6, end: 29.6 },
+        { id: "build", start: 29.6, end: 34.6 },
+        { id: "org",   start: 34.6, end: 39.6 },
+        { id: "every", start: 39.6, end: 43.2 },
+        { id: "ai",    start: 43.2, end: 48.2 },
+        { id: "setup", start: 48.2, end: 53.6 },
+      ];
+      FEATURES.forEach((f) => {
+        scene("#s-" + f.id, f.start, f.end);
+        caption("#b-" + f.id, "#c-" + f.id, f.start, f.end);
+      });
+
+      // Outro: fade in on the radial hero, content settles.
+      scene("#s-outro", 53.6, 59.0, { kb: false });
+      tl.fromTo("#i-outro", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.9, ease: "power3.out" }, 54.0);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

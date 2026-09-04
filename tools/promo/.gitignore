@@ -1,0 +1,9 @@
+# Rendered video output (build artifacts) and tooling caches.
+out/
+.hyperframes/
+node_modules/
+*.log
+
+# Ignore rendered MP4s anywhere, but keep the curated source clips under assets/.
+*.mp4
+!assets/video/*.mp4
