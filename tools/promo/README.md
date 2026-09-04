@@ -1,85 +1,53 @@
 # Airwave promo video (`tools/promo`)
 
-The Airwave sizzle reel, built with [HyperFrames](https://github.com/heygen-com/hyperframes)
-(HeyGen's open-source HTML/CSS/GSAP -> MP4 renderer). It stitches our screenshots and demo clips
-into a polished, on-brand showcase.
+The Airwave sizzle reel, built with [Remotion](https://remotion.dev) (React + Tailwind v4 + `motion`).
+Renders a 1920x1080, 60fps, ~61.6s hero reel from our screenshots + demo clips, on the getairwave.tv brand.
 
-**This is a standalone marketing/dev tool, deliberately OUTSIDE the pnpm workspaces.** It is not in
-`apps/*` or `packages/*`, so it is never swept into the version-bump lockstep, `pnpm dev`, or the app
-builds. It manages its own deps and renders here.
+**Standalone project, deliberately OUTSIDE the pnpm workspaces** — it's a marketing tool, not shipped in any
+app, so it never gets version-bumped, booted by `pnpm dev`, or built with the monorepo. It has its own
+`node_modules` + lockfile.
 
-## Targets
+## Setup
 
-- **16:9 hero** (1920x1080), ~45-70s — for getairwave.tv, YouTube, the README. *(build first)*
-- **Vertical cut** (1080x1920), ~20-40s — derived from the same scenes/assets afterward.
+```bash
+cd tools/promo
+pnpm install --ignore-workspace   # own node_modules; won't touch the monorepo
+pnpm rebuild esbuild              # Remotion needs esbuild's native binary (pnpm blocks its build script)
+```
 
-## Vibe
+## Commands
 
-Sleek premium product showcase: calm, screenshot-forward, soft cross-dissolves and gentle Ken-Burns
-pans, the demo clips front and center, one short caption per scene. Product speaks; minimal hype.
+```bash
+pnpm studio         # live browser preview — scrub the whole reel instantly (best for iterating)
+pnpm render         # render to out/reel.mp4 on the GPU (--gl=angle --concurrency=4) — fast
+pnpm render:cpu     # software fallback (--concurrency=20) if the GPU path misbehaves
+```
+
+- Rendered MP4s go to `out/` (gitignored). Media is served from `assets/` via `staticFile()` (see
+  `remotion.config.ts` `setPublicDir`).
+- **GPU note:** `--gl=angle` at high concurrency crashes (ANGLE memory leak x many heavy-blur tabs), so the GPU
+  path runs at concurrency 4. The 208px blob blur is the main per-frame cost. `EPERM: rename ...in-progress`
+  means the output mp4 is open in a player — close it or render to a fresh name.
+
+## Structure
+
+- `src/Root.tsx` — the `AirwaveHero` `<Composition>` (1920x1080, 60fps).
+- `src/Reel.tsx` — sequences Intro -> Features -> Outro.
+- `src/theme.ts` — brand colors, fonts, the `FEATURES` list, and glass-frame geometry.
+- `src/components/` — `Intro` (Logo splash), `SectionText` (apps/site SectionHeader styling), `Features`
+  (two-column: text + the persistent aspect-morphing glass media frame with blur-swap), `Outro` (wordmark
+  lockup + two static platform tile rows), `BlobBg` (GuideEngine "organic" blob SVG, recolored).
+- `src/styles.css` — Tailwind v4 `@import` + brand `@theme` tokens. `src/fonts.ts` — loads bundled Inter.
+- `assets/` — demo clips (`video/`, from `apps/site/public/demos`), `screenshots/`, `brand/`, `fonts/`.
 
 ## Brand
 
-Everything is pulled from the marketing site (`apps/site`), the "10-foot navy" look:
+Pulled from `apps/site` (getairwave.tv): deep-navy surfaces (`#060a14`) + sky-blue accent (`#4a9fe0`); display
+= the Avenir Next system stack; body = Inter; mono = system. Platform icons via `react-icons` (same set as the
+site home page).
 
-- **Palette:** deep-navy surfaces (`#060a14` / `#0b1120` / `#0f1626`) + a sky-blue accent (`#4a9fe0`).
-- **Type:** display/title = the Avenir Next system stack the site uses; body = Inter (`Inter-Bold.ttf`
-  bundled in `assets/fonts`); mono/eyebrow labels = system monospace.
-- Use the tokens and helper classes in **`brand.css`** (`.scene`, `.scene--hero`, `.title`,
-  `.subtitle`, `.eyebrow`, `.shot`, `.accent-bar`, `.chip`, `.vignette`). Import it in every scene.
+## Roadmap / next
 
-## Assets (`assets/`)
-
-- `screenshots/` — the full set of product screenshots (from `docs/screenshots`).
-- `video/` — the site's feature demo clips (from `apps/site/public/demos`), all 1920x1078 16:9, 4-10s:
-  `guide-surf` (guide navigation), `tune-in-info` (tune in + program info), `restart` (DVR restart),
-  `channel-surf` (channel surfing), `dvr-bumper` (DVR + Up Next bumper), `filtered-pick` (building a
-  channel from a filter), `lenses` (package guide lenses), `mini-player` (mini player). Plus
-  `dev-setup.mp4`, the `pnpm dev:setup` wizard recording (portrait; ideal for the vertical cut).
-- `brand/` — transparent wordmarks (row + column), the `splash` animation, and the logo mark.
-- `fonts/Inter-Bold.ttf` — bundled so the render embeds Inter deterministically.
-
-## Suggested scene flow (16:9)
-
-Lead with the motion demos (`assets/video/*.mp4`); use screenshots as accents/holds between them.
-
-1. **Intro** — wordmark on the radial-navy hero (`splash` / `wordmark-column-transparent.png`), tagline
-   "Turn your Plex library into your own always-on live TV."
-2. **The guide** — `guide-surf.mp4`, caption "A real channel guide, from your own library."
-3. **Tune in** — `tune-in-info.mp4`, "Join what's on now, mid-program."
-4. **DVR** — `restart.mp4`, "Rewind, restart, jump to live."
-5. **Channel surf** — `channel-surf.mp4`.
-6. **Bumpers** — `dvr-bumper.mp4`, "Clean 'Up Next' cards between programs."
-7. **Build a channel** — `filtered-pick.mp4`, then hold on `admin-channel-preview-and-schedule` /
-   `admin-guidepreview`.
-8. **Organize & share** — `lenses.mp4` + `admin-packages` / `admin-users`.
-9. **Everywhere** — `mini-player.mp4` + platform chips (Apple TV, iPad, Android TV, Fire TV, webOS,
-   Roku, desktop).
-10. **Optional AI** — `admin-aiassistant` / `admin-ailineupworkflow-observability`.
-11. **Set up in one command** — `video/dev-setup.mp4` as a framed inset.
-12. **Outro** — wordmark + `getairwave.tv` CTA.
-
-## How to build it
-
-HyperFrames is agent-driven. One-time setup (interactive; needs an agent restart):
-
-```bash
-npx skills add heygen-com/hyperframes   # choose "Core Skills" in the picker, then restart the agent
-```
-
-Then, from this folder, drive it with the router and our brief:
-
-```
-/hyperframes  Build a 1920x1080, ~60s sleek premium product-showcase reel for Airwave using the assets
-in tools/promo/assets and the styling in tools/promo/brand.css. Follow the scene flow in the README.
-```
-
-Preview and render:
-
-```bash
-npx hyperframes preview                       # live browser preview
-npx hyperframes render --output out/airwave-hero-16x9.mp4
-```
-
-Rendered MP4s go in `out/` (gitignored). Requires Node 22+, FFmpeg, and Chromium (Puppeteer, fetched
-on first render).
+- Better/cleaner demo clips; swap in admin-UI recordings for Build / Organize / Optional-AI.
+- Background music bed + voiceover (Remotion `<Audio>` + volume automation; source/TTS via the media skill).
+- A vertical (9:16) social cut, reusing these scenes.

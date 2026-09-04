@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.3] - 2026-09-04
+
+Promo — the Airwave sizzle reel, rebuilt in Remotion.
+
+### Added
+- **`tools/promo` — the Airwave promo reel (Remotion).** A 1920x1080, 60fps, ~61.6s hero reel built with
+  Remotion + Tailwind v4 + Framer Motion on the getairwave.tv brand: a Logo-splash intro; two-column feature
+  scenes with a persistent glass media frame that morphs to each clip's aspect (blur-masked swaps, crisp inner
+  edge); an outro with the wordmark lockup + static platform tiles (Apple TV, iPad, Android TV, Fire TV, webOS,
+  Roku, Windows, macOS, Docker, Linux, browser); and a GuideEngine-style animated blob backdrop. GPU rendering
+  (`--gl=angle`). Standalone project, outside the pnpm workspaces (never version-bumped or built with the apps).
+
+### Removed
+- The earlier HyperFrames version of the promo (`index.html`, `hyperframes.json`, etc.), superseded by the
+  Remotion build.
+
 ## [0.13.2] - 2026-09-04
 
 Admin web — a device-code CTA on the non-admin notice so viewers (and app reviewers) aren't stranded.

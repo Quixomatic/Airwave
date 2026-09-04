@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+/* Airwave brand tokens (from apps/site — the "10-foot navy" look). @theme exposes them as
+   Tailwind utilities: bg-bg, text-fg, text-accent, font-display, etc. */
+@theme {
+  --color-bg: #060a14;
+  --color-surface: #0b1120;
+  --color-surface-2: #0f1626;
+  --color-highlight: #12233d;
+  --color-fg: #f1f5f9;
+  --color-muted: #94a3b8;
+  --color-border: rgba(148, 163, 184, 0.14);
+  --color-accent: #4a9fe0;
+  --color-accent-2: #7bb8ea;
+
+  --font-display: "Avenir Next", "Segoe UI Variable Display", "SF Pro Display", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}

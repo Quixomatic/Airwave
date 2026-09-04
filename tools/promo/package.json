@@ -1,11 +1,31 @@
 {
-  "name": "airwave-hero",
+  "name": "airwave-promo",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "npx --yes hyperframes@0.8.27 preview",
-    "check": "npx --yes hyperframes@0.8.27 check",
-    "render": "npx --yes hyperframes@0.8.27 render",
-    "publish": "npx --yes hyperframes@0.8.27 publish"
+    "studio": "remotion studio",
+    "render": "remotion render AirwaveHero out/reel.mp4 --public-dir=assets --gl=angle --concurrency=4",
+    "render:cpu": "remotion render AirwaveHero out/reel.mp4 --public-dir=assets --concurrency=20",
+    "still": "remotion still"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.520",
+    "@remotion/tailwind-v4": "4.0.520",
+    "motion": "^13.2.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-icons": "^5.7.0",
+    "remotion": "4.0.520"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.7.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }
