@@ -1,6 +1,6 @@
 import { Button } from "@airwave/ui/components/button";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { LogOut, ShieldAlert } from "lucide-react";
+import { LogOut, ShieldAlert, Tv } from "lucide-react";
 import { useState } from "react";
 
 import { Logo } from "@/components/logo";
@@ -49,6 +49,19 @@ function NotAuthorized() {
             can't sign in here. You can still use the Airwave TV apps to watch.
           </p>
         </div>
+
+        {/* Primary path for a non-admin here: approving a TV / streaming-device sign-in. Make it obvious
+            so nobody (App reviewers included) is stranded on this page wondering where the code goes. */}
+        <div className="border-border bg-muted/40 flex w-full flex-col items-center gap-3 rounded-xl border p-5">
+          <p className="text-sm font-medium">Signing in a TV or streaming device?</p>
+          <p className="text-muted-foreground text-sm">
+            Enter the code shown on your device to approve it and finish signing in.
+          </p>
+          <Button className="w-full" onClick={() => navigate({ to: "/device" })}>
+            <Tv className="mr-2 size-4" /> Approve a device code
+          </Button>
+        </div>
+
         <Button variant="outline" onClick={handleSignOut} disabled={out}>
           <LogOut className="mr-2 size-4" /> Sign out
         </Button>

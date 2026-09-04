@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.2] - 2026-09-04
+
+Admin web — a device-code CTA on the non-admin notice so viewers (and app reviewers) aren't stranded.
+
+### Fixed
+- The **`/not-authorized`** page (where a signed-in non-admin lands) now shows a prominent **"Approve a
+  device code"** button linking to `/device`. A viewer's main reason to reach the admin web is to approve a
+  TV device-code sign-in, but the bare "Admin access only" notice was a dead-end — it stranded viewers, and
+  repeatedly stranded App Store review (reviewers signed in, saw "admin only", and stopped without reaching
+  `/device`). The button makes the next step obvious.
+
 ## [0.13.1] - 2026-09-03
 
 Docs (getairwave.tv) — a dedicated Local Development page with a screencast of the setup wizard.
