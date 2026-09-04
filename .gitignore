@@ -112,3 +112,9 @@ apps/desktop/pg-launcher/
 *.cer
 *.certSigningRequest
 .secrets/
+
+# Agent skills installed locally via `npx skills add` (HyperFrames + video skills).
+# Local-only tooling — not committed. Keep the project's own version-bump skill tracked.
+.claude/skills/*
+!.claude/skills/version-bump/
+skills-lock.json
