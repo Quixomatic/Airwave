@@ -110,39 +110,41 @@ A Postgres database and [`docker-compose.yml`](./docker-compose.yml) wire it tog
 
 ## Screenshots
 
+<sub>Click any thumbnail to enlarge.</sub>
+
 ### On your TV (the 10-foot app)
 
-|   |   |
-|---|---|
-| ![The Aurora channel guide](docs/screenshots/appletv-guide.webp) | ![A channel playing with the DVR scrubber](docs/screenshots/appletv-fullchrome.webp) |
-| *The Aurora channel guide — channels on the rail, what's on now/next.* | *A channel playing, with the DVR scrubber and glass controls.* |
-| ![The "Up Next" bumper card](docs/screenshots/appletv-bumper.webp) | ![Channel surf carousel](docs/screenshots/appletv-channelsurfing.webp) |
-| *The "Up Next" bumper between programs (with an optional music bed).* | *Channel surf — flip channels without leaving what's on.* |
-| ![Filter the guide](docs/screenshots/appletv-sidebarfilter.webp) | ![Full program info](docs/screenshots/appletv-fullchrome-programinfo.webp) |
-| *Filter the guide by package, favorites, or recents.* | *Full program info while you watch.* |
-| ![Device capability check](docs/screenshots/appletv-diagnostic.webp) | ![Sign in with a QR code](docs/screenshots/tvweb-qrcode.webp) |
-| *First run: each device measures exactly what it can decode.* | *Sign in by scanning a code — Plex device-link or an Airwave code.* |
+<p align="center">
+  <a href="docs/screenshots/appletv-guide.webp"><img src="docs/screenshots/appletv-guide.webp" width="150" alt="The Aurora channel guide"></a>
+  <a href="docs/screenshots/appletv-fullchrome.webp"><img src="docs/screenshots/appletv-fullchrome.webp" width="150" alt="A channel playing with the DVR scrubber"></a>
+  <a href="docs/screenshots/appletv-bumper.webp"><img src="docs/screenshots/appletv-bumper.webp" width="150" alt="The Up Next bumper card"></a>
+  <a href="docs/screenshots/appletv-channelsurfing.webp"><img src="docs/screenshots/appletv-channelsurfing.webp" width="150" alt="Channel surf carousel"></a>
+  <a href="docs/screenshots/appletv-sidebarfilter.webp"><img src="docs/screenshots/appletv-sidebarfilter.webp" width="150" alt="Filter the guide"></a>
+  <a href="docs/screenshots/appletv-fullchrome-programinfo.webp"><img src="docs/screenshots/appletv-fullchrome-programinfo.webp" width="150" alt="Full program info"></a>
+  <a href="docs/screenshots/appletv-diagnostic.webp"><img src="docs/screenshots/appletv-diagnostic.webp" width="150" alt="Device capability check"></a>
+  <a href="docs/screenshots/tvweb-qrcode.webp"><img src="docs/screenshots/tvweb-qrcode.webp" width="150" alt="Sign in with a QR code"></a>
+</p>
 
 ### In the admin (build & manage)
 
-|   |   |
-|---|---|
-| ![Build a channel from a filter](docs/screenshots/admin-channel-filter.webp) | ![Preview and schedule](docs/screenshots/admin-channel-preview-and-schedule.webp) |
-| *Build a channel from a metadata filter, with grouping & rotation strategies — and a live preview of what resolves.* | *Preview the resolved pool and the generated schedule.* |
-| ![The guide previewed in a TV mockup](docs/screenshots/admin-guidepreview.webp) | ![All your channels](docs/screenshots/admin-channels.webp) |
-| *The guide, previewed in a TV-device mockup.* | *All your channels at a glance.* |
-| ![Channel packages](docs/screenshots/admin-packages.webp) | ![Connect your Plex source](docs/screenshots/admin-source.webp) |
-| *Group channels into packages.* | *Connect your Plex server and choose libraries.* |
-| ![Per-user access control](docs/screenshots/admin-users.webp) | ![Now Playing sessions](docs/screenshots/admin-settings-sessions.webp) |
-| *Plex-style per-user access control.* | *Now Playing — who's watching, and how each stream is delivered.* |
-| ![Bumpers and music](docs/screenshots/admin-bumpers.webp) | ![AI connections](docs/screenshots/admin-settings-ai.webp) |
-| *Bumpers + an optional ambient-music library.* | *Optional AI — bring your own provider key.* |
-| ![The AI assistant in action](docs/screenshots/admin-aiassistant.webp) | ![Background jobs](docs/screenshots/admin-jobs.webp) |
-| *The AI assistant analyzing a channel's filter, with tool calls.* | *Background jobs — metadata sync, schedule refresh, and more.* |
-| ![Import a lineup](docs/screenshots/admin-importer.webp) | ![AI lineup run — observability](docs/screenshots/admin-ailineupworkflow-observability.webp) |
-| *Import a lineup — pick and choose packages & channels, with de-dup.* | *The AI lineup builder, fully observable — per-channel steps, tokens, cost.* |
-| ![Import run — observability](docs/screenshots/admin-importworkflow-observability.webp) | ![Import / Export](docs/screenshots/admin-settings-importexport.webp) |
-| *Every durable workflow run is inspectable end to end.* | *Export a lineup to move it to another Airwave instance.* |
+<p align="center">
+  <a href="docs/screenshots/admin-channel-filter.webp"><img src="docs/screenshots/admin-channel-filter.webp" width="150" alt="Build a channel from a filter"></a>
+  <a href="docs/screenshots/admin-channel-preview-and-schedule.webp"><img src="docs/screenshots/admin-channel-preview-and-schedule.webp" width="150" alt="Preview and schedule"></a>
+  <a href="docs/screenshots/admin-guidepreview.webp"><img src="docs/screenshots/admin-guidepreview.webp" width="150" alt="The guide previewed in a TV mockup"></a>
+  <a href="docs/screenshots/admin-channels.webp"><img src="docs/screenshots/admin-channels.webp" width="150" alt="All your channels"></a>
+  <a href="docs/screenshots/admin-packages.webp"><img src="docs/screenshots/admin-packages.webp" width="150" alt="Channel packages"></a>
+  <a href="docs/screenshots/admin-source.webp"><img src="docs/screenshots/admin-source.webp" width="150" alt="Connect your Plex source"></a>
+  <a href="docs/screenshots/admin-users.webp"><img src="docs/screenshots/admin-users.webp" width="150" alt="Per-user access control"></a>
+  <a href="docs/screenshots/admin-settings-sessions.webp"><img src="docs/screenshots/admin-settings-sessions.webp" width="150" alt="Now Playing sessions"></a>
+  <a href="docs/screenshots/admin-bumpers.webp"><img src="docs/screenshots/admin-bumpers.webp" width="150" alt="Bumpers and music"></a>
+  <a href="docs/screenshots/admin-settings-ai.webp"><img src="docs/screenshots/admin-settings-ai.webp" width="150" alt="AI connections"></a>
+  <a href="docs/screenshots/admin-aiassistant.webp"><img src="docs/screenshots/admin-aiassistant.webp" width="150" alt="The AI assistant in action"></a>
+  <a href="docs/screenshots/admin-jobs.webp"><img src="docs/screenshots/admin-jobs.webp" width="150" alt="Background jobs"></a>
+  <a href="docs/screenshots/admin-importer.webp"><img src="docs/screenshots/admin-importer.webp" width="150" alt="Import a lineup"></a>
+  <a href="docs/screenshots/admin-ailineupworkflow-observability.webp"><img src="docs/screenshots/admin-ailineupworkflow-observability.webp" width="150" alt="AI lineup run observability"></a>
+  <a href="docs/screenshots/admin-importworkflow-observability.webp"><img src="docs/screenshots/admin-importworkflow-observability.webp" width="150" alt="Import run observability"></a>
+  <a href="docs/screenshots/admin-settings-importexport.webp"><img src="docs/screenshots/admin-settings-importexport.webp" width="150" alt="Import / Export"></a>
+</p>
 
 ---
 
@@ -398,6 +400,16 @@ set one up**.
   itself, not the chat.
 
 Bring-your-own-key, opt-in, and fully separable — a convenience for authoring, not a dependency.
+
+---
+
+## Contributing
+
+Airwave is source-available so you can make it your own: fork it and change whatever you like, no
+permission needed. If you want to contribute **back**, pull requests are welcome for real fixes and
+enhancements. Please skim **[CONTRIBUTING.md](./CONTRIBUTING.md)** first (short version: small housekeeping
+changes are better raised as an issue than a PR, and for anything substantial, open an issue before you
+build). Taking part means following the [Code of Conduct](./CODE_OF_CONDUCT.md).
 
 ---
 
