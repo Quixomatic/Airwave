@@ -2,7 +2,8 @@
 
 One continuous narration, one line per section, in the warm second-person voice of the intro. Lengths are
 tuned to each scene's current runtime (scene timings can flex to the real audio when we wire `<Audio>` in).
-Suggested audio files: drop each as `assets/vo/<file>` and we'll mount one per `<Sequence>`.
+Suggested audio files: drop each as `assets/audio/vo/<file>` (local-only folder — see
+`assets/audio/README.md`) and flip its `have: true` in `src/theme.ts`; the Soundtrack mounts one per `<Sequence>`.
 
 | # | Scene | Scene dur | File | Line |
 |---|-------|-----------|------|------|
@@ -26,7 +27,8 @@ Suggested audio files: drop each as `assets/vo/<file>` and we'll mount one per `
 - Total spoken ≈ 55-60s, matching the ~61.6s reel with a little room to breathe.
 
 ## Wiring (next step, after audio exists)
-- Put clips in `assets/vo/` (served via `staticFile("vo/…")`).
-- Mount each in its scene's `<Sequence>` as `<Audio src={staticFile(...)} />`; flex each scene's `dur` in
-  `src/theme.ts` to its clip length.
-- Add a music bed as a top-level `<Audio loop volume={…}>`, ducked under the VO (Remotion volume automation).
+- **DONE (v1):** the audio layer is built — `src/components/Soundtrack.tsx` mounts per-scene VO + a ducking
+  music bed via frame-driven volume automation; the schedule lives in `VO` (+ music constants) in `src/theme.ts`.
+- Put clips in `assets/audio/vo/` (served via `staticFile("audio/vo/…")`) and flip `have: true` per clip.
+- Music bed: drop a file in `assets/audio/music/` and set `MUSIC_BED = "audio/music/bed.mp3"` in `theme.ts`.
+- Optional: flex each scene's `dur` in `src/theme.ts` to its clip length once real VO lengths are known.

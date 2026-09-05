@@ -65,25 +65,25 @@ const voFeat = (id: string, file: string, have = false): VoClip => {
   return { id, file, atSec: INTRO_SEC + f.start, winSec: f.dur, have };
 };
 export const VO: VoClip[] = [
-  { id: "intro", file: "vo/01-intro.mp3", atSec: 0, winSec: INTRO_SEC, have: true },
-  voFeat("guide", "vo/02-guide.mp3"),
-  voFeat("tune", "vo/03-live.mp3"),
-  voFeat("dvr", "vo/04-dvr.mp3"),
-  voFeat("surf", "vo/05-surf.mp3"),
-  voFeat("bump", "vo/06-bumpers.mp3"),
-  voFeat("build", "vo/07-build.mp3"),
-  voFeat("org", "vo/08-organize.mp3"),
-  voFeat("every", "vo/09-everywhere.mp3"),
-  voFeat("ai", "vo/10-ai.mp3"),
-  voFeat("setup", "vo/11-selfhost.mp3"),
-  { id: "outro", file: "vo/12-outro.mp3", atSec: INTRO_SEC + FEATURES_SEC, winSec: OUTRO_SEC, have: false },
+  { id: "intro", file: "audio/vo/01-intro.mp3", atSec: 0, winSec: INTRO_SEC, have: true },
+  voFeat("guide", "audio/vo/02-guide.mp3"),
+  voFeat("tune", "audio/vo/03-live.mp3"),
+  voFeat("dvr", "audio/vo/04-dvr.mp3"),
+  voFeat("surf", "audio/vo/05-surf.mp3"),
+  voFeat("bump", "audio/vo/06-bumpers.mp3"),
+  voFeat("build", "audio/vo/07-build.mp3"),
+  voFeat("org", "audio/vo/08-organize.mp3"),
+  voFeat("every", "audio/vo/09-everywhere.mp3"),
+  voFeat("ai", "audio/vo/10-ai.mp3"),
+  voFeat("setup", "audio/vo/11-selfhost.mp3"),
+  { id: "outro", file: "audio/vo/12-outro.mp3", atSec: INTRO_SEC + FEATURES_SEC, winSec: OUTRO_SEC, have: false },
 ];
 export const VO_VOL = 1.0;
 export const VO_FADE_SEC = 0.08; // tiny click-safe fade-in on each VO clip
 
 // Music bed loops under the whole reel via frame-driven volume automation (fade in/out + duck under VO).
 // Drop a file in assets/vo/ and set the path to enable it.
-export const MUSIC_BED: string | null = null; // e.g. "vo/bed.mp3"
+export const MUSIC_BED: string | null = null; // e.g. "audio/music/bed.mp3" (drop the file in assets/audio/music/)
 export const MUSIC_VOL = 0.16; // bed level in the gaps between narration
 export const MUSIC_DUCK = 0.06; // bed level while a VO line is speaking
 export const MUSIC_FADE_IN_SEC = 1.2;

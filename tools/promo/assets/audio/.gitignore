@@ -1,0 +1,5 @@
+# This folder is TRACKED, but its audio contents are LOCAL-ONLY (never committed).
+# Drop voiceover clips in vo/ and the music bed in music/ — see README.md.
+*
+!.gitignore
+!README.md
