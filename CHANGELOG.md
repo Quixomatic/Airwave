@@ -2,6 +2,38 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.4] - 2026-09-05
+
+tv-native (iOS / Apple TV) — fix a main-thread ⇄ mpv deadlock freeze (GitHub #30) and enable the player's
+own logging (GitHub #31), by completing the port to plezy's async libmpv client API.
+
+### Fixed
+- **Apple TV / iPad no longer freeze on a main-thread ⇄ mpv deadlock (GitHub #30).** The Apple mpv core
+  (`packages/mpv-player/ios/MpvCore.swift`) called libmpv **synchronously on the calling thread**, and the
+  Expo view prop setters run on the **main thread**. On tvOS the `avfoundation` video output must
+  `dispatch_sync` to the main queue to touch its display layer; when that coincided with a main-thread mpv
+  call, the two deadlocked — a multi-minute freeze that tvOS killed with `0x8BADF00D`. Both Apple cores now
+  use libmpv's **async client API** (`mpv_command_async` / `mpv_set_property_async` with a request-id → reply
+  table); those submit and return immediately, never blocking the caller, so the deadlock is structurally
+  impossible. This completes the port from plezy's `MpvPlayerCoreBase` — we had ported the structure but kept
+  synchronous calls since v0.7.19. `MpvAudioCore` gets the same treatment for parity.
+
+### Added
+- **libmpv logging (GitHub #31).** Both Apple cores now request mpv log messages (verbose in debug,
+  warnings+ on a store build) and emit them via `os_log`, so a shipped app's player log is visible in
+  Console.app off a retail device — previously release builds had effectively no player logging. Remaining
+  `print()` calls replaced with `os_log`.
+
+### Changed
+- `avfoundation-composite-osd=no` on the Apple mpv output. Subtitles are selected/burned server-side (Plex),
+  so mpv's per-frame OSD compositing is not our render path; disabling it reduces video-output ↔ main-thread
+  coupling (matches plezy + streamyfin).
+
+### Verification
+- Native change — requires a fresh iOS/tvOS build; verify on device (Apple TV + iPad) before release.
+  On-device matrix + the #30 repro (HEVC copy + E-AC3→mp3 HLS, long session with transitions) in
+  `.plans/mpv-async-refactor.md`.
+
 ## [0.13.3] - 2026-09-04
 
 Promo — the Airwave sizzle reel, rebuilt in Remotion.
