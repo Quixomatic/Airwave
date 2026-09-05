@@ -2,6 +2,17 @@ import AVFoundation
 import Foundation
 import Libmpv
 import QuartzCore
+import os
+
+/// Safely convert an mpv C string to a Swift String. mpv does NOT guarantee UTF-8 for log messages, error
+/// strings, or system-encoded paths — validate as UTF-8, else fall back to Latin-1 so we never crash on
+/// non-UTF-8 bytes. (Ported from plezy's `MpvPlayerCoreBase.safeString`.)
+func mpvSafeString(_ cstr: UnsafePointer<CChar>) -> String {
+  if let s = String(validatingUTF8: cstr) { return s }
+  let len = strlen(cstr)
+  let buf = UnsafeBufferPointer(start: UnsafeRawPointer(cstr).assumingMemoryBound(to: UInt8.self), count: len)
+  return String(buf.map { Character(Unicode.Scalar($0)) })
+}
 
 /// Events surfaced from the mpv render/event loop up to the Expo view.
 protocol MpvCoreDelegate: AnyObject {
@@ -35,6 +46,16 @@ final class MpvCore {
   private var currentVolume: Double = 100
   private var fadeTimer: DispatchSourceTimer?
 
+  private let log = Logger(subsystem: "com.airwave.tv", category: "mpv")
+
+  // Async request table (ported from plezy's MpvPlayerCoreBase): every mpv_command_async /
+  // mpv_set_property_async submits with a reply id, and the matching MPV_EVENT_*_REPLY drains its completion.
+  // The async client API returns IMMEDIATELY (never blocks the caller), so a libmpv call on the MAIN thread
+  // can no longer deadlock against the avfoundation VO's dispatch_sync(main). See .plans/mpv-async-refactor.md.
+  private var pendingRequests: [UInt64: (Result<Void, Error>) -> Void] = [:]
+  private let pendingRequestsLock = NSLock()
+  private var nextRequestId: UInt64 = 1
+
   // MARK: setup
 
   /// Create + initialize mpv, rendering into `layer` (its pointer is handed to mpv as `wid`, which the
@@ -50,6 +71,15 @@ final class MpvCore {
     mpv = mpv_create()
     guard let mpv else { return false }
 
+    // Enable libmpv's own log BEFORE initialize, so a stalled/failing pipeline is diagnosable — verbose in
+    // debug, warnings+ on a store build (which `print` never reached). Surfaced via os_log in `handleLogMessage`
+    // → visible in Console.app off a retail device. (plezy does this; we had dropped it. GitHub #31.)
+    #if DEBUG
+      checkError(mpv_request_log_messages(mpv, "v"))
+    #else
+      checkError(mpv_request_log_messages(mpv, "warn"))
+    #endif
+
     // Point the avfoundation VO at our layer.
     var wid = Int64(Int(bitPattern: Unmanaged.passUnretained(layer).toOpaque()))
     checkError(mpv_set_option(mpv, "wid", MPV_FORMAT_INT64, &wid))
@@ -57,6 +87,10 @@ final class MpvCore {
     // Defaults (overridable via `options`).
     var opts: [String: String] = [
       "vo": "avfoundation",
+      // Don't composite the OSD (subtitles) onto frames in the VO: our subtitles are burned/selected
+      // SERVER-SIDE (Plex PUT ?subtitleStreamID= + transcode), so mpv's OSD isn't our render path. Compositing
+      // does per-frame CoreImage work that widens the VO↔main coupling on tvOS. Matches plezy + streamyfin.
+      "avfoundation-composite-osd": "no",
       "hwdec": "videotoolbox",
       "hwdec-codecs": "all",
       "target-colorspace-hint": "auto",
@@ -222,6 +256,7 @@ final class MpvCore {
   func dispose() {
     isDisposing = true
     cancelFade()
+    cancelPendingRequests()
     let handle = mpv
     let ctx = wakeupContext
     mpv = nil
@@ -256,27 +291,94 @@ final class MpvCore {
       try session.setCategory(.playback, mode: .moviePlayback, policy: .longFormAudio, options: [])
       try session.setActive(true)
     } catch {
-      print("[MpvCore] audio session config failed: \(error)")
+      log.error("audio session config failed: \(error.localizedDescription, privacy: .public)")
     }
   }
 
   // MARK: mpv primitives
 
-  private func command(_ args: [String]) {
-    guard let mpv else { return }
+  // All mutations go through the ASYNC client API (mpv_command_async / mpv_set_property_async). These submit
+  // to mpv's internal core and return immediately — they NEVER block the caller — so it's safe to call them
+  // from ANY thread, including the main thread (Expo `Prop` setters run there). mpv executes submissions in
+  // ORDER on its own core, so the load-then-reset sequence in `load()` still applies in order. Completions are
+  // fired when the matching MPV_EVENT_*_REPLY arrives (see `handle`); our callers are fire-and-forget, but the
+  // reply path still surfaces any mpv error to os_log. (Ported from plezy's MpvPlayerCoreBase.)
+
+  private func command(_ args: [String]) { commandAsync(args) { _ in } }
+
+  private func commandAsync(_ args: [String], completion: @escaping (Result<Void, Error>) -> Void) {
+    guard let mpv, !args.isEmpty else { completion(.success(())); return }
+    let requestId = registerRequest(completion)
     var cargs: [UnsafeMutablePointer<CChar>?] = args.map { strdup($0) }
     cargs.append(nil)
     cargs.withUnsafeBufferPointer { buffer in
-      // mpv_command wants `const char **` — rebind the strdup'd mutable pointers to const (plezy's pattern).
+      // mpv_command_async wants `const char **` — rebind the strdup'd mutable pointers to const (plezy's pattern).
       var constPointers = buffer.map { $0.map { UnsafePointer($0) } }
-      _ = mpv_command(mpv, &constPointers)
+      let status = mpv_command_async(mpv, requestId, &constPointers)
+      completeRequestIfSubmissionFailed(requestId: requestId, status: status)
     }
     cargs.forEach { free($0) }
   }
 
-  private func setProperty(_ name: String, _ value: String) {
-    guard let mpv else { return }
-    _ = mpv_set_property_string(mpv, name, value)
+  private func setProperty(_ name: String, _ value: String) { setPropertyAsync(name, value) { _ in } }
+
+  private func setPropertyAsync(_ name: String, _ value: String, completion: @escaping (Result<Void, Error>) -> Void) {
+    guard let mpv else { completion(.success(())); return }
+    let requestId = registerRequest(completion)
+    let status = name.withCString { namePtr in
+      value.withCString { valuePtr in
+        var propertyValue: UnsafePointer<CChar>? = valuePtr
+        return mpv_set_property_async(mpv, requestId, namePtr, MPV_FORMAT_STRING, &propertyValue)
+      }
+    }
+    completeRequestIfSubmissionFailed(requestId: requestId, status: status)
+  }
+
+  // MARK: async request table
+
+  private func registerRequest(_ completion: @escaping (Result<Void, Error>) -> Void) -> UInt64 {
+    pendingRequestsLock.lock()
+    defer { pendingRequestsLock.unlock() }
+    let id = nextRequestId
+    nextRequestId += 1
+    pendingRequests[id] = completion
+    return id
+  }
+
+  private func takeRequest(_ id: UInt64) -> ((Result<Void, Error>) -> Void)? {
+    pendingRequestsLock.lock()
+    defer { pendingRequestsLock.unlock() }
+    return pendingRequests.removeValue(forKey: id)
+  }
+
+  private func mpvError(_ status: CInt) -> NSError {
+    NSError(domain: "mpv", code: Int(status), userInfo: [NSLocalizedDescriptionKey: mpvSafeString(mpv_error_string(status))])
+  }
+
+  /// The async submit itself failed (rare — bad args / no core). Fire the completion now; no reply will come.
+  private func completeRequestIfSubmissionFailed(requestId: UInt64, status: CInt) {
+    guard status < 0, let completion = takeRequest(requestId) else { return }
+    let err = mpvError(status)
+    DispatchQueue.main.async { completion(.failure(err)) }
+  }
+
+  /// Drain a command/set-property reply: log any mpv error (observability), then fire the completion on main.
+  private func completeVoidRequest(requestId: UInt64, error status: CInt) {
+    if status < 0 {
+      log.error("mpv async op failed: \(mpvSafeString(mpv_error_string(status)), privacy: .public)")
+    }
+    guard let completion = takeRequest(requestId) else { return }
+    DispatchQueue.main.async { completion(status < 0 ? .failure(self.mpvError(status)) : .success(())) }
+  }
+
+  /// Fail every outstanding completion (called on dispose) so nothing leaks or hangs.
+  private func cancelPendingRequests() {
+    pendingRequestsLock.lock()
+    let pending = pendingRequests
+    pendingRequests.removeAll()
+    pendingRequestsLock.unlock()
+    let err = NSError(domain: "mpv", code: -1, userInfo: [NSLocalizedDescriptionKey: "Player disposed"])
+    for (_, completion) in pending { DispatchQueue.main.async { completion(.failure(err)) } }
   }
 
   // MARK: event loop
@@ -334,8 +436,31 @@ final class MpvCore {
     case MPV_EVENT_PROPERTY_CHANGE:
       guard let data = event.data else { break }
       handleProperty(data.assumingMemoryBound(to: mpv_event_property.self).pointee)
+    case MPV_EVENT_COMMAND_REPLY, MPV_EVENT_SET_PROPERTY_REPLY:
+      // Async submit finished — fire its completion (and log any mpv error).
+      completeVoidRequest(requestId: event.reply_userdata, error: event.error)
+    case MPV_EVENT_LOG_MESSAGE:
+      handleLogMessage(event)
     default:
       break
+    }
+  }
+
+  /// mpv's own log line (level requested in `setup`) → os_log, so a store build's Console.app can answer
+  /// "why did the video stop". Runs on the mpv queue (from the event loop). GitHub #31.
+  private func handleLogMessage(_ event: mpv_event) {
+    guard let p = event.data?.assumingMemoryBound(to: mpv_event_log_message.self) else { return }
+    let prefix = p.pointee.prefix.map { mpvSafeString($0) } ?? ""
+    let level = p.pointee.level.map { mpvSafeString($0) } ?? ""
+    let text = (p.pointee.text.map { mpvSafeString($0) } ?? "").trimmingCharacters(in: .newlines)
+    if text.isEmpty { return }
+    switch level {
+    case "fatal", "error":
+      log.error("[\(prefix, privacy: .public)] \(text, privacy: .public)")
+    case "warn":
+      log.notice("[\(prefix, privacy: .public)] \(text, privacy: .public)")
+    default:
+      log.debug("[\(prefix, privacy: .public)] \(text, privacy: .public)")
     }
   }
 
@@ -405,6 +530,6 @@ final class MpvCore {
   }
 
   private func checkError(_ status: CInt) {
-    if status < 0 { print("[MpvCore] error: \(String(cString: mpv_error_string(status)))") }
+    if status < 0 { log.error("error: \(mpvSafeString(mpv_error_string(status)), privacy: .public)") }
   }
 }

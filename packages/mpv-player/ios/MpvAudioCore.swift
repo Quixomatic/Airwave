@@ -1,5 +1,6 @@
 import Foundation
 import Libmpv
+import os
 
 /// A HEADLESS (no video surface) audio-only libmpv core — for the bumper music bed (§7.14 Phase B) and future
 /// audio-only "radio" channels. Ported from plezy's `MpvAudioPlayerCore`: create → set `vid=no` /
@@ -27,6 +28,14 @@ final class MpvAudioCore {
   private var currentVolume: Double = 1.0
   private var fadeTimer: DispatchSourceTimer?
 
+  private let log = Logger(subsystem: "com.airwave.tv", category: "mpv-audio")
+
+  // Async request table — same as MpvCore (see .plans/mpv-async-refactor.md). Keeps this headless core off the
+  // synchronous client API too, for parity and so it's safe to call from any thread.
+  private var pendingRequests: [UInt64: (Result<Void, Error>) -> Void] = [:]
+  private let pendingRequestsLock = NSLock()
+  private var nextRequestId: UInt64 = 1
+
   @discardableResult
   func setup() -> Bool {
     // SESSION-PASSIVE: this headless bumper-music core NEVER touches the shared AVAudioSession. The app
@@ -36,6 +45,13 @@ final class MpvAudioCore {
 
     mpv = mpv_create()
     guard let mpv else { return false }
+
+    // libmpv log → os_log (verbose debug / warnings on a store build). GitHub #31.
+    #if DEBUG
+      _ = mpv_request_log_messages(mpv, "v")
+    #else
+      _ = mpv_request_log_messages(mpv, "warn")
+    #endif
 
     // Audio-only, headless. No `wid`, no VO surface — the whole point.
     let opts: [String: String] = [
@@ -148,6 +164,7 @@ final class MpvAudioCore {
   func dispose() {
     isDisposing = true
     cancelFade()
+    cancelPendingRequests()
     let handle = mpv
     let ctx = wakeupContext
     mpv = nil
@@ -163,20 +180,68 @@ final class MpvAudioCore {
 
   // MARK: mpv primitives (trimmed copy of MpvCore's — kept local so the video core stays untouched)
 
+  // Async client API (see MpvCore / .plans/mpv-async-refactor.md) — non-blocking submits, replies drained in `handle`.
+
   private func command(_ args: [String]) {
-    guard let mpv else { return }
+    guard let mpv, !args.isEmpty else { return }
+    let requestId = registerRequest { _ in }
     var cargs: [UnsafeMutablePointer<CChar>?] = args.map { strdup($0) }
     cargs.append(nil)
     cargs.withUnsafeBufferPointer { buffer in
       var constPointers = buffer.map { $0.map { UnsafePointer($0) } }
-      _ = mpv_command(mpv, &constPointers)
+      let status = mpv_command_async(mpv, requestId, &constPointers)
+      completeRequestIfSubmissionFailed(requestId: requestId, status: status)
     }
     cargs.forEach { free($0) }
   }
 
   private func setProperty(_ name: String, _ value: String) {
     guard let mpv else { return }
-    _ = mpv_set_property_string(mpv, name, value)
+    let requestId = registerRequest { _ in }
+    let status = name.withCString { namePtr in
+      value.withCString { valuePtr in
+        var propertyValue: UnsafePointer<CChar>? = valuePtr
+        return mpv_set_property_async(mpv, requestId, namePtr, MPV_FORMAT_STRING, &propertyValue)
+      }
+    }
+    completeRequestIfSubmissionFailed(requestId: requestId, status: status)
+  }
+
+  // MARK: async request table
+
+  private func registerRequest(_ completion: @escaping (Result<Void, Error>) -> Void) -> UInt64 {
+    pendingRequestsLock.lock()
+    defer { pendingRequestsLock.unlock() }
+    let id = nextRequestId
+    nextRequestId += 1
+    pendingRequests[id] = completion
+    return id
+  }
+
+  private func takeRequest(_ id: UInt64) -> ((Result<Void, Error>) -> Void)? {
+    pendingRequestsLock.lock()
+    defer { pendingRequestsLock.unlock() }
+    return pendingRequests.removeValue(forKey: id)
+  }
+
+  private func completeRequestIfSubmissionFailed(requestId: UInt64, status: CInt) {
+    guard status < 0, let completion = takeRequest(requestId) else { return }
+    DispatchQueue.main.async { completion(.failure(NSError(domain: "mpv", code: Int(status)))) }
+  }
+
+  private func completeVoidRequest(requestId: UInt64, error status: CInt) {
+    if status < 0 { log.error("mpv async op failed: \(mpvSafeString(mpv_error_string(status)), privacy: .public)") }
+    guard let completion = takeRequest(requestId) else { return }
+    DispatchQueue.main.async { completion(status < 0 ? .failure(NSError(domain: "mpv", code: Int(status))) : .success(())) }
+  }
+
+  private func cancelPendingRequests() {
+    pendingRequestsLock.lock()
+    let pending = pendingRequests
+    pendingRequests.removeAll()
+    pendingRequestsLock.unlock()
+    let err = NSError(domain: "mpv", code: -1)
+    for (_, completion) in pending { DispatchQueue.main.async { completion(.failure(err)) } }
   }
 
   private func getDouble(_ name: String) -> Double {
@@ -228,6 +293,21 @@ final class MpvAudioCore {
                 prop.format == MPV_FORMAT_FLAG,
                 let f = prop.data?.assumingMemoryBound(to: Int32.self).pointee {
         DispatchQueue.main.async { self.onBuffering?(f != 0) }
+      }
+    case MPV_EVENT_COMMAND_REPLY, MPV_EVENT_SET_PROPERTY_REPLY:
+      completeVoidRequest(requestId: event.reply_userdata, error: event.error)
+    case MPV_EVENT_LOG_MESSAGE:
+      guard let p = event.data?.assumingMemoryBound(to: mpv_event_log_message.self) else { break }
+      let prefix = p.pointee.prefix.map { mpvSafeString($0) } ?? ""
+      let level = p.pointee.level.map { mpvSafeString($0) } ?? ""
+      let text = (p.pointee.text.map { mpvSafeString($0) } ?? "").trimmingCharacters(in: .newlines)
+      if text.isEmpty { break }
+      if level == "fatal" || level == "error" {
+        log.error("[\(prefix, privacy: .public)] \(text, privacy: .public)")
+      } else if level == "warn" {
+        log.notice("[\(prefix, privacy: .public)] \(text, privacy: .public)")
+      } else {
+        log.debug("[\(prefix, privacy: .public)] \(text, privacy: .public)")
       }
     default:
       break
