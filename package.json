@@ -10,6 +10,7 @@
     "dev": "turbo run dev --filter=!desktop --filter=!@airwave/desktop-setup",
     "dev:core": "turbo run dev -F server -F web -F tv-web",
     "dev:setup": "bun scripts/dev-setup.ts",
+    "version:bump": "bun scripts/bump-version.ts",
     "build": "turbo run build --filter=!tv-tauri",
     "check-types": "turbo run check-types",
     "dev:web": "turbo run dev -F web",

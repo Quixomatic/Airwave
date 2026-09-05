@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.5] - 2026-09-05
+
+Repo tooling — a one-command, footgun-proof version bumper.
+
+### Added
+- **`pnpm version:bump <patch|minor|major|X.Y.Z> [--dry-run]`** (`scripts/bump-version.ts`) sets every
+  Airwave version file in lockstep — all `apps/*/package.json` (discovered, not hardcoded), the webOS
+  `appinfo.json`, the Expo `app.json`, the Tauri `tauri.conf.json` / `Cargo.toml` / `Cargo.lock`, and the
+  Roku `manifest`. Every edit is **targeted** (a JSON `version` key, the manifest's three version lines, or
+  the single `airwave` package line in the Cargo files found via its `name = "airwave"` anchor), so a
+  dependency crate can never be bumped by accident. Refuses to run if the files are out of sync (surfaces the
+  mismatch instead of normalizing), and `--dry-run` previews without writing. Edits version files only — the
+  CHANGELOG entry + commit + push stay with the `/version-bump` flow.
+
 ## [0.13.4] - 2026-09-05
 
 tv-native (iOS / Apple TV) — fix a main-thread ⇄ mpv deadlock freeze (GitHub #30) and enable the player's
