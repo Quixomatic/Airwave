@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.6] - 2026-09-05
+
+tv-native — a client-side freeze detector so a mid-program player freeze is finally visible (GitHub #31).
+
+### Added
+- **Freeze detector in the channel player** (`apps/tv-native/src/features/watch/use-tv-player.ts`). Playback
+  telemetry was a one-shot watchdog ~6s after each load, so a freeze *after* playback started recorded
+  nothing. The player's tick now watches liveness: once a program is playing (baseline anchored, not paused,
+  not buffering), if no mpv progress event arrives for 12s the native player has frozen (e.g. the tvOS mpv
+  deadlock, #30) and one `PlaybackLog` row is posted with outcome `stalled` and the freeze detail. The JS
+  thread and networking keep running during a native main-thread wedge (the heartbeat kept flowing in the #30
+  crash), so this is the only layer that can see such a freeze. Re-arms once progress resumes.
+
 ## [0.13.5] - 2026-09-05
 
 Repo tooling — a one-command, footgun-proof version bumper.

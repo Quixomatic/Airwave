@@ -98,6 +98,10 @@ const LOOKAHEAD_S = 6 * 60;
 // reloads (reset on any real progress) so a permanently-dead stream can't loop.
 const RESUME_STALL_MS = 5000;
 const RESUME_MAX_RETRIES = 2;
+// Freeze detector (GitHub #31): once a program is playing, if NO progress event arrives for this long while
+// we're meant to be playing (not paused/buffering), the native player has frozen mid-stream (e.g. the tvOS
+// mpv main-thread deadlock) — post one PlaybackLog so an otherwise-invisible freeze is recorded.
+const FREEZE_MS = 12000;
 
 const titleOf = (g?: GuideMeta | null) => (!g ? "" : g.showTitle ? `${g.showTitle} — ${g.title}` : g.title);
 
@@ -153,6 +157,7 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   // has loaded, so a stale onProgress from the outgoing stream can't anchor the new program's baseline.
   const bufferingRef = useRef(false); // latest onBuffering state — for the watchdog's stuck-diagnosis
   const loggedRef = useRef(false); // already logged this load (onLoad/onError)? the watchdog skips if so
+  const frozeLoggedRef = useRef(false); // #31: already posted a freeze row for the CURRENT stall episode? (re-arms on progress)
   // Resume-stall watchdog state (see RESUME_STALL_MS): armed on unpause; the tick reloads if mpv's clock
   // hasn't produced a progress event within the window; capped by resumeAttemptsRef (reset on progress).
   const lastProgressAtRef = useRef(0); // Date.now() of the last onProgress — the liveness signal
@@ -173,7 +178,7 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
 
   // PlaybackLog: one row per program load — the server's decision (mode/codecs/connection, captured in
   // goTo) + the real on-device outcome (libVLC first-play dims, or an error message).
-  const recordLog = useCallback((outcome?: "playing" | "not_decoding" | "error", errorDetail?: string | null) => {
+  const recordLog = useCallback((outcome?: "playing" | "not_decoding" | "error" | "stalled", errorDetail?: string | null) => {
     const ctx = logCtxRef.current;
     if (!ctx) return;
     loggedRef.current = true;
@@ -331,6 +336,7 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
           baselineArmedRef.current = false;
           bufferingRef.current = false;
           loggedRef.current = false;
+          frozeLoggedRef.current = false; // #31: fresh load → re-arm the freeze detector
           console.log(`[mpv] LOAD mode=${info.mode} offset=${offset}s conn=${info.connection ?? "?"} ${info.container ?? "?"}/${info.videoCodec ?? "?"}/${info.audioCodec ?? "?"} ${info.url.slice(0, 90)}`);
           setStartTime(info.mode === "direct" ? offset : 0);
           setSource(info.url);
@@ -551,6 +557,24 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
           stallTicksRef.current = 0;
           lastPosSampleRef.current = positionSecRef.current;
         }
+        // Freeze detector (GitHub #31). A native player can freeze mid-stream with NO event — onProgress just
+        // stops (e.g. the tvOS mpv main-thread deadlock, where the delegate's DispatchQueue.main.async never
+        // drains). The JS thread + this tick keep running, and networking still works during a native
+        // main-thread wedge (the heartbeat kept flowing in the #30 crash), so JS is the ONLY layer that can see
+        // and report it. If we're meant to be playing (baseline anchored, not paused, not buffering) but no
+        // progress event has arrived for FREEZE_MS, post ONE PlaybackLog. Re-arms once progress resumes.
+        if (cur.baselineReady && firstProgressRef.current && !pausedRef.current && !bufferingRef.current) {
+          const sinceProgress = Date.now() - lastProgressAtRef.current;
+          if (sinceProgress >= FREEZE_MS) {
+            if (!frozeLoggedRef.current) {
+              frozeLoggedRef.current = true;
+              console.log(`[mpv] FREEZE detected — no progress for ${Math.round(sinceProgress / 1000)}s`);
+              recordLog("stalled", `frozen: no progress for ${Math.round(sinceProgress / 1000)}s (pos=${positionSecRef.current.toFixed(1)}s buffering=${bufferingRef.current})`);
+            }
+          } else {
+            frozeLoggedRef.current = false;
+          }
+        }
       } else {
         if (!pausedRef.current) bumperEffRef.current += wallDt;
         effective = bumperEffRef.current;
@@ -601,7 +625,7 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
       }));
     }, 500);
     return () => clearInterval(id);
-  }, [now, goTo, currentEffective, buildScrubber]);
+  }, [now, goTo, currentEffective, buildScrubber, recordLog]);
 
   // Heartbeat the watch session (~10s) for Now Watching + orphan-transcode reap; end it on unmount.
   useEffect(() => {
