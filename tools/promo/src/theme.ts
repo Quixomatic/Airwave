@@ -52,6 +52,44 @@ export const FEATURES_SEC = 48.6; // sum of feature block (5s..53.6s absolute)
 export const OUTRO_SEC = 8.0; // lockup + two static tile rows
 export const TOTAL_SEC = INTRO_SEC + FEATURES_SEC + OUTRO_SEC; // 61.6
 
+// ── Audio: voiceover + music bed ──────────────────────────────────────────────
+// One VO line per scene (see vo-script.md). Start times DERIVE from the scene layout so they can't drift:
+// a feature line starts at INTRO_SEC + feature.start; intro at 0; outro at the outro's start. `winSec` is the
+// nominal spoken window used ONLY to shape the music duck (the clip itself plays its real natural length).
+// Drop clips in `assets/vo/<file>` and flip `have: true` as each is generated — only `have` clips are mounted
+// (so Studio never 404s on a not-yet-made file) and only `have` clips duck the music.
+export type VoClip = { id: string; file: string; atSec: number; winSec: number; have: boolean };
+const feat = (id: string) => FEATURES.find((f) => f.id === id)!;
+const voFeat = (id: string, file: string, have = false): VoClip => {
+  const f = feat(id);
+  return { id, file, atSec: INTRO_SEC + f.start, winSec: f.dur, have };
+};
+export const VO: VoClip[] = [
+  { id: "intro", file: "vo/01-intro.mp3", atSec: 0, winSec: INTRO_SEC, have: true },
+  voFeat("guide", "vo/02-guide.mp3"),
+  voFeat("tune", "vo/03-live.mp3"),
+  voFeat("dvr", "vo/04-dvr.mp3"),
+  voFeat("surf", "vo/05-surf.mp3"),
+  voFeat("bump", "vo/06-bumpers.mp3"),
+  voFeat("build", "vo/07-build.mp3"),
+  voFeat("org", "vo/08-organize.mp3"),
+  voFeat("every", "vo/09-everywhere.mp3"),
+  voFeat("ai", "vo/10-ai.mp3"),
+  voFeat("setup", "vo/11-selfhost.mp3"),
+  { id: "outro", file: "vo/12-outro.mp3", atSec: INTRO_SEC + FEATURES_SEC, winSec: OUTRO_SEC, have: false },
+];
+export const VO_VOL = 1.0;
+export const VO_FADE_SEC = 0.08; // tiny click-safe fade-in on each VO clip
+
+// Music bed loops under the whole reel via frame-driven volume automation (fade in/out + duck under VO).
+// Drop a file in assets/vo/ and set the path to enable it.
+export const MUSIC_BED: string | null = null; // e.g. "vo/bed.mp3"
+export const MUSIC_VOL = 0.16; // bed level in the gaps between narration
+export const MUSIC_DUCK = 0.06; // bed level while a VO line is speaking
+export const MUSIC_FADE_IN_SEC = 1.2;
+export const MUSIC_FADE_OUT_SEC = 1.6;
+export const MUSIC_DUCK_RAMP_SEC = 0.35; // how fast the bed dips into / recovers from a duck
+
 // Glass frame geometry: both width AND height morph to the active media's aspect. Landscape is
 // short + wide; the portrait dev-setup clip gets a taller, narrower frame.
 export const FRAME_MAT = 14;

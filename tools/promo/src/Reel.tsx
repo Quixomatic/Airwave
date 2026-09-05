@@ -4,6 +4,7 @@ import { C, FEATURES_SEC, FPS as FPS_CONST, INTRO_SEC, OUTRO_SEC, TOTAL_SEC } fr
 import { Intro } from "./components/Intro";
 import { Features } from "./components/Features";
 import { Outro } from "./components/Outro";
+import { Soundtrack } from "./components/Soundtrack";
 
 export const FPS = FPS_CONST;
 export const DURATION_IN_FRAMES = Math.round(TOTAL_SEC * FPS);
@@ -24,6 +25,7 @@ export const Reel: React.FC = () => {
       <Sequence from={introF + featF} durationInFrames={outroF} layout="none">
         <Outro />
       </Sequence>
+      <Soundtrack />
     </AbsoluteFill>
   );
 };
