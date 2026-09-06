@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.9] - 2026-09-06
+
+tv-roku — the full-player Info panel now sizes to its content (closer to tv-web/native).
+
+### Changed
+- **The Info view is bottom-anchored and grows to fit.** The program summary's height is measured and the whole
+  stack (title, meta row, summary, Genres/Cast/Director/Studio columns, PLAYBACK chips, hint) flows from a
+  fixed bottom upward, so a short description hugs the bottom and a long one pushes the title + scrim up (up to
+  8 lines of summary). Previously everything sat at hard-coded Y positions, leaving a large gap under short
+  descriptions.
+
+### Fixed
+- Exiting the Info view now restores the scrubber-mode title/scrim position (it was previously left raised where
+  Info had moved it).
+
 ## [0.13.8] - 2026-09-06
 
 tv-roku — bind the remote's Play/Pause button (parity with tv-native, GitHub #16).

@@ -614,12 +614,20 @@ end sub
 ' The Info view (tv-web/native parity): the panel GROWS UPWARD (title+scrim move up), a badge meta row
 ' (year · rating chip · ★critic · duration), the summary, Genres/Cast/Director/Studio COLUMNS, and the
 ' PLAYBACK delivery chips. Positions flow with measured widths.
-const INFO_TITLE_Y = 512
-const INFO_META_Y = 620
-const INFO_SUMMARY_Y = 664
-const INFO_COLS_Y = 838
-const INFO_DL_Y = 942
-const INFO_HINT_Y = 1030
+' BOTTOM-ANCHORED: the stack grows UPWARD from a fixed bottom (tv-web/native parity), so a short summary hugs
+' the bottom and a long one pushes the title + scrim up. Section heights are fixed to their fonts; only the
+' summary height is MEASURED (boundingRect), so the columns/delivery/hint always flow right under it.
+const INFO_BOTTOM = 1046 ' the "Press Back" hint's bottom edge — the anchor the whole stack ends at
+const INFO_TITLEBLOCK_H = 88 ' title + subtitle
+const INFO_META_H = 34
+const INFO_COLS_H = 74
+const INFO_DL_H = 58 ' "PLAYBACK" label + chip row
+const INFO_HINT_H = 24
+const INFO_G_TITLE = 24 ' title → meta
+const INFO_G_META = 16 ' meta → summary (tv-web marginBottom 16)
+const INFO_G_SUM = 26 ' summary → columns (tv-web marginTop 24)
+const INFO_G_COLS = 22 ' columns → delivery
+const INFO_G_DL = 26 ' delivery → hint
 
 sub buildInfo(parent as object)
     g = parent.createChild("Group")
@@ -630,8 +638,8 @@ sub buildInfo(parent as object)
     m.mStar = mkLabel(g, Theme.FONT_REG, 18, "0xF0A92AFF", [0, 0], 40, 1)
     m.mCritic = mkLabel(g, Theme.FONT_MED, 20, C_SUB, [0, 0], 80, 1)
     m.mDur = mkLabel(g, Theme.FONT_REG, 20, C_SUB, [0, 0], 140, 1)
-    ' summary
-    m.infoSummary = mkLabel(g, Theme.FONT_REG, 22, C_DETAIL, [PAD_X, INFO_SUMMARY_Y], 1300, 4)
+    ' summary — full text (up to 8 lines), width matches tv-web's maxWidth so it wraps the same; Y set in renderInfo
+    m.infoSummary = mkLabel(g, Theme.FONT_REG, 22, C_DETAIL, [PAD_X, 0], 1100, 8)
     ' detail columns (label over value)
     m.cols = []
     for i = 0 to 3
@@ -641,13 +649,13 @@ sub buildInfo(parent as object)
         m.cols.push({ group: c, label: cl, value: cv })
     end for
     ' delivery
-    m.dlLabel = mkLabel(g, Theme.FONT_SEMI, 13, C_HINT, [PAD_X, INFO_DL_Y], 300, 1)
+    m.dlLabel = mkLabel(g, Theme.FONT_SEMI, 13, C_HINT, [PAD_X, 0], 300, 1)
     m.dlLabel.text = "PLAYBACK"
     m.dlChips = []
     for i = 0 to 5
         m.dlChips.push(mkChip(g, 15))
     end for
-    m.infoHint = mkLabel(g, Theme.FONT_REG, 15, C_HINT, [PAD_X, INFO_HINT_Y], 500, 1)
+    m.infoHint = mkLabel(g, Theme.FONT_REG, 15, C_HINT, [PAD_X, 0], 500, 1)
     m.infoHint.text = "Press Back to return"
     m.infoGroup = g
 end sub
@@ -682,12 +690,14 @@ sub setInfoMode(on as boolean)
     m.body.visible = not on
     m.infoGroup.visible = on
     if on
-        ' Grow the panel upward: raise the title/sub + extend the scrim (parity with tv-web/native).
-        m.title.translation = [PAD_X, INFO_TITLE_Y]
-        m.subTitle.translation = [PAD_X, INFO_TITLE_Y + 52]
-        m.scrim.translation = [0, INFO_TITLE_Y - 44]
-        m.scrim.height = 1080 - (INFO_TITLE_Y - 44)
+        ' renderInfo positions the title/summary/columns/scrim, bottom-anchored to the measured content height.
         renderInfo()
+    else
+        ' Restore the scrubber-mode title/scrim that the Info view raised (previously left where Info put them).
+        m.title.translation = [PAD_X, 744]
+        m.subTitle.translation = [PAD_X, 796]
+        m.scrim.translation = [0, PANEL_TOP]
+        m.scrim.height = 1080 - PANEL_TOP
     end if
     armHide()   ' the Info view still auto-hides on the 8s timer, like tv-web/native
 end sub
@@ -696,11 +706,60 @@ sub renderInfo()
     g = m.status.guide
     if g = invalid then return
 
-    ' meta row — year · rating chip · ★ critic · duration (flow with measured widths)
+    ' ---- Set the summary text + MEASURE its wrapped height (the only variable-height row) ----
+    hasSummary = (g.summary <> invalid and g.summary <> "")
+    if hasSummary then m.infoSummary.text = g.summary else m.infoSummary.text = ""
+    m.infoSummary.visible = hasSummary
+    sh = 0
+    if hasSummary
+        r = m.infoSummary.boundingRect()
+        if r <> invalid and r.height > 0 then sh = Int(r.height)
+        if sh <= 0 then sh = 96   ' fallback ≈ 3 lines if the rect isn't ready yet
+    end if
+
+    ' ---- Which optional sections are present? (drives both the height math and visibility) ----
+    colDefs = [
+        { label: "GENRES", value: joinOr(g.genres) },
+        { label: "CAST", value: joinOr(g.cast) },
+        { label: "DIRECTOR", value: joinOr(g.directors) },
+        { label: "STUDIO", value: strOr(g.studio) }
+    ]
+    hasCols = false
+    for i = 0 to 3
+        if colDefs[i].value <> "" then hasCols = true
+    end for
+
+    d = m.status.delivery
+    chipDefs = []
+    if d <> invalid
+        chipDefs.push({ text: UCase(deliveryModeLabel(d.mode)), accent: true })
+        if d.container <> invalid then chipDefs.push({ text: UCase(d.container), accent: false })
+        if d.videoCodec <> invalid then chipDefs.push({ text: UCase(d.videoCodec), accent: false })
+        if d.audioCodec <> invalid then chipDefs.push({ text: UCase(d.audioCodec), accent: false })
+        if d.connection <> invalid then chipDefs.push({ text: UCase(d.connection), accent: (d.connection <> "local") })
+    end if
+    hasDL = chipDefs.count() > 0
+
+    ' ---- Bottom-anchor: total content height → topY so the hint lands at INFO_BOTTOM (grows upward) ----
+    total = INFO_TITLEBLOCK_H + INFO_G_TITLE + INFO_META_H
+    if hasSummary then total = total + INFO_G_META + sh
+    if hasCols then total = total + INFO_G_SUM + INFO_COLS_H
+    if hasDL then total = total + INFO_G_COLS + INFO_DL_H
+    total = total + INFO_G_DL + INFO_HINT_H
+    topY = INFO_BOTTOM - total
+
+    ' Title + scrim rise to fit the content.
+    m.title.translation = [PAD_X, topY]
+    m.subTitle.translation = [PAD_X, topY + 52]
+    m.scrim.translation = [0, topY - 44]
+    m.scrim.height = 1080 - (topY - 44)
+
+    ' ---- meta row — year · rating chip · ★ critic · duration (x-flow with measured widths) ----
+    metaY = topY + INFO_TITLEBLOCK_H + INFO_G_TITLE
     x = PAD_X
     if g.year <> invalid
         m.mYear.text = Str(g.year).Trim()
-        m.mYear.translation = [x, INFO_META_Y]
+        m.mYear.translation = [x, metaY]
         m.mYear.visible = true
         x = x + measureW(m.mYear, 60) + 16
     else
@@ -712,7 +771,7 @@ sub renderInfo()
         tw = measureW(m.ratingChip.label, 40)
         m.ratingChip.bg.width = tw + 24
         m.ratingChip.bg.blendColor = "0x94A3B82E"
-        m.ratingChip.group.translation = [x, INFO_META_Y - 4]
+        m.ratingChip.group.translation = [x, metaY - 4]
         m.ratingChip.group.visible = true
         x = x + tw + 24 + 16
     else
@@ -720,11 +779,11 @@ sub renderInfo()
     end if
     if g.criticRating <> invalid
         Icon.apply(m.mStar, "lucide:Star", 18, "0xF0A92AFF")
-        m.mStar.translation = [x, INFO_META_Y + 2]
+        m.mStar.translation = [x, metaY + 2]
         m.mStar.visible = true
         x = x + 26
         m.mCritic.text = fmtRating(g.criticRating)
-        m.mCritic.translation = [x, INFO_META_Y]
+        m.mCritic.translation = [x, metaY]
         m.mCritic.visible = true
         x = x + measureW(m.mCritic, 40) + 16
     else
@@ -733,70 +792,85 @@ sub renderInfo()
     end if
     if g.durationMs <> invalid
         m.mDur.text = Str(Int(g.durationMs / 60000)).Trim() + " min"
-        m.mDur.translation = [x, INFO_META_Y]
+        m.mDur.translation = [x, metaY]
         m.mDur.visible = true
     else
         m.mDur.visible = false
     end if
+    y = metaY + INFO_META_H
 
-    if g.summary <> invalid then m.infoSummary.text = g.summary else m.infoSummary.text = ""
-
-    ' detail columns
-    colDefs = [
-        { label: "GENRES", value: joinOr(g.genres) },
-        { label: "CAST", value: joinOr(g.cast) },
-        { label: "DIRECTOR", value: joinOr(g.directors) },
-        { label: "STUDIO", value: strOr(g.studio) }
-    ]
-    cx = PAD_X
-    for i = 0 to 3
-        c = m.cols[i]
-        v = colDefs[i].value
-        if v <> ""
-            c.label.text = colDefs[i].label
-            c.value.text = v
-            c.group.translation = [cx, INFO_COLS_Y]
-            c.group.visible = true
-            w = measureW(c.value, 200)
-            if w > 340 then w = 340
-            cx = cx + w + 44
-        else
-            c.group.visible = false
-        end if
-    end for
-
-    ' delivery chips
-    d = m.status.delivery
-    chipDefs = []
-    if d <> invalid
-        chipDefs.push({ text: UCase(deliveryModeLabel(d.mode)), accent: true })
-        if d.container <> invalid then chipDefs.push({ text: UCase(d.container), accent: false })
-        if d.videoCodec <> invalid then chipDefs.push({ text: UCase(d.videoCodec), accent: false })
-        if d.audioCodec <> invalid then chipDefs.push({ text: UCase(d.audioCodec), accent: false })
-        if d.connection <> invalid then chipDefs.push({ text: UCase(d.connection), accent: (d.connection <> "local") })
+    ' ---- summary (already measured) ----
+    if hasSummary
+        y = y + INFO_G_META
+        m.infoSummary.translation = [PAD_X, y]
+        y = y + sh
     end if
-    dx = PAD_X
-    for i = 0 to 5
-        chip = m.dlChips[i]
-        if i < chipDefs.count()
-            cd = chipDefs[i]
-            chip.label.text = cd.text
-            tw = measureW(chip.label, 60)
-            chip.bg.width = tw + 24
-            if cd.accent
-                chip.bg.blendColor = withAlpha(m.top.accent, 0.14)
-                chip.label.color = m.top.accent
+
+    ' ---- detail columns (label over value, x-flow) ----
+    if hasCols
+        y = y + INFO_G_SUM
+        cx = PAD_X
+        for i = 0 to 3
+            c = m.cols[i]
+            v = colDefs[i].value
+            if v <> ""
+                c.label.text = colDefs[i].label
+                c.value.text = v
+                c.group.translation = [cx, y]
+                c.group.visible = true
+                w = measureW(c.value, 200)
+                if w > 340 then w = 340
+                cx = cx + w + 44
             else
-                chip.bg.blendColor = "0x94A3B824"
-                chip.label.color = C_DETAIL
+                c.group.visible = false
             end if
-            chip.group.translation = [dx, INFO_DL_Y + 24]
-            chip.group.visible = true
-            dx = dx + tw + 24 + 10
-        else
-            chip.group.visible = false
-        end if
-    end for
+        end for
+        y = y + INFO_COLS_H
+    else
+        for i = 0 to 3
+            m.cols[i].group.visible = false
+        end for
+    end if
+
+    ' ---- delivery ("PLAYBACK" label + chips) ----
+    if hasDL
+        y = y + INFO_G_COLS
+        m.dlLabel.translation = [PAD_X, y]
+        m.dlLabel.visible = true
+        chipY = y + 24
+        dx = PAD_X
+        for i = 0 to 5
+            chip = m.dlChips[i]
+            if i < chipDefs.count()
+                cd = chipDefs[i]
+                chip.label.text = cd.text
+                tw = measureW(chip.label, 60)
+                chip.bg.width = tw + 24
+                if cd.accent
+                    chip.bg.blendColor = withAlpha(m.top.accent, 0.14)
+                    chip.label.color = m.top.accent
+                else
+                    chip.bg.blendColor = "0x94A3B824"
+                    chip.label.color = C_DETAIL
+                end if
+                chip.group.translation = [dx, chipY]
+                chip.group.visible = true
+                dx = dx + tw + 24 + 10
+            else
+                chip.group.visible = false
+            end if
+        end for
+        y = y + INFO_DL_H
+    else
+        m.dlLabel.visible = false
+        for i = 0 to 5
+            m.dlChips[i].group.visible = false
+        end for
+    end if
+
+    ' ---- hint ----
+    y = y + INFO_G_DL
+    m.infoHint.translation = [PAD_X, y]
 end sub
 
 function joinOr(arr as dynamic) as string
