@@ -28,6 +28,9 @@
         <field id="dockH" type="integer" value="351" />
         <!-- PlayerHost → MainScene surface commands: goMini | goFull | close | blurMini. -->
         <field id="playerCmd" type="string" alwaysNotify="true" />
+        <!-- MainScene → PlayerHost external command (e.g. the remote Play/Pause button while the guide is
+             focused with a docked mini feed). Currently: "pause" → togglePause. -->
+        <field id="extCmd" type="string" alwaysNotify="true" onChange="onExtCmd" />
         <!-- MainScene observes this to hide the player + refocus the guide. -->
         <field id="done" type="boolean" alwaysNotify="true" />
     </interface>

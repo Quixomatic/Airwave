@@ -1008,6 +1008,13 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
     if not m.top.active then return false
 
+    ' Dedicated Play/Pause button toggles playback in EVERY chrome state (closed, open panel, picker, info) —
+    ' the top-priority claim, matching tv-native's media-play-pause layer. Same toggle as the on-screen control.
+    if key = Keys.PLAY
+        fire("pause", "")
+        return true
+    end if
+
     ' Picker modal owns all keys while open.
     if m.picker <> invalid
         if key = Keys.UP

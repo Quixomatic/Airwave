@@ -482,6 +482,13 @@ function onKeyEvent(key as string, press as boolean) as boolean
         closePlayer()
         return true
     end if
+    ' Dedicated Play/Pause button toggles the active player from anywhere it wasn't already claimed by a
+    ' focused owner (e.g. while the guide is focused with a docked mini feed, or during channel surf which
+    ' lets it bubble). The full chrome / mini overlay claim it first in their own handlers.
+    if key = "play" and m.player <> invalid and m.player.layout <> "off"
+        m.player.extCmd = "pause"
+        return true
+    end if
     if key = "options"
         ' ✱ focuses the docked mini feed (→ its Full/Close overlay); else the dev diagnostic re-run.
         if m.player <> invalid and m.player.layout = "mini"

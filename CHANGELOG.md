@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.8] - 2026-09-06
+
+tv-roku — bind the remote's Play/Pause button (parity with tv-native, GitHub #16).
+
+### Added
+- The dedicated **Play/Pause** button on the Roku remote now toggles the currently playing channel, matching
+  the Apple TV binding. It's claimed as a top-priority key across every player context: the full-screen chrome
+  (including the audio/subtitle/quality pickers and the info view) and the docked mini feed; channel surf lets
+  it bubble; and when the guide is focused with a mini feed playing it falls through to `MainScene`, which
+  toggles the player via a new inbound `extCmd` field on `PlayerHost`. Same toggle as the on-screen Pause
+  control; active only while a program or bumper is playing.
+
 ## [0.13.7] - 2026-09-06
 
 Promo reel (`tools/promo`) — voiceover, a music bed, and animated blob backgrounds. (Marketing tooling,

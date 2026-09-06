@@ -331,6 +331,8 @@ end sub
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
     if not m.top.open then return false
+    ' Let the Play/Pause button bubble up to MainScene so it toggles the underlying playback while surfing.
+    if key = Keys.PLAY then return false
     if key = Keys.LEFT
         move(-1)
         return true
