@@ -29,7 +29,11 @@ const HERO_GRAIN_LIGHT = ["#93c5fd", "#4a9fe0", "#dbeafe00"];
  * Kicked off after a short delay (the shaders error if uniforms aren't ready on slower devices) and paused
  * (`speed: 0`) whenever it scrolls off-screen so it isn't burning GPU.
  */
-export function HeroShaders({ constrainLogo = false }: { constrainLogo?: boolean } = {}) {
+export function HeroShaders({
+  constrainLogo = false,
+  subtleLogo = false,
+  hideLogo = false,
+}: { constrainLogo?: boolean; subtleLogo?: boolean; hideLogo?: boolean } = {}) {
   // Pinned dark: the hero is always dark-themed regardless of the site light/dark toggle.
   const dark = true;
   const ref = useRef<HTMLDivElement | null>(null);
@@ -39,10 +43,9 @@ export function HeroShaders({ constrainLogo = false }: { constrainLogo?: boolean
   const logo = (
     <ImageDithering
       image="/logo-lit.png"
-      // V2 (constrainLogo): smaller, so it reads as a subtle accent within the content column, not a
-      // panel-spanning graphic.
-      width={constrainLogo ? 360 : 470}
-      height={constrainLogo ? 260 : 340}
+      // subtleLogo (V2): smaller so it reads as a faint accent behind the text. Otherwise V1-size.
+      width={subtleLogo ? 360 : 470}
+      height={subtleLogo ? 260 : 340}
       colorBack="#00000000"
       colorFront={dark ? "#4a9fe0" : "#3f8fd0"}
       colorHighlight={dark ? "#8ec5f0" : "#6aa8e0"}
@@ -53,8 +56,8 @@ export function HeroShaders({ constrainLogo = false }: { constrainLogo?: boolean
       className={cn(
         "absolute animate-fd-fade-in duration-400",
         constrainLogo
-          ? // Sits at the top-right of the constrained column, well faded since it now sits behind the text.
-            "top-[4%] right-0 opacity-[0.18] max-md:hidden"
+          ? // Sits at the top-right of the constrained column. Faded when subtle (V2); full prominence (V3).
+            cn("top-[7%] right-0", subtleLogo ? "opacity-[0.18] max-md:hidden" : "max-md:opacity-40")
           : "max-md:-right-6 max-md:-bottom-6 max-md:opacity-60 md:top-[7%] md:right-[4%]",
       )}
       minPixelRatio={1}
@@ -78,8 +81,10 @@ export function HeroShaders({ constrainLogo = false }: { constrainLogo?: boolean
         />
       )}
       {/* V2 keeps the dithered logo inside a centered max-w-5xl column so it never drifts out into the wide
-          panel's side margins; V1 places it raw against the panel. */}
+          panel's side margins; V1 places it raw against the panel. `hideLogo` suppresses it entirely (V3
+          renders its own straddling <DitheredLogo> outside this overflow-hidden panel). */}
       {show &&
+        !hideLogo &&
         (constrainLogo ? (
           <div className="pointer-events-none absolute inset-0">
             <div className="relative mx-auto h-full max-w-5xl px-6 md:px-12">{logo}</div>
@@ -88,6 +93,41 @@ export function HeroShaders({ constrainLogo = false }: { constrainLogo?: boolean
           logo
         ))}
     </div>
+  );
+}
+
+/**
+ * The dithered Airwave mark on its own — same shader as the hero backdrop's logo, but rendered wherever it's
+ * placed (not locked inside the overflow-hidden hero panel). Used by V3 to straddle the panel's bottom edge.
+ * Position/size it via `className` on the wrapper.
+ */
+export function DitheredLogo({
+  className,
+  width = 470,
+  height = 340,
+}: {
+  className?: string;
+  width?: number;
+  height?: number;
+}) {
+  const dark = true;
+  const show = useDeferredShow();
+  if (!show) return null;
+  return (
+    <ImageDithering
+      image="/logo-lit.png"
+      width={width}
+      height={height}
+      colorBack="#00000000"
+      colorFront={dark ? "#4a9fe0" : "#3f8fd0"}
+      colorHighlight={dark ? "#8ec5f0" : "#6aa8e0"}
+      type="4x4"
+      size={2.5}
+      fit="contain"
+      speed={0}
+      className={cn("animate-fd-fade-in duration-400", className)}
+      minPixelRatio={1}
+    />
   );
 }
 

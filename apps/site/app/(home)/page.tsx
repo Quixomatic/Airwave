@@ -10,7 +10,7 @@ import { button, card, heading, SectionHeader, Wide } from "@/components/landing
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { getHeroDownloads } from "@/lib/releases";
 import { AgnosticBackground, ShaderCta } from "@/components/shaders";
-import { HeroV1, HeroV2 } from "@/components/hero";
+import { HeroV1, HeroV2, HeroV3 } from "@/components/hero";
 import { HeroToggle } from "@/components/hero-toggle";
 import { COMPOSE } from "./compose";
 import { PreviewImages } from "./page.client";
@@ -58,7 +58,7 @@ export default async function HomePage() {
       {/* Two variants, toggled on the dev run only (HeroToggle): v1 is the current shipped hero; v2 is the
           GuideEngine-style inset-panel hero with a glass frame straddling the bottom edge. Prod always renders
           v1. Both force the dark palette internally (they sit on a dark shader wash). */}
-      <HeroToggle dev={dev} v1={<HeroV1 dl={dl} />} v2={<HeroV2 dl={dl} />} />
+      <HeroToggle dev={dev} v1={<HeroV1 dl={dl} />} v2={<HeroV2 dl={dl} />} v3={<HeroV3 dl={dl} />} />
 
       {/* ── Intro statement ──────────────────────────────────────────────────── */}
       <Wide className="mt-16 lg:mt-28">

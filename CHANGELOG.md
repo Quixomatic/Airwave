@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.14] - 2026-09-07
+
+Site (getairwave.tv) — add a side-by-side hero variant (V3) and revert production to V1 while V2/V3 are refined.
+
+### Added
+- **Hero V3** (`components/hero.tsx`): the same inset shader panel + glass promo frame as V2, but laid out
+  side-by-side — hero copy in the left column, the glass-framed YouTube promo in the right column (top-aligned
+  to the title). The dithered Airwave mark straddles the panel's bottom-center edge, half on / half off, the
+  way the video does in V2 (new standalone `DitheredLogo`, with a `hideLogo` flag on `HeroShaders`). The
+  dev-only switcher now offers V1 / V2 / V3.
+
+### Changed
+- Production shows V1 again for now (V2 and V3 are still being refined). The switcher stays dev-only and never
+  renders in production.
+
 ## [0.13.13] - 2026-09-07
 
 Site (getairwave.tv) — refine the new hero (V2).

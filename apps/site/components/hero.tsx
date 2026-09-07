@@ -6,7 +6,7 @@ import { Wide } from "@/components/landing";
 import { ClipCarousel } from "@/components/clip-carousel";
 import { HeroPromo } from "@/components/hero-promo";
 import { HeroDownloadButtons } from "@/components/hero-downloads";
-import { HeroShaders } from "@/components/shaders";
+import { HeroShaders, DitheredLogo } from "@/components/shaders";
 import type { HeroDownloads } from "@/lib/releases";
 
 // The hero shot quietly cycles these once ready (bare carousel — no controls); the guide screenshot is the poster.
@@ -97,7 +97,7 @@ export function HeroV2({ dl }: { dl: HeroDownloads }) {
           frame hangs past it. Pinned dark (the shader wash needs the dark tokens). */}
       <div className="dark absolute inset-x-2 top-2 bottom-[200px] -z-1 overflow-hidden rounded-2xl border bg-fd-background md:inset-x-4 md:top-4 md:bottom-[260px]" />
       <div className="dark absolute inset-x-2 top-2 bottom-[200px] -z-1 overflow-hidden rounded-2xl md:inset-x-4 md:top-4 md:bottom-[260px]">
-        <HeroShaders constrainLogo />
+        <HeroShaders constrainLogo subtleLogo />
       </div>
 
       {/* Constrained content, centered in the wide panel. */}
@@ -135,6 +135,90 @@ export function HeroV2({ dl }: { dl: HeroDownloads }) {
               <div className="m-2 overflow-hidden rounded-lg bg-fd-background">
                 <HeroPromo poster="/screenshots/appletv-guide.webp" clips={HERO_REEL} />
               </div>
+            </div>
+          </div>
+        </Wide>
+      </div>
+    </section>
+  );
+}
+
+/** The V2/V3 frosted-glass promo frame — GuideEngine's frame re-tuned for the dark backdrop. */
+function GlassPromoFrame({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn("rounded-2xl border border-white/15 backdrop-blur-2xl", className)}
+      style={{ boxShadow: GLASS_SHADOW, background: GLASS_SHEEN }}
+    >
+      <div className="m-2 overflow-hidden rounded-lg bg-fd-background">
+        <HeroPromo poster="/screenshots/appletv-guide.webp" clips={HERO_REEL} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * HeroV3 — the same inset shader panel + glass promo frame as V2, but laid out SIDE-BY-SIDE: hero copy in the
+ * left column and the glass-framed promo player in the right column (fully inside the panel, not hanging off
+ * the bottom). Type is scaled down a notch to make room for the two-column layout.
+ */
+export function HeroV3({ dl }: { dl: HeroDownloads }) {
+  return (
+    <section className="relative -mt-4">
+      {/* Background panel behind both columns. It ends early at the bottom (leaving an apron) so the dithered
+          logo can straddle its bottom-center edge — the V2 straddle trick, applied to the logo instead of the
+          video. */}
+      <div className="dark absolute inset-x-2 top-2 bottom-[130px] -z-1 overflow-hidden rounded-2xl border bg-fd-background md:inset-x-4 md:top-4 md:bottom-[150px]" />
+      <div className="dark absolute inset-x-2 top-2 bottom-[130px] -z-1 overflow-hidden rounded-2xl md:inset-x-4 md:top-4 md:bottom-[150px]">
+        <HeroShaders hideLogo />
+      </div>
+
+      {/* The dithered mark straddling the panel's bottom-center edge (half on the panel, half on the apron). */}
+      <DitheredLogo
+        width={360}
+        height={264}
+        className="pointer-events-none absolute bottom-[130px] left-1/2 z-1 -translate-x-1/2 translate-y-1/2 md:bottom-[150px]"
+      />
+
+      {/* pb reserves the apron below the columns so the panel's early end lands at the columns' bottom and the
+          off-panel half of the logo sits in the apron (not over the next section). */}
+      <div className="dark relative z-10 pb-[130px] text-landing-foreground md:pb-[150px]">
+        <Wide>
+          <div className="grid items-start gap-10 py-16 lg:grid-cols-2 lg:gap-14 lg:py-24">
+            {/* Left — hero copy (same type sizes as V2). */}
+            <div className="text-center lg:text-left">
+              <p className="w-fit rounded-full border border-brand/50 bg-fd-background/50 px-3 py-1.5 text-xs font-medium text-brand backdrop-blur-md max-lg:mx-auto">
+                The live-TV layer for your Plex library.
+              </p>
+              <h1 className="mt-8 font-display text-[clamp(2.5rem,7vw,4.75rem)] leading-none font-medium tracking-[-0.045em] text-fd-foreground [text-shadow:0_2px_18px_rgb(3_7_18_/_0.6)]">
+                Your library, always on. Surf it like <span className="text-brand-200">live TV</span>.
+              </h1>
+              <p className="mt-6 mb-10 text-base text-fd-foreground/85 [text-shadow:0_1px_14px_rgb(3_7_18_/_0.55)] max-lg:mx-auto max-lg:max-w-xl md:text-lg">
+                Airwave turns your own media into always-on, channel-surfable live TV — a real guide, DVR, and
+                bumpers — streamed straight from your Plex to native apps on every big screen you own.
+              </p>
+              <div className="flex flex-col gap-4 max-lg:items-center">
+                <HeroDownloadButtons dl={dl} />
+                <div className="flex flex-row flex-wrap items-center gap-2.5">
+                  <Link href="/docs/getting-started" className={cn(button("secondary"), "max-sm:text-sm")}>
+                    Get started
+                  </Link>
+                  <GitHubButton />
+                </div>
+              </div>
+            </div>
+
+            {/* Right — the glass promo frame, top-aligned with the TITLE. The invisible badge-sized spacer
+                (lg only) + matching mt-8 reproduce the left column's badge + title gap, so the frame's top edge
+                lines up exactly with the title's top regardless of the badge's rendered height. */}
+            <div>
+              <p
+                aria-hidden
+                className="invisible w-fit rounded-full px-3 py-1.5 text-xs font-medium max-lg:hidden"
+              >
+                &nbsp;
+              </p>
+              <GlassPromoFrame className="lg:mt-8" />
             </div>
           </div>
         </Wide>
