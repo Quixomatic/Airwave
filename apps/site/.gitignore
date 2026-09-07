@@ -16,3 +16,6 @@ next-env.d.ts
 *.tsbuildinfo
 .turbo/
 node_modules/
+
+# Local backup of the pre-refresh demo clips (also in git history) — not deployed.
+public/demos/v1/

@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.11] - 2026-09-07
+
+Site (getairwave.tv) — refreshed demo clips and a richer channel-guide carousel.
+
+### Changed
+- Swapped the hero, features, and channel-guide demo clips for the improved recordings from the promo reel
+  (channel-surf, dvr-bumper, filtered-pick, lenses, restart, tune-in-info, mini-player), web-sized to match the
+  existing clips so the pages stay light. Only `guide-surf` is unchanged for now. The pre-refresh clips are kept
+  as a local backup (and remain in git history).
+- Channel-guide carousel: the DVR item now uses the real DVR/restart clip (it was showing the bumper clip),
+  plus new **Mini player** and **Bumpers** items — six features total.
+- Features page: the "Author a lineup" block now plays the channel-creation video instead of a static
+  screenshot.
+
 ## [0.13.10] - 2026-09-07
 
 Promo reel (`tools/promo`) — real demo footage across the reel + a layered "Everywhere" device stack.

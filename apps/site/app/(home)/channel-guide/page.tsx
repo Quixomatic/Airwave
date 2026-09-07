@@ -17,9 +17,19 @@ const GUIDE_CLIPS: Clip[] = [
     subtitle: "Channels down the side, what's-on across the top, and a live playhead marking now. Arrow to a channel and you join it mid-program — exactly where it is on the shared timeline.",
   },
   {
-    src: "/demos/dvr-bumper.mp4",
+    src: "/demos/restart.mp4",
     title: "A DVR scrubber.",
-    subtitle: "The program you're in, flanked by the previous tail and the upcoming bumper. Scrub back within the buffer — you just can't jump ahead of live.",
+    subtitle: "Scrub back within the live buffer or restart the current program from the top, DVR-style. You just can't jump ahead of live, so every viewer stays on the same moment.",
+  },
+  {
+    src: "/demos/mini-player.mp4",
+    title: "A mini player.",
+    subtitle: "Keep watching in the corner while you browse the guide. Press OK or the green button to pop straight back to your show, right where it left off.",
+  },
+  {
+    src: "/demos/dvr-bumper.mp4",
+    title: "Bumpers between shows.",
+    subtitle: "Programs don't cut to black. Between them, Airwave plays “Up Next” cards with blurred cover art, a countdown, and an optional ambient-music bed, so one show flows into the next.",
   },
   {
     src: "/demos/lenses.mp4",

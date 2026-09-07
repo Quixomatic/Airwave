@@ -33,7 +33,7 @@ const GROUPS: { eyebrow: string; title: string; media: Media; features: Feature[
   {
     eyebrow: "Building",
     title: "Author a lineup, or let it author itself.",
-    media: { image: "/screenshots/admin-channel-filter.webp", alt: "Building a channel from a metadata filter" },
+    media: { video: "/demos/filtered-pick.mp4", alt: "Authoring a channel from a metadata filter" },
     features: [
       { icon: Filter, title: "Filter-based channels", body: "Define a channel by a metadata filter — genre, year, network, cast, resolution, “added in the last N days” — with a live preview of what resolves." },
       { icon: Shuffle, title: "Ordering & strategies", body: "Shuffle, sort, or layer grouping/rotation strategies on top: marathons, round-robins, length-aware blocks, and no-repeat windows." },
