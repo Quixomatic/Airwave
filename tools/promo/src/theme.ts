@@ -42,8 +42,8 @@ export const FEATURES: Feature[] = [
   { id: "bump", pill: "Bumpers", pre: "Polished ", hl: "bumpers", post: ".", desc: "Clean “Up Next” cards between programs, with an optional ambient-music bed.", src: "video/dvr-bumper.mp4", kind: "video", start: 19.6, dur: 5.0 },
   { id: "build", pill: "Build it", pre: "", hl: "Build", post: " a channel fast.", desc: "Point a filter at your library and a channel schedules itself. Preview it live before you save.", src: "video/filtered-pick.mp4", kind: "video", start: 24.6, dur: 5.0 },
   { id: "org", pill: "Organize", pre: "", hl: "Organize", post: " & share.", desc: "Bundle channels into packages and share them per user, Plex-style.", src: "video/lenses.mp4", kind: "video", start: 29.6, dur: 5.0 },
-  { id: "every", pill: "Everywhere", pre: "On ", hl: "every screen", post: ".", desc: "Native apps for Apple TV, mobile, the web, desktop, and Roku.", src: "video/mini-player.mp4", kind: "video", start: 34.6, dur: 3.6 },
-  { id: "ai", pill: "Optional AI", pre: "", hl: "AI", post: " lineup builder.", desc: "Bring your own key and let an assistant draft entire lineups. Completely optional.", src: "screenshots/admin-aiassistant.webp", kind: "img", start: 38.2, dur: 5.0 },
+  { id: "every", pill: "Everywhere", pre: "On ", hl: "every screen", post: ".", desc: "Native apps for Apple TV, mobile, the web, desktop, and Roku.", src: "video/tune-in-info.mp4", kind: "video", start: 34.6, dur: 6.5 }, // src is a PLACEHOLDER (long enough not to freeze) — swap for the real TV recording
+  { id: "ai", pill: "Optional AI", pre: "", hl: "AI", post: " lineup builder.", desc: "Bring your own key and let an assistant draft entire lineups. Completely optional.", src: "video/ai-channel-creation.mp4", kind: "video", start: 38.2, dur: 5.0 },
   { id: "setup", pill: "Self-host", pre: "", hl: "Self-host", post: " it all.", desc: "Your server, your library. From a fresh clone to running in one command.", src: "video/dev-setup.mp4", kind: "video", portrait: true, start: 43.2, dur: 5.4 },
 ];
 
@@ -98,7 +98,7 @@ export const FRAME_MAT = 14;
 const LAND_ASPECT = 1920 / 1078;
 const PORT_ASPECT = 964 / 1298;
 export const FRAME_H_LAND = 620; // taller landscape → ~1082 wide (bigger demos)
-export const FRAME_H_PORT = 820;
+export const FRAME_H_PORT = 900; // portrait media (self-host dev-setup) gets extra height
 export const frameHeightFor = (f: Feature) => (f.portrait ? FRAME_H_PORT : FRAME_H_LAND);
 export const frameWidthFor = (f: Feature) => {
   const sh = frameHeightFor(f) - FRAME_MAT * 2;

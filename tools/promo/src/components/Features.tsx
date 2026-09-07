@@ -2,6 +2,7 @@ import { AbsoluteFill, Easing, Img, interpolate, OffthreadVideo, Sequence, stati
 import { C, FRAME_H_PORT, FRAME_MAT, FRAME_W_LAND, frameHeightFor, frameWidthFor } from "../theme";
 import type { FeatureTiming } from "../timeline";
 import { BlobBg } from "./BlobBg";
+import { EverywhereLayers } from "./EverywhereLayers";
 import { SectionText } from "./SectionText";
 
 // Persistent glass frame on the right (its WIDTH morphs to each media's aspect, height constant);
@@ -12,6 +13,7 @@ export const Features: React.FC<{ features: FeatureTiming[] }> = ({ features }) 
   const { fps, durationInFrames } = useVideoConfig();
   const tSec = frame / fps;
   const s = (sec: number) => sec * fps;
+  const everyF = features.find((f) => f.id === "every");
 
   // Frame width keyframes (ramp ~0.3s across each boundary; flat within a feature).
   const ramp = 0.3;
@@ -97,6 +99,19 @@ export const Features: React.FC<{ features: FeatureTiming[] }> = ({ features }) 
           </div>
         </div>
       </div>
+
+      {/* Everywhere scene: two extra cascading device layers + lighting platform tiles, over the frame. */}
+      {everyF ? (
+        <Sequence from={Math.round(everyF.startSec * fps)} durationInFrames={Math.round(everyF.durSec * fps)} layout="none">
+          {/* Real device clips [macOS, iPad] — each frame sizes to the clip's aspect. (TV = Frame 1 = every.src.) */}
+          <EverywhereLayers
+            layers={[
+              { src: "video/macos.mp4", aspect: 1556 / 884 },
+              { src: "video/ipad.mp4", aspect: 1200 / 900 },
+            ]}
+          />
+        </Sequence>
+      ) : null}
     </AbsoluteFill>
   );
 };

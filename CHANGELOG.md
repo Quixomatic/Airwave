@@ -2,6 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.10] - 2026-09-07
+
+Promo reel (`tools/promo`) — real demo footage across the reel + a layered "Everywhere" device stack.
+(Marketing tooling, outside the pnpm workspaces.)
+
+### Added
+- **The Everywhere scene is now a layered device stack.** Frame 1 (the TV) enters normally (same blur-swap as
+  every scene), then the macOS and iPad layers slide up + fade in, cascaded down-and-right and progressively
+  smaller for depth; each frame **sizes to its clip's aspect** (the iPad keeps its real 4:3). A platform-tile
+  strip below lights up group-by-group — a gold flash settling to normal — in reveal order (TV → macOS → iPad).
+  New `src/components/EverywhereLayers.tsx`.
+
+### Changed
+- Swapped in real recordings for most scenes: tune-in (from the mini player), channel surf, DVR/restart,
+  bumpers, build (a 4x channel-creation), organize, and the **Optional AI** scene (now a 5x channel-build
+  video instead of a static screenshot). Clips carry buffer so no scene freezes.
+- The self-host portrait media frame gets extra height (`FRAME_H_PORT`).
+
 ## [0.13.9] - 2026-09-06
 
 tv-roku — the full-player Info panel now sizes to its content (closer to tv-web/native).
