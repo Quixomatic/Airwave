@@ -97,7 +97,7 @@ export function HeroV2({ dl }: { dl: HeroDownloads }) {
           frame hangs past it. Pinned dark (the shader wash needs the dark tokens). */}
       <div className="dark absolute inset-x-2 top-2 bottom-[200px] -z-1 overflow-hidden rounded-2xl border bg-fd-background md:inset-x-4 md:top-4 md:bottom-[260px]" />
       <div className="dark absolute inset-x-2 top-2 bottom-[200px] -z-1 overflow-hidden rounded-2xl md:inset-x-4 md:top-4 md:bottom-[260px]">
-        <HeroShaders />
+        <HeroShaders constrainLogo />
       </div>
 
       {/* Constrained content, centered in the wide panel. */}
@@ -108,7 +108,9 @@ export function HeroV2({ dl }: { dl: HeroDownloads }) {
               The live-TV layer for your Plex library.
             </p>
             <h1 className="mt-8 max-w-4xl font-display text-[clamp(2.5rem,7vw,4.75rem)] leading-none font-medium tracking-[-0.045em] text-fd-foreground [text-shadow:0_2px_18px_rgb(3_7_18_/_0.6)] max-lg:mx-auto">
-              Your library, always on. Surf it like <span className="text-brand-200">live TV</span>.
+              Your library, always on.
+              <br />
+              Surf it like <span className="text-brand-200">live TV</span>.
             </h1>
             <p className="mt-6 mb-10 max-w-2xl text-base text-fd-foreground/85 [text-shadow:0_1px_14px_rgb(3_7_18_/_0.55)] max-lg:mx-auto md:text-lg">
               Airwave turns your own media into always-on, channel-surfable live TV — a real guide, DVR, and

@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { cn } from "@/lib/cn";
 
 // The animated backgrounds are the one third-party piece — @paper-design/shaders-react (WebGL). Loaded
 // client-only via next/dynamic (ssr:false) exactly like fumadocs.dev does, so they never run on the server.
@@ -28,12 +29,37 @@ const HERO_GRAIN_LIGHT = ["#93c5fd", "#4a9fe0", "#dbeafe00"];
  * Kicked off after a short delay (the shaders error if uniforms aren't ready on slower devices) and paused
  * (`speed: 0`) whenever it scrolls off-screen so it isn't burning GPU.
  */
-export function HeroShaders() {
+export function HeroShaders({ constrainLogo = false }: { constrainLogo?: boolean } = {}) {
   // Pinned dark: the hero is always dark-themed regardless of the site light/dark toggle.
   const dark = true;
   const ref = useRef<HTMLDivElement | null>(null);
   const visible = useIsVisible(ref);
   const show = useDeferredShow();
+
+  const logo = (
+    <ImageDithering
+      image="/logo-lit.png"
+      // V2 (constrainLogo): smaller, so it reads as a subtle accent within the content column, not a
+      // panel-spanning graphic.
+      width={constrainLogo ? 360 : 470}
+      height={constrainLogo ? 260 : 340}
+      colorBack="#00000000"
+      colorFront={dark ? "#4a9fe0" : "#3f8fd0"}
+      colorHighlight={dark ? "#8ec5f0" : "#6aa8e0"}
+      type="4x4"
+      size={2.5}
+      fit="contain"
+      speed={0}
+      className={cn(
+        "absolute animate-fd-fade-in duration-400",
+        constrainLogo
+          ? // Sits at the top-right of the constrained column, well faded since it now sits behind the text.
+            "top-[4%] right-0 opacity-[0.18] max-md:hidden"
+          : "max-md:-right-6 max-md:-bottom-6 max-md:opacity-60 md:top-[7%] md:right-[4%]",
+      )}
+      minPixelRatio={1}
+    />
+  );
 
   return (
     <div ref={ref} className="absolute inset-0 -z-1 overflow-hidden">
@@ -51,22 +77,16 @@ export function HeroShaders() {
           maxPixelCount={1920 * 1080}
         />
       )}
-      {show && (
-        <ImageDithering
-          image="/logo-lit.png"
-          width={470}
-          height={340}
-          colorBack="#00000000"
-          colorFront={dark ? "#4a9fe0" : "#3f8fd0"}
-          colorHighlight={dark ? "#8ec5f0" : "#6aa8e0"}
-          type="4x4"
-          size={2.5}
-          fit="contain"
-          speed={0}
-          className="absolute animate-fd-fade-in duration-400 max-md:-right-6 max-md:-bottom-6 max-md:opacity-60 md:top-[7%] md:right-[4%]"
-          minPixelRatio={1}
-        />
-      )}
+      {/* V2 keeps the dithered logo inside a centered max-w-5xl column so it never drifts out into the wide
+          panel's side margins; V1 places it raw against the panel. */}
+      {show &&
+        (constrainLogo ? (
+          <div className="pointer-events-none absolute inset-0">
+            <div className="relative mx-auto h-full max-w-5xl px-6 md:px-12">{logo}</div>
+          </div>
+        ) : (
+          logo
+        ))}
     </div>
   );
 }

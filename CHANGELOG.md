@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.13] - 2026-09-07
+
+Site (getairwave.tv) — refine the new hero (V2).
+
+### Changed
+- The dithered Airwave logo in the V2 hero is now constrained to the centered max-w-5xl content column (so it
+  no longer drifts into the wide panel's side margins) and made much subtler (smaller + low opacity), since it
+  now sits behind the hero text. V1 is unchanged.
+- Break the hero headline before "Surf" so it reads on two lines.
+
 ## [0.13.12] - 2026-09-07
 
 Site (getairwave.tv) — a new hero with the YouTube promo embedded in a glass frame.
