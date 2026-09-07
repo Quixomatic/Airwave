@@ -4,14 +4,14 @@ import { ServerCodeBlock } from "fumadocs-ui/components/codeblock.rsc";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tv, Rewind, Clapperboard, MonitorPlay, ShieldCheck, Sparkles, TerminalIcon, Globe } from "lucide-react";
 import { SiApple, SiAndroid, SiLg, SiGooglechrome, SiRoku, SiSamsung } from "react-icons/si";
-import { FaAmazon, FaWindows, FaLinux, FaGithub } from "react-icons/fa";
+import { FaAmazon, FaWindows, FaLinux } from "react-icons/fa";
 import { cn } from "@/lib/cn";
 import { button, card, heading, SectionHeader, Wide } from "@/components/landing";
 import { ScrollReveal } from "@/components/scroll-reveal";
-import { ClipCarousel } from "@/components/clip-carousel";
-import { HeroDownloadButtons } from "@/components/hero-downloads";
 import { getHeroDownloads } from "@/lib/releases";
-import { AgnosticBackground, HeroShaders, ShaderCta } from "@/components/shaders";
+import { AgnosticBackground, ShaderCta } from "@/components/shaders";
+import { HeroV1, HeroV2 } from "@/components/hero";
+import { HeroToggle } from "@/components/hero-toggle";
 import { COMPOSE } from "./compose";
 import { PreviewImages } from "./page.client";
 
@@ -49,66 +49,16 @@ const COMING_SOON: { name: string; Icon: ComponentType<{ className?: string }> }
   { name: "Samsung (Tizen)", Icon: SiSamsung },
 ];
 
-// The hero shot quietly cycles these once ready (bare carousel — no controls); the guide screenshot is the poster.
-const HERO_REEL = [
-  { src: "/demos/guide-surf.mp4" },
-  { src: "/demos/mini-player.mp4" },
-  { src: "/demos/lenses.mp4" },
-];
-
 export default async function HomePage() {
   const dl = await getHeroDownloads();
+  const dev = process.env.NODE_ENV === "development";
   return (
     <main className="pt-4 pb-6 text-landing-foreground md:pb-12">
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
-      {/* Force the dark palette here regardless of the site theme: the hero sits on a dark shader
-          background, so its text/badge/border tokens must stay dark-mode values even in light mode.
-          `.dark` re-scopes --color-fd-*, --brand*, and --landing-foreground for this subtree. */}
-      <Wide>
-      <div className="dark relative isolate flex h-[76vh] max-h-[900px] min-h-[620px] w-full overflow-hidden rounded-2xl border bg-fd-background text-landing-foreground">
-        <HeroShaders />
-        {/* Hero shot anchored lower-right, bleeding off the panel. Starts as the guide screenshot (poster),
-            then quietly cycles the demo clips (bare carousel, no controls). z-1 keeps it above the shaders
-            (-z-1) but below the text content (z-2), so text stays on top. */}
-        <ClipCarousel
-          variant="bare"
-          poster="/screenshots/appletv-guide.webp"
-          clips={HERO_REEL}
-          className="pointer-events-none absolute top-[74%] left-1/2 z-1 w-[90%] max-w-none -translate-x-1/2 rounded-xl border-2 border-fd-border shadow-2xl shadow-black/40 md:top-[66%] md:left-[38%] md:w-[760px] md:translate-x-0 lg:top-[62%] lg:left-[42%] lg:w-[900px] xl:left-[49%] xl:w-[980px]"
-        />
-        <div className="z-2 flex size-full flex-col px-4 max-md:items-center max-md:text-center md:p-12">
-          <p className="mt-12 w-fit rounded-full border border-brand/50 bg-fd-background/50 px-3 py-1.5 text-xs font-medium text-brand backdrop-blur-md">
-            The live-TV layer for your Plex library.
-          </p>
-          <h1 className="my-8 font-display text-[clamp(2.5rem,7vw,4.75rem)] leading-none font-medium tracking-[-0.045em] text-fd-foreground [text-shadow:0_2px_18px_rgb(3_7_18_/_0.6)] xl:mb-10">
-            Your library,
-            <br className="md:hidden" /> always on.
-            <br />
-            Surf it like <span className="text-brand-200">live TV</span>.
-          </h1>
-          <p className="mb-10 max-w-xl text-base text-fd-foreground/85 [text-shadow:0_1px_14px_rgb(3_7_18_/_0.55)] md:text-lg">
-            Airwave turns your own media into always-on, channel-surfable live TV — a real guide, DVR, and
-            bumpers — streamed straight from your Plex to native apps on every big screen you own.
-          </p>
-          <HeroDownloadButtons dl={dl} />
-          <div className="mt-5 flex flex-row flex-wrap items-center gap-2.5">
-            <Link href="/docs/getting-started" className={cn(button("secondary"), "max-sm:text-sm")}>
-              Get started
-            </Link>
-            <a
-              href="https://github.com/Quixomatic/Airwave"
-              target="_blank"
-              rel="noreferrer noopener"
-              aria-label="GitHub"
-              title="GitHub"
-              className="inline-flex size-[46px] items-center justify-center rounded-full border bg-fd-secondary text-fd-secondary-foreground transition-colors hover:bg-fd-accent"
-            >
-              <FaGithub className="size-5" />
-            </a>
-          </div>
-        </div>
-      </div>
-      </Wide>
+      {/* Two variants, toggled on the dev run only (HeroToggle): v1 is the current shipped hero; v2 is the
+          GuideEngine-style inset-panel hero with a glass frame straddling the bottom edge. Prod always renders
+          v1. Both force the dark palette internally (they sit on a dark shader wash). */}
+      <HeroToggle dev={dev} v1={<HeroV1 dl={dl} />} v2={<HeroV2 dl={dl} />} />
 
       {/* ── Intro statement ──────────────────────────────────────────────────── */}
       <Wide className="mt-16 lg:mt-28">

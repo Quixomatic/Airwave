@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.12] - 2026-09-07
+
+Site (getairwave.tv) — a new hero with the YouTube promo embedded in a glass frame.
+
+### Added
+- **New home hero (`components/hero.tsx`).** A near-full-width, slightly-inset shader background panel sits
+  behind the constrained content, and a frosted-glass media frame straddles its lower edge (half on the panel,
+  half off onto the page) in the vein of the GuideEngine landing. The frame plays the **Airwave promo reel
+  from YouTube** (autoplay, muted, looped, captions off, via youtube-nocookie), with the demo clip reel as the
+  fallback shown until the embed is ready (`components/hero-promo.tsx`).
+- A dev-only hero switcher (`components/hero-toggle.tsx`) to flip between the previous hero (V1) and the new
+  one (V2) on the dev run; the choice persists in localStorage. It never renders in production.
+
+### Changed
+- Production now shows the new hero (V2). The previous hero is kept behind the dev switcher.
+
 ## [0.13.11] - 2026-09-07
 
 Site (getairwave.tv) — refreshed demo clips and a richer channel-guide carousel.

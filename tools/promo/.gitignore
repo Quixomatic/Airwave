@@ -7,3 +7,6 @@ node_modules/
 # Ignore rendered MP4s anywhere, but keep the curated source clips under assets/.
 *.mp4
 !assets/video/*.mp4
+
+# Local publish metadata (titles, descriptions, tags) — not tracked.
+publish/
