@@ -4,26 +4,23 @@ import { cn } from "@/lib/cn";
 import { button } from "@/components/landing";
 import { Wide } from "@/components/landing";
 import { ClipCarousel } from "@/components/clip-carousel";
-import { HeroPromo } from "@/components/hero-promo";
+import { HeroClipReel } from "@/components/hero-clips";
+import { HeroBadge } from "@/components/hero-badge";
 import { HeroDownloadButtons } from "@/components/hero-downloads";
 import { HeroShaders, DitheredLogo } from "@/components/shaders";
 import type { HeroDownloads } from "@/lib/releases";
 
-// The hero shot quietly cycles these once ready (bare carousel — no controls); the guide screenshot is the poster.
+// The hero clip reel — the same demo clips as the features page carousel; the guide screenshot is the poster.
 export const HERO_REEL = [
-  { src: "/demos/guide-surf.mp4" },
-  { src: "/demos/mini-player.mp4" },
-  { src: "/demos/lenses.mp4" },
+  { src: "/demos/guide-surf.mp4", label: "Surf the guide" },
+  { src: "/demos/tune-in-info.mp4", label: "Program info" },
+  { src: "/demos/channel-surf.mp4", label: "Channel surf" },
+  { src: "/demos/restart.mp4", label: "Start over" },
+  { src: "/demos/dvr-bumper.mp4", label: "DVR + bumper" },
+  { src: "/demos/mini-player.mp4", label: "Mini player" },
+  { src: "/demos/lenses.mp4", label: "Filter lenses" },
+  { src: "/demos/filtered-pick.mp4", label: "Filtered pick" },
 ];
-
-// GuideEngine's `shadow-glass` is built for a LIGHT page (dark drop-shadows on white). On our dark navy hero
-// those shadows vanish and the frame reads flat, so this is the same glass idea re-tuned for a dark backdrop:
-// a bright top-edge highlight + a subtle white inner ring for the frosted sheen, plus deep ambient shadows for
-// lift where the frame hangs off the panel.
-const GLASS_SHADOW =
-  "inset 0 1px 0 0 rgba(255,255,255,0.35), inset 0 0 0 1px rgba(255,255,255,0.12), 0 2px 8px rgba(0,0,0,0.35), 0 16px 40px rgba(0,0,0,0.45), 0 36px 70px rgba(0,0,0,0.4)";
-// A top-lit sheen over the frosted fill (the second half of the glass look on dark).
-const GLASS_SHEEN = "linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03))";
 
 function GitHubButton() {
   return (
@@ -104,9 +101,7 @@ export function HeroV2({ dl }: { dl: HeroDownloads }) {
       <div className="dark relative z-10 text-landing-foreground">
         <Wide>
           <div className="mx-auto max-w-5xl pt-24 pb-6 text-center lg:pt-36 lg:text-left">
-            <p className="w-fit rounded-full border border-brand/50 bg-fd-background/50 px-3 py-1.5 text-xs font-medium text-brand backdrop-blur-md max-lg:mx-auto">
-              The live-TV layer for your Plex library.
-            </p>
+            <HeroBadge clips={HERO_REEL} poster="/screenshots/appletv-guide.webp" className="max-lg:mx-auto" />
             <h1 className="mt-8 max-w-4xl font-display text-[clamp(2.5rem,7vw,4.75rem)] leading-none font-medium tracking-[-0.045em] text-fd-foreground [text-shadow:0_2px_18px_rgb(3_7_18_/_0.6)] max-lg:mx-auto">
               Your library, always on.
               <br />
@@ -126,16 +121,12 @@ export function HeroV2({ dl }: { dl: HeroDownloads }) {
               </div>
             </div>
 
-            {/* Frosted-glass frame straddling the panel's bottom edge — GuideEngine's frame, no traffic lights,
-                re-tuned for the dark backdrop (sheen + top highlight instead of light-mode drop-shadows). */}
-            <div
-              className="mt-14 rounded-2xl border border-white/15 backdrop-blur-2xl lg:mt-16"
-              style={{ boxShadow: GLASS_SHADOW, background: GLASS_SHEEN }}
-            >
-              <div className="m-2 overflow-hidden rounded-lg bg-fd-background">
-                <HeroPromo poster="/screenshots/appletv-guide.webp" clips={HERO_REEL} />
-              </div>
-            </div>
+            {/* The demo clip reel in the glass frame (straddling the panel's bottom edge), controls below. */}
+            <HeroClipReel
+              clips={HERO_REEL}
+              poster="/screenshots/appletv-guide.webp"
+              className="mt-14 lg:mt-16"
+            />
           </div>
         </Wide>
       </div>
@@ -143,22 +134,8 @@ export function HeroV2({ dl }: { dl: HeroDownloads }) {
   );
 }
 
-/** The V2/V3 frosted-glass promo frame — GuideEngine's frame re-tuned for the dark backdrop. */
-function GlassPromoFrame({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn("rounded-2xl border border-white/15 backdrop-blur-2xl", className)}
-      style={{ boxShadow: GLASS_SHADOW, background: GLASS_SHEEN }}
-    >
-      <div className="m-2 overflow-hidden rounded-lg bg-fd-background">
-        <HeroPromo poster="/screenshots/appletv-guide.webp" clips={HERO_REEL} />
-      </div>
-    </div>
-  );
-}
-
 /**
- * HeroV3 — the same inset shader panel + glass promo frame as V2, but laid out SIDE-BY-SIDE: hero copy in the
+ * HeroV3 — the same inset shader panel + glass media frame as V2, but laid out SIDE-BY-SIDE: hero copy in the
  * left column and the glass-framed promo player in the right column (fully inside the panel, not hanging off
  * the bottom). Type is scaled down a notch to make room for the two-column layout.
  */
@@ -196,9 +173,7 @@ export function HeroV3({ dl }: { dl: HeroDownloads }) {
           <div className="grid items-start gap-10 pt-16 pb-28 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-14 lg:pt-24 lg:pb-40">
             {/* Left — hero copy (same type sizes as V2). */}
             <div className="text-center lg:text-left">
-              <p className="w-fit rounded-full border border-brand/50 bg-fd-background/50 px-3 py-1.5 text-xs font-medium text-brand backdrop-blur-md max-lg:mx-auto">
-                The live-TV layer for your Plex library.
-              </p>
+              <HeroBadge clips={HERO_REEL} poster="/screenshots/appletv-guide.webp" className="max-lg:mx-auto" />
               <h1 className="mt-8 font-display text-[clamp(2.5rem,7vw,4.75rem)] leading-none font-medium tracking-[-0.045em] text-fd-foreground [text-shadow:0_2px_18px_rgb(3_7_18_/_0.6)]">
                 Your library, always on. Surf it like <span className="text-brand-200">live TV</span>.
               </h1>
@@ -227,7 +202,11 @@ export function HeroV3({ dl }: { dl: HeroDownloads }) {
               >
                 &nbsp;
               </p>
-              <GlassPromoFrame className="lg:mt-8" />
+              <HeroClipReel
+                clips={HERO_REEL}
+                poster="/screenshots/appletv-guide.webp"
+                className="lg:mt-8"
+              />
             </div>
           </div>
         </Wide>
