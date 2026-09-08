@@ -41,6 +41,7 @@ function DownloadButton({
   fallbackHref,
   defaultId,
   autoDetect = false,
+  compact = false,
 }: {
   productLabel: string;
   items: Item[];
@@ -50,6 +51,9 @@ function DownloadButton({
   defaultId: string;
   /** when true, override the default with the build matching the visitor's OS. */
   autoDetect?: boolean;
+  /** Smaller label text so both buttons fit a narrow space. `true` = always (V3's left column);
+   *  `"narrow"` = only below ~598px (V2, once the row gets tight). */
+  compact?: boolean | "narrow";
 }) {
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string>(defaultId);
@@ -88,6 +92,8 @@ function DownloadButton({
           {...(main?.external ? { target: "_blank", rel: "noreferrer noopener" } : {})}
           className={cn(
             "inline-flex items-center gap-2 rounded-l-full py-3 pr-4 pl-5 font-medium tracking-tight transition-colors",
+            compact === true && "text-sm",
+            compact === "narrow" && "max-[598px]:text-sm",
             base,
           )}
         >
@@ -124,7 +130,13 @@ function DownloadButton({
   );
 }
 
-export function HeroDownloadButtons({ dl }: { dl: HeroDownloads }) {
+export function HeroDownloadButtons({
+  dl,
+  compact = false,
+}: {
+  dl: HeroDownloads;
+  compact?: boolean | "narrow";
+}) {
   const server: Item[] = [
     { id: "docker", short: "Docker", label: "Docker / self-host", Icon: FaDocker, href: "/docs/self-hosting", cta: "Self-host with Docker" },
     { id: "win", short: "Windows", label: "Windows (x64)", Icon: FaWindows, href: dl.server.windows, os: "windows" },
@@ -141,10 +153,15 @@ export function HeroDownloadButtons({ dl }: { dl: HeroDownloads }) {
   ];
 
   return (
-    <div className="flex flex-row flex-wrap items-start gap-4">
+    <div
+      className={cn(
+        "flex flex-row flex-wrap items-start",
+        compact === true ? "gap-2.5" : compact === "narrow" ? "gap-4 max-[598px]:gap-2.5" : "gap-4",
+      )}
+    >
       {/* Server always leads with Docker (self-host is the primary path); Client auto-detects the OS. */}
-      <DownloadButton productLabel="Server" items={server} variant="primary" fallbackHref={dl.releases} defaultId="docker" />
-      <DownloadButton productLabel="Client" items={client} variant="secondary" fallbackHref={dl.releases} defaultId="mac" autoDetect />
+      <DownloadButton productLabel="Server" items={server} variant="primary" fallbackHref={dl.releases} defaultId="docker" compact={compact} />
+      <DownloadButton productLabel="Client" items={client} variant="secondary" fallbackHref={dl.releases} defaultId="mac" autoDetect compact={compact} />
     </div>
   );
 }

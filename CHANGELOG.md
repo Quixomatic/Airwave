@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.15] - 2026-09-08
+
+Site (getairwave.tv) — promote the side-by-side hero (V3) to production and refine the CTA sizing.
+
+### Changed
+- **Production now uses the V3 hero.** It's the side-by-side layout at `xl` and up (hero copy left, the
+  glass-framed YouTube promo right, ~40/60), and falls back to the V2 straddle layout below `xl`. The dev-only
+  switcher still offers V1 / V2 / V3.
+- The download buttons and the "Get started" button use smaller (`text-sm`) labels in the V3 layout so the
+  Server + Client buttons sit side by side in the narrower left column, with a tighter gap between them.
+- The V2 hero (and V3's sub-`xl` fallback) now drops to the same compact CTA sizing below ~598px.
+
 ## [0.13.14] - 2026-09-07
 
 Site (getairwave.tv) — add a side-by-side hero variant (V3) and revert production to V1 while V2/V3 are refined.

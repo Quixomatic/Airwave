@@ -5,8 +5,8 @@ import { useEffect, useState, type ReactNode } from "react";
 /**
  * Dev-only hero switcher. Renders whichever hero variant is selected and, ONLY in development, shows a small
  * fixed toggle so James can flip between the current hero (v1) and the GuideEngine-style hero (v2) on his dev
- * run. The choice persists in localStorage. In production `dev` is false, so it renders V1 (V2/V3 are being
- * refined) with no visible chrome — the switcher is dev-only scaffolding.
+ * run. The choice persists in localStorage. In production `dev` is false, so it renders V3 (the chosen hero,
+ * which itself falls back to V2's layout below xl) with no visible chrome — the switcher is dev-only scaffolding.
  */
 type Variant = "v1" | "v2" | "v3";
 
@@ -21,7 +21,7 @@ export function HeroToggle({
   v2: ReactNode;
   v3: ReactNode;
 }) {
-  const [variant, setVariant] = useState<Variant>("v1");
+  const [variant, setVariant] = useState<Variant>("v3");
 
   useEffect(() => {
     if (!dev) return;
@@ -34,8 +34,9 @@ export function HeroToggle({
     if (dev) window.localStorage.setItem("airwave-hero-variant", v);
   };
 
-  // Production shows V1 for now (V2/V3 are being refined). In dev, the toggle picks and persists the variant.
-  const active = dev ? variant : "v1";
+  // Production shows V3 (the chosen hero; it falls back to V2's layout below xl). In dev, the toggle picks and
+  // persists the variant — V1/V2 are kept for switching back.
+  const active = dev ? variant : "v3";
   const nodes: Record<Variant, ReactNode> = { v1, v2, v3 };
 
   return (

@@ -117,9 +117,9 @@ export function HeroV2({ dl }: { dl: HeroDownloads }) {
               bumpers — streamed straight from your Plex to native apps on every big screen you own.
             </p>
             <div className="flex flex-col gap-4 max-lg:items-center">
-              <HeroDownloadButtons dl={dl} />
+              <HeroDownloadButtons dl={dl} compact="narrow" />
               <div className="flex flex-row flex-wrap items-center gap-2.5">
-                <Link href="/docs/getting-started" className={cn(button("secondary"), "max-sm:text-sm")}>
+                <Link href="/docs/getting-started" className={cn(button("secondary"), "max-[598px]:text-sm")}>
                   Get started
                 </Link>
                 <GitHubButton />
@@ -164,7 +164,15 @@ function GlassPromoFrame({ className }: { className?: string }) {
  */
 export function HeroV3({ dl }: { dl: HeroDownloads }) {
   return (
-    <section className="relative -mt-4">
+    <>
+      {/* Below xl, V3's two columns get cramped, so fall back to V2's straddle layout. (CSS swap — the hidden
+          hero's shaders auto-pause via their IntersectionObserver, so it's cheap.) */}
+      <div className="xl:hidden">
+        <HeroV2 dl={dl} />
+      </div>
+
+      {/* xl and up: the side-by-side layout. */}
+      <section className="relative -mt-4 max-xl:hidden">
       {/* Background panel behind both columns. It ends early at the bottom (leaving an apron) so the dithered
           logo can straddle its bottom-center edge — the V2 straddle trick, applied to the logo instead of the
           video. */}
@@ -175,8 +183,8 @@ export function HeroV3({ dl }: { dl: HeroDownloads }) {
 
       {/* The dithered mark straddling the panel's bottom-center edge (half on the panel, half on the apron). */}
       <DitheredLogo
-        width={360}
-        height={264}
+        width={300}
+        height={220}
         className="pointer-events-none absolute bottom-[130px] left-1/2 z-1 -translate-x-1/2 translate-y-1/2 md:bottom-[150px]"
       />
 
@@ -184,7 +192,7 @@ export function HeroV3({ dl }: { dl: HeroDownloads }) {
           off-panel half of the logo sits in the apron (not over the next section). */}
       <div className="dark relative z-10 pb-[130px] text-landing-foreground md:pb-[150px]">
         <Wide>
-          <div className="grid items-start gap-10 py-16 lg:grid-cols-2 lg:gap-14 lg:py-24">
+          <div className="grid items-start gap-10 py-16 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-14 lg:py-24">
             {/* Left — hero copy (same type sizes as V2). */}
             <div className="text-center lg:text-left">
               <p className="w-fit rounded-full border border-brand/50 bg-fd-background/50 px-3 py-1.5 text-xs font-medium text-brand backdrop-blur-md max-lg:mx-auto">
@@ -198,9 +206,9 @@ export function HeroV3({ dl }: { dl: HeroDownloads }) {
                 bumpers — streamed straight from your Plex to native apps on every big screen you own.
               </p>
               <div className="flex flex-col gap-4 max-lg:items-center">
-                <HeroDownloadButtons dl={dl} />
+                <HeroDownloadButtons dl={dl} compact />
                 <div className="flex flex-row flex-wrap items-center gap-2.5">
-                  <Link href="/docs/getting-started" className={cn(button("secondary"), "max-sm:text-sm")}>
+                  <Link href="/docs/getting-started" className={cn(button("secondary"), "text-sm")}>
                     Get started
                   </Link>
                   <GitHubButton />
@@ -223,6 +231,7 @@ export function HeroV3({ dl }: { dl: HeroDownloads }) {
           </div>
         </Wide>
       </div>
-    </section>
+      </section>
+    </>
   );
 }
