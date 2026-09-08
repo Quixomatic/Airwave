@@ -176,23 +176,24 @@ export function HeroV3({ dl }: { dl: HeroDownloads }) {
       {/* Background panel behind both columns. It ends early at the bottom (leaving an apron) so the dithered
           logo can straddle its bottom-center edge — the V2 straddle trick, applied to the logo instead of the
           video. */}
-      <div className="dark absolute inset-x-2 top-2 bottom-[130px] -z-1 overflow-hidden rounded-2xl border bg-fd-background md:inset-x-4 md:top-4 md:bottom-[150px]" />
-      <div className="dark absolute inset-x-2 top-2 bottom-[130px] -z-1 overflow-hidden rounded-2xl md:inset-x-4 md:top-4 md:bottom-[150px]">
+      <div className="dark absolute inset-x-2 top-2 bottom-[48px] -z-1 overflow-hidden rounded-2xl border bg-fd-background md:inset-x-4 md:top-4 md:bottom-[56px]" />
+      <div className="dark absolute inset-x-2 top-2 bottom-[48px] -z-1 overflow-hidden rounded-2xl md:inset-x-4 md:top-4 md:bottom-[56px]">
         <HeroShaders hideLogo />
       </div>
 
-      {/* The dithered mark straddling the panel's bottom-center edge (half on the panel, half on the apron). */}
+      {/* The dithered mark sitting on the panel's bottom-center edge — a modest hang past it (translate-y-1/3),
+          with the apron below giving it room. */}
       <DitheredLogo
         width={300}
         height={220}
-        className="pointer-events-none absolute bottom-[130px] left-1/2 z-1 -translate-x-1/2 translate-y-1/2 md:bottom-[150px]"
+        className="pointer-events-none absolute bottom-[48px] left-1/2 z-1 -translate-x-1/2 translate-y-1/3 md:bottom-[56px]"
       />
 
       {/* pb reserves the apron below the columns so the panel's early end lands at the columns' bottom and the
           off-panel half of the logo sits in the apron (not over the next section). */}
-      <div className="dark relative z-10 pb-[130px] text-landing-foreground md:pb-[150px]">
+      <div className="dark relative z-10 pb-[48px] text-landing-foreground md:pb-[56px]">
         <Wide>
-          <div className="grid items-start gap-10 py-16 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-14 lg:py-24">
+          <div className="grid items-start gap-10 pt-16 pb-28 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-14 lg:pt-24 lg:pb-40">
             {/* Left — hero copy (same type sizes as V2). */}
             <div className="text-center lg:text-left">
               <p className="w-fit rounded-full border border-brand/50 bg-fd-background/50 px-3 py-1.5 text-xs font-medium text-brand backdrop-blur-md max-lg:mx-auto">
