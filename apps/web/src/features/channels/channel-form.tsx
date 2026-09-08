@@ -19,7 +19,18 @@ import { Switch } from "@airwave/ui/components/switch";
 import { Textarea } from "@airwave/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ChevronDown, Info, Layers, ListFilter, SlidersHorizontal, Tv, type LucideIcon } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ClipboardPaste,
+  Copy,
+  Info,
+  Layers,
+  ListFilter,
+  SlidersHorizontal,
+  Tv,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -28,6 +39,8 @@ import { IconTintField } from "@/features/icons/icon-tint-field";
 import { trpc } from "@/utils/trpc";
 
 import { FilterBuilder, type FilterGroup, normalizeFilter } from "./filter-builder";
+import { encodeFilter } from "./filter-clipboard";
+import { ImportFilterDialog } from "./import-filter-dialog";
 import { StrategyEditor, type ChannelStrategy } from "./strategy-editor";
 
 export type Ordering = "SHUFFLE" | "IN_ORDER" | "BY_AIR_DATE";
@@ -155,6 +168,8 @@ export function ChannelForm({
   const [enabled, setEnabled] = useState(initial?.enabled ?? true);
   const [bumperMode, setBumperMode] = useState<BumperMode>(initial?.bumperMode ?? "INHERIT");
   const [filter, setFilter] = useState<FilterGroup>(() => normalizeFilter(initial?.filter));
+  const [importOpen, setImportOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const selectedPackage = packages.data?.find((p) => p.id === packageId);
 
@@ -162,6 +177,24 @@ export function ChannelForm({
     ...(movies ? (["movie"] as const) : []),
     ...(tv ? (["show"] as const) : []),
   ];
+
+  // Copy the current content types + filter to the clipboard (versioned envelope); paste opens a review dialog.
+  const copyFilter = async () => {
+    if (copied) return;
+    try {
+      await navigator.clipboard.writeText(encodeFilter(mediaTypes, filter));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Couldn't copy — the clipboard isn't available in this context.");
+    }
+  };
+  const applyImportedFilter = (types: MediaType[], f: FilterGroup) => {
+    setMovies(types.includes("movie"));
+    setTv(types.includes("show"));
+    setFilter(normalizeFilter(f));
+    toast.success("Filter applied.");
+  };
 
   // Report the live filter/source/sort upward so a preview panel can resolve the UNSAVED filter (#12). Fires
   // whenever the builder, media types, sort, or the resolved source changes; `mediaTypes` is rebuilt inside from
@@ -415,17 +448,42 @@ export function ChannelForm({
       {/* Content types + filter together, LAST — they jointly define what plays, and the
           resolved preview tiles render right below the form. */}
       <Section title="Content & filter" icon={ListFilter}>
-        <div className="space-y-2">
-          <Label>Content</Label>
-          <div className="flex gap-4 text-sm">
-            <label className="flex items-center gap-2">
-              <Checkbox checked={movies} onCheckedChange={(v) => setMovies(v === true)} />
-              Movies
-            </label>
-            <label className="flex items-center gap-2">
-              <Checkbox checked={tv} onCheckedChange={(v) => setTv(v === true)} />
-              TV Shows
-            </label>
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-2">
+            <Label>Content</Label>
+            <div className="flex gap-4 text-sm">
+              <label className="flex items-center gap-2">
+                <Checkbox checked={movies} onCheckedChange={(v) => setMovies(v === true)} />
+                Movies
+              </label>
+              <label className="flex items-center gap-2">
+                <Checkbox checked={tv} onCheckedChange={(v) => setTv(v === true)} />
+                TV Shows
+              </label>
+            </div>
+          </div>
+          {/* Copy the content types + filter to the clipboard, or paste one in (with a review dialog). */}
+          <div className="flex shrink-0 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={copyFilter}
+              className={copied ? "pointer-events-none text-emerald-600 dark:text-emerald-500" : undefined}
+            >
+              {copied ? (
+                <>
+                  <Check className="mr-1 h-3.5 w-3.5" /> Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="mr-1 h-3.5 w-3.5" /> Copy
+                </>
+              )}
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+              <ClipboardPaste className="mr-1 h-3.5 w-3.5" /> Paste
+            </Button>
           </div>
         </div>
         <FilterBuilder
@@ -435,6 +493,13 @@ export function ChannelForm({
           mediaTypes={mediaTypes}
         />
       </Section>
+
+      <ImportFilterDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onApply={applyImportedFilter}
+        mediaSourceId={sourceId}
+      />
 
       {/* Advanced grouping/rotation strategy — collapsed by default so a basic channel stays simple, but
           auto-expanded when this channel ALREADY has a strategy (so it's not hidden). Optional; off = plays in

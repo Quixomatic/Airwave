@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.18] - 2026-09-08
+
+Admin — copy and paste channel filters.
+
+### Added
+- **Copy / paste a filter** in the channel form's "Content & filter" section. Copy serializes the content
+  types + filter to the clipboard in a versioned envelope (`{"type":"airwave/filter","v":1,…}`), and the
+  button confirms with a green "Copied" state. Paste opens an **Import filter** dialog that best-effort
+  prefills from the clipboard, validates the JSON (with clear errors), and shows a **faithful read-only
+  preview** of the filter plus the content types it will apply, before you confirm. Works across create and
+  edit, so a filter can be copied from one channel and pasted into another.
+- **Read-only mode for the filter builder** (`readOnly` prop) — renders the filter faithfully but
+  non-interactive (disabled controls, no add/remove); reusable beyond the import preview.
+
 ## [0.13.17] - 2026-09-08
 
 Admin — clone a channel, plus tooltips and a package hover card on the channel list.

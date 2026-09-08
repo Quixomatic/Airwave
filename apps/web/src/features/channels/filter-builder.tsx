@@ -95,6 +95,8 @@ type SharedProps = {
   fields: FieldMeta[];
   mediaSourceId: string;
   mediaTypes: ("movie" | "show")[];
+  /** Render the filter faithfully but non-interactive (disabled controls, no add/remove). */
+  readOnly?: boolean;
 };
 
 export function FilterBuilder({
@@ -102,11 +104,13 @@ export function FilterBuilder({
   onChange,
   mediaSourceId,
   mediaTypes,
+  readOnly = false,
 }: {
   value: FilterGroup;
   onChange: (g: FilterGroup) => void;
   mediaSourceId: string;
   mediaTypes: ("movie" | "show")[];
+  readOnly?: boolean;
 }) {
   const fields = useQuery(trpc.channels.filterFields.queryOptions());
   return (
@@ -117,6 +121,7 @@ export function FilterBuilder({
       fields={fields.data ?? []}
       mediaSourceId={mediaSourceId}
       mediaTypes={mediaTypes}
+      readOnly={readOnly}
     />
   );
 }
@@ -129,6 +134,7 @@ function GroupEditor({
   fields,
   mediaSourceId,
   mediaTypes,
+  readOnly,
 }: SharedProps & {
   group: FilterGroup;
   onChange: (g: FilterGroup) => void;
@@ -147,6 +153,7 @@ function GroupEditor({
           Match
           <Select
             value={group.combinator}
+            disabled={readOnly}
             onValueChange={(v) => onChange({ ...group, combinator: (v ?? "and") as "and" | "or" })}
           >
             <SelectTrigger className="w-32 min-w-0">
@@ -159,7 +166,7 @@ function GroupEditor({
           </Select>
           of:
         </div>
-        {onRemove && !isRoot && (
+        {!readOnly && onRemove && !isRoot && (
           <Button variant="ghost" size="icon-sm" onClick={onRemove}>
             <X className="h-3.5 w-3.5" />
           </Button>
@@ -177,6 +184,7 @@ function GroupEditor({
               fields={fields}
               mediaSourceId={mediaSourceId}
               mediaTypes={mediaTypes}
+              readOnly={readOnly}
             />
           ) : (
             <GroupEditor
@@ -187,6 +195,7 @@ function GroupEditor({
               fields={fields}
               mediaSourceId={mediaSourceId}
               mediaTypes={mediaTypes}
+              readOnly={readOnly}
             />
           ),
         )}
@@ -195,32 +204,34 @@ function GroupEditor({
         )}
       </div>
 
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() =>
-            onChange({
-              ...group,
-              children: [
-                ...group.children,
-                { type: "condition", id: uid(), field: fields[0]?.field ?? "genre", op: "is", value: "" },
-              ],
-            })
-          }
-        >
-          <Plus className="mr-1 h-3.5 w-3.5" /> Condition
-        </Button>
-        {isRoot && (
+      {!readOnly && (
+        <div className="flex gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => onChange({ ...group, children: [...group.children, emptyGroup()] })}
+            onClick={() =>
+              onChange({
+                ...group,
+                children: [
+                  ...group.children,
+                  { type: "condition", id: uid(), field: fields[0]?.field ?? "genre", op: "is", value: "" },
+                ],
+              })
+            }
           >
-            <Plus className="mr-1 h-3.5 w-3.5" /> Group
+            <Plus className="mr-1 h-3.5 w-3.5" /> Condition
           </Button>
-        )}
-      </div>
+          {isRoot && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onChange({ ...group, children: [...group.children, emptyGroup()] })}
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" /> Group
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -232,6 +243,7 @@ function ConditionEditor({
   fields,
   mediaSourceId,
   mediaTypes,
+  readOnly,
 }: SharedProps & {
   condition: FilterCondition;
   onChange: (c: FilterCondition) => void;
@@ -245,13 +257,14 @@ function ConditionEditor({
       mediaTypes,
       field: condition.field,
     }),
-    enabled: isTag && !!mediaSourceId && mediaTypes.length > 0,
+    enabled: isTag && !!mediaSourceId && mediaTypes.length > 0 && !readOnly,
   });
 
   return (
     <div className="flex items-center gap-2">
       <Select
         value={condition.field}
+        disabled={readOnly}
         onValueChange={(v) => {
           const next = v ?? condition.field;
           const m = fields.find((f) => f.field === next);
@@ -272,6 +285,7 @@ function ConditionEditor({
 
       <Select
         value={condition.op}
+        disabled={readOnly}
         onValueChange={(v) => onChange({ ...condition, op: (v ?? "is") as FilterOp })}
       >
         <SelectTrigger className="w-36">
@@ -289,6 +303,7 @@ function ConditionEditor({
       {meta?.kind === "bool" ? (
         <Select
           value={condition.value || "true"}
+          disabled={readOnly}
           onValueChange={(v) => onChange({ ...condition, value: v ?? "true" })}
         >
           <SelectTrigger className="min-w-0 flex-1">
@@ -302,6 +317,7 @@ function ConditionEditor({
       ) : isTag ? (
         <Select
           value={condition.value}
+          disabled={readOnly}
           onValueChange={(v) => onChange({ ...condition, value: v ?? "" })}
         >
           <SelectTrigger className="min-w-0 flex-1">
@@ -319,12 +335,14 @@ function ConditionEditor({
         <Input
           type="date"
           className="h-8 flex-1"
+          disabled={readOnly}
           value={condition.value}
           onChange={(e) => onChange({ ...condition, value: e.target.value })}
         />
       ) : (
         <Input
           className="h-8 flex-1"
+          disabled={readOnly}
           value={condition.value}
           onChange={(e) => onChange({ ...condition, value: e.target.value })}
           placeholder={
@@ -333,9 +351,11 @@ function ConditionEditor({
         />
       )}
 
-      <Button variant="ghost" size="icon-sm" onClick={onRemove}>
-        <X className="h-3.5 w-3.5" />
-      </Button>
+      {!readOnly && (
+        <Button variant="ghost" size="icon-sm" onClick={onRemove}>
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      )}
     </div>
   );
 }
