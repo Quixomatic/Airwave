@@ -94,3 +94,17 @@
   --brand-secondary-foreground: #dbeafe;
   --landing-foreground: #cbd5e1;
 }
+
+/* A periodic light sweep — used on the hero "Play" badge. The band crosses in the first ~third, then holds
+   off-screen for the rest of the cycle so it glints occasionally rather than churning constantly. */
+@keyframes badge-shimmer {
+  0% { transform: translateX(-100%); }
+  35% { transform: translateX(200%); }
+  100% { transform: translateX(200%); }
+}
+.animate-badge-shimmer {
+  animation: badge-shimmer 4.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-badge-shimmer { animation: none; }
+}

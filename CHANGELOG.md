@@ -2,6 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.16] - 2026-09-08
+
+Site (getairwave.tv) — hero polish: animated entrance, a promo modal, and a frosted bottom edge.
+
+### Added
+- **Staggered entrance animation** on the hero (V2 + V3, via framer-motion): the copy fades + slides up in
+  sequence (badge, title, subhead, CTAs) and the V3 media frame slides in from the right on load.
+- **Bottom-edge progressive blur** (`components/bottom-blur.tsx`) mounted at the marketing layout level — a
+  stack of increasingly-blurred, masked layers so content melts into a frosted edge at the bottom of the
+  viewport (ported from the GuideEngine landing).
+- A caption below the clip reel controls: the current clip's name, a separator, and a monospace `x/y` position.
+- A **shimmer** light-sweep on the hero badge, and the badge now leads with a solid "▶ Play" chip.
+
+### Changed
+- The badge's promo modal is larger and now **autoplays with sound** (the click grants autoplay-with-sound),
+  with a best-effort `vq=hd1080` quality hint.
+- The reel's `filtered-pick` clip is labeled "Create channel".
+
 ## [0.13.15] - 2026-09-08
 
 Site (getairwave.tv) — promote the side-by-side hero (V3) to production and refine the CTA sizing.

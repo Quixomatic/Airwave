@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { FaGithub } from "react-icons/fa";
 import { cn } from "@/lib/cn";
 import { button } from "@/components/landing";
@@ -19,8 +22,15 @@ export const HERO_REEL = [
   { src: "/demos/dvr-bumper.mp4", label: "DVR + bumper" },
   { src: "/demos/mini-player.mp4", label: "Mini player" },
   { src: "/demos/lenses.mp4", label: "Filter lenses" },
-  { src: "/demos/filtered-pick.mp4", label: "Filtered pick" },
+  { src: "/demos/filtered-pick.mp4", label: "Create channel" },
 ];
+
+// Staggered fade-up entrance (matches the GuideEngine landing hero: fade + slide-up on load, incremental delay).
+const fadeUp = (delay: number) => ({
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.5, delay },
+});
 
 function GitHubButton() {
   return (
@@ -101,17 +111,25 @@ export function HeroV2({ dl }: { dl: HeroDownloads }) {
       <div className="dark relative z-10 text-landing-foreground">
         <Wide>
           <div className="mx-auto max-w-5xl pt-24 pb-6 text-center lg:pt-36 lg:text-left">
-            <HeroBadge clips={HERO_REEL} poster="/screenshots/appletv-guide.webp" className="max-lg:mx-auto" />
-            <h1 className="mt-8 max-w-4xl font-display text-[clamp(2.5rem,7vw,4.75rem)] leading-none font-medium tracking-[-0.045em] text-fd-foreground [text-shadow:0_2px_18px_rgb(3_7_18_/_0.6)] max-lg:mx-auto">
+            <motion.div {...fadeUp(0)}>
+              <HeroBadge clips={HERO_REEL} poster="/screenshots/appletv-guide.webp" className="max-lg:mx-auto" />
+            </motion.div>
+            <motion.h1
+              {...fadeUp(0.1)}
+              className="mt-8 max-w-4xl font-display text-[clamp(2.5rem,7vw,4.75rem)] leading-none font-medium tracking-[-0.045em] text-fd-foreground [text-shadow:0_2px_18px_rgb(3_7_18_/_0.6)] max-lg:mx-auto"
+            >
               Your library, always on.
               <br />
               Surf it like <span className="text-brand-200">live TV</span>.
-            </h1>
-            <p className="mt-6 mb-10 max-w-2xl text-base text-fd-foreground/85 [text-shadow:0_1px_14px_rgb(3_7_18_/_0.55)] max-lg:mx-auto md:text-lg">
+            </motion.h1>
+            <motion.p
+              {...fadeUp(0.2)}
+              className="mt-6 mb-10 max-w-2xl text-base text-fd-foreground/85 [text-shadow:0_1px_14px_rgb(3_7_18_/_0.55)] max-lg:mx-auto md:text-lg"
+            >
               Airwave turns your own media into always-on, channel-surfable live TV — a real guide, DVR, and
               bumpers — streamed straight from your Plex to native apps on every big screen you own.
-            </p>
-            <div className="flex flex-col gap-4 max-lg:items-center">
+            </motion.p>
+            <motion.div {...fadeUp(0.3)} className="flex flex-col gap-4 max-lg:items-center">
               <HeroDownloadButtons dl={dl} compact="narrow" />
               <div className="flex flex-row flex-wrap items-center gap-2.5">
                 <Link href="/docs/getting-started" className={cn(button("secondary"), "max-[598px]:text-sm")}>
@@ -119,14 +137,16 @@ export function HeroV2({ dl }: { dl: HeroDownloads }) {
                 </Link>
                 <GitHubButton />
               </div>
-            </div>
+            </motion.div>
 
             {/* The demo clip reel in the glass frame (straddling the panel's bottom edge), controls below. */}
-            <HeroClipReel
-              clips={HERO_REEL}
-              poster="/screenshots/appletv-guide.webp"
-              className="mt-14 lg:mt-16"
-            />
+            <motion.div {...fadeUp(0.4)}>
+              <HeroClipReel
+                clips={HERO_REEL}
+                poster="/screenshots/appletv-guide.webp"
+                className="mt-14 lg:mt-16"
+              />
+            </motion.div>
           </div>
         </Wide>
       </div>
@@ -171,17 +191,25 @@ export function HeroV3({ dl }: { dl: HeroDownloads }) {
       <div className="dark relative z-10 pb-[48px] text-landing-foreground md:pb-[56px]">
         <Wide>
           <div className="grid items-start gap-10 pt-16 pb-28 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-14 lg:pt-24 lg:pb-40">
-            {/* Left — hero copy (same type sizes as V2). */}
+            {/* Left — hero copy (same type sizes as V2), staggered fade-up on load. */}
             <div className="text-center lg:text-left">
-              <HeroBadge clips={HERO_REEL} poster="/screenshots/appletv-guide.webp" className="max-lg:mx-auto" />
-              <h1 className="mt-8 font-display text-[clamp(2.5rem,7vw,4.75rem)] leading-none font-medium tracking-[-0.045em] text-fd-foreground [text-shadow:0_2px_18px_rgb(3_7_18_/_0.6)]">
+              <motion.div {...fadeUp(0)}>
+                <HeroBadge clips={HERO_REEL} poster="/screenshots/appletv-guide.webp" className="max-lg:mx-auto" />
+              </motion.div>
+              <motion.h1
+                {...fadeUp(0.1)}
+                className="mt-8 font-display text-[clamp(2.5rem,7vw,4.75rem)] leading-none font-medium tracking-[-0.045em] text-fd-foreground [text-shadow:0_2px_18px_rgb(3_7_18_/_0.6)]"
+              >
                 Your library, always on. Surf it like <span className="text-brand-200">live TV</span>.
-              </h1>
-              <p className="mt-6 mb-10 text-base text-fd-foreground/85 [text-shadow:0_1px_14px_rgb(3_7_18_/_0.55)] max-lg:mx-auto max-lg:max-w-xl md:text-lg">
+              </motion.h1>
+              <motion.p
+                {...fadeUp(0.2)}
+                className="mt-6 mb-10 text-base text-fd-foreground/85 [text-shadow:0_1px_14px_rgb(3_7_18_/_0.55)] max-lg:mx-auto max-lg:max-w-xl md:text-lg"
+              >
                 Airwave turns your own media into always-on, channel-surfable live TV — a real guide, DVR, and
                 bumpers — streamed straight from your Plex to native apps on every big screen you own.
-              </p>
-              <div className="flex flex-col gap-4 max-lg:items-center">
+              </motion.p>
+              <motion.div {...fadeUp(0.3)} className="flex flex-col gap-4 max-lg:items-center">
                 <HeroDownloadButtons dl={dl} compact />
                 <div className="flex flex-row flex-wrap items-center gap-2.5">
                   <Link href="/docs/getting-started" className={cn(button("secondary"), "text-sm")}>
@@ -189,16 +217,19 @@ export function HeroV3({ dl }: { dl: HeroDownloads }) {
                   </Link>
                   <GitHubButton />
                 </div>
-              </div>
+              </motion.div>
             </div>
 
-            {/* Right — the glass promo frame, top-aligned with the TITLE. The invisible badge-sized spacer
-                (lg only) + matching mt-8 reproduce the left column's badge + title gap, so the frame's top edge
-                lines up exactly with the title's top regardless of the badge's rendered height. */}
-            <div>
+            {/* Right — the glass media frame, top-aligned with the TITLE (invisible badge-sized spacer + matching
+                mt-8), sliding in from the right on load. */}
+            <motion.div
+              initial={{ opacity: 0, x: 48 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.15 }}
+            >
               <p
                 aria-hidden
-                className="invisible w-fit rounded-full px-3 py-1.5 text-xs font-medium max-lg:hidden"
+                className="invisible w-fit rounded-full px-3 py-1 text-xs font-medium max-lg:hidden"
               >
                 &nbsp;
               </p>
@@ -207,7 +238,7 @@ export function HeroV3({ dl }: { dl: HeroDownloads }) {
                 poster="/screenshots/appletv-guide.webp"
                 className="lg:mt-8"
               />
-            </div>
+            </motion.div>
           </div>
         </Wide>
       </div>

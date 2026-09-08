@@ -40,11 +40,19 @@ export function HeroBadge({
         type="button"
         onClick={() => setOpen(true)}
         className={cn(
-          "group inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-brand/50 bg-fd-background/50 px-3 py-1.5 text-xs font-medium text-brand backdrop-blur-md transition-colors hover:border-brand hover:bg-fd-background/70",
+          "group relative inline-flex cursor-pointer items-center gap-2 overflow-hidden rounded-full border border-brand/50 bg-fd-background/50 py-1 pr-3 pl-1 text-xs font-medium text-brand backdrop-blur-md transition-colors hover:border-brand hover:bg-fd-background/70",
           className,
         )}
       >
-        <Play className="size-2.5 fill-current" />
+        {/* Periodic light sweep. */}
+        <span
+          aria-hidden
+          className="animate-badge-shimmer pointer-events-none absolute inset-0 bg-[linear-gradient(110deg,transparent_35%,rgba(255,255,255,0.28)_50%,transparent_65%)]"
+        />
+        <span className="inline-flex items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-brand-foreground">
+          <Play className="size-2.5 fill-current" strokeWidth={0} />
+          Play
+        </span>
         {LABEL}
       </button>
 

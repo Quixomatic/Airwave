@@ -108,6 +108,15 @@ export function HeroClipReel({
           )}
         </button>
       </div>
+
+      {/* Caption: what's on now + our position in the reel. */}
+      <p className="mt-2 text-center text-xs text-fd-muted-foreground">
+        <span className="font-medium text-fd-foreground">{clips[active].label ?? clips[active].title}</span>
+        <span className="mx-1.5 text-fd-muted-foreground/50">·</span>
+        <span className="font-mono">
+          {active + 1}/{clips.length}
+        </span>
+      </p>
     </div>
   );
 }
