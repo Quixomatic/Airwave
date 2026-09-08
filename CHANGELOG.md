@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.17] - 2026-09-08
+
+Admin — clone a channel, plus tooltips and a package hover card on the channel list.
+
+### Added
+- **Clone channel.** A Copy-icon button on each channel row and a "Clone" button on the edit-channel header
+  open the create form pre-filled from the source channel (`/channels/new?from=<id>`): name + " (Clone)", media
+  types, filter, ordering, sort, advanced grouping strategy, package, icon, tint, description, and bumper mode
+  are copied; the channel number and callsign are left blank (the number auto-assigns on save). A banner in
+  clone mode reminds you the clone still has to be submitted. Reuses the existing form and `channels.create`;
+  filter-based channels clone fully (collection/playlist/manual-item channels clone their filter only).
+- **Tooltips** on the channel-list clone button and the active/inactive switch.
+- **Package hover card** on a channel row's package chip — shows the package icon, name, channel count, and
+  description. New `@airwave/ui` `hover-card` component (Base UI PreviewCard); `channels.list` now returns the
+  package description and channel count.
+
 ## [0.13.16] - 2026-09-08
 
 Site (getairwave.tv) — hero polish: animated entrance, a promo modal, and a frosted bottom edge.

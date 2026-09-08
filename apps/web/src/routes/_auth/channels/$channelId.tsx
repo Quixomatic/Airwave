@@ -8,7 +8,7 @@ import {
 } from "@airwave/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Loader2, Tv } from "lucide-react";
+import { Copy, Loader2, Tv } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -144,6 +144,14 @@ function ChannelDetail() {
       </TopHeaderRight>
 
       <HeaderRight>
+        <Button
+          variant="ghost"
+          size="sm"
+          render={<Link to="/channels/new" search={{ from: channelId }} />}
+        >
+          <Copy className="mr-1.5 h-3.5 w-3.5" />
+          Clone
+        </Button>
         <Button variant="ghost" size="sm" onClick={del}>
           Delete
         </Button>

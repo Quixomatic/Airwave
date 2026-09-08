@@ -141,7 +141,16 @@ export const channelsRouter = router({
           enabled: true,
           icon: true,
           tint: true,
-          package: { select: { id: true, name: true, icon: true, tint: true } },
+          package: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              icon: true,
+              tint: true,
+              _count: { select: { channels: true } },
+            },
+          },
         },
       });
     }),

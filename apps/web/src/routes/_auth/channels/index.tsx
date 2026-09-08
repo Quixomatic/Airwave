@@ -20,15 +20,18 @@ import {
   FramePanel,
   FrameTitle,
 } from "@airwave/ui/components/frame";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@airwave/ui/components/hover-card";
 import { Input } from "@airwave/ui/components/input";
 import { Skeleton } from "@airwave/ui/components/skeleton";
 import { Switch } from "@airwave/ui/components/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@airwave/ui/components/tooltip";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowUpDown,
   Blocks,
+  Copy,
   Filter,
   LayoutGrid,
   ListOrdered,
@@ -417,6 +420,7 @@ function ChannelsList() {
               />
             )
           ) : (
+            <TooltipProvider delay={300}>
             <ul className="divide-y">
               {channels.data?.map((c) => {
                 const tile = resolveTile({
@@ -426,6 +430,9 @@ function ChannelsList() {
                   inheritedTint: c.package?.tint,
                   defaultIcon: Tv,
                 });
+                const pkgTile = c.package
+                  ? resolveTile({ icon: c.package.icon, tint: c.package.tint, defaultIcon: Blocks })
+                  : null;
                 return (
                   <li key={c.id} className="flex items-center">
                     <Link
@@ -446,25 +453,71 @@ function ChannelsList() {
                           Inactive
                         </span>
                       )}
-                      {c.package && (
-                        <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-xs">
-                          {c.package.name}
-                        </span>
+                      {c.package && pkgTile && (
+                        <HoverCard>
+                          <HoverCardTrigger
+                            render={
+                              <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-xs">
+                                {c.package.name}
+                              </span>
+                            }
+                          />
+                          <HoverCardContent>
+                            <div className="flex items-start gap-2.5">
+                              <AccentIconTile icon={pkgTile.Icon} tint={pkgTile.tint} size="lg" />
+                              <div className="min-w-0">
+                                <p className="text-foreground truncate font-medium">{c.package.name}</p>
+                                <p className="text-muted-foreground text-xs">
+                                  {c.package._count?.channels ?? 0} channel
+                                  {(c.package._count?.channels ?? 0) === 1 ? "" : "s"}
+                                </p>
+                                {c.package.description && (
+                                  <p className="text-muted-foreground mt-1.5 line-clamp-4 text-xs leading-relaxed">
+                                    {c.package.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
                       )}
                       <span className="text-muted-foreground text-xs capitalize">
                         {c.ordering.toLowerCase().replace("_", " ")}
                       </span>
                     </Link>
-                    <label
-                      className="px-4"
-                      title={c.enabled ? "Active — click to deactivate" : "Inactive — click to activate"}
-                    >
-                      <Switch checked={c.enabled} onCheckedChange={(v) => toggle(c.id, v === true)} />
-                    </label>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-muted-foreground hover:text-foreground"
+                            aria-label={`Clone ${c.name}`}
+                            render={<Link to="/channels/new" search={{ from: c.id }} />}
+                          >
+                            <Copy />
+                          </Button>
+                        }
+                      />
+                      <TooltipContent>Clone channel</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <label className="px-4">
+                            <Switch checked={c.enabled} onCheckedChange={(v) => toggle(c.id, v === true)} />
+                          </label>
+                        }
+                      />
+                      <TooltipContent>
+                        {c.enabled ? "Active — click to deactivate" : "Inactive — click to activate"}
+                      </TooltipContent>
+                    </Tooltip>
                   </li>
                 );
               })}
             </ul>
+            </TooltipProvider>
           )}
         </FramePanel>
       </Frame>
