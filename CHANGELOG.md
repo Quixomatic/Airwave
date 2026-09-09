@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.19] - 2026-09-09
+
+tv-native (Android TV) — re-fit HDR video aspect after the switch so it stops occasionally zooming.
+**Needs a new Android build; adb-test before merge.**
+
+### Fixed
+- **HDR content no longer sometimes stays zoomed after the `mediacodec_embed` switch.** The aspect-fit was
+  applied once on the initial gpu-next load; the in-place HDR switch reconfigures the MediaCodec surface
+  asynchronously and never re-fired the fit, so the letterbox could miss and the video appeared zoomed. The
+  view now re-fits on the switch (`MpvCore.maybeSwitchHdr` pushes mpv's authoritative display aspect,
+  `video-params/aspect`, via a new `mpvAspectChanged` delegate — immediately and again ~150ms later to catch
+  the async surface reconfigure) and forces a relayout, plus a HDR-scoped global-layout re-fit for
+  surface/mini↔full settles (adapted from plezy's ExoPlayer refit-on-settle). Android-only; SDR/gpu-next and
+  iOS/tvOS untouched.
+
 ## [0.13.18] - 2026-09-08
 
 Admin — copy and paste channel filters.

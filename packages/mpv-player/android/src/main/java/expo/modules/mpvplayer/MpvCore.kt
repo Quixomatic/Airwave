@@ -21,6 +21,9 @@ import kotlin.math.abs
 /** Events surfaced from the mpv flows up to the Expo view (mirrors the iOS `MpvCoreDelegate`). */
 interface MpvCoreDelegate {
   fun mpvDidLoad(duration: Double, width: Int, height: Int)
+  /** The video's true display aspect ratio (DAR) changed mid-program — used to re-fit the view's aspect
+   *  container after the HDR (`mediacodec_embed`) switch, which ignores mpv's own aspect handling. */
+  fun mpvAspectChanged(dar: Double)
   fun mpvFirstFrame()
   fun mpvProgress(time: Double, duration: Double)
   fun mpvBuffering(buffering: Boolean)
@@ -462,6 +465,12 @@ class MpvCore(private val appContext: Context) {
     p.setProperty("hwdec", if (isHdr) "mediacodec" else "mediacodec,mediacodec-copy")
     p.setProperty("vo", neededVo)
 
+    // mediacodec_embed ignores mpv's own aspect handling (keepaspect/panscan), so the view must letterbox
+    // the surface itself. `mpvDidLoad` fit the container once on the initial gpu-next load and never re-fires
+    // for this in-place switch, so re-push the true display aspect now (and again after the embed surface
+    // reconfigures asynchronously). Only for HDR — SDR stays on gpu-next, which fits itself.
+    if (isHdr) refitHdrAspect()
+
     // TRANSCODE (Plex HLS): switch the VO/decoder LIVE on the running stream — do NOT reload. Re-requesting
     // the Plex session URL (`loadfile replace`) un-anchors it (offset lost) AND resets mpv's `time-pos`,
     // which the JS channel clock depends on (it must stay session-relative + continuous). This mirrors how
@@ -479,5 +488,32 @@ class MpvCore(private val appContext: Context) {
     pendingLoadStart = pos
     android.util.Log.i("MpvCore", "HDR switch → re-opening on $neededVo at ${pos}s")
     pendingLoadUrl?.let { doLoad(p, it, pos, pendingLoadMode) }
+  }
+
+  /**
+   * Re-fit the view's aspect container to the HDR video's true display aspect after the switch to
+   * `mediacodec_embed`. Pushed immediately, then again after a short delay because MediaCodec reconfigures the
+   * surface asynchronously — the immediate push can land before the new surface is in place. (Mirrors plezy's
+   * ExoPlayer refit-on-settle, scoped to the HDR path.)
+   */
+  private fun refitHdrAspect() {
+    scope.launch {
+      pushAspect()
+      delay(150)
+      pushAspect()
+    }
+  }
+
+  /** Read mpv's authoritative display aspect (`video-params/aspect` = dims × SAR) and push it to the view. */
+  private suspend fun pushAspect() {
+    val p = player ?: return
+    val dar =
+      (p.getDouble("video-params/aspect") ?: 0.0).takeIf { it > 0.0 }
+        ?: run {
+          val w = p.getDouble("dwidth") ?: 0.0
+          val h = p.getDouble("dheight") ?: 0.0
+          if (w > 0 && h > 0) w / h else 0.0
+        }
+    if (dar > 0.0) delegate?.mpvAspectChanged(dar)
   }
 }
