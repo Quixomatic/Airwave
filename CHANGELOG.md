@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.23] - 2026-09-09
+
+tv-native (Android TV) — make the HDR/aspect display-size tracking event-driven (no timer). **Needs a build.**
+
+### Changed
+- Replaced the ~2.5s polling window (0.13.22) with mpv **property observers on `dwidth`/`dheight`** plus a
+  single read at PlaybackRestart. The letterbox now updates the instant mpv reports the real display size
+  (however long the decode takes), and the PlaybackRestart read covers a new program whose size equals the
+  last (where the observer wouldn't fire). No timer, no polling; still dedup'd so it never churns the surface.
+
 ## [0.13.22] - 2026-09-09
 
 tv-native (Android TV) — fix the real cause of HDR aspect stretch + the switch flicker. **Needs a new build.**

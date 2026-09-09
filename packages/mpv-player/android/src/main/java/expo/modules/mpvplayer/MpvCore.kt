@@ -84,7 +84,7 @@ class MpvCore(private val appContext: Context) {
   private var pendingSurface: Surface? = null
   private var loadedEmitted = false
   private var firstFrameEmitted = false
-  // Last video display size pushed to the view (dedup for watchVideoSize). Reset per user load().
+  // Last video display size pushed to the view (dedup for pushVideoSize). Reset per user load().
   private var lastSizeW = 0
   private var lastSizeH = 0
   // Last commanded volume in mpv units (0..100); a fade resumes from here. The hybrid single engine shares
@@ -153,6 +153,10 @@ class MpvCore(private val appContext: Context) {
         delegate?.mpvProgress(t, dur)
       }.launchIn(scope)
       p.observeFlag("paused-for-cache").onEach { delegate?.mpvBuffering(it) }.launchIn(scope)
+      // Drive the aspect letterbox off the REAL display size, reacting the instant it changes (the first read
+      // after playback starts can be a placeholder before the frame decodes). Both feed the same dedup'd push.
+      p.observeDouble("dwidth").onEach { pushVideoSize() }.launchIn(scope)
+      p.observeDouble("dheight").onEach { pushVideoSize() }.launchIn(scope)
 
       p.eventFlow.onEach { handleEvent(it) }.launchIn(scope)
       // Forward mpv's own logs to logcat (`adb logcat -s MpvCore`) — invaluable for diagnosing
@@ -398,8 +402,9 @@ class MpvCore(private val appContext: Context) {
         // mediacodec_embed), then the first-frame signal.
         scope.launch { maybeEmitLoad() }
         if (HDR_SWITCH_ENABLED) scope.launch { maybeSwitchHdr() }
-        // Track the real display size as it settles (first read can be a placeholder) — drives the letterbox.
-        watchVideoSize()
+        // One size read now (covers a new program whose size equals the last, where the observer won't fire);
+        // the dwidth/dheight observers catch every subsequent change (e.g. placeholder → real after decode).
+        scope.launch { pushVideoSize() }
         if (!firstFrameEmitted) {
           firstFrameEmitted = true
           delegate?.mpvFirstFrame()
@@ -473,8 +478,8 @@ class MpvCore(private val appContext: Context) {
     p.setProperty("hwdec", if (isHdr) "mediacodec" else "mediacodec,mediacodec-copy")
     p.setProperty("vo", neededVo)
 
-    // The aspect letterbox is driven by the real display size via `watchVideoSize` (on each PlaybackRestart).
-    // The direct-play re-open below fires a fresh PlaybackRestart that re-detects the size; SDR stays on
+    // The aspect letterbox is driven by the real display size (dwidth/dheight observers + a PlaybackRestart
+    // read). The direct-play re-open below fires a fresh PlaybackRestart that re-detects the size; SDR stays on
     // gpu-next which fits itself. No forced relayout here — that churned the surface and caused reconfig flicker.
 
     // TRANSCODE (Plex HLS): switch the VO/decoder LIVE on the running stream — do NOT reload. Re-requesting
@@ -503,26 +508,21 @@ class MpvCore(private val appContext: Context) {
    * ExoPlayer refit-on-settle, scoped to the HDR path.)
    */
   /**
-   * Poll mpv's real display size (`dwidth`/`dheight`) across a short window after playback (re)starts, and push
-   * it to the view whenever it changes. The FIRST read after PlaybackRestart can be a placeholder (e.g. 960x540
-   * on Fire TV's MediaCodec) before the real frame decodes, so a single early read wrongly letterboxes to ~16:9
-   * and stretches scope content. This settles to the true size (e.g. 3840x1608 = 2.39:1) within ~1s. Dedup'd, so
-   * it fires only on an actual change — no surface churn (which caused HDR reconfig flicker).
+   * Read mpv's real display size (`dwidth`/`dheight`, PAR-correct) and push it to the view when it changes.
+   * Driven by the `dwidth`/`dheight` property observers (fires the instant the real frame decodes and the size
+   * updates from any placeholder — e.g. Fire TV MediaCodec briefly reports ~960x540) plus one read at
+   * PlaybackRestart (covers a new program whose size equals the last, where the observer wouldn't fire). No
+   * timer/poll, and dedup'd so it never churns the surface (which caused HDR reconfig flicker).
    */
-  private fun watchVideoSize() {
-    scope.launch {
-      for (step in longArrayOf(0, 250, 300, 450, 500, 1000)) {
-        if (step > 0) delay(step)
-        val p = player ?: return@launch
-        val w = (p.getDouble("dwidth") ?: 0.0).toInt()
-        val h = (p.getDouble("dheight") ?: 0.0).toInt()
-        if (w > 0 && h > 0 && (w != lastSizeW || h != lastSizeH)) {
-          lastSizeW = w
-          lastSizeH = h
-          android.util.Log.i("MpvCore", "video size → ${w}x${h}")
-          delegate?.mpvVideoSize(w, h)
-        }
-      }
+  private suspend fun pushVideoSize() {
+    val p = player ?: return
+    val w = (p.getDouble("dwidth") ?: 0.0).toInt()
+    val h = (p.getDouble("dheight") ?: 0.0).toInt()
+    if (w > 0 && h > 0 && (w != lastSizeW || h != lastSizeH)) {
+      lastSizeW = w
+      lastSizeH = h
+      android.util.Log.i("MpvCore", "video size → ${w}x${h}")
+      delegate?.mpvVideoSize(w, h)
     }
   }
 }
