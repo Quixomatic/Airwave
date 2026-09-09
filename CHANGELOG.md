@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.19] - 2026-09-09
+
+Server tooling — a per-device playback-log inspector.
+
+### Added
+- **`apps/server/scripts/show-device-log.ts`** — dump one device's `PlaybackLog` (matched by deviceId /
+  platform / model / userAgent substring) joined to the real HDR flag from `MediaItem.guide.hdr`
+  (HDR10 / Dolby Vision / HLG), with an `hdr`-only filter and a distinct-HDR-title summary. Useful for finding
+  the exact HDR titles a given panel (e.g. a Fire Stick) played when building a targeted test channel.
+
 ## [0.13.18] - 2026-09-08
 
 Admin — copy and paste channel filters.
