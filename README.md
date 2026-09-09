@@ -5,7 +5,7 @@
   <a href="LICENSE"><img alt="License: PolyForm Perimeter 1.0.1" src="https://img.shields.io/badge/license-PolyForm%20Perimeter%201.0.1-lightgrey"></a>
   <a href="https://www.getairwave.tv"><img alt="Website: getairwave.tv" src="https://img.shields.io/badge/website-getairwave.tv-orange"></a>
   <a href="https://www.getairwave.tv/docs"><img alt="Docs" src="https://img.shields.io/badge/docs-getairwave.tv%2Fdocs-blue"></a>
-  <img alt="Platforms" src="https://img.shields.io/badge/platforms-Apple%20TV%20%7C%20iPad%20%7C%20Fire%20TV%20%7C%20Android%20TV%20%7C%20webOS%20%7C%20Roku%20%7C%20Web-blueviolet">
+  <img alt="Platforms" src="https://img.shields.io/badge/platforms-Apple%20TV%20%7C%20iPad%20%7C%20Fire%20TV%20%7C%20Android%20TV%20%7C%20webOS%20%7C%20Roku%20%7C%20Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-blueviolet">
   <a href="https://github.com/Quixomatic/Airwave/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Quixomatic/Airwave?style=flat&color=yellow"></a>
 </p>
 
