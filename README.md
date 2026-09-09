@@ -1,10 +1,25 @@
-<p align="center">
-  <img src="docs/screenshots/splash.gif" alt="Airwave" width="620">
-</p>
+<img src="docs/screenshots/splash.gif" alt="Airwave" width="100%">
 
 # Airwave
 
 **Turn your Plex library into your own always-on live TV.**
+
+<p align="center">
+  <a href="https://github.com/Quixomatic/Airwave/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/Quixomatic/Airwave?sort=semver&color=4a9fe0"></a>
+  <a href="LICENSE"><img alt="License: PolyForm Perimeter 1.0.1" src="https://img.shields.io/badge/license-PolyForm%20Perimeter%201.0.1-blue"></a>
+  <a href="https://www.getairwave.tv"><img alt="Website: getairwave.tv" src="https://img.shields.io/badge/website-getairwave.tv-4a9fe0"></a>
+  <img alt="Platforms" src="https://img.shields.io/badge/platforms-Apple%20TV%20%7C%20iPad%20%7C%20Fire%20TV%20%7C%20Android%20TV%20%7C%20webOS%20%7C%20Roku%20%7C%20Web-informational">
+  <a href="https://github.com/Quixomatic/Airwave/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Quixomatic/Airwave?style=flat&color=4a9fe0"></a>
+</p>
+
+<p align="center">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white">
+  <img alt="BrighterScript" src="https://img.shields.io/badge/BrighterScript-662D91?logo=roku&logoColor=white">
+  <img alt="Rust" src="https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white">
+  <img alt="Swift" src="https://img.shields.io/badge/Swift-F05138?logo=swift&logoColor=white">
+  <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white">
+</p>
 
 <p align="center">
   <a href="https://www.getairwave.tv"><b>🌐 getairwave.tv</b></a>
