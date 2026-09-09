@@ -21,10 +21,10 @@ import kotlin.math.abs
 /** Events surfaced from the mpv flows up to the Expo view (mirrors the iOS `MpvCoreDelegate`). */
 interface MpvCoreDelegate {
   fun mpvDidLoad(duration: Double, width: Int, height: Int)
-  /** Ask the view to re-fit its aspect container to the video (using the dims it already has from load) —
-   *  after the HDR (`mediacodec_embed`) switch reconfigures the surface. No value: the embed VO can briefly
-   *  misreport the aspect during the async reconfigure, so we re-assert the known-good dims, not re-read. */
-  fun mpvRefitVideo()
+  /** The video's real display size (mpv `dwidth`/`dheight`, PAR-correct) once it's known/updated. Drives the
+   *  view's aspect letterbox. Fires as the size settles after load and after the HDR re-open, because the
+   *  first `dwidth`/`dheight` read can be a placeholder (e.g. 960x540) before the real frame decodes. */
+  fun mpvVideoSize(width: Int, height: Int)
   fun mpvFirstFrame()
   fun mpvProgress(time: Double, duration: Double)
   fun mpvBuffering(buffering: Boolean)
@@ -84,6 +84,9 @@ class MpvCore(private val appContext: Context) {
   private var pendingSurface: Surface? = null
   private var loadedEmitted = false
   private var firstFrameEmitted = false
+  // Last video display size pushed to the view (dedup for watchVideoSize). Reset per user load().
+  private var lastSizeW = 0
+  private var lastSizeH = 0
   // Last commanded volume in mpv units (0..100); a fade resumes from here. The hybrid single engine shares
   // this ONE `volume` between video (full) and audio-only bumper/radio content — a video load resets it.
   private var currentVolume = 100.0
@@ -171,6 +174,8 @@ class MpvCore(private val appContext: Context) {
   fun load(url: String, startTime: Double, mode: String = "video") {
     loadedEmitted = false
     firstFrameEmitted = false
+    lastSizeW = 0
+    lastSizeH = 0
     hdrChecked = false
     fadeJob?.cancel()
     pendingLoadUrl = url
@@ -393,6 +398,8 @@ class MpvCore(private val appContext: Context) {
         // mediacodec_embed), then the first-frame signal.
         scope.launch { maybeEmitLoad() }
         if (HDR_SWITCH_ENABLED) scope.launch { maybeSwitchHdr() }
+        // Track the real display size as it settles (first read can be a placeholder) — drives the letterbox.
+        watchVideoSize()
         if (!firstFrameEmitted) {
           firstFrameEmitted = true
           delegate?.mpvFirstFrame()
@@ -466,11 +473,9 @@ class MpvCore(private val appContext: Context) {
     p.setProperty("hwdec", if (isHdr) "mediacodec" else "mediacodec,mediacodec-copy")
     p.setProperty("vo", neededVo)
 
-    // mediacodec_embed ignores mpv's own aspect handling (keepaspect/panscan), so the view must letterbox
-    // the surface itself. `mpvDidLoad` fit the container once on the initial gpu-next load and never re-fires
-    // for this in-place switch, so re-push the true display aspect now (and again after the embed surface
-    // reconfigures asynchronously). Only for HDR — SDR stays on gpu-next, which fits itself.
-    if (isHdr) refitHdrAspect()
+    // The aspect letterbox is driven by the real display size via `watchVideoSize` (on each PlaybackRestart).
+    // The direct-play re-open below fires a fresh PlaybackRestart that re-detects the size; SDR stays on
+    // gpu-next which fits itself. No forced relayout here — that churned the surface and caused reconfig flicker.
 
     // TRANSCODE (Plex HLS): switch the VO/decoder LIVE on the running stream — do NOT reload. Re-requesting
     // the Plex session URL (`loadfile replace`) un-anchors it (offset lost) AND resets mpv's `time-pos`,
@@ -497,20 +502,27 @@ class MpvCore(private val appContext: Context) {
    * surface asynchronously — the immediate push can land before the new surface is in place. (Mirrors plezy's
    * ExoPlayer refit-on-settle, scoped to the HDR path.)
    */
-  private fun refitHdrAspect() {
-    // Re-assert the video aspect against the mediacodec_embed surface. We do NOT re-read mpv's aspect here:
-    // right after the switch the embed VO can momentarily report the CODED/padded frame (e.g. 3840x2176 ≈
-    // 16:9) instead of the cropped display frame (3840x1608 = 2.39:1), which would collapse the letterbox to
-    // fill. The view already has the true dims from the initial (gpu-next) load; we just force it to re-fit.
-    // Fired across a window because the embed surface reconfigures asynchronously (observed ~1s post-switch).
+  /**
+   * Poll mpv's real display size (`dwidth`/`dheight`) across a short window after playback (re)starts, and push
+   * it to the view whenever it changes. The FIRST read after PlaybackRestart can be a placeholder (e.g. 960x540
+   * on Fire TV's MediaCodec) before the real frame decodes, so a single early read wrongly letterboxes to ~16:9
+   * and stretches scope content. This settles to the true size (e.g. 3840x1608 = 2.39:1) within ~1s. Dedup'd, so
+   * it fires only on an actual change — no surface churn (which caused HDR reconfig flicker).
+   */
+  private fun watchVideoSize() {
     scope.launch {
-      delegate?.mpvRefitVideo()
-      delay(300)
-      delegate?.mpvRefitVideo()
-      delay(600)
-      delegate?.mpvRefitVideo()
-      delay(700)
-      delegate?.mpvRefitVideo()
+      for (step in longArrayOf(0, 250, 300, 450, 500, 1000)) {
+        if (step > 0) delay(step)
+        val p = player ?: return@launch
+        val w = (p.getDouble("dwidth") ?: 0.0).toInt()
+        val h = (p.getDouble("dheight") ?: 0.0).toInt()
+        if (w > 0 && h > 0 && (w != lastSizeW || h != lastSizeH)) {
+          lastSizeW = w
+          lastSizeH = h
+          android.util.Log.i("MpvCore", "video size → ${w}x${h}")
+          delegate?.mpvVideoSize(w, h)
+        }
+      }
     }
   }
 }

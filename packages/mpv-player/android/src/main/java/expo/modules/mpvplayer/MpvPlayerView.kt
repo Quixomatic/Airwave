@@ -48,14 +48,10 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   private var videoW = 0
   private var videoH = 0
   private var contentFit = "contain"
-  // HDR (mediacodec_embed) aspect handling. `mediacodec_embed` reconfigures its surface asynchronously and
-  // ignores mpv's aspect handling, and the once-per-load `mpvDidLoad` never re-fires for the in-place HDR
-  // switch — so the core asks us to re-fit (`mpvRefitVideo`), which re-applies our known-good `videoW/videoH`
-  // (from the initial load) and forces a relayout so the embed surface re-fits. We deliberately do NOT re-read
-  // mpv's aspect on the embed VO — it can briefly report the coded/padded frame and collapse the letterbox.
-  // `hdrActive` gates the global-layout re-fit (plezy's settle safety net), scoped to HDR. Reset on a new program.
-  private var hdrActive = false
-  private var aspectRefitListener: android.view.ViewTreeObserver.OnGlobalLayoutListener? = null
+  // The real display size arrives via `mpvVideoSize` (the core watches mpv's dwidth/dheight as they settle —
+  // the first read can be a placeholder like 960x540 before the frame decodes). That updates videoW/videoH and
+  // re-letterboxes. We do NOT force relayouts or run a global-layout listener: that churned the surface and
+  // caused HDR reconfig flicker; a real size change already triggers a relayout via setAspectRatio.
 
   var options: Map<String, String> = emptyMap()
   // "auto" = full negotiated multichannel layout (default); "stereo" = force a fold-down. Merged into the
@@ -112,7 +108,7 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
    * view (no letterbox); "contain"/default → the content aspect, so the container centers + letterboxes it.
    * `setAspectRatio` only re-lays-out when the ratio actually changes (once per video), so no per-event churn.
    */
-  private fun applyAspect(force: Boolean = false) {
+  private fun applyAspect() {
     val forceFill = contentFit == "cover" || contentFit == "fill"
     val ratio =
       when {
@@ -120,23 +116,18 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
         videoW > 0 && videoH > 0 -> videoW.toFloat() / videoH.toFloat()
         else -> 0f
       }
-    android.util.Log.i("MpvCore", "applyAspect ratio=$ratio (video=${videoW}x${videoH} fit=$contentFit force=$force hdr=$hdrActive)")
+    android.util.Log.i("MpvCore", "applyAspect ratio=$ratio (video=${videoW}x${videoH} fit=$contentFit)")
     videoContainer.setAspectRatio(ratio)
-    // The change-guarded setAspectRatio won't relayout when the ratio number is unchanged, but the embed
-    // surface may have reconfigured underneath — force a re-measure so the SurfaceView re-fits the container.
-    if (force) videoContainer.requestLayout()
   }
 
   // MARK: props
 
   fun setPendingSource(source: String?) {
     pendingSource = source
-    // New program → dims unknown until its first frame; reset so applyAspect re-fits once mpvDidLoad reports
-    // the new dimensions, rather than reusing the previous program's. Also clear the HDR aspect/flag so a new
-    // (possibly SDR) program starts from the mpvDidLoad-driven fit.
+    // New program → dims unknown until its first frame; reset so applyAspect re-fits once the size is reported
+    // (via mpvVideoSize), rather than reusing the previous program's.
     videoW = 0
     videoH = 0
-    hdrActive = false
     applyAspect()
     scheduleApply()
   }
@@ -227,14 +218,16 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   }
 
   /**
-   * The HDR (`mediacodec_embed`) switch asks us to re-fit (on the UI thread): re-apply our known-good
-   * `videoW/videoH` (from the initial load) and force a relayout so the reconfigured embed surface re-fits to
-   * the letterbox. Arms the global-layout re-fit for the rest of this HDR program. Called several times across
-   * the ~1s async reconfigure window (MpvCore.refitHdrAspect).
+   * The real display size (mpv dwidth/dheight), pushed as it settles after load / the HDR re-open — the first
+   * read can be a placeholder (e.g. 960x540) before the frame decodes. Updating videoW/videoH re-letterboxes
+   * via applyAspect (the ratio change triggers the relayout). Runs on the UI thread (core scope = Main).
    */
-  override fun mpvRefitVideo() {
-    hdrActive = true
-    applyAspect(force = true)
+  override fun mpvVideoSize(width: Int, height: Int) {
+    if (width > 0 && height > 0 && (width != videoW || height != videoH)) {
+      videoW = width
+      videoH = height
+      applyAspect()
+    }
   }
 
   override fun mpvFirstFrame() {
@@ -259,22 +252,7 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
 
   // MARK: teardown
 
-  override fun onAttachedToWindow() {
-    super.onAttachedToWindow()
-    // Re-assert the HDR aspect on every layout settle (surface reconfig, mini↔full) — plezy's settle safety
-    // net, scoped to HDR. `applyAspect()` (no force) only relayouts on an actual ratio change, so it can't loop.
-    if (aspectRefitListener == null) {
-      val l = android.view.ViewTreeObserver.OnGlobalLayoutListener {
-        if (hdrActive) applyAspect()
-      }
-      aspectRefitListener = l
-      viewTreeObserver.addOnGlobalLayoutListener(l)
-    }
-  }
-
   override fun onDetachedFromWindow() {
-    aspectRefitListener?.let { viewTreeObserver.removeOnGlobalLayoutListener(it) }
-    aspectRefitListener = null
     super.onDetachedFromWindow()
     if (!disposed) {
       disposed = true

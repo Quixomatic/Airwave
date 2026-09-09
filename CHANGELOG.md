@@ -2,6 +2,27 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.22] - 2026-09-09
+
+tv-native (Android TV) — fix the real cause of HDR aspect stretch + the switch flicker. **Needs a new build.**
+
+### Fixed
+- **HDR/scope video no longer stretches.** The root cause was the aspect being computed from a placeholder
+  display size: mpv's `dwidth`/`dheight` is read once, right after playback restarts, which on some devices
+  (e.g. Fire TV MediaCodec) is *before* the real frame decodes — returning ~`960x540` (16:9) instead of the
+  true size (e.g. `3840x1608` = 2.39:1). 16:9 content survived by coincidence; scope films stretched. The core
+  now **watches the display size as it settles** (`watchVideoSize`, polled across ~2.5s after each
+  PlaybackRestart) and pushes it to the view via `mpvVideoSize` whenever it changes — so the letterbox tracks
+  the real size on any device (mirrors plezy's `onVideoSizeChanged`).
+- **No more reconfigure flicker / HDR↔DV badge flip-flop on the switch.** Removed the forced-relayout and
+  global-layout re-fit machinery added in 0.13.19–0.13.21; it churned the SurfaceView size, which made
+  MediaCodec reconfigure repeatedly (each reconfig a visible filter flash + a dynamic-range re-read). A real
+  size change already triggers a single relayout via `setAspectRatio`, so no forcing is needed.
+
+### Note
+- Any residual per-scene flicker on HDR10+ titles is the decoder re-emitting dynamic metadata, inherent to the
+  content, not this code path.
+
 ## [0.13.21] - 2026-09-09
 
 tv-native (Android TV) — correct the HDR aspect re-fit (v0.13.19 regressed it). **Needs a new Android build.**
