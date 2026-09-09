@@ -21,9 +21,10 @@ import kotlin.math.abs
 /** Events surfaced from the mpv flows up to the Expo view (mirrors the iOS `MpvCoreDelegate`). */
 interface MpvCoreDelegate {
   fun mpvDidLoad(duration: Double, width: Int, height: Int)
-  /** The video's true display aspect ratio (DAR) changed mid-program — used to re-fit the view's aspect
-   *  container after the HDR (`mediacodec_embed`) switch, which ignores mpv's own aspect handling. */
-  fun mpvAspectChanged(dar: Double)
+  /** Ask the view to re-fit its aspect container to the video (using the dims it already has from load) —
+   *  after the HDR (`mediacodec_embed`) switch reconfigures the surface. No value: the embed VO can briefly
+   *  misreport the aspect during the async reconfigure, so we re-assert the known-good dims, not re-read. */
+  fun mpvRefitVideo()
   fun mpvFirstFrame()
   fun mpvProgress(time: Double, duration: Double)
   fun mpvBuffering(buffering: Boolean)
@@ -497,23 +498,19 @@ class MpvCore(private val appContext: Context) {
    * ExoPlayer refit-on-settle, scoped to the HDR path.)
    */
   private fun refitHdrAspect() {
+    // Re-assert the video aspect against the mediacodec_embed surface. We do NOT re-read mpv's aspect here:
+    // right after the switch the embed VO can momentarily report the CODED/padded frame (e.g. 3840x2176 ≈
+    // 16:9) instead of the cropped display frame (3840x1608 = 2.39:1), which would collapse the letterbox to
+    // fill. The view already has the true dims from the initial (gpu-next) load; we just force it to re-fit.
+    // Fired across a window because the embed surface reconfigures asynchronously (observed ~1s post-switch).
     scope.launch {
-      pushAspect()
-      delay(150)
-      pushAspect()
+      delegate?.mpvRefitVideo()
+      delay(300)
+      delegate?.mpvRefitVideo()
+      delay(600)
+      delegate?.mpvRefitVideo()
+      delay(700)
+      delegate?.mpvRefitVideo()
     }
-  }
-
-  /** Read mpv's authoritative display aspect (`video-params/aspect` = dims × SAR) and push it to the view. */
-  private suspend fun pushAspect() {
-    val p = player ?: return
-    val dar =
-      (p.getDouble("video-params/aspect") ?: 0.0).takeIf { it > 0.0 }
-        ?: run {
-          val w = p.getDouble("dwidth") ?: 0.0
-          val h = p.getDouble("dheight") ?: 0.0
-          if (w > 0 && h > 0) w / h else 0.0
-        }
-    if (dar > 0.0) delegate?.mpvAspectChanged(dar)
   }
 }

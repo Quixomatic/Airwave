@@ -2,6 +2,23 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.21] - 2026-09-09
+
+tv-native (Android TV) — correct the HDR aspect re-fit (v0.13.19 regressed it). **Needs a new Android build.**
+
+### Fixed
+- **HDR video no longer stretches to fill on the switch.** v0.13.19 re-read mpv's aspect from the
+  `mediacodec_embed` VO right after the switch, but that VO briefly reports the *coded/padded* frame (e.g.
+  3840x2176 ≈ 16:9) instead of the *cropped* display frame (3840x1608 = 2.39:1) — within the 1% tolerance of
+  16:9, so the letterbox collapsed to fill and the picture stretched. The re-fit now **re-asserts the
+  known-good dimensions from the initial load** (never re-reading the embed VO) and forces a relayout, fired
+  several times across the ~1s asynchronous surface reconfigure (`mpvRefitVideo`). Added diagnostic logging of
+  the applied aspect ratio and surface size. Android-only; SDR/gpu-next and iOS/tvOS untouched.
+
+### Note
+- The HDR/Dolby-Vision badge flip-flop seen on some titles is HDR10+ dynamic per-scene metadata
+  (`hdr10-plus-info` re-emitted by the decoder), a separate issue from the aspect fit.
+
 ## [0.13.20] - 2026-09-09
 
 Server tooling — a per-device playback-log inspector.

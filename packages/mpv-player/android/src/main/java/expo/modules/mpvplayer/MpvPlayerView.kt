@@ -50,10 +50,10 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   private var contentFit = "contain"
   // HDR (mediacodec_embed) aspect handling. `mediacodec_embed` reconfigures its surface asynchronously and
   // ignores mpv's aspect handling, and the once-per-load `mpvDidLoad` never re-fires for the in-place HDR
-  // switch — so the core pushes the true display aspect via `mpvAspectChanged`, which takes precedence over
-  // `videoW/videoH` and forces a relayout. `hdrActive` gates the global-layout re-fit (plezy's settle safety
-  // net), scoped to HDR so the working SDR/gpu-next path is untouched. Both reset on a new program.
-  private var hdrAspect = 0f
+  // switch — so the core asks us to re-fit (`mpvRefitVideo`), which re-applies our known-good `videoW/videoH`
+  // (from the initial load) and forces a relayout so the embed surface re-fits. We deliberately do NOT re-read
+  // mpv's aspect on the embed VO — it can briefly report the coded/padded frame and collapse the letterbox.
+  // `hdrActive` gates the global-layout re-fit (plezy's settle safety net), scoped to HDR. Reset on a new program.
   private var hdrActive = false
   private var aspectRefitListener: android.view.ViewTreeObserver.OnGlobalLayoutListener? = null
 
@@ -99,6 +99,7 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   }
 
   override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+    android.util.Log.i("MpvCore", "surfaceChanged ${width}x${height} (view=${this.width}x${this.height})")
     core.setSurfaceSize(width, height)
   }
 
@@ -116,11 +117,10 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
     val ratio =
       when {
         forceFill -> 0f
-        // HDR: the core-supplied display aspect wins (mediacodec_embed ignores mpv's own aspect handling).
-        hdrAspect > 0f -> hdrAspect
         videoW > 0 && videoH > 0 -> videoW.toFloat() / videoH.toFloat()
         else -> 0f
       }
+    android.util.Log.i("MpvCore", "applyAspect ratio=$ratio (video=${videoW}x${videoH} fit=$contentFit force=$force hdr=$hdrActive)")
     videoContainer.setAspectRatio(ratio)
     // The change-guarded setAspectRatio won't relayout when the ratio number is unchanged, but the embed
     // surface may have reconfigured underneath — force a re-measure so the SurfaceView re-fits the container.
@@ -136,7 +136,6 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
     // (possibly SDR) program starts from the mpvDidLoad-driven fit.
     videoW = 0
     videoH = 0
-    hdrAspect = 0f
     hdrActive = false
     applyAspect()
     scheduleApply()
@@ -228,15 +227,13 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   }
 
   /**
-   * The HDR (`mediacodec_embed`) switch reports the video's true display aspect here (on the UI thread). It
-   * takes precedence over `videoW/videoH` and forces a relayout so the embed surface re-fits, and it arms the
-   * global-layout re-fit for the rest of this HDR program. Called immediately after the switch and again ~150ms
-   * later (MpvCore.refitHdrAspect) to catch the asynchronous surface reconfigure.
+   * The HDR (`mediacodec_embed`) switch asks us to re-fit (on the UI thread): re-apply our known-good
+   * `videoW/videoH` (from the initial load) and force a relayout so the reconfigured embed surface re-fits to
+   * the letterbox. Arms the global-layout re-fit for the rest of this HDR program. Called several times across
+   * the ~1s async reconfigure window (MpvCore.refitHdrAspect).
    */
-  override fun mpvAspectChanged(dar: Double) {
+  override fun mpvRefitVideo() {
     hdrActive = true
-    val a = dar.toFloat()
-    if (a > 0f) hdrAspect = a
     applyAspect(force = true)
   }
 
@@ -268,7 +265,7 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
     // net, scoped to HDR. `applyAspect()` (no force) only relayouts on an actual ratio change, so it can't loop.
     if (aspectRefitListener == null) {
       val l = android.view.ViewTreeObserver.OnGlobalLayoutListener {
-        if (hdrActive && hdrAspect > 0f) applyAspect()
+        if (hdrActive) applyAspect()
       }
       aspectRefitListener = l
       viewTreeObserver.addOnGlobalLayoutListener(l)
