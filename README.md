@@ -5,11 +5,11 @@
 **Turn your Plex library into your own always-on live TV.**
 
 <p align="center">
-  <a href="https://github.com/Quixomatic/Airwave/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/Quixomatic/Airwave?sort=semver&color=4a9fe0"></a>
+  <a href="https://github.com/Quixomatic/Airwave/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/Quixomatic/Airwave?sort=semver&color=brightgreen"></a>
   <a href="LICENSE"><img alt="License: PolyForm Perimeter 1.0.1" src="https://img.shields.io/badge/license-PolyForm%20Perimeter%201.0.1-blue"></a>
-  <a href="https://www.getairwave.tv"><img alt="Website: getairwave.tv" src="https://img.shields.io/badge/website-getairwave.tv-4a9fe0"></a>
-  <img alt="Platforms" src="https://img.shields.io/badge/platforms-Apple%20TV%20%7C%20iPad%20%7C%20Fire%20TV%20%7C%20Android%20TV%20%7C%20webOS%20%7C%20Roku%20%7C%20Web-informational">
-  <a href="https://github.com/Quixomatic/Airwave/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Quixomatic/Airwave?style=flat&color=4a9fe0"></a>
+  <a href="https://www.getairwave.tv"><img alt="Website: getairwave.tv" src="https://img.shields.io/badge/website-getairwave.tv-orange"></a>
+  <img alt="Platforms" src="https://img.shields.io/badge/platforms-Apple%20TV%20%7C%20iPad%20%7C%20Fire%20TV%20%7C%20Android%20TV%20%7C%20webOS%20%7C%20Roku%20%7C%20Web-blueviolet">
+  <a href="https://github.com/Quixomatic/Airwave/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Quixomatic/Airwave?style=flat&color=yellow"></a>
 </p>
 
 <p align="center">
