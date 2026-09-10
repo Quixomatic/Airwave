@@ -286,9 +286,12 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
         currentRef.current = loaded;
         pausedRef.current = false;
         setTracks({ audio: info.audioTracks, subtitle: info.subtitleTracks });
-        // Pick the VO up front on Android: this program's known dynamic range (server guide.hdr). Set with
-        // `source` below so it's coalesced into the single native load(). SDR when absent.
-        setDynamicRange(info.hdr ? "hdr" : "sdr");
+        // Pick the VO up front on Android: this program's known dynamic range. Set with `source` below so
+        // it's coalesced into the single native load(). Prefer `info.hdr` from the /media response (added
+        // v0.13.20 — authoritative for the resolved media), but fall back to the program's `guide.hdr` from
+        // the timeline we already fetched, so this works against a server that predates that field (no server
+        // upgrade required). Neither → SDR (gpu-next tone-maps, the safe default).
+        setDynamicRange((info.hdr ?? entry.slot.guide.hdr) ? "hdr" : "sdr");
         // mpv loads by setting the source prop; `startTime` opens direct-play AT the offset (loadfile
         // start=). Baseline is set in onLoad/onFirstFrame — see the event handlers below.
         logCtxRef.current = {

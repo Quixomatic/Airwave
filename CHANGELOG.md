@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.24] - 2026-09-10
+
+Android TV — make the up-front HDR VO work without a server upgrade.
+
+### Changed
+- The player now falls back to the program's `guide.hdr` (already present in the timeline the client
+  fetches) when the `/media` resolve response doesn't include the `hdr` field — i.e. when the server
+  predates 0.13.20. So HDR still engages on the correct video output on an un-upgraded server; the `/media`
+  `hdr` field stays the preferred, authoritative source when present. Client-only, non-breaking.
+
 ## [0.13.23] - 2026-09-10
 
 Android TV — fix the HDR letterbox sizing/positioning (center the surface ourselves; reset cleanly for SDR).
