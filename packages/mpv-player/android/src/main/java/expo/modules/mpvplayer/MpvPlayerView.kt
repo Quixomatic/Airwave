@@ -3,7 +3,6 @@ package expo.modules.mpvplayer
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
-import android.view.Gravity
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.widget.FrameLayout
@@ -22,10 +21,14 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
 
   private val core = MpvCore(context.applicationContext)
   private val surfaceView = SurfaceView(context)
-  // The SurfaceView lives inside an aspect-ratio container (ExoPlayer's AspectRatioFrameLayout pattern) so
-  // aspect is applied ONCE per video, declaratively, in the layout pass — instead of imperatively mutating
-  // the surface's layoutParams on every event (which thrashed the surface + raced the HDR switch).
-  private val videoContainer = AspectRatioFrameLayout(context)
+  // A full-size container that measures + lays out + CENTERS the SurfaceView itself. We do NOT rely on the
+  // parent centering a self-shrunk container (React Native lays a native view's children out top-left and
+  // ignores Android layout_gravity → the old AspectRatioFrameLayout landed off-center: bars only on the right/
+  // bottom), and we do NOT rely on requestLayout() (it doesn't propagate inside an RN view subtree, so an
+  // aspect change stuck until a full remount). The container fills; only the SurfaceView is letterboxed, and
+  // ONLY on the HDR path (see applyAspect). SDR/mini → the SurfaceView fills = the pre-0.13.19 full surface,
+  // so mpv's gpu-next handles the letterbox exactly as it always did.
+  private val videoContainer = VideoContainer(context)
 
   private var didSetup = false
   private var pendingSource: String? = null
@@ -48,9 +51,8 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   // option fixes it — mpv-android#486), so a full-screen surface stretches non-16:9 content (e.g. 3840x2076
   // cinema → +4% taller). The container letterboxes it. The real display size arrives via `mpvVideoSize` (the
   // core watches mpv's dwidth/dheight as they settle — the first read can be a placeholder like 960x540 before
-  // the frame decodes). That updates videoW/videoH and re-letterboxes. We do NOT force relayouts or run a
-  // global-layout listener: that churned the surface and caused HDR reconfig flicker; a real size change
-  // already triggers a relayout via setAspectRatio.
+  // the frame decodes). That updates videoW/videoH and re-letterboxes (applyAspect → videoContainer.targetRatio,
+  // which centers the SurfaceView). SDR leaves the surface full-screen so mpv's gpu-next letterboxes it itself.
   private var videoW = 0
   private var videoH = 0
   private var contentFit = "contain"
@@ -73,18 +75,13 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
 
   init {
     setBackgroundColor(Color.BLACK)
-    // SurfaceView fills the aspect container; the container is centered in this (black) view, so any
-    // letterbox/pillarbox bars are just this view's background showing through.
-    surfaceView.layoutParams = FrameLayout.LayoutParams(
-      FrameLayout.LayoutParams.MATCH_PARENT,
-      FrameLayout.LayoutParams.MATCH_PARENT,
-    )
+    // The container fills this (black) view and lays the SurfaceView out itself (centered, sized per
+    // targetRatio). Any letterbox/pillarbox bars are the black background showing through.
     surfaceView.holder.addCallback(this)
     videoContainer.addView(surfaceView)
     videoContainer.layoutParams = FrameLayout.LayoutParams(
       FrameLayout.LayoutParams.MATCH_PARENT,
       FrameLayout.LayoutParams.MATCH_PARENT,
-      Gravity.CENTER,
     )
     addView(videoContainer)
     core.delegate = this
@@ -97,6 +94,7 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   }
 
   override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+    android.util.Log.i("MpvCore", "surfaceChanged ${width}x${height} (view=${this.width}x${this.height})")
     core.setSurfaceSize(width, height)
   }
 
@@ -111,14 +109,15 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
    * On SDR, mpv's own renderer (gpu-next) letterboxes correctly inside the full-screen surface via
    * keepaspect/panscan, so we leave the container FILLING (ratio 0) and let mpv handle it — no view-layer
    * constraint, and no surface-resize churn from resizing the SurfaceView off full-screen. "cover"/"fill" (or
-   * unknown dims) → 0 = fill even on HDR. `setAspectRatio` only re-lays-out when the ratio actually changes
-   * (once per video), so no per-event churn.
+   * unknown dims) → 0 = fill even on HDR. `VideoContainer.targetRatio` only re-lays-out when the ratio actually
+   * changes (once per video), so no per-event churn.
    */
   private fun applyAspect() {
     val hdr = pendingDynamicRange == "hdr"
     val forceFill = contentFit == "cover" || contentFit == "fill"
     val ratio = if (hdr && !forceFill && videoW > 0 && videoH > 0) videoW.toFloat() / videoH.toFloat() else 0f
-    videoContainer.setAspectRatio(ratio)
+    android.util.Log.i("MpvCore", "applyAspect ratio=$ratio (video=${videoW}x${videoH} fit=$contentFit hdr=$hdr)")
+    videoContainer.targetRatio = ratio
   }
 
   // MARK: props
@@ -276,43 +275,71 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
 }
 
 /**
- * A FrameLayout that constrains itself to a target video aspect ratio (RESIZE_MODE_FIT), so a child
- * SurfaceView filling it is letterboxed rather than stretched. This is the standard ExoPlayer
- * `AspectRatioFrameLayout` technique — aspect is applied declaratively in the measure pass, and
- * `setAspectRatio` only requests a relayout when the ratio actually changes, so there's no per-event
- * surface churn. `ratio <= 0` = fill (no constraint). Centered by its parent's gravity.
+ * A full-size FrameLayout that sizes + CENTERS its single child (the SurfaceView) itself.
+ *
+ * `targetRatio == 0` → the child fills the container (the pre-0.13.19 full-screen surface: mpv's own
+ * gpu-next renderer letterboxes SDR correctly inside it). `targetRatio > 0` → the child is letterboxed to
+ * that aspect and centered — used ONLY for the HDR VO `mediacodec_embed`, which renders the MediaCodec
+ * surface directly and ignores mpv's keepaspect/panscan (mpv-android#486), so it must be shaped at the view
+ * layer.
+ *
+ * Two things this deliberately does NOT rely on, because both fail inside a React Native native view:
+ *  - **Parent gravity.** We center the child explicitly (child.layout), not via layout_gravity — RN lays a
+ *    native view's children out itself and doesn't honor Android gravity.
+ *  - **requestLayout() propagation.** RN's UIManager owns the layout pass and does not re-lay-out a native
+ *    ViewGroup's children when it calls requestLayout(). The documented workaround (Shopify) is to override
+ *    requestLayout() and post a runnable that measures + lays out ourselves — which drives our onLayout, so
+ *    an aspect change (or a reset to fill) takes effect immediately instead of sticking until a full remount.
  */
-private class AspectRatioFrameLayout(context: Context) : FrameLayout(context) {
-  private var aspectRatio = 0f
-
-  fun setAspectRatio(ratio: Float) {
-    if (aspectRatio != ratio) {
-      aspectRatio = ratio
-      requestLayout()
+private class VideoContainer(context: Context) : FrameLayout(context) {
+  // 0 = child fills; else the child is letterboxed to this aspect and centered.
+  var targetRatio = 0f
+    set(value) {
+      if (field != value) {
+        field = value
+        requestLayout()
+      }
     }
+
+  private val measureAndLayout = Runnable {
+    measure(
+      MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+      MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY),
+    )
+    layout(left, top, right, bottom)
   }
 
-  override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-    super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-    if (aspectRatio <= 0f) return
-    val w = measuredWidth
-    val h = measuredHeight
-    if (w == 0 || h == 0) return
-    val viewAspect = w.toFloat() / h.toFloat()
-    // Within tolerance of the panel aspect → fill (avoids a sub-pixel 1px letterbox on near-16:9 content).
-    if (Math.abs(aspectRatio / viewAspect - 1f) <= 0.01f) return
-    var nw = w
-    var nh = h
-    if (viewAspect < aspectRatio) {
-      // Video is wider than the view → limit height (bars top/bottom).
-      nh = Math.round(w / aspectRatio)
-    } else {
-      // Video is taller than the view → limit width (bars left/right).
-      nw = Math.round(h * aspectRatio)
+  override fun requestLayout() {
+    super.requestLayout()
+    // RN won't run our layout pass on its own — post one (the canonical RN Android workaround).
+    post(measureAndLayout)
+  }
+
+  override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+    val cw = r - l
+    val ch = b - t
+    val child = getChildAt(0) ?: return
+    if (cw <= 0 || ch <= 0) return
+    var w = cw
+    var h = ch
+    if (targetRatio > 0f) {
+      val viewAspect = cw.toFloat() / ch.toFloat()
+      // Within tolerance of the container aspect → fill (avoids a sub-pixel 1px bar on near-16:9 content).
+      if (Math.abs(targetRatio / viewAspect - 1f) > 0.01f) {
+        if (viewAspect < targetRatio) {
+          h = Math.round(cw / targetRatio) // video wider than container → bars top/bottom
+        } else {
+          w = Math.round(ch * targetRatio) // video taller than container → bars left/right
+        }
+      }
     }
-    super.onMeasure(
-      MeasureSpec.makeMeasureSpec(nw, MeasureSpec.EXACTLY),
-      MeasureSpec.makeMeasureSpec(nh, MeasureSpec.EXACTLY),
+    val left = (cw - w) / 2
+    val top = (ch - h) / 2
+    child.measure(
+      MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY),
+      MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY),
     )
+    child.layout(left, top, left + w, top + h)
+    android.util.Log.i("MpvCore", "layout surface ${w}x${h} at ($left,$top) container=${cw}x${ch} ratio=$targetRatio")
   }
 }

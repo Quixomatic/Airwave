@@ -2,6 +2,27 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.23] - 2026-09-10
+
+Android TV — fix the HDR letterbox sizing/positioning (center the surface ourselves; reset cleanly for SDR).
+
+### Fixed
+- **HDR video was mis-sized** — variously stretched, or letterboxed but pinned to the top/left corner (bars
+  only on the bottom/right), and the wrong geometry **persisted into the next program (even SDR) until the
+  channel was fully closed and reopened.** Root cause: the aspect container relied on two things that don't
+  hold inside a React Native native view — Android `layout_gravity` for centering (RN lays a native view's
+  children out itself and ignores gravity → off-center), and `requestLayout()` to re-fit (RN's UIManager
+  owns the layout pass and doesn't re-lay-out a native ViewGroup's children → the fit stuck until a remount).
+- The player now **sizes and centers the SurfaceView itself**: it overrides `requestLayout()` to post a
+  manual `measure`/`layout` (the documented RN Android workaround) and centers the surface explicitly, so an
+  aspect change — or the reset to full-screen — takes effect immediately. SDR (and mini-player) leave the
+  surface **full-screen**, exactly as before 0.13.19, so mpv's own gpu-next renderer letterboxes it; only the
+  HDR path (`mediacodec_embed`, which ignores mpv's aspect handling) is letterboxed at the view layer.
+
+### Diagnostics
+- Added `applyAspect`, `surfaceChanged`, and `layout surface …` logcat lines (tag `MpvCore`) to make the
+  view-layer sizing observable on device.
+
 ## [0.13.22] - 2026-09-10
 
 Android TV — restrict the view-layer letterbox to the HDR path.
