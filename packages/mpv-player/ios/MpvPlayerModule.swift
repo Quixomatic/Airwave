@@ -63,6 +63,10 @@ public class MpvPlayerModule: Module {
       // triggers the coalesced load. (DVR seeks go through the imperative `seek` below, not startTime.)
       Prop("startTime") { (view: MpvPlayerView, t: Double) in view.setPendingStartTime(t) }
       Prop("mode") { (view: MpvPlayerView, mode: String) in view.setPendingMode(mode) }
+      // Accepted for the 1:1 cross-platform contract; iOS/tvOS handle HDR via their own display-criteria path,
+      // so these are inert here (only Android's up-front VO selection acts on them).
+      Prop("dynamicRange") { (view: MpvPlayerView, range: String?) in view.setPendingHdr(range) }
+      Prop("supportsHdr") { (view: MpvPlayerView, supported: Bool) in view.setSupportsHdr(supported) }
       Prop("source") { (view: MpvPlayerView, source: String?) in view.setPendingSource(source) }
       Prop("paused") { (view: MpvPlayerView, paused: Bool) in view.setPaused(paused) }
       Prop("muted") { (view: MpvPlayerView, muted: Bool) in view.setMuted(muted) }

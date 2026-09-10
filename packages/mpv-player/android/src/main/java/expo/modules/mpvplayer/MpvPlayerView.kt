@@ -33,6 +33,9 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   // Content mode for the NEXT load ("video" | "audio"). Set alongside `source` in one render, read by
   // applySource → core.load. Audio = the bumper music bed / radio (no video track, JS-driven volume).
   private var pendingMode: String = "video"
+  // Dynamic range for the NEXT load ("hdr" | "sdr" | null). Set alongside `source` (from the server's
+  // guide.hdr), read by applySource → core.load to pick the VO up front. null (bumper/audio) leaves the VO.
+  private var pendingDynamicRange: String? = null
   private var lastLoadedSource: String? = null
   private var applyScheduled = false
   private var disposed = false
@@ -40,11 +43,14 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   // hold during playback like iOS/tvOS, so without this a playing channel dims + sleeps.
   private var videoActive = false
 
-  // Video display dimensions (from mpvDidLoad, PAR-correct) + the requested fit, fed to videoContainer's
-  // aspect. The HDR VO `mediacodec_embed` renders the MediaCodec surface directly and ignores mpv's
-  // keepaspect/panscan (no mpv option fixes it — mpv-android#486), so a full-screen surface stretches
-  // non-16:9 content (e.g. 3840x2076 cinema → +4% taller). The container letterboxes it. The HDR re-open is
-  // also clamped to ≥ the seek offset (MpvCore.maybeSwitchHdr) so any surface reconfig can't drop the offset.
+  // Video display dimensions + the requested fit, fed to videoContainer's aspect. The HDR VO
+  // `mediacodec_embed` renders the MediaCodec surface directly and ignores mpv's keepaspect/panscan (no mpv
+  // option fixes it — mpv-android#486), so a full-screen surface stretches non-16:9 content (e.g. 3840x2076
+  // cinema → +4% taller). The container letterboxes it. The real display size arrives via `mpvVideoSize` (the
+  // core watches mpv's dwidth/dheight as they settle — the first read can be a placeholder like 960x540 before
+  // the frame decodes). That updates videoW/videoH and re-letterboxes. We do NOT force relayouts or run a
+  // global-layout listener: that churned the surface and caused HDR reconfig flicker; a real size change
+  // already triggers a relayout via setAspectRatio.
   private var videoW = 0
   private var videoH = 0
   private var contentFit = "contain"
@@ -112,8 +118,8 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
 
   fun setPendingSource(source: String?) {
     pendingSource = source
-    // New program → dims unknown until its first frame; reset so applyAspect re-fits once mpvDidLoad reports
-    // the new dimensions, rather than reusing the previous program's.
+    // New program → dims unknown until its first frame; reset so applyAspect re-fits once the size is reported
+    // (via mpvVideoSize), rather than reusing the previous program's.
     videoW = 0
     videoH = 0
     applyAspect()
@@ -127,6 +133,19 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   fun setPendingMode(mode: String) {
     pendingMode = if (mode == "audio") "audio" else "video"
   }
+
+  /** The program's dynamic range for the next load — "hdr"/"sdr" (from the server's guide.hdr) picks the VO
+   *  up front; null (bumper/audio) leaves the VO untouched. Set alongside `source`; applied at applySource. */
+  fun setPendingHdr(dynamicRange: String?) {
+    pendingDynamicRange = when (dynamicRange) {
+      "hdr" -> "hdr"
+      "sdr" -> "sdr"
+      else -> null
+    }
+  }
+
+  /** The panel's HDR capability (staged for the future display-gated VO decision; not yet consulted). */
+  fun setSupportsHdr(supported: Boolean) = core.setSupportsHdr(supported)
 
   fun setContentFit(fit: String) {
     contentFit = fit
@@ -188,7 +207,7 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
       surfaceView.keepScreenOn = false
       return
     }
-    core.load(src, pendingStartTime, pendingMode)
+    core.load(src, pendingStartTime, pendingMode, pendingDynamicRange)
     // Video playback keeps the screen awake (audio-only bumper/radio doesn't); paused state refines it.
     videoActive = pendingMode != "audio"
     surfaceView.keepScreenOn = videoActive
@@ -203,6 +222,19 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
       applyAspect()
     }
     onLoad(mapOf("duration" to duration, "width" to width, "height" to height))
+  }
+
+  /**
+   * The real display size (mpv dwidth/dheight), pushed as it settles after load — the first read can be a
+   * placeholder (e.g. 960x540) before the frame decodes. Updating videoW/videoH re-letterboxes via applyAspect
+   * (the ratio change triggers the relayout). Runs on the UI thread (core scope = Main).
+   */
+  override fun mpvVideoSize(width: Int, height: Int) {
+    if (width > 0 && height > 0 && (width != videoW || height != videoH)) {
+      videoW = width
+      videoH = height
+      applyAspect()
+    }
   }
 
   override fun mpvFirstFrame() {

@@ -182,6 +182,10 @@ export type MediaInfo = {
   audioTracks: Track[];
   subtitleTracks: Track[];
   decision?: { videoDecision?: string; audioDecision?: string; videoCodec?: string; audioCodec?: string; container?: string };
+  /** The program's dynamic range (server-derived from the video stream's colorTrc/DOVI → MediaItem.guide.hdr):
+   *  "HDR10" | "Dolby Vision" | "HLG" when HDR, else undefined. The Android player uses this to pick the mpv VO
+   *  up front at load (HDR → mediacodec_embed). See .plans/android-hdr-vo-predetect.md. */
+  hdr?: string;
   /** Dolby Vision metadata (captured from Plex). Plumbed to the client but NOT yet consumed — the
    *  native DV-mode switch (dvh1 display criteria on tvOS) is a deferred step. See .plans/tv-native.md §11. */
   dovi?: { profile: number; level?: number; blCompatId?: number };

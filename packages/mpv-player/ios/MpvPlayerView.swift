@@ -22,6 +22,11 @@ final class MpvPlayerView: ExpoView, MpvCoreDelegate {
   // load (bumper bed) must NOT touch the HDMI dynamic-range mode, or every bumper would bounce an HDR program
   // HDR→SDR→HDR (a black re-sync). We leave the last program's criteria in place across the bumper.
   private var currentMode: String = "video"
+  // Accepted from JS for a 1:1 cross-platform contract but NOT consulted on Apple: tvOS already drives HDR via
+  // its own display-criteria path (set on first frame), so the Android up-front-VO flags are inert here.
+  // Stored only so the props exist. See .plans/android-hdr-vo-predetect.md §2a.
+  private var pendingDynamicRange: String?
+  private var supportsHdr = false
   private var lastLoadedSource: String?
   private var applyScheduled = false
   private var lastWidth: Int = 0
@@ -75,6 +80,9 @@ final class MpvPlayerView: ExpoView, MpvCoreDelegate {
   }
   func setPendingStartTime(_ t: Double) { pendingStartTime = t }
   func setPendingMode(_ mode: String) { pendingMode = (mode == "audio") ? "audio" : "video" }
+  // Accepted for the 1:1 JS contract; iOS/tvOS handle HDR via display criteria, so these stay inert here.
+  func setPendingHdr(_ dynamicRange: String?) { pendingDynamicRange = dynamicRange }
+  func setSupportsHdr(_ supported: Bool) { supportsHdr = supported }
 
   func setContentFit(_ fit: String) {
     switch fit {

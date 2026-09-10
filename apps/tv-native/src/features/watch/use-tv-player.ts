@@ -114,6 +114,11 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   // Content mode for the single hybrid engine: "video" for programs, "audio" for the bumper music bed (and
   // future radio). Set alongside `source`; the view applies it per-load. See .plans/mpv-hybrid-core.md.
   const [mode, setMode] = useState<"video" | "audio">("video");
+  // The current program's dynamic range (server `guide.hdr` → "hdr"/"sdr"), set alongside `source` on a
+  // PROGRAM load. The Android player picks the mpv VO up front from it (mediacodec_embed for HDR vs gpu-next),
+  // so there's no first-frame HDR detect / re-open. Bumper/audio loads deliberately DON'T update it — and the
+  // native side ignores it for audio mode anyway — so an HDR→bumper→HDR run never churns the VO. iOS ignores it.
+  const [dynamicRange, setDynamicRange] = useState<"hdr" | "sdr">("sdr");
   const positionSecRef = useRef(0); // latest onProgress currentTime (seconds); the effectiveTime clock reads this
   const playingRef = useRef(false);
   // audioMode is client-side only (mpv output layout — not a server param), but it's in the reload key so
@@ -281,6 +286,9 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
         currentRef.current = loaded;
         pausedRef.current = false;
         setTracks({ audio: info.audioTracks, subtitle: info.subtitleTracks });
+        // Pick the VO up front on Android: this program's known dynamic range (server guide.hdr). Set with
+        // `source` below so it's coalesced into the single native load(). SDR when absent.
+        setDynamicRange(info.hdr ? "hdr" : "sdr");
         // mpv loads by setting the source prop; `startTime` opens direct-play AT the offset (loadfile
         // start=). Baseline is set in onLoad/onFirstFrame — see the event handlers below.
         logCtxRef.current = {
@@ -745,5 +753,5 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
     [onLoad, onFirstFrame, onProgress, onBuffering, onError, onEnd],
   );
 
-  return { viewRef, source, startTime, mode, videoEvents, status, controls, tracks, titleOf };
+  return { viewRef, source, startTime, mode, dynamicRange, videoEvents, status, controls, tracks, titleOf };
 }
