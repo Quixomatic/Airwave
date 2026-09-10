@@ -16,17 +16,17 @@ import { COMPOSE } from "./compose";
 import { PreviewImages } from "./page.client";
 
 export const metadata = {
-  title: "Airwave — your Plex library, as custom live TV",
+  title: "Airwave · your Plex library, as custom live TV",
 };
 
 // Landing variant helpers (heading/button/card/Wide) now live in `@/components/landing` (shared across
 // marketing pages — the fumadocs.dev-style design system).
 
 const FEATURES = [
-  { icon: Tv, title: "A real channel guide", body: "A grid guide you surf like cable — always-on channels on one continuous, deterministic timeline everyone sees in sync." },
-  { icon: Rewind, title: "Live offset + DVR", body: "Tune in mid-program at the right moment, then scrub back within the live buffer. You join what's on now — you just can't skip ahead." },
-  { icon: Clapperboard, title: "Bumpers & ambient music", body: "Between-program “Up Next” cards with cover art, plus an optional ambient-music bed — the touches that make it feel like a channel." },
-  { icon: MonitorPlay, title: "Direct-play everywhere", body: "Each device measures what it can decode and direct-plays your files natively — 4K HDR, multichannel audio — transcoding only when it must." },
+  { icon: Tv, title: "A real channel guide", body: "A grid guide you surf like cable, always-on channels on one continuous, deterministic timeline everyone sees in sync." },
+  { icon: Rewind, title: "Live offset + DVR", body: "Tune in mid-program at the right moment, then scrub back within the live buffer. You join what's on now. You just can't skip ahead." },
+  { icon: Clapperboard, title: "Bumpers & ambient music", body: "Between-program “Up Next” cards with cover art, plus an optional ambient-music bed, the touches that make it feel like a channel." },
+  { icon: MonitorPlay, title: "Direct-play everywhere", body: "Each device measures what it can decode and direct-plays your files natively (4K HDR, multichannel audio), transcoding only when it must." },
   { icon: ShieldCheck, title: "Self-hosted & private", body: "You run the server. Your library, viewers, and history stay on your hardware. No telemetry, no accounts on our end, nothing phoning home." },
   { icon: Sparkles, title: "Build channels fast", body: "Author channels from metadata filters, auto-generate a whole lineup, or let a bring-your-own-key AI assistant draft one for you." },
 ];
@@ -65,7 +65,7 @@ export default async function HomePage() {
         <p className="text-2xl leading-snug font-light tracking-tight md:text-3xl xl:text-4xl">
           Airwave is a <span className="font-medium text-brand">self-hostable</span> service that turns your
           own <span className="font-medium text-brand">Plex</span> library into curated, always-on{" "}
-          <span className="font-medium text-brand">live TV channels</span> — the broadcast-style guide you
+          <span className="font-medium text-brand">live TV channels</span>, the broadcast-style guide you
           leave on, not another grid of posters to scroll. You own the server, the content, and the data.
         </p>
       </Wide>
@@ -82,7 +82,7 @@ export default async function HomePage() {
                 <>
                   One image, two roles, a Postgres. Drop this{" "}
                   <code className="text-brand">compose.yaml</code>, point it at your database, and pull
-                  updates by re-pulling the tag. No transcoder to babysit — Airwave is the channel brain,
+                  updates by re-pulling the tag. No transcoder to babysit. Airwave is the channel brain,
                   your Plex does the streaming.
                 </>
               }
@@ -119,12 +119,12 @@ export default async function HomePage() {
         <div className={cn(card(), "flex flex-col")}>
           <h3 className={heading("h3", "mb-6")}>A real 10-foot experience.</h3>
           <p className="mb-4 text-fd-muted-foreground">
-            The viewer app is a proper couch-and-remote TV app — an Aurora channel-guide grid, a glass player
+            The viewer app is a proper couch-and-remote TV app: an Aurora channel-guide grid, a glass player
             with a DVR scrubber, channel up/down, and the “Up Next” bumper card. The same app across
             platforms, delivered as a native binary or a browser player.
           </p>
           <p className="mb-6 text-fd-muted-foreground">
-            Built for a big screen and a remote — deliberately not a phone UI.
+            Built for a big screen and a remote, deliberately not a phone UI.
           </p>
           <div className="mt-auto flex flex-row flex-wrap gap-3">
             <Link href="/channel-guide" className={button("primary", "text-sm")}>
@@ -144,7 +144,7 @@ export default async function HomePage() {
             label="Features"
             title="Everything a channel needs."
             titleCh={12}
-            description="Not a media browser — a channel you leave on. All of it runs from your own Plex, on your own hardware."
+            description="Not a media browser, a channel you leave on. All of it runs from your own Plex, on your own hardware."
             className="mb-[clamp(2.5rem,6vw,4.5rem)]"
           />
         </ScrollReveal>
@@ -175,7 +175,7 @@ export default async function HomePage() {
           <div className={cn(card(), "relative z-2 flex flex-col overflow-hidden")}>
             <h3 className={heading("h3", "mb-3")}>Works on most platforms.</h3>
             <p className="mb-8 max-w-md text-fd-muted-foreground">
-              10-foot native apps for the living room, plus a browser player you serve from the same stack —
+              10-foot native apps for the living room, plus a browser player you serve from the same stack,
               the same app everywhere.
             </p>
             {/* Square tiles — icon stacked over the platform name, like an app grid. */}
@@ -238,14 +238,14 @@ export default async function HomePage() {
               <Step>
                 <h4 className="mb-1 font-medium text-landing-foreground">Build channels</h4>
                 <p className="text-sm text-fd-muted-foreground">
-                  Filter your library into channels — “90s comedies”, “all Studio Ghibli” — laid onto a
+                  Filter your library into channels (“90s comedies”, “all Studio Ghibli”), laid onto a
                   continuous timeline.
                 </p>
               </Step>
               <Step>
                 <h4 className="mb-1 font-medium text-landing-foreground">Tune in</h4>
                 <p className="text-sm text-fd-muted-foreground">
-                  Open a TV app, sign in, and channel-surf your library like it&apos;s live cable — at home or
+                  Open a TV app, sign in, and channel-surf your library like it&apos;s live cable, at home or
                   on the road.
                 </p>
               </Step>
@@ -261,7 +261,7 @@ export default async function HomePage() {
             <h2 className={heading("h2", "mb-4")}>Design your lineup, then forget about it.</h2>
             <p className="mb-6 text-fd-muted-foreground">
               Build channels from filters, group them into packages, share them per-viewer, and let the
-              scheduler keep every channel running deterministically — no babysitting.
+              scheduler keep every channel running deterministically, no babysitting.
             </p>
             <div className="flex flex-row flex-wrap gap-3">
               <Link href="/docs/channels" className={button("primary", "text-sm")}>
@@ -276,7 +276,7 @@ export default async function HomePage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/screenshots/admin-channels.webp"
-              alt="The Airwave admin — channels"
+              alt="The Airwave admin: channels"
               className="w-full"
             />
           </div>

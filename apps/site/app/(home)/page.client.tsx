@@ -26,7 +26,7 @@ export function PreviewImages() {
             <img
               key={item.name}
               src={item.src}
-              alt={`Airwave — ${item.name}`}
+              alt={`Airwave: ${item.name}`}
               className={cn(
                 "col-start-1 row-start-1 w-full select-none transition-opacity duration-500",
                 active === i ? "opacity-100" : "pointer-events-none opacity-0",

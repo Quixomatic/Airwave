@@ -73,8 +73,8 @@ export function HeroV1({ dl }: { dl: HeroDownloads }) {
             Surf it like <span className="text-brand-200">live TV</span>.
           </h1>
           <p className="mb-10 max-w-xl text-base text-fd-foreground/85 [text-shadow:0_1px_14px_rgb(3_7_18_/_0.55)] md:text-lg">
-            Airwave turns your own media into always-on, channel-surfable live TV — a real guide, DVR, and
-            bumpers — streamed straight from your Plex to native apps on every big screen you own.
+            Airwave turns your own media into always-on, channel-surfable live TV with a real guide, DVR, and
+            bumpers, streamed straight from your Plex to native apps on every big screen you own.
           </p>
           <HeroDownloadButtons dl={dl} />
           <div className="mt-5 flex flex-row flex-wrap items-center gap-2.5">
@@ -126,8 +126,8 @@ export function HeroV2({ dl }: { dl: HeroDownloads }) {
               {...fadeUp(0.2)}
               className="mt-6 mb-10 max-w-2xl text-base text-fd-foreground/85 [text-shadow:0_1px_14px_rgb(3_7_18_/_0.55)] max-lg:mx-auto md:text-lg"
             >
-              Airwave turns your own media into always-on, channel-surfable live TV — a real guide, DVR, and
-              bumpers — streamed straight from your Plex to native apps on every big screen you own.
+              Airwave turns your own media into always-on, channel-surfable live TV with a real guide, DVR, and
+              bumpers, streamed straight from your Plex to native apps on every big screen you own.
             </motion.p>
             <motion.div {...fadeUp(0.3)} className="flex flex-col gap-4 max-lg:items-center">
               <HeroDownloadButtons dl={dl} compact="narrow" />
@@ -206,8 +206,8 @@ export function HeroV3({ dl }: { dl: HeroDownloads }) {
                 {...fadeUp(0.2)}
                 className="mt-6 mb-10 text-base text-fd-foreground/85 [text-shadow:0_1px_14px_rgb(3_7_18_/_0.55)] max-lg:mx-auto max-lg:max-w-xl md:text-lg"
               >
-                Airwave turns your own media into always-on, channel-surfable live TV — a real guide, DVR, and
-                bumpers — streamed straight from your Plex to native apps on every big screen you own.
+                Airwave turns your own media into always-on, channel-surfable live TV with a real guide, DVR, and
+                bumpers, streamed straight from your Plex to native apps on every big screen you own.
               </motion.p>
               <motion.div {...fadeUp(0.3)} className="flex flex-col gap-4 max-lg:items-center">
                 <HeroDownloadButtons dl={dl} compact />

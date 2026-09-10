@@ -1,6 +1,6 @@
 ---
 title: "I missed channel surfing, so I made Airwave"
-description: The longer story — why I built a server-first, self-hosted live-TV system on top of Plex, and what it actually does.
+description: "The longer story: why I built a server-first, self-hosted live-TV system on top of Plex, and what it actually does."
 author: James
 date: "2026-08-24"
 image: /screenshots/appletv-guide-featured.webp
@@ -12,7 +12,7 @@ I miss TV.
 
 Not the cable bill, the commercials, or being stuck with whatever the networks decided to show. I miss the *experience* of television. Turning it on. Seeing what's already playing. Jumping into a movie halfway through. Finding an episode of something you haven't watched in years. Having something just *be on* instead of staring at Plex for fifteen minutes trying to decide what to watch.
 
-And now that I have a son, I wanted him to be able to have that experience too — except with channels made from our own media.
+And now that I have a son, I wanted him to be able to have that experience too, except with channels made from our own media.
 
 So that's what Airwave became.
 
@@ -20,7 +20,7 @@ So that's what Airwave became.
 
 ## Where it came from
 
-Airwave was heavily inspired by **NostalgeX and BunnyEars TV**. They proved to me that the basic idea — turning your own media library back into something resembling live television — was every bit as fun as it sounded. But they also weren't quite what I wanted. Both were centered around Apple TV and did the work on the client itself. I started Airwave because I wanted this running on my **LG webOS TV**, and from the beginning I wanted the "brain" to be a real service I self-host next to Plex rather than something living inside one particular TV app.
+Airwave was heavily inspired by **NostalgeX and BunnyEars TV**. They proved to me that the basic idea, turning your own media library back into something resembling live television, was every bit as fun as it sounded. But they also weren't quite what I wanted. Both were centered around Apple TV and did the work on the client itself. I started Airwave because I wanted this running on my **LG webOS TV**, and from the beginning I wanted the "brain" to be a real service I self-host next to Plex rather than something living inside one particular TV app.
 
 That became one of the core ideas behind Airwave:
 
@@ -34,7 +34,7 @@ The simplest description is probably: **think Pluto TV or an old cable box, exce
 
 You can make a 90s sitcom channel, a Marvel channel, Saturday-morning cartoons, a kids channel, a channel that quietly marathons a favorite show, or something built from practically any combination of genre, year, network, cast, rating, collection, or playlist. Airwave turns that into an actual continuous schedule and presents it through a proper 10-foot channel guide.
 
-![Defining a channel in the admin — filters, ordering, and a live preview](/screenshots/admin-channel-edit.webp)
+![Defining a channel in the admin: filters, ordering, and a live preview](/screenshots/admin-channel-edit.webp)
 
 ## You join what's already airing
 
@@ -42,23 +42,23 @@ And the important part is that when you tune in, **you don't start the file at t
 
 But it's not rigid live TV either. Airwave has a full DVR-style timeline behind LIVE. You can scrub backward through programs that already aired, restart the currently playing program from the beginning, or jump back into an earlier episode or movie. The only thing you can't do is seek *ahead* of LIVE.
 
-I did exactly that with my son's Bluey channel recently — I went back three or four episodes in the channel history and started one that had aired earlier so he could watch from there.
+I did exactly that with my son's Bluey channel recently. I went back three or four episodes in the channel history and started one that had aired earlier so he could watch from there.
 
 ![Full-screen playback with the DVR scrubber behind LIVE](/screenshots/appletv-fullchrome.webp)
 
 That combination is really what I wanted: **the discovery of live TV without giving up the useful parts of a DVR.** And that seemingly small difference in how you interact with your library completely changes how I watch mine.
 
-Yesterday **Avengers: Age of Ultron** happened to be playing on one of my channels. I jumped into it because it was on, and then just... watched the rest of the movie. I probably never would have gone into Plex and deliberately picked Age of Ultron. But because I stumbled across it like I would have on TV years ago, it sucked me in. That's exactly what I wanted Airwave to do — it gets me watching things buried in my library that I'd forgotten about instead of endlessly choosing from thumbnails.
+Yesterday **Avengers: Age of Ultron** happened to be playing on one of my channels. I jumped into it because it was on, and then just... watched the rest of the movie. I probably never would have gone into Plex and deliberately picked Age of Ultron. But because I stumbled across it like I would have on TV years ago, it sucked me in. That's exactly what I wanted Airwave to do. It gets me watching things buried in my library that I'd forgotten about instead of endlessly choosing from thumbnails.
 
 ## I actually use it, every day
 
-And this isn't something I made against a demo library and threw onto GitHub. **I use Airwave basically every day on my Apple TV.** My son has his own channels. On a recent road trip, he watched a mixed channel of his shows on an iPad for a huge chunk of the drive, streaming back from our Plex server at home — and because the network lives on the server, the iPad wasn't creating some separate version of his channels for the trip. It was just another Airwave client tuning into the same channels we have at home.
+And this isn't something I made against a demo library and threw onto GitHub. **I use Airwave basically every day on my Apple TV.** My son has his own channels. On a recent road trip, he watched a mixed channel of his shows on an iPad for a huge chunk of the drive, streaming back from our Plex server at home, and because the network lives on the server, the iPad wasn't creating some separate version of his channels for the trip. It was just another Airwave client tuning into the same channels we have at home.
 
 ## Self-hosting and the apps
 
 You can self-host the server however you like: the classic **Docker + PostgreSQL** route, or a **one-click desktop app for Windows and macOS** (Linux is next) that bundles the server, admin, and database together if you'd rather skip Docker. Either way, the viewing experience runs across Apple TV/iPad, Android TV/Fire TV, LG webOS, Roku, a native desktop app, and the browser.
 
-There's also a native desktop app for **Windows and macOS** — the same guide and DVR, built on Tauri with the same **mpv** engine as the TV apps, so it direct-plays 4K HDR right on your computer.
+There's also a native desktop app for **Windows and macOS**: the same guide and DVR, built on Tauri with the same **mpv** engine as the TV apps, so it direct-plays 4K HDR right on your computer.
 
 ![The Airwave native desktop app on macOS](/screenshots/desktop-app-macos.webp)
 
@@ -81,15 +81,15 @@ Underneath the nostalgic "make Plex feel like TV again" idea, there's gotten to 
 
 Since this will come up: Airwave is very heavily AI-assisted. I've been a full-stack developer for 10+ years. I designed the product, architecture, data model, scheduling and playback behavior, infrastructure, technical constraints, and UX. I review the work, debug it, test it on real hardware, and decide what actually goes into the project.
 
-But Claude Code has written the vast majority of the literal source code. I'm not going to pretend I manually typed an enormous codebase that I didn't — and "Claude built it" doesn't really describe what happened either. This has basically been me applying a decade of software-development experience while using an absurdly capable implementation tool. I'm far more interested in whether the resulting software is understandable, maintainable, and actually works than in arguing over who typed each function.
+But Claude Code has written the vast majority of the literal source code. I'm not going to pretend I manually typed an enormous codebase that I didn't, and "Claude built it" doesn't really describe what happened either. This has basically been me applying a decade of software-development experience while using an absurdly capable implementation tool. I'm far more interested in whether the resulting software is understandable, maintainable, and actually works than in arguing over who typed each function.
 
 ## Why
 
-Ultimately, I didn't make Airwave because I wanted to launch a product. **I made it because I wanted it.** I wanted my channels back. I wanted my son to have channels. I wanted to turn on the TV without having to make a decision — that old feeling where you stumble across a movie you haven't thought about in years, say "oh, this is on," and suddenly you're watching it.
+Ultimately, I didn't make Airwave because I wanted to launch a product. **I made it because I wanted it.** I wanted my channels back. I wanted my son to have channels. I wanted to turn on the TV without having to make a decision: that old feeling where you stumble across a movie you haven't thought about in years, say "oh, this is on," and suddenly you're watching it.
 
 Streaming solved access to content incredibly well. But I think we lost something when everything became a catalog and every time you sit down you're expected to choose exactly what you want to watch. Airwave is my attempt to bring the other experience back.
 
-It's source-available and self-hostable — the server, admin panel, and browser player are free to run and tinker with. The native apps can be built and sideloaded yourself; the prebuilt store versions are just a small paid convenience.
+It's source-available and self-hostable: the server, admin panel, and browser player are free to run and tinker with. The native apps can be built and sideloaded yourself; the prebuilt store versions are just a small paid convenience.
 
 ## Try it
 
@@ -97,4 +97,4 @@ It's source-available and self-hostable — the server, admin panel, and browser
 - [Explore the features](/features) · [How it works](/docs/architecture)
 - [Source on GitHub](https://github.com/Quixomatic/Airwave)
 
-Happy to get into the architecture, the scheduling engine, or the DVR/effective-time model — reach out any time.
+Happy to get into the architecture, the scheduling engine, or the DVR/effective-time model. Reach out any time.

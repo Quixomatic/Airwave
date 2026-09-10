@@ -16,8 +16,13 @@ export const blog = defineDocs({
       author: z.string(),
       date: z.string(),
       // Required featured image (a path under /public, e.g. "/blog/my-post.png"), shown on the blog list
-      // cards + the post header. Generate a branded default with scripts/gen-blog-image.py, or drop a real one.
+      // cards + as the social/OG card + the JSON-LD image. Generate a branded default with
+      // scripts/gen-blog-image.py, or drop a real one. For a video post, use a still from the video.
       image: z.string(),
+      // Optional YouTube video id. When set, the post header plays the glass-framed embed IN PLACE OF the
+      // featured `image` (the image still powers the social card + list thumbnail, which can't be a video),
+      // and the page emits VideoObject structured data.
+      video: z.string().optional(),
     }),
   },
 });

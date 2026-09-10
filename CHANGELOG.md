@@ -2,6 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.25] - 2026-09-10
+
+Site (getairwave.tv) — a promo-video blog post, video SEO, and a copy cleanup.
+
+### Added
+- **"See Airwave in action" blog post** announcing the Introducing Airwave video. Video posts now play the
+  promo in a **glass-framed embed** (the same frosted frame as the hero) in the post header, in place of the
+  static featured image (the image still powers the social card and list thumbnail). New reusable
+  `PromoVideo` / `PromoEmbed` components and an optional `video` field on the blog schema.
+- **Structured data (JSON-LD) for SEO**: an Organization + WebSite block site-wide, and Article (plus
+  **VideoObject** for video posts) on each blog post, so posts are eligible for richer search results. Blog
+  posts now also emit `article` Open Graph metadata (published time + author).
+
+### Changed
+- The browser-tab / metadata **title separator is now a middot (`·`)** instead of an em dash.
+- **Removed em dashes** from all blog posts and the home page copy (they read as an AI tell), replaced with
+  natural punctuation. (A wider sweep of the docs pages and remaining marketing pages is still pending.)
+
 ## [0.13.24] - 2026-09-10
 
 Android TV — make the up-front HDR VO work without a server upgrade.

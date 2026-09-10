@@ -6,8 +6,11 @@ import { InlineTOC } from "fumadocs-ui/components/inline-toc";
 import { blogSource } from "@/lib/source";
 import { readingTimeMinutes } from "@/lib/reading-time";
 import { getMDXComponents } from "@/components/mdx";
+import { PromoEmbed } from "@/components/promo-video";
 
 type Params = { params: Promise<{ slug: string }> };
+
+const SITE = "https://getairwave.tv";
 
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
@@ -30,8 +33,48 @@ export default async function BlogPost(props: Params) {
   const newer = idx > 0 ? all[idx - 1] : null;
   const older = idx >= 0 && idx < all.length - 1 ? all[idx + 1] : null;
 
+  // Structured data (JSON-LD): an Article for every post, plus a VideoObject when the post embeds a video
+  // (makes the post eligible for a video rich result — thumbnail/date in search).
+  const url = `${SITE}/blog/${slug}`;
+  const imageUrl = `${SITE}${page.data.image}`;
+  const jsonLd: Record<string, unknown>[] = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      headline: page.data.title,
+      description: page.data.description,
+      image: imageUrl,
+      datePublished: page.data.date,
+      dateModified: page.data.date,
+      author: { "@type": "Person", name: page.data.author },
+      publisher: {
+        "@type": "Organization",
+        name: "Airwave",
+        logo: { "@type": "ImageObject", url: `${SITE}/logo.png` },
+      },
+      mainEntityOfPage: url,
+    },
+  ];
+  if (page.data.video) {
+    jsonLd.push({
+      "@context": "https://schema.org",
+      "@type": "VideoObject",
+      name: page.data.title,
+      description: page.data.description,
+      thumbnailUrl: [imageUrl],
+      uploadDate: page.data.date,
+      embedUrl: `https://www.youtube-nocookie.com/embed/${page.data.video}`,
+      contentUrl: `https://www.youtube.com/watch?v=${page.data.video}`,
+    });
+  }
+
   return (
     <main className="flex-1">
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger -- JSON.stringify output is safe structured data
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Centered header — meta, title, subtitle, with a soft radial glow that fades into the page
           background (selfh.st style: no back button, no border line) */}
       <div className="relative">
@@ -58,18 +101,23 @@ export default async function BlogPost(props: Params) {
         </div>
       </div>
 
-      {/* Featured image — deliberately wider than the prose column (selfh.st's content-wide vs content). */}
+      {/* Featured media — deliberately wider than the prose column (selfh.st's content-wide vs content). A
+          post with a `video` plays the glass-framed embed here; otherwise the featured image. */}
       <div className="mx-auto w-full max-w-5xl px-6 pt-10">
-        <div className="relative aspect-video overflow-hidden rounded-xl border border-fd-border bg-fd-muted">
-          <Image
-            src={page.data.image}
-            alt={page.data.title}
-            fill
-            className="object-cover"
-            sizes="(max-width: 1024px) 100vw, 1024px"
-            priority
-          />
-        </div>
+        {page.data.video ? (
+          <PromoEmbed id={page.data.video} title={page.data.title} />
+        ) : (
+          <div className="relative aspect-video overflow-hidden rounded-xl border border-fd-border bg-fd-muted">
+            <Image
+              src={page.data.image}
+              alt={page.data.title}
+              fill
+              className="object-cover"
+              sizes="(max-width: 1024px) 100vw, 1024px"
+              priority
+            />
+          </div>
+        )}
       </div>
 
       {/* Body in fumadocs prose, with a collapsible inline TOC */}
@@ -124,7 +172,15 @@ export async function generateMetadata(props: Params): Promise<Metadata> {
   return {
     title: page.data.title,
     description: page.data.description,
-    openGraph: { title: page.data.title, description: page.data.description, images: [page.data.image] },
+    openGraph: {
+      type: "article",
+      title: page.data.title,
+      description: page.data.description,
+      publishedTime: page.data.date,
+      authors: [page.data.author],
+      url: `${SITE}/blog/${slug}`,
+      images: [page.data.image],
+    },
     twitter: {
       card: "summary_large_image",
       title: page.data.title,

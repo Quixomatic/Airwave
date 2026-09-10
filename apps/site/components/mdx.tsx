@@ -5,6 +5,7 @@ import type { ComponentProps } from "react";
 import { PlatformMatrix } from "@/components/platform-matrix";
 import { ClientDownloads, ServerDownloads } from "@/components/downloads-table";
 import { Mermaid } from "@/components/mdx/mermaid";
+import { PromoVideo } from "@/components/promo-video";
 
 /**
  * A styled, self-contained video embed for screencasts / demos — usable in any MDX page as
@@ -34,6 +35,7 @@ function Video({ caption, className, ...rest }: ComponentProps<"video"> & { capt
  *   build-time image sizing fills in width/height for local images in `public/` — so a plain markdown
  *   `![alt](/screenshots/foo.webp)` becomes an optimized, zoomable image with no manual dimensions.
  * - `Video` → the styled embed above, available to every page without an import.
+ * - `PromoVideo` → the glass-framed YouTube promo embed (matches the hero's frame).
  * - `PlatformMatrix` → the checkmark-style platform-support table (used on `/docs/platforms`).
  */
 export function getMDXComponents(components?: MDXComponents): MDXComponents {
@@ -41,6 +43,7 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
     ...defaultMdxComponents,
     img: (props) => <ImageZoom {...(props as ComponentProps<typeof ImageZoom>)} />,
     Video,
+    PromoVideo,
     PlatformMatrix,
     ClientDownloads,
     ServerDownloads,
