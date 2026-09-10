@@ -93,6 +93,11 @@ class MpvPlayerModule : Module() {
       // triggers the coalesced load. (DVR seeks go through the imperative `seek` below, not startTime.)
       Prop("startTime") { view: MpvPlayerView, t: Double -> view.setPendingStartTime(t) }
       Prop("mode") { view: MpvPlayerView, mode: String -> view.setPendingMode(mode) }
+      // The program's dynamic range ("hdr"/"sdr", from the server's guide.hdr) — picks the mpv VO up front on
+      // Android (mediacodec_embed for HDR vs gpu-next for SDR); null (bumper/audio) leaves the VO. Set with source.
+      Prop("dynamicRange") { view: MpvPlayerView, range: String? -> view.setPendingHdr(range) }
+      // The panel's HDR capability — staged for the future display-gated VO decision; not yet consulted.
+      Prop("supportsHdr") { view: MpvPlayerView, supported: Boolean -> view.setSupportsHdr(supported) }
       Prop("source") { view: MpvPlayerView, source: String? -> view.setPendingSource(source) }
       Prop("paused") { view: MpvPlayerView, paused: Boolean -> view.setPaused(paused) }
       Prop("muted") { view: MpvPlayerView, muted: Boolean -> view.setMuted(muted) }

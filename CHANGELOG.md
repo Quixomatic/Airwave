@@ -2,6 +2,84 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.23] - 2026-09-10
+
+Android TV — fix the HDR letterbox sizing/positioning (center the surface ourselves; reset cleanly for SDR).
+
+### Fixed
+- **HDR video was mis-sized** — variously stretched, or letterboxed but pinned to the top/left corner (bars
+  only on the bottom/right), and the wrong geometry **persisted into the next program (even SDR) until the
+  channel was fully closed and reopened.** Root cause: the aspect container relied on two things that don't
+  hold inside a React Native native view — Android `layout_gravity` for centering (RN lays a native view's
+  children out itself and ignores gravity → off-center), and `requestLayout()` to re-fit (RN's UIManager
+  owns the layout pass and doesn't re-lay-out a native ViewGroup's children → the fit stuck until a remount).
+- The player now **sizes and centers the SurfaceView itself**: it overrides `requestLayout()` to post a
+  manual `measure`/`layout` (the documented RN Android workaround) and centers the surface explicitly, so an
+  aspect change — or the reset to full-screen — takes effect immediately. SDR (and mini-player) leave the
+  surface **full-screen**, exactly as before 0.13.19, so mpv's own gpu-next renderer letterboxes it; only the
+  HDR path (`mediacodec_embed`, which ignores mpv's aspect handling) is letterboxed at the view layer.
+
+### Diagnostics
+- Added `applyAspect`, `surfaceChanged`, and `layout surface …` logcat lines (tag `MpvCore`) to make the
+  view-layer sizing observable on device.
+
+## [0.13.22] - 2026-09-10
+
+Android TV — restrict the view-layer letterbox to the HDR path.
+
+### Fixed
+- The view-layer aspect letterbox now applies **only on the HDR video output** (`mediacodec_embed`, which
+  ignores mpv's keepaspect/panscan). On SDR, mpv's own renderer (gpu-next) already letterboxes correctly
+  inside the full-screen surface, so the container is left filling — avoiding a redundant SurfaceView resize
+  (and the `surfaceChanged` churn it caused) on every SDR program. This was the documented intent of the
+  container-letterbox all along; it had been applied to all content.
+
+## [0.13.21] - 2026-09-10
+
+Android TV — pick the mpv video output UP FRONT from the program's known dynamic range (HDR fix).
+
+### Changed
+- **HDR video output is now chosen at the load boundary, not on the first decoded frame.** Each program's
+  dynamic range is known in advance (the server's `guide.hdr`, delivered on the media resolve response as
+  `hdr`), so the Android mpv core opens HDR content directly on `vo=mediacodec_embed` (+ zero-copy
+  `hwdec=mediacodec`, real HDR10/HLG/Dolby Vision passthrough) and SDR on `gpu-next` (`gpu` on the Shield) —
+  set BEFORE that program's `loadfile`. This replaces the old detect-on-first-frame + `loadfile replace`
+  re-open, which caused two device-confirmed regressions: seeking back across a program boundary restarted
+  the program from 0, and the mid-stream surface switch produced reconfigure flicker and an HDR↔Dolby-Vision
+  badge flip. There is no mid-stream switch anymore, so neither can happen.
+- **Bumpers and audio-only loads leave the video output untouched** (they carry no dynamic-range flag), so an
+  `HDR program → bumper → HDR program` run stays on the HDR path end-to-end with no pointless switching —
+  matching the iOS behavior.
+
+### Added
+- A declarative `dynamicRange` (`"hdr"`/`"sdr"`) prop on the mpv player, set alongside `source`, plus a
+  staged `supportsHdr` prop (the panel's HDR capability, plumbed for a future display-gated decision but not
+  yet consulted). Both are exposed on iOS and Android for a 1:1 contract; **iOS/tvOS accept them but are
+  unaffected** (they already drive HDR via their own display-criteria path).
+- The letterbox now tracks the video's real display size via mpv `dwidth`/`dheight` observers (the first read
+  can be a placeholder before the frame decodes), deduped so it never churns the surface.
+
+### Verification
+- Android-only behavior change; iOS/tvOS/desktop paths are untouched. Needs an on-device check on Android TV
+  (Fire TV): HDR direct-play letterboxes without zoom, seeking back across a bumper into HDR content does not
+  restart from 0, no reconfigure flicker or badge flip, and SDR is unchanged.
+
+## [0.13.20] - 2026-09-10
+
+Server — surface a program's HDR/dynamic-range on the playback resolve endpoint.
+
+### Added
+- **`hdr` on the media resolve response.** `GET /api/v1/channels/:id/media` (`resolveMedia`) now returns
+  the program's dynamic range read from `MediaItem.guide.hdr` (`"HDR10"` / `"Dolby Vision"` / `"HLG"`, else
+  `null` for SDR), alongside the existing stream decision and Dolby Vision metadata. It rides on the same
+  `guide` read that already backed `dovi`, so there's no new column, endpoint, or query.
+
+### Why
+- A client can now pick its video-output path **up front at load time** from a fact the server already
+  knows, instead of detecting on the first decoded frame. This is the plumbing for the Android mpv HDR work
+  (choose `mediacodec_embed` for HDR vs `gpu-next` for SDR at the load boundary). It naturally covers both
+  direct-play and transcode, since the response is where that decision is already made.
+
 ## [0.13.19] - 2026-09-09
 
 Server tooling — a per-device playback-log inspector.

@@ -63,6 +63,20 @@ export interface MpvPlayerViewProps extends ViewProps {
    * `.plans/mpv-hybrid-core.md`.
    */
   mode?: "video" | "audio";
+  /**
+   * The current program's dynamic range, from the server's `guide.hdr` (`"hdr"` when HDR10/Dolby Vision/HLG,
+   * `"sdr"` otherwise). Set alongside `source`. **Android** uses it to pick the mpv video output UP FRONT at
+   * load (`mediacodec_embed` for HDR passthrough vs `gpu-next`/`gpu` for SDR) — no first-frame detection, no
+   * re-open. Omit it (or leave it unset) for bumper/audio-only loads so the VO is left untouched. **iOS/tvOS**
+   * accept it but ignore it (they drive HDR via their own display-criteria path). See
+   * `.plans/android-hdr-vo-predetect.md`.
+   */
+  dynamicRange?: "hdr" | "sdr";
+  /**
+   * Whether the panel is HDR-capable (from the client's display probe). Plumbed for a future display-gated VO
+   * decision (HDR content on an SDR panel → tone-map on `gpu-next`); **not yet consulted** on any platform.
+   */
+  supportsHdr?: boolean;
   /** `true` = paused. */
   paused?: boolean;
   muted?: boolean;

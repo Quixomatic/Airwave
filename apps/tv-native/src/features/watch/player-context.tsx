@@ -1,4 +1,4 @@
-import { MpvPlayerView } from "@airwave/mpv-player";
+import { MpvPlayerView, mpvDisplay } from "@airwave/mpv-player";
 import { Maximize2, X } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
@@ -177,6 +177,9 @@ function PlayerHost({
   // Device audio-output pref (Settings → Audio). Reactive: flipping it reloads the current program with
   // the new mpv `audio-channels` (see useTvPlayer's reload key + the MpvPlayerView `audioMode` prop).
   const audioMode = useAudioMode();
+  // The panel's HDR capability (Android Display probe; null off Android → false). A device constant, staged
+  // for the future display-gated VO decision — the native side stores but doesn't yet consult it.
+  const supportsHdr = useMemo(() => mpvDisplay.getInfo()?.hdr ?? false, []);
   const [qualities, setQualities] = useState<{ id: string; label: string }[]>([]);
   useEffect(() => {
     api.qualities().then((r) => setQualities(r.qualities)).catch(() => {});
@@ -247,7 +250,7 @@ function PlayerHost({
         // Subtitles OFF by default: mpv otherwise auto-selects the embedded/forced sub track (sid=auto).
         // In this app subs are delivered by SERVER burn-in (selecting them re-resolves to a transcode
         // that hardcodes them into the video), so mpv must never render a text sub track itself.
-        <MpvPlayerView ref={tv.viewRef} source={tv.source} startTime={tv.startTime} mode={tv.mode} audioMode={audioMode} options={{ sid: "no", "sub-auto": "no" }} {...tv.videoEvents} style={StyleSheet.absoluteFill} contentFit={full ? "contain" : "cover"} />
+        <MpvPlayerView ref={tv.viewRef} source={tv.source} startTime={tv.startTime} mode={tv.mode} dynamicRange={tv.dynamicRange} supportsHdr={supportsHdr} audioMode={audioMode} options={{ sid: "no", "sub-auto": "no" }} {...tv.videoEvents} style={StyleSheet.absoluteFill} contentFit={full ? "contain" : "cover"} />
       )}
 
       {/* bumper interstitial — full (blurred art + big title + donut) or compact (mini feed) */}

@@ -99,20 +99,30 @@ export async function resolveMedia(
   );
   if (!info) throw notFound("No playable media part.");
 
-  // Dolby Vision metadata (captured at sync → MediaItem.guide.dovi). Passed through so the native
-  // player CAN switch the Apple TV into DV mode (dvh1 display criteria) — that consumer is a later,
-  // tvOS-only step; for now it's plumbed but unused. See .plans/tv-native.md §11 (DV arc).
+  // Color/HDR metadata captured at sync onto MediaItem.guide.
+  //  - `hdr`: the program's dynamic range (defacto-correct from the video stream's colorTrc/DOVI;
+  //    "HDR10" | "Dolby Vision" | "HLG", else null for SDR). The Android mpv core reads this at LOAD
+  //    to pick the VO UP FRONT (mediacodec_embed for HDR, gpu-next for SDR) — no first-frame probe,
+  //    no mid-stream re-open. See .plans/android-hdr-vo-predetect.md.
+  //  - `dovi`: Dolby Vision profile/level, so the native player CAN switch the Apple TV into DV mode
+  //    (dvh1 display criteria) — that consumer is a later, tvOS-only step. See .plans/tv-native.md §11.
   const item = await prisma.mediaItem.findUnique({
     where: { mediaSourceId_ratingKey: { mediaSourceId: source.id, ratingKey } },
     select: { guide: true },
   });
-  const dovi = (item?.guide as { dovi?: { profile: number; level?: number; blCompatId?: number } } | null)?.dovi;
+  const guide = item?.guide as {
+    hdr?: "HDR10" | "Dolby Vision" | "HLG" | null;
+    dovi?: { profile: number; level?: number; blCompatId?: number };
+  } | null;
+  const hdr = guide?.hdr ?? null;
+  const dovi = guide?.dovi;
 
   return {
     ...info,
     offsetSeconds,
     connection,
     capsSource: measured ? "measured" : opts.caps ? "reported" : "default",
+    hdr,
     ...(dovi ? { dovi } : {}),
   };
 }
