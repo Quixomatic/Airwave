@@ -105,13 +105,20 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   }
 
   /**
-   * Feed the video's display aspect to the container. "cover"/"fill" (or unknown dims) → 0 = fill the whole
-   * view (no letterbox); "contain"/default → the content aspect, so the container centers + letterboxes it.
-   * `setAspectRatio` only re-lays-out when the ratio actually changes (once per video), so no per-event churn.
+   * Feed the video's display aspect to the container — but ONLY on the HDR path. The HDR VO
+   * `mediacodec_embed` renders the MediaCodec surface directly and ignores mpv's keepaspect/panscan
+   * (mpv-android#486), so a full-screen surface stretches non-16:9 content → we letterbox at the view layer.
+   * On SDR, mpv's own renderer (gpu-next) letterboxes correctly inside the full-screen surface via
+   * keepaspect/panscan, so we leave the container FILLING (ratio 0) and let mpv handle it — no view-layer
+   * constraint, and no surface-resize churn from resizing the SurfaceView off full-screen. "cover"/"fill" (or
+   * unknown dims) → 0 = fill even on HDR. `setAspectRatio` only re-lays-out when the ratio actually changes
+   * (once per video), so no per-event churn.
    */
   private fun applyAspect() {
-    val fill = contentFit == "cover" || contentFit == "fill" || videoW <= 0 || videoH <= 0
-    videoContainer.setAspectRatio(if (fill) 0f else videoW.toFloat() / videoH.toFloat())
+    val hdr = pendingDynamicRange == "hdr"
+    val forceFill = contentFit == "cover" || contentFit == "fill"
+    val ratio = if (hdr && !forceFill && videoW > 0 && videoH > 0) videoW.toFloat() / videoH.toFloat() else 0f
+    videoContainer.setAspectRatio(ratio)
   }
 
   // MARK: props

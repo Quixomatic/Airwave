@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.22] - 2026-09-10
+
+Android TV — restrict the view-layer letterbox to the HDR path.
+
+### Fixed
+- The view-layer aspect letterbox now applies **only on the HDR video output** (`mediacodec_embed`, which
+  ignores mpv's keepaspect/panscan). On SDR, mpv's own renderer (gpu-next) already letterboxes correctly
+  inside the full-screen surface, so the container is left filling — avoiding a redundant SurfaceView resize
+  (and the `surfaceChanged` churn it caused) on every SDR program. This was the documented intent of the
+  container-letterbox all along; it had been applied to all content.
+
 ## [0.13.21] - 2026-09-10
 
 Android TV — pick the mpv video output UP FRONT from the program's known dynamic range (HDR fix).
