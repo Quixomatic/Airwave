@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.20] - 2026-09-10
+
+Server — surface a program's HDR/dynamic-range on the playback resolve endpoint.
+
+### Added
+- **`hdr` on the media resolve response.** `GET /api/v1/channels/:id/media` (`resolveMedia`) now returns
+  the program's dynamic range read from `MediaItem.guide.hdr` (`"HDR10"` / `"Dolby Vision"` / `"HLG"`, else
+  `null` for SDR), alongside the existing stream decision and Dolby Vision metadata. It rides on the same
+  `guide` read that already backed `dovi`, so there's no new column, endpoint, or query.
+
+### Why
+- A client can now pick its video-output path **up front at load time** from a fact the server already
+  knows, instead of detecting on the first decoded frame. This is the plumbing for the Android mpv HDR work
+  (choose `mediacodec_embed` for HDR vs `gpu-next` for SDR at the load boundary). It naturally covers both
+  direct-play and transcode, since the response is where that decision is already made.
+
 ## [0.13.19] - 2026-09-09
 
 Server tooling — a per-device playback-log inspector.
