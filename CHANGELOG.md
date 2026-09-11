@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.29] - 2026-09-11
+
+TV (webOS / tv-web) — a proper debounced scrubbing experience.
+
+### Changed
+- **◄/► now scrubs with a moving preview and commits a single seek.** Holding or tapping ◄/► slides the
+  scrubber thumb (10s per step, clamped to the DVR buffer and the live edge, and it scrubs through bumpers
+  too) while the video keeps playing; the real seek fires **once**, ~500ms after you stop. Previously each
+  press was a full seek, so rewinding a minute meant six re-resolves/reloads (and six Plex transcode
+  sessions on the transcode path); now it's one. New `features/watch/scrub-controller.ts` (a small,
+  framework-agnostic preview/debounce controller) drives it; the underlying seek (`goTo`) is unchanged and
+  still agnostic to direct-play vs transcode. After a commit the thumb stays pinned at the target until the
+  new position loads, so a slow transcode reload doesn't snap it back. Acceleration-on-hold is built in but
+  off for now (flat 10s).
+
 ## [0.13.28] - 2026-09-11
 
 TV (webOS / tv-web) — the audio, subtitle, and quality menus now open as a dialog.

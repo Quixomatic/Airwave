@@ -162,8 +162,11 @@ export function FullChrome({
             quality={quality}
             audioStreamId={audioStreamId}
             subtitleStreamId={subtitleStreamId}
-            onSeekBack={() => controls.seekBy(-10)}
-            onSeekForward={() => controls.seekBy(10)}
+            getPosition={controls.currentEffective}
+            getFloor={controls.floor}
+            getLive={controls.liveEdge}
+            previewScrubber={controls.previewScrubber}
+            onSeekTo={controls.seekTo}
             onPlayPause={controls.togglePause}
             onLive={controls.jumpToLive}
             onRestart={controls.restart}
