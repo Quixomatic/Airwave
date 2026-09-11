@@ -1,8 +1,8 @@
 import type { ComponentType } from "react";
 import Link from "next/link";
 import { ServerCodeBlock } from "fumadocs-ui/components/codeblock.rsc";
-import { Step, Steps } from "fumadocs-ui/components/steps";
-import { Tv, Rewind, Clapperboard, MonitorPlay, ShieldCheck, Sparkles, TerminalIcon, Globe } from "lucide-react";
+import { LiveTvStepper } from "@/components/live-tv-stepper";
+import { Globe, Terminal, SlidersHorizontal } from "lucide-react";
 import { SiApple, SiAndroid, SiLg, SiGooglechrome, SiRoku, SiSamsung } from "react-icons/si";
 import { FaAmazon, FaWindows, FaLinux } from "react-icons/fa";
 import { cn } from "@/lib/cn";
@@ -13,6 +13,22 @@ import { AgnosticBackground, ShaderCta } from "@/components/shaders";
 import { HeroV1, HeroV2, HeroV3 } from "@/components/hero";
 import { HeroToggle } from "@/components/hero-toggle";
 import { COMPOSE } from "./compose";
+import { ENV_EXAMPLE } from "./env-example";
+import { SelfHostConfig } from "@/components/self-host-config";
+import { SelfHostConfigV2, SourceScope, SourceActions } from "@/components/self-host-config-v2";
+import { Bento, type BentoItem } from "@/components/bento";
+import { GuideMock, FormatScatter, DvrScrubber, BumperMock, PerUserMock, FilterMock, SelfHostMock } from "@/components/bento-mockups";
+
+// Flatten the ServerCodeBlock's own chrome so it sits flush inside SelfHostConfig's (v1) bordered container.
+const FLAT_CODEBLOCK = "!my-0 !rounded-none !border-0 !shadow-none !bg-transparent [&_pre]:max-h-[360px]";
+const CODE_MAXH = "[&_pre]:max-h-[360px]";
+const REPO = "https://github.com/Quixomatic/Airwave/blob/main";
+const COMPOSE_URL = `${REPO}/docker-compose.yml`;
+const ENV_URL = `${REPO}/.env.example`;
+// Which self-host config style the home page renders. Defaults to v1 (the bordered-header card); set
+// SELFHOST_CONFIG_VARIANT=v2 in the environment to switch to the tabs-over-card version. Read server-side at
+// build time, so a change takes effect on the next deploy.
+const SELFHOST_VARIANT = process.env.SELFHOST_CONFIG_VARIANT === "v2" ? "v2" : "v1";
 import { PreviewImages } from "./page.client";
 
 export const metadata = {
@@ -22,13 +38,71 @@ export const metadata = {
 // Landing variant helpers (heading/button/card/Wide) now live in `@/components/landing` (shared across
 // marketing pages — the fumadocs.dev-style design system).
 
-const FEATURES = [
-  { icon: Tv, title: "A real channel guide", body: "A grid guide you surf like cable, always-on channels on one continuous, deterministic timeline everyone sees in sync." },
-  { icon: Rewind, title: "Live offset + DVR", body: "Tune in mid-program at the right moment, then scrub back within the live buffer. You join what's on now. You just can't skip ahead." },
-  { icon: Clapperboard, title: "Bumpers & ambient music", body: "Between-program “Up Next” cards with cover art, plus an optional ambient-music bed, the touches that make it feel like a channel." },
-  { icon: MonitorPlay, title: "Direct-play everywhere", body: "Each device measures what it can decode and direct-plays your files natively (4K HDR, multichannel audio), transcoding only when it must." },
-  { icon: ShieldCheck, title: "Self-hosted & private", body: "You run the server. Your library, viewers, and history stay on your hardware. No telemetry, no accounts on our end, nothing phoning home." },
-  { icon: Sparkles, title: "Build channels fast", body: "Author channels from metadata filters, auto-generate a whole lineup, or let a bring-your-own-key AI assistant draft one for you." },
+// Bento layout mirrors plezy's exact 8-cell grid (4 cols x 4 rows): a 2x2 hero, a 1x2 tall tile, four 1x1
+// smalls, a 2-wide tile, and a full-width banner. Explicit lg placement so it matches cell-for-cell; below lg
+// the `span` classes don't apply and the tiles flow in this array order (stacked / 2-up).
+const FEATURES: BentoItem[] = [
+  {
+    title: "A real channel guide",
+    body: "A grid guide you surf like cable, always-on channels on one continuous, deterministic timeline everyone sees in sync.",
+    titleSize: "lg",
+    content: <GuideMock />,
+    span: "lg:col-start-1 lg:col-span-2 lg:row-start-1 lg:row-span-2",
+    radius: "lg:rounded-tl-3xl lg:rounded-tr-md lg:rounded-br-md lg:rounded-bl-md",
+  },
+  {
+    title: "Bumpers & music",
+    body: "“Up Next” cards and an optional ambient bed between programs.",
+    content: <BumperMock />,
+    span: "lg:col-start-3 lg:row-start-1",
+    radius: "lg:rounded-md",
+    bg: "bg-fd-secondary",
+  },
+  {
+    title: "Direct-play first",
+    body: "Plays your files natively; transcodes only when a device needs it.",
+    content: <FormatScatter />,
+    span: "lg:col-start-3 lg:row-start-2",
+    radius: "lg:rounded-md",
+  },
+  {
+    title: "Live offset + DVR",
+    body: "Join what's on now, scrub back through the buffer, restart, or roll into an earlier program. You just can't skip ahead of live.",
+    content: <DvrScrubber />,
+    span: "lg:col-start-4 lg:row-start-1 lg:row-span-2",
+    radius: "lg:rounded-tr-3xl lg:rounded-tl-md lg:rounded-br-md lg:rounded-bl-md",
+  },
+  {
+    title: "Self-hosted & private",
+    body: "Runs on your hardware. No telemetry, nothing phones home.",
+    content: <SelfHostMock />,
+    span: "lg:col-start-1 lg:row-start-3",
+    radius: "lg:rounded-md",
+    bg: "bg-fd-secondary",
+  },
+  {
+    title: "Per-user access",
+    body: "Share whole packages or specific channels, enforced per viewer.",
+    content: <PerUserMock />,
+    span: "lg:col-start-2 lg:row-start-3",
+    radius: "lg:rounded-md",
+  },
+  {
+    title: "Build channels fast",
+    body: "Author from metadata filters, auto-generate a whole lineup, or let a bring-your-own-key AI assistant draft one.",
+    content: <FilterMock />,
+    span: "lg:col-start-3 lg:col-span-2 lg:row-start-3",
+    radius: "lg:rounded-md",
+    bg: "bg-fd-secondary",
+  },
+  {
+    title: "& much more",
+    body: "Build entire lineups with AI, a built-in AI assistant, AI run observability, live session tracking, one synced guide every viewer shares, remote and relay playback, and more shipping regularly.",
+    span: "lg:col-start-1 lg:col-span-4 lg:row-start-4",
+    radius: "lg:rounded-t-md lg:rounded-b-3xl",
+    href: "/features",
+    cta: "See all features",
+  },
 ];
 
 // Fully-supported first (green "Ready"), then partial (amber "WIP"); COMING_SOON renders after (muted "Soon").
@@ -99,15 +173,51 @@ export default async function HomePage() {
           </div>
         </div>
         <div className="min-w-0">
-          <div className="mb-3 flex flex-row items-center gap-2 text-fd-muted-foreground">
-            <TerminalIcon className="size-4" />
-            <span className="font-mono text-xs">docker-compose.yml</span>
-          </div>
-          <ServerCodeBlock
-            code={COMPOSE}
-            lang="yaml"
-            codeblock={{ className: "bg-fd-secondary [&_pre]:max-h-[360px]" }}
-          />
+          {SELFHOST_VARIANT === "v2" ? (
+            <SelfHostConfigV2
+              files={[
+                {
+                  id: "compose",
+                  label: "docker-compose.yml",
+                  icon: <Terminal />,
+                  block: (
+                    <SourceScope url={COMPOSE_URL}>
+                      <ServerCodeBlock code={COMPOSE} lang="yaml" codeblock={{ Actions: SourceActions, className: CODE_MAXH }} />
+                    </SourceScope>
+                  ),
+                },
+                {
+                  id: "env",
+                  label: ".env.example",
+                  icon: <SlidersHorizontal />,
+                  block: (
+                    <SourceScope url={ENV_URL}>
+                      <ServerCodeBlock code={ENV_EXAMPLE} lang="bash" codeblock={{ Actions: SourceActions, className: CODE_MAXH }} />
+                    </SourceScope>
+                  ),
+                },
+              ]}
+            />
+          ) : (
+            <SelfHostConfig
+              files={[
+                {
+                  id: "compose",
+                  label: "docker-compose.yml",
+                  url: COMPOSE_URL,
+                  code: COMPOSE,
+                  block: <ServerCodeBlock code={COMPOSE} lang="yaml" codeblock={{ allowCopy: false, className: FLAT_CODEBLOCK }} />,
+                },
+                {
+                  id: "env",
+                  label: ".env.example",
+                  url: ENV_URL,
+                  code: ENV_EXAMPLE,
+                  block: <ServerCodeBlock code={ENV_EXAMPLE} lang="bash" codeblock={{ allowCopy: false, className: FLAT_CODEBLOCK }} />,
+                },
+              ]}
+            />
+          )}
         </div>
       </Wide>
 
@@ -148,15 +258,7 @@ export default async function HomePage() {
             className="mb-[clamp(2.5rem,6vw,4.5rem)]"
           />
         </ScrollReveal>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((f) => (
-            <div key={f.title} className={cn(card(), "flex flex-col")}>
-              <f.icon className="mb-4 size-6 text-brand" />
-              <h3 className={heading("h3", "mb-2 text-base lg:text-lg")}>{f.title}</h3>
-              <p className="text-fd-muted-foreground">{f.body}</p>
-            </div>
-          ))}
-        </div>
+        <Bento items={FEATURES} bordered={false} />
       </Wide>
 
       {/* ── Living-room grid (fumadocs "For Engineers"-style grid) ───────────── */}
@@ -170,7 +272,7 @@ export default async function HomePage() {
             className="mb-[clamp(2.5rem,6vw,4.5rem)]"
           />
         </ScrollReveal>
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 lg:[grid-template-columns:2.2fr_1fr] xl:[grid-template-columns:2.5fr_1fr]">
           {/* Works on most platforms — dithered-warp background, like fumadocs' "Framework Agnostic" card */}
           <div className={cn(card(), "relative z-2 flex flex-col overflow-hidden")}>
             <h3 className={heading("h3", "mb-3")}>Works on most platforms.</h3>
@@ -179,7 +281,7 @@ export default async function HomePage() {
               the same app everywhere.
             </p>
             {/* Square tiles — icon stacked over the platform name, like an app grid. */}
-            <div className="mb-8 grid grid-cols-4 gap-2.5">
+            <div className="mb-8 grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6">
               {PLATFORMS.map((p) => (
                 <div
                   key={p.name}
@@ -225,31 +327,28 @@ export default async function HomePage() {
             <AgnosticBackground />
           </div>
 
-          {/* Three steps — the fumadocs Steps component, in one card */}
+          {/* Three steps — an animated vertical stepper that cycles through the setup flow. */}
           <div className={cn(card(), "flex flex-col")}>
             <h3 className={heading("h3", "mb-6")}>Three steps to live TV.</h3>
-            <Steps>
-              <Step>
-                <h4 className="mb-1 font-medium text-landing-foreground">Connect Plex</h4>
-                <p className="text-sm text-fd-muted-foreground">
-                  Sign in with Plex once, enable your libraries, and sync metadata into Airwave&apos;s cache.
-                </p>
-              </Step>
-              <Step>
-                <h4 className="mb-1 font-medium text-landing-foreground">Build channels</h4>
-                <p className="text-sm text-fd-muted-foreground">
-                  Filter your library into channels (“90s comedies”, “all Studio Ghibli”), laid onto a
-                  continuous timeline.
-                </p>
-              </Step>
-              <Step>
-                <h4 className="mb-1 font-medium text-landing-foreground">Tune in</h4>
-                <p className="text-sm text-fd-muted-foreground">
-                  Open a TV app, sign in, and channel-surf your library like it&apos;s live cable, at home or
-                  on the road.
-                </p>
-              </Step>
-            </Steps>
+            <LiveTvStepper
+              steps={[
+                {
+                  title: "Connect Plex",
+                  description:
+                    "Sign in with Plex once, enable your libraries, and sync metadata into Airwave's cache.",
+                },
+                {
+                  title: "Build channels",
+                  description:
+                    "Filter your library into channels (“90s comedies”, “all Studio Ghibli”), laid onto a continuous timeline.",
+                },
+                {
+                  title: "Tune in",
+                  description:
+                    "Open a TV app, sign in, and channel-surf your library like it's live cable, at home or on the road.",
+                },
+              ]}
+            />
           </div>
         </div>
       </Wide>

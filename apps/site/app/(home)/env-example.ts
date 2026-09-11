@@ -1,0 +1,89 @@
+// Mirror of the repo's root `.env.example`, shown in the home page's self-host config switcher next to
+// `compose.ts`. Keep in sync with `/.env.example` (the switcher links to the real file on GitHub).
+export const ENV_EXAMPLE = `# ============================================================================
+#  Airwave — self-host stack configuration
+#  Copy to .env, fill in the values, then deploy (Dockge, or \`docker compose up -d\`).
+# ============================================================================
+
+# --- Image ------------------------------------------------------------------
+# The published image to run. Pin a version (e.g. :0.6.30) or track :latest.
+CG_IMAGE=ghcr.io/quixomatic/airwave:latest
+
+# --- Where the apps are reachable FROM YOUR BROWSER / TV ---------------------
+# CRITICAL: these are baked into the admin build and used for auth + CORS, so they
+# must be the addresses your browser and TV actually use — your host's LAN IP or a
+# domain, with the PUBLISHED ports below. Do NOT use "localhost" unless you only
+# ever browse from the host machine itself.
+#
+#   SERVER_PUBLIC_URL — where the API/server is reachable (also the TV's server URL)
+#   WEB_PUBLIC_URL    — where the admin web is reachable
+SERVER_PUBLIC_URL=http://192.168.1.10:36020
+WEB_PUBLIC_URL=http://192.168.1.10:36021
+
+# Extra admin origins to allow-list for CORS + auth, beyond WEB_PUBLIC_URL. Comma-separated exact
+# origins (scheme + host + port, no trailing slash). Use it when the admin is reachable at more than
+# one address — e.g. WEB_PUBLIC_URL is a public HTTPS domain but you also open the admin over the LAN:
+#   EXTRA_CORS_ORIGINS=http://192.168.1.10:36021
+# Note: a LAN-IP origin calling an HTTPS API is genuinely cross-site, so it relies on third-party
+# cookies (the auth cookie is already SameSite=None;Secure on an HTTPS server). Works today; the
+# clean long-term path is to reach the admin at its own domain.
+# EXTRA_CORS_ORIGINS=
+
+# --- Published host ports (host side -> fixed container side) ----------------
+SERVER_PORT=36020    # -> container 3000  (must match SERVER_PUBLIC_URL's port)
+WEB_PORT=36021       # -> container 3001  (must match WEB_PUBLIC_URL's port)
+
+# --- Postgres ---------------------------------------------------------------
+POSTGRES_USER=channelguide
+POSTGRES_PASSWORD=change-me-please
+POSTGRES_DB=channelguide
+
+# --- Auth / security --------------------------------------------------------
+# 32+ character random secret. Generate one with:  openssl rand -base64 48
+BETTER_AUTH_SECRET=change-me-to-a-long-random-string-at-least-32-chars
+
+# First admin account, seeded on first boot (optional but recommended).
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=change-me
+
+# --- Runtime user / timezone (TrueNAS datasets) -----------------------------
+PUID=1000
+PGID=1000
+UMASK=022
+TZ=UTC
+
+# --- Optional: bumper ambient music -----------------------------------------
+# The bumper-music library persists via a volume mounted at the FIXED container path /data/bumper-music
+# (BUMPER_MUSIC_DIR in the server env — leave it alone). Choose only the HOST side here. Unset = a Docker
+# named volume (channelguide_bumpermusic). To manage the files from your host — drop tracks in and hit
+# "Scan folder" on the Bumpers page — set a bind path to your own folder/dataset instead:
+# BUMPER_MUSIC_VOLUME=/mnt/tank/apps/airwave/bumper-music
+
+# --- Optional: TV web player (browser) --------------------------------------
+# The 10-foot TV app, served as an auth-gated browser web player. Off by default.
+# To enable it: uncomment COMPOSE_PROFILES, and set the public URL + published port.
+# TV_WEB_PUBLIC_URL is also allow-listed on the server (as TV_APP_ORIGIN) for the TV
+# login flow — so it must be the address browsers actually reach the player at.
+# (The installed webOS/Tizen app needs none of this — it's bearer-auth, origin-agnostic.)
+# COMPOSE_PROFILES=tvweb
+# TV_WEB_PUBLIC_URL=http://192.168.1.10:36022
+# TV_WEB_PORT=36022    # -> container 3002
+# By default the player talks to the same server URL as the admin (SERVER_PUBLIC_URL). If you
+# reverse-proxy the player at its own public domain with /api + /img forwarded to the server, set
+# the player's server URL to that same domain — then the server never needs to be exposed:
+# TV_SERVER_URL=https://airwave-tv.turboforge.io
+
+# --- Optional: social OAuth (set BOTH id + secret to enable a provider) -----
+# GOOGLE_CLIENT_ID=
+# GOOGLE_CLIENT_SECRET=
+# GITHUB_CLIENT_ID=
+# GITHUB_CLIENT_SECRET=
+
+# --- Optional: stable Plex client identifier --------------------------------
+# PLEX_CLIENT_IDENTIFIER=
+
+# --- Optional: durable AI-lineup workflow engine ----------------------------
+# Off by default. Uncomment to enable the AI lineup builder's workflow engine.
+# (Its Postgres connection is derived from the Postgres settings above.)
+# WORKFLOW_ENABLED=1
+`;

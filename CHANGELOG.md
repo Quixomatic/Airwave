@@ -2,6 +2,29 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.27] - 2026-09-11
+
+Site (getairwave.tv) — a redesigned home page feature section plus a couple of home-page building blocks.
+
+### Added
+- **A bento grid** for the "Everything a channel needs" section (`components/bento.tsx`): a
+  content-driven layout (no fixed row heights) with per-card title/body size variants, a content slot, and
+  an enable/disable `bordered` prop. Each card carries a bespoke mock (`components/bento-mockups.tsx`): a
+  tinted channel-guide skeleton (hero), the mini bumper countdown donut, direct-play format chips, a
+  player-screen DVR scrubber (segmented, live edge, channel badge, play glyph), self-hosted "installs on"
+  host tiles (Docker/Windows/macOS/Linux) with a Better Auth chip, per-user avatars + access chips, and the
+  admin read-only channel filter fading off the bottom.
+- **An animated "three steps to live TV" stepper** (`components/live-tv-stepper.tsx`): a self-contained
+  vertical stepper that cycles through the steps with a spinner then green checks, honoring
+  `prefers-reduced-motion`.
+- **A self-host config viewer with two variants** (`components/self-host-config.tsx` +
+  `self-host-config-v2.tsx`): switch between `docker-compose.yml` and `.env.example`, with a GitHub source
+  link beside the copy button. The variant is chosen by the `SELFHOST_CONFIG_VARIANT` env var (default v1).
+
+### Changed
+- The home page's feature, steps, and self-host sections were rebuilt around the components above, with the
+  steps card narrowed to give the platform grid more room.
+
 ## [0.13.26] - 2026-09-11
 
 Site (getairwave.tv) — the first Airwave Weekly post and blog typography polish.
