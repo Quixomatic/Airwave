@@ -2,6 +2,23 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.26] - 2026-09-11
+
+Site (getairwave.tv) — the first Airwave Weekly post and blog typography polish.
+
+### Added
+- **"Airwave Weekly (11 September 2026)"** blog post: a plain-language digest of everything shipped over the
+  past couple of weeks (playback, platforms, AI, admin, desktop, site), with a short highlights list up top,
+  the start of a recurring weekly series.
+
+### Changed
+- **Blog post typography** tuned to read like a clean weekly newsletter: larger, tighter section headings
+  (h2 30px / h3 24px, semibold, negative letter-spacing) with tighter heading margins, and softened light/dark
+  body and heading colors. Scoped to blog posts (`.blog-prose`); docs are unaffected, and the site's own
+  column widths and body size are unchanged.
+- The blog post header title matches that scale (smaller and lighter than before), and the per-post **table of
+  contents was removed**.
+
 ## [0.13.25] - 2026-09-10
 
 Site (getairwave.tv) — a promo-video blog post, video SEO, and a copy cleanup.

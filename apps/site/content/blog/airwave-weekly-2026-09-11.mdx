@@ -1,0 +1,78 @@
+---
+title: "Airwave Weekly (11 September 2026)"
+description: "The first edition, catching up on a couple of busy weeks of updates."
+author: James
+date: "2026-09-11"
+image: /screenshots/desktop-macos-still.webp
+---
+
+I ship a lot of small releases, and almost all of it disappears into the changelog where nobody reads it. So
+I'm going to start writing a short weekly rundown of what actually changed.
+
+This first one is a catch-up, because the last couple of weeks turned into **48 releases** across the TV apps,
+the server, the AI tools, the desktop app, and the site. Here's what changed for you.
+
+## The short version
+
+- HDR on Android TV and Fire TV now plays at the right aspect ratio, and rewinding no longer restarts the program.
+- Fixed a rare Apple TV freeze, the NVIDIA Shield purple-screen bug, and a transcode stall at around five minutes.
+- Fire TV and Roku are live in their app stores.
+- Big AI lineups build reliably now, and there's a new cloud model option that plans a lineup for under a cent.
+- You can clone a channel and copy filters between channels.
+- The desktop app stays awake during playback and can launch at login.
+- New promo video, roadmap voting, and refreshed docs.
+
+The rest of this post goes through each of those in a bit more detail.
+
+## Playback
+
+HDR on Android TV and Fire TV got a real overhaul. HDR movies and shows now play at the right aspect ratio
+instead of being zoomed or stretched, switching between HDR and SDR programs is smooth, and rewinding back
+into an earlier program no longer restarts it from the beginning. Airwave now works out the right video path
+before playback starts, from the program's actual color information, instead of guessing partway through.
+
+A few other playback fixes landed too. The rare Apple TV hang that could lock up the app, usually right after
+a bumper, is gone. NVIDIA Shield SDR playback that came out as a purple screen is fixed. And transcoded
+streams no longer stall after about five and a half minutes.
+
+## Platforms
+
+Fire TV and Roku are both in their app stores now, alongside Apple TV and the native Windows and macOS apps.
+iPad and Android TV are still working through review and testing, and the browser player runs everywhere in
+the meantime.
+
+## AI channel-building
+
+Big lineups build reliably now. There was a timeout that used to kill long builds, and it's fixed, so a full
+lineup actually finishes. I also added Z.ai (GLM) as a cheap cloud option: it can plan a whole lineup for well
+under a cent, or you can pair a cloud planner with a local worker model and generate channels for close to
+nothing without a GPU. Local models got better too, with a filter-building fix and a switch to turn off
+"thinking" for the models that support it. The run view now shows exactly what the AI is doing while it works:
+live progress, token and cost breakdowns, the full planning transcript, and a dry-run preview before anything
+is written.
+
+## Admin
+
+You can clone a channel now instead of rebuilding one by hand. You can copy a filter off one channel and paste
+it into another, with a preview of exactly what you're pasting. And the channel list picked up tooltips and
+package hover cards, plus a live preview (with posters) of an unsaved channel's filter as you build it.
+
+## Desktop
+
+The desktop app keeps your machine awake during playback, recovers cleanly if it crashes, and gained
+run-at-login and silent-start options.
+
+## Site and docs
+
+There's a new promo video, with a short post to go with it: [See Airwave in action](/blog/see-airwave-in-action).
+The home page got a refresh, there's roadmap voting so you can tell me what to build next, the blog got
+rebuilt, and the docs picked up a generated changelog and a local development guide.
+
+## Getting involved
+
+There's a new `pnpm dev:setup` wizard that takes a contributor from a fresh clone to a running dev environment
+in a couple of minutes, plus contributing and security guidelines.
+
+That's the catch-up. These will be shorter from here. If you want to steer what comes next, the
+[roadmap](/roadmap) is the place to vote, and the full technical history always lives in the
+[changelog](/docs/changelog).

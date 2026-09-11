@@ -108,3 +108,40 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-badge-shimmer { animation: none; }
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Blog reading typography — only heading sizes and the light/dark font colors are
+   tuned to match selfh.st; body size and column width stay at the site defaults.
+   selfh.st renders its posts with Tailwind Typography (`prose`): h2 = 1.5rem,
+   h3 = 1.25rem, headings #262626 / #e6e6e6, body text #404040 / #b3b3b3. Scoped to
+   `.blog-prose` (docs prose untouched); loaded after the fumadocs preset so these
+   win on equal specificity.
+   ──────────────────────────────────────────────────────────────────────────── */
+.blog-prose :where(p, ul, ol, li, blockquote) {
+  color: #3f3f46; /* neutral zinc-700, ~selfh.st #404040 */
+}
+.dark .blog-prose :where(p, ul, ol, li, blockquote) {
+  color: #c7ccd6; /* soft neutral grey for the navy ground, ~selfh.st #b3b3b3 */
+}
+.blog-prose :where(h2, h3, h4) {
+  color: #262626;
+}
+.dark .blog-prose :where(h2, h3, h4) {
+  color: #e6e6e6;
+}
+.blog-prose :where(h2) {
+  font-size: 1.875rem; /* 30px */
+  line-height: 1.33333; /* ~40px */
+  font-weight: 600;
+  letter-spacing: -0.05em; /* selfh.st's tight heading tracking */
+  margin-top: 25px;
+  margin-bottom: 10px;
+}
+.blog-prose :where(h3) {
+  font-size: 1.5rem; /* 24px */
+  line-height: 1.33333;
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  margin-top: 20px;
+  margin-bottom: 8px;
+}

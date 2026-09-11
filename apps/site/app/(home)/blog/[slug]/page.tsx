@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { InlineTOC } from "fumadocs-ui/components/inline-toc";
 import { blogSource } from "@/lib/source";
 import { readingTimeMinutes } from "@/lib/reading-time";
 import { getMDXComponents } from "@/components/mdx";
@@ -92,7 +91,9 @@ export default async function BlogPost(props: Params) {
             <span className="before:mr-2 before:content-['·']">{page.data.author}</span>
             <span className="before:mr-2 before:content-['·']">{mins} min read</span>
           </div>
-          <h1 className="mt-4 text-balance text-4xl font-bold tracking-tight sm:text-5xl">{page.data.title}</h1>
+          <h1 className="mt-4 text-balance text-2xl font-semibold tracking-[-0.07em] md:text-3xl md:font-medium lg:text-4xl">
+            {page.data.title}
+          </h1>
           {page.data.description ? (
             <p className="mx-auto mt-4 max-w-2xl text-balance text-lg text-fd-muted-foreground">
               {page.data.description}
@@ -122,8 +123,7 @@ export default async function BlogPost(props: Params) {
 
       {/* Body in fumadocs prose, with a collapsible inline TOC */}
       <article className="mx-auto w-full max-w-3xl px-6 py-10">
-        <InlineTOC items={page.data.toc} />
-        <div className="prose mt-6 max-w-none">
+        <div className="prose blog-prose max-w-none">
           <Mdx components={getMDXComponents()} />
         </div>
       </article>
