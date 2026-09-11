@@ -741,6 +741,14 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
       },
       jumpToLive: () => void goTo(now()),
       seekBy: (seconds: number) => void goTo(currentEffective() + seconds),
+      // Absolute seek (the debounced scrubber's single commit) — same agnostic goTo as seekBy.
+      seekTo: (target: number) => void goTo(target),
+      // Read-only helpers for the scrubber PREVIEW (no seek): current position, scrub bounds, and a
+      // scrubber view computed at an arbitrary target time.
+      currentEffective: () => currentEffective(),
+      floor: () => slotsRef.current[0]?.startS ?? now(),
+      liveEdge: () => now(),
+      previewScrubber: (target: number) => buildScrubber(target, now()),
       restart: () => {
         const cur = currentRef.current;
         if (!cur) return;
@@ -748,7 +756,7 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
         else void goTo(cur.startS);
       },
     }),
-    [goTo, now, currentEffective],
+    [goTo, now, currentEffective, buildScrubber],
   );
 
   const videoEvents = useMemo(

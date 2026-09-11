@@ -2,6 +2,25 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.31] - 2026-09-11
+
+TV (native / tv-native) — the same debounced scrubbing, with synthesized press-and-hold.
+
+### Changed
+- Ported the debounced scrubber to tv-native (Apple TV / Fire TV / Android TV / iPad): ◄/► slides a
+  preview thumb (flat 10s per step, clamped to the DVR buffer and live edge, through bumpers) and commits
+  a **single** seek ~500ms after you stop, instead of one seek per press. Same framework-agnostic
+  `scrub-controller.ts`; the underlying `goTo` is unchanged.
+- **Press-and-hold on the remote is synthesized in the input layer.** react-native-tvos doesn't stream
+  repeated left/right while a d-pad is held (it emits `longLeft`/`longRight` with `eventKeyAction` 0/1, on
+  both tvOS and Android TV), so `useTVInput` now turns a long-direction press into a repeating `left`/
+  `right` stream (130ms) until release — downstream sees normal keys, identical to the web wiring. A
+  long-press *end* no longer emits a stray key (keeps `longSelect`→mini-focus single-firing).
+
+### Verification
+- Taps + typecheck are covered; the hold behavior needs an on-device check (Apple TV + Fire TV/Shield) —
+  confirm hold-to-rewind repeats and tune `HOLD_REPEAT_MS` if needed.
+
 ## [0.13.30] - 2026-09-11
 
 TV (desktop / tv-tauri) — the same debounced scrubbing as tv-web.

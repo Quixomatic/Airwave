@@ -74,12 +74,28 @@ export function useKeyLayer(opts: { id: string; priority: number; active?: boole
  * undefined, so this is a no-op there and touch drives the state instead. The `if` is constant per
  * build (never toggles at runtime), so the conditional hook call is safe.
  */
+// Press-and-hold on the TV remote: react-native-tvos does NOT stream repeated left/right while a d-pad is
+// held — it emits `longLeft`/`longRight` with `eventKeyAction` 0 (press) / 1 (release), on both tvOS and
+// Android TV (the same mechanism that makes `longSelect` work). To match tv-web's autorepeat we synthesize
+// it HERE: on a long-direction press start, dispatch that direction once and then repeat it on an interval
+// until release. Everything downstream just sees normal `left`/`right` keys (so the scrubber wiring is
+// identical across clients). Discrete taps still arrive as plain `left`/`right`.
+const HOLD_REPEAT_MS = 130; // tune for hold-scrub speed (matches tv-web's autorepeat feel)
+
 export function useTVInput() {
   const RNTV = RN as unknown as {
-    useTVEventHandler?: (cb: (e: { eventType: string }) => void) => void;
+    useTVEventHandler?: (cb: (e: { eventType: string; eventKeyAction?: number }) => void) => void;
     TVEventControl?: { enableTVMenuKey?: () => void; disableTVMenuKey?: () => void };
   };
   const useTVEventHandler = RNTV.useTVEventHandler;
+  const holdRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopHold = () => {
+    if (holdRef.current) {
+      clearInterval(holdRef.current);
+      holdRef.current = null;
+    }
+  };
+  useEffect(() => stopHold, []);
   // Enable the tvOS Menu button so it delivers a `menu` event to our dispatcher (→ `back`) for in-app
   // back navigation (close Info, close panels, dock/undock the player) instead of the OS immediately
   // backgrounding the app to Home. No-op on the iPad build. At the true guide root the guide flips this
@@ -92,6 +108,19 @@ export function useTVInput() {
   if (useTVEventHandler) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useTVEventHandler((e) => {
+      // Hold on ◄/► → synthesize repeats until release. `eventKeyAction`: 0 = press start, 1 = release.
+      if (e.eventType === "longLeft" || e.eventType === "longRight") {
+        const dir: SemanticKey = e.eventType === "longLeft" ? "left" : "right";
+        stopHold();
+        if (e.eventKeyAction === 1) return; // release → just stop
+        dispatchKey(dir); // immediate first step, then repeat while held
+        holdRef.current = setInterval(() => dispatchKey(dir), HOLD_REPEAT_MS);
+        return;
+      }
+      // Any other key ends an in-progress hold. Ignore a long-press END callback so it can't emit a
+      // stray key (also keeps longSelect → okLong single-firing).
+      stopHold();
+      if (e.eventKeyAction === 1) return;
       dispatchKey(tvEventToKey(e.eventType));
     });
   }

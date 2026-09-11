@@ -1,6 +1,6 @@
 import { AudioLines, Captions, Clapperboard, Info, Pause, Play, Radio, RotateCcw, SlidersHorizontal, Star, Tv } from "lucide-react-native";
 import type { ComponentType } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Platform, ScrollView, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -10,7 +10,8 @@ import { cs, hexA, scaled } from "@/features/guide/layout";
 import { LAYER, onInputActivity, useKeyLayer } from "@/lib/input";
 
 import { usePicker } from "./picker";
-import type { Delivery, useTvPlayer } from "./use-tv-player";
+import { createScrubController } from "./scrub-controller";
+import type { Delivery, ScrubberView, useTvPlayer } from "./use-tv-player";
 
 /**
  * The full-screen player's feature panel, ported from tv-web — the DVR scrubber (multi-segment,
@@ -20,7 +21,6 @@ import type { Delivery, useTvPlayer } from "./use-tv-player";
  */
 type Player = ReturnType<typeof useTvPlayer>;
 
-const SEEK = 10;
 const CTL_COUNT = 8;
 
 function fmt(total: number): string {
@@ -46,12 +46,57 @@ export function FeaturePanel({
 }) {
   const { status, controls } = player;
   const g = status.guide;
-  const sc = status.scrubber;
   const delivery = status.delivery;
   const { open: openPicker, openKind } = usePicker();
 
   const [focus, setFocus] = useState<{ row: 0 | 1; col: number }>({ row: 0, col: 0 });
   const [infoMode, setInfoMode] = useState(false);
+
+  // ── Debounced scrubber (ported from tv-web) ───────────────────────────────
+  // ◄/► move a PREVIEW thumb; the real seek fires ONCE ~500ms after the last input. On a HOLD, the input
+  // source (useTVInput) synthesizes repeated left/right, so this is identical to the web wiring. The
+  // underlying seek (seekTo → goTo) is unchanged and agnostic to direct vs transcode.
+  const [preview, setPreview] = useState<ScrubberView | null>(null);
+  const settlingRef = useRef(false);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrub = useMemo(
+    () =>
+      createScrubController({
+        getPosition: () => controls.currentEffective(),
+        getFloor: () => controls.floor(),
+        getLive: () => controls.liveEdge(),
+        onPreview: (t) => {
+          if (t != null) settlingRef.current = false;
+          setPreview(t == null ? null : controls.previewScrubber(t));
+        },
+        commit: (t) => {
+          settlingRef.current = true;
+          if (settleTimer.current) clearTimeout(settleTimer.current);
+          settleTimer.current = setTimeout(() => {
+            settlingRef.current = false;
+            setPreview(null);
+          }, 3500);
+          controls.seekTo(t);
+        },
+      }),
+    [controls],
+  );
+  const sc = preview ?? status.scrubber;
+  // Keep the thumb pinned at the target until the real position lands (no snap-back on a slow reload).
+  useEffect(() => {
+    if (settlingRef.current && preview && status.scrubber && Math.abs(status.scrubber.thumbPct - preview.thumbPct) < 2.5) {
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+      settlingRef.current = false;
+      setPreview(null);
+    }
+  }, [status.scrubber, preview]);
+  useEffect(
+    () => () => {
+      scrub.cancel();
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+    },
+    [scrub],
+  );
 
   const isEpisode = !!g?.showTitle && g?.season != null && g?.episode != null;
   const title = isEpisode ? g?.showTitle : g?.title;
@@ -77,6 +122,7 @@ export function FeaturePanel({
   }, [openKind]);
 
   const activateControl = (col: number) => {
+    scrub.cancel(); // leaving the scrubber row for a control drops any pending scrub
     switch (col) {
       case 0:
         controls.togglePause();
@@ -113,17 +159,20 @@ export function FeaturePanel({
     onKey(e) {
       if (e.key === "back") {
         if (infoMode) setInfoMode(false);
-        else onClose();
+        else {
+          scrub.cancel();
+          onClose();
+        }
         return true;
       }
       if (infoMode) return true; // details view owns the keys; Back (above) exits it
       if (focus.row === 0) {
         switch (e.key) {
           case "left":
-            controls.seekBy(-SEEK);
+            scrub.scrub(-1);
             return true;
           case "right":
-            controls.seekBy(SEEK);
+            scrub.scrub(1);
             return true;
           case "ok":
             controls.togglePause();
