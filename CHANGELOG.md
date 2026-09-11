@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.28] - 2026-09-11
+
+TV (webOS / tv-web) — the audio, subtitle, and quality menus now open as a dialog.
+
+### Changed
+- The three track menus (audio / subtitles / quality) on the watch screen now open as a **centered dialog**
+  matching the native apps, instead of a dropdown above the control button. New
+  `features/watch/track-picker.tsx`: a blurred card with a title, a scrollable list of rows (a leading
+  check on the current track, an accent-highlighted focus row), and an "OK to select · Back to cancel"
+  hint. It owns the keys at `LAYER.MODAL` while open (up/down to move, OK to select, Back to cancel),
+  opens focused on the current selection, and is portaled to `<body>` so the feature panel's slide-up
+  transform doesn't offset it. The old base-ui dropdown menu was removed from the feature panel.
+
 ## [0.13.27] - 2026-09-11
 
 Site (getairwave.tv) — a redesigned home page feature section plus a couple of home-page building blocks.

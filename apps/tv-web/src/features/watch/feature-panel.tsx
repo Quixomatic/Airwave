@@ -1,10 +1,3 @@
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@airwave/ui/components/dropdown-menu";
 import { motion } from "framer-motion";
 import {
   AudioLines,
@@ -23,6 +16,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { GuideMeta } from "../../lib/api";
 import { LAYER, useKeyLayer } from "../../lib/input";
+import { TrackPicker } from "./track-picker";
 import type { Delivery, ScrubberView } from "./use-tv-player";
 
 /**
@@ -208,34 +202,19 @@ export function FeaturePanel({
     transition: "background .12s, border-color .12s",
   });
 
-  const circleSelector = (
-    key: Exclude<MenuKey, null>,
-    col: number,
-    Icon: typeof AudioLines,
-    currentValue: string,
-    items: { value: string; label: string }[],
-    onValue: (v: string) => void,
-  ) => (
-    <DropdownMenu open={openMenu === key} onOpenChange={(o) => setOpenMenu(o ? key : null)}>
-      <DropdownMenuTrigger
-        ref={(el) => {
-          ctlRefs.current[col] = el;
-        }}
-        style={glass(col, true)}
-        aria-label={key}
-      >
-        <Icon size={ICON} />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" sideOffset={12} align="end" className="min-w-48">
-        <DropdownMenuRadioGroup value={currentValue} onValueChange={onValue}>
-          {items.map((it) => (
-            <DropdownMenuRadioItem key={it.value} value={it.value} className="text-base">
-              {it.label}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+  // A circular glass icon button that opens the corresponding track picker (OK on the focused button, or
+  // click). The picker itself is a centered dialog rendered below (matching tv-native).
+  const circleButton = (key: Exclude<MenuKey, null>, col: number, Icon: typeof AudioLines) => (
+    <button
+      ref={(el) => {
+        ctlRefs.current[col] = el;
+      }}
+      style={glass(col, true)}
+      aria-label={key}
+      onClick={() => setOpenMenu(key)}
+    >
+      <Icon size={ICON} />
+    </button>
   );
 
   const audioItems = [
@@ -388,13 +367,34 @@ export function FeaturePanel({
             </button>
 
             <div style={{ marginLeft: "auto", display: "flex", gap: 12 }}>
-              {circleSelector("audio", 5, AudioLines, audioStreamId ?? "", audioItems, onSelectAudio)}
-              {circleSelector("subs", 6, Captions, subtitleStreamId && subtitleStreamId !== "off" ? subtitleStreamId : "off", subItems, onSelectSub)}
-              {circleSelector("quality", 7, SlidersHorizontal, quality, qualityItems, onSelectQuality)}
+              {circleButton("audio", 5, AudioLines)}
+              {circleButton("subs", 6, Captions)}
+              {circleButton("quality", 7, SlidersHorizontal)}
             </div>
           </div>
         </>
       )}
+
+      {/* Audio / subtitle / quality picker — one centered dialog (tv-native parity), driven by which circle
+          is open. Owns keys at LAYER.MODAL while open, and is portaled to <body> so this panel's slide-up
+          transform doesn't move it. */}
+      <TrackPicker
+        open={openMenu !== null}
+        title={openMenu === "audio" ? "Audio" : openMenu === "subs" ? "Subtitles" : "Quality"}
+        items={openMenu === "audio" ? audioItems : openMenu === "subs" ? subItems : qualityItems}
+        current={
+          openMenu === "audio"
+            ? audioStreamId ?? ""
+            : openMenu === "subs"
+              ? subtitleStreamId && subtitleStreamId !== "off"
+                ? subtitleStreamId
+                : "off"
+              : quality
+        }
+        accent={accent}
+        onValue={openMenu === "audio" ? onSelectAudio : openMenu === "subs" ? onSelectSub : onSelectQuality}
+        onClose={() => setOpenMenu(null)}
+      />
     </motion.div>
   );
 }
