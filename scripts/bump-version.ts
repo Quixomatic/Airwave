@@ -36,7 +36,7 @@ const die = (msg: string): never => {
 };
 
 // ── target discovery ─────────────────────────────────────────────────────────
-type Kind = "jsonVersion" | "rokuManifest" | "cargoPackage" | "cargoLockPackage";
+type Kind = "jsonVersion" | "rokuManifest" | "cargoPackage" | "cargoLockPackage" | "tizenConfig";
 type Target = { path: string; kind: Kind };
 
 function appPackageJsons(): string[] {
@@ -58,6 +58,7 @@ function appPackageJsons(): string[] {
 const TARGETS: Target[] = [
   ...appPackageJsons().map((path): Target => ({ path, kind: "jsonVersion" })),
   { path: join(ROOT, "apps/tv-web/public/appinfo.json"), kind: "jsonVersion" }, // webOS manifest
+  { path: join(ROOT, "apps/tv-web/public/config.xml"), kind: "tizenConfig" }, // Tizen (Samsung TV) manifest
   { path: join(ROOT, "apps/tv-native/app.json"), kind: "jsonVersion" }, // Expo
   { path: join(ROOT, "apps/tv-tauri/src-tauri/tauri.conf.json"), kind: "jsonVersion" },
   { path: join(ROOT, "apps/tv-tauri/src-tauri/Cargo.toml"), kind: "cargoPackage" },
@@ -126,6 +127,18 @@ function cargoWrite(text: string, next: string): string {
   return text;
 }
 
+/**
+ * Tizen config.xml: the widget's own `version="X.Y.Z"` attribute. `\bversion=` (not just `version=`) so the
+ * two-segment `required_version="2.4"` is never touched — a word boundary can't sit inside `required_version`,
+ * and it isn't three segments anyway.
+ */
+function tizenRead(text: string): string | null {
+  return text.match(/\bversion="(\d+\.\d+\.\d+)"/)?.[1] ?? null;
+}
+function tizenWrite(text: string, next: string): string {
+  return text.replace(/(\bversion=")(\d+\.\d+\.\d+)(")/, `$1${next}$3`); // first occurrence only
+}
+
 function readVersion(t: Target, text: string): string | null {
   switch (t.kind) {
     case "jsonVersion":
@@ -135,6 +148,8 @@ function readVersion(t: Target, text: string): string | null {
     case "cargoPackage":
     case "cargoLockPackage":
       return cargoRead(text);
+    case "tizenConfig":
+      return tizenRead(text);
   }
 }
 function writeVersion(t: Target, text: string, next: string): string {
@@ -146,6 +161,8 @@ function writeVersion(t: Target, text: string, next: string): string {
     case "cargoPackage":
     case "cargoLockPackage":
       return cargoWrite(text, next);
+    case "tizenConfig":
+      return tizenWrite(text, next);
   }
 }
 

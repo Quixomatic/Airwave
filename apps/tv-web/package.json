@@ -10,7 +10,8 @@
     "start": "vite",
     "check-types": "vite build && tsc --noEmit",
     "gen-webos-assets": "python scripts/gen-webos-assets.py",
-    "package:webos": "vite build && node scripts/package-webos.mjs"
+    "package:webos": "vite build && node scripts/package-webos.mjs",
+    "package:tizen": "vite build && node scripts/package-tizen.mjs"
   },
   "dependencies": {
     "@airwave/ui": "workspace:*",

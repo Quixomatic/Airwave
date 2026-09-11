@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Tizen (Samsung TV) web-app manifest — the Tizen equivalent of appinfo.json (webOS). Lives in public/ so
+  Vite copies it to dist/ root, where `tizen package` reads it. The widget `version` is kept in lockstep by
+  `pnpm version:bump` (see scripts/bump-version.ts). Packaged into a signed .wgt by `pnpm --filter tv-web
+  package:tizen`.
+
+  Identity (change once, never after publishing): the 10-char `package` id + the `id` after it form the
+  Samsung application id. required_version is the MINIMUM Tizen TV platform; 2.4 targets a broad range of
+  Samsung TVs (raise it only to use newer TV web APIs).
+-->
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="http://com.airwave.tv/Airwave" version="0.13.28" viewmodes="maximized">
+  <tizen:application id="Airwavetv1.Airwave" package="Airwavetv1" required_version="2.4"/>
+  <tizen:profile name="tv"/>
+  <name>Airwave</name>
+  <icon src="icon.png"/>
+  <content src="index.html"/>
+  <!-- Reach the self-hosted Airwave server (any origin, over http/https). -->
+  <access origin="*" subdomains="true"/>
+  <tizen:privilege name="http://tizen.org/privilege/internet"/>
+  <!-- Needed for tizen.tvinputdevice.registerKey() (media + color remote keys). -->
+  <tizen:privilege name="http://developer.samsung.com/privilege/productinfo"/>
+  <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
+</widget>

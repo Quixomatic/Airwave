@@ -101,6 +101,10 @@ packages/api/src/**/*.d.ts
 # webOS ares-package output (.ipk build artifacts)
 apps/tv-web/build-ipk/
 
+# Tizen/Samsung tizen-package output (.wgt build artifacts)
+*.wgt
+apps/tv-web/build-wgt/
+
 # Electrobun desktop build outputs (installer + release artifacts + the pre-bundled pg launcher)
 apps/desktop/artifacts/
 apps/desktop/pg-launcher/
