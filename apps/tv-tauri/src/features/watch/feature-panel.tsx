@@ -20,10 +20,11 @@ import {
   Star,
   Tv,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { GuideMeta } from "../../lib/api";
 import { LAYER, useKeyLayer } from "../../lib/input";
+import { createScrubController } from "./scrub-controller";
 import type { Delivery, ScrubberView } from "./use-tv-player";
 
 /**
@@ -67,8 +68,11 @@ export function FeaturePanel({
   quality,
   audioStreamId,
   subtitleStreamId,
-  onSeekBack,
-  onSeekForward,
+  getPosition,
+  getFloor,
+  getLive,
+  previewScrubber,
+  onSeekTo,
   onPlayPause,
   onLive,
   onRestart,
@@ -89,8 +93,11 @@ export function FeaturePanel({
   quality: string;
   audioStreamId?: string;
   subtitleStreamId?: string;
-  onSeekBack: () => void;
-  onSeekForward: () => void;
+  getPosition: () => number;
+  getFloor: () => number;
+  getLive: () => number;
+  previewScrubber: (target: number) => ScrubberView;
+  onSeekTo: (target: number) => void;
   onPlayPause: () => void;
   onLive: () => void;
   onRestart: () => void;
@@ -112,6 +119,67 @@ export function FeaturePanel({
   const ctlRefs = useRef<(HTMLElement | null)[]>([]);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const CTL_COUNT = 8; // Pause · Restart · ChannelSurf · Info · Live · Audio · Subs · Quality
+
+  // ── Debounced scrubber ────────────────────────────────────────────────────
+  // ◄/► move a PREVIEW thumb; the real seek fires ONCE after ~500ms idle. The seek (onSeekTo → goTo)
+  // is untouched and stays agnostic to direct vs transcode.
+  const [preview, setPreview] = useState<ScrubberView | null>(null);
+  const settlingRef = useRef(false);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrubFns = useRef({ getPosition, getFloor, getLive, previewScrubber, onSeekTo });
+  scrubFns.current = { getPosition, getFloor, getLive, previewScrubber, onSeekTo };
+  const scrub = useMemo(
+    () =>
+      createScrubController({
+        getPosition: () => scrubFns.current.getPosition(),
+        getFloor: () => scrubFns.current.getFloor(),
+        getLive: () => scrubFns.current.getLive(),
+        onPreview: (t) => {
+          if (t != null) settlingRef.current = false;
+          setPreview(t == null ? null : scrubFns.current.previewScrubber(t));
+        },
+        commit: (t) => {
+          settlingRef.current = true;
+          if (settleTimer.current) clearTimeout(settleTimer.current);
+          settleTimer.current = setTimeout(() => {
+            settlingRef.current = false;
+            setPreview(null);
+          }, 3500);
+          scrubFns.current.onSeekTo(t);
+        },
+      }),
+    [],
+  );
+  useEffect(() => {
+    if (settlingRef.current && preview && scrubber && Math.abs(scrubber.thumbPct - preview.thumbPct) < 2.5) {
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+      settlingRef.current = false;
+      setPreview(null);
+    }
+  }, [scrubber, preview]);
+  useEffect(
+    () => () => {
+      scrub.cancel();
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+    },
+    [scrub],
+  );
+  const jumpToLive = () => {
+    scrub.cancel();
+    onLive();
+  };
+  const doRestart = () => {
+    scrub.cancel();
+    onRestart();
+  };
+  const enterInfo = () => {
+    scrub.cancel();
+    setInfoMode(true);
+  };
+  const closePanel = () => {
+    scrub.cancel();
+    onClose();
+  };
 
   const armHide = () => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -153,7 +221,7 @@ export function FeaturePanel({
       if (e.key === "back") {
         if (infoMode) setInfoMode(false);
         else if (openMenu) setOpenMenu(null);
-        else onClose();
+        else closePanel();
         return true;
       }
       armHide();
@@ -167,10 +235,10 @@ export function FeaturePanel({
       if (focus.row === 0) {
         switch (e.key) {
           case "left":
-            onSeekBack();
+            scrub.scrub(-1);
             return true;
           case "right":
-            onSeekForward();
+            scrub.scrub(1);
             return true;
           case "ok":
             onPlayPause();
@@ -264,7 +332,7 @@ export function FeaturePanel({
 
   // Scrubber geometry — percentages are pre-computed by the hook (expanded focus program
   // + fixed left/right peeks). See use-tv-player buildScrubber.
-  const sc = scrubber;
+  const sc = preview ?? scrubber;
   const posPct = sc?.thumbPct ?? 0;
   const livePct = sc?.livePct ?? 100;
   const liveInWindow = sc?.liveVisible ?? true;
@@ -380,7 +448,7 @@ export function FeaturePanel({
                 {fmt(sc?.slotPositionS ?? 0)}
               </span>
               <span
-                onClick={(e) => { e.stopPropagation(); onLive(); }}
+                onClick={(e) => { e.stopPropagation(); jumpToLive(); }}
                 style={{ position: "absolute", right: 0, display: "inline-flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 700, letterSpacing: 0.5, color: atLive ? "#ef4444" : "#94a3b8" }}
               >
                 <span style={{ width: 9, height: 9, borderRadius: "50%", background: atLive ? "#ef4444" : "#64748b" }} />
@@ -400,17 +468,17 @@ export function FeaturePanel({
               ref={(el) => { ctlRefs.current[1] = el; }}
               style={{ ...glass(1), opacity: canRestart ? 1 : 0.4 }}
               onMouseEnter={() => setFocus({ row: 1, col: 1 })}
-              onClick={onRestart}
+              onClick={doRestart}
             >
               <RotateCcw size={ICON} /> Restart
             </button>
             <button ref={(el) => { ctlRefs.current[2] = el; }} style={glass(2)} onMouseEnter={() => setFocus({ row: 1, col: 2 })} onClick={onChannelSurf}>
               <Tv size={ICON} /> Channel Surf
             </button>
-            <button ref={(el) => { ctlRefs.current[3] = el; }} style={glass(3)} onMouseEnter={() => setFocus({ row: 1, col: 3 })} onClick={() => setInfoMode(true)}>
+            <button ref={(el) => { ctlRefs.current[3] = el; }} style={glass(3)} onMouseEnter={() => setFocus({ row: 1, col: 3 })} onClick={enterInfo}>
               <Info size={ICON} /> Info
             </button>
-            <button ref={(el) => { ctlRefs.current[4] = el; }} style={glass(4)} onMouseEnter={() => setFocus({ row: 1, col: 4 })} onClick={onLive}>
+            <button ref={(el) => { ctlRefs.current[4] = el; }} style={glass(4)} onMouseEnter={() => setFocus({ row: 1, col: 4 })} onClick={jumpToLive}>
               {atLive ? <Clapperboard size={ICON} /> : <Radio size={ICON} />} {atLive ? "Continue Watching" : "Jump to Live"}
             </button>
 

@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.30] - 2026-09-11
+
+TV (desktop / tv-tauri) — the same debounced scrubbing as tv-web.
+
+### Changed
+- Ported the debounced scrubber to tv-tauri: holding/tapping ◄/► slides a preview thumb (flat 10s per
+  step, clamped to the DVR buffer and live edge, through bumpers) and commits a **single** seek ~500ms
+  after you stop, instead of one seek per press. Same framework-agnostic `scrub-controller.ts` as tv-web,
+  wired into tv-tauri's feature panel; the underlying `goTo` seek is unchanged. Press-and-hold works
+  natively (tv-tauri shares tv-web's DOM input dispatcher).
+
 ## [0.13.29] - 2026-09-11
 
 TV (webOS / tv-web) — a proper debounced scrubbing experience.
