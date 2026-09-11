@@ -4,7 +4,25 @@
  * so normalization is just a rename to our vocabulary. Everything downstream (the dispatcher, the
  * guide's zone machine) deals in `SemanticKey`, identical to tv-web.
  */
-export type SemanticKey = "up" | "down" | "left" | "right" | "ok" | "okLong" | "back" | "chUp" | "chDown" | "digit" | "playPause" | "unknown";
+export type SemanticKey =
+  | "up"
+  | "down"
+  | "left"
+  | "right"
+  | "ok"
+  | "okLong"
+  // Press-and-hold on ◄/► (from tvOS/Android-TV `longLeft`/`longRight`): a `*Hold` on press-start and a
+  // shared `holdEnd` on release. A zone that wants hold-repeat (the player chrome's scrubber) starts its
+  // own interval on `leftHold`/`rightHold` and stops on `holdEnd`; zones that don't care just ignore them.
+  | "leftHold"
+  | "rightHold"
+  | "holdEnd"
+  | "back"
+  | "chUp"
+  | "chDown"
+  | "digit"
+  | "playPause"
+  | "unknown";
 
 /** `digit` carries 0–9 in `digit`. (Number/channel keys don't arrive via `useTVEventHandler` on the
  *  current RN-TV targets — the on-screen keypad / CH buttons drive that logic directly; these types

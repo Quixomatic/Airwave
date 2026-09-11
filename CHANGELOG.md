@@ -2,6 +2,23 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.32] - 2026-09-11
+
+TV (native / tv-native) — fix D-pad navigation broken by 0.13.31, and move press-and-hold into the zone.
+
+### Fixed
+- **0.13.31 broke all D-pad navigation on tvOS.** The press-and-hold handling was wrongly placed in the
+  global input source (`useTVInput`) and inspected `eventKeyAction` on every key; normal d-pad events
+  (up/down/left/right/select) carry their own action values on tvOS, so they got swallowed and nothing
+  could navigate. Reverted the global path to dispatch exactly as before.
+
+### Changed
+- Press-and-hold scrubbing now lives in the **feature-panel's `LAYER.CHROME` zone**, per the zonal input
+  model — not the global dispatcher. The dispatcher only *translates* `longLeft`/`longRight` (with
+  `eventKeyAction`) into `leftHold`/`rightHold`/`holdEnd` semantic keys and feeds them to the zone stack;
+  the panel runs the repeat interval while held (scoped to the scrubber row) and stops on release. Zones
+  that don't opt in (the guide) simply ignore these keys.
+
 ## [0.13.31] - 2026-09-11
 
 TV (native / tv-native) — the same debounced scrubbing, with synthesized press-and-hold.

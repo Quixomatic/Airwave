@@ -22,6 +22,7 @@ import type { Delivery, ScrubberView, useTvPlayer } from "./use-tv-player";
 type Player = ReturnType<typeof useTvPlayer>;
 
 const CTL_COUNT = 8;
+const HOLD_MS = 130; // scrub-repeat cadence while ◄/► is held (tune for feel)
 
 function fmt(total: number): string {
   const s = Math.max(0, Math.floor(total));
@@ -53,12 +54,20 @@ export function FeaturePanel({
   const [infoMode, setInfoMode] = useState(false);
 
   // ── Debounced scrubber (ported from tv-web) ───────────────────────────────
-  // ◄/► move a PREVIEW thumb; the real seek fires ONCE ~500ms after the last input. On a HOLD, the input
-  // source (useTVInput) synthesizes repeated left/right, so this is identical to the web wiring. The
-  // underlying seek (seekTo → goTo) is unchanged and agnostic to direct vs transcode.
+  // ◄/► move a PREVIEW thumb; the real seek fires ONCE ~500ms after the last input. Press-and-hold is owned
+  // HERE, in the panel's CHROME zone (not the global input source): the dispatcher just delivers
+  // `leftHold`/`rightHold` (press) + `holdEnd` (release) semantic keys, and this layer runs the repeat
+  // interval while held. The underlying seek (seekTo → goTo) is unchanged and agnostic to direct vs transcode.
   const [preview, setPreview] = useState<ScrubberView | null>(null);
   const settlingRef = useRef(false);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopHold = () => {
+    if (holdRef.current) {
+      clearInterval(holdRef.current);
+      holdRef.current = null;
+    }
+  };
   const scrub = useMemo(
     () =>
       createScrubController({
@@ -93,6 +102,7 @@ export function FeaturePanel({
   useEffect(
     () => () => {
       scrub.cancel();
+      stopHold();
       if (settleTimer.current) clearTimeout(settleTimer.current);
     },
     [scrub],
@@ -157,6 +167,22 @@ export function FeaturePanel({
     id: "feature-panel",
     priority: LAYER.CHROME,
     onKey(e) {
+      // Press-and-hold on ◄/► (only meaningful on the scrubber row): run the repeat interval here, in this
+      // zone. `holdEnd` (release) or any other key stops it. The dispatcher just hands us these keys.
+      if (e.key === "leftHold" || e.key === "rightHold") {
+        if (!infoMode && focus.row === 0) {
+          const dir = e.key === "leftHold" ? -1 : 1;
+          stopHold();
+          scrub.scrub(dir);
+          holdRef.current = setInterval(() => scrub.scrub(dir), HOLD_MS);
+        }
+        return true;
+      }
+      if (e.key === "holdEnd") {
+        stopHold();
+        return true;
+      }
+      stopHold(); // any other key ends an in-progress hold
       if (e.key === "back") {
         if (infoMode) setInfoMode(false);
         else {
