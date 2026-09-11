@@ -9,7 +9,8 @@
     "serve": "vite preview",
     "start": "vite",
     "check-types": "vite build && tsc --noEmit",
-    "gen-webos-assets": "python scripts/gen-webos-assets.py"
+    "gen-webos-assets": "python scripts/gen-webos-assets.py",
+    "package:webos": "vite build && node scripts/package-webos.mjs"
   },
   "dependencies": {
     "@airwave/ui": "workspace:*",
