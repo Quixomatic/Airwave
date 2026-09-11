@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Tizen (Samsung TV) web-app manifest — the Tizen equivalent of appinfo.json (webOS). Lives in public/ so
-  Vite copies it to dist/ root, where `tizen package` reads it. The widget `version` is kept in lockstep by
-  `pnpm version:bump` (see scripts/bump-version.ts). Packaged into a signed .wgt by `pnpm --filter tv-web
-  package:tizen`.
+  Tizen (Samsung TV) web-app manifest, the Tizen counterpart of appinfo.json (webOS). Lives in public/ so
+  Vite copies it to dist/ root, where the tizen packager reads it. The widget version is kept in lockstep
+  by the repo version bump (scripts/bump-version.ts), and it is packaged into a signed .wgt by the tv-web
+  package:tizen script.
 
-  Identity (change once, never after publishing): the 10-char `package` id + the `id` after it form the
-  Samsung application id. required_version is the MINIMUM Tizen TV platform; 2.4 targets a broad range of
-  Samsung TVs (raise it only to use newer TV web APIs).
+  Identity (set once, never change after publishing): the 10-char package id plus the id that follows form
+  the Samsung application id. required_version is the MINIMUM Tizen TV platform; 2.4 targets a broad range
+  of Samsung TVs (raise it only to use newer TV web APIs). NB: XML comments must not contain a double
+  hyphen, so avoid CLI flags here.
 -->
 <widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="http://com.airwave.tv/Airwave" version="0.13.28" viewmodes="maximized">
   <tizen:application id="Airwavetv1.Airwave" package="Airwavetv1" required_version="2.4"/>
