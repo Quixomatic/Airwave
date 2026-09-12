@@ -23,23 +23,29 @@ use gtk::prelude::*;
 
 use crate::mpv::{self, ffi};
 
-// ── GL proc resolution (libepoxy directly) ───────────────────────────────────
-// GTK links libepoxy; we dlopen it and use `epoxy_get_proc_address` to resolve GL symbols for mpv and for
-// our own glGetIntegerv. (We do NOT use the `epoxy` crate — its 0.1.0 pins a gl_generator that depends on a
-// yanked xml-rs and won't build.)
-type EpoxyGetProc = unsafe extern "C" fn(*const c_char) -> *mut c_void;
-static EPOXY_GET_PROC: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
+// ── GL proc resolution (eglGetProcAddress) ───────────────────────────────────
+// GDK creates an EGL context on Wayland/X11, so we resolve every GL/EGL symbol mpv needs (and our own
+// glGetIntegerv) through the driver's `eglGetProcAddress` — exactly like plezy (mpv_player.cc:20). We
+// dlopen `libEGL.so.1` (the SYSTEM driver's EGL, never a bundled copy — linuxdeploy excludes libEGL for
+// this reason) and cache `eglGetProcAddress`. This replaces an earlier attempt to use libepoxy, which does
+// NOT export a generic `epoxy_get_proc_address` (undefined-symbol crash).
+type EglGetProc = unsafe extern "C" fn(*const c_char) -> *mut c_void;
+static EGL_GET_PROC: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 
 fn resolve(name: *const c_char) -> *mut c_void {
-    let p = EPOXY_GET_PROC.load(Ordering::Relaxed);
+    let p = EGL_GET_PROC.load(Ordering::Relaxed);
     if p.is_null() {
         return ptr::null_mut();
     }
-    let f: EpoxyGetProc = unsafe { std::mem::transmute(p) };
+    let f: EglGetProc = unsafe { std::mem::transmute(p) };
     unsafe { f(name) }
 }
 
-// mpv resolves each GL symbol it needs through this (whatever context GDK created — EGL on Wayland).
+fn resolve_cstr(name: &[u8]) -> *mut c_void {
+    resolve(name.as_ptr() as *const c_char)
+}
+
+// mpv resolves each GL symbol it needs through this (whatever context GDK created — EGL on Wayland/X11).
 extern "C" fn get_proc_address(_ctx: *mut c_void, name: *const c_char) -> *mut c_void {
     resolve(name)
 }
@@ -54,11 +60,18 @@ static GL_GET_INTEGERV: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 const GL_DRAW_FRAMEBUFFER_BINDING: c_int = 0x8CA6;
 
 fn current_fbo() -> c_int {
-    let f = GL_GET_INTEGERV.load(Ordering::Relaxed);
+    // Resolve lazily on first use: eglGetProcAddress most reliably returns core-GL entry points once a
+    // context is current, which it is inside the GLArea `render` pass (our only caller).
+    let mut f = GL_GET_INTEGERV.load(Ordering::Relaxed);
+    if f.is_null() {
+        f = resolve_cstr(b"glGetIntegerv\0");
+        GL_GET_INTEGERV.store(f, Ordering::Relaxed);
+    }
     if f.is_null() {
         return 0;
     }
-    // SAFETY: `f` is `glGetIntegerv` resolved via epoxy; called on the GTK render (main) thread.
+    // SAFETY: `f` is `glGetIntegerv` resolved via eglGetProcAddress; called on the GTK render (main) thread
+    // with the GLArea's GL context current.
     let get: GlGetIntegerv = unsafe { std::mem::transmute(f) };
     let mut fbo: c_int = 0;
     get(GL_DRAW_FRAMEBUFFER_BINDING, &mut fbo);
@@ -118,16 +131,20 @@ extern "C" fn on_update(data: *mut c_void) {
 /// Insert a GLArea behind the transparent webview, create mpv's OpenGL render context, and wire the render
 /// pump. Call AFTER `mpv_initialize` (with `vo=libmpv`), on the main thread (Tauri `setup`).
 pub fn setup(window: &tauri::WebviewWindow, mpv: &Arc<mpv::Mpv>) -> Result<(), String> {
-    // Resolve GL procs via libepoxy (already linked by GTK). Cache `epoxy_get_proc_address`, then use it
-    // for glGetIntegerv (the FBO read). The library handle is leaked for the app lifetime.
+    // Resolve GL procs via the driver's EGL. dlopen the SYSTEM libEGL (never a bundled copy) and cache
+    // `eglGetProcAddress`; `resolve()` then serves both mpv's proc callback and our glGetIntegerv. The
+    // handle is leaked for the app lifetime. (glGetIntegerv itself is resolved lazily in current_fbo once
+    // the GL context is current.)
     {
         use libloading::os::unix::{Library, Symbol};
-        let lib = unsafe { Library::new("libepoxy.so.0").or_else(|_| Library::new("libepoxy.so")) }
-            .map_err(|e| e.to_string())?;
-        let get: Symbol<EpoxyGetProc> = unsafe { lib.get(b"epoxy_get_proc_address").map_err(|e| e.to_string())? };
-        EPOXY_GET_PROC.store(*get as usize as *mut c_void, Ordering::Relaxed);
+        let lib = unsafe { Library::new("libEGL.so.1").or_else(|_| Library::new("libEGL.so")) }
+            .map_err(|e| format!("dlopen libEGL: {e}"))?;
+        let get: Symbol<EglGetProc> = unsafe {
+            lib.get(b"eglGetProcAddress")
+                .map_err(|e| format!("eglGetProcAddress: {e}"))?
+        };
+        EGL_GET_PROC.store(*get as usize as *mut c_void, Ordering::Relaxed);
         std::mem::forget(lib);
-        GL_GET_INTEGERV.store(resolve(b"glGetIntegerv\0".as_ptr() as *const c_char), Ordering::Relaxed);
     }
 
     let gtk_window = window.gtk_window().map_err(|e| e.to_string())?;
