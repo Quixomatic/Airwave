@@ -450,13 +450,18 @@ fn local_subnets() -> Vec<String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // WebKitGTK 2.42+ uses a DMABUF GPU renderer that draws a BLANK window on many drivers and especially
-    // virtualized GPUs (VMs) — the classic "Tauri Linux blank window." Disable it before the webview inits
-    // so the UI paints via the fallback path. Our mpv video uses its own GL context and is unaffected. Set
-    // only if the user hasn't overridden it. Linux-only.
+    // On a virtualized GPU (VM, virgl/Venus) the WebKitWebProcess — the separate child that renders the page —
+    // can't create an EGL display for its accelerated compositor and hard-aborts ("Could not create default
+    // EGL display: EGL_BAD_PARAMETER. Aborting..."; confirmed via coredumpctl to be WebKitWebProcess, not our
+    // code). Disabling WebKitGTK's accelerated compositing makes the web process paint on the CPU and avoids
+    // that EGL display entirely. Only-if-unset so real-GPU users can re-enable. mpv's own GL surface is a
+    // separate concern in the main process.
+    // NOTE: do NOT also set WEBKIT_DISABLE_DMABUF_RENDERER — on Omarchy, compositing-off + DMABUF-off ABORTED,
+    // while compositing-off + DMABUF-on rendered fine. The DMABUF renderer is also the fast path on real HW.
+    // TODO(perf): compositing-off penalizes real-hardware Linux; gate on a virtualized-GPU probe before GA.
     #[cfg(target_os = "linux")]
-    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
-        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    if std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_none() {
+        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
     }
     tauri::Builder::default()
         // Log plugin first so it captures everything (Rust `log::*` + JS `@tauri-apps/plugin-log`)
