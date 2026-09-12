@@ -122,8 +122,7 @@ pub fn setup(window: &tauri::WebviewWindow, mpv: &Arc<mpv::Mpv>) -> Result<(), S
     // for glGetIntegerv (the FBO read). The library handle is leaked for the app lifetime.
     {
         use libloading::os::unix::{Library, Symbol};
-        let lib = Library::new("libepoxy.so.0")
-            .or_else(|_| Library::new("libepoxy.so"))
+        let lib = unsafe { Library::new("libepoxy.so.0").or_else(|_| Library::new("libepoxy.so")) }
             .map_err(|e| e.to_string())?;
         let get: Symbol<EpoxyGetProc> = unsafe { lib.get(b"epoxy_get_proc_address").map_err(|e| e.to_string())? };
         EPOXY_GET_PROC.store(*get as usize as *mut c_void, Ordering::Relaxed);
