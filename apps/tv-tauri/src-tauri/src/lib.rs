@@ -515,6 +515,9 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
     // Transparent webview so the video composites behind the UI (Windows: WebView2/DComp over the
     // child HWND; macOS: transparent WKWebView over the Metal layer). NOT window transparency on
     // Windows; on macOS the window itself is transparent (tauri.macos.conf `transparent: true`).
+    // Linux EXCLUDED: soia sets this Windows-only; forcing a transparent bg on WebKitGTK here can blank
+    // the UI. Linux transparency comes from tauri.linux.conf (`transparent: true`).
+    #[cfg(not(target_os = "linux"))]
     let _ = window.set_background_color(Some(tauri::utils::config::Color(0, 0, 0, 0)));
 
     // macOS: extend the webview content under a transparent titlebar so the NATIVE traffic lights
@@ -548,9 +551,15 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
     }
     #[cfg(target_os = "linux")]
     {
-        mpv.set_option_string("vo", "libmpv")?; // enable the render API (GLArea render context)
+        mpv.set_option_string("vo", "libmpv")?; // enable the render API
         mpv.initialize()?;
-        render_linux::setup(&window, &mpv)?;
+        // DIAGNOSTIC (temporary): the GtkOverlay reparent in render_linux::setup blanks the WebKitGTK
+        // webview. Skip it to confirm the UI renders when the webview is left untouched. If it does, the
+        // reparent is the cause → build the no-reparent wl_subsurface + EGL path (soia's model). Then
+        // restore this call. See .plans/tv-tauri-linux-render.md.
+        let _ = &window;
+        log::warn!("linux video: DIAGNOSTIC — video setup skipped, webview left untouched");
+        // render_linux::setup(&window, &mpv)?;
     }
     #[cfg(target_os = "windows")]
     {
