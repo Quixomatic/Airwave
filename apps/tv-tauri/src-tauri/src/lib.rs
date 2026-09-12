@@ -448,21 +448,53 @@ fn local_subnets() -> Vec<String> {
     prefixes
 }
 
+/// On a virtualized GPU (VM, virgl/Venus) WebKitGTK's WebProcess can't create an EGL display for its
+/// accelerated compositor and hard-aborts ("Could not create default EGL display: EGL_BAD_PARAMETER.
+/// Aborting...") before any window shows — confirmed via coredumpctl to be WebKitWebProcess, unrelated to our
+/// video code (a blank window aborts the same way). Disabling accelerated compositing (webview paints on the
+/// CPU, which is fine — mpv owns video on its own GL path) avoids that EGL display and fixes it.
+///
+/// The catch: WebKit reads `WEBKIT_DISABLE_COMPOSITING_MODE` when libwebkit2gtk LOADS, before `main` runs, so
+/// setting it in-process is too late (verified on-device: it only takes effect when present at process start,
+/// e.g. from the shell). So if it isn't already set, set it and re-exec ourselves — the fresh process starts
+/// with it in the environment before WebKit loads. Guarded against an exec loop; opt out on real GPUs with
+/// `AIRWAVE_NO_WEBKIT_REEXEC=1`. TODO(perf): gate the default on a virtualized-GPU probe before GA.
+#[cfg(target_os = "linux")]
+fn ensure_webkit_env_via_reexec() {
+    use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
+
+    if std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_some()
+        || std::env::var_os("AIRWAVE_NO_WEBKIT_REEXEC").is_some()
+    {
+        return; // already set by the user/shell, or we've already re-exec'd once.
+    }
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    let Ok(exe_c) = CString::new(exe.as_os_str().as_bytes()) else {
+        return;
+    };
+    let argv_c: Vec<CString> = std::env::args_os()
+        .filter_map(|a| CString::new(a.as_bytes()).ok())
+        .collect();
+    std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+    std::env::set_var("AIRWAVE_NO_WEBKIT_REEXEC", "1"); // loop guard for the re-exec'd process
+    let mut argv: Vec<*const libc::c_char> = argv_c.iter().map(|a| a.as_ptr()).collect();
+    argv.push(std::ptr::null());
+    // SAFETY: exe_c/argv are valid, NUL-terminated C strings that outlive the call; execv replaces this
+    // process image and only returns on failure.
+    unsafe {
+        libc::execv(exe_c.as_ptr(), argv.as_ptr());
+    }
+    log::error!("re-exec to set WEBKIT_DISABLE_COMPOSITING_MODE failed; continuing (may abort in a VM)");
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // On a virtualized GPU (VM, virgl/Venus) the WebKitWebProcess — the separate child that renders the page —
-    // can't create an EGL display for its accelerated compositor and hard-aborts ("Could not create default
-    // EGL display: EGL_BAD_PARAMETER. Aborting..."; confirmed via coredumpctl to be WebKitWebProcess, not our
-    // code). Disabling WebKitGTK's accelerated compositing makes the web process paint on the CPU and avoids
-    // that EGL display entirely. Only-if-unset so real-GPU users can re-enable. mpv's own GL surface is a
-    // separate concern in the main process.
-    // NOTE: do NOT also set WEBKIT_DISABLE_DMABUF_RENDERER — on Omarchy, compositing-off + DMABUF-off ABORTED,
-    // while compositing-off + DMABUF-on rendered fine. The DMABUF renderer is also the fast path on real HW.
-    // TODO(perf): compositing-off penalizes real-hardware Linux; gate on a virtualized-GPU probe before GA.
+    // Must run before WebKit's library loads (see the function doc). Linux/VM-only workaround.
     #[cfg(target_os = "linux")]
-    if std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_none() {
-        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
-    }
+    ensure_webkit_env_via_reexec();
     tauri::Builder::default()
         // Log plugin first so it captures everything (Rust `log::*` + JS `@tauri-apps/plugin-log`)
         // to the terminal running `tauri dev`. Registered unconditionally so JS logging works.
