@@ -450,6 +450,14 @@ fn local_subnets() -> Vec<String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // WebKitGTK 2.42+ uses a DMABUF GPU renderer that draws a BLANK window on many drivers and especially
+    // virtualized GPUs (VMs) — the classic "Tauri Linux blank window." Disable it before the webview inits
+    // so the UI paints via the fallback path. Our mpv video uses its own GL context and is unaffected. Set
+    // only if the user hasn't overridden it. Linux-only.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
     tauri::Builder::default()
         // Log plugin first so it captures everything (Rust `log::*` + JS `@tauri-apps/plugin-log`)
         // to the terminal running `tauri dev`. Registered unconditionally so JS logging works.
