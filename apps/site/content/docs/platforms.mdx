@@ -49,7 +49,9 @@ native `<video>` element with an **hls.js** fallback for MSE playback. It powers
 
 - **Any browser** — via the optional **`tvweb` Docker role**, an auth-gated web player you serve from the
   same compose stack. This works today, for free, on any modern browser.
-- **LG webOS** — the same web app packaged as a webOS TV app (with a Samsung Tizen build on the roadmap).
+- **LG webOS** — the same web app packaged as a webOS TV app, sideloadable today via the `ares-install` CLI.
+- **Samsung (Tizen)** — the same web app packaged as a Tizen TV app, sideloadable today via Tizen Studio's
+  `tizen install` (its store listing is still to come).
 
 TV clients sign in with a **device-code flow** — scan a QR or enter a short code — using either "Sign in
 with Plex" or any Airwave account.

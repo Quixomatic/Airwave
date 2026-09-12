@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.34] - 2026-09-12
+
+Site (getairwave.tv) — mark Samsung (Tizen) as sideload-ready.
+
+### Changed
+- Samsung (Tizen) is now presented as sideloadable today (like LG webOS), not "on the roadmap": the home
+  page platforms grid shows it as **Ready**, and the docs (platforms, architecture, downloads) describe
+  sideloading the Tizen app via Tizen Studio's `tizen install` (Developer Mode + a Samsung certificate),
+  mirroring the webOS `ares-install` wording.
+
 ## [0.13.33] - 2026-09-11
 
 TV (desktop / tv-tauri) — mouse seeking on the scrubber.

@@ -115,12 +115,12 @@ const PLATFORMS: { name: string; Icon: ComponentType<{ className?: string }>; ba
   { name: "Roku", Icon: SiRoku, badge: "Ready" },
   { name: "Any browser", Icon: Globe, badge: "Ready" },
   { name: "Fire TV", Icon: FaAmazon, badge: "Ready" },
+  { name: "Samsung (Tizen)", Icon: SiSamsung, badge: "Ready" },
   { name: "Android TV", Icon: SiAndroid, badge: "WIP" },
 ];
 
 const COMING_SOON: { name: string; Icon: ComponentType<{ className?: string }> }[] = [
   { name: "Linux", Icon: FaLinux },
-  { name: "Samsung (Tizen)", Icon: SiSamsung },
 ];
 
 export default async function HomePage() {
