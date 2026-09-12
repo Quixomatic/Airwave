@@ -13,7 +13,6 @@
 //! iteration (Omarchy/Hyprland/Wayland). Two risk points are flagged inline: (1) reparenting Tauri's GTK
 //! child into a GtkOverlay, and (2) reading the GLArea's bound FBO id. See `.plans/tv-tauri-linux-render.md`.
 
-use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_void};
 use std::ptr;
 use std::sync::atomic::{AtomicPtr, Ordering};
@@ -24,14 +23,25 @@ use gtk::prelude::*;
 
 use crate::mpv::{self, ffi};
 
-// ── GL proc resolution (epoxy) ───────────────────────────────────────────────
-// mpv resolves each GL symbol it needs through this. GTK links libepoxy, so its loader hands back the
-// live GL/GLES entry points for whatever context GDK created (EGL on Wayland).
-extern "C" fn get_proc_address(_ctx: *mut c_void, name: *const c_char) -> *mut c_void {
-    let Ok(s) = (unsafe { CStr::from_ptr(name) }).to_str() else {
+// ── GL proc resolution (libepoxy directly) ───────────────────────────────────
+// GTK links libepoxy; we dlopen it and use `epoxy_get_proc_address` to resolve GL symbols for mpv and for
+// our own glGetIntegerv. (We do NOT use the `epoxy` crate — its 0.1.0 pins a gl_generator that depends on a
+// yanked xml-rs and won't build.)
+type EpoxyGetProc = unsafe extern "C" fn(*const c_char) -> *mut c_void;
+static EPOXY_GET_PROC: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
+
+fn resolve(name: *const c_char) -> *mut c_void {
+    let p = EPOXY_GET_PROC.load(Ordering::Relaxed);
+    if p.is_null() {
         return ptr::null_mut();
-    };
-    epoxy::get_proc_addr(s) as *mut c_void
+    }
+    let f: EpoxyGetProc = unsafe { std::mem::transmute(p) };
+    unsafe { f(name) }
+}
+
+// mpv resolves each GL symbol it needs through this (whatever context GDK created — EGL on Wayland).
+extern "C" fn get_proc_address(_ctx: *mut c_void, name: *const c_char) -> *mut c_void {
+    resolve(name)
 }
 
 // The live mpv render context, so the GLArea's `render` closure (main thread) can draw with it. Only ever
@@ -108,19 +118,17 @@ extern "C" fn on_update(data: *mut c_void) {
 /// Insert a GLArea behind the transparent webview, create mpv's OpenGL render context, and wire the render
 /// pump. Call AFTER `mpv_initialize` (with `vo=libmpv`), on the main thread (Tauri `setup`).
 pub fn setup(window: &tauri::WebviewWindow, mpv: &Arc<mpv::Mpv>) -> Result<(), String> {
-    // Load libepoxy so both mpv's get_proc_address and our glGetIntegerv resolve to the live GL entry
-    // points. GTK already links epoxy; we just point the crate's loader at it.
+    // Resolve GL procs via libepoxy (already linked by GTK). Cache `epoxy_get_proc_address`, then use it
+    // for glGetIntegerv (the FBO read). The library handle is leaked for the app lifetime.
     {
-        use libloading::os::unix::Library;
-        // RTLD_DEFAULT-style: epoxy is already in-process (GTK linked it); open with the SONAME.
-        let lib = Library::new("libepoxy.so.0").or_else(|_| Library::new("libepoxy.so")).map_err(|e| e.to_string())?;
-        epoxy::load_with(|name| unsafe {
-            lib.get::<*const c_void>(name.as_bytes()).map(|s| *s).unwrap_or(ptr::null())
-        });
-        // Cache glGetIntegerv for the FBO read.
-        GL_GET_INTEGERV.store(epoxy::get_proc_addr("glGetIntegerv") as *mut c_void, Ordering::Relaxed);
-        // Leak the library handle for the app lifetime.
+        use libloading::os::unix::{Library, Symbol};
+        let lib = Library::new("libepoxy.so.0")
+            .or_else(|_| Library::new("libepoxy.so"))
+            .map_err(|e| e.to_string())?;
+        let get: Symbol<EpoxyGetProc> = unsafe { lib.get(b"epoxy_get_proc_address").map_err(|e| e.to_string())? };
+        EPOXY_GET_PROC.store(*get as usize as *mut c_void, Ordering::Relaxed);
         std::mem::forget(lib);
+        GL_GET_INTEGERV.store(resolve(b"glGetIntegerv\0".as_ptr() as *const c_char), Ordering::Relaxed);
     }
 
     let gtk_window = window.gtk_window().map_err(|e| e.to_string())?;

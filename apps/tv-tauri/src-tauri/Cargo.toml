@@ -68,7 +68,6 @@ objc2-quartz-core = { version = "0.3.1", features = ["CALayer", "CAMetalLayer"] 
 gtk = "0.18"
 gdkwayland = "0.18"
 gdkx11 = "0.18"
-epoxy = "0.1"
 libloading = "0.8"
 
 # Keep the machine + display awake while video plays (desktop only). Tauri has no first-class API
