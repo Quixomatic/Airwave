@@ -1,6 +1,8 @@
 mod mpv;
 #[cfg(target_os = "macos")]
 mod render_macos;
+#[cfg(target_os = "linux")]
+mod render_linux;
 mod wakelock;
 
 use std::sync::Arc;
@@ -485,11 +487,17 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|_window, _event| {
-            // macOS render API: refit the GL drawable when the window resizes.
+            // Render-API targets (macOS + Linux): refit the GL drawable when the window resizes.
             #[cfg(target_os = "macos")]
             if let tauri::WindowEvent::Resized(_) = _event {
                 if let Some(w) = _window.get_webview_window("main") {
                     render_macos::on_resize(&w);
+                }
+            }
+            #[cfg(target_os = "linux")]
+            if let tauri::WindowEvent::Resized(_) = _event {
+                if let Some(w) = _window.get_webview_window("main") {
+                    render_linux::on_resize(&w);
                 }
             }
         })
@@ -519,11 +527,12 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
     let mpv = Arc::new(mpv::Mpv::new()?);
     mpv.set_option_string("hwdec", "auto")?; // hardware decode (soia baseline)
 
-    // Video attach is per-platform. Windows/Linux: mpv renders itself into a native surface passed as
-    // `wid` (Windows = the main window HWND under the WebView2 DComp visual) — a pre-init option. macOS:
-    // mpv 0.41 has no embed window context (cocoa/macvk make their own window — see
-    // project-tv-tauri-macos-render), so we use the RENDER API: `vo=libmpv`, then create + drive an
-    // OpenGL render context into a view behind the transparent webview.
+    // Video attach is per-platform, an explicit 3-way split:
+    //  • Windows: mpv renders itself into the main window's HWND, passed as the pre-init `wid` (the video is
+    //    a child HWND under the WebView2 DComp visual). mpv's own gpu-next VO.
+    //  • macOS + Linux: mpv 0.41 has no usable embed-window context, so both use the RENDER API — `vo=libmpv`
+    //    then create + drive an OpenGL `mpv_render_context` into a surface behind the transparent webview
+    //    (macOS: an NSView/CVDisplayLink; Linux: a GTK GLArea). No `wid`.
     #[cfg(target_os = "macos")]
     {
         // Diagnostic: mpv's own verbose log to a predictable file (readable render failures). Non-fatal.
@@ -537,7 +546,13 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
         mpv.initialize()?;
         render_macos::setup(&window, &mpv)?;
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
+    {
+        mpv.set_option_string("vo", "libmpv")?; // enable the render API (GLArea render context)
+        mpv.initialize()?;
+        render_linux::setup(&window, &mpv)?;
+    }
+    #[cfg(target_os = "windows")]
     {
         let wid = resolve_video_wid(&window)?;
         mpv.set_option_i64("wid", wid)?;
@@ -569,11 +584,6 @@ fn resolve_video_wid(window: &tauri::WebviewWindow) -> Result<i64, String> {
         RawWindowHandle::Win32(h) => Ok(h.hwnd.get() as i64),
         other => Err(format!("unsupported window handle: {other:?}")),
     }
-}
-
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
-fn resolve_video_wid(_window: &tauri::WebviewWindow) -> Result<i64, String> {
-    Err("video render-attach not implemented on this platform yet".into())
 }
 
 /// macOS: put the window in "full-size content view" with a transparent, title-less titlebar so the

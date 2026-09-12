@@ -61,6 +61,16 @@ objc2-app-kit = { version = "0.3.1", features = ["NSWindow", "NSView", "NSRespon
 objc2-foundation = { version = "0.3.1", features = ["NSString", "NSGeometry"] }
 objc2-quartz-core = { version = "0.3.1", features = ["CALayer", "CAMetalLayer"] }
 
+# Linux: GTK (must match Tauri's gtk version) for the GLArea video surface behind the WebKitGTK webview,
+# the gdk Wayland/X11 backends to pass the display handle to mpv for VAAPI, and epoxy to resolve GL procs
+# for the mpv render context. mpv itself is linked via build.rs (libmpv.so). Render API — no `wid`.
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+gdkwayland = "0.18"
+gdkx11 = "0.18"
+epoxy = "0.1"
+libloading = "0.8"
+
 # Keep the machine + display awake while video plays (desktop only). Tauri has no first-class API
 # (tauri#3697), so we mirror our Tauri+libmpv reference (soia): hold an OS wake assertion during playback.
 # keepawake → IOPMAssertion (macOS) / SetThreadExecutionState (Windows) / D-Bus·systemd (Linux). Scoped to
