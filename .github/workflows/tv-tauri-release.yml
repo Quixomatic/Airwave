@@ -448,6 +448,8 @@ jobs:
           DEPLOY_GTK_VERSION: "3"
           NO_APPSTREAM: "1"
           LDAI_NO_APPSTREAM: "1"
+          # Surface the gtk plugin's output (Installing AppRun hook / excludes) so we can confirm it ran.
+          TAURI_BUNDLER_LOG_LEVEL: "debug"
           # libmpv.so.2 is vendored (linked via build.rs, no rpath) — put it on the lib path so linuxdeploy
           # can resolve + bundle it into the AppImage.
           LD_LIBRARY_PATH: ${{ github.workspace }}/apps/tv-tauri/src-tauri/vendor/libmpv/linux-x64/lib

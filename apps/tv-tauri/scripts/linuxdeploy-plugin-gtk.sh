@@ -293,56 +293,26 @@ for (( i=0; i<${#FIND_ARRAY[@]}; i+=2 )); do
     done < <(find "$directory" \( -type l -o -type f \) -name "$library" -print0)
 done
 
+# Exclude ONLY the libraries that MUST come from the host because they are coupled to the host's GPU driver,
+# display server, or Wayland compositor. Bundling any of these makes them shadow the host's driver-matched
+# copies, which is what broke WebKitGTK's EGL on Omarchy/virgl ("Could not create default EGL display").
+#
+# Everything else (libselinux, libapparmor, libssl, X11 client libs, pulse, systemd/udev/dbus, ...) is left
+# to be bundled normally. soia's upstream list also excluded those, but that assumes a Ubuntu/Fedora host
+# that ships them — a minimal distro like Arch/Omarchy does NOT have libselinux/libapparmor, so excluding
+# them makes the AppImage fail to start ("libselinux.so.1: cannot open"). Bundling them (as Tauri's default
+# plugin already did) keeps the AppImage self-contained and portable across distros.
 EXCLUDE_LIBRARIES=(
     "libwayland-client.so.0"
     "libwayland-cursor.so.0"
     "libwayland-egl.so.1"
     "libwayland-server.so.0"
-    "libudev.so.1"
-    "libsystemd.so.0"
-    "libcap.so.2"
-    "libdbus-1.so.3"
     "libvulkan.so.1"
     "libva.so.2"
     "libva-drm.so.2"
     "libva-x11.so.2"
     "libvdpau.so.1"
     "libdrm.so.2"
-    "libselinux.so.1"
-    "libapparmor.so.1"
-    "libseccomp.so.2"
-    "libacl.so.1"
-    "libkeyutils.so.1"
-    "libgudev-1.0.so.0"
-    "libmount.so.1"
-    "libblkid.so.1"
-    "libcups.so.2"
-    "libssl.so.3"
-    "libcrypto.so.3"
-    "libkrb5.so.3"
-    "libkrb5support.so.0"
-    "libgssapi_krb5.so.2"
-    "libk5crypto.so.3"
-    "libXau.so.6"
-    "libXcomposite.so.1"
-    "libXcursor.so.1"
-    "libXdamage.so.1"
-    "libXdmcp.so.6"
-    "libXext.so.6"
-    "libXfixes.so.3"
-    "libXinerama.so.1"
-    "libXi.so.6"
-    "libXpresent.so.1"
-    "libXrandr.so.2"
-    "libXrender.so.1"
-    "libXss.so.1"
-    "libXv.so.1"
-    "libxcb-render.so.0"
-    "libxcb-shape.so.0"
-    "libxcb-shm.so.0"
-    "libxcb-xfixes.so.0"
-    "libpulse.so.0"
-    "libpulsecommon-16.1.so"
 )
 EXCLUDE_ARGS=()
 for library in "${EXCLUDE_LIBRARIES[@]}"; do
