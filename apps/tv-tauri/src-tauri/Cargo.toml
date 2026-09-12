@@ -61,6 +61,19 @@ objc2-app-kit = { version = "0.3.1", features = ["NSWindow", "NSView", "NSRespon
 objc2-foundation = { version = "0.3.1", features = ["NSString", "NSGeometry"] }
 objc2-quartz-core = { version = "0.3.1", features = ["CALayer", "CAMetalLayer"] }
 
+# Linux: video is a Wayland subsurface behind the transparent WebKitGTK webview (soia's model, NO GTK
+# reparent). wayland-client marshals the compositor/subcompositor/surface/subsurface on the toplevel's
+# foreign wl_display; wayland-egl gives the wl_egl_window; EGL itself is linked (host libEGL, never bundled)
+# via a #[link] block in render_linux.rs. gtk stays only for the glib main-loop channel (render pump).
+# mpv is linked via build.rs (libmpv.so). Render API — no `wid`.
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+wayland-client = "0.31"
+wayland-egl = "0.32"
+# setlocale(LC_NUMERIC, "C") before mpv_create — mandatory or mpv_create() returns null on non-C locales
+# (glibc/AppImage runtimes set a non-C LC_NUMERIC). See mpv/mod.rs and plezy mpv_player.cc:35.
+libc = "0.2"
+
 # Keep the machine + display awake while video plays (desktop only). Tauri has no first-class API
 # (tauri#3697), so we mirror our Tauri+libmpv reference (soia): hold an OS wake assertion during playback.
 # keepawake → IOPMAssertion (macOS) / SetThreadExecutionState (Windows) / D-Bus·systemd (Linux). Scoped to

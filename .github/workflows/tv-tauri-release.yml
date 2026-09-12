@@ -6,7 +6,8 @@ name: TV Desktop (tv-tauri) Build & Release
 #
 # STATUS: WINDOWS (signed NSIS + updater) and macOS (Apple Silicon + Intel, .app/.dmg) are real builds.
 # macOS is UNSIGNED for now — signing/notarization + a merged latest.json are the finalize pass (Phase
-# 8C). LINUX stays a NO-OP until its X11/wayland embed lands. See .plans/tv-tauri.md Phase 8.
+# 8C). LINUX is a DRAFT AppImage build (render API into a GTK GLArea) — a downloadable workflow artifact
+# for on-device testing, not yet wired into latest.json/updater. See .plans/tv-tauri-linux-render.md.
 #
 # The big libmpv runtime DLLs are NOT committed — this fetches them from the `libmpv-latest` release
 # (built by libmpv-windows.yml) into vendor/. The tiny MSVC import lib (windows-x64/lib/mpv.lib) IS
@@ -58,10 +59,14 @@ jobs:
             updaterarch: x86_64
             target: x86_64-apple-darwin
             supported: true
-          # NO-OP until the Linux X11/wayland embed lands.
+          # Linux x64 — render API (vo=libmpv into a GTK GLArea behind the transparent WebKitGTK webview),
+          # bundled as an AppImage (runs on any distro incl. Arch/Omarchy). `target` empty → native x86_64.
           - os: ubuntu-24.04
             arch: x64
-            supported: false
+            libmpv: linux-x64
+            updaterarch: x86_64
+            target: ""
+            supported: true
     runs-on: ${{ matrix.os }}
 
     env:
@@ -78,6 +83,19 @@ jobs:
         if: ${{ !matrix.supported }}
         shell: bash
         run: echo "tv-tauri ${{ matrix.os }} is a no-op until its mpv render-attach lands (Phase 6). Skipping."
+
+      # Linux (Tauri v2 on ubuntu-24.04): WebKitGTK 4.1 + GTK3 dev, plus GL/EGL/epoxy for the GLArea render
+      # context and AppImage tooling deps. libmpv itself comes from the release tarball below.
+      - name: Install Linux build deps
+        if: matrix.supported && runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf \
+            libepoxy-dev libegl1-mesa-dev libgl1-mesa-dev \
+            libappindicator3-dev file \
+            libglib2.0-dev libglib2.0-bin libgdk-pixbuf-2.0-dev libgtk-3-bin \
+            libpango1.0-dev desktop-file-utils squashfs-tools
 
       - uses: pnpm/action-setup@v4
         if: matrix.supported
@@ -127,6 +145,9 @@ jobs:
           if [ -n "$BIN_SRC" ]; then rm -rf "$DEST/bin"; cp -r "$BIN_SRC" "$DEST/bin"; fi
           if [ "$RUNNER_OS" = "Windows" ]; then
             ls "$DEST/lib/mpv.lib" >/dev/null || { echo "mpv.lib missing (re-run libmpv-windows.yml)"; ls "$DEST/lib"; exit 1; }
+          elif [ "$RUNNER_OS" = "Linux" ]; then
+            # Linux: the linker wants `libmpv.so`; symlink to the soname (`libmpv.so.2`).
+            ( cd "$DEST/lib" && { [ -e libmpv.so ] || ln -s libmpv.so.* libmpv.so; } )
           else
             # macOS: the linker wants `libmpv.dylib`; symlink to the soname (`libmpv.2.dylib`).
             ( cd "$DEST/lib" && { [ -e libmpv.dylib ] || ln -s libmpv.*.dylib libmpv.dylib; } )
@@ -394,6 +415,56 @@ jobs:
               {key:'darwin-${ARCH}', signature:process.env.SIG, url:process.env.URL}));
           "
           cat "artifacts/frag-darwin-${ARCH}.json"; echo
+          ls -la "$OUT"
+
+      # ── Linux (AppImage) — DRAFT (render API into a GTK GLArea; needs on-device validation). Build the
+      # AppImage and stage it for the upload step below. No updater fragment yet (unvalidated), so it never
+      # touches latest.json; the AppImage is just a downloadable workflow artifact to test on Arch/Omarchy.
+      # soia's proven Linux discrepancy: bundle the AppImage via linuxdeploy-plugin-gtk so the host's
+      # graphics/Wayland/DRM/VA libs are EXCLUDED (used from the host) instead of shadowed by bundled copies.
+      # Bundled copies are what break WebKitGTK's EGL on real GPUs/virgl ("Could not create default EGL
+      # display: EGL_BAD_PARAMETER"). Tauri's linuxdeploy auto-runs the plugin when it's in ~/.cache/tauri.
+      - name: Prepare linuxdeploy GTK plugin (Linux)
+        if: matrix.supported && runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.cache/tauri"
+          cp apps/tv-tauri/scripts/linuxdeploy-plugin-gtk.sh "$HOME/.cache/tauri/linuxdeploy-plugin-gtk.sh"
+          chmod +x "$HOME/.cache/tauri/linuxdeploy-plugin-gtk.sh"
+
+      - name: Build (Tauri AppImage) — Linux
+        if: matrix.supported && runner.os == 'Linux'
+        working-directory: apps/tv-tauri
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          # GitHub runners have no FUSE, and linuxdeploy (+ its appimage plugin) are themselves AppImages —
+          # extract-and-run instead of mounting.
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          NO_STRIP: "true"
+          # linuxdeploy-plugin-gtk: GTK3 app; skip AppStream metadata generation (no metainfo shipped).
+          DEPLOY_GTK_VERSION: "3"
+          NO_APPSTREAM: "1"
+          LDAI_NO_APPSTREAM: "1"
+          # Surface the gtk plugin's output (Installing AppRun hook / excludes) so we can confirm it ran.
+          TAURI_BUNDLER_LOG_LEVEL: "debug"
+          # libmpv.so.2 is vendored (linked via build.rs, no rpath) — put it on the lib path so linuxdeploy
+          # can resolve + bundle it into the AppImage.
+          LD_LIBRARY_PATH: ${{ github.workspace }}/apps/tv-tauri/src-tauri/vendor/libmpv/linux-x64/lib
+        run: pnpm tauri build --bundles appimage
+
+      - name: Stage AppImage (Linux)
+        if: matrix.supported && runner.os == 'Linux'
+        working-directory: apps/tv-tauri
+        shell: bash
+        run: |
+          set -euo pipefail
+          APPIMG="$(ls src-tauri/target/release/bundle/appimage/*.AppImage | head -1)"
+          VER="$(node -p "require('./package.json').version")"
+          OUT="artifacts"; mkdir -p "$OUT"
+          cp "$APPIMG" "$OUT/Airwave-Client_${VER}_x86_64.AppImage"
           ls -la "$OUT"
 
       - name: Upload build artifacts
