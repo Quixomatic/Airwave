@@ -553,14 +553,12 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
     {
         mpv.set_option_string("vo", "libmpv")?; // enable the render API
         mpv.initialize()?;
-        // STEP 1 (base validation): the GtkGLArea + GtkOverlay reparent breaks the webview — it panics
-        // Tauri's undecorated-resizing handler (unwrap on Err: Widget GtkOverlay, tauri-runtime-wry
-        // undecorated_resizing.rs:546) and blanks the UI. soia never reparents GTK widgets. So skip the
-        // reparent to confirm the webview renders cleanly; STEP 2 adds video the soia way — a wl_subsurface
-        // below the webview + a platform-EGL surface, no GTK reparent.
-        let _ = &window;
-        log::warn!("linux video: reparent disabled (pending soia wl_subsurface path); UI-only validation");
-        // render_linux::setup(&window, &mpv)?;
+        // soia model: render video into a wl_subsurface BEHIND the transparent webview (no GTK reparent —
+        // reparenting panics Tauri's undecorated-resizing handler and blanks the UI). Best-effort: a failure
+        // logs and leaves the (working) UI intact rather than aborting the rest of setup.
+        if let Err(e) = render_linux::setup(&window, &mpv) {
+            log::error!("linux video setup failed (UI unaffected): {e}");
+        }
     }
     #[cfg(target_os = "windows")]
     {
