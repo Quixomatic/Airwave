@@ -148,8 +148,14 @@ pub fn setup(window: &tauri::WebviewWindow, mpv: &Arc<mpv::Mpv>) -> Result<(), S
     gl_area.set_has_depth_buffer(false);
     gl_area.set_has_stencil_buffer(false);
     overlay.add(&gl_area); // base layer (video)
-    overlay.add_overlay(&child); // the webview, on top
-    overlay.set_overlay_pass_through(&child, false);
+    // The webview goes on top as an overlay child. Overlay children take their natural size + alignment by
+    // default (so WebKitGTK collapses → blank window); force it to FILL the whole overlay so the UI shows.
+    child.set_halign(gtk::Align::Fill);
+    child.set_valign(gtk::Align::Fill);
+    child.set_hexpand(true);
+    child.set_vexpand(true);
+    overlay.add_overlay(&child); // the webview, on top (transparent, so the video shows through)
+    overlay.set_overlay_pass_through(&child, false); // the webview still receives input
     gtk_window.add(&overlay);
     overlay.show_all();
 
