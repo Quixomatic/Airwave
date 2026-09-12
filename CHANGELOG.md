@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.37] - 2026-09-12
+
+TV (desktop / tv-tauri) — click the video to play/pause.
+
+### Added
+- Clicking anywhere on the exposed video in the full-screen player toggles play/pause (the mouse analogue
+  of spacebar). A transparent click-catcher sits above the bumper visual (so it works during a bumper) but
+  below every interactive overlay (feature panel, channel surf, Back, chip), so clicking those still hits
+  them and only a click on the bare video toggles. Mouse movement already reveals the chrome, so it doesn't
+  force the panel open or disturb an open channel-surf.
+
 ## [0.13.36] - 2026-09-12
 
 TV (desktop / tv-tauri) — make mouse-drag scrubbing track the cursor 1:1.

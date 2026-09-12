@@ -136,6 +136,14 @@ export function FullChrome({
         />
       )}
 
+      {/* Click-catcher over the exposed video: a click toggles play/pause (the mouse analogue of spacebar).
+          It sits ABOVE the bumper visual (so toggle works during a bumper too) but BELOW every interactive
+          overlay — the feature panel, channel surf, Back, and the chip — so clicks on those hit them, and
+          only a click on the bare video (above whichever panel is up) reaches here. No setPanelOpen: a click
+          always comes with mouse movement, which already reveals the chrome, and toggling shouldn't disturb
+          an open surf/panel. */}
+      <div onClick={() => controls.togglePause()} style={{ position: "absolute", inset: 0 }} />
+
       {status.error && !panelOpen && (
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 rounded-lg bg-red-950/90 px-4 py-2 text-red-200">
           {status.error}
