@@ -69,7 +69,7 @@ impl Mpv {
 
     /// The raw mpv context pointer (for `mpv_render_context_create` on macOS). The render context is
     /// created once at setup and lives for the app; the caller must not free the ctx.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     pub fn ctx_raw(&self) -> *mut c_void {
         self.ctx()
     }

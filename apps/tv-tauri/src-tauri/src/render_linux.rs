@@ -160,7 +160,7 @@ pub fn setup(window: &tauri::WebviewWindow, mpv: &Arc<mpv::Mpv>) -> Result<(), S
         let area = gl_area.clone();
         rx.attach(None, move |_| {
             area.queue_render();
-            gtk::glib::Continue(true)
+            gtk::glib::ControlFlow::Continue
         });
     }
     // Leak the sender so its pointer stays valid for the update callback for the app lifetime.
@@ -173,7 +173,7 @@ pub fn setup(window: &tauri::WebviewWindow, mpv: &Arc<mpv::Mpv>) -> Result<(), S
     let x11_display = x11_display_ptr(&gtk_window);
     gl_area.connect_realize(move |area| {
         area.make_current();
-        if let Err(e) = area.error() {
+        if let Some(e) = area.error() {
             log::error!("GLArea realize error: {e}");
             return;
         }
@@ -214,7 +214,7 @@ pub fn setup(window: &tauri::WebviewWindow, mpv: &Arc<mpv::Mpv>) -> Result<(), S
 
     gl_area.connect_render(move |area, _ctx| {
         render(area);
-        gtk::Inhibit(true)
+        gtk::glib::Propagation::Stop
     });
 
     Ok(())
