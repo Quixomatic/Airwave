@@ -135,6 +135,9 @@ export function FeaturePanel({
   // PINS the anchor program (beginDrag) so the window doesn't re-center mid-drag, and pauses playback until
   // release. The underlying seek (onSeekTo → goTo) is untouched, agnostic to direct vs transcode.
   const [preview, setPreview] = useState<ScrubberView | null>(null);
+  // While mouse-dragging, kill the thumb/fill CSS transitions so they track the cursor 1:1 instead of
+  // easing behind it (the 0.35s ease reads as lag during a drag). Keyboard scrubbing keeps the ease.
+  const [dragging, setDragging] = useState(false);
   const settlingRef = useRef(false);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const committedTargetRef = useRef<number | null>(null);
@@ -200,6 +203,7 @@ export function FeaturePanel({
     e.preventDefault();
     scrub.cancel(); // drop any pending keyboard scrub
     setFocus({ row: 0, col: 0 });
+    setDragging(true);
     if (!paused) scrubFns.current.pauseVideo();
     scrubFns.current.beginDrag();
     const pctFrom = (clientX: number) => {
@@ -218,6 +222,7 @@ export function FeaturePanel({
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      setDragging(false);
       scrubFns.current.endDrag();
       commitSeek(dragTargetRef.current);
     };
@@ -480,7 +485,7 @@ export function FeaturePanel({
                   }}
                 >
                   {seg.fillPct > 0 && (
-                    <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${seg.fillPct}%`, background: accent, transition: "width 0.35s ease" }} />
+                    <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${seg.fillPct}%`, background: accent, transition: dragging ? "none" : "width 0.35s ease" }} />
                   )}
                 </div>
               ))}
@@ -498,12 +503,12 @@ export function FeaturePanel({
                   background: "#fff",
                   boxShadow: scrubFocused ? `0 0 0 5px ${accent}66` : "0 0 6px rgba(0,0,0,0.5)",
                   transform: "translate(-50%, -50%)",
-                  transition: "width .12s, height .12s, left 0.35s ease",
+                  transition: dragging ? "width .12s, height .12s" : "width .12s, height .12s, left 0.35s ease",
                 }}
               />
             </div>
             <div style={{ position: "relative", height: 26, marginTop: 10 }}>
-              <span style={{ position: "absolute", left: `${posPct}%`, transform: "translateX(-50%)", fontSize: 17, fontWeight: 600, color: scrubFocused ? "#f1f5f9" : "#c3c9d4", transition: "left 0.35s ease" }}>
+              <span style={{ position: "absolute", left: `${posPct}%`, transform: "translateX(-50%)", fontSize: 17, fontWeight: 600, color: scrubFocused ? "#f1f5f9" : "#c3c9d4", transition: dragging ? "none" : "left 0.35s ease" }}>
                 {fmt(sc?.slotPositionS ?? 0)}
               </span>
               <span

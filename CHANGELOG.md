@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.36] - 2026-09-12
+
+TV (desktop / tv-tauri) — make mouse-drag scrubbing track the cursor 1:1.
+
+### Fixed
+- While dragging the scrubber with the mouse, the thumb, the accent fill, and the position time label
+  now drop their `0.35s` CSS ease so they track the cursor exactly instead of easing behind it (which
+  read as lag even though the seek was correct). The eases return on release, and keyboard/remote
+  scrubbing is unchanged (the ease looks right on discrete steps).
+
 ## [0.13.35] - 2026-09-12
 
 Site (getairwave.tv) — fix the Samsung (Tizen) status in the data-driven tables (missed in 0.13.34).
