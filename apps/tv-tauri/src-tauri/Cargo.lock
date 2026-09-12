@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "airwave"
-version = "0.13.32"
+version = "0.13.33"
 dependencies = [
  "futures",
  "if-addrs",

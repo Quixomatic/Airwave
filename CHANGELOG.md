@@ -2,6 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.33] - 2026-09-11
+
+TV (desktop / tv-tauri) — mouse seeking on the scrubber.
+
+### Added
+- **Click and drag to seek with the mouse.** Click anywhere on the scrubber to jump there; click and drag
+  to slide a live preview thumb, with playback paused for the drag and the seek committed on release. The
+  bar's anchor program is **pinned during a drag** so the window doesn't re-center under the cursor
+  (dragging into the peek zones reaches the adjacent bumper / previous program). Clamped to the DVR buffer
+  and the live edge.
+
+### Changed
+- `buildScrubber` gained an optional `focusOverride`, and the hook exposes the inverse of its non-linear
+  `mapT` (`effectiveAtPct` for a click; `beginDrag`/`dragScrubberAt`/`endDrag` for a pinned drag) plus a
+  non-toggling `pause`. The scrubber's settle (keep the thumb pinned until the seek lands) is now
+  time-based, shared by keyboard and mouse. Mouse handling is pure DOM pointer events, outside the
+  key-zone input stack.
+
 ## [0.13.32] - 2026-09-11
 
 TV (native / tv-native) — fix D-pad navigation broken by 0.13.31, and move press-and-hold into the zone.

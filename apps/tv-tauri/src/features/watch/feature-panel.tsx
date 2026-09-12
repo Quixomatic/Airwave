@@ -20,7 +20,7 @@ import {
   Star,
   Tv,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 
 import type { GuideMeta } from "../../lib/api";
 import { LAYER, useKeyLayer } from "../../lib/input";
@@ -73,6 +73,10 @@ export function FeaturePanel({
   getLive,
   previewScrubber,
   onSeekTo,
+  beginDrag,
+  dragScrubberAt,
+  endDrag,
+  pauseVideo,
   onPlayPause,
   onLive,
   onRestart,
@@ -98,6 +102,12 @@ export function FeaturePanel({
   getLive: () => number;
   previewScrubber: (target: number) => ScrubberView;
   onSeekTo: (target: number) => void;
+  /** Mouse-drag scrubbing (desktop): pin the anchor at drag start, map a bar fraction (0..1) → a preview
+   *  view + absolute target while pinned, release the pin, and pause playback for the drag's duration. */
+  beginDrag: () => void;
+  dragScrubberAt: (pct: number) => { view: ScrubberView; target: number };
+  endDrag: () => void;
+  pauseVideo: () => void;
   onPlayPause: () => void;
   onLive: () => void;
   onRestart: () => void;
@@ -120,14 +130,36 @@ export function FeaturePanel({
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const CTL_COUNT = 8; // Pause · Restart · ChannelSurf · Info · Live · Audio · Subs · Quality
 
-  // ── Debounced scrubber ────────────────────────────────────────────────────
-  // ◄/► move a PREVIEW thumb; the real seek fires ONCE after ~500ms idle. The seek (onSeekTo → goTo)
-  // is untouched and stays agnostic to direct vs transcode.
+  // ── Scrubber: debounced keyboard seek + mouse click/drag ──────────────────────────────────
+  // ◄/► (keyboard, debounced) and mouse click/drag both move a PREVIEW thumb and commit ONE seek. A drag
+  // PINS the anchor program (beginDrag) so the window doesn't re-center mid-drag, and pauses playback until
+  // release. The underlying seek (onSeekTo → goTo) is untouched, agnostic to direct vs transcode.
   const [preview, setPreview] = useState<ScrubberView | null>(null);
   const settlingRef = useRef(false);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scrubFns = useRef({ getPosition, getFloor, getLive, previewScrubber, onSeekTo });
-  scrubFns.current = { getPosition, getFloor, getLive, previewScrubber, onSeekTo };
+  const committedTargetRef = useRef<number | null>(null);
+  const dragTargetRef = useRef(0);
+  const barRef = useRef<HTMLDivElement | null>(null);
+  const scrubFns = useRef({ getPosition, getFloor, getLive, previewScrubber, onSeekTo, beginDrag, dragScrubberAt, endDrag, pauseVideo });
+  scrubFns.current = { getPosition, getFloor, getLive, previewScrubber, onSeekTo, beginDrag, dragScrubberAt, endDrag, pauseVideo };
+
+  // Commit a seek and pin the preview thumb until the real position lands. Time-based (compares effective
+  // to the target) so it survives the window re-centering after the seek — shared by keyboard + mouse.
+  const commitSeek = useMemo(
+    () => (t: number) => {
+      settlingRef.current = true;
+      committedTargetRef.current = t;
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+      settleTimer.current = setTimeout(() => {
+        settlingRef.current = false;
+        committedTargetRef.current = null;
+        setPreview(null);
+      }, 3500);
+      scrubFns.current.onSeekTo(t);
+    },
+    [],
+  );
+
   const scrub = useMemo(
     () =>
       createScrubController({
@@ -138,25 +170,21 @@ export function FeaturePanel({
           if (t != null) settlingRef.current = false;
           setPreview(t == null ? null : scrubFns.current.previewScrubber(t));
         },
-        commit: (t) => {
-          settlingRef.current = true;
-          if (settleTimer.current) clearTimeout(settleTimer.current);
-          settleTimer.current = setTimeout(() => {
-            settlingRef.current = false;
-            setPreview(null);
-          }, 3500);
-          scrubFns.current.onSeekTo(t);
-        },
+        commit: (t) => commitSeek(t),
       }),
-    [],
+    [commitSeek],
   );
+
+  // Drop the pinned preview once the real position lands near the committed target (re-checked each tick).
   useEffect(() => {
-    if (settlingRef.current && preview && scrubber && Math.abs(scrubber.thumbPct - preview.thumbPct) < 2.5) {
+    if (settlingRef.current && committedTargetRef.current != null && Math.abs(scrubFns.current.getPosition() - committedTargetRef.current) < 2) {
       if (settleTimer.current) clearTimeout(settleTimer.current);
       settlingRef.current = false;
+      committedTargetRef.current = null;
       setPreview(null);
     }
-  }, [scrubber, preview]);
+  }, [scrubber]);
+
   useEffect(
     () => () => {
       scrub.cancel();
@@ -164,6 +192,38 @@ export function FeaturePanel({
     },
     [scrub],
   );
+
+  // Mouse click/drag on the scrubber (desktop). Click = seek to that point; drag = live preview with the
+  // window pinned + playback paused, committing on release. Pure DOM pointer handling — outside the
+  // key-zone stack (like the control buttons' mouse handlers), so it never touches remote/keyboard input.
+  const onScrubMouseDown = (e: ReactMouseEvent) => {
+    e.preventDefault();
+    scrub.cancel(); // drop any pending keyboard scrub
+    setFocus({ row: 0, col: 0 });
+    if (!paused) scrubFns.current.pauseVideo();
+    scrubFns.current.beginDrag();
+    const pctFrom = (clientX: number) => {
+      const r = barRef.current?.getBoundingClientRect();
+      if (!r || r.width === 0) return 0;
+      return Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    };
+    const apply = (clientX: number) => {
+      const { view, target } = scrubFns.current.dragScrubberAt(pctFrom(clientX));
+      settlingRef.current = false;
+      setPreview(view);
+      dragTargetRef.current = target;
+    };
+    apply(e.clientX);
+    const onMove = (ev: MouseEvent) => apply(ev.clientX);
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      scrubFns.current.endDrag();
+      commitSeek(dragTargetRef.current);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
   const jumpToLive = () => {
     scrub.cancel();
     onLive();
@@ -398,12 +458,11 @@ export function FeaturePanel({
           {/* Scrubber — borderless */}
           <button
             ref={scrubberRef}
-            onClick={onPlayPause}
+            onMouseDown={onScrubMouseDown}
             onMouseEnter={() => setFocus({ row: 0, col: 0 })}
-            onMouseLeave={() => setFocus({ row: 1, col: -1 })}
             style={{ display: "block", width: "100%", textAlign: "left", border: "none", outline: "none", background: "transparent", cursor: "pointer", padding: "6px 0 4px" }}
           >
-            <div style={{ position: "relative", height: 8 }}>
+            <div ref={barRef} style={{ position: "relative", height: 8 }}>
               {/* one rounded segment per slot (tiny gaps); the current slot fills to the thumb in the accent */}
               {sc?.segments.map((seg, i) => (
                 <div

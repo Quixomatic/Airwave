@@ -234,6 +234,10 @@ export function FullChrome({
             getLive={controls.liveEdge}
             previewScrubber={controls.previewScrubber}
             onSeekTo={controls.seekTo}
+            beginDrag={controls.beginDrag}
+            dragScrubberAt={controls.dragScrubberAt}
+            endDrag={controls.endDrag}
+            pauseVideo={controls.pause}
             onPlayPause={controls.togglePause}
             onLive={controls.jumpToLive}
             onRestart={controls.restart}
