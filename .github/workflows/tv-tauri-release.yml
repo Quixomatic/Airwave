@@ -425,6 +425,13 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          # GitHub runners have no FUSE, and linuxdeploy (+ its appimage plugin) are themselves AppImages —
+          # extract-and-run instead of mounting.
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          NO_STRIP: "true"
+          # libmpv.so.2 is vendored (linked via build.rs, no rpath) — put it on the lib path so linuxdeploy
+          # can resolve + bundle it into the AppImage.
+          LD_LIBRARY_PATH: ${{ github.workspace }}/apps/tv-tauri/src-tauri/vendor/libmpv/linux-x64/lib
         run: pnpm tauri build --bundles appimage
 
       - name: Stage AppImage (Linux)
