@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.35] - 2026-09-12
+
+Site (getairwave.tv) — fix the Samsung (Tizen) status in the data-driven tables (missed in 0.13.34).
+
+### Fixed
+- The **platform matrix** now shows Samsung (Tizen) as **full support** (was "planned"), and the
+  **downloads table** has a Samsung (Tizen) row with a **Sideload** status, matching LG webOS. 0.13.34
+  only updated the prose; these two tables are data-driven components and were missed.
+
 ## [0.13.34] - 2026-09-12
 
 Site (getairwave.tv) — mark Samsung (Tizen) as sideload-ready.

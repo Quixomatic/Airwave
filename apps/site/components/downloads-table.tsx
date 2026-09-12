@@ -108,6 +108,7 @@ export async function ClientDownloads() {
     { platform: "Fire TV", Icon: FaAndroid, delivery: "Native app", href: AMAZON_APPSTORE, getLabel: "Amazon Appstore", external: true, status: "available" },
     { platform: "Roku", Icon: FaChrome, delivery: "Native channel", href: ROKU_CHANNEL_STORE, getLabel: "Roku Channel Store", external: true, status: "available" },
     { platform: "LG webOS", Icon: FaChrome, delivery: "Packaged web app", href: REPO, getLabel: "Sideload / from source", external: true, status: "available", statusLabel: "Sideload" },
+    { platform: "Samsung", sub: "Tizen", Icon: FaChrome, delivery: "Packaged web app", href: REPO, getLabel: "Sideload / from source", external: true, status: "available", statusLabel: "Sideload" },
     { platform: "Windows", sub: "x64", Icon: FaWindows, delivery: "Desktop app (Tauri)", href: dl.client.windows, getLabel: "Download (.exe)", external: true, status: "available" },
     { platform: "macOS", sub: "Apple Silicon", Icon: FaApple, delivery: "Desktop app (Tauri)", href: dl.client.macos, getLabel: "Download (.dmg)", external: true, status: "available" },
     { platform: "macOS", sub: "Intel", Icon: FaApple, delivery: "Desktop app (Tauri)", href: dl.client.macosIntel, getLabel: "Download (.dmg)", external: true, status: "available" },
