@@ -69,6 +69,9 @@ gtk = "0.18"
 gdkwayland = "0.18"
 gdkx11 = "0.18"
 libloading = "0.8"
+# setlocale(LC_NUMERIC, "C") before mpv_create — mandatory or mpv_create() returns null on non-C locales
+# (glibc/AppImage runtimes set a non-C LC_NUMERIC). See mpv/mod.rs and plezy mpv_player.cc:35.
+libc = "0.2"
 
 # Keep the machine + display awake while video plays (desktop only). Tauri has no first-class API
 # (tauri#3697), so we mirror our Tauri+libmpv reference (soia): hold an OS wake assertion during playback.

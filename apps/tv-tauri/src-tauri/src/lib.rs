@@ -561,13 +561,7 @@ fn setup_player(app: &mut tauri::App) -> Result<(), String> {
     {
         mpv.set_option_string("vo", "libmpv")?; // enable the render API
         mpv.initialize()?;
-        // DIAGNOSTIC (temporary): the GtkOverlay reparent in render_linux::setup blanks the WebKitGTK
-        // webview. Skip it to confirm the UI renders when the webview is left untouched. If it does, the
-        // reparent is the cause → build the no-reparent wl_subsurface + EGL path (soia's model). Then
-        // restore this call. See .plans/tv-tauri-linux-render.md.
-        let _ = &window;
-        log::warn!("linux video: DIAGNOSTIC — video setup skipped, webview left untouched");
-        // render_linux::setup(&window, &mpv)?;
+        render_linux::setup(&window, &mpv)?;
     }
     #[cfg(target_os = "windows")]
     {

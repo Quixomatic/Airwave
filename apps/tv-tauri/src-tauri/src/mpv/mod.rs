@@ -35,6 +35,15 @@ impl Mpv {
     /// Call [`Mpv::set_option_string`] for pre-init options BEFORE this if
     /// needed; here we set them then `mpv_initialize`.
     pub fn new() -> Result<Self, String> {
+        // mpv REQUIRES the C numeric locale before mpv_create(), or it refuses to initialize
+        // ("Non-C locale detected... mpv_create() returned null"). glibc desktops and the AppImage
+        // runtime commonly set a non-C LC_NUMERIC, which is what bit us on Omarchy. Force it here,
+        // before creating the context (plezy does the same: mpv_player.cc:35). Linux-gated:
+        // Windows/macOS create mpv fine as-is, so we leave the shipping platforms untouched.
+        #[cfg(target_os = "linux")]
+        unsafe {
+            libc::setlocale(libc::LC_NUMERIC, b"C\0".as_ptr() as *const libc::c_char);
+        }
         let ctx = unsafe { ffi::mpv_create() };
         if ctx.is_null() {
             return Err("mpv_create() returned null (libmpv missing or LC_NUMERIC not C)".into());
