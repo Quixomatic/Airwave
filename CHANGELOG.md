@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.41] - 2026-09-13
+
+Desktop (Linux) — AppImage self-updating (updater parity with Windows and macOS).
+
+### Added
+- The Linux AppImage now participates in the built-in updater, like Windows and macOS. The release build
+  already signs the AppImage (`createUpdaterArtifacts` + the signing key produce `<AppImage>.sig`); the
+  release workflow now stages that signature and emits a `linux-x86_64` fragment that the finalize job folds
+  into `latest.json`, so installed Linux clients self-update straight from the GitHub Release. On Linux the
+  updater downloads and swaps the AppImage in place, verifying it against the bundled minisign public key.
+
 ## [0.13.40] - 2026-09-12
 
 Site + downloads — the Linux desktop client is officially available.

@@ -4,10 +4,9 @@ name: TV Desktop (tv-tauri) Build & Release
 # updater artifacts (latest.json + .sig) to the GitHub Release. Triggers on `v*` tags (same as the
 # server's desktop-release.yml — a tag fires both) or manually.
 #
-# STATUS: WINDOWS (signed NSIS + updater) and macOS (Apple Silicon + Intel, .app/.dmg) are real builds.
-# macOS is UNSIGNED for now — signing/notarization + a merged latest.json are the finalize pass (Phase
-# 8C). LINUX is a DRAFT AppImage build (render API into a GTK GLArea) — a downloadable workflow artifact
-# for on-device testing, not yet wired into latest.json/updater. See .plans/tv-tauri-linux-render.md.
+# STATUS: WINDOWS (signed NSIS + updater), macOS (Apple Silicon + Intel, .app/.dmg), and LINUX (AppImage,
+# render API into a Wayland subsurface) are all real builds, attached to the release with a merged
+# latest.json for self-update on every platform (key linux-x86_64). See .plans/tv-tauri-linux-render.md.
 #
 # The big libmpv runtime DLLs are NOT committed — this fetches them from the `libmpv-latest` release
 # (built by libmpv-windows.yml) into vendor/. The tiny MSVC import lib (windows-x64/lib/mpv.lib) IS
@@ -417,9 +416,9 @@ jobs:
           cat "artifacts/frag-darwin-${ARCH}.json"; echo
           ls -la "$OUT"
 
-      # ── Linux (AppImage) — DRAFT (render API into a GTK GLArea; needs on-device validation). Build the
-      # AppImage and stage it for the upload step below. No updater fragment yet (unvalidated), so it never
-      # touches latest.json; the AppImage is just a downloadable workflow artifact to test on Arch/Omarchy.
+      # ── Linux (AppImage) — render API into a Wayland subsurface behind the transparent webview (soia's
+      # model, no GTK reparent). Built + signed here, attached to the release, and wired into latest.json for
+      # self-update (see the Stage step's frag-linux-x86_64.json).
       # soia's proven Linux discrepancy: bundle the AppImage via linuxdeploy-plugin-gtk so the host's
       # graphics/Wayland/DRM/VA libs are EXCLUDED (used from the host) instead of shadowed by bundled copies.
       # Bundled copies are what break WebKitGTK's EGL on real GPUs/virgl ("Could not create default EGL
@@ -455,7 +454,7 @@ jobs:
           LD_LIBRARY_PATH: ${{ github.workspace }}/apps/tv-tauri/src-tauri/vendor/libmpv/linux-x64/lib
         run: pnpm tauri build --bundles appimage
 
-      - name: Stage AppImage (Linux)
+      - name: Stage AppImage + updater fragment (Linux)
         if: matrix.supported && runner.os == 'Linux'
         working-directory: apps/tv-tauri
         shell: bash
@@ -464,7 +463,28 @@ jobs:
           APPIMG="$(ls src-tauri/target/release/bundle/appimage/*.AppImage | head -1)"
           VER="$(node -p "require('./package.json').version")"
           OUT="artifacts"; mkdir -p "$OUT"
-          cp "$APPIMG" "$OUT/Airwave-Client_${VER}_x86_64.AppImage"
+          ASSET="Airwave-Client_${VER}_x86_64.AppImage"
+          cp "$APPIMG" "$OUT/$ASSET"
+          # Self-update fragment, mirroring Windows/macOS. `createUpdaterArtifacts: true` + the signing key
+          # (set in the build step) already produce "<AppImage>.sig". On Linux the updater downloads the
+          # AppImage DIRECTLY (not a tarball) and the sig is over the file BYTES, so it stays valid across the
+          # rename. Copy it beside the renamed asset and emit frag-linux-x86_64.json (key `linux-x86_64`) for
+          # the finalize job to fold into latest.json. If the .sig is somehow missing (unsigned build), skip
+          # the fragment so we never write a broken latest.json entry that would break every platform.
+          SIGSRC="${APPIMG}.sig"
+          if [ -f "$SIGSRC" ]; then
+            cp "$SIGSRC" "$OUT/${ASSET}.sig"
+            export SIG="$(cat "$SIGSRC")"
+            export URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/${ASSET}"
+            node -e "
+              const fs=require('fs');
+              fs.writeFileSync('artifacts/frag-linux-x86_64.json', JSON.stringify(
+                {key:'linux-x86_64', signature:process.env.SIG, url:process.env.URL}));
+            "
+            echo 'frag-linux-x86_64.json:'; cat artifacts/frag-linux-x86_64.json; echo
+          else
+            echo 'WARNING: no AppImage .sig found — Linux updater fragment skipped (direct download only)'
+          fi
           ls -la "$OUT"
 
       - name: Upload build artifacts
