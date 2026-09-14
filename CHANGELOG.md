@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.44] - 2026-09-14
+
+Site (getairwave.tv) — blog comments, powered by GitHub Discussions with a native-feeling UI.
+
+### Added
+- Comments on blog posts. Readers sign in with their own GitHub account to comment, reply, and react;
+  each post's thread is stored as a GitHub Discussion on the public Airwave repo (one discussion per
+  post, keyed by slug, opened on the first comment), so GitHub owns the data, moderation, and
+  spam/auth with no separate database. It's the fuma-comment UI themed to the site (navy, light and
+  dark), not an embedded iframe.
+- `app/api/comments/*` route handlers implementing the comment API against the GitHub Discussions
+  GraphQL API: list, post, edit, delete, and 👍 / 👎 via reactions, plus a GitHub OAuth sign-in flow
+  whose user token stays server-side in an httpOnly, AES-256-GCM-encrypted cookie (never exposed to
+  the browser).
+- A two-way Markdown bridge so what a reader writes in the rich editor is stored as Markdown on GitHub
+  and read back into the editor's format on display. Comments appear below the previous/next post
+  navigation.
+
+### Notes
+- Comments render only when the `GITHUB_COMMENTS_*` environment variables are set (the OAuth app
+  client id/secret, a token secret, and the repo + Discussions category ids).
+
 ## [0.13.43] - 2026-09-14
 
 Site — a blog post on why Airwave direct-plays instead of transcoding, a reusable blog CTA, and bigger diagrams.

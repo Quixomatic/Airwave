@@ -6,6 +6,8 @@ import { blogSource } from "@/lib/source";
 import { readingTimeMinutes } from "@/lib/reading-time";
 import { getMDXComponents } from "@/components/mdx";
 import { PromoEmbed } from "@/components/promo-video";
+import { BlogComments } from "@/components/blog-comments";
+import { commentsReadable } from "@/lib/comments/config";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -130,7 +132,7 @@ export default async function BlogPost(props: Params) {
 
       {/* Prev/next post tiles — older on the left, newer on the right (like the docs pages). */}
       {(older || newer) && (
-        <nav className="mx-auto grid w-full max-w-3xl grid-cols-1 gap-4 px-6 pb-16 sm:grid-cols-2">
+        <nav className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-4 px-6 pb-8 sm:grid-cols-2">
           {older ? (
             <Link
               href={older.url}
@@ -157,6 +159,13 @@ export default async function BlogPost(props: Params) {
           ) : null}
         </nav>
       )}
+
+      {/* Comments — below the prev/next navigation. */}
+      {commentsReadable() ? (
+        <section className="mx-auto w-full max-w-6xl px-6 pb-16">
+          <BlogComments slug={slug} />
+        </section>
+      ) : null}
     </main>
   );
 }

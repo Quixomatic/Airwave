@@ -2,8 +2,15 @@
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
 
-/* Tailwind v4 needs to scan fumadocs-ui's compiled classes so its utilities aren't purged. */
+/* Blog comments (fuma-comment) — its Tailwind preset (fc-* tokens, .tiptap styles, animations).
+   We use the preset, not its prebuilt style.css, so the site's single Tailwind build generates the
+   classes (one preflight, no duplicate reset). The navy override below maps fc-* onto our fd-* tokens
+   so the widget follows the site theme. */
+@import "@fuma-comment/react/preset.css";
+
+/* Tailwind v4 needs to scan compiled classes so its utilities aren't purged. */
 @source "../node_modules/fumadocs-ui/dist/**/*.js";
+@source "../node_modules/@fuma-comment/react/dist/**/*.js";
 
 /* Display face — a system stack (no web-font load; the device supplies Avenir Next / SF Pro /
    Segoe UI Variable, falling back to ui-sans-serif). Registering it in the `--font-*` namespace
@@ -144,4 +151,26 @@
   letter-spacing: -0.05em;
   margin-top: 20px;
   margin-bottom: 8px;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Blog comments (fuma-comment) — map its fc-* tokens onto our fd-* tokens so the
+   widget matches the site and follows the light/dark switch automatically (the
+   fd-* values are already theme-aware). Scoped to the `.airwave-comments` wrapper.
+   ──────────────────────────────────────────────────────────────────────────── */
+.airwave-comments {
+  --color-fc-background: var(--color-fd-card);
+  --color-fc-foreground: var(--color-fd-foreground);
+  --color-fc-muted: var(--color-fd-muted);
+  --color-fc-muted-foreground: var(--color-fd-muted-foreground);
+  --color-fc-popover: var(--color-fd-popover);
+  --color-fc-popover-foreground: var(--color-fd-popover-foreground);
+  --color-fc-card: var(--color-fd-muted);
+  --color-fc-card-foreground: var(--color-fd-foreground);
+  --color-fc-border: var(--color-fd-border);
+  --color-fc-primary: var(--color-fd-primary);
+  --color-fc-primary-foreground: var(--color-fd-primary-foreground);
+  --color-fc-accent: var(--color-fd-accent);
+  --color-fc-accent-foreground: var(--color-fd-accent-foreground);
+  --color-fc-ring: var(--color-fd-ring);
 }
