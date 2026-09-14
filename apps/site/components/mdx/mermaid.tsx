@@ -14,8 +14,21 @@ export async function Mermaid({ chart }: { chart: string }) {
       fg: "var(--color-fd-foreground)",
       interactive: true,
       transparent: true,
+      // More breathing room than the defaults (padding 40 / nodeSpacing 24 / layerSpacing 40) so
+      // diagrams read larger and less cramped. Size comes from the layout, not CSS scaling.
+      padding: 36,
+      nodeSpacing: 44,
+      layerSpacing: 64,
     });
-    return <div className="my-6 flex justify-center" dangerouslySetInnerHTML={{ __html: svg }} />;
+    // Center the diagram at its natural size, only capping width so a wide graph can't overflow the
+    // column. A diagram's HEIGHT comes from its orientation (use `flowchart TD` for a tall vertical
+    // flow); stretching the SVG wider can't add height, so we don't force full width.
+    return (
+      <div
+        className="my-6 flex justify-center [&_svg]:!h-auto [&_svg]:!max-w-full"
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+    );
   } catch {
     return (
       <CodeBlock title="Mermaid">

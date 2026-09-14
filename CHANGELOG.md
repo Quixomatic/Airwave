@@ -2,6 +2,25 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.43] - 2026-09-14
+
+Site — a blog post on why Airwave direct-plays instead of transcoding, a reusable blog CTA, and bigger diagrams.
+
+### Added
+- Blog post "Most self-hosted live TV re-encodes your whole library. Airwave doesn't." The ErsatzTV / Tunarr
+  differentiator: those tools sideline Plex to a file list and manufacture one heavy continuous transcoded
+  stream, while Airwave direct-plays the original file through Plex Media Server and only transcodes when a
+  device genuinely can't decode. Includes two contrasting Mermaid diagrams and a closing call to action.
+- `<Cta>` MDX component (the shared ShaderCta panel) so any post can drop a call to action inline via
+  `<Cta />`, with optional `title` / `subtitle` or custom buttons. Presence in the MDX controls placement.
+- `scripts/gen-blog-image.py`, a reusable branded featured-image generator: a blurred screenshot backdrop
+  behind a center-weighted navy scrim, with the Airwave mark, a vertical separator, and the article title
+  centered over it. Used to make this post's featured image.
+
+### Changed
+- Mermaid diagrams render larger and less cramped, roomier node/layer spacing, centered at their natural size
+  and capped to the content width, across both docs and blog.
+
 ## [0.13.42] - 2026-09-14
 
 TV (desktop / tv-tauri) — audio / subtitle / quality menus as a top-center slide-in dialog.

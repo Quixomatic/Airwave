@@ -4,6 +4,7 @@ import type { MDXComponents } from "mdx/types";
 import type { ComponentProps } from "react";
 import { PlatformMatrix } from "@/components/platform-matrix";
 import { ClientDownloads, ServerDownloads } from "@/components/downloads-table";
+import { Cta } from "@/components/blog-cta";
 import { Mermaid } from "@/components/mdx/mermaid";
 import { PromoVideo } from "@/components/promo-video";
 
@@ -37,6 +38,7 @@ function Video({ caption, className, ...rest }: ComponentProps<"video"> & { capt
  * - `Video` → the styled embed above, available to every page without an import.
  * - `PromoVideo` → the glass-framed YouTube promo embed (matches the hero's frame).
  * - `PlatformMatrix` → the checkmark-style platform-support table (used on `/docs/platforms`).
+ * - `Cta` → the shared ShaderCta call-to-action panel, droppable into any post (esp. blog) via `<Cta />`.
  */
 export function getMDXComponents(components?: MDXComponents): MDXComponents {
   return {
@@ -47,6 +49,7 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
     PlatformMatrix,
     ClientDownloads,
     ServerDownloads,
+    Cta,
     Mermaid,
     ...components,
   };
