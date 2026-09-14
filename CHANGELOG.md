@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.42] - 2026-09-14
+
+TV (desktop / tv-tauri) — audio / subtitle / quality menus as a top-center slide-in dialog.
+
+### Changed
+- Replaced tv-tauri's base-ui audio / subtitle / quality dropdowns with a dialog matching the tv-web and
+  tv-native track picker (blurred card, a leading check on the current track, an accent focus row),
+  presented like this app's channel-number entry: a top-center slide-in dropping below the window titlebar
+  over a faint dim, sized for a desktop window rather than 10-foot. Keeps the zoned input model (owns
+  `LAYER.MODAL` while open: up/down move, OK selects, Back cancels, opens focused on the current selection),
+  plus mouse hover/click and click-outside to dismiss.
+
 ## [0.13.41] - 2026-09-13
 
 Desktop (Linux) — AppImage self-updating (updater parity with Windows and macOS).

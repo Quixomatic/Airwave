@@ -1,11 +1,4 @@
 import { Button } from "@airwave/ui/components/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@airwave/ui/components/dropdown-menu";
 import { motion } from "framer-motion";
 import {
   AudioLines,
@@ -25,6 +18,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEven
 import type { GuideMeta } from "../../lib/api";
 import { LAYER, useKeyLayer } from "../../lib/input";
 import { createScrubController } from "./scrub-controller";
+import { TrackPicker } from "./track-picker";
 import type { Delivery, ScrubberView } from "./use-tv-player";
 
 /**
@@ -32,7 +26,7 @@ import type { Delivery, ScrubberView } from "./use-tv-player";
  * OK slides this up (Framer Motion): the program title, a minimal borderless DVR
  * scrubber (accent fill, thumb, time under the thumb, LIVE on the far right), a row of
  * glassmorphism control pills, and circular glass icon buttons for audio / subtitles /
- * quality (base-lyra dropdowns opening upward). ALL icons are lucide — the C2's system
+ * quality (each opens a top-center slide-in TrackPicker dialog). ALL icons are lucide — the C2's system
  * font has no glyphs for unicode symbols (they render as tofu boxes).
  *
  * Focus: row 0 = scrubber (◄► seek, OK pause, ▼ to controls); row 1 = the buttons
@@ -277,8 +271,9 @@ export function FeaturePanel({
   //
   // NOTE: this is the one place in the app that drives REAL DOM focus (the scrubber + control
   // buttons above), so OK is deliberately NOT claimed on the control row — leaving it unconsumed
-  // lets the natively-focused button/dropdown-trigger fire its own click. Same reason the
-  // `openMenu` branch returns false: base-ui owns the keys while a dropdown is open.
+  // lets the natively-focused button fire its own onClick, which opens the track picker. While a picker
+  // is open it owns the keys at LAYER.MODAL (above this CHROME layer), so the `openMenu` guards below are
+  // just belt-and-suspenders.
   useKeyLayer({
     id: "feature-panel",
     priority: LAYER.CHROME,
@@ -291,7 +286,7 @@ export function FeaturePanel({
       }
       armHide();
       if (infoMode) return false; // details view — Back exits it; no nav
-      if (openMenu) return false; // base-ui owns keys while a dropdown is open
+      if (openMenu) return false; // a track picker is open — it owns keys at LAYER.MODAL
       // Spacebar = play/pause from anywhere in the open chrome (either focus row).
       if (e.key === "playpause") {
         onPlayPause();
@@ -325,7 +320,7 @@ export function FeaturePanel({
           setFocus({ row: 0, col: 0 });
           return true;
       }
-      // OK passes through → native button / dropdown-trigger handles it.
+      // OK passes through → the natively-focused control button handles it (e.g. opens the track picker).
       return false;
     },
   });
@@ -354,35 +349,21 @@ export function FeaturePanel({
     transition: "background .12s, border-color .12s",
   });
 
-  const circleSelector = (
-    key: Exclude<MenuKey, null>,
-    col: number,
-    Icon: typeof AudioLines,
-    currentValue: string,
-    items: { value: string; label: string }[],
-    onValue: (v: string) => void,
-  ) => (
-    <DropdownMenu open={openMenu === key} onOpenChange={(o) => setOpenMenu(o ? key : null)}>
-      <DropdownMenuTrigger
-        ref={(el) => {
-          ctlRefs.current[col] = el;
-        }}
-        style={glass(col, true)}
-        onMouseEnter={() => setFocus({ row: 1, col })}
-        aria-label={key}
-      >
-        <Icon size={ICON} />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" sideOffset={12} align="end" className="min-w-48">
-        <DropdownMenuRadioGroup value={currentValue} onValueChange={onValue}>
-          {items.map((it) => (
-            <DropdownMenuRadioItem key={it.value} value={it.value} className="text-base">
-              {it.label}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+  // Circle trigger button. OK on the control row is left unconsumed by the panel's key layer, so the
+  // natively-focused button's onClick fires it; the picker (rendered once below, driven by openMenu) then
+  // owns the keys at LAYER.MODAL. Mouse users just click.
+  const circleSelector = (key: Exclude<MenuKey, null>, col: number, Icon: typeof AudioLines) => (
+    <button
+      ref={(el) => {
+        ctlRefs.current[col] = el;
+      }}
+      style={glass(col, true)}
+      onMouseEnter={() => setFocus({ row: 1, col })}
+      onClick={() => setOpenMenu(key)}
+      aria-label={key}
+    >
+      <Icon size={ICON} />
+    </button>
   );
 
   const audioItems = [
@@ -394,6 +375,21 @@ export function FeaturePanel({
     ...tracks.subtitle.map((t) => ({ value: t.id, label: t.label })),
   ];
   const qualityItems = qualities.map((q) => ({ value: q.id, label: q.label }));
+
+  // The one open picker's data, derived from which circle is armed (audio / subs / quality).
+  const picker =
+    openMenu === "audio"
+      ? { title: "Audio", items: audioItems, current: audioStreamId ?? "", onValue: onSelectAudio }
+      : openMenu === "subs"
+        ? {
+            title: "Subtitles",
+            items: subItems,
+            current: subtitleStreamId && subtitleStreamId !== "off" ? subtitleStreamId : "off",
+            onValue: onSelectSub,
+          }
+        : openMenu === "quality"
+          ? { title: "Quality", items: qualityItems, current: quality, onValue: onSelectQuality }
+          : null;
 
   // Scrubber geometry — percentages are pre-computed by the hook (expanded focus program
   // + fixed left/right peeks). See use-tv-player buildScrubber.
@@ -547,13 +543,22 @@ export function FeaturePanel({
             </button>
 
             <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
-              {circleSelector("audio", 5, AudioLines, audioStreamId ?? "", audioItems, onSelectAudio)}
-              {circleSelector("subs", 6, Captions, subtitleStreamId && subtitleStreamId !== "off" ? subtitleStreamId : "off", subItems, onSelectSub)}
-              {circleSelector("quality", 7, SlidersHorizontal, quality, qualityItems, onSelectQuality)}
+              {circleSelector("audio", 5, AudioLines)}
+              {circleSelector("subs", 6, Captions)}
+              {circleSelector("quality", 7, SlidersHorizontal)}
             </div>
           </div>
         </>
       )}
+      <TrackPicker
+        open={openMenu !== null}
+        title={picker?.title ?? ""}
+        items={picker?.items ?? []}
+        current={picker?.current ?? ""}
+        accent="#3b82f6"
+        onValue={(v) => picker?.onValue(v)}
+        onClose={() => setOpenMenu(null)}
+      />
     </motion.div>
   );
 }
