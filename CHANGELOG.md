@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.53] - 2026-09-15
+
+Admin — the playlists/collections picker now matches the filter builder's look.
+
+### Changed
+- Reworked `MembershipBuilder` to mirror the filter builder: the same bordered box, and each row is a left
+  dropdown (Playlist / Collection) plus a right dropdown listing the chosen kind (playlists flat;
+  collections grouped by library, each with its item count and a "smart" badge). Switching the left
+  dropdown resets the row's pick. Up/down arrows still reorder rows (the IN_ORDER play order), and the
+  "plays everything in these, combined" note is centered under the rows.
+
 ## [0.13.52] - 2026-09-15
 
 Admin — channel editor can now build a channel from Plex playlists and collections, not just a metadata
