@@ -2,7 +2,29 @@
 
 All notable changes to Airwave are documented here.
 
-## [0.13.50] - 2026-09-15
+## [0.13.51] - 2026-09-15
+
+Server — tRPC router support for playlist/collection ("membership") channels: pickers, create/update, and
+an unsaved preview.
+
+### What ships
+
+- `channels.playlists` and `channels.collections` procs feed the admin membership picker: the source's
+  video playlists (title + item count + smart badge) and its collections aggregated across the enabled
+  movie/show libraries, each tagged with its library title.
+- `channels.create` / `channels.update` now accept an optional `sources` list
+  (`[{ type: "playlist" | "collection", key, title? }]`). A non-empty `sources` writes a `MEMBERSHIP`
+  definition; otherwise the channel stays a `PREDICATE` (filter) definition exactly as before. On update,
+  a switch between the two kinds clears the other kind's column so a stale filter or source list can't
+  leak into resolution. `channels.get` now returns the definition `kind` and `sources` so the editor can
+  load a membership channel.
+- `channels.previewMembership` resolves an unsaved membership source into the same coalesced
+  show/movie preview shape as the filter preview, so the editor can show the combined pool before saving.
+
+### Notes
+
+- Backend only; the admin UI for choosing playlists/collections (the mode tiles + picker) is the next
+  step. The existing filter-based create/update path is unchanged.
 
 Server — playlist/collection ("membership") channels resolve end to end. Also resyncs the TV-client
 version manifests, which had drifted.

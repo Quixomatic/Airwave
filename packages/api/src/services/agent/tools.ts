@@ -4,7 +4,7 @@ import { toAccentKey } from "../accents";
 import { normalizeCallsign } from "../generator/callsign";
 import { getFilterValues, type GuideMeta, type PlexItem } from "../plex/client";
 import { fieldMeta, FILTER_FIELDS, OPS_FOR_KIND, type FilterNode } from "../plex/filter-fields";
-import { resolveFilter } from "../plex/resolve";
+import { type MembershipSource, resolveFilter, resolveMembership } from "../plex/resolve";
 import { channelSortParam } from "../plex/sort-fields";
 import { decryptToken } from "../plex/token";
 
@@ -205,6 +205,15 @@ export async function previewFilter(
   const source = await requireSource(prisma, args.mediaSourceId);
   const sort = channelSortParam("SHUFFLE", args.sortField ?? "title", args.sortDir ?? "asc");
   const items = await resolveFilter(prisma, source, args.mediaTypes, asFilterNode(args.filter), sort);
+  return previewItems(prisma, args.mediaSourceId, items, args.detail);
+}
+
+export async function previewMembership(
+  prisma: PrismaClient,
+  args: { mediaSourceId: string; sources: MembershipSource[]; detail?: PreviewDetail },
+) {
+  const source = await requireSource(prisma, args.mediaSourceId);
+  const items = await resolveMembership(prisma, source, args.sources);
   return previewItems(prisma, args.mediaSourceId, items, args.detail);
 }
 

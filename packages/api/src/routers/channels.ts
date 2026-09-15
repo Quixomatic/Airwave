@@ -6,12 +6,16 @@ import { adminProcedure, router } from "../index";
 import { toAccentKey } from "../services/accents";
 import { getGuideGrid } from "../services/guide";
 import { runJob } from "../services/jobs/scheduler";
-import { getFilterValues } from "../services/plex/client";
+import { getCollections, getFilterValues, getPlaylists } from "../services/plex/client";
 import { FILTER_FIELDS, FILTER_OPS, OPS_FOR_KIND, fieldMeta } from "../services/plex/filter-fields";
 import { resolveChannel } from "../services/plex/resolve";
 import { decryptToken } from "../services/plex/token";
 import { getSourceReadiness, notReadyReason } from "../services/sources/readiness";
-import { previewItems, previewFilter as resolvePreviewFilter } from "../services/agent/tools";
+import {
+  previewItems,
+  previewFilter as resolvePreviewFilter,
+  previewMembership as resolvePreviewMembership,
+} from "../services/agent/tools";
 import { SORT_FIELDS } from "../services/plex/sort-fields";
 import { normalizeCallsign } from "../services/generator/callsign";
 import {
@@ -26,6 +30,16 @@ const orderingEnum = z.enum(["SHUFFLE", "IN_ORDER", "BY_AIR_DATE"]);
 const mediaTypeEnum = z.enum(["movie", "show"]);
 const bumperModeEnum = z.enum(["INHERIT", "OFF", "INTERSTITIAL_ONLY", "FULL"]);
 const opEnum = z.enum(FILTER_OPS);
+
+// A MEMBERSHIP definition's ordered source list: Plex playlists/collections unioned into the pool. When a
+// create/update carries a non-empty `sources`, the channel is a MEMBERSHIP channel (its filter is ignored);
+// otherwise it's a PREDICATE (filter) channel as before. `key` is the playlist/collection ratingKey.
+const membershipSourceSchema = z.object({
+  type: z.enum(["playlist", "collection"]),
+  key: z.string().min(1),
+  title: z.string().optional(),
+});
+const sourcesSchema = z.array(membershipSourceSchema).optional();
 
 const conditionSchema = z.object({
   type: z.literal("condition"),
@@ -188,8 +202,13 @@ export const channelsRouter = router({
       tint: channel.tint,
       packageIcon: channel.package?.icon ?? null,
       packageTint: channel.package?.tint ?? null,
+      // How the pool is defined: PREDICATE (filter) or MEMBERSHIP (playlists/collections).
+      kind: def?.kind ?? "PREDICATE",
       mediaTypes: filter.mediaTypes ?? ["movie", "show"],
       filter: filter.filter ?? null,
+      sources:
+        (def?.sources as unknown as { type: "playlist" | "collection"; key: string; title?: string }[] | null) ??
+        null,
       strategy: (channel.strategy as unknown) ?? null,
     };
   }),
@@ -255,6 +274,9 @@ export const channelsRouter = router({
         mediaSourceId: z.string(),
         mediaTypes: z.array(mediaTypeEnum).min(1),
         filter: nodeSchema.optional(),
+        // MEMBERSHIP: when present + non-empty, the channel's pool is these playlists/collections (the
+        // filter is ignored). Absent/empty → a PREDICATE (filter) channel, as before.
+        sources: sourcesSchema,
         ordering: orderingEnum.default("SHUFFLE"),
         strategy: strategySchema.optional(),
         sortField: z.string().optional(),
@@ -282,10 +304,16 @@ export const channelsRouter = router({
         input.number ??
         ((await ctx.prisma.channel.aggregate({ _max: { number: true } }))._max.number ?? 0) + 1;
 
-      const plexFilter = {
-        mediaTypes: input.mediaTypes,
-        ...(input.filter ? { filter: JSON.parse(JSON.stringify(input.filter)) } : {}),
-      };
+      const isMembership = !!input.sources?.length;
+      const definition = isMembership
+        ? { kind: "MEMBERSHIP" as const, sources: JSON.parse(JSON.stringify(input.sources)) as Prisma.InputJsonValue }
+        : {
+            kind: "PREDICATE" as const,
+            plexFilter: {
+              mediaTypes: input.mediaTypes,
+              ...(input.filter ? { filter: JSON.parse(JSON.stringify(input.filter)) } : {}),
+            },
+          };
 
       const channel = await ctx.prisma.channel.create({
         data: {
@@ -306,7 +334,7 @@ export const channelsRouter = router({
           enabled: input.enabled ?? true,
           bumperMode: input.bumperMode ?? "INHERIT",
           createdById: ctx.session.user.id,
-          definitions: { create: { kind: "PREDICATE", plexFilter } },
+          definitions: { create: definition },
         },
       });
 
@@ -341,6 +369,7 @@ export const channelsRouter = router({
         number: z.number().int(),
         mediaTypes: z.array(mediaTypeEnum).min(1),
         filter: nodeSchema.optional(),
+        sources: sourcesSchema, // non-empty → MEMBERSHIP; absent/empty → PREDICATE (see create)
         ordering: orderingEnum,
         strategy: strategySchema.optional(),
         sortField: z.string().optional(),
@@ -386,20 +415,28 @@ export const channelsRouter = router({
         },
       });
 
-      const plexFilter = {
-        mediaTypes: input.mediaTypes,
-        ...(input.filter ? { filter: JSON.parse(JSON.stringify(input.filter)) } : {}),
-      };
+      // Rewrite the single definition to the submitted source. On a kind switch (filter <-> membership),
+      // clear the other kind's column so a stale filter/sources blob can't leak into resolution.
+      const isMembership = !!input.sources?.length;
+      const defData = isMembership
+        ? {
+            kind: "MEMBERSHIP" as const,
+            sources: JSON.parse(JSON.stringify(input.sources)) as Prisma.InputJsonValue,
+            plexFilter: Prisma.DbNull,
+          }
+        : {
+            kind: "PREDICATE" as const,
+            plexFilter: {
+              mediaTypes: input.mediaTypes,
+              ...(input.filter ? { filter: JSON.parse(JSON.stringify(input.filter)) } : {}),
+            } as Prisma.InputJsonValue,
+            sources: Prisma.DbNull,
+          };
       const def = channel.definitions[0];
       if (def) {
-        await ctx.prisma.channelDefinition.update({
-          where: { id: def.id },
-          data: { plexFilter },
-        });
+        await ctx.prisma.channelDefinition.update({ where: { id: def.id }, data: defData });
       } else {
-        await ctx.prisma.channelDefinition.create({
-          data: { channelId: input.id, kind: "PREDICATE", plexFilter },
-        });
+        await ctx.prisma.channelDefinition.create({ data: { channelId: input.id, ...defData } });
       }
 
       // A bumper-mode change immediately kicks off the reconcile job to repair this
@@ -453,6 +490,57 @@ export const channelsRouter = router({
         filter: input.filter,
         sortField: input.sortField,
         sortDir: input.sortDir,
+        detail: input.detail,
+      }),
+    ),
+
+  /** The source's video playlists, for the membership picker (title + item count + smart badge). */
+  playlists: adminProcedure
+    .input(z.object({ mediaSourceId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const source = await ctx.prisma.mediaSource.findUnique({ where: { id: input.mediaSourceId } });
+      if (!source?.baseUrl) return [];
+      return getPlaylists(source.baseUrl, decryptToken(source.token));
+    }),
+
+  /**
+   * The source's collections, for the membership picker — aggregated across its enabled movie/show
+   * libraries (collections are per-library), each tagged with its library title so the picker can group.
+   */
+  collections: adminProcedure
+    .input(z.object({ mediaSourceId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const source = await ctx.prisma.mediaSource.findUnique({ where: { id: input.mediaSourceId } });
+      if (!source?.baseUrl) return [];
+      const token = decryptToken(source.token);
+      const libs = await ctx.prisma.mediaLibrary.findMany({
+        where: { mediaSourceId: input.mediaSourceId, enabled: true, type: { in: ["movie", "show"] } },
+        select: { key: true, title: true, type: true },
+      });
+      const out: Array<{ key: string; title: string; childCount: number; smart: boolean; library: string; libraryType: string }> = [];
+      for (const lib of libs) {
+        const cols = await getCollections(source.baseUrl, token, lib.key);
+        for (const c of cols) out.push({ ...c, library: lib.title, libraryType: lib.type });
+      }
+      return out;
+    }),
+
+  /**
+   * Preview an UNSAVED membership source — resolves the chosen playlists/collections into the same
+   * coalesced shape as `preview`, so the editor can show the combined pool before saving.
+   */
+  previewMembership: adminProcedure
+    .input(
+      z.object({
+        mediaSourceId: z.string(),
+        sources: z.array(membershipSourceSchema),
+        detail: z.enum(["quick", "default", "verbose"]).optional(),
+      }),
+    )
+    .query(({ ctx, input }) =>
+      resolvePreviewMembership(ctx.prisma, {
+        mediaSourceId: input.mediaSourceId,
+        sources: input.sources,
         detail: input.detail,
       }),
     ),
