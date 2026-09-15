@@ -26,7 +26,9 @@ import {
   Copy,
   Info,
   Layers,
+  ListChecks,
   ListFilter,
+  ListMusic,
   SlidersHorizontal,
   Tv,
   type LucideIcon,
@@ -41,11 +43,16 @@ import { trpc } from "@/utils/trpc";
 import { FilterBuilder, type FilterGroup, normalizeFilter } from "./filter-builder";
 import { encodeFilter } from "./filter-clipboard";
 import { ImportFilterDialog } from "./import-filter-dialog";
+import { MembershipBuilder, type MembershipSource } from "./membership-builder";
 import { StrategyEditor, type ChannelStrategy } from "./strategy-editor";
 
 export type Ordering = "SHUFFLE" | "IN_ORDER" | "BY_AIR_DATE";
 export type MediaType = "movie" | "show";
 export type BumperMode = "INHERIT" | "OFF" | "INTERSTITIAL_ONLY" | "FULL";
+/** How the pool is defined. `manual` is reserved (tile disabled for now). */
+export type ChannelMode = "filter" | "membership" | "manual";
+
+export type { MembershipSource };
 
 export type ChannelFormValues = {
   name: string;
@@ -53,6 +60,8 @@ export type ChannelFormValues = {
   number: string;
   mediaTypes: MediaType[];
   filter: FilterGroup;
+  /** Non-empty ⇒ a MEMBERSHIP channel (playlists/collections); empty ⇒ a filter channel. */
+  sources: MembershipSource[];
   ordering: Ordering;
   strategy: ChannelStrategy | null;
   sortField: string;
@@ -65,15 +74,52 @@ export type ChannelFormValues = {
   bumperMode: BumperMode;
 };
 
-/** The live filter state the form reports upward (via `onPreviewInputChange`) so a preview panel can resolve
- *  the UNSAVED filter — see channels.previewFilter (GitHub #12). */
+/** The live pool definition the form reports upward (via `onPreviewInputChange`) so a preview panel can resolve
+ *  the UNSAVED filter/membership source — see channels.previewFilter / previewMembership (GitHub #12). */
 export type ChannelPreviewInput = {
+  mode: ChannelMode;
   mediaSourceId: string;
   mediaTypes: MediaType[];
   filter: FilterGroup;
+  sources: MembershipSource[];
   sortField: string;
   sortDir: "asc" | "desc";
 };
+
+const MODE_TILES: { id: ChannelMode; label: string; icon: LucideIcon; desc: string; disabled?: boolean }[] = [
+  { id: "filter", label: "Filter", icon: ListFilter, desc: "Match by metadata — genre, year, rating…" },
+  { id: "membership", label: "Playlists & collections", icon: ListMusic, desc: "Use specific Plex playlists or collections" },
+  { id: "manual", label: "Manual", icon: ListChecks, desc: "Hand-pick items (coming soon)", disabled: true },
+];
+
+/** The three pool-definition modes as selectable tiles. Manual is present but disabled. */
+function ModeTiles({ value, onChange }: { value: ChannelMode; onChange: (m: ChannelMode) => void }) {
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {MODE_TILES.map((m) => {
+        const selected = value === m.id;
+        return (
+          <button
+            key={m.id}
+            type="button"
+            disabled={m.disabled}
+            aria-pressed={selected}
+            onClick={() => onChange(m.id)}
+            className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors ${
+              selected ? "border-primary bg-primary/5 ring-primary/40 ring-1" : "border-border hover:bg-muted/50"
+            } disabled:cursor-not-allowed disabled:opacity-50`}
+          >
+            <span className="flex items-center gap-1.5 text-sm font-medium">
+              <m.icon className="size-4 shrink-0" />
+              {m.label}
+            </span>
+            <span className="text-muted-foreground text-xs">{m.desc}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 const BUMPER_MODE_OPTIONS: { value: BumperMode; label: string }[] = [
   { value: "INHERIT", label: "Inherit global setting" },
@@ -168,6 +214,9 @@ export function ChannelForm({
   const [enabled, setEnabled] = useState(initial?.enabled ?? true);
   const [bumperMode, setBumperMode] = useState<BumperMode>(initial?.bumperMode ?? "INHERIT");
   const [filter, setFilter] = useState<FilterGroup>(() => normalizeFilter(initial?.filter));
+  // A channel loaded with sources is a membership channel; otherwise it's a filter channel.
+  const [mode, setMode] = useState<ChannelMode>(initial?.sources?.length ? "membership" : "filter");
+  const [membershipSources, setMembershipSources] = useState<MembershipSource[]>(initial?.sources ?? []);
   const [importOpen, setImportOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -200,9 +249,9 @@ export function ChannelForm({
   // whenever the builder, media types, sort, or the resolved source changes; `mediaTypes` is rebuilt inside from
   // the `movies`/`tv` deps (it's a fresh array each render, so it can't be a dep itself).
   useEffect(() => {
-    onPreviewInputChange?.({ mediaSourceId: sourceId, mediaTypes, filter, sortField, sortDir });
+    onPreviewInputChange?.({ mode, mediaSourceId: sourceId, mediaTypes, filter, sources: membershipSources, sortField, sortDir });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceId, movies, tv, filter, sortField, sortDir, onPreviewInputChange]);
+  }, [sourceId, mode, movies, tv, filter, membershipSources, sortField, sortDir, onPreviewInputChange]);
 
   if (sources.data && !sourceId) {
     // No usable source — say exactly which step is missing so the fix is obvious.
@@ -225,13 +274,21 @@ export function ChannelForm({
     );
   }
 
+  // Only rows with a chosen playlist/collection count; blank rows are editor scaffolding.
+  const chosenSources = membershipSources.filter((s) => s.key);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       toast.error("Name is required.");
       return;
     }
-    if (mediaTypes.length === 0) {
+    if (mode === "membership") {
+      if (chosenSources.length === 0) {
+        toast.error("Add at least one playlist or collection.");
+        return;
+      }
+    } else if (mediaTypes.length === 0) {
       toast.error("Pick at least one content type.");
       return;
     }
@@ -239,8 +296,11 @@ export function ChannelForm({
       name,
       callsign,
       number,
-      mediaTypes,
+      // mediaTypes is meaningless for a membership channel (the resolver ignores it), but the API still
+      // requires a non-empty list — send both so validation passes.
+      mediaTypes: mode === "membership" ? (mediaTypes.length ? mediaTypes : ["movie", "show"]) : mediaTypes,
       filter,
+      sources: mode === "membership" ? chosenSources : [],
       ordering,
       strategy,
       sortField,
@@ -446,52 +506,61 @@ export function ChannelForm({
       </Section>
 
       {/* Content types + filter together, LAST — they jointly define what plays, and the
-          resolved preview tiles render right below the form. */}
+          resolved preview tiles render right below the form. The mode tiles pick HOW the pool is
+          defined: a metadata filter, or specific Plex playlists/collections. */}
       <Section title="Content & filter" icon={ListFilter}>
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-2">
-            <Label>Content</Label>
-            <div className="flex gap-4 text-sm">
-              <label className="flex items-center gap-2">
-                <Checkbox checked={movies} onCheckedChange={(v) => setMovies(v === true)} />
-                Movies
-              </label>
-              <label className="flex items-center gap-2">
-                <Checkbox checked={tv} onCheckedChange={(v) => setTv(v === true)} />
-                TV Shows
-              </label>
+        <ModeTiles value={mode} onChange={setMode} />
+
+        {mode === "membership" ? (
+          <MembershipBuilder value={membershipSources} onChange={setMembershipSources} mediaSourceId={sourceId} />
+        ) : (
+          <>
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-2">
+                <Label>Content</Label>
+                <div className="flex gap-4 text-sm">
+                  <label className="flex items-center gap-2">
+                    <Checkbox checked={movies} onCheckedChange={(v) => setMovies(v === true)} />
+                    Movies
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <Checkbox checked={tv} onCheckedChange={(v) => setTv(v === true)} />
+                    TV Shows
+                  </label>
+                </div>
+              </div>
+              {/* Copy the content types + filter to the clipboard, or paste one in (with a review dialog). */}
+              <div className="flex shrink-0 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={copyFilter}
+                  className={copied ? "pointer-events-none text-emerald-600 dark:text-emerald-500" : undefined}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="mr-1 h-3.5 w-3.5" /> Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="mr-1 h-3.5 w-3.5" /> Copy
+                    </>
+                  )}
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+                  <ClipboardPaste className="mr-1 h-3.5 w-3.5" /> Paste
+                </Button>
+              </div>
             </div>
-          </div>
-          {/* Copy the content types + filter to the clipboard, or paste one in (with a review dialog). */}
-          <div className="flex shrink-0 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={copyFilter}
-              className={copied ? "pointer-events-none text-emerald-600 dark:text-emerald-500" : undefined}
-            >
-              {copied ? (
-                <>
-                  <Check className="mr-1 h-3.5 w-3.5" /> Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="mr-1 h-3.5 w-3.5" /> Copy
-                </>
-              )}
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => setImportOpen(true)}>
-              <ClipboardPaste className="mr-1 h-3.5 w-3.5" /> Paste
-            </Button>
-          </div>
-        </div>
-        <FilterBuilder
-          value={filter}
-          onChange={setFilter}
-          mediaSourceId={sourceId}
-          mediaTypes={mediaTypes}
-        />
+            <FilterBuilder
+              value={filter}
+              onChange={setFilter}
+              mediaSourceId={sourceId}
+              mediaTypes={mediaTypes}
+            />
+          </>
+        )}
       </Section>
 
       <ImportFilterDialog

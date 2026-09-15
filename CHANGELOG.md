@@ -2,6 +2,29 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.52] - 2026-09-15
+
+Admin — channel editor can now build a channel from Plex playlists and collections, not just a metadata
+filter. Completes the playlist/collection ("membership") channels feature.
+
+### What ships
+
+- The channel editor's "Content & filter" section now leads with three mode tiles: Filter, Playlists &
+  collections, and Manual (present but disabled). Filter keeps the existing content-type checkboxes and
+  filter builder; Playlists & collections swaps in a new picker. Works identically on the new-channel and
+  edit-channel pages, and loads the right mode when editing an existing channel.
+- New `MembershipBuilder`: an ordered list of rows, each choosing one playlist or collection from a
+  grouped dropdown (Playlists, then Collections by library, each showing its item count and a "smart"
+  badge). Rows union into the pool; move up/down reorders them, which is the IN_ORDER play order. Show and
+  season entries expand to their episodes when the channel resolves.
+- The preview panel resolves a membership source through `channels.previewMembership` (and a filter
+  through `previewFilter` as before), so the combined pool previews live before saving.
+
+### Notes
+
+- Manual mode (hand-picking individual items) is intentionally disabled for now. Ordering, strategy,
+  weighting, bumpers, and scheduling all apply to a membership pool unchanged.
+
 ## [0.13.51] - 2026-09-15
 
 Server — tRPC router support for playlist/collection ("membership") channels: pickers, create/update, and

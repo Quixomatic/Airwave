@@ -21,7 +21,15 @@ const DEBOUNCE_MS = 800;
 /** Stable content key for an input — changes only when something that affects the resolved pool changes. */
 function inputKey(i: ChannelPreviewInput | null): string {
   if (!i) return "";
-  return JSON.stringify({ m: i.mediaSourceId, t: i.mediaTypes, f: i.filter, sf: i.sortField, sd: i.sortDir });
+  return JSON.stringify({
+    mode: i.mode,
+    m: i.mediaSourceId,
+    t: i.mediaTypes,
+    f: i.filter,
+    s: i.sources,
+    sf: i.sortField,
+    sd: i.sortDir,
+  });
 }
 
 /** True if the filter tree has at least one COMPLETE condition — a field with a non-empty value. A freshly
@@ -32,6 +40,11 @@ function filterHasPredicate(g: ChannelPreviewInput["filter"]): boolean {
   const walk = (nodes: ChannelPreviewInput["filter"]["children"]): boolean =>
     nodes.some((n) => (n.type === "condition" ? n.value.trim() !== "" : walk(n.children)));
   return walk(g.children);
+}
+
+/** Whether an input is worth auto-resolving: a filled-in filter, or a membership source with a chosen item. */
+function hasResolvable(i: ChannelPreviewInput): boolean {
+  return i.mode === "membership" ? i.sources.some((s) => s.key) : filterHasPredicate(i.filter);
 }
 
 /**
@@ -78,8 +91,9 @@ export function ChannelPreviewPanel({
   useEffect(() => {
     if (!input?.mediaSourceId) return;
     if (key === lastKey.current) return;
-    // Don't auto-resolve a predicate-less filter — it'd pull the whole library. Manual "Update preview" still can.
-    if (!filterHasPredicate(input.filter)) return;
+    // Don't auto-resolve an empty filter / no chosen source — it'd pull the whole library or nothing. Manual
+    // "Update preview" still can.
+    if (!hasResolvable(input)) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       lastKey.current = key;
@@ -90,21 +104,30 @@ export function ChannelPreviewPanel({
     };
   }, [key, input]);
 
+  // Resolve the UNSAVED pool via the proc matching its mode: a metadata filter (previewFilter) or the chosen
+  // Plex playlists/collections (previewMembership). Both return the same coalesced preview shape.
+  // Keep the last resolved pool visible (as `data`) while the next resolve runs, so the skeleton count can
+  // match the results currently on screen across repeated edits — not just the first reload.
+  const queryOpts = { placeholderData: keepPreviousData, trpc: { context: { skipBatch: true } } } as const;
+  const membershipMode = resolveInput?.mode === "membership";
   const preview = useQuery(
-    trpc.channels.previewFilter.queryOptions(
-      resolveInput
-        ? {
-            mediaSourceId: resolveInput.mediaSourceId,
-            mediaTypes: resolveInput.mediaTypes,
-            filter: resolveInput.filter,
-            sortField: resolveInput.sortField,
-            sortDir: resolveInput.sortDir,
-          }
-        : skipToken,
-      // Keep the last resolved pool visible (as `data`) while the next resolve runs, so the skeleton count can
-      // match the results currently on screen across repeated edits — not just the first reload.
-      { placeholderData: keepPreviousData, trpc: { context: { skipBatch: true } } },
-    ),
+    membershipMode
+      ? trpc.channels.previewMembership.queryOptions(
+          { mediaSourceId: resolveInput!.mediaSourceId, sources: resolveInput!.sources.filter((s) => s.key) },
+          queryOpts,
+        )
+      : trpc.channels.previewFilter.queryOptions(
+          resolveInput
+            ? {
+                mediaSourceId: resolveInput.mediaSourceId,
+                mediaTypes: resolveInput.mediaTypes,
+                filter: resolveInput.filter,
+                sortField: resolveInput.sortField,
+                sortDir: resolveInput.sortDir,
+              }
+            : skipToken,
+          queryOpts,
+        ),
   );
 
   const updateNow = () => {
