@@ -540,34 +540,64 @@ export async function getCollections(
   }));
 }
 
-/** A playlist's items, in playlist order (leaf movies/episodes). Guide is thin — the resolver hydrates. */
+async function fetchMetadata(baseUrl: string, token: string, path: string): Promise<PlexMetadata[]> {
+  const res = await fetch(`${baseUrl}${path}`, { headers: pmsHeaders(token) });
+  if (!res.ok) throw new Error(`Plex ${path} failed (${res.status})`);
+  const data = (await res.json()) as { MediaContainer?: { Metadata?: PlexMetadata[] } };
+  return data.MediaContainer?.Metadata ?? [];
+}
+
+/**
+ * Expand a raw playlist/collection listing to SCHEDULABLE LEAF VIDEO items, preserving the source order.
+ * Movies and episodes pass through as-is; a `show` container expands to all its episodes (in air order)
+ * via `/allLeaves`; a `season` expands to its episodes via `/children` (Plex returns nothing for a
+ * season's `/allLeaves`). Non-video items (photo/track/artist/album/clip) are dropped. Verified against
+ * real playlists, movie collections, and show-level + episode-level TV collections.
+ */
+async function expandMembershipItems(
+  baseUrl: string,
+  token: string,
+  raw: PlexMetadata[],
+): Promise<PlexItem[]> {
+  const groups = await Promise.all(
+    raw.map((m): Promise<PlexMetadata[]> => {
+      const type = m.type;
+      if (type === "movie" || type === "episode") return Promise.resolve([m]);
+      if (type === "show") return fetchMetadata(baseUrl, token, `/library/metadata/${m.ratingKey}/allLeaves`);
+      if (type === "season") return fetchMetadata(baseUrl, token, `/library/metadata/${m.ratingKey}/children`);
+      return Promise.resolve([]); // not a schedulable video leaf
+    }),
+  );
+  return groups.flat().map(toPlexItem);
+}
+
+/**
+ * A playlist's items, in playlist order, expanded to leaf video items (see {@link expandMembershipItems}).
+ * Guide is thin (these endpoints ignore `includeElements=Stream`) — the resolver hydrates from the cache.
+ */
 export async function getPlaylistItems(
   baseUrl: string,
   token: string,
   playlistKey: string,
 ): Promise<PlexItem[]> {
-  const res = await fetch(`${baseUrl}/playlists/${playlistKey}/items`, { headers: pmsHeaders(token) });
-  if (!res.ok) throw new Error(`Plex playlist items failed (${res.status})`);
-  const data = (await res.json()) as { MediaContainer?: { Metadata?: PlexMetadata[] } };
-  return (data.MediaContainer?.Metadata ?? []).map(toPlexItem);
+  return expandMembershipItems(baseUrl, token, await fetchMetadata(baseUrl, token, `/playlists/${playlistKey}/items`));
 }
 
 /**
- * A collection's items, in collection order. NOTE: a collection of SHOWS returns `show` containers, which
- * would need expansion to episodes before scheduling; movie collections return leaf movies. Smart
- * collections resolve to their current items. Guide is thin — the resolver hydrates.
+ * A collection's items, in collection order, expanded to leaf video items. A collection of SHOWS returns
+ * `show` containers (expanded to episodes here); movie collections return leaf movies; smart collections
+ * resolve to their current items. Guide is thin — the resolver hydrates.
  */
 export async function getCollectionItems(
   baseUrl: string,
   token: string,
   collectionKey: string,
 ): Promise<PlexItem[]> {
-  const res = await fetch(`${baseUrl}/library/collections/${collectionKey}/items`, {
-    headers: pmsHeaders(token),
-  });
-  if (!res.ok) throw new Error(`Plex collection items failed (${res.status})`);
-  const data = (await res.json()) as { MediaContainer?: { Metadata?: PlexMetadata[] } };
-  return (data.MediaContainer?.Metadata ?? []).map(toPlexItem);
+  return expandMembershipItems(
+    baseUrl,
+    token,
+    await fetchMetadata(baseUrl, token, `/library/collections/${collectionKey}/items`),
+  );
 }
 
 /**

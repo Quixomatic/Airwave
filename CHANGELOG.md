@@ -2,6 +2,38 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.50] - 2026-09-15
+
+Server — playlist/collection ("membership") channels resolve end to end. Also resyncs the TV-client
+version manifests, which had drifted.
+
+### What ships
+
+- `resolveChannel` (`services/plex/resolve.ts`) now branches on the definition's `kind`: `PREDICATE`
+  keeps resolving a metadata filter (unchanged), and the new `MEMBERSHIP` kind resolves a pool from one
+  or more Plex playlists / collections via `resolveMembership`. It fetches each source in list order,
+  unions and dedupes by ratingKey (first occurrence wins, so `IN_ORDER` preserves the playlist/collection
+  order), and hydrates each item's guide from the `MediaItem` cache (which already carries the stream
+  badges from the media sync) with a batched Plex metadata fetch as the fallback for anything not yet
+  cached. No extra per-item Plex round-trip, so a membership channel matches filter-mode richness.
+- `getPlaylistItems` / `getCollectionItems` (`services/plex/client.ts`) now expand container items to
+  schedulable leaves, preserving source order: a `show` expands to its episodes via `/allLeaves`, a
+  `season` via `/children` (Plex returns nothing for a season's `/allLeaves`), and movies / episodes pass
+  through. Verified against real playlists, movie collections, and show-, season-, and episode-level TV
+  collections; a 167-item mixed pool resolved to leaves with zero containers, zero duplicates, and full
+  badges on every item.
+- `BY_AIR_DATE` ordering for a membership channel re-sorts the pool in the resolver (filter mode gets
+  this from Plex's `sort=` parameter, which the membership path can't use); `IN_ORDER` and `SHUFFLE` are
+  handled downstream as before. The admin UI for choosing playlists/collections is still to come.
+
+### Version resync
+
+- Brought the TV-client version manifests back into lockstep. `apps/tv-web/public/appinfo.json` +
+  `config.xml`, `apps/tv-native/app.json`, `apps/tv-tauri/src-tauri/{tauri.conf.json, Cargo.toml,
+  Cargo.lock}`, and `apps/tv-roku/manifest` had been left at 0.13.43 while the `package.json` versions
+  advanced to 0.13.49, because the v0.13.44–0.13.49 bumps edited only the `package.json` files instead of
+  running `pnpm version:bump`. All 16 version files are now at 0.13.50.
+
 ## [0.13.49] - 2026-09-15
 
 Database — channel-definition schema for the playlist/collection ("membership") source.

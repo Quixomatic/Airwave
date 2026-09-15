@@ -1,6 +1,14 @@
 import type { PrismaClient } from "@airwave/db";
 
-import { type PlexItem, getFilterValues, getSectionItemsRaw } from "./client";
+import {
+  type GuideMeta,
+  type PlexItem,
+  getCollectionItems,
+  getFilterValues,
+  getMetadataByKeys,
+  getPlaylistItems,
+  getSectionItemsRaw,
+} from "./client";
 import { type FilterCondition, type FilterNode, buildParam } from "./filter-fields";
 import { channelSortParam } from "./sort-fields";
 import { decryptToken } from "./token";
@@ -115,9 +123,78 @@ export async function resolveFilter(
   return [...out.values()];
 }
 
+/** One membership source: a specific Plex playlist or collection (by ratingKey). */
+export type MembershipSource = { type: "playlist" | "collection"; key: string; title?: string };
+
 /**
- * Resolve a channel's candidate pool — loads its definition and delegates to
- * {@link resolveFilter}.
+ * Resolve a "membership" pool: the union of one or more Plex playlists / collections, in the order the
+ * sources are listed (each in its own playlist/collection order), deduped by ratingKey (first occurrence
+ * wins, so IN_ORDER preserves the source order). Containers (shows/seasons) are expanded to episodes by
+ * the client. The guide is hydrated from the MediaItem cache — which already carries stream badges
+ * (resolution / hdr / audio) from the media sync, so a membership channel matches filter-mode richness
+ * with no extra Plex round-trip; anything not yet cached falls back to a batched Plex metadata fetch, and
+ * self-heals on the next sync.
+ */
+export async function resolveMembership(
+  prisma: PrismaClient,
+  source: ResolveSource,
+  sources: MembershipSource[],
+): Promise<PlexItem[]> {
+  // 1. Each source's leaf items, in source array order. A missing/deleted source resolves to [] rather
+  //    than hard-failing the whole channel.
+  const perSource = await Promise.all(
+    sources.map((s) =>
+      (s.type === "playlist"
+        ? getPlaylistItems(source.baseUrl, source.token, s.key)
+        : getCollectionItems(source.baseUrl, source.token, s.key)
+      ).catch(() => [] as PlexItem[]),
+    ),
+  );
+
+  // 2. Union + dedupe by ratingKey (first occurrence wins → preserves order for IN_ORDER).
+  const ordered: PlexItem[] = [];
+  const seen = new Set<string>();
+  for (const items of perSource)
+    for (const it of items)
+      if (!seen.has(it.ratingKey)) {
+        seen.add(it.ratingKey);
+        ordered.push(it);
+      }
+  if (!ordered.length) return [];
+
+  // 3. Hydrate the rich guide from the MediaItem cache; fall back to a Plex metadata fetch (with streams)
+  //    for anything uncached; then the thin /items guide as a last resort (self-heals on next sync).
+  const keys = ordered.map((i) => i.ratingKey);
+  const cached = await prisma.mediaItem.findMany({
+    where: { mediaSourceId: source.id, ratingKey: { in: keys } },
+    select: { ratingKey: true, title: true, durationMs: true, year: true, airDate: true, guide: true },
+  });
+  const cachedByKey = new Map(cached.map((r) => [r.ratingKey, r]));
+
+  const uncachedKeys = keys.filter((k) => !cachedByKey.has(k));
+  const fetched = uncachedKeys.length ? await getMetadataByKeys(source.baseUrl, source.token, uncachedKeys) : [];
+  const fetchedByKey = new Map(fetched.map((i) => [i.ratingKey, i]));
+  const thinByKey = new Map(ordered.map((i) => [i.ratingKey, i]));
+
+  return keys.map((key) => {
+    const row = cachedByKey.get(key);
+    if (row)
+      return {
+        ratingKey: row.ratingKey,
+        title: row.title,
+        durationMs: row.durationMs,
+        year: row.year ?? undefined,
+        originallyAvailableAt: row.airDate ?? undefined,
+        guide: row.guide as unknown as GuideMeta,
+      };
+    return fetchedByKey.get(key) ?? thinByKey.get(key)!;
+  });
+}
+
+/**
+ * Resolve a channel's candidate pool — loads its (single) definition and delegates by kind: PREDICATE
+ * (a metadata filter) to {@link resolveFilter}, MEMBERSHIP (Plex playlists / collections) to
+ * {@link resolveMembership}. Ordering / strategy / weighting / scheduling downstream is source-agnostic.
  */
 export async function resolveChannel(
   prisma: PrismaClient,
@@ -130,15 +207,20 @@ export async function resolveChannel(
   const source = channel?.mediaSource;
   const def = channel?.definitions[0];
   if (!channel || !source?.baseUrl || !def) return [];
+  const src = { id: source.id, baseUrl: source.baseUrl, token: decryptToken(source.token) };
+
+  if (def.kind === "MEMBERSHIP") {
+    const sources = (def.sources as unknown as MembershipSource[] | null) ?? [];
+    const pool = await resolveMembership(prisma, src, sources);
+    // The membership pool arrives in source order (IN_ORDER). BY_AIR_DATE re-sorts here — filter mode
+    // gets this from Plex's `sort=` param, which membership can't use. SHUFFLE is applied downstream.
+    if (channel.ordering === "BY_AIR_DATE")
+      return pool.sort((a, b) => (b.originallyAvailableAt ?? "").localeCompare(a.originallyAvailableAt ?? ""));
+    return pool;
+  }
 
   const filter = (def.plexFilter as unknown as ChannelFilter | null) ?? {};
   const mediaTypes = filter.mediaTypes?.length ? filter.mediaTypes : ["movie", "show"];
   const sort = channelSortParam(channel.ordering, channel.sortField, channel.sortDir);
-  return resolveFilter(
-    prisma,
-    { id: source.id, baseUrl: source.baseUrl, token: decryptToken(source.token) },
-    mediaTypes,
-    filter.filter,
-    sort,
-  );
+  return resolveFilter(prisma, src, mediaTypes, filter.filter, sort);
 }
