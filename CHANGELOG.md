@@ -2,6 +2,25 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.57] - 2026-09-15
+
+Server — router support for Manual-mode channels: media search, show drill-down, preview, and
+create/update (groundwork; the admin picker UI is next).
+
+### Added
+- `channels.searchMedia` — searches the MediaItem cache (instant, no Plex round-trip) for movies / shows /
+  episodes matching a title query, scoped by content type, returned as three capped buckets of preview
+  tiles (episode matches carry their show/season/episode context).
+- `channels.showEpisodes` — a show's episodes grouped by season (seasons derived from `guide.season`),
+  for the drill-down; cache-only.
+- `channels.previewManual` — resolves an unsaved list of hand-picked ratingKeys into the coalesced preview
+  shape.
+
+### Changed
+- `channels.create` / `channels.update` now accept `manualItemKeys`; a non-empty list writes a
+  `MANUAL_ITEMS` definition (priority over membership sources and filter), and on update a kind switch
+  clears the other kinds' columns. `channels.get` returns `manualItemKeys`.
+
 ## [0.13.56] - 2026-09-15
 
 Server — resolver for MANUAL_ITEMS (hand-picked) channels (groundwork for Manual mode; not yet wired to

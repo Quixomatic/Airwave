@@ -14,7 +14,10 @@ import { getSourceReadiness, notReadyReason } from "../services/sources/readines
 import {
   previewItems,
   previewFilter as resolvePreviewFilter,
+  previewManual as resolvePreviewManual,
   previewMembership as resolvePreviewMembership,
+  searchMedia as searchMediaService,
+  showEpisodes as showEpisodesService,
 } from "../services/agent/tools";
 import { SORT_FIELDS } from "../services/plex/sort-fields";
 import { normalizeCallsign } from "../services/generator/callsign";
@@ -40,6 +43,9 @@ const membershipSourceSchema = z.object({
   title: z.string().optional(),
 });
 const sourcesSchema = z.array(membershipSourceSchema).optional();
+// MANUAL_ITEMS: an ordered list of hand-picked ratingKeys (movie / show / episode). A non-empty list makes
+// the channel a MANUAL_ITEMS channel (takes priority over sources/filter).
+const manualItemKeysSchema = z.array(z.string().min(1)).optional();
 
 const conditionSchema = z.object({
   type: z.literal("condition"),
@@ -209,6 +215,7 @@ export const channelsRouter = router({
       sources:
         (def?.sources as unknown as { type: "playlist" | "collection"; key: string; title?: string }[] | null) ??
         null,
+      manualItemKeys: def?.manualItemKeys ?? [],
       strategy: (channel.strategy as unknown) ?? null,
     };
   }),
@@ -277,6 +284,8 @@ export const channelsRouter = router({
         // MEMBERSHIP: when present + non-empty, the channel's pool is these playlists/collections (the
         // filter is ignored). Absent/empty → a PREDICATE (filter) channel, as before.
         sources: sourcesSchema,
+        // MANUAL_ITEMS: hand-picked ratingKeys. Non-empty → MANUAL_ITEMS (takes priority).
+        manualItemKeys: manualItemKeysSchema,
         ordering: orderingEnum.default("SHUFFLE"),
         strategy: strategySchema.optional(),
         sortField: z.string().optional(),
@@ -304,16 +313,18 @@ export const channelsRouter = router({
         input.number ??
         ((await ctx.prisma.channel.aggregate({ _max: { number: true } }))._max.number ?? 0) + 1;
 
-      const isMembership = !!input.sources?.length;
-      const definition = isMembership
-        ? { kind: "MEMBERSHIP" as const, sources: JSON.parse(JSON.stringify(input.sources)) as Prisma.InputJsonValue }
-        : {
-            kind: "PREDICATE" as const,
-            plexFilter: {
-              mediaTypes: input.mediaTypes,
-              ...(input.filter ? { filter: JSON.parse(JSON.stringify(input.filter)) } : {}),
-            },
-          };
+      // Pick the definition kind by which data is present: manual items > membership sources > filter.
+      const definition = input.manualItemKeys?.length
+        ? { kind: "MANUAL_ITEMS" as const, manualItemKeys: input.manualItemKeys }
+        : input.sources?.length
+          ? { kind: "MEMBERSHIP" as const, sources: JSON.parse(JSON.stringify(input.sources)) as Prisma.InputJsonValue }
+          : {
+              kind: "PREDICATE" as const,
+              plexFilter: {
+                mediaTypes: input.mediaTypes,
+                ...(input.filter ? { filter: JSON.parse(JSON.stringify(input.filter)) } : {}),
+              },
+            };
 
       const channel = await ctx.prisma.channel.create({
         data: {
@@ -370,6 +381,7 @@ export const channelsRouter = router({
         mediaTypes: z.array(mediaTypeEnum).min(1),
         filter: nodeSchema.optional(),
         sources: sourcesSchema, // non-empty → MEMBERSHIP; absent/empty → PREDICATE (see create)
+        manualItemKeys: manualItemKeysSchema, // non-empty → MANUAL_ITEMS (takes priority)
         ordering: orderingEnum,
         strategy: strategySchema.optional(),
         sortField: z.string().optional(),
@@ -415,23 +427,32 @@ export const channelsRouter = router({
         },
       });
 
-      // Rewrite the single definition to the submitted source. On a kind switch (filter <-> membership),
-      // clear the other kind's column so a stale filter/sources blob can't leak into resolution.
-      const isMembership = !!input.sources?.length;
-      const defData = isMembership
+      // Rewrite the single definition to the submitted source, by kind: manual items > membership > filter.
+      // On any kind switch, clear the other kinds' columns so a stale filter / sources / manual list can't
+      // leak into resolution (`manualItemKeys` is a scalar list → cleared with `[]`, not DbNull).
+      const defData = input.manualItemKeys?.length
         ? {
-            kind: "MEMBERSHIP" as const,
-            sources: JSON.parse(JSON.stringify(input.sources)) as Prisma.InputJsonValue,
+            kind: "MANUAL_ITEMS" as const,
+            manualItemKeys: input.manualItemKeys,
             plexFilter: Prisma.DbNull,
-          }
-        : {
-            kind: "PREDICATE" as const,
-            plexFilter: {
-              mediaTypes: input.mediaTypes,
-              ...(input.filter ? { filter: JSON.parse(JSON.stringify(input.filter)) } : {}),
-            } as Prisma.InputJsonValue,
             sources: Prisma.DbNull,
-          };
+          }
+        : input.sources?.length
+          ? {
+              kind: "MEMBERSHIP" as const,
+              sources: JSON.parse(JSON.stringify(input.sources)) as Prisma.InputJsonValue,
+              plexFilter: Prisma.DbNull,
+              manualItemKeys: [],
+            }
+          : {
+              kind: "PREDICATE" as const,
+              plexFilter: {
+                mediaTypes: input.mediaTypes,
+                ...(input.filter ? { filter: JSON.parse(JSON.stringify(input.filter)) } : {}),
+              } as Prisma.InputJsonValue,
+              sources: Prisma.DbNull,
+              manualItemKeys: [],
+            };
       const def = channel.definitions[0];
       if (def) {
         await ctx.prisma.channelDefinition.update({ where: { id: def.id }, data: defData });
@@ -541,6 +562,47 @@ export const channelsRouter = router({
       resolvePreviewMembership(ctx.prisma, {
         mediaSourceId: input.mediaSourceId,
         sources: input.sources,
+        detail: input.detail,
+      }),
+    ),
+
+  /** Manual-mode search over the MediaItem cache — movies / shows / episodes matching a title query. */
+  searchMedia: adminProcedure
+    .input(
+      z.object({
+        mediaSourceId: z.string(),
+        query: z.string(),
+        types: z.array(z.enum(["movie", "show", "episode"])).min(1),
+      }),
+    )
+    .query(({ ctx, input }) =>
+      searchMediaService(ctx.prisma, {
+        mediaSourceId: input.mediaSourceId,
+        query: input.query,
+        types: input.types,
+      }),
+    ),
+
+  /** A show's episodes grouped by season, for the Manual-mode drill-down (cache-only). */
+  showEpisodes: adminProcedure
+    .input(z.object({ mediaSourceId: z.string(), showRatingKey: z.string() }))
+    .query(({ ctx, input }) =>
+      showEpisodesService(ctx.prisma, { mediaSourceId: input.mediaSourceId, showRatingKey: input.showRatingKey }),
+    ),
+
+  /** Preview an UNSAVED manual pool — resolves hand-picked ratingKeys into the coalesced preview shape. */
+  previewManual: adminProcedure
+    .input(
+      z.object({
+        mediaSourceId: z.string(),
+        itemKeys: z.array(z.string()),
+        detail: z.enum(["quick", "default", "verbose"]).optional(),
+      }),
+    )
+    .query(({ ctx, input }) =>
+      resolvePreviewManual(ctx.prisma, {
+        mediaSourceId: input.mediaSourceId,
+        itemKeys: input.itemKeys,
         detail: input.detail,
       }),
     ),

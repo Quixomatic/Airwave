@@ -4,7 +4,7 @@ import { toAccentKey } from "../accents";
 import { normalizeCallsign } from "../generator/callsign";
 import { getFilterValues, type GuideMeta, type PlexItem } from "../plex/client";
 import { fieldMeta, FILTER_FIELDS, OPS_FOR_KIND, type FilterNode } from "../plex/filter-fields";
-import { type MembershipSource, resolveFilter, resolveMembership } from "../plex/resolve";
+import { type MembershipSource, resolveFilter, resolveManual, resolveMembership } from "../plex/resolve";
 import { channelSortParam } from "../plex/sort-fields";
 import { decryptToken } from "../plex/token";
 
@@ -215,6 +215,84 @@ export async function previewMembership(
   const source = await requireSource(prisma, args.mediaSourceId);
   const items = await resolveMembership(prisma, source, args.sources);
   return previewItems(prisma, args.mediaSourceId, items, args.detail);
+}
+
+export async function previewManual(
+  prisma: PrismaClient,
+  args: { mediaSourceId: string; itemKeys: string[]; detail?: PreviewDetail },
+) {
+  const source = await requireSource(prisma, args.mediaSourceId);
+  const items = await resolveManual(prisma, source, args.itemKeys);
+  return previewItems(prisma, args.mediaSourceId, items, args.detail);
+}
+
+export type ManualSearchType = "movie" | "show" | "episode";
+
+/**
+ * Search the MediaItem cache for the Manual-mode picker — instant, no Plex round-trip. Matches item titles
+ * (case-insensitive) within the chosen content types and returns three buckets of preview tiles: movies +
+ * shows (expandable in the UI) + episodes whose OWN title matches (direct hits, carrying show/season/episode
+ * context in their guide). Each bucket is capped. Scope is by content TYPE (MediaItem has no library key).
+ */
+export async function searchMedia(
+  prisma: PrismaClient,
+  args: { mediaSourceId: string; query: string; types: ManualSearchType[] },
+): Promise<{ movies: PlexItem[]; shows: PlexItem[]; episodes: PlexItem[] }> {
+  const q = args.query.trim();
+  if (!q || args.types.length === 0) return { movies: [], shows: [], episodes: [] };
+  const PER_BUCKET = 25;
+  const rows = await prisma.mediaItem.findMany({
+    where: {
+      mediaSourceId: args.mediaSourceId,
+      available: true,
+      type: { in: args.types },
+      title: { contains: q, mode: "insensitive" },
+    },
+    orderBy: { title: "asc" },
+    take: PER_BUCKET * args.types.length,
+    select: { ratingKey: true, title: true, durationMs: true, year: true, airDate: true, guide: true, type: true },
+  });
+
+  const out = { movies: [] as PlexItem[], shows: [] as PlexItem[], episodes: [] as PlexItem[] };
+  for (const r of rows) {
+    const bucket = r.type === "movie" ? out.movies : r.type === "show" ? out.shows : out.episodes;
+    if (bucket.length < PER_BUCKET) bucket.push(mediaItemToPlexItem(r));
+  }
+  return out;
+}
+
+/**
+ * A show's episodes for the Manual-mode drill-down, grouped by season — from the MediaItem cache (episodes
+ * link to their show via `parentId`; seasons are derived from `guide.season`, not stored). No Plex round-trip.
+ */
+export async function showEpisodes(
+  prisma: PrismaClient,
+  args: { mediaSourceId: string; showRatingKey: string },
+): Promise<{ season: number; episodes: { ratingKey: string; title: string; episode: number | null }[] }[]> {
+  const show = await prisma.mediaItem.findFirst({
+    where: { mediaSourceId: args.mediaSourceId, ratingKey: args.showRatingKey, type: "show" },
+    select: { id: true },
+  });
+  if (!show) return [];
+  const eps = await prisma.mediaItem.findMany({
+    where: { mediaSourceId: args.mediaSourceId, parentId: show.id, type: "episode", available: true },
+    select: { ratingKey: true, title: true, guide: true },
+  });
+
+  const bySeason = new Map<number, { ratingKey: string; title: string; episode: number | null }[]>();
+  for (const e of eps) {
+    const g = (e.guide ?? {}) as { season?: number; episode?: number };
+    const season = g.season ?? 0;
+    const arr = bySeason.get(season) ?? [];
+    arr.push({ ratingKey: e.ratingKey, title: e.title, episode: g.episode ?? null });
+    bySeason.set(season, arr);
+  }
+  return [...bySeason.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([season, episodes]) => ({
+      season,
+      episodes: episodes.sort((a, b) => (a.episode ?? 0) - (b.episode ?? 0)),
+    }));
 }
 
 export async function searchTitles(prisma: PrismaClient, args: { mediaSourceId: string; mediaTypes: MediaType[]; query: string; detail?: PreviewDetail }) {
