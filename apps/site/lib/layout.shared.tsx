@@ -17,25 +17,28 @@ export function baseOptions(context: "home" | "docs" = "home"): BaseLayoutProps 
     nav: {
       title: <Logo />,
     },
-    // Keep the marquee items top-level; tuck the secondary ones behind a native fumadocs "Resources" menu.
-    // The logo (nav title) links home to `/` by default.
+    // Marquee items are top-level. Blog is a first-class item next to FAQ. The logo (nav title) links
+    // home to `/` by default.
     links: [
       { text: "Documentation", url: "/docs", on },
       { text: "Features", url: "/features", on },
       { text: "Channel guide", url: "/channel-guide", on },
       { text: "Roadmap", url: "/roadmap", on },
       { text: "FAQ", url: "/faq", on },
-      {
-        type: "menu",
-        text: "Resources",
-        on,
-        items: [
-          { text: "Blog", description: "News + the occasional dev-log", url: "/blog" },
-          { text: "About", description: "Why Airwave exists", url: "/about" },
-          { text: "Contact", description: "Get in touch", url: "/contact" },
-          { text: "Platforms", description: "What it runs on", url: "/docs/platforms" },
-        ],
-      },
+      { text: "Blog", url: "/blog", on },
+      // "Resources" submenu disabled for now — Blog is promoted above, and its other links (About,
+      // Contact, Platforms) all live in the footer. Kept here (commented) to re-enable easily.
+      // {
+      //   type: "menu",
+      //   text: "Resources",
+      //   on,
+      //   items: [
+      //     { text: "Blog", description: "News + the occasional dev-log", url: "/blog" },
+      //     { text: "About", description: "Why Airwave exists", url: "/about" },
+      //     { text: "Contact", description: "Get in touch", url: "/contact" },
+      //     { text: "Platforms", description: "What it runs on", url: "/docs/platforms" },
+      //   ],
+      // },
     ],
     githubUrl: "https://github.com/Quixomatic/Airwave",
   };

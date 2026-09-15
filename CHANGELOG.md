@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.47] - 2026-09-14
+
+Site (getairwave.tv) — Blog promoted to a top-level nav item; Resources menu hidden.
+
+### Changed
+- Promoted Blog to a first-class header link next to FAQ, and disabled the "Resources" dropdown (its
+  other links, About / Contact / Platforms, are already in the footer). The Resources menu is kept
+  commented out in `layout.shared.tsx` so it's easy to re-enable. Applies to the desktop navbar and the
+  mobile menu alike, since fumadocs derives both from the same `links` list.
+
 ## [0.13.46] - 2026-09-14
 
 Site (getairwave.tv) — @mention autocomplete on blog comments.
