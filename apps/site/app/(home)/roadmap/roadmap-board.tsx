@@ -1,18 +1,31 @@
 "use client";
 
-import { ChevronUp } from "lucide-react";
+import { Check, ChevronUp } from "lucide-react";
 import { useState } from "react";
 
 import type { RoadmapItem } from "@/lib/roadmap";
 
 /**
- * The roadmap list — one ranked row per item (highest-voted first), each with a vertical upvote
- * button + a Status badge. Optimistic: a click flips the button + count instantly, POSTs the toggle,
- * then reconciles to the server's `{ voteCount, hasVoted }` (or reverts on error). Order is fixed for
- * the session so a vote doesn't make rows jump; a reload re-ranks.
+ * The roadmap list — one ranked row per item. Shipped items sort to the TOP with a green check (no
+ * longer votable, but still showing the votes they gathered); the rest follow, highest-voted first,
+ * each with a vertical upvote button + a Status badge. Voting is optimistic: a click flips the button +
+ * count instantly, POSTs the toggle, then reconciles to the server's `{ voteCount, hasVoted }` (or
+ * reverts on error). Order is fixed for the session so a vote doesn't make rows jump; a reload re-ranks.
  */
 
-type Row = RoadmapItem & { pending: boolean };
+type Row = RoadmapItem & { pending: boolean; shipped: boolean };
+
+/** A status that means the feature is built + released — sorts to the top, shows a check, isn't votable. */
+function isShipped(status: string): boolean {
+  const key = status.trim().toLowerCase();
+  return (
+    key.includes("ship") ||
+    key.includes("done") ||
+    key.includes("released") ||
+    key.includes("live") ||
+    key.includes("implement")
+  );
+}
 
 /** Map a Project Status option → a badge style. Unknown/blank statuses render no badge. */
 function statusBadge(status: string): { label: string; className: string } | null {
@@ -22,7 +35,7 @@ function statusBadge(status: string): { label: string; className: string } | nul
   if (key.includes("progress") || key.includes("building")) {
     return { label: status, className: "border-transparent bg-fd-primary/10 text-fd-primary" };
   }
-  if (key.includes("ship") || key.includes("done") || key.includes("released") || key.includes("live")) {
+  if (isShipped(status)) {
     return { label: status, className: "border-transparent bg-emerald-500/10 text-emerald-500" };
   }
   if (key.includes("explor") || key.includes("consider") || key.includes("idea")) {
@@ -44,6 +57,19 @@ function Badge({ status }: { status: string }) {
 }
 
 function VoteButton({ item, onVote }: { item: Row; onVote: (item: Row) => void }) {
+  // Shipped: not votable anymore — a static green check tile that still shows the votes it gathered.
+  if (item.shipped) {
+    return (
+      <div
+        className="flex w-14 shrink-0 flex-col items-center rounded-xl border border-emerald-500/40 bg-emerald-500/5 py-2 text-emerald-500"
+        title="Shipped"
+        aria-label={`Shipped — ${item.voteCount} ${item.voteCount === 1 ? "vote" : "votes"}`}
+      >
+        <Check className="size-4" />
+        <span className="text-sm font-semibold tabular-nums">{item.voteCount}</span>
+      </div>
+    );
+  }
   return (
     <button
       type="button"
@@ -64,10 +90,16 @@ function VoteButton({ item, onVote }: { item: Row; onVote: (item: Row) => void }
 }
 
 export function RoadmapBoard({ items, configured }: { items: RoadmapItem[]; configured: boolean }) {
-  const [rows, setRows] = useState<Row[]>(items.map((i) => ({ ...i, pending: false })));
+  // Items arrive vote-sorted; a stable partition floats shipped ones to the top while keeping vote order
+  // within each group (Array.prototype.sort is stable).
+  const [rows, setRows] = useState<Row[]>(() =>
+    items
+      .map((i) => ({ ...i, pending: false, shipped: isShipped(i.status) }))
+      .sort((a, b) => Number(b.shipped) - Number(a.shipped)),
+  );
 
   async function onVote(item: Row) {
-    if (item.pending) return;
+    if (item.pending || item.shipped) return; // shipped items aren't votable
     const optimisticVoted = !item.hasVoted;
 
     // Optimistic flip.

@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.55] - 2026-09-15
+
+Site (getairwave.tv) — shipped roadmap items float to the top with a green check.
+
+### Changed
+- Roadmap items whose Project `Status` reads as shipped (ship / done / released / live / implemented) now
+  sort to the top of the list, and their vote tile becomes a static green check instead of an upvote
+  button, so they can't be voted on anymore but still show the votes they gathered. The emerald "Shipped"
+  status badge is unchanged. Everything else stays ranked by votes below.
+
 ## [0.13.54] - 2026-09-15
 
 Admin — a "Mode" label above the channel content mode tiles.
