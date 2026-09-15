@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.54] - 2026-09-15
+
+Admin — a "Mode" label above the channel content mode tiles.
+
+### Changed
+- Added a "Mode" field label above the Filter / Playlists & collections / Manual tiles in the channel
+  editor, matching the other labeled fields in the form.
+
 ## [0.13.53] - 2026-09-15
 
 Admin — the playlists/collections picker now matches the filter builder's look.

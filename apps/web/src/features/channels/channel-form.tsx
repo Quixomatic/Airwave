@@ -509,7 +509,10 @@ export function ChannelForm({
           resolved preview tiles render right below the form. The mode tiles pick HOW the pool is
           defined: a metadata filter, or specific Plex playlists/collections. */}
       <Section title="Content & filter" icon={ListFilter}>
-        <ModeTiles value={mode} onChange={setMode} />
+        <div className="space-y-2">
+          <Label>Mode</Label>
+          <ModeTiles value={mode} onChange={setMode} />
+        </div>
 
         {mode === "membership" ? (
           <MembershipBuilder value={membershipSources} onChange={setMembershipSources} mediaSourceId={sourceId} />
