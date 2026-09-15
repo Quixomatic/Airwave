@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.46] - 2026-09-14
+
+Site (getairwave.tv) — @mention autocomplete on blog comments.
+
+### Changed
+- Updated blog comments to `fuma-comment-github-discussions` 1.1.1 and enabled `@mention` autocomplete
+  (`mention: { enabled: true }` on the comment API and the widget). Typing `@` suggests GitHub users
+  mentionable on the repo (via `repository.mentionableUsers`); posting `@login` links the real account
+  and renders as a mention chip. 1.1.1 also carries the fix that stores mentions by login, not display
+  name.
+
 ## [0.13.45] - 2026-09-14
 
 Site (getairwave.tv) — blog comments now run on the published `fuma-comment-github-discussions` package.

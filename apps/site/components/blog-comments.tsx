@@ -69,7 +69,13 @@ export function BlogComments({ slug }: { slug: string }) {
 
   return (
     <div className="airwave-comments not-prose">
-      <Comments page={slug} apiUrl="/api/comments" auth={{ type: "api", signIn }} title={header} />
+      <Comments
+        page={slug}
+        apiUrl="/api/comments"
+        auth={{ type: "api", signIn }}
+        mention={{ enabled: true }}
+        title={header}
+      />
     </div>
   );
 }
