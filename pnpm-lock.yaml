@@ -251,6 +251,9 @@ importers:
       framer-motion:
         specifier: ^12.42.2
         version: 12.43.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      fuma-comment-github-discussions:
+        specifier: ^0.1.0
+        version: 0.1.0(@fuma-comment/server@1.5.1(cc257d3ce0a85c9f9778fc15e949c4be))(next@16.3.0(@types/node@22.20.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))
       fumadocs-core:
         specifier: ^16.14.3
         version: 16.14.3(@mdx-js/mdx@3.1.1)(@tanstack/react-router@1.170.17(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/estree-jsx@1.0.5)(@types/hast@3.0.5)(@types/mdast@4.0.4)(@types/react@19.2.17)(lucide-react@1.24.0(react@19.2.7))(next@16.3.0(@types/node@22.20.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(zod@4.4.3)
@@ -7302,6 +7305,15 @@ packages:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
+
+  fuma-comment-github-discussions@0.1.0:
+    resolution: {integrity: sha512-3geBfH6ziSsf7xaHNgQ2dowC6PoMfDX7n28N4mXUzQOvz/aKny0emuPWJU1eBzlN7WT4qIOvCOQt1ChySmExQg==}
+    peerDependencies:
+      '@fuma-comment/server': ^1.5.0
+      next: '>=14.0.0'
+    peerDependenciesMeta:
+      next:
+        optional: true
 
   fumadocs-core@16.14.3:
     resolution: {integrity: sha512-xoGy6YelmU8GD4RKUiSuraFnRW91DqBM328Gs/YasltLrnMDWgEaYMKAcrGLVrikpqJkFx+etHo8BcClOMNt+A==}
@@ -18780,6 +18792,13 @@ snapshots:
 
   fsevents@2.3.3:
     optional: true
+
+  fuma-comment-github-discussions@0.1.0(@fuma-comment/server@1.5.1(cc257d3ce0a85c9f9778fc15e949c4be))(next@16.3.0(@types/node@22.20.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)):
+    dependencies:
+      '@fuma-comment/server': 1.5.1(cc257d3ce0a85c9f9778fc15e949c4be)
+      marked: 14.1.4
+    optionalDependencies:
+      next: 16.3.0(@types/node@22.20.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
 
   fumadocs-core@16.14.3(@mdx-js/mdx@3.1.1)(@tanstack/react-router@1.170.17(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/estree-jsx@1.0.5)(@types/hast@3.0.5)(@types/mdast@4.0.4)(@types/react@19.2.17)(lucide-react@1.24.0(react@19.2.7))(next@16.3.0(@types/node@22.20.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(zod@4.4.3):
     dependencies:

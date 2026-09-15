@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.45] - 2026-09-14
+
+Site (getairwave.tv) — blog comments now run on the published `fuma-comment-github-discussions` package.
+
+### Changed
+- Airwave's blog comments now consume the `fuma-comment-github-discussions` npm package (extracted from
+  this integration and published separately) instead of hand-rolled route handlers. The comment API is
+  fuma-comment's `NextComment` bound to the package's GitHub Discussions storage + auth adapter, and
+  sign-in uses the package's reference OAuth routes. Behavior is unchanged, same repo, category,
+  discussions, and `awc_gh` sign-in cookie, so existing sign-ins keep working; this replaces roughly ten
+  internal modules with a single dependency plus thin config glue (`lib/comments.ts`).
+
 ## [0.13.44] - 2026-09-14
 
 Site (getairwave.tv) — blog comments, powered by GitHub Discussions with a native-feeling UI.

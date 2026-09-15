@@ -7,7 +7,7 @@ import { readingTimeMinutes } from "@/lib/reading-time";
 import { getMDXComponents } from "@/components/mdx";
 import { PromoEmbed } from "@/components/promo-video";
 import { BlogComments } from "@/components/blog-comments";
-import { commentsReadable } from "@/lib/comments/config";
+import { commentsEnabled } from "@/lib/comments";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -161,7 +161,7 @@ export default async function BlogPost(props: Params) {
       )}
 
       {/* Comments — below the prev/next navigation. */}
-      {commentsReadable() ? (
+      {commentsEnabled() ? (
         <section className="mx-auto w-full max-w-6xl px-6 pb-16">
           <BlogComments slug={slug} />
         </section>
