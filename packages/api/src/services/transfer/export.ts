@@ -61,8 +61,8 @@ export async function exportLineup(prisma: PrismaClient) {
         plexFilter: d.plexFilter,
         // Portable library reference — the importer resolves this back to a key on the target source.
         plexLibraryTitle: d.plexLibraryKey ? (libTitle.get(`${c.mediaSourceId}:${d.plexLibraryKey}`) ?? null) : null,
-        plexCollectionKey: d.plexCollectionKey,
-        plexPlaylistKey: d.plexPlaylistKey,
+        // MEMBERSHIP playlist/collection sources (server-specific keys; importer drops non-PREDICATE defs).
+        sources: d.sources,
         manualItemKeys: d.manualItemKeys,
       })),
     })),

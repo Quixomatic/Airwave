@@ -6,8 +6,7 @@ enum OrderingStrategy {
 
 enum ChannelDefinitionKind {
   PREDICATE // metadata predicate groups (resolved against Plex's API for Plex sources)
-  PLEX_COLLECTION
-  PLEX_PLAYLIST
+  MEMBERSHIP // one or more Plex playlists/collections, unioned (see ChannelDefinition.sources)
   MANUAL_ITEMS // explicit include/exclude of specific media items
 }
 
@@ -146,9 +145,9 @@ model ChannelDefinition {
   plexFilter     Json?
   plexLibraryKey String?
 
-  // PLEX_COLLECTION / PLEX_PLAYLIST
-  plexCollectionKey String?
-  plexPlaylistKey   String?
+  // MEMBERSHIP — an ordered list of Plex playlists/collections, unioned into the pool:
+  // [{ type: "playlist" | "collection", key: string, title?: string }]. Order drives IN_ORDER.
+  sources Json?
 
   // MANUAL_ITEMS — explicit media-server item ids (ratingKeys)
   manualItemKeys String[]

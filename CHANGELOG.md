@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.49] - 2026-09-15
+
+Database — channel-definition schema for the playlist/collection ("membership") source.
+
+### Changed
+- `ChannelDefinition`: replaced the unused `PLEX_COLLECTION` / `PLEX_PLAYLIST` kinds with a single
+  `MEMBERSHIP` kind plus a `sources` JSON column (an ordered list of
+  `{ type: "playlist" | "collection", key, title? }`), and dropped the unused `plexPlaylistKey` /
+  `plexCollectionKey` columns. `PREDICATE` (filter) and `MANUAL_ITEMS` are unchanged. Migration
+  `20260915211113_membership_source`; no data affected (nothing used those kinds/columns). Transfer
+  export/import updated to match. Not yet wired into channel resolution.
+
 ## [0.13.48] - 2026-09-15
 
 Server — Plex client methods for playlist/collection channel sources (groundwork, not yet wired).

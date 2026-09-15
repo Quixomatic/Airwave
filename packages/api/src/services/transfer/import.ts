@@ -15,7 +15,7 @@ import { LINEUP_EXPORT_VERSION } from "./export";
  * only read what we need.
  */
 export type ImportedDefinition = {
-  kind: string; // "PREDICATE" | "PLEX_COLLECTION" | "PLEX_PLAYLIST" | "MANUAL_ITEMS"
+  kind: string; // "PREDICATE" | "MEMBERSHIP" | "MANUAL_ITEMS"
   mode?: string;
   sortIndex?: number;
   plexFilter?: unknown;
