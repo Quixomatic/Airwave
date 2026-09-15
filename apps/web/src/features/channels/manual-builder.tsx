@@ -1,105 +1,93 @@
 import { Button } from "@airwave/ui/components/button";
 import { Checkbox } from "@airwave/ui/components/checkbox";
-import { Input } from "@airwave/ui/components/input";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Check, ChevronDown, ChevronRight, Clapperboard, Search, Tv, X } from "lucide-react";
+import { Check, Clapperboard, ListChecks, Search, Tv, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { EmptyState } from "@/components/empty-state";
 import { sourceImg } from "@/lib/img";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/utils/trpc";
 
+import { GRID_CLASS, PreviewSkeleton } from "./channel-preview";
+
 /**
  * The Manual-mode ("hand-picked") pool builder. A search bar (with Movies / TV Shows scope baked in) queries
- * the MediaItem cache; results are movies, shows (expandable to seasons → episodes), and direct episode-title
- * hits, each with a check-circle. "Add item(s)" commits the checked selection into the pool: a whole show
- * stores the show key (resolves live to its current episodes), a season stores its episode keys, and an
- * episode/movie stores its own key. The current pool renders below as removable rows.
+ * the MediaItem cache; results render as poster tiles (matching the preview grid) with a check-circle each.
+ * "Add item(s)" commits the checked selection into the pool: a whole show stores the show key (resolves live
+ * to its current episodes), a movie / episode stores its own key. The current pool renders below as removable
+ * rows. NOTE: drilling INTO a show (season / specific-episode picking from a tile) is a separate UX still to
+ * be designed — for now a show tile selects the whole show, and specific episodes come from episode-title
+ * search results.
  */
+
+const ONE_ROW = 8;
 
 const se = (s?: number | null, e?: number | null) =>
   s != null && e != null ? `S${String(s).padStart(2, "0")}E${String(e).padStart(2, "0")}` : null;
 
-/** A round check toggle (Plex-style), filled emerald when selected. */
-function CheckCircle({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
+type Tile = {
+  ratingKey: string;
+  title: string;
+  subtitle?: string;
+  thumb?: string;
+  isShow?: boolean;
+};
+
+/** A selectable poster tile (same shape as the preview tiles) with a check-circle + selected ring. */
+function PickTile({ sourceId, tile, selected, onToggle }: { sourceId: string; tile: Tile; selected: boolean; onToggle: () => void }) {
+  const src = tile.thumb ? sourceImg(sourceId, tile.thumb, 240) : null;
+  const [loaded, setLoaded] = useState(false);
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={on}
-      aria-label={label}
-      className={cn(
-        "flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors",
-        on
-          ? "border-emerald-500 bg-emerald-500 text-white"
-          : "border-muted-foreground/40 text-transparent hover:border-emerald-500",
-      )}
-    >
-      <Check className="size-3.5" />
+    <button type="button" onClick={onToggle} className="group flex flex-col gap-1 text-left">
+      <div className={cn("bg-muted relative aspect-[2/3] overflow-hidden rounded-md border", selected && "ring-primary ring-2")}>
+        {src ? (
+          <>
+            {!loaded && <div className="bg-muted absolute inset-0 animate-pulse" />}
+            <img
+              src={src}
+              alt={tile.title}
+              loading="lazy"
+              onLoad={() => setLoaded(true)}
+              onError={() => setLoaded(true)}
+              className={cn("h-full w-full object-cover transition-opacity duration-300", loaded ? "opacity-100" : "opacity-0")}
+            />
+          </>
+        ) : (
+          <div className="text-muted-foreground/40 flex h-full items-center justify-center">
+            {tile.isShow ? <Tv className="size-6" /> : <Clapperboard className="size-6" />}
+          </div>
+        )}
+        {/* Check-circle: filled when selected, a faint hover affordance otherwise. */}
+        <span
+          className={cn(
+            "absolute right-1 top-1 flex size-5 items-center justify-center rounded-full border transition-colors",
+            selected
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-white/70 bg-black/40 text-transparent group-hover:text-white/80",
+          )}
+        >
+          <Check className="size-3.5" />
+        </span>
+        {tile.isShow && (
+          <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">Show</span>
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-xs font-medium" title={tile.title}>
+          {tile.title}
+        </p>
+        {tile.subtitle && <p className="text-muted-foreground truncate text-[10px]">{tile.subtitle}</p>}
+      </div>
     </button>
   );
 }
 
-function Thumb({ sourceId, thumb, isShow }: { sourceId: string; thumb?: string; isShow?: boolean }) {
-  const src = thumb ? sourceImg(sourceId, thumb, 120) : null;
+function TileSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="bg-muted relative h-12 w-8 shrink-0 overflow-hidden rounded border">
-      {src ? (
-        <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
-      ) : (
-        <div className="text-muted-foreground/40 flex h-full items-center justify-center">
-          {isShow ? <Tv className="size-3.5" /> : <Clapperboard className="size-3.5" />}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ShowEpisodes({
-  mediaSourceId,
-  showKey,
-  checked,
-  toggle,
-}: {
-  mediaSourceId: string;
-  showKey: string;
-  checked: Set<string>;
-  toggle: (keys: string | string[]) => void;
-}) {
-  const seasons = useQuery(
-    trpc.channels.showEpisodes.queryOptions({ mediaSourceId, showRatingKey: showKey }, { enabled: !!mediaSourceId }),
-  );
-  if (seasons.isLoading) return <p className="text-muted-foreground py-1 pl-10 text-xs">Loading episodes…</p>;
-  if (!seasons.data?.length) return <p className="text-muted-foreground py-1 pl-10 text-xs">No episodes.</p>;
-
-  return (
-    <div className="space-y-1 pl-10">
-      {seasons.data.map((s) => {
-        const epKeys = s.episodes.map((e) => e.ratingKey);
-        const allOn = epKeys.every((k) => checked.has(k));
-        return (
-          <div key={s.season} className="space-y-1">
-            <div className="flex items-center gap-2 text-xs font-medium">
-              <CheckCircle on={allOn} onClick={() => toggle(epKeys)} label={`Select all of season ${s.season}`} />
-              Season {s.season}
-              <span className="text-muted-foreground font-normal">
-                {s.episodes.length} ep{s.episodes.length === 1 ? "" : "s"}
-              </span>
-            </div>
-            <div className="space-y-0.5 pl-7">
-              {s.episodes.map((e) => (
-                <div key={e.ratingKey} className="flex items-center gap-2 text-xs">
-                  <CheckCircle on={checked.has(e.ratingKey)} onClick={() => toggle(e.ratingKey)} label={`Select ${e.title}`} />
-                  <span className="text-muted-foreground tabular-nums">
-                    {se(s.season, e.episode) ?? `E${e.episode ?? "?"}`}
-                  </span>
-                  <span className="truncate">{e.title}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
+    <div className="space-y-1.5">
+      <p className="text-muted-foreground text-xs font-medium">{label}</p>
+      <div className={GRID_CLASS}>{children}</div>
     </div>
   );
 }
@@ -118,7 +106,6 @@ export function ManualBuilder({
   const [movies, setMovies] = useState(true);
   const [tv, setTv] = useState(true);
   const [checked, setChecked] = useState<Set<string>>(new Set());
-  const [expandedShow, setExpandedShow] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 300);
@@ -141,16 +128,13 @@ export function ManualBuilder({
     ),
   );
 
-  const toggle = (keys: string | string[]) => {
-    const arr = Array.isArray(keys) ? keys : [keys];
+  const toggle = (key: string) =>
     setChecked((prev) => {
       const next = new Set(prev);
-      const allIn = arr.every((k) => next.has(k));
-      for (const k of arr) if (allIn) next.delete(k);
-        else next.add(k);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
-  };
   const addChecked = () => {
     const toAdd = [...checked].filter((k) => !value.includes(k));
     if (toAdd.length) onChange([...value, ...toAdd]);
@@ -160,6 +144,7 @@ export function ManualBuilder({
 
   const data = results.data;
   const hasResults = data && (data.movies.length > 0 || data.shows.length > 0 || data.episodes.length > 0);
+  const searching = canSearch && results.isFetching && !hasResults;
 
   return (
     <div className="space-y-3 rounded-md border p-3">
@@ -171,7 +156,7 @@ export function ManualBuilder({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search movies, shows, episodes…"
-            className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            className="placeholder:text-muted-foreground w-full bg-transparent text-sm outline-none"
           />
         </div>
         <div className="flex items-center gap-4 text-sm">
@@ -186,76 +171,59 @@ export function ManualBuilder({
         </div>
       </div>
 
-      {/* Results */}
+      {/* Results — poster tiles matching the preview grid. The scroll box uses p-1 so a selected tile's
+          outer ring isn't clipped at the edges. */}
       {debounced.length >= 2 && (
-        <div className="max-h-96 space-y-3 overflow-y-auto pr-1">
-          {!hasResults ? (
-            <p className="text-muted-foreground py-4 text-center text-sm">
-              {results.isFetching ? "Searching…" : "No matches."}
-            </p>
+        <div className="max-h-[32rem] space-y-3 overflow-y-auto p-1">
+          {searching ? (
+            <PreviewSkeleton count={ONE_ROW} />
+          ) : !hasResults ? (
+            <p className="text-muted-foreground py-4 text-center text-sm">No matches.</p>
           ) : (
             <>
               {data.movies.length > 0 && (
-                <Section label="Movies">
+                <TileSection label="Movies">
                   {data.movies.map((m) => (
-                    <Row key={m.ratingKey}>
-                      <CheckCircle on={checked.has(m.ratingKey)} onClick={() => toggle(m.ratingKey)} label={`Select ${m.title}`} />
-                      <Thumb sourceId={mediaSourceId} thumb={m.guide?.thumb} />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm">{m.title}</p>
-                        {m.guide?.year != null && <p className="text-muted-foreground text-xs">{m.guide.year}</p>}
-                      </div>
-                    </Row>
+                    <PickTile
+                      key={m.ratingKey}
+                      sourceId={mediaSourceId}
+                      tile={{ ratingKey: m.ratingKey, title: m.title, subtitle: m.guide?.year ? String(m.guide.year) : undefined, thumb: m.guide?.thumb }}
+                      selected={checked.has(m.ratingKey)}
+                      onToggle={() => toggle(m.ratingKey)}
+                    />
                   ))}
-                </Section>
+                </TileSection>
               )}
-
               {data.shows.length > 0 && (
-                <Section label="Shows">
+                <TileSection label="Shows">
                   {data.shows.map((s) => (
-                    <div key={s.ratingKey}>
-                      <Row>
-                        <CheckCircle on={checked.has(s.ratingKey)} onClick={() => toggle(s.ratingKey)} label={`Select all of ${s.title}`} />
-                        <Thumb sourceId={mediaSourceId} thumb={s.guide?.thumb} isShow />
-                        <button
-                          type="button"
-                          onClick={() => setExpandedShow((cur) => (cur === s.ratingKey ? null : s.ratingKey))}
-                          className="flex min-w-0 flex-1 items-center gap-1 text-left"
-                        >
-                          {expandedShow === s.ratingKey ? (
-                            <ChevronDown className="size-3.5 shrink-0" />
-                          ) : (
-                            <ChevronRight className="size-3.5 shrink-0" />
-                          )}
-                          <span className="truncate text-sm">{s.title}</span>
-                        </button>
-                      </Row>
-                      {expandedShow === s.ratingKey && (
-                        <ShowEpisodes mediaSourceId={mediaSourceId} showKey={s.ratingKey} checked={checked} toggle={toggle} />
-                      )}
-                    </div>
+                    <PickTile
+                      key={s.ratingKey}
+                      sourceId={mediaSourceId}
+                      tile={{ ratingKey: s.ratingKey, title: s.title, thumb: s.guide?.thumb, isShow: true }}
+                      selected={checked.has(s.ratingKey)}
+                      onToggle={() => toggle(s.ratingKey)}
+                    />
                   ))}
-                </Section>
+                </TileSection>
               )}
-
               {data.episodes.length > 0 && (
-                <Section label="Episodes">
+                <TileSection label="Episodes">
                   {data.episodes.map((e) => (
-                    <Row key={e.ratingKey}>
-                      <CheckCircle on={checked.has(e.ratingKey)} onClick={() => toggle(e.ratingKey)} label={`Select ${e.title}`} />
-                      <Thumb sourceId={mediaSourceId} thumb={e.guide?.thumb} />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm">
-                          {e.guide?.showTitle ? `${e.guide.showTitle} — ` : ""}
-                          {e.title}
-                        </p>
-                        {se(e.guide?.season, e.guide?.episode) && (
-                          <p className="text-muted-foreground text-xs tabular-nums">{se(e.guide?.season, e.guide?.episode)}</p>
-                        )}
-                      </div>
-                    </Row>
+                    <PickTile
+                      key={e.ratingKey}
+                      sourceId={mediaSourceId}
+                      tile={{
+                        ratingKey: e.ratingKey,
+                        title: e.guide?.showTitle ? `${e.guide.showTitle} — ${e.title}` : e.title,
+                        subtitle: se(e.guide?.season, e.guide?.episode) ?? undefined,
+                        thumb: e.guide?.thumb,
+                      }}
+                      selected={checked.has(e.ratingKey)}
+                      onToggle={() => toggle(e.ratingKey)}
+                    />
                   ))}
-                </Section>
+                </TileSection>
               )}
             </>
           )}
@@ -274,12 +242,24 @@ export function ManualBuilder({
           In this channel {value.length > 0 ? `(${value.length})` : ""}
         </p>
         {value.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Nothing added yet. Search above and add items.</p>
+          <EmptyState
+            icon={ListChecks}
+            title="Nothing added yet"
+            description="Search above and add movies, shows, or episodes to build this channel."
+          />
         ) : (
           <div className="space-y-1">
             {(pool.data ?? []).map((it) => (
               <div key={it.ratingKey} className="flex items-center gap-2">
-                <Thumb sourceId={mediaSourceId} thumb={it.thumb} isShow={it.type === "show"} />
+                <div className="bg-muted relative h-12 w-8 shrink-0 overflow-hidden rounded border">
+                  {it.thumb ? (
+                    <img src={sourceImg(mediaSourceId, it.thumb, 120) ?? undefined} alt="" loading="lazy" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="text-muted-foreground/40 flex h-full items-center justify-center">
+                      {it.type === "show" ? <Tv className="size-3.5" /> : <Clapperboard className="size-3.5" />}
+                    </div>
+                  )}
+                </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">
                     {it.showTitle ? `${it.showTitle} — ` : ""}
@@ -287,11 +267,7 @@ export function ManualBuilder({
                     {!it.available && <span className="text-muted-foreground"> (unavailable)</span>}
                   </p>
                   <p className="text-muted-foreground text-xs">
-                    {it.type === "show"
-                      ? "Whole show"
-                      : it.type === "episode"
-                        ? (se(it.season, it.episode) ?? "Episode")
-                        : "Movie"}
+                    {it.type === "show" ? "Whole show" : it.type === "episode" ? (se(it.season, it.episode) ?? "Episode") : "Movie"}
                   </p>
                 </div>
                 <Button type="button" variant="ghost" size="icon-sm" onClick={() => removeKey(it.ratingKey)} aria-label="Remove">
@@ -304,17 +280,4 @@ export function ManualBuilder({
       </div>
     </div>
   );
-}
-
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <p className="text-muted-foreground text-xs font-medium">{label}</p>
-      {children}
-    </div>
-  );
-}
-
-function Row({ children }: { children: React.ReactNode }) {
-  return <div className="flex items-center gap-2 py-0.5">{children}</div>;
 }

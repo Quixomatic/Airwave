@@ -22,8 +22,9 @@ type PreviewItem = {
 };
 export type ChannelPreviewData = { totalItems: number; showCount: number; movieCount: number; items: PreviewItem[] };
 
-// The responsive tile grid, shared by the real tiles and the skeletons so they align exactly.
-const GRID_CLASS = "grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8";
+// The responsive tile grid, shared by the real tiles and the skeletons so they align exactly. Exported so
+// the Manual-mode picker's search results use the identical grid + skeleton.
+export const GRID_CLASS = "grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8";
 const ONE_ROW = 8; // lg:grid-cols-8 → a single desktop row of skeletons for the first-ever load.
 
 export function ChannelPreviewTiles({
@@ -80,7 +81,7 @@ export function ChannelPreviewTiles({
  * skeletons (poster at the same 2/3 aspect, plus title + subtitle bars) on the same responsive grid. `count`
  * matches the on-screen results during a reload; it's ONE_ROW on the first-ever load.
  */
-function PreviewSkeleton({ count }: { count: number }) {
+export function PreviewSkeleton({ count }: { count: number }) {
   return (
     <div className="space-y-2.5">
       {/* stand-in for the "N items · X shows · Y movies" metric line */}

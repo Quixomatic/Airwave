@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.59] - 2026-09-15
+
+Admin — Manual-mode picker now uses the shared poster tiles + empty state.
+
+### Changed
+- Manual-mode search results render as poster-tile grids matching the channel preview (same grid + loading
+  skeleton, shared from `channel-preview`), each tile with a check-circle and a selected ring. The empty
+  pool now uses the shared `EmptyState`. Scroll box padded so a selected tile's ring isn't clipped at the
+  edge. Show tiles select the whole show for now; drilling into a show (season / specific episode) is a
+  separate interaction still to be designed.
+
 ## [0.13.58] - 2026-09-15
 
 Admin — Manual mode: build a channel by hand-picking movies, shows, seasons, and episodes. Completes the
