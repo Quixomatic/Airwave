@@ -572,6 +572,15 @@ async function expandMembershipItems(
 }
 
 /**
+ * A show's episodes (all seasons), in air order — `/library/metadata/{key}/allLeaves`. Used by the
+ * MANUAL_ITEMS resolver to expand a "whole show" pick LIVE at build time (new episodes get picked up).
+ * Guide is thin; the resolver hydrates from the cache.
+ */
+export async function getShowEpisodes(baseUrl: string, token: string, showKey: string): Promise<PlexItem[]> {
+  return (await fetchMetadata(baseUrl, token, `/library/metadata/${showKey}/allLeaves`)).map(toPlexItem);
+}
+
+/**
  * A playlist's items, in playlist order, expanded to leaf video items (see {@link expandMembershipItems}).
  * Guide is thin (these endpoints ignore `includeElements=Stream`) — the resolver hydrates from the cache.
  */

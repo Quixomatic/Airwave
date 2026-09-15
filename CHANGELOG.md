@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.56] - 2026-09-15
+
+Server — resolver for MANUAL_ITEMS (hand-picked) channels (groundwork for Manual mode; not yet wired to
+create/update or the admin UI).
+
+### Added
+- `resolveManual` + a `MANUAL_ITEMS` branch in `resolveChannel`. A channel's `manualItemKeys` (a mix of
+  movie / show / episode ratingKeys) resolve to a pool: a `show` key expands LIVE to its current episodes
+  via `getShowEpisodes` (`/allLeaves`), so a newly-added episode joins the pool on the next build/extend;
+  `movie` / `episode` keys are already leaves. Keys are classified from the MediaItem cache. Same order /
+  dedupe / cache-join guide hydration as membership — factored into a shared `unionAndHydrate` helper that
+  both `resolveMembership` and `resolveManual` use. Verified end to end (movie + whole show + specific
+  episodes → 97 leaves, 0 containers, 0 dupes, full badges).
+
 ## [0.13.55] - 2026-09-15
 
 Site (getairwave.tv) — shipped roadmap items float to the top with a green check.
