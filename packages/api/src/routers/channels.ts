@@ -12,6 +12,7 @@ import { resolveChannel } from "../services/plex/resolve";
 import { decryptToken } from "../services/plex/token";
 import { getSourceReadiness, notReadyReason } from "../services/sources/readiness";
 import {
+  itemLabels as itemLabelsService,
   previewItems,
   previewFilter as resolvePreviewFilter,
   previewManual as resolvePreviewManual,
@@ -589,6 +590,11 @@ export const channelsRouter = router({
     .query(({ ctx, input }) =>
       showEpisodesService(ctx.prisma, { mediaSourceId: input.mediaSourceId, showRatingKey: input.showRatingKey }),
     ),
+
+  /** Label a set of hand-picked ratingKeys (cache lookup) so the Manual builder can render a saved pool. */
+  itemsByKeys: adminProcedure
+    .input(z.object({ mediaSourceId: z.string(), keys: z.array(z.string()) }))
+    .query(({ ctx, input }) => itemLabelsService(ctx.prisma, { mediaSourceId: input.mediaSourceId, keys: input.keys })),
 
   /** Preview an UNSAVED manual pool — resolves hand-picked ratingKeys into the coalesced preview shape. */
   previewManual: adminProcedure

@@ -43,6 +43,7 @@ import { trpc } from "@/utils/trpc";
 import { FilterBuilder, type FilterGroup, normalizeFilter } from "./filter-builder";
 import { encodeFilter } from "./filter-clipboard";
 import { ImportFilterDialog } from "./import-filter-dialog";
+import { ManualBuilder } from "./manual-builder";
 import { MembershipBuilder, type MembershipSource } from "./membership-builder";
 import { StrategyEditor, type ChannelStrategy } from "./strategy-editor";
 
@@ -62,6 +63,8 @@ export type ChannelFormValues = {
   filter: FilterGroup;
   /** Non-empty ⇒ a MEMBERSHIP channel (playlists/collections); empty ⇒ a filter channel. */
   sources: MembershipSource[];
+  /** Non-empty ⇒ a MANUAL_ITEMS channel (hand-picked ratingKeys); takes priority over sources/filter. */
+  manualItemKeys: string[];
   ordering: Ordering;
   strategy: ChannelStrategy | null;
   sortField: string;
@@ -82,6 +85,7 @@ export type ChannelPreviewInput = {
   mediaTypes: MediaType[];
   filter: FilterGroup;
   sources: MembershipSource[];
+  itemKeys: string[];
   sortField: string;
   sortDir: "asc" | "desc";
 };
@@ -89,7 +93,7 @@ export type ChannelPreviewInput = {
 const MODE_TILES: { id: ChannelMode; label: string; icon: LucideIcon; desc: string; disabled?: boolean }[] = [
   { id: "filter", label: "Filter", icon: ListFilter, desc: "Match by metadata — genre, year, rating…" },
   { id: "membership", label: "Playlists & collections", icon: ListMusic, desc: "Use specific Plex playlists or collections" },
-  { id: "manual", label: "Manual", icon: ListChecks, desc: "Hand-pick items (coming soon)", disabled: true },
+  { id: "manual", label: "Manual", icon: ListChecks, desc: "Hand-pick individual movies, shows, or episodes" },
 ];
 
 /** The three pool-definition modes as selectable tiles. Manual is present but disabled. */
@@ -214,9 +218,12 @@ export function ChannelForm({
   const [enabled, setEnabled] = useState(initial?.enabled ?? true);
   const [bumperMode, setBumperMode] = useState<BumperMode>(initial?.bumperMode ?? "INHERIT");
   const [filter, setFilter] = useState<FilterGroup>(() => normalizeFilter(initial?.filter));
-  // A channel loaded with sources is a membership channel; otherwise it's a filter channel.
-  const [mode, setMode] = useState<ChannelMode>(initial?.sources?.length ? "membership" : "filter");
+  // Derive the initial mode from which data the loaded channel carries: manual items > sources > filter.
+  const [mode, setMode] = useState<ChannelMode>(
+    initial?.manualItemKeys?.length ? "manual" : initial?.sources?.length ? "membership" : "filter",
+  );
   const [membershipSources, setMembershipSources] = useState<MembershipSource[]>(initial?.sources ?? []);
+  const [manualItemKeys, setManualItemKeys] = useState<string[]>(initial?.manualItemKeys ?? []);
   const [importOpen, setImportOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -249,9 +256,18 @@ export function ChannelForm({
   // whenever the builder, media types, sort, or the resolved source changes; `mediaTypes` is rebuilt inside from
   // the `movies`/`tv` deps (it's a fresh array each render, so it can't be a dep itself).
   useEffect(() => {
-    onPreviewInputChange?.({ mode, mediaSourceId: sourceId, mediaTypes, filter, sources: membershipSources, sortField, sortDir });
+    onPreviewInputChange?.({
+      mode,
+      mediaSourceId: sourceId,
+      mediaTypes,
+      filter,
+      sources: membershipSources,
+      itemKeys: manualItemKeys,
+      sortField,
+      sortDir,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceId, mode, movies, tv, filter, membershipSources, sortField, sortDir, onPreviewInputChange]);
+  }, [sourceId, mode, movies, tv, filter, membershipSources, manualItemKeys, sortField, sortDir, onPreviewInputChange]);
 
   if (sources.data && !sourceId) {
     // No usable source — say exactly which step is missing so the fix is obvious.
@@ -288,6 +304,11 @@ export function ChannelForm({
         toast.error("Add at least one playlist or collection.");
         return;
       }
+    } else if (mode === "manual") {
+      if (manualItemKeys.length === 0) {
+        toast.error("Add at least one item.");
+        return;
+      }
     } else if (mediaTypes.length === 0) {
       toast.error("Pick at least one content type.");
       return;
@@ -296,11 +317,12 @@ export function ChannelForm({
       name,
       callsign,
       number,
-      // mediaTypes is meaningless for a membership channel (the resolver ignores it), but the API still
-      // requires a non-empty list — send both so validation passes.
-      mediaTypes: mode === "membership" ? (mediaTypes.length ? mediaTypes : ["movie", "show"]) : mediaTypes,
+      // mediaTypes is meaningless for a membership/manual channel (the resolver ignores it), but the API
+      // still requires a non-empty list — send both so validation passes.
+      mediaTypes: mode === "filter" ? mediaTypes : mediaTypes.length ? mediaTypes : ["movie", "show"],
       filter,
       sources: mode === "membership" ? chosenSources : [],
+      manualItemKeys: mode === "manual" ? manualItemKeys : [],
       ordering,
       strategy,
       sortField,
@@ -514,7 +536,9 @@ export function ChannelForm({
           <ModeTiles value={mode} onChange={setMode} />
         </div>
 
-        {mode === "membership" ? (
+        {mode === "manual" ? (
+          <ManualBuilder value={manualItemKeys} onChange={setManualItemKeys} mediaSourceId={sourceId} />
+        ) : mode === "membership" ? (
           <MembershipBuilder value={membershipSources} onChange={setMembershipSources} mediaSourceId={sourceId} />
         ) : (
           <>

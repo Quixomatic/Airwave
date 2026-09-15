@@ -27,6 +27,7 @@ function inputKey(i: ChannelPreviewInput | null): string {
     t: i.mediaTypes,
     f: i.filter,
     s: i.sources,
+    k: i.itemKeys,
     sf: i.sortField,
     sd: i.sortDir,
   });
@@ -42,9 +43,11 @@ function filterHasPredicate(g: ChannelPreviewInput["filter"]): boolean {
   return walk(g.children);
 }
 
-/** Whether an input is worth auto-resolving: a filled-in filter, or a membership source with a chosen item. */
+/** Whether an input is worth auto-resolving: a filled-in filter, a chosen membership source, or a manual item. */
 function hasResolvable(i: ChannelPreviewInput): boolean {
-  return i.mode === "membership" ? i.sources.some((s) => s.key) : filterHasPredicate(i.filter);
+  if (i.mode === "membership") return i.sources.some((s) => s.key);
+  if (i.mode === "manual") return i.itemKeys.length > 0;
+  return filterHasPredicate(i.filter);
 }
 
 /**
@@ -109,25 +112,29 @@ export function ChannelPreviewPanel({
   // Keep the last resolved pool visible (as `data`) while the next resolve runs, so the skeleton count can
   // match the results currently on screen across repeated edits — not just the first reload.
   const queryOpts = { placeholderData: keepPreviousData, trpc: { context: { skipBatch: true } } } as const;
-  const membershipMode = resolveInput?.mode === "membership";
   const preview = useQuery(
-    membershipMode
-      ? trpc.channels.previewMembership.queryOptions(
-          { mediaSourceId: resolveInput!.mediaSourceId, sources: resolveInput!.sources.filter((s) => s.key) },
+    resolveInput?.mode === "manual"
+      ? trpc.channels.previewManual.queryOptions(
+          { mediaSourceId: resolveInput.mediaSourceId, itemKeys: resolveInput.itemKeys },
           queryOpts,
         )
-      : trpc.channels.previewFilter.queryOptions(
-          resolveInput
-            ? {
-                mediaSourceId: resolveInput.mediaSourceId,
-                mediaTypes: resolveInput.mediaTypes,
-                filter: resolveInput.filter,
-                sortField: resolveInput.sortField,
-                sortDir: resolveInput.sortDir,
-              }
-            : skipToken,
-          queryOpts,
-        ),
+      : resolveInput?.mode === "membership"
+        ? trpc.channels.previewMembership.queryOptions(
+            { mediaSourceId: resolveInput.mediaSourceId, sources: resolveInput.sources.filter((s) => s.key) },
+            queryOpts,
+          )
+        : trpc.channels.previewFilter.queryOptions(
+            resolveInput
+              ? {
+                  mediaSourceId: resolveInput.mediaSourceId,
+                  mediaTypes: resolveInput.mediaTypes,
+                  filter: resolveInput.filter,
+                  sortField: resolveInput.sortField,
+                  sortDir: resolveInput.sortDir,
+                }
+              : skipToken,
+            queryOpts,
+          ),
   );
 
   const updateNow = () => {

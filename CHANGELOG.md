@@ -2,6 +2,27 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.58] - 2026-09-15
+
+Admin — Manual mode: build a channel by hand-picking movies, shows, seasons, and episodes. Completes the
+third channel content mode.
+
+### What ships
+
+- The Manual mode tile in the channel editor is now enabled, with a new `ManualBuilder`: a search bar with
+  Movies / TV Shows scope baked in, searching the library instantly (MediaItem cache, no Plex round-trip).
+  Results are movies, shows (expandable to seasons → episodes), and direct episode-title matches, each with
+  a Plex-style check-circle. "Add item(s)" commits the checked selection into the pool, shown below as
+  removable rows; the preview panel resolves the manual pool live via `channels.previewManual`.
+- Picking a whole show stores the show and resolves LIVE (a new episode joins the pool on the next
+  build/extend); a whole season stores that season's episodes; individual episodes and movies store
+  themselves. Works on the new-channel and edit-channel pages, and loads the right mode when editing.
+
+### Notes
+
+- All three content modes (Filter, Playlists & collections, Manual) are now available. Ordering, strategy,
+  weighting, bumpers, and scheduling apply to a manual pool unchanged.
+
 ## [0.13.57] - 2026-09-15
 
 Server — router support for Manual-mode channels: media search, show drill-down, preview, and

@@ -295,6 +295,48 @@ export async function showEpisodes(
     }));
 }
 
+export type ManualItemLabel = {
+  ratingKey: string;
+  title: string;
+  type: string;
+  showTitle?: string;
+  season?: number;
+  episode?: number;
+  thumb?: string;
+  available: boolean;
+};
+
+/**
+ * Label a set of hand-picked ratingKeys from the MediaItem cache — for the Manual-mode builder to render the
+ * current pool (a channel loads only bare keys). Preserves input order; a key not in the cache comes back
+ * `available: false` with a placeholder title so the row can still be shown + removed.
+ */
+export async function itemLabels(
+  prisma: PrismaClient,
+  args: { mediaSourceId: string; keys: string[] },
+): Promise<ManualItemLabel[]> {
+  if (!args.keys.length) return [];
+  const rows = await prisma.mediaItem.findMany({
+    where: { mediaSourceId: args.mediaSourceId, ratingKey: { in: args.keys } },
+    select: { ratingKey: true, title: true, type: true, guide: true, available: true },
+  });
+  const byKey = new Map(rows.map((r) => [r.ratingKey, r]));
+  return args.keys.map((k) => {
+    const r = byKey.get(k);
+    const g = (r?.guide ?? {}) as { showTitle?: string; season?: number; episode?: number; thumb?: string };
+    return {
+      ratingKey: k,
+      title: r?.title ?? "(unavailable)",
+      type: r?.type ?? "unknown",
+      showTitle: g.showTitle,
+      season: g.season,
+      episode: g.episode,
+      thumb: g.thumb,
+      available: Boolean(r?.available),
+    };
+  });
+}
+
 export async function searchTitles(prisma: PrismaClient, args: { mediaSourceId: string; mediaTypes: MediaType[]; query: string; detail?: PreviewDetail }) {
   const source = await requireSource(prisma, args.mediaSourceId);
   const tree: FilterNode = { type: "condition", field: "title", op: "contains", value: args.query };
