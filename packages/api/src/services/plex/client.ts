@@ -498,6 +498,100 @@ export async function getSectionItemsRaw(
   return (data.MediaContainer?.Metadata ?? []).map(toPlexItem);
 }
 
+// ── Playlist & collection sources ("membership" channels) ───────────────────────────────────────
+// NOTE: the /items endpoints IGNORE `includeElements=Stream` — they return items WITHOUT the per-file
+// Stream array, so the guide from `toPlexItem` here is thin (no hdr/audio/resolution badges). That's
+// fine: the membership resolver hydrates the rich guide from the MediaItem cache (enriched by the media
+// sync), falling back to `getMetadataByKeys` for anything not yet cached. These calls only need to give
+// the ordered leaf ratingKeys + basics (duration/type/air date) for union + scheduling.
+
+export type PlaylistSummary = { key: string; title: string; itemCount: number; smart: boolean };
+export type CollectionSummary = { key: string; title: string; childCount: number; smart: boolean };
+
+/** List the server's VIDEO playlists (for the admin membership picker). */
+export async function getPlaylists(baseUrl: string, token: string): Promise<PlaylistSummary[]> {
+  const res = await fetch(`${baseUrl}/playlists?playlistType=video`, { headers: pmsHeaders(token) });
+  if (!res.ok) throw new Error(`Plex playlists failed (${res.status})`);
+  const data = (await res.json()) as { MediaContainer?: { Metadata?: PlexMetadata[] } };
+  return (data.MediaContainer?.Metadata ?? []).map((m) => ({
+    key: String(m.ratingKey),
+    title: m.title,
+    itemCount: (m as { leafCount?: number }).leafCount ?? 0,
+    smart: Boolean((m as { smart?: boolean }).smart),
+  }));
+}
+
+/** List a library section's collections (for the admin membership picker). Collections are per-library. */
+export async function getCollections(
+  baseUrl: string,
+  token: string,
+  sectionKey: string,
+): Promise<CollectionSummary[]> {
+  const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/collections`, {
+    headers: pmsHeaders(token),
+  });
+  if (!res.ok) throw new Error(`Plex collections failed (${res.status})`);
+  const data = (await res.json()) as { MediaContainer?: { Metadata?: PlexMetadata[] } };
+  return (data.MediaContainer?.Metadata ?? []).map((m) => ({
+    key: String(m.ratingKey),
+    title: m.title,
+    childCount: (m as { childCount?: number }).childCount ?? 0,
+    smart: Boolean((m as { smart?: boolean }).smart),
+  }));
+}
+
+/** A playlist's items, in playlist order (leaf movies/episodes). Guide is thin — the resolver hydrates. */
+export async function getPlaylistItems(
+  baseUrl: string,
+  token: string,
+  playlistKey: string,
+): Promise<PlexItem[]> {
+  const res = await fetch(`${baseUrl}/playlists/${playlistKey}/items`, { headers: pmsHeaders(token) });
+  if (!res.ok) throw new Error(`Plex playlist items failed (${res.status})`);
+  const data = (await res.json()) as { MediaContainer?: { Metadata?: PlexMetadata[] } };
+  return (data.MediaContainer?.Metadata ?? []).map(toPlexItem);
+}
+
+/**
+ * A collection's items, in collection order. NOTE: a collection of SHOWS returns `show` containers, which
+ * would need expansion to episodes before scheduling; movie collections return leaf movies. Smart
+ * collections resolve to their current items. Guide is thin — the resolver hydrates.
+ */
+export async function getCollectionItems(
+  baseUrl: string,
+  token: string,
+  collectionKey: string,
+): Promise<PlexItem[]> {
+  const res = await fetch(`${baseUrl}/library/collections/${collectionKey}/items`, {
+    headers: pmsHeaders(token),
+  });
+  if (!res.ok) throw new Error(`Plex collection items failed (${res.status})`);
+  const data = (await res.json()) as { MediaContainer?: { Metadata?: PlexMetadata[] } };
+  return (data.MediaContainer?.Metadata ?? []).map(toPlexItem);
+}
+
+/**
+ * Batch metadata for specific ratingKeys WITH per-file streams — the Plex-side hydration fallback for
+ * membership items not (yet) in the MediaItem cache. Chunked to keep the URL length sane.
+ */
+export async function getMetadataByKeys(
+  baseUrl: string,
+  token: string,
+  ratingKeys: string[],
+): Promise<PlexItem[]> {
+  const out: PlexItem[] = [];
+  for (let i = 0; i < ratingKeys.length; i += 50) {
+    const chunk = ratingKeys.slice(i, i + 50);
+    const res = await fetch(`${baseUrl}/library/metadata/${chunk.join(",")}?includeElements=Stream`, {
+      headers: pmsHeaders(token),
+    });
+    if (!res.ok) throw new Error(`Plex metadata failed (${res.status})`);
+    const data = (await res.json()) as { MediaContainer?: { Metadata?: PlexMetadata[] } };
+    out.push(...(data.MediaContainer?.Metadata ?? []).map(toPlexItem));
+  }
+  return out;
+}
+
 /** Every item of a given type in a section, paged through in full — for metadata sync. */
 export async function getAllSectionItems(
   baseUrl: string,

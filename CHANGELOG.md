@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.48] - 2026-09-15
+
+Server — Plex client methods for playlist/collection channel sources (groundwork, not yet wired).
+
+### Added
+- Plex client methods for the upcoming playlist/collection ("membership") channel source:
+  `getPlaylists` / `getCollections` (admin pickers), `getPlaylistItems` / `getCollectionItems` (a
+  playlist's or collection's items, in source order, leaf items), and `getMetadataByKeys` (batched
+  `/library/metadata?includeElements=Stream` hydration). Nothing consumes them yet; a read-only probe
+  (`apps/server/scripts/probe-playlists-collections.ts`) verifies them against a live Plex server.
+
 ## [0.13.47] - 2026-09-14
 
 Site (getairwave.tv) — Blog promoted to a top-level nav item; Resources menu hidden.
