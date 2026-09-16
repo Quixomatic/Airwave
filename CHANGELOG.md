@@ -2,6 +2,29 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.64] - 2026-09-16
+
+AI assistant — full awareness and editing of all three channel content modes.
+
+### Added
+- The channel assistant now understands Filter, Playlists & collections (membership), and Manual channels.
+  `get_channel` / `list_channels` report each channel's `mode` (membership channels return their sources,
+  manual channels a labeled sample + count) instead of showing them as blank filters. New read tools:
+  `list_channel_items` (a manual channel's members), `list_playlists` / `list_collections` (membership
+  discovery), `show_episodes` (episode drill-down), and `preview_channel` (resolve any saved channel's
+  pool). New arbitrary-input previews `preview_membership` / `preview_manual` mirror `preview_filter`.
+- The assistant can now build and edit the other two modes (approval-gated): `create_channel` accepts an
+  optional membership `sources` list or `manualItemKeys`; `add_channel_sources` / `remove_channel_sources`
+  and `add_channel_items` / `remove_channel_items` edit members incrementally. Manual items are found by
+  reusing `preview_filter` / `search_titles` / `show_episodes`.
+
+### Notes
+- Filter (PREDICATE) is the default and strongly preferred mode: the assistant only creates a membership
+  or manual channel when explicitly asked. A channel's mode is fixed at creation and can't be switched
+  (filter edits on a non-filter channel are refused with a clear message).
+- The autonomous workflow lineup builder is unchanged — it still authors filter channels only; the
+  `create_channel` filter path is byte-for-byte the same and the update guard never applies to it.
+
 ## [0.13.63] - 2026-09-15
 
 Admin — Manual picker polish: input-group search bar, frosted edge, and clearer empty states.

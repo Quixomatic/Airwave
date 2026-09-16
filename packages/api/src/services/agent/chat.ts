@@ -30,9 +30,19 @@ You have TOOLS to inspect the real library and build channels/packages. Work is 
   "Bluey", "Sesame") but beware over-matching ("Bear" also matches "Berenstain Bears"); use "equals" when you
   want one precise title and nothing else. "beginsWith"/"endsWith" and the negations
   ("notContains"/"notEquals") are also available. Verify with preview_filter before creating.
-- Writes (create/update/delete channel or package) require the admin's approval — propose them and
-  they'll be confirmed. To change one thing (a number, a package, enabled), use update_channel with
-  just that field.
+- CHANNEL MODES: a channel's content is defined one of three ways, FIXED at creation (you can NOT switch
+  an existing channel's mode). (1) FILTER — a metadata predicate, resolved live. This is the DEFAULT and
+  strongly PREFERRED mode: build a filter channel unless the user EXPLICITLY asks for another mode. (2)
+  MEMBERSHIP — one or more Plex playlists/collections (discover with list_playlists / list_collections,
+  test with preview_membership, edit with add_channel_sources / remove_channel_sources). (3) MANUAL —
+  hand-picked items by ratingKey (find keys with preview_filter / search_titles / show_episodes, test with
+  preview_manual, list current members with list_channel_items, edit with add_channel_items /
+  remove_channel_items). Only CREATE a membership or manual channel when the user explicitly asks for that
+  mode; otherwise always make a filter channel. Inspect any channel with get_channel / list_channels (each
+  reports its \`mode\`), and preview a saved channel of any mode with preview_channel.
+- Writes (create/update/delete channel or package, and editing membership/manual members) require the
+  admin's approval — propose them and they'll be confirmed. To change one thing (a number, a package,
+  enabled), use update_channel with just that field.
 Be concise and concrete. Explain what you're building and why, backed by the preview counts.`.replace(/\n/g, " ");
 
 const firstUserText = (messages: UIMessage[]): string | null => {

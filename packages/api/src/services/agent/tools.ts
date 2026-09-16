@@ -2,9 +2,9 @@ import { Prisma, type PrismaClient } from "@airwave/db";
 
 import { toAccentKey } from "../accents";
 import { normalizeCallsign } from "../generator/callsign";
-import { getFilterValues, type GuideMeta, type PlexItem } from "../plex/client";
+import { getCollections, getFilterValues, getPlaylists, type GuideMeta, type PlexItem } from "../plex/client";
 import { fieldMeta, FILTER_FIELDS, OPS_FOR_KIND, type FilterNode } from "../plex/filter-fields";
-import { type MembershipSource, resolveFilter, resolveManual, resolveMembership } from "../plex/resolve";
+import { type MembershipSource, resolveChannel, resolveFilter, resolveManual, resolveMembership } from "../plex/resolve";
 import { channelSortParam } from "../plex/sort-fields";
 import { decryptToken } from "../plex/token";
 
@@ -349,9 +349,25 @@ export async function searchTitles(prisma: PrismaClient, args: { mediaSourceId: 
 export async function listChannels(prisma: PrismaClient) {
   const rows = await prisma.channel.findMany({
     orderBy: { number: "asc" },
-    select: { id: true, number: true, name: true, enabled: true, aiGenerated: true, package: { select: { id: true, name: true } } },
+    select: {
+      id: true,
+      number: true,
+      name: true,
+      enabled: true,
+      aiGenerated: true,
+      package: { select: { id: true, name: true } },
+      // `mode` tells the assistant how each channel's content is defined without a per-channel get_channel.
+      definitions: { orderBy: { sortIndex: "asc" }, take: 1, select: { kind: true } },
+    },
   });
-  return rows;
+  return rows.map(({ definitions, ...c }) => ({ ...c, mode: channelMode(definitions[0]?.kind) }));
+}
+
+/** Map the (internal) ChannelDefinition kind to the mode label the assistant reasons about. */
+function channelMode(kind?: string): "filter" | "membership" | "manual" {
+  if (kind === "MEMBERSHIP") return "membership";
+  if (kind === "MANUAL_ITEMS") return "manual";
+  return "filter";
 }
 
 export async function getChannel(prisma: PrismaClient, id: string) {
@@ -361,8 +377,8 @@ export async function getChannel(prisma: PrismaClient, id: string) {
   });
   if (!c) throw new Error(`Channel ${id} not found`);
   const def = c.definitions[0];
-  const pf = (def?.plexFilter as { mediaTypes?: string[]; filter?: FilterNode } | null) ?? {};
-  return {
+  const mode = channelMode(def?.kind);
+  const base = {
     id: c.id,
     number: c.number,
     name: c.name,
@@ -375,9 +391,22 @@ export async function getChannel(prisma: PrismaClient, id: string) {
     description: c.description,
     package: c.package,
     aiGenerated: c.aiGenerated,
-    mediaTypes: pf.mediaTypes ?? [],
-    filter: pf.filter ?? null,
+    mode,
   };
+
+  // MEMBERSHIP → its playlist/collection sources (with cached titles). MANUAL → a labeled sample + count of
+  // its hand-picked members (use list_channel_items for the full list). FILTER → the predicate tree.
+  if (mode === "membership") {
+    const sources = (def?.sources as unknown as MembershipSource[] | null) ?? [];
+    return { ...base, sources };
+  }
+  if (mode === "manual") {
+    const keys = def?.manualItemKeys ?? [];
+    const sample = keys.length ? await itemLabels(prisma, { mediaSourceId: c.mediaSourceId, keys: keys.slice(0, 8) }) : [];
+    return { ...base, manualItemCount: keys.length, manualSample: sample };
+  }
+  const pf = (def?.plexFilter as { mediaTypes?: string[]; filter?: FilterNode } | null) ?? {};
+  return { ...base, mediaTypes: pf.mediaTypes ?? [], filter: pf.filter ?? null };
 }
 
 export async function listPackages(prisma: PrismaClient) {
@@ -404,6 +433,10 @@ export type ChannelInput = {
   mediaSourceId: string;
   mediaTypes: MediaType[];
   filter?: FilterNode;
+  // Non-PREDICATE modes — ONLY set when the user explicitly asks for a playlists/collections or manual
+  // channel. Absent (the default) ⇒ a PREDICATE (filter) channel, which is always the preferred mode.
+  sources?: MembershipSource[];
+  manualItemKeys?: string[];
   ordering?: "SHUFFLE" | "IN_ORDER" | "BY_AIR_DATE";
   sortField?: string;
   sortDir?: "asc" | "desc";
@@ -418,7 +451,19 @@ export type ChannelInput = {
 
 export async function createChannel(prisma: PrismaClient, userId: string, input: ChannelInput) {
   const number = input.number ?? ((await prisma.channel.aggregate({ _max: { number: true } }))._max.number ?? 0) + 1;
-  const plexFilter = { mediaTypes: input.mediaTypes, ...(input.filter ? { filter: JSON.parse(JSON.stringify(input.filter)) } : {}) };
+  // Kind by which content data is present: manual > membership > filter. The filter path is the default and
+  // is byte-for-byte what it's always been (the workflow lineup builder passes neither sources nor items).
+  const definition = input.manualItemKeys?.length
+    ? { kind: "MANUAL_ITEMS" as const, manualItemKeys: input.manualItemKeys }
+    : input.sources?.length
+      ? { kind: "MEMBERSHIP" as const, sources: JSON.parse(JSON.stringify(input.sources)) as Prisma.InputJsonValue }
+      : {
+          kind: "PREDICATE" as const,
+          plexFilter: {
+            mediaTypes: input.mediaTypes,
+            ...(input.filter ? { filter: JSON.parse(JSON.stringify(input.filter)) } : {}),
+          } as Prisma.InputJsonValue,
+        };
   const c = await prisma.channel.create({
     data: {
       name: input.name,
@@ -435,7 +480,7 @@ export async function createChannel(prisma: PrismaClient, userId: string, input:
       enabled: input.enabled ?? true,
       createdById: userId,
       aiGenerated: true,
-      definitions: { create: { kind: "PREDICATE", plexFilter: plexFilter as Prisma.InputJsonValue } },
+      definitions: { create: definition },
     },
   });
   return { id: c.id, number };
@@ -459,9 +504,19 @@ export async function updateChannel(prisma: PrismaClient, id: string, patch: Par
   if (patch.description !== undefined) data.description = patch.description;
   if (patch.enabled !== undefined) data.enabled = patch.enabled;
 
-  // If filter / mediaTypes changed, rewrite the definition's plexFilter.
+  // If filter / mediaTypes changed, rewrite the definition's plexFilter. A channel's MODE is fixed at
+  // creation — refuse a filter edit on a membership/manual channel rather than silently no-op'ing (the
+  // resolver ignores plexFilter on those). Channel-level edits above (name/number/package/…) still applied.
   if (patch.filter !== undefined || patch.mediaTypes !== undefined) {
     const def = existing.definitions[0];
+    if (def && def.kind !== "PREDICATE") {
+      const label = def.kind === "MEMBERSHIP" ? "playlists/collections" : "manual";
+      throw new Error(
+        `Channel "${existing.name}" is a ${label} channel, not a filter channel, so a filter edit doesn't apply. ` +
+          `Use the ${def.kind === "MEMBERSHIP" ? "membership source" : "manual item"} tools to change its members, ` +
+          `or edit it in the channel editor. A channel's mode can't be switched.`,
+      );
+    }
     const cur = (def?.plexFilter as { mediaTypes?: MediaType[]; filter?: FilterNode } | null) ?? {};
     const mediaTypes = patch.mediaTypes ?? cur.mediaTypes ?? ["movie", "show"];
     const filter = patch.filter !== undefined ? patch.filter : cur.filter;
@@ -477,6 +532,127 @@ export async function updateChannel(prisma: PrismaClient, id: string, patch: Par
 export async function deleteChannel(prisma: PrismaClient, id: string) {
   await prisma.channel.delete({ where: { id } });
   return { id, deleted: true };
+}
+
+/* ---------------- Membership + manual member editing (approval-gated in chat) ------------------
+ * A channel's MODE is fixed at creation and is NEVER switched here — each editor requires the channel to
+ * already be that mode and throws a clear error otherwise. Members are edited with add/remove (never a full
+ * replace) so a large manual list stays cheap + safe to change. */
+
+/** Load a channel's single definition (id + kind + content columns), or throw. */
+async function loadDefinition(prisma: PrismaClient, channelId: string) {
+  const ch = await prisma.channel.findUnique({
+    where: { id: channelId },
+    select: { name: true, definitions: { orderBy: { sortIndex: "asc" }, take: 1 } },
+  });
+  const def = ch?.definitions[0];
+  if (!ch || !def) throw new Error(`Channel ${channelId} not found (or has no definition).`);
+  return { name: ch.name, def };
+}
+
+function requireMode(name: string, kind: string, want: "MEMBERSHIP" | "MANUAL_ITEMS", verb: string): void {
+  if (kind === want) return;
+  const label = kind === "MEMBERSHIP" ? "playlists/collections" : kind === "MANUAL_ITEMS" ? "manual" : "filter";
+  const target = want === "MEMBERSHIP" ? "playlists/collections" : "manual";
+  throw new Error(
+    `Channel "${name}" is a ${label} channel, so you can't ${verb} — that only applies to a ${target} channel. ` +
+      `A channel's mode is fixed at creation and can't be switched; create a ${target} channel instead.`,
+  );
+}
+
+/** Add playlist/collection sources to a MEMBERSHIP channel (dedupe by type:key). */
+export async function addChannelSources(prisma: PrismaClient, id: string, sources: MembershipSource[]) {
+  const { name, def } = await loadDefinition(prisma, id);
+  requireMode(name, def.kind, "MEMBERSHIP", "add playlists/collections");
+  const cur = (def.sources as unknown as MembershipSource[] | null) ?? [];
+  const seen = new Set(cur.map((s) => `${s.type}:${s.key}`));
+  const merged = [...cur];
+  for (const s of sources) {
+    const k = `${s.type}:${s.key}`;
+    if (!seen.has(k)) {
+      seen.add(k);
+      merged.push({ type: s.type, key: s.key, title: s.title });
+    }
+  }
+  await prisma.channelDefinition.update({ where: { id: def.id }, data: { sources: merged as unknown as Prisma.InputJsonValue } });
+  return { id, sources: merged };
+}
+
+/** Remove playlist/collection sources (by ratingKey) from a MEMBERSHIP channel. */
+export async function removeChannelSources(prisma: PrismaClient, id: string, keys: string[]) {
+  const { name, def } = await loadDefinition(prisma, id);
+  requireMode(name, def.kind, "MEMBERSHIP", "remove playlists/collections");
+  const cur = (def.sources as unknown as MembershipSource[] | null) ?? [];
+  const drop = new Set(keys);
+  const next = cur.filter((s) => !drop.has(s.key));
+  await prisma.channelDefinition.update({ where: { id: def.id }, data: { sources: next as unknown as Prisma.InputJsonValue } });
+  return { id, sources: next };
+}
+
+/** Add hand-picked ratingKeys (movie / show / episode) to a MANUAL_ITEMS channel (dedupe). */
+export async function addChannelItems(prisma: PrismaClient, id: string, itemKeys: string[]) {
+  const { name, def } = await loadDefinition(prisma, id);
+  requireMode(name, def.kind, "MANUAL_ITEMS", "add items");
+  const set = new Set(def.manualItemKeys);
+  for (const k of itemKeys) set.add(k);
+  const next = [...set];
+  await prisma.channelDefinition.update({ where: { id: def.id }, data: { manualItemKeys: next } });
+  return { id, count: next.length };
+}
+
+/** Remove hand-picked ratingKeys from a MANUAL_ITEMS channel. */
+export async function removeChannelItems(prisma: PrismaClient, id: string, itemKeys: string[]) {
+  const { name, def } = await loadDefinition(prisma, id);
+  requireMode(name, def.kind, "MANUAL_ITEMS", "remove items");
+  const drop = new Set(itemKeys);
+  const next = def.manualItemKeys.filter((k) => !drop.has(k));
+  await prisma.channelDefinition.update({ where: { id: def.id }, data: { manualItemKeys: next } });
+  return { id, count: next.length };
+}
+
+/** The STORED members of a MANUAL_ITEMS channel, labeled — what to add/remove against. */
+export async function listChannelItems(prisma: PrismaClient, id: string, detail: PreviewDetail = "default") {
+  const ch = await prisma.channel.findUnique({
+    where: { id },
+    select: { mediaSourceId: true, definitions: { orderBy: { sortIndex: "asc" }, take: 1 } },
+  });
+  const def = ch?.definitions[0];
+  if (!ch || !def) throw new Error(`Channel ${id} not found.`);
+  if (def.kind !== "MANUAL_ITEMS") throw new Error(`Channel is not a manual channel (it's ${channelMode(def.kind)}); use preview_channel to see its contents.`);
+  const labels = await itemLabels(prisma, { mediaSourceId: ch.mediaSourceId, keys: def.manualItemKeys });
+  if (detail === "quick") return { count: labels.length, items: labels.map((l) => ({ ratingKey: l.ratingKey, title: l.title, type: l.type })) };
+  return { count: labels.length, items: labels };
+}
+
+/* ---------------- Membership discovery + saved-channel preview (read) ---------------- */
+
+/** The source's video playlists (membership picker). */
+export async function listPlaylists(prisma: PrismaClient, args: { mediaSourceId: string }) {
+  const source = await requireSource(prisma, args.mediaSourceId);
+  return getPlaylists(source.baseUrl, source.token);
+}
+
+/** The source's collections, aggregated across enabled movie/show libraries, each tagged with its library. */
+export async function listCollections(prisma: PrismaClient, args: { mediaSourceId: string }) {
+  const source = await requireSource(prisma, args.mediaSourceId);
+  const libs = await prisma.mediaLibrary.findMany({
+    where: { mediaSourceId: args.mediaSourceId, enabled: true, type: { in: ["movie", "show"] } },
+    select: { key: true, title: true, type: true },
+  });
+  const out: Array<{ key: string; title: string; childCount: number; smart: boolean; library: string; libraryType: string }> = [];
+  for (const lib of libs) {
+    const cols = await getCollections(source.baseUrl, source.token, lib.key);
+    for (const c of cols) out.push({ ...c, library: lib.title, libraryType: lib.type });
+  }
+  return out;
+}
+
+/** Preview a SAVED channel's resolved pool (any mode) — resolveChannel branches, then previewItems coalesces. */
+export async function previewChannel(prisma: PrismaClient, args: { id: string; detail?: PreviewDetail }) {
+  const channel = await prisma.channel.findUnique({ where: { id: args.id }, select: { mediaSourceId: true } });
+  if (!channel) throw new Error(`Channel ${args.id} not found`);
+  const items = await resolveChannel(prisma, args.id);
+  return previewItems(prisma, channel.mediaSourceId, items, args.detail);
 }
 
 /** Bulk patch (only `packageId` / `enabled`) across many channels — for organizing / the workflow. */
