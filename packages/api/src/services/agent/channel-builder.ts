@@ -52,7 +52,8 @@ export type ChannelBuildResult = {
   key: string;
   name: string;
   number: number;
-  status: "created" | "skipped" | "failed";
+  /** `cancelled` = the run was stopped and this build's in-flight loop was aborted (#28) — not a failure. */
+  status: "created" | "skipped" | "failed" | "cancelled";
   channelId?: string;
   poolSize?: number;
   reason?: string;
@@ -136,6 +137,12 @@ export type BuildChannelArgs = {
   dryRun?: boolean;
   /** Run/step identity, so this build's reasoning can be recorded. */
   trace?: TraceContext;
+  /**
+   * Abort the agent loop in flight — #28. The workflow step passes a signal that trips when the run is
+   * cancelled; it's forwarded to `generateText`, which tears down the underlying model calls (and therefore
+   * the whole tool loop). Kept out of the WDK so the service stays SDK-free.
+   */
+  abortSignal?: AbortSignal;
 };
 
 /**
@@ -395,6 +402,8 @@ export async function buildPlannedChannel(
       model: getModel(connection),
       tools,
       stopWhen: stepCountIs(MAX_STEPS),
+      // #28 — trips when the run is cancelled, aborting the model call and ending the loop.
+      abortSignal: args.abortSignal,
       ...(traceId
         ? {
             onStepFinish: (step: unknown) => {
@@ -458,23 +467,31 @@ export async function buildPlannedChannel(
     };
     agentTrace = summarizeAgentSteps(result.steps ?? []);
   } catch (err) {
-    const failed: ChannelBuildResult = {
-      ...base,
-      status: "failed",
-      usage,
-      reason: err instanceof Error ? err.message : String(err),
-    };
-    // The agent loop threw — drop the reservation so the number is free for the retry.
+    // #28 — distinguish a deliberate cancel (the run was stopped and our AbortSignal tripped) from a real
+    // failure. A cancelled build is NOT an error: report it as "cancelled" (gray on the run page) with no
+    // `error` set, so hitting Stop doesn't paint the lineup red. `abortSignal.aborted` is the definitive
+    // signal (we tripped it ourselves); the AbortError name is a fallback.
+    const aborted =
+      args.abortSignal?.aborted === true || (err instanceof Error && err.name === "AbortError");
+    const status = aborted ? "cancelled" : "failed";
+    const reason = aborted
+      ? "Run cancelled — build aborted in flight."
+      : err instanceof Error
+        ? err.message
+        : String(err);
+    const settled: ChannelBuildResult = { ...base, status, usage, reason };
+    // The agent loop ended early — drop the reservation so the number is free (none exists in a dry run).
     await prisma.channel.delete({ where: { id: reservedId } }).catch(() => {});
-    // A throwing build is exactly the case the old accounting lost: the step retries, and
-    // whatever it already spent went unrecorded. Finalize the open trace row (or record one).
-    const failUsage = { model: connection.model, ...usage, agentSteps: usage?.steps };
+    // A build that ends via throw is exactly the case the old accounting lost: whatever it already spent went
+    // unrecorded. Finalize the open trace row (or record one). On a real failure keep `error`; on a cancel
+    // leave it null so it doesn't read as a fault.
+    const endUsage = { model: connection.model, ...usage, agentSteps: usage?.steps };
     if (traceId) {
       await updateTrace(prisma, traceId, {
-        status: "failed",
-        reason: failed.reason,
-        error: failed.reason,
-        usage: failUsage,
+        status,
+        reason,
+        error: aborted ? null : reason,
+        usage: endUsage,
         finished: true,
       });
     } else if (args.trace) {
@@ -485,14 +502,14 @@ export async function buildPlannedChannel(
         channelKey: channel.key,
         channelNumber: channel.number,
         channelName: channel.name,
-        status: "failed",
-        reason: failed.reason,
-        error: failed.reason,
+        status,
+        reason,
+        error: aborted ? null : reason,
         usage: { model: connection.model, ...usage },
         startedAt,
       });
     }
-    return failed;
+    return settled;
   }
 
   // `outcome` is only ever assigned inside a tool's `execute` callback, which TypeScript's

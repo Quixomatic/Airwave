@@ -19,11 +19,107 @@
  * and are never mounted on the public Hono app. Same posture as Postgres on :5433.
  * Revisit if the worker ever runs on another host, or the port is published in Docker.
  */
+import prisma from "@airwave/db";
 import { setLineupRunner } from "@airwave/api/services/agent/lineup-runner";
 import { setImportRunner } from "@airwave/api/services/transfer/import-runner";
+import { getAppSettings } from "@airwave/api/services/settings/index";
 
 import { importLineupWorkflow } from "../workflows/import";
 import { aiLineupWorkflow } from "../workflows/lineup";
+
+/** Run statuses that mean a run is over. Anything else is still "live" and could be resumed. */
+const TERMINAL_RUN_STATUS = new Set(["completed", "failed", "cancelled", "aborted", "expired"]);
+
+/** Minimal shapes for the pieces of the world storage + observability API this guard uses. */
+type Loose = Record<string, unknown>;
+type WorldStorage = {
+  runs: {
+    list: (o: { resolveData?: "all" | "none"; pagination?: { cursor?: string } }) => Promise<{ data: Loose[]; cursor?: string }>;
+    get: (runId: string, o?: { resolveData?: "all" | "none" }) => Promise<Loose>;
+  };
+};
+
+/**
+ * #29 — zombie-resume safety. BEFORE the world starts polling, cancel any non-terminal AI-lineup run whose
+ * FROZEN config args no longer match the current settings.
+ *
+ * The bug: a run's args are frozen at dispatch. A run that failed but never reached terminal stays
+ * re-deliverable, so a later container restart resumes it — re-running `createPackages` (which WIPES the AI
+ * lineup) and rebuilding with the OLD concurrency / token budget from before the admin changed them. The
+ * terminal-marking fix (FatalError on deterministic plan failure) stops most of these from lingering; this is
+ * the backstop for runs that predate the fix or failed transiently.
+ *
+ * We read each run's frozen args straight from the SDK via the observability API (no stored hash, no
+ * migration — see the probe `scripts/observability-probe.ts`) and compare only the CONFIG-derived fields
+ * (concurrency, plannerMaxOutputTokens). Per-run choices (dryRun / limit / sourceId) are intrinsic to the run
+ * and are NOT drift. An unchanged-config run is left alone so a legitimate crash-resume still resumes.
+ *
+ * Best-effort: never blocks engine startup. `world.runs` reads and the cancel work with the world not yet
+ * started (the probe confirmed storage reads need no `world.start()`).
+ */
+async function guardStaleLineupRuns(deps: {
+  world: WorldStorage;
+  cancelRun: (runId: string) => Promise<void>;
+  hydrate: (resource: Loose) => Loose;
+}): Promise<void> {
+  try {
+    const settings = await getAppSettings(prisma);
+
+    // Metadata only, paginated to completion — the SDK returns ~20 rows + a cursor per page, so a single
+    // call would silently miss older non-terminal runs (learned running the probe).
+    const runs: Loose[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await deps.world.runs.list({ resolveData: "none", pagination: cursor ? { cursor } : {} });
+      runs.push(...page.data);
+      cursor = page.cursor;
+    } while (cursor);
+
+    const pick = (o: Loose, ...keys: string[]): unknown => {
+      for (const k of keys) if (o[k] != null) return o[k];
+      return undefined;
+    };
+    const candidates = runs.filter((r) => {
+      const name = String(pick(r, "name", "workflowName") ?? "");
+      const status = String(pick(r, "status") ?? "");
+      return name.includes("aiLineupWorkflow") && !TERMINAL_RUN_STATUS.has(status);
+    });
+    if (!candidates.length) {
+      console.log("[workflow] startup guard: no non-terminal lineup runs to check");
+      return;
+    }
+
+    for (const r of candidates) {
+      const runId = String(pick(r, "runId", "id"));
+      try {
+        const full = deps.hydrate(await deps.world.runs.get(runId, { resolveData: "all" }));
+        const input = full.input;
+        const args = (Array.isArray(input) ? input[0] : input) as Loose | undefined;
+        const frozenConcurrency = args?.concurrency;
+        const frozenTokens = args?.plannerMaxOutputTokens;
+        const drift =
+          frozenConcurrency !== settings.channelBuildConcurrency ||
+          frozenTokens !== settings.plannerMaxOutputTokens;
+        if (!drift) {
+          console.log(`[workflow] startup guard: ${runId} config unchanged — allowing resume`);
+          continue;
+        }
+        console.warn(
+          `[workflow] startup guard: ${runId} was dispatched with STALE config ` +
+            `(concurrency ${String(frozenConcurrency)} -> ${settings.channelBuildConcurrency}, ` +
+            `plannerMaxOutputTokens ${String(frozenTokens)} -> ${settings.plannerMaxOutputTokens}) — ` +
+            `cancelling so it can't resume and wipe-rebuild with old settings (#29)`,
+        );
+        await deps.cancelRun(runId);
+      } catch (e) {
+        console.warn(`[workflow] startup guard: could not inspect/cancel ${runId}:`, e);
+      }
+    }
+  } catch (e) {
+    // The guard must never stop the engine from booting.
+    console.warn("[workflow] startup guard failed (continuing to start):", e);
+  }
+}
 
 /**
  * Loopback-only port for the workflow handlers. Never expose this.
@@ -45,9 +141,16 @@ export async function startWorkflowEngine(): Promise<void> {
 
   // Imported lazily so a checkout that hasn't run `bunx workflow build` still boots —
   // the .well-known bundles simply don't exist yet.
-  const [{ createWorld }, { start, getRun }, flow, step] = await Promise.all([
+  const [
+    { createWorld },
+    { start, getRun },
+    { hydrateResourceIO, observabilityRevivers },
+    flow,
+    step,
+  ] = await Promise.all([
     import("@workflow/world-postgres"),
     import("workflow/api"),
+    import("workflow/observability"),
     import("../.well-known/workflow/v1/flow.js"),
     import("../.well-known/workflow/v1/step.js"),
   ]);
@@ -96,6 +199,19 @@ export async function startWorkflowEngine(): Promise<void> {
   }
 
   const world = createWorld();
+
+  // #29 — cancel any config-drifted non-terminal lineup run BEFORE the poller can pick it up and
+  // resume-and-wipe with stale args. Reads frozen args via the observability API; best-effort. Cancel goes
+  // through the same `getRun().cancel()` the runner uses.
+  await guardStaleLineupRuns({
+    world: world as unknown as WorldStorage,
+    cancelRun: async (runId) => {
+      const run = await getRun(runId);
+      await run?.cancel();
+    },
+    hydrate: (resource) => hydrateResourceIO(resource as never, observabilityRevivers) as Loose,
+  });
+
   await world.start();
 
   setLineupRunner({

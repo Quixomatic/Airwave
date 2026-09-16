@@ -252,6 +252,27 @@ APPEARANCE:
 - Every channel and every package needs an \`icon\`. Pick one that genuinely evokes it — a Bond channel is not a generic TV set. Icons come from the **lucide** and **phosphor** sets, written \`lucide:Name\` / \`phosphor:Name\` in PascalCase.
 - Packages also need an \`accent\` from the 16 palette keys. Channels do NOT — their colours are assigned by a palette cycle that produces deliberate variance across the guide.`;
 
+/**
+ * A DETERMINISTIC plan failure — one that will fail identically on retry, so the run should be marked
+ * terminally failed rather than burning the retry budget and (per #29) lingering re-deliverable across a
+ * restart. Thrown for `AI_NoObjectGeneratedError` (a malformed-shape response, or a token-overflow
+ * truncation — raising `plannerMaxOutputTokens` is the fix for that, not another identical call).
+ *
+ * Thrown HERE, in the service, because `packages/api` must never import the Workflow SDK. The `planLineup`
+ * workflow step catches this and re-throws it as the SDK's `FatalError` (which skips retries). A transient
+ * failure (network / 5xx / 429) stays a plain throw and keeps its normal retryable behaviour.
+ */
+export class PlanFatalError extends Error {
+  constructor(
+    message: string,
+    /** The original error, preserved for logging/trace. */
+    readonly original: unknown,
+  ) {
+    super(message);
+    this.name = "PlanFatalError";
+  }
+}
+
 export type PlanOptions = {
   /**
    * Force an exact channel count. Leave unset for the real behaviour — the model sizes the
@@ -260,6 +281,12 @@ export type PlanOptions = {
   targetChannels?: number;
   /** Max output tokens for the design call (AppSettings.plannerMaxOutputTokens). Defaults to 32000. */
   maxOutputTokens?: number;
+  /**
+   * Abort the (long, expensive) planner call in flight — #28. The workflow step passes a signal that trips
+   * when the run is cancelled, so "Stop" tears down the live generation instead of only stopping future
+   * steps. Passed straight to `generateObject`. Kept here (not the WDK) so the service stays SDK-free.
+   */
+  abortSignal?: AbortSignal;
 };
 
 /**
@@ -491,6 +518,8 @@ export async function planLineup(
        * see the catch below). Hence the knob: raise it for very large libraries / verbose models.
        */
       maxOutputTokens: opts.maxOutputTokens ?? 32_000,
+      // #28 — trips when the run is cancelled, so Stop aborts this in-flight call.
+      abortSignal: opts.abortSignal,
       system: SYSTEM,
       prompt: [
         libraryContext,
@@ -533,6 +562,17 @@ export async function planLineup(
       };
       if (traceId) await updateTrace(prisma, traceId, { ...failure, finished: true });
       else await recordTrace(prisma, { ...opts.trace, stepName: "planLineup", phase: "plan", ...failure, usage: { model: connection.model }, startedAt });
+    }
+    // A DETERMINISTIC failure (no valid object — malformed shape, or a token-overflow truncation) will fail
+    // identically on retry, so surface it as terminal (#29): the workflow step translates PlanFatalError to
+    // the SDK's FatalError, which skips retries and marks the run failed instead of leaving it re-deliverable.
+    // Anything else (network / 5xx / 429) stays a plain throw and keeps its normal retryable behaviour.
+    if (e?.name === "AI_NoObjectGeneratedError") {
+      throw new PlanFatalError(
+        `Planner produced no valid object (finishReason=${e.finishReason ?? "?"}). A retry with the same ` +
+          `prompt and token cap fails the same way — raise plannerMaxOutputTokens if it truncated.`,
+        err,
+      );
     }
     throw err;
   }

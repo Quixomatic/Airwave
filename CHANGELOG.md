@@ -2,6 +2,36 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.4] - 2026-09-16
+
+AI lineup run lifecycle — Stop now truly cancels a run, and a stale run can no longer resume and wipe the
+lineup with old settings.
+
+### Fixed
+- **Stop actually cancels the work (#28).** Cancelling a run now aborts the in-flight model calls, not just
+  future steps: each long step (the planner, and every channel build) polls the run status and trips an
+  `AbortSignal` on its `generateText` / `generateObject` call the moment the run is stopped. Previously a
+  ~minutes-long planner or build call kept running (and billing) after Stop.
+- **Zombie resume with stale args (#29).** A plan that failed with a deterministic error (a malformed or
+  token-truncated response) could stay re-deliverable and, after a container restart days later, resume and
+  destructively wipe-and-rebuild the lineup using the run's old frozen concurrency / token settings. Two
+  guards: a deterministic plan failure is now marked terminal immediately (it fails identically on retry, so
+  the run ends as `failed` instead of lingering), and on engine startup any non-terminal lineup run whose
+  frozen config no longer matches the current settings is cancelled before it can resume.
+
+### Changed
+- A build that is aborted by a cancel is reported as **cancelled** (gray), not **failed** (red), so stopping
+  a run no longer paints the run page with false failures. A terminal run also no longer shows builds stuck
+  on "running" if their final trace landed just after polling stopped.
+- The planner step is capped to one retry (it is the single most expensive call, and a deterministic failure
+  is already terminal), so a flaky provider can't silently run it four times.
+- The run page's Replay-timeline gantt no longer has its own slider — the floating action bar's scrubber
+  drives it, and the gantt's playhead follows.
+
+### Notes
+- After deploying, `bunx workflow build` regenerates the workflow handlers (`pnpm dev` does this
+  automatically on startup when a workflow or a service it inlines has changed).
+
 ## [0.14.3] - 2026-09-16
 
 AI lineup run page — the replay timeline follows the global scrubber and sits up top.

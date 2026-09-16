@@ -22,7 +22,7 @@
  * pick up workflow changes (the directives are a build-time transform).
  */
 import prisma from "@airwave/db";
-import { getStepMetadata, getWorkflowMetadata } from "workflow";
+import { FatalError, getStepMetadata, getWorkflowMetadata } from "workflow";
 
 import type { ChannelBuildResult } from "@airwave/api/services/agent/channel-builder";
 import { buildPlannedChannel } from "@airwave/api/services/agent/channel-builder";
@@ -43,6 +43,7 @@ import type {
 import {
   assignChannelNumbers,
   formatLineupPlan,
+  PlanFatalError,
   planLineup as planLineupService,
 } from "@airwave/api/services/agent/lineup-plan";
 import type { LineupRunArgs } from "@airwave/api/services/agent/lineup-runner";
@@ -90,6 +91,57 @@ async function tracePhase(
   output?: unknown,
 ): Promise<void> {
   await recordTrace(prisma, { ...traceContext(), stepName, phase, status: "ok", output, startedAt });
+}
+
+/** How often a long step checks whether its run was cancelled, so Stop aborts an in-flight model call. */
+const CANCEL_POLL_MS = 4_000;
+
+/**
+ * True once the run has been cancelled/aborted. Read from the world's OWN run table via raw SQL (same
+ * source `lineup-runs.ts` uses) rather than the WDK client, so it's cheap and safe to call repeatedly from
+ * inside a step. Best-effort: a failed status read must never fail the step.
+ */
+async function isRunCancelled(runId: string): Promise<boolean> {
+  try {
+    const rows = await prisma.$queryRawUnsafe<{ status: string }[]>(
+      `SELECT status::text AS status FROM workflow.workflow_runs WHERE id = $1`,
+      runId,
+    );
+    const s = rows[0]?.status;
+    return s === "cancelled" || s === "aborted";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Run a step's expensive AI work with COOPERATIVE cancellation (#28).
+ *
+ * The WDK's `cancel()` marks the run terminal and stops FUTURE steps, but it does NOT abort an in-flight JS
+ * step (that auto-abort is Python-only here). So a planner/build call (~minutes on the GPU) would keep
+ * running after Stop. Fix: poll the run status and, when it flips to cancelled, trip an `AbortSignal` that the
+ * service forwards to `generateText`/`generateObject` — which tears down the model call (and the whole tool
+ * loop). Cancellation lands within ~one poll interval, not instantly, which is fine for a multi-minute call.
+ *
+ * Only callable inside a `"use step"` (reads `getWorkflowMetadata`). The runId is captured up front so the
+ * interval closure doesn't depend on async-local context that a timer callback wouldn't have.
+ */
+async function withRunCancellation<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const { workflowRunId } = getWorkflowMetadata();
+  const controller = new AbortController();
+  const timer = setInterval(() => {
+    void isRunCancelled(workflowRunId).then((cancelled) => {
+      if (cancelled && !controller.signal.aborted) {
+        console.log(`[lineup] run ${workflowRunId} cancelled — aborting in-flight step call`);
+        controller.abort();
+      }
+    });
+  }, CANCEL_POLL_MS);
+  try {
+    return await fn(controller.signal);
+  } finally {
+    clearInterval(timer);
+  }
 }
 
 // PlannedChannel / PlannedPackage / LineupPlan now live with the planner service
@@ -339,11 +391,22 @@ async function planLineup(
   maxOutputTokens?: number,
 ): Promise<LineupPlanDraft> {
   "use step";
-  const plan = await planLineupService(prisma, libraryContext, {
-    existingPackages,
-    trace: traceContext(),
-    maxOutputTokens,
-  });
+  let plan: LineupPlanDraft;
+  const trace = traceContext();
+  try {
+    // #28 — cooperative cancel: aborts this (long) planner call if the run is stopped mid-flight.
+    plan = await withRunCancellation((abortSignal) =>
+      planLineupService(prisma, libraryContext, { existingPackages, trace, maxOutputTokens, abortSignal }),
+    );
+  } catch (err) {
+    // #29: a DETERMINISTIC plan failure (no valid object — bad shape or token overflow) fails identically
+    // on retry. Re-throw as FatalError so the run is marked terminally `failed` immediately, instead of
+    // burning the retry budget and (the actual bug) staying re-deliverable so a container restart re-runs
+    // it days later and wipe-rebuilds with stale args. A transient failure propagates unchanged and retries.
+    // The service tags it (packages/api can't import the Workflow SDK); we translate it here.
+    if (err instanceof PlanFatalError) throw new FatalError(err.message);
+    throw err;
+  }
   const channels = plan.packages.reduce((n, p) => n + p.channels.length, 0);
   const reused = plan.packages.filter((p) => p.existingKey).length;
   console.log(
@@ -351,6 +414,10 @@ async function planLineup(
   );
   return plan;
 }
+// The planner is ONE big, expensive call. A deterministic failure is already made terminal above (FatalError,
+// no retry); this caps a TRANSIENT failure to a single retry (2 attempts total) rather than the default 3, so
+// a flaky provider can't quietly run the priciest call in the workflow four times. (#29)
+planLineup.maxRetries = 1;
 
 /** Resolve every channel's number against live state — see `assignChannelNumbers`. */
 async function assignNumbers(
@@ -447,16 +514,21 @@ async function buildChannel(
   dryRun: boolean,
 ): Promise<ChannelBuildResult> {
   "use step";
-  const result = await buildPlannedChannel(prisma, {
-    channel,
-    packageId,
-    mediaSourceId: sourceId,
-    userId,
-    libraryContext,
-    mode,
-    dryRun,
-    trace: traceContext(),
-  });
+  const trace = traceContext();
+  // #28 — cooperative cancel: aborts this build's agent loop if the run is stopped mid-flight.
+  const result = await withRunCancellation((abortSignal) =>
+    buildPlannedChannel(prisma, {
+      channel,
+      packageId,
+      mediaSourceId: sourceId,
+      userId,
+      libraryContext,
+      mode,
+      dryRun,
+      trace,
+      abortSignal,
+    }),
+  );
 
   // Dry run: the channel was verified but never persisted, so there's nothing to schedule.
   if (dryRun) {

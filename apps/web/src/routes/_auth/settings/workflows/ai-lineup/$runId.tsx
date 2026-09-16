@@ -796,6 +796,7 @@ const SCRUB_BAR: Record<string, string> = {
   ok: "bg-emerald-500",
   failed: "bg-red-500",
   skipped: "bg-amber-500",
+  cancelled: "bg-muted-foreground/40",
   upcoming: "bg-muted-foreground/25",
 };
 
@@ -833,7 +834,6 @@ function RunScrubber({
   tMax: number;
   scrubbing: boolean;
   live: boolean;
-  onScrub: (ms: number | null) => void;
 }) {
   if (!traces.length) return null;
 
@@ -885,18 +885,8 @@ function RunScrubber({
             );
           })}
         </div>
-        <input
-          type="range"
-          min={0}
-          max={1000}
-          value={Math.round(((t - tMin) / span) * 1000)}
-          onChange={(e) => {
-            const nv = tMin + (Number(e.target.value) / 1000) * span;
-            onScrub(nv >= tMax - 1 ? null : nv); // re-pin to live at the far right (drives the shared time)
-          }}
-          className="w-full"
-          aria-label="Scrub run timeline"
-        />
+        {/* The gantt's own slider is hidden for now — the floating action bar's scrubber drives the shared
+            time, and this frame's playhead already follows it. Restore the <input range> here to re-enable. */}
       </FramePanel>
     </Frame>
   );
@@ -1055,7 +1045,17 @@ function RunDetail() {
     scrubbing && (!r.finishedAt || new Date(r.finishedAt).getTime() > T)
       ? ({ ...r, status: "running", finishedAt: null } as R)
       : r;
-  const observed = (scrubbing ? all.filter((r) => new Date(r.startedAt).getTime() <= T) : all).map(asObserved);
+  // Once the run is terminal, a trace row still marked "running" is stale: a build's FINAL trace write (e.g.
+  // "cancelled" after a Stop) can land a few seconds after the run flips terminal and the page stops polling.
+  // Coerce those to the run's terminal outcome so the live view matches — a reload reads the real, already-
+  // correct DB value. Never while scrubbing ("running" is intentional there) or while the run is live.
+  const runIsTerminal = !isLive && !!run.data?.status && TERMINAL_RUN_STATUS.has(run.data.status);
+  const terminalTone = run.data?.status === "cancelled" ? "cancelled" : "failed";
+  const coerceStale = <R extends { status: string }>(r: R): R =>
+    runIsTerminal && !scrubbing && r.status === "running" ? ({ ...r, status: terminalTone } as R) : r;
+  const observed = (scrubbing ? all.filter((r) => new Date(r.startedAt).getTime() <= T) : all)
+    .map(asObserved)
+    .map(coerceStale);
 
   const planAttempts = observed.filter((t) => t.phase === "plan") as unknown as PlanAttempt[];
   const buildRows = observed.filter((t) => t.phase === "build") as unknown as BuildTrace[];
@@ -1117,7 +1117,9 @@ function RunDetail() {
             ? { ...s, status: "running", completedAt: null, durationSeconds: null }
             : s,
         )
-    : timelineAll;
+    : // Same stale-row coercion for the SDK step timeline, so a terminal run shows no lingering "running"
+      // steps (and the "Building a channel…" placeholders, which key off status === "running", clear).
+      timelineAll.map(coerceStale);
 
   // Live builds: a `buildChannel` step whose trace hasn't landed yet (the trace row — with the whole
   // transcript — is written only when the step finishes). Show a placeholder so an in-flight build is
@@ -1324,7 +1326,6 @@ function RunDetail() {
           tMax={tMax}
           scrubbing={scrubbing}
           live={isLive}
-          onScrub={setScrub}
         />
       )}
 
