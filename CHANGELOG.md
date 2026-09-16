@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.0] - 2026-09-16
+
+AI lineup — richer, live observability tracing across the whole workflow.
+
+### Added
+- The planner step (`planLineup`) now opens a LIVE trace row up front (status "running") and finalizes it
+  on success/failure, like the channel builds — so the observability page shows the planner in flight
+  instead of a black box until the single (long) call returns.
+- Every workflow phase now records a trace row with a real duration: `analyzeLibrary`, `buildSharedContext`,
+  `listExistingPackages`, `createPackages`, `assignNumbers`, and `reportLineup` previously left no trace at
+  all (only console logs). The run's timeline is now complete end to end.
+
+### Notes
+- After deploying, `bunx workflow build` regenerates the workflow handlers (the `apps/server/workflows`
+  edits are a build-time transform).
+
 ## [0.13.65] - 2026-09-16
 
 AI assistant — clearer "media source not found" error so the model self-corrects.

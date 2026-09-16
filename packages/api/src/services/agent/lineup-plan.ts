@@ -26,7 +26,7 @@ import { z } from "zod";
 import { ACCENT_KEYS, channelAccentAt } from "../accents";
 import { fieldMeta, OPS_FOR_KIND } from "../plex/filter-fields";
 import { getConnectionForRole, getModel } from "./config";
-import { recordTrace, type TraceContext } from "./lineup-trace";
+import { recordTrace, startTrace, updateTrace, type TraceContext } from "./lineup-trace";
 
 
 /**
@@ -464,6 +464,21 @@ export async function planLineup(
   let object: z.infer<typeof planSchema>;
   let usage: Awaited<ReturnType<typeof generateObject>>["usage"] | undefined;
 
+  // Open a LIVE trace row up front so the observability page shows "planLineup running" during the (long,
+  // single) planner call instead of a black box until it returns. Falls back to a one-shot recordTrace at the
+  // end if the row couldn't be opened. Mirrors the channel builder's live-tracing pattern.
+  const traceId = opts.trace
+    ? await startTrace(prisma, {
+        ...opts.trace,
+        stepName: "planLineup",
+        phase: "plan",
+        status: "running",
+        input: { existingPackages: opts.existingPackages?.map((p) => p.key) ?? [] },
+        usage: { model: connection.model },
+        startedAt,
+      })
+    : null;
+
   try {
     ({ object, usage } = await generateObject({
       model: getModel(connection),
@@ -511,16 +526,13 @@ export async function planLineup(
       if (e.cause) console.error(`[plan] cause:`, String(e.cause).slice(0, 800));
     }
     if (opts.trace) {
-      await recordTrace(prisma, {
-        ...opts.trace,
-        stepName: "planLineup",
-        phase: "plan",
-        status: "failed",
+      const failure = {
+        status: "failed" as const,
         error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
         output: { finishReason: e?.finishReason, rawTextChars: e?.text?.length ?? 0 },
-        usage: { model: connection.model },
-        startedAt,
-      });
+      };
+      if (traceId) await updateTrace(prisma, traceId, { ...failure, finished: true });
+      else await recordTrace(prisma, { ...opts.trace, stepName: "planLineup", phase: "plan", ...failure, usage: { model: connection.model }, startedAt });
     }
     throw err;
   }
@@ -539,12 +551,8 @@ export async function planLineup(
   // channels that actually got BUILT left a row anywhere, so a capped run threw away the other
   // 28 designs. Storing it means plan quality can be judged for the price of one call.
   if (opts.trace) {
-    await recordTrace(prisma, {
-      ...opts.trace,
-      stepName: "planLineup",
-      phase: "plan",
-      status: "ok",
-      input: { existingPackages: opts.existingPackages?.map((p) => p.key) ?? [] },
+    const success = {
+      status: "ok" as const,
       output: draft,
       usage: {
         model: connection.model,
@@ -553,8 +561,17 @@ export async function planLineup(
         cacheReadTokens: usage?.inputTokenDetails?.cacheReadTokens ?? 0,
         cacheWriteTokens: usage?.inputTokenDetails?.cacheWriteTokens ?? 0,
       },
-      startedAt,
-    });
+    };
+    if (traceId) await updateTrace(prisma, traceId, { ...success, finished: true });
+    else
+      await recordTrace(prisma, {
+        ...opts.trace,
+        stepName: "planLineup",
+        phase: "plan",
+        input: { existingPackages: opts.existingPackages?.map((p) => p.key) ?? [] },
+        ...success,
+        startedAt,
+      });
   }
 
   return draft;

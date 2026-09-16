@@ -46,6 +46,7 @@ import {
   planLineup as planLineupService,
 } from "@airwave/api/services/agent/lineup-plan";
 import type { LineupRunArgs } from "@airwave/api/services/agent/lineup-runner";
+import { recordTrace, type TracePhase } from "@airwave/api/services/agent/lineup-trace";
 import { clearAiGenerated, createPackage, discoverFieldValues } from "@airwave/api/services/agent/tools";
 import {
   INITIAL_WINDOW_SECONDS,
@@ -75,6 +76,20 @@ function traceContext() {
   const { workflowRunId } = getWorkflowMetadata();
   const { stepId, attempt } = getStepMetadata();
   return { runId: workflowRunId, stepId, attempt };
+}
+
+/**
+ * Record a phase's trace row from inside a step, so the observability timeline (and the scrubber) sees
+ * EVERY phase, not just the plan + per-channel builds. `startedAt` is captured at the top of the step so the
+ * row carries a real duration. Best-effort (recordTrace never throws). Only callable inside a `"use step"`.
+ */
+async function tracePhase(
+  startedAt: Date,
+  stepName: string,
+  phase: TracePhase,
+  output?: unknown,
+): Promise<void> {
+  await recordTrace(prisma, { ...traceContext(), stepName, phase, status: "ok", output, startedAt });
 }
 
 // PlannedChannel / PlannedPackage / LineupPlan now live with the planner service
@@ -219,12 +234,20 @@ function sampleAcrossPackages<T extends { packageId: string }>(jobs: T[], limit:
 /** §4.1 — distill the library into a few-KB profile the planner can reason over. */
 async function analyzeLibrary(sourceId: string): Promise<LibraryProfile> {
   "use step";
+  const startedAt = new Date();
   const profile = await buildLibraryProfile(prisma, sourceId);
   console.log(
     `[lineup] analyze: ${profile.totals.movies} movies / ${profile.totals.shows} shows / ` +
       `${profile.totals.episodes} episodes · ${profile.genres.length} genres · ` +
       `${profile.studios.length} studios · ${profile.topShows.length} sizeable shows`,
   );
+  await tracePhase(startedAt, "analyzeLibrary", "analyze", {
+    movies: profile.totals.movies,
+    shows: profile.totals.shows,
+    episodes: profile.totals.episodes,
+    genres: profile.genres.length,
+    studios: profile.studios.length,
+  });
   return profile;
 }
 
@@ -237,6 +260,7 @@ async function analyzeLibrary(sourceId: string): Promise<LibraryProfile> {
  */
 async function buildSharedContext(sourceId: string, profile: LibraryProfile): Promise<string> {
   "use step";
+  const startedAt = new Date();
   const vocabulary = await buildFilterVocabulary((field) =>
     discoverFieldValues(prisma, { mediaSourceId: sourceId, mediaTypes: ["movie", "show"], field }),
   );
@@ -255,6 +279,11 @@ async function buildSharedContext(sourceId: string, profile: LibraryProfile): Pr
   console.log(
     `[lineup] shared context: ${vocabulary.length} fields, ${text.length} chars (~${Math.ceil(text.length / 4)} tokens, cached once for the whole run)`,
   );
+  await tracePhase(startedAt, "buildSharedContext", "context", {
+    fields: vocabulary.length,
+    chars: text.length,
+    approxTokens: Math.ceil(text.length / 4),
+  });
   return text;
 }
 
@@ -266,6 +295,7 @@ async function buildSharedContext(sourceId: string, profile: LibraryProfile): Pr
  */
 async function listExistingPackages(): Promise<ExistingPackage[]> {
   "use step";
+  const startedAt = new Date();
   const rows = await prisma.channelPackage.findMany({
     orderBy: [{ sortIndex: "asc" }, { name: "asc" }],
     select: {
@@ -295,6 +325,10 @@ async function listExistingPackages(): Promise<ExistingPackage[]> {
     `[lineup] existing packages: ${packages.length} offered to the planner ` +
       `(${rows.length - packages.length} AI packages excluded — they're wiped before reuse resolves)`,
   );
+  await tracePhase(startedAt, "listExistingPackages", "context", {
+    offered: packages.length,
+    excludedAiPackages: rows.length - packages.length,
+  });
   return packages;
 }
 
@@ -324,8 +358,13 @@ async function assignNumbers(
   packageIds: Record<string, string>,
 ): Promise<LineupPlan> {
   "use step";
+  const startedAt = new Date();
   const plan = await assignChannelNumbers(prisma, draft, packageIds);
   console.log(`[lineup] numbering:\n${formatLineupPlan(plan)}`);
+  await tracePhase(startedAt, "assignNumbers", "numbering", {
+    packages: plan.packages.length,
+    channels: plan.packages.reduce((n, p) => n + p.channels.length, 0),
+  });
   return plan;
 }
 
@@ -339,12 +378,14 @@ async function assignNumbers(
  */
 async function createPackages(plan: LineupPlanDraft, dryRun: boolean): Promise<Record<string, string>> {
   "use step";
+  const startedAt = new Date();
   // DRY RUN: the load-bearing safety gate. Do NOT wipe the existing AI lineup and do NOT create packages —
   // return placeholder ids so the per-channel verify step still runs. Nothing is persisted. (#22)
   if (dryRun) {
     const ids: Record<string, string> = {};
     for (const pkg of plan.packages) ids[pkg.key] = `dry-run:${pkg.key}`;
     console.log(`[lineup] createPackages: DRY RUN — ${plan.packages.length} packages NOT created (existing lineup untouched)`);
+    await tracePhase(startedAt, "createPackages", "packages", { dryRun: true, packages: plan.packages.length });
     return ids;
   }
   const cleared = await clearAiGenerated(prisma, "both");
@@ -385,6 +426,7 @@ async function createPackages(plan: LineupPlanDraft, dryRun: boolean): Promise<R
   }
 
   console.log(`[lineup] createPackages: ${created} created, ${reused} reused`);
+  await tracePhase(startedAt, "createPackages", "packages", { created, reused, cleared });
   return ids;
 }
 
@@ -453,6 +495,7 @@ async function reportLineup(
   dryRun: boolean,
 ): Promise<LineupReport> {
   "use step";
+  const startedAt = new Date();
   const usage = built.reduce(
     (acc, b) => {
       if (!b.usage) return acc;
@@ -486,5 +529,13 @@ async function reportLineup(
       `cacheWrite ${usage.cacheWriteTokens.toLocaleString()}) ` +
       `out=${usage.outputTokens.toLocaleString()} over ${usage.steps} steps in ${usage.channelsWithUsage} builds`,
   );
+  await tracePhase(startedAt, "reportLineup", "report", {
+    packagesCreated: report.packagesCreated,
+    channelsPlanned: report.channelsPlanned,
+    channelsCreated: report.channelsCreated,
+    skipped: report.skipped.length,
+    failed: report.failed.length,
+    dryRun,
+  });
   return report;
 }
