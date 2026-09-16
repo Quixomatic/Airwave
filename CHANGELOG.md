@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.62] - 2026-09-15
+
+Admin — Manual picker: a floating selection action bar.
+
+### Changed
+- Selecting search results in the Manual picker now brings up a floating action bar (Framer Motion fade +
+  slide up) anchored to the bottom of the search results section: it shows the count and offers Select all,
+  Clear, and Add item(s), replacing the static Add button.
+
 ## [0.13.61] - 2026-09-15
 
 Admin — Manual pool: multi-column list rows.

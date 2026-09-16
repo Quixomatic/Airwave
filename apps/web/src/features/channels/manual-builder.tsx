@@ -1,7 +1,8 @@
 import { Button } from "@airwave/ui/components/button";
 import { Checkbox } from "@airwave/ui/components/checkbox";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Check, ChevronDown, ChevronRight, Clapperboard, ListChecks, ListTree, Search, Tv, X } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Check, ChevronDown, ChevronRight, Clapperboard, ListChecks, ListTree, Plus, Search, Tv, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { EmptyState } from "@/components/empty-state";
@@ -246,6 +247,12 @@ export function ManualBuilder({
   const hasResults = data && (data.movies.length > 0 || data.shows.length > 0 || data.episodes.length > 0);
   const searching = canSearch && results.isFetching && !hasResults;
 
+  // The top-level result items (movies + whole shows + direct episodes), for "Select all".
+  const resultKeys = data ? [...data.movies, ...data.shows, ...data.episodes].map((i) => i.ratingKey) : [];
+  const allSelected = resultKeys.length > 0 && resultKeys.every((k) => checked.has(k));
+  const selectAll = () => setChecked((prev) => new Set([...prev, ...resultKeys]));
+  const clearSelection = () => setChecked(new Set());
+
   return (
     <div className="space-y-3 rounded-md border p-3">
       {/* Search bar with the scope checkboxes baked in. */}
@@ -272,9 +279,10 @@ export function ManualBuilder({
       </div>
 
       {/* Results — poster tiles matching the preview grid. The scroll box uses p-1 so a selected tile's
-          outer ring isn't clipped at the edges. */}
+          outer ring isn't clipped at the edges. The `relative` wrapper anchors the floating action bar. */}
       {debounced.length >= 2 && (
-        <div className="max-h-[32rem] space-y-3 overflow-y-auto p-1">
+        <div className="relative">
+          <div className="max-h-[32rem] space-y-3 overflow-y-auto p-1">
           {searching ? (
             <PreviewSkeleton count={ONE_ROW} />
           ) : !hasResults ? (
@@ -331,13 +339,36 @@ export function ManualBuilder({
               )}
             </>
           )}
-        </div>
-      )}
+          </div>
 
-      {checked.size > 0 && (
-        <Button type="button" size="sm" onClick={addChecked}>
-          Add {checked.size} item{checked.size === 1 ? "" : "s"}
-        </Button>
+          {/* Floating action bar — fades/slides in from the bottom of the results section on selection. */}
+          <AnimatePresence>
+            {checked.size > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 16 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center"
+              >
+                <div className="bg-popover/95 pointer-events-auto flex items-center gap-1 rounded-full border py-1.5 pl-3 pr-1.5 shadow-lg backdrop-blur">
+                  <span className="text-sm font-medium">{checked.size} selected</span>
+                  <span className="bg-border mx-1 h-4 w-px" />
+                  <Button type="button" variant="ghost" size="sm" onClick={selectAll} disabled={allSelected}>
+                    Select all
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={clearSelection}>
+                    Clear
+                  </Button>
+                  <Button type="button" size="sm" onClick={addChecked}>
+                    <Plus className="mr-1 size-3.5" />
+                    Add {checked.size} item{checked.size === 1 ? "" : "s"}
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       )}
 
       {/* Current pool — removable. */}
