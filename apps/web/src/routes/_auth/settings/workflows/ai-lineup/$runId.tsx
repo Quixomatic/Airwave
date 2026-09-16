@@ -816,23 +816,36 @@ type ScrubRow = {
  * of the run legible (watch the builds fire, spot stragglers). Pure view over the trace rows we already
  * store; step/attempt granularity. Pinned to "live" (T = latest) until you scrub back.
  */
-function RunScrubber({ traces, live }: { traces: ScrubRow[]; live: boolean }) {
-  // null = pinned to the live edge; a number = scrubbed to that instant.
-  const [scrub, setScrub] = useState<number | null>(null);
+function RunScrubber({
+  traces,
+  t,
+  tMin,
+  tMax,
+  scrubbing,
+  live,
+  onScrub,
+}: {
+  traces: ScrubRow[];
+  // CONTROLLED by the page's shared scrub time, so the gantt playhead follows the global scrubber. It still
+  // shows the FULL timeline (all rows) and its own slider can drive the same shared time independently.
+  t: number;
+  tMin: number;
+  tMax: number;
+  scrubbing: boolean;
+  live: boolean;
+  onScrub: (ms: number | null) => void;
+}) {
   if (!traces.length) return null;
 
   const rows = traces
-    .map((t) => ({
-      ...t,
-      start: new Date(t.startedAt).getTime(),
-      end: t.finishedAt ? new Date(t.finishedAt).getTime() : null,
+    .map((r) => ({
+      ...r,
+      start: new Date(r.startedAt).getTime(),
+      end: r.finishedAt ? new Date(r.finishedAt).getTime() : null,
     }))
     .sort((a, b) => a.start - b.start || (a.channelName ?? "").localeCompare(b.channelName ?? ""));
   const now = Date.now();
-  const tMin = Math.min(...rows.map((r) => r.start));
-  const tMax = Math.max(...rows.map((r) => r.end ?? (live ? now : r.start)), live ? now : tMin);
   const span = Math.max(1, tMax - tMin);
-  const t = scrub ?? tMax;
   const pct = (ms: number) => ((ms - tMin) / span) * 100;
   const stateAt = (r: (typeof rows)[number]) =>
     r.start > t ? "upcoming" : r.end == null || r.end > t ? "running" : r.status;
@@ -844,7 +857,7 @@ function RunScrubber({ traces, live }: { traces: ScrubRow[]; live: boolean }) {
         <FrameTitle className="text-sm">Replay timeline</FrameTitle>
         <span className="text-muted-foreground text-xs tabular-nums">
           {new Date(t).toLocaleTimeString()}
-          {scrub == null ? (live ? " · live" : " · end") : ""} · {runningNow} running
+          {!scrubbing ? (live ? " · live" : " · end") : ""} · {runningNow} running
         </span>
       </FrameHeader>
       <FramePanel className="space-y-2">
@@ -879,7 +892,7 @@ function RunScrubber({ traces, live }: { traces: ScrubRow[]; live: boolean }) {
           value={Math.round(((t - tMin) / span) * 1000)}
           onChange={(e) => {
             const nv = tMin + (Number(e.target.value) / 1000) * span;
-            setScrub(nv >= tMax - 1 ? null : nv); // re-pin to live at the far right
+            onScrub(nv >= tMax - 1 ? null : nv); // re-pin to live at the far right (drives the shared time)
           }}
           className="w-full"
           aria-label="Scrub run timeline"
@@ -1302,6 +1315,19 @@ function RunDetail() {
         </Frame>
       )}
 
+      {/* Replay scrubber — the run overview + shared scrub, above the plan/build detail it drives. */}
+      {all.length > 0 && (
+        <RunScrubber
+          traces={all as unknown as ScrubRow[]}
+          t={T}
+          tMin={tMin}
+          tMax={tMax}
+          scrubbing={scrubbing}
+          live={isLive}
+          onScrub={setScrub}
+        />
+      )}
+
       {/* THE PLAN — the run's most valuable artifact, and previously discarded entirely for any
           channel that a build cap meant we never constructed. The frame renders even before the
           plan step finishes, showing a loading state while the planner works. */}
@@ -1403,9 +1429,6 @@ function RunDetail() {
           </FramePanel>
         </Frame>
       )}
-
-      {/* Replay scrubber — reconstruct the run's state at any instant to see ordering + concurrency. */}
-      {all.length > 0 && <RunScrubber traces={all as unknown as ScrubRow[]} live={isLive} />}
 
       {/* The SDK's outside view — durations and retries per step, with a proportional bar and, for
           builds, the channel the step was for (correlated by stepId). */}

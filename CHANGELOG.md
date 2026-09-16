@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.3] - 2026-09-16
+
+AI lineup run page — the replay timeline follows the global scrubber and sits up top.
+
+### Changed
+- The gantt "Replay timeline" now shares the page's scrub time: the global scrubber in the floating bar
+  moves its playhead (and it still has its own slider that drives the same shared time), while it keeps
+  showing the full run timeline. Moved it above the plan and channel-build frames so it reads as the run
+  overview that drives the detail below.
+
 ## [0.14.2] - 2026-09-16
 
 AI lineup run page — a floating action bar with a global replay scrubber.
