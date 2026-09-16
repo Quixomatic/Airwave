@@ -37,7 +37,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@airwave/ui/components/tooltip";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   CheckCircle2,
@@ -790,6 +790,105 @@ function PlanSection({ attempts }: { attempts: PlanAttempt[] }) {
 
 // ---- Page ------------------------------------------------------------------------------------
 
+/** One row's state AS OF the scrubber time T. */
+const SCRUB_BAR: Record<string, string> = {
+  running: "bg-blue-500",
+  ok: "bg-emerald-500",
+  failed: "bg-red-500",
+  skipped: "bg-amber-500",
+  upcoming: "bg-muted-foreground/25",
+};
+
+type ScrubRow = {
+  id: string;
+  phase: string;
+  stepName: string;
+  channelName: string | null;
+  attempt: number;
+  status: string;
+  startedAt: string | Date;
+  finishedAt: string | Date | null;
+};
+
+/**
+ * Replay scrubber (observability): a Gantt of every trace row on a shared time axis, with a slider that
+ * reconstructs the run's state at any moment T — upcoming / running / final. Makes the ORDER and CONCURRENCY
+ * of the run legible (watch the builds fire, spot stragglers). Pure view over the trace rows we already
+ * store; step/attempt granularity. Pinned to "live" (T = latest) until you scrub back.
+ */
+function RunScrubber({ traces, live }: { traces: ScrubRow[]; live: boolean }) {
+  // null = pinned to the live edge; a number = scrubbed to that instant.
+  const [scrub, setScrub] = useState<number | null>(null);
+  if (!traces.length) return null;
+
+  const rows = traces
+    .map((t) => ({
+      ...t,
+      start: new Date(t.startedAt).getTime(),
+      end: t.finishedAt ? new Date(t.finishedAt).getTime() : null,
+    }))
+    .sort((a, b) => a.start - b.start || (a.channelName ?? "").localeCompare(b.channelName ?? ""));
+  const now = Date.now();
+  const tMin = Math.min(...rows.map((r) => r.start));
+  const tMax = Math.max(...rows.map((r) => r.end ?? (live ? now : r.start)), live ? now : tMin);
+  const span = Math.max(1, tMax - tMin);
+  const t = scrub ?? tMax;
+  const pct = (ms: number) => ((ms - tMin) / span) * 100;
+  const stateAt = (r: (typeof rows)[number]) =>
+    r.start > t ? "upcoming" : r.end == null || r.end > t ? "running" : r.status;
+  const runningNow = rows.filter((r) => stateAt(r) === "running").length;
+
+  return (
+    <Frame>
+      <FrameHeader className="flex-row items-center justify-between gap-2">
+        <FrameTitle className="text-sm">Replay timeline</FrameTitle>
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {new Date(t).toLocaleTimeString()}
+          {scrub == null ? (live ? " · live" : " · end") : ""} · {runningNow} running
+        </span>
+      </FrameHeader>
+      <FramePanel className="space-y-2">
+        <div className="max-h-72 space-y-0.5 overflow-y-auto pr-1">
+          {rows.map((r) => {
+            const st = stateAt(r);
+            const left = pct(r.start);
+            const width = Math.max(pct(r.end ?? (live ? now : r.start)) - left, 0.6);
+            return (
+              <div key={r.id} className="flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground w-44 shrink-0 truncate">
+                  {(PHASE_LABEL[r.phase] ?? r.phase) + ": "}
+                  {r.channelName ?? r.stepName}
+                  {r.attempt > 1 ? ` (a${r.attempt})` : ""}
+                </span>
+                <div className="bg-muted/40 relative h-3 flex-1 overflow-hidden rounded">
+                  <div
+                    className={`absolute inset-y-0 rounded ${SCRUB_BAR[st] ?? SCRUB_BAR.upcoming} ${st === "running" ? "animate-pulse" : ""}`}
+                    style={{ left: `${left}%`, width: `${width}%` }}
+                  />
+                  {/* playhead — same axis on every row, so the lines align vertically */}
+                  <div className="bg-foreground/50 absolute inset-y-0 w-px" style={{ left: `${pct(t)}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={1000}
+          value={Math.round(((t - tMin) / span) * 1000)}
+          onChange={(e) => {
+            const nv = tMin + (Number(e.target.value) / 1000) * span;
+            setScrub(nv >= tMax - 1 ? null : nv); // re-pin to live at the far right
+          }}
+          className="w-full"
+          aria-label="Scrub run timeline"
+        />
+      </FramePanel>
+    </Frame>
+  );
+}
+
 function RunDetail() {
   const { runId } = Route.useParams();
   // Auto-refresh toggle. On (default) = poll live runs; off = the Refresh button is the only way to update,
@@ -922,6 +1021,22 @@ function RunDetail() {
     void usage.refetch();
   };
 
+  // Stop a live run (#28). The mutation existed with no caller; this is the escape hatch. Cancelling marks
+  // the run terminal + stops future steps (an in-flight model call finishes, then the run reports cancelled).
+  const cancelRun = useMutation(
+    trpc.ai.cancelLineupRun.mutationOptions({
+      onSuccess: () => {
+        void run.refetch();
+        refetchAll();
+      },
+    }),
+  );
+  const stopRun = () => {
+    if (window.confirm("Stop this run? A build in progress will leave a partially-built lineup.")) {
+      cancelRun.mutate({ runId });
+    }
+  };
+
   // Timeline → jump-to. Clicking a step scrolls to (and, for builds, opens) the thing it produced.
   // Single-open accordion: only one channel build is expanded at a time.
   const [openBuild, setOpenBuild] = useState<string | null>(null);
@@ -973,6 +1088,18 @@ function RunDetail() {
               <Switch checked={autoPoll} onCheckedChange={(v) => setAutoPoll(v === true)} />
               Auto-refresh
             </label>
+            {isLive && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={stopRun}
+                disabled={cancelRun.isPending}
+                className="text-red-600 hover:text-red-600 dark:text-red-500"
+              >
+                {cancelRun.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ban className="mr-2 h-4 w-4" />}
+                Stop run
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={refetchAll} disabled={traces.isFetching}>
               {traces.isFetching ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1177,6 +1304,9 @@ function RunDetail() {
           </FramePanel>
         </Frame>
       )}
+
+      {/* Replay scrubber — reconstruct the run's state at any instant to see ordering + concurrency. */}
+      {all.length > 0 && <RunScrubber traces={all as unknown as ScrubRow[]} live={isLive} />}
 
       {/* The SDK's outside view — durations and retries per step, with a proportional bar and, for
           builds, the channel the step was for (correlated by stepId). */}

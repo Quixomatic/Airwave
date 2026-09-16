@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.1] - 2026-09-16
+
+AI lineup run page — a Stop button and a replay scrubber.
+
+### Added
+- **Stop run** button in the run detail header (shown while a run is live). Wires the existing
+  `ai.cancelLineupRun` (which had no caller), with a confirm — marks the run cancelled and stops further
+  steps. (#28; cooperative abort of an in-flight model call is a follow-up.)
+- **Replay scrubber**: a Gantt of every trace row on a shared time axis with a slider that reconstructs the
+  run's state at any instant (upcoming / running / final), so the order and concurrency of a run are
+  legible. Pure view over the trace rows; pinned to live until you scrub back.
+
 ## [0.14.0] - 2026-09-16
 
 AI lineup — richer, live observability tracing across the whole workflow.
