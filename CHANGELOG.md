@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.2] - 2026-09-16
+
+AI lineup run page — a floating action bar with a global replay scrubber.
+
+### Added
+- A floating action bar pinned to the bottom of the run page (sticky, strong shadow) holding the run
+  status, a global replay scrubber, a jump-to-live/end button, and Stop run.
+- The global scrubber replays the WHOLE page through observed time: dragging back re-renders every frame
+  (plan, builds, other phases, step timeline) as of that instant — rows not yet started are hidden and rows
+  still in flight read as running. Jump-to-live re-pins to the latest.
+
+### Changed
+- The Stop-run control moved from the header into the floating bar. The gantt "Replay timeline" frame
+  stays as its own self-contained overview (its own slider, always the full timeline) and is not affected
+  by the global scrubber.
+
 ## [0.14.1] - 2026-09-16
 
 AI lineup run page — a Stop button and a replay scrubber.

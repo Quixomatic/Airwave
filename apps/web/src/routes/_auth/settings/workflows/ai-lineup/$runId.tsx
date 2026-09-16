@@ -889,11 +889,90 @@ function RunScrubber({ traces, live }: { traces: ScrubRow[]; live: boolean }) {
   );
 }
 
+/**
+ * The floating run action bar — bottom-anchored, frosted (BottomBlur), styled like the manual-channel
+ * picker's bar but full-width. It hosts the GLOBAL replay scrubber (drags the whole page back through what
+ * was observed at time T), the current run status, a jump-to-live/end button, and Stop run. The gantt
+ * "Replay timeline" frame is a separate, self-contained overview and is NOT driven by this scrubber.
+ */
+function RunActionBar({
+  runStatus,
+  isLive,
+  scrubbing,
+  t,
+  tMin,
+  tMax,
+  onScrub,
+  onLive,
+  onStop,
+  stopping,
+}: {
+  runStatus: string | null;
+  isLive: boolean;
+  scrubbing: boolean;
+  t: number;
+  tMin: number;
+  tMax: number;
+  onScrub: (ms: number | null) => void;
+  onLive: () => void;
+  onStop: () => void;
+  stopping: boolean;
+}) {
+  const span = Math.max(1, tMax - tMin);
+  return (
+    // `sticky` pins the bar to the bottom of the page scrollport with no layout changes and no blur — it
+    // stays in the content column (its own flow width, so it never touches the scrollbar), offset up with a
+    // strong shadow so it reads as floating over the content.
+    <div className="pointer-events-none sticky bottom-6 z-40 mt-4 flex justify-center px-2">
+      <div className="bg-card pointer-events-auto flex w-full max-w-4xl items-center gap-3 rounded-md border py-2 pr-2 pl-3 shadow-[0_25px_60px_-10px_rgba(0,0,0,0.65),0_10px_25px_-8px_rgba(0,0,0,0.5)] dark:shadow-[0_25px_70px_-8px_rgba(0,0,0,0.9),0_10px_25px_-6px_rgba(0,0,0,0.75)]">
+          {runStatus && (
+            <Badge variant="outline" className={`shrink-0 ${STATUS_TONE[runStatus] ?? ""}`}>
+              {runStatus[0].toUpperCase() + runStatus.slice(1)}
+            </Badge>
+          )}
+          <span className="text-muted-foreground w-20 shrink-0 text-xs tabular-nums">
+            {new Date(t).toLocaleTimeString()}
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={1000}
+            value={Math.round(((t - tMin) / span) * 1000)}
+            onChange={(e) => {
+              const nv = tMin + (Number(e.target.value) / 1000) * span;
+              onScrub(nv >= tMax - 1 ? null : nv); // re-pin to live at the far right
+            }}
+            className="min-w-0 flex-1"
+            aria-label="Scrub the run"
+          />
+          <Button size="sm" variant="ghost" onClick={onLive} disabled={!scrubbing} className="shrink-0">
+            {isLive ? "Live" : "End"}
+          </Button>
+          {isLive && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onStop}
+              disabled={stopping}
+              className="shrink-0 text-red-600 hover:text-red-600 dark:text-red-500"
+            >
+              {stopping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ban className="mr-2 h-4 w-4" />}
+              Stop
+            </Button>
+          )}
+        </div>
+    </div>
+  );
+}
+
 function RunDetail() {
   const { runId } = Route.useParams();
   // Auto-refresh toggle. On (default) = poll live runs; off = the Refresh button is the only way to update,
   // which keeps the server log clean (each poll is a long tRPC GET). Frontend-only; gates every interval.
   const [autoPoll, setAutoPoll] = useState(true);
+  // Global replay scrub — an instant the user dragged to via the floating bar (null = pinned to the live
+  // edge). When scrubbed back, the WHOLE page renders "as observed at T". See the derivation below.
+  const [scrub, setScrub] = useState<number | null>(null);
 
   // The authoritative run status + return value. Only `plan`/`build` phases write trace rows, so the
   // report (which carries `dryRun`) and the overall status live on the run itself, not in a trace.
@@ -946,11 +1025,30 @@ function RunDetail() {
   const totalOut = rows.reduce((s, r) => s + r.outputTokens, 0);
 
   const all = traces.data ?? [];
-  const planAttempts = all.filter((t) => t.phase === "plan") as unknown as PlanAttempt[];
-  const buildRows = all.filter((t) => t.phase === "build") as unknown as BuildTrace[];
+
+  // ── Global replay derivation ────────────────────────────────────────────────────────────────────
+  // Bounds from the trace rows; `T` is the instant every frame is rendered as-of. `scrubbing` is true only
+  // when dragged back from the live edge. A row not yet started at T is hidden; a row still in flight at T
+  // is collapsed to `running` (its post-hoc trace + finish time didn't exist yet at T).
+  const scrubMs = all
+    .flatMap((r) => [new Date(r.startedAt).getTime(), r.finishedAt ? new Date(r.finishedAt).getTime() : NaN])
+    .filter(Number.isFinite);
+  const tMin = scrubMs.length ? Math.min(...scrubMs) : 0;
+  const tEnd = scrubMs.length ? Math.max(...scrubMs) : 0;
+  const tMax = isLive ? Math.max(tEnd, Date.now()) : tEnd;
+  const scrubbing = scrub != null && scrub < tMax;
+  const T = scrub ?? tMax;
+  const asObserved = <R extends { startedAt: string | Date; finishedAt: string | Date | null; status: string }>(r: R): R =>
+    scrubbing && (!r.finishedAt || new Date(r.finishedAt).getTime() > T)
+      ? ({ ...r, status: "running", finishedAt: null } as R)
+      : r;
+  const observed = (scrubbing ? all.filter((r) => new Date(r.startedAt).getTime() <= T) : all).map(asObserved);
+
+  const planAttempts = observed.filter((t) => t.phase === "plan") as unknown as PlanAttempt[];
+  const buildRows = observed.filter((t) => t.phase === "build") as unknown as BuildTrace[];
   // Plan attempts (incl. failed retries) live in their own section now; everything non-build,
   // non-plan lands here (analyze, context, packages, numbering, report).
-  const others = all.filter((t) => t.phase !== "build" && t.phase !== "plan");
+  const others = observed.filter((t) => t.phase !== "build" && t.phase !== "plan");
   // Dry run (#22): the report is the run's RETURN VALUE (there is no `report` trace phase), plus each
   // dry-run build tags its input, so a preview shows the badge live too — not only once it finishes.
   const report = run.data?.output as
@@ -969,9 +1067,11 @@ function RunDetail() {
     all.some((t) => Boolean((t.input as { dryRun?: boolean } | null)?.dryRun));
 
   // Overall run status for the header badge. `run.data.status` is authoritative; fall back to the
-  // step list (any running → running; otherwise completed once steps exist).
-  const runStatus =
-    run.data?.status ?? (isLive ? "running" : (steps.data?.length ?? 0) > 0 ? "completed" : null);
+  // step list (any running → running; otherwise completed once steps exist). While scrubbed back the run
+  // wasn't terminal yet, so it reads as "running".
+  const runStatus = scrubbing
+    ? "running"
+    : (run.data?.status ?? (isLive ? "running" : (steps.data?.length ?? 0) > 0 ? "completed" : null));
 
   // Merge builds by channel so retries/duplicates collapse into one card with an attempt switcher.
   const buildGroups = new Map<string, BuildTrace[]>();
@@ -993,7 +1093,18 @@ function RunDetail() {
   // Correlate the SDK step list with build traces (by stepId) so the timeline can name channels.
   const channelByStep = new Map<string, BuildTrace>();
   for (const b of buildRows) if (b.stepId) channelByStep.set(b.stepId, b);
-  const timeline = steps.data ?? [];
+  // Step timeline, also rendered as-of T when scrubbing (steps not started are hidden; ones finishing
+  // after T read as running).
+  const timelineAll = steps.data ?? [];
+  const timeline = scrubbing
+    ? timelineAll
+        .filter((s) => s.startedAt && new Date(s.startedAt).getTime() <= T)
+        .map((s) =>
+          s.completedAt && new Date(s.completedAt).getTime() > T
+            ? { ...s, status: "running", completedAt: null, durationSeconds: null }
+            : s,
+        )
+    : timelineAll;
 
   // Live builds: a `buildChannel` step whose trace hasn't landed yet (the trace row — with the whole
   // transcript — is written only when the step finishes). Show a placeholder so an in-flight build is
@@ -1067,7 +1178,7 @@ function RunDetail() {
         : others.length > 0;
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="space-y-4 pb-32">
       {/* Header + summary. Rendered immediately; the stat tiles fill in as data lands. */}
       <Frame>
         <FrameHeader className="flex-row items-center justify-between">
@@ -1088,18 +1199,6 @@ function RunDetail() {
               <Switch checked={autoPoll} onCheckedChange={(v) => setAutoPoll(v === true)} />
               Auto-refresh
             </label>
-            {isLive && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={stopRun}
-                disabled={cancelRun.isPending}
-                className="text-red-600 hover:text-red-600 dark:text-red-500"
-              >
-                {cancelRun.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ban className="mr-2 h-4 w-4" />}
-                Stop run
-              </Button>
-            )}
             <Button size="sm" variant="outline" onClick={refetchAll} disabled={traces.isFetching}>
               {traces.isFetching ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1376,6 +1475,22 @@ function RunDetail() {
           })}
         </FramePanel>
       </Frame>
+
+      {/* Floating global scrubber + status + cancel — replays the whole page through observed time. */}
+      {all.length > 0 && (
+        <RunActionBar
+          runStatus={runStatus}
+          isLive={isLive}
+          scrubbing={scrubbing}
+          t={T}
+          tMin={tMin}
+          tMax={tMax}
+          onScrub={setScrub}
+          onLive={() => setScrub(null)}
+          onStop={stopRun}
+          stopping={cancelRun.isPending}
+        />
+      )}
     </div>
   );
 }
