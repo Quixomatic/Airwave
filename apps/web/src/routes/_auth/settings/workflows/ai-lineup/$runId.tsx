@@ -38,7 +38,7 @@ import {
   TooltipTrigger,
 } from "@airwave/ui/components/tooltip";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   CheckCircle2,
   ChevronLeft,
@@ -1067,6 +1067,7 @@ function RunDetail() {
   const report = run.data?.output as
     | {
         dryRun?: boolean;
+        sourceId?: string;
         channelsPlanned?: number;
         channelsCreated?: number;
         packagesCreated?: number;
@@ -1163,6 +1164,27 @@ function RunDetail() {
     }
   };
 
+  // Build-from-dry-run (#32): commit the plan this dry run verified as a REAL run — no AI, no re-planning.
+  // Navigates to the new run so you watch it build.
+  const navigate = useNavigate();
+  const applyRun = useMutation(
+    trpc.ai.buildFromRun.mutationOptions({
+      onSuccess: (data: { runId: string }) => {
+        void navigate({ to: "/settings/workflows/ai-lineup/$runId", params: { runId: data.runId } });
+      },
+    }),
+  );
+  const applyThisPlan = () => {
+    if (!report?.sourceId) return;
+    if (
+      window.confirm(
+        "Build this plan for real? This replaces the current AI lineup with the channels this dry run verified (no AI, no re-planning).",
+      )
+    ) {
+      applyRun.mutate({ fromRunId: runId, sourceId: report.sourceId });
+    }
+  };
+
   // Timeline → jump-to. Clicking a step scrolls to (and, for builds, opens) the thing it produced.
   // Single-open accordion: only one channel build is expanded at a time.
   const [openBuild, setOpenBuild] = useState<string | null>(null);
@@ -1214,6 +1236,16 @@ function RunDetail() {
               <Switch checked={autoPoll} onCheckedChange={(v) => setAutoPoll(v === true)} />
               Auto-refresh
             </label>
+            {isDryRun && !isLive && run.data?.status === "completed" && report?.sourceId && (
+              <Button size="sm" onClick={applyThisPlan} disabled={applyRun.isPending}>
+                {applyRun.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Tv className="mr-2 h-4 w-4" />
+                )}
+                Build this plan
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={refetchAll} disabled={traces.isFetching}>
               {traces.isFetching ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

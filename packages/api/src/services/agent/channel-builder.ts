@@ -57,6 +57,13 @@ export type ChannelBuildResult = {
   channelId?: string;
   poolSize?: number;
   reason?: string;
+  /**
+   * The filter the agent actually COMMITTED — which may differ from the planner's proposal, since the
+   * builder can refine it during verification. Captured on the result (so it rides in the step's output)
+   * expressly so a build-from-dry-run can persist exactly what was verified WITHOUT re-running the agent.
+   */
+  committedFilter?: unknown;
+  committedMediaTypes?: string[];
   /** What this channel's agent loop cost. Absent when no LLM call was made. */
   usage?: ChannelUsage;
 };
@@ -362,9 +369,18 @@ export async function buildPlannedChannel(
           outcome = { ...base, status: "skipped", poolSize, reason: `Only ${poolSize} items matched.` };
           return { ok: false, message: `Pool too small (${poolSize}). Broaden the filter or give_up.` };
         }
-        // DRY RUN: record what it WOULD create — the verified pool size — but write nothing.
+        // DRY RUN: record what it WOULD create — the verified pool size AND the committed filter — but
+        // write nothing. The committed filter is what makes a later build-from-dry-run able to persist this
+        // exact channel without re-running the agent (see ChannelBuildResult.committedFilter).
         if (dryRun) {
-          outcome = { ...base, status: "created", poolSize, reason: "Dry run — would create with this verified filter." };
+          outcome = {
+            ...base,
+            status: "created",
+            poolSize,
+            reason: "Dry run — would create with this verified filter.",
+            committedFilter: filter,
+            committedMediaTypes: mediaTypes,
+          };
           return { ok: true, number: channel.number };
         }
         // The row already exists (reserved before the loop) — commit writes the VERIFIED
@@ -376,7 +392,14 @@ export async function buildPlannedChannel(
           filter: filter as never,
           enabled: true,
         });
-        outcome = { ...base, status: "created", channelId: reservedId, poolSize };
+        outcome = {
+          ...base,
+          status: "created",
+          channelId: reservedId,
+          poolSize,
+          committedFilter: filter,
+          committedMediaTypes: mediaTypes,
+        };
         return { ok: true, channelId: reservedId, number: channel.number };
       },
     }),

@@ -13,11 +13,31 @@
  * env configured still typechecks and boots; the procedures just report "not available".
  */
 
+/**
+ * Seed a run from a PREVIOUS run instead of planning fresh (§7.3a Workstreams C+D).
+ *  - `apply`   (#32): materialize a completed DRY RUN's verified outcomes into real channels — no AI, no
+ *              re-plan. Wipes + recreates the lineup and re-assigns numbers (against real packages), then
+ *              creates each would-create channel from the filter the dry run already committed.
+ *  - `rebuild` (#23): re-run the AI build for `channelKeys` only, from a completed run's stored plan data,
+ *              reusing the existing package + number. No wipe, no re-plan, no renumber; other channels are
+ *              left untouched (reported as "skipped over").
+ */
+export type SeedMode = "apply" | "rebuild";
+export type LineupSeed = {
+  /** The completed source run to seed from (a dry run for `apply`; any completed run for `rebuild`). */
+  fromRunId: string;
+  mode: SeedMode;
+  /** `rebuild` only: which channel keys to rebuild. Ignored for `apply` (which does the whole lineup). */
+  channelKeys?: string[];
+};
+
 export type LineupRunArgs = {
   /** Which media source to build the lineup from. */
   sourceId: string;
   /** Admin who triggered the run — recorded as each channel's `createdById`. */
   userId: string;
+  /** Seed from a previous run (build-from-dry-run / rebuild-single) instead of planning fresh. */
+  seed?: LineupSeed;
   /** Best-quality per-channel agent loop (default) vs the cheap deterministic path. */
   mode?: "quality" | "fast";
   /** Cap the run for testing — build at most this many channels. */

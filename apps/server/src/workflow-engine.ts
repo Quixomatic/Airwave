@@ -144,12 +144,14 @@ export async function startWorkflowEngine(): Promise<void> {
   const [
     { createWorld },
     { start, getRun },
+    { setWorld },
     { hydrateResourceIO, observabilityRevivers },
     flow,
     step,
   ] = await Promise.all([
     import("@workflow/world-postgres"),
     import("workflow/api"),
+    import("workflow/runtime"),
     import("workflow/observability"),
     import("../.well-known/workflow/v1/flow.js"),
     import("../.well-known/workflow/v1/step.js"),
@@ -199,6 +201,9 @@ export async function startWorkflowEngine(): Promise<void> {
   }
 
   const world = createWorld();
+  // Register the world globally so steps can read run/step data via `getWorld()` (the seed loader for the
+  // build-from-dry-run / rebuild flows) without opening a second pg pool per run.
+  setWorld(world);
 
   // #29 — cancel any config-drifted non-terminal lineup run BEFORE the poller can pick it up and
   // resume-and-wipe with stale args. Reads frozen args via the observability API; best-effort. Cancel goes

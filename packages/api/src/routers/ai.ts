@@ -104,6 +104,31 @@ export const aiRouter = router({
       });
     }),
 
+  /**
+   * Build a real lineup from a completed DRY RUN (#32). Materializes the filters the dry run already verified
+   * — no re-plan, no AI — wiping + recreating the AI lineup just like a normal build. Same destructive
+   * confirm as `buildLineup` (it replaces the existing AI lineup).
+   */
+  buildFromRun: adminProcedure
+    .input(z.object({ fromRunId: z.string(), sourceId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const readiness = await getSourceReadiness(ctx.prisma, input.sourceId);
+      if (!readiness?.ready) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: readiness ? notReadyReason(readiness.fields, "build an AI lineup")! : "Media source not found.",
+        });
+      }
+      const settings = await getAppSettings(ctx.prisma);
+      return requireLineupRunner().start({
+        sourceId: input.sourceId,
+        userId: ctx.session.user.id,
+        concurrency: settings.channelBuildConcurrency,
+        plannerMaxOutputTokens: settings.plannerMaxOutputTokens,
+        seed: { fromRunId: input.fromRunId, mode: "apply" },
+      });
+    }),
+
   /** Recent AI lineup runs for the observability page (metadata + step counts). */
   lineupRuns: adminProcedure
     .input(z.object({ limit: z.number().int().positive().max(100).optional() }).optional())

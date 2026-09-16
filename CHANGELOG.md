@@ -2,6 +2,29 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.5] - 2026-09-16
+
+AI lineup — build a real lineup from a completed dry run, without re-running the AI (#32).
+
+### Added
+- **Build this plan** on a completed dry run's page. A dry run already verifies every channel's filter; this
+  commits that result as a real lineup with **no AI and no re-planning** — it reads the plan and each
+  channel's committed filter back from the source run (via the workflow observability API), wipes and
+  recreates the AI lineup, re-assigns channel numbers against the real packages, and materializes each
+  channel directly from its verified filter. Same destructive confirm as a normal build; it navigates you to
+  the new run so you can watch it.
+- `ai.buildFromRun` procedure and a `seed` mode on the lineup workflow (`apply`) that drives the above.
+- The dry-run build now records the filter it actually **committed** (which can differ from the planner's
+  proposal after verification), so applying a dry run reproduces exactly what it previewed.
+- `scripts/seed-probe.ts` — a permanent inspector that assembles the seed a build-from-dry-run would consume
+  and shows the SDK step layer (one per channel) vs. the observability trace rows (per execution).
+
+### Notes
+- Materializing skips the per-channel agent loop entirely, so applying a dry run costs no build tokens.
+- Rebuild-a-single-channel (#23) is a follow-up; the workflow guards that seed mode until it lands.
+- After deploying, `bunx workflow build` regenerates the handlers (`pnpm dev` does this on startup when a
+  workflow or an inlined service changed).
+
 ## [0.14.4] - 2026-09-16
 
 AI lineup run lifecycle — Stop now truly cancels a run, and a stale run can no longer resume and wipe the

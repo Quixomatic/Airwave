@@ -23,6 +23,8 @@
  */
 import prisma from "@airwave/db";
 import { FatalError, getStepMetadata, getWorkflowMetadata } from "workflow";
+import { hydrateResourceIO, observabilityRevivers } from "workflow/observability";
+import { getWorld } from "workflow/runtime";
 
 import type { ChannelBuildResult } from "@airwave/api/services/agent/channel-builder";
 import { buildPlannedChannel } from "@airwave/api/services/agent/channel-builder";
@@ -46,9 +48,9 @@ import {
   PlanFatalError,
   planLineup as planLineupService,
 } from "@airwave/api/services/agent/lineup-plan";
-import type { LineupRunArgs } from "@airwave/api/services/agent/lineup-runner";
+import type { LineupRunArgs, LineupSeed, SeedMode } from "@airwave/api/services/agent/lineup-runner";
 import { recordTrace, type TracePhase } from "@airwave/api/services/agent/lineup-trace";
-import { clearAiGenerated, createPackage, discoverFieldValues } from "@airwave/api/services/agent/tools";
+import { clearAiGenerated, createChannel, createPackage, discoverFieldValues } from "@airwave/api/services/agent/tools";
 import {
   INITIAL_WINDOW_SECONDS,
   generateChannelSchedule,
@@ -144,6 +146,115 @@ async function withRunCancellation<T>(fn: (signal: AbortSignal) => Promise<T>): 
   }
 }
 
+// ---------------------------------------------------------------------------
+// Seed (Workstreams C+D) — reuse a previous run's data instead of planning fresh.
+// ---------------------------------------------------------------------------
+
+/** A channel's verified outcome from the source run, deduped by key — what `apply` materializes. */
+type SeedOutcome = {
+  /** The dry run's build committed a channel (would-create) vs skipped/failed it. */
+  wouldCreate: boolean;
+  /** The filter the agent COMMITTED — apply persists this verbatim, no AI. */
+  committedFilter?: unknown;
+  committedMediaTypes?: string[];
+  poolSize?: number;
+  reason?: string;
+};
+
+/** Fully-resolved seed: the source run's draft + per-channel outcomes, read once via the observability API. */
+type ResolvedSeed = {
+  mode: SeedMode;
+  channelKeys?: string[];
+  draft: LineupPlanDraft;
+  /** by channel key (deduped) — apply materializes these. */
+  outcomes: Record<string, SeedOutcome>;
+  /** by channel key — the source run's existing packageId + number (rebuild reuses these). */
+  sourceChannels: Record<string, { number?: number; packageId?: string }>;
+};
+
+type Loose = Record<string, unknown>;
+
+/**
+ * Read everything a seeded run needs from the SOURCE run, via the supported observability API (validated by
+ * `scripts/seed-probe.ts`). The plan DRAFT (planLineup output) is the canonical channel list; per-channel
+ * committed outcomes come from the buildChannel step OUTPUTS. The SDK step layer is one-step-per-channel, so
+ * the dry-run replay's duplicate EXECUTIONS (which only bloat the trace table) aren't seen here — but we
+ * still dedupe by key, preferring an outcome that actually committed a filter, as belt-and-suspenders.
+ *
+ * Its own durable step: the read is memoized, so a resumed run reuses the identical seed.
+ */
+async function loadSeed(seed: LineupSeed): Promise<ResolvedSeed> {
+  "use step";
+  const world = getWorld() as unknown as {
+    steps: {
+      list: (o: { runId: string; resolveData?: "all" | "none"; pagination?: { cursor?: string } }) => Promise<{
+        data: Loose[];
+        cursor?: string;
+      }>;
+    };
+  };
+  const hydrate = (r: Loose): Loose => hydrateResourceIO(r as never, observabilityRevivers) as Loose;
+  const pick = (o: Loose, ...keys: string[]): unknown => {
+    for (const k of keys) if (o[k] != null) return o[k];
+    return undefined;
+  };
+
+  // All steps, paginated (the SDK returns ~20 rows + a cursor per page).
+  const rows: Loose[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await world.steps.list({
+      runId: seed.fromRunId,
+      resolveData: "all",
+      pagination: cursor ? { cursor } : {},
+    });
+    rows.push(...page.data);
+    cursor = page.cursor;
+  } while (cursor);
+  const steps = rows.map(hydrate);
+  const nameOf = (s: Loose) => String(pick(s, "stepName", "step_name") ?? "");
+
+  const planStep = steps.find((s) => nameOf(s).includes("planLineup"));
+  const draft = (planStep ? pick(planStep, "output") : undefined) as LineupPlanDraft | undefined;
+  if (!draft?.packages?.length) {
+    // Deterministic: a run with no plan draft can never be seeded from. Fail terminally, don't retry.
+    throw new FatalError(`Seed run ${seed.fromRunId} has no plan draft to build from.`);
+  }
+
+  const outcomes: Record<string, SeedOutcome> = {};
+  const sourceChannels: Record<string, { number?: number; packageId?: string }> = {};
+  for (const s of steps) {
+    if (!nameOf(s).includes("buildChannel")) continue;
+    const input = pick(s, "input");
+    const tuple = ((Array.isArray(input) ? input : (input as { args?: unknown[] } | undefined)?.args) ?? []) as unknown[];
+    const channel = tuple[0] as { key?: string; number?: number } | undefined;
+    const packageId = tuple[1] as string | undefined;
+    const output = pick(s, "output") as
+      | { key?: string; status?: string; poolSize?: number; committedFilter?: unknown; committedMediaTypes?: string[]; reason?: string }
+      | undefined;
+    const key = channel?.key ?? output?.key;
+    if (!key) continue;
+    // Dedupe: keep the outcome that actually committed a filter over one that didn't.
+    const existing = outcomes[key];
+    if (existing && existing.committedFilter != null && output?.committedFilter == null) continue;
+    outcomes[key] = {
+      wouldCreate: output?.status === "created",
+      committedFilter: output?.committedFilter,
+      committedMediaTypes: output?.committedMediaTypes,
+      poolSize: output?.poolSize,
+      reason: output?.reason,
+    };
+    sourceChannels[key] = { number: channel?.number, packageId };
+  }
+
+  console.log(
+    `[lineup] loadSeed(${seed.mode}) from ${seed.fromRunId}: ${draft.packages.length} packages, ` +
+      `${Object.keys(outcomes).length} channel outcomes` +
+      (seed.channelKeys ? `, ${seed.channelKeys.length} target(s)` : ""),
+  );
+  return { mode: seed.mode, channelKeys: seed.channelKeys, draft, outcomes, sourceChannels };
+}
+
 // PlannedChannel / PlannedPackage / LineupPlan now live with the planner service
 // (packages/api/.../lineup-plan.ts) so the Zod schema is the single source of truth —
 // they're re-exported above.
@@ -180,29 +291,36 @@ export type LineupReport = {
 export async function aiLineupWorkflow(args: LineupRunArgs): Promise<LineupReport> {
   "use workflow";
 
-  const profile = await analyzeLibrary(args.sourceId);
+  const dryRun = args.dryRun ?? false;
 
-  // Built BEFORE the plan now: the planner authors real filters, so it needs the actual tag
-  // vocabulary, not just the statistical profile. The same string is then handed to every
-  // builder byte-identically, so the whole run shares ONE prompt-cache entry.
-  const libraryContext = await buildSharedContext(args.sourceId, profile);
+  // Seed (Workstreams C+D): reuse a previous run's data instead of planning fresh.
+  const seed = args.seed ? await loadSeed(args.seed) : null;
+  const apply = seed?.mode === "apply";
+  if (seed?.mode === "rebuild") {
+    // #23 rebuild-single lands in a follow-up. Guard here so a rebuild dispatch can NEVER reach the
+    // destructive wipe below through a half-implemented path.
+    throw new FatalError("rebuild-single (#23) is not yet implemented.");
+  }
 
-  // What's already on the server, so the planner can file channels into an existing
-  // package instead of minting a near-duplicate.
-  const existingPackages = await listExistingPackages();
+  // APPLY skips the AI entirely: the library analysis + shared context exist only to author filters, which
+  // apply reuses from the dry run. A normal run does the full analysis before planning.
+  const profile = apply ? null : await analyzeLibrary(args.sourceId);
+  // The planner authors real filters, so it needs the actual tag vocabulary; the same string is then handed
+  // to every builder byte-identically, so a normal run shares ONE prompt-cache entry.
+  const libraryContext = profile ? await buildSharedContext(args.sourceId, profile) : "";
 
-  // The planner always plans the FULL lineup — sized to the library, not to a quota.
-  const draft = await planLineup(libraryContext, existingPackages, args.plannerMaxOutputTokens);
+  // Plan: a seeded run reuses the source run's draft; a normal run reads existing packages and plans fresh.
+  const existingPackages = seed ? [] : await listExistingPackages();
+  const draft = seed ? seed.draft : await planLineup(libraryContext, existingPackages, args.plannerMaxOutputTokens);
 
   // Packages first, so each channel has a real packageId to attach to. This also wipes any previous AI
-  // lineup — destructive, hence the confirmation on the admin action. In a DRY RUN it does NEITHER (no wipe,
-  // no creates) and returns placeholder ids so the verify step can still run. See #22 dry-run.
-  const dryRun = args.dryRun ?? false;
+  // lineup — destructive, hence the confirmation on the admin action. APPLY wipes + recreates just like a
+  // normal run (it replaces the lineup with what the dry run verified). In a DRY RUN it does NEITHER and
+  // returns placeholder ids so the verify step can still run. See #22 dry-run.
   const packageIds = await createPackages(draft, dryRun);
 
-  // Numbering runs AFTER the wipe, so it allocates against the numbers that are actually
-  // free rather than ones about to be released. Its own step, so a resumed run replays the
-  // identical assignment instead of re-deriving it against changed state.
+  // Numbering runs AFTER the wipe, against real packages — which is exactly why APPLY re-numbers instead of
+  // reusing the dry run's placeholder-based numbers. Its own step, so a resumed run replays it identically.
   const plan = await assignNumbers(draft, packageIds);
 
   // Flatten so the concurrency cap applies across the WHOLE lineup rather than per
@@ -216,7 +334,7 @@ export async function aiLineupWorkflow(args: LineupRunArgs): Promise<LineupRepor
   // still shows you the whole lineup it would build, and only pays to construct a sample.
   // Interleaved across packages rather than taking the first N, so the sample spans
   // different kinds of channel instead of one package's worth.
-  const jobs = args.limit ? sampleAcrossPackages(allJobs, args.limit) : allJobs;
+  const jobs = args.limit && !seed ? sampleAcrossPackages(allJobs, args.limit) : allJobs;
   if (args.limit && allJobs.length > jobs.length) {
     console.log(`[lineup] planned ${allJobs.length} channels; building ${jobs.length} (limit)`);
   }
@@ -230,15 +348,18 @@ export async function aiLineupWorkflow(args: LineupRunArgs): Promise<LineupRepor
     const wave = jobs.slice(i, i + concurrency);
     const results = await Promise.all(
       wave.map((job) =>
-        buildChannel(
-          job.channel,
-          job.packageId,
-          args.sourceId,
-          args.userId,
-          libraryContext,
-          args.mode ?? "quality",
-          dryRun,
-        ),
+        apply
+          ? // APPLY: persist the dry run's verified outcome, no agent loop.
+            materializeChannel(job.channel, job.packageId, seed!.outcomes[job.channel.key], args.userId, args.sourceId)
+          : buildChannel(
+              job.channel,
+              job.packageId,
+              args.sourceId,
+              args.userId,
+              libraryContext,
+              args.mode ?? "quality",
+              dryRun,
+            ),
       ),
     );
     built.push(...results);
@@ -557,6 +678,86 @@ async function buildChannel(
   }
 
   return result;
+}
+
+/**
+ * APPLY (#32) — create a channel from the filter a dry run already COMMITTED, with NO agent loop.
+ *
+ * The dry run did the expensive verification; applying it just persists that outcome. Mirrors `buildChannel`'s
+ * tail (create + windowed schedule + trace) but skips the ~40k-token agent entirely. The unique
+ * `Channel.number` is the idempotency claim: a workflow-replay re-dispatch loses the create and returns the
+ * existing channel rather than duplicating it.
+ */
+async function materializeChannel(
+  channel: PlannedChannel,
+  packageId: string,
+  outcome: SeedOutcome | undefined,
+  userId: string,
+  sourceId: string,
+): Promise<ChannelBuildResult> {
+  "use step";
+  const startedAt = new Date();
+  const trace = traceContext();
+  const base = { key: channel.key, name: channel.name, number: channel.number };
+  const traceBase = {
+    ...trace,
+    stepName: "materializeChannel",
+    phase: "build" as const,
+    channelKey: channel.key,
+    channelNumber: channel.number,
+    channelName: channel.name,
+    startedAt,
+  };
+
+  // The dry run skipped this channel (give_up / too small) or produced no committed filter — nothing to build.
+  if (!outcome?.wouldCreate || outcome.committedFilter == null) {
+    const reason = outcome?.reason ?? "The dry run did not produce a buildable channel.";
+    await recordTrace(prisma, { ...traceBase, status: "skipped", reason, output: { status: "skipped" } });
+    return { ...base, status: "skipped", reason };
+  }
+
+  let channelId: string;
+  try {
+    const made = await createChannel(prisma, userId, {
+      mediaSourceId: sourceId,
+      name: channel.name,
+      number: channel.number,
+      packageId,
+      description: channel.description,
+      callsign: channel.callsign,
+      icon: channel.icon,
+      tint: channel.accent,
+      ordering: channel.ordering,
+      sortField: channel.sortField ?? undefined,
+      sortDir: channel.sortDir ?? undefined,
+      mediaTypes: (outcome.committedMediaTypes ?? channel.mediaTypes) as ("movie" | "show")[],
+      filter: outcome.committedFilter as never,
+      enabled: true,
+    });
+    channelId = made.id;
+  } catch {
+    // Lost a replay race — the number is claimed by the first execution. Return that one, don't duplicate.
+    const existing = await prisma.channel.findUnique({ where: { number: channel.number }, select: { id: true } });
+    if (existing) {
+      return { ...base, status: "created", channelId: existing.id, reason: "Already materialized (duplicate suppressed)." };
+    }
+    throw new Error(`Could not create channel ${channel.number}`);
+  }
+
+  // Windowed initial schedule so it's watchable immediately (same as buildChannel).
+  try {
+    await generateChannelSchedule(prisma, channelId, { windowSeconds: INITIAL_WINDOW_SECONDS });
+  } catch (err) {
+    console.warn(`[lineup] ${channel.name}: schedule build failed (backfill will retry):`, err);
+  }
+  console.log(`[lineup] ${channel.number} ${channel.name}: materialized from dry run (pool ${outcome.poolSize ?? "?"})`);
+  await recordTrace(prisma, {
+    ...traceBase,
+    status: "ok",
+    reason: "Materialized from the dry run's verified filter (no AI).",
+    output: { status: "created", poolSize: outcome.poolSize, channelId },
+  });
+  return { ...base, status: "created", channelId, poolSize: outcome.poolSize };
 }
 
 /** §4.5 — summarize what was built. */
