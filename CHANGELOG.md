@@ -2,6 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.63] - 2026-09-15
+
+Admin — Manual picker polish: input-group search bar, frosted edge, and clearer empty states.
+
+### Changed
+- The search bar is now an input group: a taller text input with the standard Input styling, then a
+  lighter (frame-base) segment holding the scope checkboxes, then a "Clear all". Added an Episodes scope
+  checkbox (off by default), so TV Shows searches shows only and Select all doesn't sweep in episode-title
+  matches.
+- The selection action bar now appears as soon as a search returns results (not only on selection), shows
+  the count with Select all / Clear / Add, uses the frame-base background, and slides up + fades with a
+  progressive frosted blur at the bottom edge of the results (ported from getairwave.tv). The results have
+  constant bottom padding while showing so nothing hides behind the bar, with no layout jump.
+- Empty states throughout the picker: prompt to search before typing, "no results found", "select at
+  least one search category" when all scopes are off, and the shared empty state for an empty pool.
+- The pool ("In this channel") renders as small thumbnail rows flowing into responsive columns; show tiles
+  drill into seasons → episodes inline. The content-mode tiles now match the search input's border/background.
+
 ## [0.13.62] - 2026-09-15
 
 Admin — Manual picker: a floating selection action bar.

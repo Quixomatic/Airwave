@@ -2,9 +2,10 @@ import { Button } from "@airwave/ui/components/button";
 import { Checkbox } from "@airwave/ui/components/checkbox";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronDown, ChevronRight, Clapperboard, ListChecks, ListTree, Plus, Search, Tv, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Clapperboard, Filter, ListChecks, ListTree, Plus, Search, SearchX, Tv, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { BottomBlur } from "@/components/bottom-blur";
 import { EmptyState } from "@/components/empty-state";
 import { sourceImg } from "@/lib/img";
 import { cn } from "@/lib/utils";
@@ -206,6 +207,7 @@ export function ManualBuilder({
   const [debounced, setDebounced] = useState("");
   const [movies, setMovies] = useState(true);
   const [tv, setTv] = useState(true);
+  const [episodes, setEpisodes] = useState(false); // off by default so search doesn't always match episode titles
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [expandedShow, setExpandedShow] = useState<string | null>(null);
 
@@ -214,7 +216,18 @@ export function ManualBuilder({
     return () => clearTimeout(t);
   }, [query]);
 
-  const types = [...(movies ? (["movie"] as const) : []), ...(tv ? (["show", "episode"] as const) : [])];
+  // Changing the search (query or scope) clears any pending selection, so the action bar never lingers on
+  // items from a previous result set.
+  useEffect(() => {
+    setChecked(new Set());
+    setExpandedShow(null);
+  }, [debounced, movies, tv, episodes]);
+
+  const types = [
+    ...(movies ? (["movie"] as const) : []),
+    ...(tv ? (["show"] as const) : []),
+    ...(episodes ? (["episode"] as const) : []),
+  ];
   const canSearch = !!mediaSourceId && debounced.length >= 2 && types.length > 0;
   const results = useQuery(
     trpc.channels.searchMedia.queryOptions(
@@ -246,6 +259,9 @@ export function ManualBuilder({
   const data = results.data;
   const hasResults = data && (data.movies.length > 0 || data.shows.length > 0 || data.episodes.length > 0);
   const searching = canSearch && results.isFetching && !hasResults;
+  // Only true when result tiles are actually on screen (not the idle/empty states, and not stale
+  // keepPreviousData after the query was cleared) — gates the action bar + frosted edge.
+  const showingResults = Boolean(hasResults) && debounced.length >= 2 && types.length > 0;
 
   // The top-level result items (movies + whole shows + direct episodes), for "Select all".
   const resultKeys = data ? [...data.movies, ...data.shows, ...data.episodes].map((i) => i.ratingKey) : [];
@@ -255,18 +271,19 @@ export function ManualBuilder({
 
   return (
     <div className="space-y-3 rounded-md border p-3">
-      {/* Search bar with the scope checkboxes baked in. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border px-3 py-2">
-        <div className="flex min-w-48 flex-1 items-center gap-2">
+      {/* Search bar as an input group: a standard-styled text input on the left, then a lighter (frame-base
+          bg) segment with the scope checkboxes, then a Clear all — divided by left borders. */}
+      <div className="border-input focus-within:border-ring focus-within:ring-ring/50 flex h-11 items-stretch overflow-hidden rounded-lg border bg-transparent transition-colors focus-within:ring-3 dark:bg-input/30">
+        <div className="flex flex-1 items-center gap-2 px-3">
           <Search className="text-muted-foreground size-4 shrink-0" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search movies, shows, episodes…"
-            className="placeholder:text-muted-foreground w-full bg-transparent text-sm outline-none"
+            className="placeholder:text-muted-foreground text-foreground h-full w-full bg-transparent text-base outline-none md:text-sm"
           />
         </div>
-        <div className="flex items-center gap-4 text-sm">
+        <div className="border-input bg-muted/72 flex items-center gap-4 border-l px-3 text-sm">
           <label className="flex items-center gap-1.5">
             <Checkbox checked={movies} onCheckedChange={(v) => setMovies(v === true)} />
             Movies
@@ -275,18 +292,47 @@ export function ManualBuilder({
             <Checkbox checked={tv} onCheckedChange={(v) => setTv(v === true)} />
             TV Shows
           </label>
+          <label className="flex items-center gap-1.5">
+            <Checkbox checked={episodes} onCheckedChange={(v) => setEpisodes(v === true)} />
+            Episodes
+          </label>
         </div>
+        <button
+          type="button"
+          onClick={() => setQuery("")}
+          disabled={!query}
+          className="border-input bg-muted/72 text-muted-foreground hover:text-foreground border-l px-3 text-sm font-medium transition-colors disabled:opacity-50"
+        >
+          Clear all
+        </button>
       </div>
 
       {/* Results — poster tiles matching the preview grid. The scroll box uses p-1 so a selected tile's
           outer ring isn't clipped at the edges. The `relative` wrapper anchors the floating action bar. */}
-      {debounced.length >= 2 && (
-        <div className="relative">
-          <div className="max-h-[32rem] space-y-3 overflow-y-auto p-1">
-          {searching ? (
+      <div className="relative">
+          {/* Bottom padding to clear the frosted edge / action bar — only while results (and thus the bar)
+              are showing, so the empty/idle states aren't pushed up by dead space. */}
+          <div className={cn("max-h-[32rem] space-y-3 overflow-y-auto p-1", showingResults && "pb-28")}>
+          {types.length === 0 ? (
+            <EmptyState
+              icon={Filter}
+              title="Select at least one search category"
+              description="Turn on Movies, TV Shows, or Episodes to search."
+            />
+          ) : debounced.length < 2 ? (
+            <EmptyState
+              icon={Search}
+              title="Search your library"
+              description="Type at least two characters to find movies, shows, or episodes to add."
+            />
+          ) : searching ? (
             <PreviewSkeleton count={ONE_ROW} />
           ) : !hasResults ? (
-            <p className="text-muted-foreground py-4 text-center text-sm">No matches.</p>
+            <EmptyState
+              icon={SearchX}
+              title="No results found"
+              description="Try a different search, or adjust the Movies / TV Shows / Episodes scope."
+            />
           ) : (
             <>
               {data.movies.length > 0 && (
@@ -341,35 +387,51 @@ export function ManualBuilder({
           )}
           </div>
 
-          {/* Floating action bar — fades/slides in from the bottom of the results section on selection. */}
+          {/* Frosted bottom edge — content fades into a blur as it scrolls under the action bar. */}
           <AnimatePresence>
-            {checked.size > 0 && (
+            {showingResults && (
               <motion.div
+                key="blur"
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 16 }}
                 transition={{ duration: 0.18, ease: "easeOut" }}
-                className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center"
+                className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-44"
               >
-                <div className="bg-popover/95 pointer-events-auto flex items-center gap-1 rounded-full border py-1.5 pl-3 pr-1.5 shadow-lg backdrop-blur">
+                <BottomBlur className="inset-0 h-full" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Floating action bar — appears as soon as there are results (even before anything is selected). */}
+          <AnimatePresence>
+            {showingResults && (
+              <motion.div
+                key="bar"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 16 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="pointer-events-none absolute inset-x-0 bottom-3 z-40 flex justify-center"
+              >
+                <div className="bg-muted/72 pointer-events-auto flex items-center gap-1 rounded-md border py-1.5 pl-3 pr-1.5 shadow-lg backdrop-blur">
                   <span className="text-sm font-medium">{checked.size} selected</span>
                   <span className="bg-border mx-1 h-4 w-px" />
                   <Button type="button" variant="ghost" size="sm" onClick={selectAll} disabled={allSelected}>
                     Select all
                   </Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={clearSelection}>
+                  <Button type="button" variant="ghost" size="sm" onClick={clearSelection} disabled={checked.size === 0}>
                     Clear
                   </Button>
-                  <Button type="button" size="sm" onClick={addChecked}>
+                  <Button type="button" size="sm" onClick={addChecked} disabled={checked.size === 0}>
                     <Plus className="mr-1 size-3.5" />
-                    Add {checked.size} item{checked.size === 1 ? "" : "s"}
+                    {checked.size > 0 ? `Add ${checked.size} item${checked.size === 1 ? "" : "s"}` : "Add items"}
                   </Button>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
-      )}
+      </div>
 
       {/* Current pool — removable. */}
       <div className="border-t pt-3">

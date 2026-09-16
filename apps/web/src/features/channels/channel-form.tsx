@@ -110,7 +110,9 @@ function ModeTiles({ value, onChange }: { value: ChannelMode; onChange: (m: Chan
             aria-pressed={selected}
             onClick={() => onChange(m.id)}
             className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors ${
-              selected ? "border-primary bg-primary/5 ring-primary/40 ring-1" : "border-border hover:bg-muted/50"
+              selected
+                ? "border-primary bg-primary/5 ring-primary/40 ring-1"
+                : "border-input bg-transparent hover:border-ring dark:bg-input/30"
             } disabled:cursor-not-allowed disabled:opacity-50`}
           >
             <span className="flex items-center gap-1.5 text-sm font-medium">
