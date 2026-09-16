@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.61] - 2026-09-15
+
+Admin — Manual pool: multi-column list rows.
+
+### Changed
+- The "In this channel" pool renders as small-thumbnail list rows (thumb + title/kind + remove) flowing
+  into as many responsive columns as the width allows, instead of the single-column list from v0.13.60.
+
 ## [0.13.60] - 2026-09-15
 
 Admin — Manual picker: drill into shows (seasons → episodes) and a tiled pool.

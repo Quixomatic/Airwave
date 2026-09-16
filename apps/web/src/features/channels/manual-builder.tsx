@@ -352,9 +352,10 @@ export function ManualBuilder({
             description="Search above and add movies, shows, or episodes to build this channel."
           />
         ) : (
-          <div className={cn(GRID_CLASS, "max-h-[24rem] overflow-y-auto p-1")}>
+          // Small tile + details rows, flowing into as many columns as the width allows.
+          <div className="grid max-h-[24rem] grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-x-4 gap-y-1.5 overflow-y-auto p-1">
             {(pool.data ?? []).map((it) => (
-              <PoolTile
+              <PoolRow
                 key={it.ratingKey}
                 sourceId={mediaSourceId}
                 item={it}
@@ -400,8 +401,8 @@ function PickTileWithDrill({
   );
 }
 
-/** A small poster tile for the current pool, with a remove (X) button over the poster. */
-function PoolTile({
+/** A pool entry: a small thumbnail with its details to the right + a remove button. Flows into columns. */
+function PoolRow({
   sourceId,
   item,
   onRemove,
@@ -410,41 +411,30 @@ function PoolTile({
   item: { ratingKey: string; title: string; type: string; showTitle?: string; season?: number; episode?: number; thumb?: string; available: boolean };
   onRemove: () => void;
 }) {
-  const src = item.thumb ? sourceImg(sourceId, item.thumb, 240) : null;
   const isShow = item.type === "show";
   const kind = isShow ? "Whole show" : item.type === "episode" ? (se(item.season, item.episode) ?? "Episode") : "Movie";
   return (
-    <div className="group flex flex-col gap-1">
-      <div className="bg-muted relative aspect-[2/3] overflow-hidden rounded-md border">
-        {src ? (
-          <img src={src} alt={item.title} loading="lazy" className="h-full w-full object-cover" />
+    <div className="group flex items-center gap-2">
+      <div className="bg-muted relative h-12 w-8 shrink-0 overflow-hidden rounded border">
+        {item.thumb ? (
+          <img src={sourceImg(sourceId, item.thumb, 120) ?? undefined} alt="" loading="lazy" className="h-full w-full object-cover" />
         ) : (
           <div className="text-muted-foreground/40 flex h-full items-center justify-center">
-            {isShow ? <Tv className="size-6" /> : <Clapperboard className="size-6" />}
+            {isShow ? <Tv className="size-3.5" /> : <Clapperboard className="size-3.5" />}
           </div>
         )}
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label={`Remove ${item.title}`}
-          className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full border border-white/70 bg-black/50 text-white transition-colors hover:bg-red-600 hover:border-red-600"
-        >
-          <X className="size-3.5" />
-        </button>
-        {isShow && (
-          <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">Show</span>
-        )}
       </div>
-      <div className="min-w-0">
-        <p className="truncate text-xs font-medium" title={item.showTitle ? `${item.showTitle} — ${item.title}` : item.title}>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm" title={item.showTitle ? `${item.showTitle} — ${item.title}` : item.title}>
           {item.showTitle ? `${item.showTitle} — ` : ""}
           {item.title}
+          {!item.available && <span className="text-muted-foreground"> (unavailable)</span>}
         </p>
-        <p className="text-muted-foreground truncate text-[10px]">
-          {kind}
-          {!item.available && " · unavailable"}
-        </p>
+        <p className="text-muted-foreground text-xs">{kind}</p>
       </div>
+      <Button type="button" variant="ghost" size="icon-sm" onClick={onRemove} aria-label={`Remove ${item.title}`}>
+        <X className="size-4" />
+      </Button>
     </div>
   );
 }
