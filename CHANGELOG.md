@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.65] - 2026-09-16
+
+AI assistant — clearer "media source not found" error so the model self-corrects.
+
+### Changed
+- When an assistant tool is called with a missing/placeholder `mediaSourceId` (a valid string slips past
+  schema validation), the error now says to call `list_media_sources` to get a valid id and retry, instead
+  of a bare "not found." Shared by every source-taking tool, so the model recovers in one step rather than
+  guessing again.
+
 ## [0.13.64] - 2026-09-16
 
 AI assistant — full awareness and editing of all three channel content modes.

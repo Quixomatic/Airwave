@@ -18,7 +18,12 @@ export type MediaType = "movie" | "show";
 
 async function requireSource(prisma: PrismaClient, mediaSourceId: string) {
   const s = await prisma.mediaSource.findUnique({ where: { id: mediaSourceId } });
-  if (!s?.baseUrl) throw new Error(`Media source ${mediaSourceId} not found or has no base URL`);
+  // A valid-but-wrong id (the model sometimes passes a placeholder) slips past the schema; point it at the
+  // tool that returns real ids so it self-corrects in one step instead of guessing again.
+  if (!s?.baseUrl)
+    throw new Error(
+      `Media source "${mediaSourceId}" not found or not connected. Call list_media_sources to get a valid mediaSourceId, then retry.`,
+    );
   return { id: s.id, baseUrl: s.baseUrl, token: decryptToken(s.token) };
 }
 
