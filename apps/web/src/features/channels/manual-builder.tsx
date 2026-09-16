@@ -1,7 +1,7 @@
 import { Button } from "@airwave/ui/components/button";
 import { Checkbox } from "@airwave/ui/components/checkbox";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Check, Clapperboard, ListChecks, Search, Tv, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Clapperboard, ListChecks, ListTree, Search, Tv, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { EmptyState } from "@/components/empty-state";
@@ -14,80 +14,180 @@ import { GRID_CLASS, PreviewSkeleton } from "./channel-preview";
 /**
  * The Manual-mode ("hand-picked") pool builder. A search bar (with Movies / TV Shows scope baked in) queries
  * the MediaItem cache; results render as poster tiles (matching the preview grid) with a check-circle each.
- * "Add item(s)" commits the checked selection into the pool: a whole show stores the show key (resolves live
- * to its current episodes), a movie / episode stores its own key. The current pool renders below as removable
- * rows. NOTE: drilling INTO a show (season / specific-episode picking from a tile) is a separate UX still to
- * be designed — for now a show tile selects the whole show, and specific episodes come from episode-title
- * search results.
+ * A show tile carries a caret: expanding it opens a full-width drill panel directly below with the show's
+ * seasons, and each season can be drilled again to its episode tiles — check-circles all the way down.
+ * "Add item(s)" commits the checked selection: a whole show stores the show key (resolves live to its
+ * current episodes), a whole season stores that season's episode keys, and a movie / episode stores its own.
  */
 
 const ONE_ROW = 8;
-
 const se = (s?: number | null, e?: number | null) =>
   s != null && e != null ? `S${String(s).padStart(2, "0")}E${String(e).padStart(2, "0")}` : null;
 
-type Tile = {
-  ratingKey: string;
-  title: string;
-  subtitle?: string;
-  thumb?: string;
-  isShow?: boolean;
-};
+/** The small round check-circle overlay used on every selectable thing. */
+function CheckDot({ selected, floating }: { selected: boolean; floating?: boolean }) {
+  return (
+    <span
+      className={cn(
+        "flex size-5 items-center justify-center rounded-full border transition-colors",
+        floating && "absolute right-1 top-1",
+        selected
+          ? "border-primary bg-primary text-primary-foreground"
+          : floating
+            ? "border-white/70 bg-black/40 text-transparent group-hover:text-white/80"
+            : "border-muted-foreground/40 text-transparent hover:text-muted-foreground/60",
+      )}
+    >
+      <Check className="size-3.5" />
+    </span>
+  );
+}
 
-/** A selectable poster tile (same shape as the preview tiles) with a check-circle + selected ring. */
-function PickTile({ sourceId, tile, selected, onToggle }: { sourceId: string; tile: Tile; selected: boolean; onToggle: () => void }) {
+type Tile = { title: string; subtitle?: string; thumb?: string; isShow?: boolean };
+
+/** A selectable poster tile (same shape as the preview tiles). Shows get an expand caret over the poster. */
+function PickTile({
+  sourceId,
+  tile,
+  selected,
+  onToggle,
+  expanded,
+  onExpand,
+}: {
+  sourceId: string;
+  tile: Tile;
+  selected: boolean;
+  onToggle: () => void;
+  expanded?: boolean;
+  onExpand?: () => void;
+}) {
   const src = tile.thumb ? sourceImg(sourceId, tile.thumb, 240) : null;
   const [loaded, setLoaded] = useState(false);
   return (
-    <button type="button" onClick={onToggle} className="group flex flex-col gap-1 text-left">
-      <div className={cn("bg-muted relative aspect-[2/3] overflow-hidden rounded-md border", selected && "ring-primary ring-2")}>
-        {src ? (
-          <>
-            {!loaded && <div className="bg-muted absolute inset-0 animate-pulse" />}
-            <img
-              src={src}
-              alt={tile.title}
-              loading="lazy"
-              onLoad={() => setLoaded(true)}
-              onError={() => setLoaded(true)}
-              className={cn("h-full w-full object-cover transition-opacity duration-300", loaded ? "opacity-100" : "opacity-0")}
-            />
-          </>
-        ) : (
-          <div className="text-muted-foreground/40 flex h-full items-center justify-center">
-            {tile.isShow ? <Tv className="size-6" /> : <Clapperboard className="size-6" />}
-          </div>
-        )}
-        {/* Check-circle: filled when selected, a faint hover affordance otherwise. */}
-        <span
-          className={cn(
-            "absolute right-1 top-1 flex size-5 items-center justify-center rounded-full border transition-colors",
-            selected
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-white/70 bg-black/40 text-transparent group-hover:text-white/80",
+    <div className="group relative flex flex-col gap-1">
+      <button type="button" onClick={onToggle} className="block text-left">
+        <div className={cn("bg-muted relative aspect-[2/3] overflow-hidden rounded-md border", selected && "ring-primary ring-2")}>
+          {src ? (
+            <>
+              {!loaded && <div className="bg-muted absolute inset-0 animate-pulse" />}
+              <img
+                src={src}
+                alt={tile.title}
+                loading="lazy"
+                onLoad={() => setLoaded(true)}
+                onError={() => setLoaded(true)}
+                className={cn("h-full w-full object-cover transition-opacity duration-300", loaded ? "opacity-100" : "opacity-0")}
+              />
+            </>
+          ) : (
+            <div className="text-muted-foreground/40 flex h-full items-center justify-center">
+              {tile.isShow ? <Tv className="size-6" /> : <Clapperboard className="size-6" />}
+            </div>
           )}
+          <CheckDot selected={selected} floating />
+        </div>
+      </button>
+      {/* Expand caret (shows only) — a sibling button so it isn't nested inside the toggle button. */}
+      {onExpand && (
+        <button
+          type="button"
+          onClick={onExpand}
+          aria-label={expanded ? "Collapse" : "Expand seasons"}
+          aria-expanded={expanded}
+          className="absolute bottom-8 left-1 flex items-center gap-0.5 rounded bg-black/70 px-1 py-0.5 text-[10px] font-medium text-white"
         >
-          <Check className="size-3.5" />
-        </span>
-        {tile.isShow && (
-          <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">Show</span>
-        )}
-      </div>
+          {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+          Seasons
+        </button>
+      )}
       <div className="min-w-0">
         <p className="truncate text-xs font-medium" title={tile.title}>
           {tile.title}
         </p>
         {tile.subtitle && <p className="text-muted-foreground truncate text-[10px]">{tile.subtitle}</p>}
       </div>
-    </button>
+    </div>
   );
 }
 
-function TileSection({ label, children }: { label: string; children: React.ReactNode }) {
+/** The full-width drill panel under an expanded show: its seasons, each drillable to its episode tiles. */
+function ShowDrill({
+  sourceId,
+  showKey,
+  showTitle,
+  checked,
+  toggle,
+}: {
+  sourceId: string;
+  showKey: string;
+  showTitle: string;
+  checked: Set<string>;
+  toggle: (keys: string | string[]) => void;
+}) {
+  const [openSeasons, setOpenSeasons] = useState<Set<number>>(new Set());
+  const seasons = useQuery(
+    trpc.channels.showEpisodes.queryOptions({ mediaSourceId: sourceId, showRatingKey: showKey }, { enabled: !!sourceId }),
+  );
+
   return (
-    <div className="space-y-1.5">
-      <p className="text-muted-foreground text-xs font-medium">{label}</p>
-      <div className={GRID_CLASS}>{children}</div>
+    <div className="bg-muted/40 col-span-full space-y-2 rounded-md border p-3">
+      <p className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
+        <ListTree className="size-3.5" /> {showTitle} · seasons
+      </p>
+      {seasons.isLoading ? (
+        <p className="text-muted-foreground text-xs">Loading episodes…</p>
+      ) : !seasons.data?.length ? (
+        <p className="text-muted-foreground text-xs">No episodes.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {seasons.data.map((s) => {
+            const epKeys = s.episodes.map((e) => e.ratingKey);
+            const allOn = epKeys.length > 0 && epKeys.every((k) => checked.has(k));
+            const open = openSeasons.has(s.season);
+            return (
+              <div key={s.season} className="space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <button type="button" onClick={() => toggle(epKeys)} aria-label={`Select all of season ${s.season}`}>
+                    <CheckDot selected={allOn} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenSeasons((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(s.season)) next.delete(s.season);
+                        else next.add(s.season);
+                        return next;
+                      })
+                    }
+                    className="flex items-center gap-1"
+                    aria-expanded={open}
+                  >
+                    {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+                    <span className="font-medium">Season {s.season}</span>
+                    <span className="text-muted-foreground text-xs">
+                      {s.episodes.length} ep{s.episodes.length === 1 ? "" : "s"}
+                    </span>
+                  </button>
+                </div>
+                {open && (
+                  <div className={cn(GRID_CLASS, "pl-7")}>
+                    {s.episodes.map((e) => (
+                      <PickTile
+                        key={e.ratingKey}
+                        sourceId={sourceId}
+                        tile={{ title: e.title, subtitle: se(s.season, e.episode) ?? `E${e.episode ?? "?"}`, thumb: e.thumb }}
+                        selected={checked.has(e.ratingKey)}
+                        onToggle={() => toggle(e.ratingKey)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -106,6 +206,7 @@ export function ManualBuilder({
   const [movies, setMovies] = useState(true);
   const [tv, setTv] = useState(true);
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [expandedShow, setExpandedShow] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 300);
@@ -120,21 +221,20 @@ export function ManualBuilder({
       { enabled: canSearch, placeholderData: keepPreviousData },
     ),
   );
-  // Label the current pool (a saved channel loads bare keys) so it renders with titles.
   const pool = useQuery(
-    trpc.channels.itemsByKeys.queryOptions(
-      { mediaSourceId, keys: value },
-      { enabled: !!mediaSourceId && value.length > 0 },
-    ),
+    trpc.channels.itemsByKeys.queryOptions({ mediaSourceId, keys: value }, { enabled: !!mediaSourceId && value.length > 0 }),
   );
 
-  const toggle = (key: string) =>
+  const toggle = (keys: string | string[]) => {
+    const arr = Array.isArray(keys) ? keys : [keys];
     setChecked((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+      const allIn = arr.every((k) => next.has(k));
+      for (const k of arr) if (allIn) next.delete(k);
+        else next.add(k);
       return next;
     });
+  };
   const addChecked = () => {
     const toAdd = [...checked].filter((k) => !value.includes(k));
     if (toAdd.length) onChange([...value, ...toAdd]);
@@ -187,7 +287,7 @@ export function ManualBuilder({
                     <PickTile
                       key={m.ratingKey}
                       sourceId={mediaSourceId}
-                      tile={{ ratingKey: m.ratingKey, title: m.title, subtitle: m.guide?.year ? String(m.guide.year) : undefined, thumb: m.guide?.thumb }}
+                      tile={{ title: m.title, subtitle: m.guide?.year ? String(m.guide.year) : undefined, thumb: m.guide?.thumb }}
                       selected={checked.has(m.ratingKey)}
                       onToggle={() => toggle(m.ratingKey)}
                     />
@@ -197,12 +297,17 @@ export function ManualBuilder({
               {data.shows.length > 0 && (
                 <TileSection label="Shows">
                   {data.shows.map((s) => (
-                    <PickTile
+                    <PickTileWithDrill
                       key={s.ratingKey}
                       sourceId={mediaSourceId}
-                      tile={{ ratingKey: s.ratingKey, title: s.title, thumb: s.guide?.thumb, isShow: true }}
+                      showKey={s.ratingKey}
+                      tile={{ title: s.title, thumb: s.guide?.thumb, isShow: true }}
                       selected={checked.has(s.ratingKey)}
                       onToggle={() => toggle(s.ratingKey)}
+                      expanded={expandedShow === s.ratingKey}
+                      onExpand={() => setExpandedShow((cur) => (cur === s.ratingKey ? null : s.ratingKey))}
+                      checked={checked}
+                      toggleKeys={toggle}
                     />
                   ))}
                 </TileSection>
@@ -214,7 +319,6 @@ export function ManualBuilder({
                       key={e.ratingKey}
                       sourceId={mediaSourceId}
                       tile={{
-                        ratingKey: e.ratingKey,
                         title: e.guide?.showTitle ? `${e.guide.showTitle} — ${e.title}` : e.title,
                         subtitle: se(e.guide?.season, e.guide?.episode) ?? undefined,
                         thumb: e.guide?.thumb,
@@ -248,36 +352,108 @@ export function ManualBuilder({
             description="Search above and add movies, shows, or episodes to build this channel."
           />
         ) : (
-          <div className="space-y-1">
+          <div className={cn(GRID_CLASS, "max-h-[24rem] overflow-y-auto p-1")}>
             {(pool.data ?? []).map((it) => (
-              <div key={it.ratingKey} className="flex items-center gap-2">
-                <div className="bg-muted relative h-12 w-8 shrink-0 overflow-hidden rounded border">
-                  {it.thumb ? (
-                    <img src={sourceImg(mediaSourceId, it.thumb, 120) ?? undefined} alt="" loading="lazy" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="text-muted-foreground/40 flex h-full items-center justify-center">
-                      {it.type === "show" ? <Tv className="size-3.5" /> : <Clapperboard className="size-3.5" />}
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm">
-                    {it.showTitle ? `${it.showTitle} — ` : ""}
-                    {it.title}
-                    {!it.available && <span className="text-muted-foreground"> (unavailable)</span>}
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    {it.type === "show" ? "Whole show" : it.type === "episode" ? (se(it.season, it.episode) ?? "Episode") : "Movie"}
-                  </p>
-                </div>
-                <Button type="button" variant="ghost" size="icon-sm" onClick={() => removeKey(it.ratingKey)} aria-label="Remove">
-                  <X className="size-4" />
-                </Button>
-              </div>
+              <PoolTile
+                key={it.ratingKey}
+                sourceId={mediaSourceId}
+                item={it}
+                onRemove={() => removeKey(it.ratingKey)}
+              />
             ))}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** A show tile that, when expanded, renders its drill panel as a full-width row right after it. */
+function PickTileWithDrill({
+  sourceId,
+  showKey,
+  tile,
+  selected,
+  onToggle,
+  expanded,
+  onExpand,
+  checked,
+  toggleKeys,
+}: {
+  sourceId: string;
+  showKey: string;
+  tile: Tile;
+  selected: boolean;
+  onToggle: () => void;
+  expanded: boolean;
+  onExpand: () => void;
+  checked: Set<string>;
+  toggleKeys: (keys: string | string[]) => void;
+}) {
+  return (
+    <>
+      <PickTile sourceId={sourceId} tile={tile} selected={selected} onToggle={onToggle} expanded={expanded} onExpand={onExpand} />
+      {expanded && (
+        <ShowDrill sourceId={sourceId} showKey={showKey} showTitle={tile.title} checked={checked} toggle={toggleKeys} />
+      )}
+    </>
+  );
+}
+
+/** A small poster tile for the current pool, with a remove (X) button over the poster. */
+function PoolTile({
+  sourceId,
+  item,
+  onRemove,
+}: {
+  sourceId: string;
+  item: { ratingKey: string; title: string; type: string; showTitle?: string; season?: number; episode?: number; thumb?: string; available: boolean };
+  onRemove: () => void;
+}) {
+  const src = item.thumb ? sourceImg(sourceId, item.thumb, 240) : null;
+  const isShow = item.type === "show";
+  const kind = isShow ? "Whole show" : item.type === "episode" ? (se(item.season, item.episode) ?? "Episode") : "Movie";
+  return (
+    <div className="group flex flex-col gap-1">
+      <div className="bg-muted relative aspect-[2/3] overflow-hidden rounded-md border">
+        {src ? (
+          <img src={src} alt={item.title} loading="lazy" className="h-full w-full object-cover" />
+        ) : (
+          <div className="text-muted-foreground/40 flex h-full items-center justify-center">
+            {isShow ? <Tv className="size-6" /> : <Clapperboard className="size-6" />}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove ${item.title}`}
+          className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full border border-white/70 bg-black/50 text-white transition-colors hover:bg-red-600 hover:border-red-600"
+        >
+          <X className="size-3.5" />
+        </button>
+        {isShow && (
+          <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">Show</span>
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-xs font-medium" title={item.showTitle ? `${item.showTitle} — ${item.title}` : item.title}>
+          {item.showTitle ? `${item.showTitle} — ` : ""}
+          {item.title}
+        </p>
+        <p className="text-muted-foreground truncate text-[10px]">
+          {kind}
+          {!item.available && " · unavailable"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function TileSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-muted-foreground text-xs font-medium">{label}</p>
+      <div className={GRID_CLASS}>{children}</div>
     </div>
   );
 }

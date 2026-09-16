@@ -268,7 +268,7 @@ export async function searchMedia(
 export async function showEpisodes(
   prisma: PrismaClient,
   args: { mediaSourceId: string; showRatingKey: string },
-): Promise<{ season: number; episodes: { ratingKey: string; title: string; episode: number | null }[] }[]> {
+): Promise<{ season: number; episodes: { ratingKey: string; title: string; episode: number | null; thumb?: string }[] }[]> {
   const show = await prisma.mediaItem.findFirst({
     where: { mediaSourceId: args.mediaSourceId, ratingKey: args.showRatingKey, type: "show" },
     select: { id: true },
@@ -279,12 +279,12 @@ export async function showEpisodes(
     select: { ratingKey: true, title: true, guide: true },
   });
 
-  const bySeason = new Map<number, { ratingKey: string; title: string; episode: number | null }[]>();
+  const bySeason = new Map<number, { ratingKey: string; title: string; episode: number | null; thumb?: string }[]>();
   for (const e of eps) {
-    const g = (e.guide ?? {}) as { season?: number; episode?: number };
+    const g = (e.guide ?? {}) as { season?: number; episode?: number; thumb?: string };
     const season = g.season ?? 0;
     const arr = bySeason.get(season) ?? [];
-    arr.push({ ratingKey: e.ratingKey, title: e.title, episode: g.episode ?? null });
+    arr.push({ ratingKey: e.ratingKey, title: e.title, episode: g.episode ?? null, thumb: g.thumb });
     bySeason.set(season, arr);
   }
   return [...bySeason.entries()]

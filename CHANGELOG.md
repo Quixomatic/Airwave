@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.13.60] - 2026-09-15
+
+Admin — Manual picker: drill into shows (seasons → episodes) and a tiled pool.
+
+### What ships
+
+- A show tile in the Manual picker now has a "Seasons" caret. Expanding it opens a full-width panel
+  directly below the tile with the show's seasons; each season has a check-circle (select the whole
+  season) and drills down again to its episode tiles (with thumbnails), check-circles all the way down.
+  Selecting a whole show still resolves live; a whole season stores that season's episodes.
+- The "In this channel" pool now renders as a grid of small poster tiles (with a remove button on each),
+  matching the search results, instead of a flat list.
+- `channels.showEpisodes` includes each episode's thumbnail so the drill-down tiles show artwork.
+
 ## [0.13.59] - 2026-09-15
 
 Admin — Manual-mode picker now uses the shared poster tiles + empty state.
