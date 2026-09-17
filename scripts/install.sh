@@ -420,7 +420,23 @@ if [ "$MODE" = uninstall ]; then
     if [ "$PURGE" = 1 ]; then REMOVE_DIR=1
     elif confirm "Delete the install directory ${DIR_ABS} (.env, docker-compose.yml)?"; then REMOVE_DIR=1; fi
     if [ "$REMOVE_DIR" = 1 ]; then
-      if dryrun; then plan "delete ${DIR_ABS}"; else cd .. && rm -rf "$DIR_ABS" && ok "Deleted ${DIR_ABS}."; fi
+      if dryrun; then
+        plan "delete ${DIR_ABS}"
+      else
+        cd "$(dirname "$DIR_ABS")" 2>/dev/null || cd /
+        if rm -rf "$DIR_ABS" 2>/dev/null; then
+          ok "Deleted ${DIR_ABS}."
+        else
+          # A bind-mounted Postgres data dir is owned by the container user (root/999), so the host can't
+          # delete it. Clear it from inside a container (which has the rights), then remove the empty dir.
+          docker run --rm -v "$DIR_ABS:/t" postgres:16-alpine find /t -mindepth 1 -delete >/dev/null 2>&1 || true
+          if rmdir "$DIR_ABS" 2>/dev/null || rm -rf "$DIR_ABS" 2>/dev/null; then
+            ok "Deleted ${DIR_ABS}."
+          else
+            warn "couldn't fully remove ${DIR_ABS} (root-owned files). Run: sudo rm -rf ${DIR_ABS}"
+          fi
+        fi
+      fi
     fi
     say ""; ok "Airwave fully removed.$( dryrun && printf ' (dry run — nothing changed)' )"
   else

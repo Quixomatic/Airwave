@@ -190,7 +190,17 @@ if ($mode -eq "uninstall") {
     if ($DryRun) { Plan "run: docker compose down -v" } else { docker compose down -v; docker volume rm airwave_meta *> $null; Ok "Deleted the data volumes." }
     $removeDir = $Purge -or (Confirm "Delete the install directory $dirAbs (.env, docker-compose.yml)?")
     if ($removeDir) {
-      if ($DryRun) { Plan "delete $dirAbs" } else { Pop-Location; Remove-Item -Recurse -Force $dirAbs; Ok "Deleted $dirAbs." }
+      if ($DryRun) { Plan "delete $dirAbs" }
+      else {
+        Pop-Location
+        try { Remove-Item -Recurse -Force $dirAbs -ErrorAction Stop; Ok "Deleted $dirAbs." }
+        catch {
+          # Bind-mounted Postgres data is owned by the container user; clear it from inside a container, then retry.
+          docker run --rm -v "${dirAbs}:/t" postgres:16-alpine find /t -mindepth 1 -delete *> $null
+          try { Remove-Item -Recurse -Force $dirAbs -ErrorAction Stop; Ok "Deleted $dirAbs." }
+          catch { Warn "couldn't fully remove $dirAbs (files owned by the container). Remove it manually." }
+        }
+      }
     }
     Write-Host ""; Ok ("Airwave fully removed.{0}" -f $(if ($DryRun) { " (dry run - nothing changed)" } else { "" }))
   } else {
