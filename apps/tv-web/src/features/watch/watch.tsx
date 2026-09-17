@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Tv } from "lucide-react";
+import { ArrowLeft, Tv } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { BumperCard } from "./bumper-card";
@@ -8,6 +8,7 @@ import { FeaturePanel } from "./feature-panel";
 import { usePlayer } from "./player-ctx";
 import type { useTvPlayer } from "./use-tv-player";
 import type { GuideChannel } from "../../lib/api";
+import { IS_BROWSER } from "../../lib/browser-mode";
 import { LAYER, useKeyLayer } from "../../lib/input";
 import { channelVivid } from "../../lib/tint";
 
@@ -76,6 +77,11 @@ export function FullChrome({
         case "back":
           onBack();
           return true;
+        case "playpause":
+          // Desktop keyboard (Space): toggle pause and reveal the chrome so the state is visible.
+          controls.togglePause();
+          setPanelOpen(true);
+          return true;
         case "ok":
         case "up":
         case "down":
@@ -95,6 +101,59 @@ export function FullChrome({
 
   return (
     <>
+      {/* Browser mouse layer: click the video to play/pause, move the mouse to reveal the chrome. Sits
+          UNDER the panel/chip/back button (they render after it), so their buttons take clicks directly;
+          only bare-video clicks reach this catcher. TV mode never mounts it. */}
+      {IS_BROWSER && (
+        <div
+          onClick={() => {
+            controls.togglePause();
+            setPanelOpen(true);
+          }}
+          onMouseMove={() => setPanelOpen(true)}
+          style={{ position: "absolute", inset: 0 }}
+        />
+      )}
+
+      {/* Browser: a mouse-reachable Back button, top-left, revealed with the chrome (there's no remote
+          Back key on a desktop). Mirrors the top-right channel chip. */}
+      {IS_BROWSER && (
+        <AnimatePresence>
+          {panelOpen && (
+            <motion.button
+              key="back-btn"
+              type="button"
+              initial={{ opacity: 0, y: -30 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -30 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              onClick={onBack}
+              style={{
+                position: "absolute",
+                top: 28,
+                left: 40,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                height: 56,
+                padding: "0 22px",
+                borderRadius: 999,
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "rgba(18,24,38,0.55)",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+                color: "#e6eaf1",
+                fontSize: 20,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              <ArrowLeft size={20} /> Back
+            </motion.button>
+          )}
+        </AnimatePresence>
+      )}
+
       {/* Bumper interstitial — status.guide is the upcoming program. */}
       {isBumper && status.guide && (
         <BumperCard

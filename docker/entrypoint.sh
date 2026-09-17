@@ -91,7 +91,8 @@ case "${CG_ROLE}" in
       exit 1
     fi
     echo "[entrypoint] building TV web player (VITE_SERVER_URL=${VITE_SERVER_URL})…"
-    pnpm --filter tv-web build
+    # This is a browser web player, not a real TV → bake browser mode (smaller scale, mouse, inset sidebar).
+    VITE_IS_BROWSER=true pnpm --filter tv-web build
 
     echo "[entrypoint] serving TV web player on :${TV_WEB_PORT:-3002}…"
     exec gosu app env HOME=/home/app WEB_DIST=/app/apps/tv-web/dist WEB_PORT="${TV_WEB_PORT:-3002}" \

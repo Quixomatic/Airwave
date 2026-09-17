@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import {
+  ArrowLeft,
   AudioLines,
   Captions,
   Clapperboard,
@@ -14,7 +15,10 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { Button } from "@airwave/ui/components/button";
+
 import type { GuideMeta } from "../../lib/api";
+import { IS_BROWSER } from "../../lib/browser-mode";
 import { LAYER, useKeyLayer } from "../../lib/input";
 import { createScrubController } from "./scrub-controller";
 import { TrackPicker } from "./track-picker";
@@ -340,6 +344,12 @@ export function FeaturePanel({
       {infoMode ? (
         /* Info mode — the details fill the space (no scrubber / controls). Back exits. */
         <div style={{ maxWidth: 1300 }}>
+          {/* Browser: a mouse-reachable Back button to exit the details (no remote Back key). */}
+          {IS_BROWSER && (
+            <Button variant="ghost" size="sm" className="mb-4 -ml-2" onClick={() => setInfoMode(false)}>
+              <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
+            </Button>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 20, color: "#c3c9d4", marginBottom: 16 }}>
             {g?.year && <span>{g.year}</span>}
             {g?.contentRating && <span style={{ padding: "2px 10px", borderRadius: 6, background: "rgba(148,163,184,0.18)" }}>{g.contentRating}</span>}
@@ -358,7 +368,9 @@ export function FeaturePanel({
             {g?.studio ? <DetailCol label="Studio" value={g.studio} /> : null}
           </div>
           {delivery && <DeliveryReadout delivery={delivery} accent={accent} />}
-          <div style={{ marginTop: 24, fontSize: 15, color: "#64748b" }}>Press Back to return</div>
+          {!IS_BROWSER && (
+            <div style={{ marginTop: 24, fontSize: 15, color: "#64748b" }}>Press Back to return</div>
+          )}
         </div>
       ) : (
         <>

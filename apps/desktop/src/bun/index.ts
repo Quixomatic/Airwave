@@ -1118,7 +1118,12 @@ async function startStack(): Promise<void> {
   const admin = serveDir(ADMIN_DIST, config.ports.admin, { VITE_SERVER_URL: adminServerUrl });
   if (admin) servers.push(admin);
   if (config.tvwebEnabled) {
-    const tv = serveDir(TVWEB_DIST, config.ports.tvweb, { VITE_SERVER_URL: tvwebServerUrl });
+    // Served as a browser web player (mouse + keyboard at a desk), so inject browser mode alongside the
+    // server URL — this wins over the baked value, so even a TV-defaulted prebuilt bundle runs desktop-tuned.
+    const tv = serveDir(TVWEB_DIST, config.ports.tvweb, {
+      VITE_SERVER_URL: tvwebServerUrl,
+      VITE_IS_BROWSER: "true",
+    });
     if (tv) servers.push(tv);
   }
 

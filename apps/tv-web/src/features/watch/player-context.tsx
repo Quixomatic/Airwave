@@ -9,6 +9,7 @@ import { Ctx, type Layout, type PlayerCtx } from "./player-ctx";
 import { accentForChannel, FullChrome } from "./watch";
 import { useTvPlayer } from "./use-tv-player";
 import { api } from "../../lib/api";
+import { IS_BROWSER } from "../../lib/browser-mode";
 import { useChannels } from "../../hooks/use-channels";
 
 /**
@@ -229,6 +230,8 @@ function PlayerHost({
   const accent = accentForChannel(channel);
 
   const [quality, setQuality] = useState("original");
+  // Browser only: hovering the docked mini feed reveals its buttons (there's no D-pad focus with a mouse).
+  const [miniHover, setMiniHover] = useState(false);
   const [audioStreamId, setAudioStreamId] = useState<string | undefined>(undefined);
   const [subtitleStreamId, setSubtitleStreamId] = useState<string | undefined>(undefined);
   const [qualities, setQualities] = useState<{ id: string; label: string }[]>([]);
@@ -276,12 +279,16 @@ function PlayerHost({
       initial={false}
       animate={target}
       transition={{ type: "spring", stiffness: 320, damping: 34 }}
+      // Browser: the docked mini feed accepts the mouse so hovering it can reveal its buttons. TV keeps
+      // it click-through (`none`) so the guide behind stays navigable.
+      onMouseEnter={IS_BROWSER && layout === "mini" ? () => setMiniHover(true) : undefined}
+      onMouseLeave={IS_BROWSER && layout === "mini" ? () => setMiniHover(false) : undefined}
       style={{
         position: "fixed",
         overflow: "hidden",
         background: "#000",
         zIndex: full ? 50 : 15,
-        pointerEvents: full ? "auto" : "none",
+        pointerEvents: full || (IS_BROWSER && layout === "mini") ? "auto" : "none",
         boxShadow: full ? "none" : "0 12px 40px rgba(0,0,0,0.6)",
       }}
     >
@@ -339,10 +346,11 @@ function PlayerHost({
       {/* Sling-style affordance: while the mini feed is playing but NOT focused, show that the
           green button jumps to it (equivalent to d-padding all the way up). Hidden once focused,
           since the two buttons are then on screen and the hint has served its purpose. */}
-      {layout === "mini" && !miniFocused && <GreenHint />}
+      {layout === "mini" && !miniFocused && !IS_BROWSER && <GreenHint />}
 
-      {/* Mini feed focus overlay — two buttons: go full, or close the feed. */}
-      {layout === "mini" && miniFocused && (
+      {/* Mini feed overlay — two buttons: go full, or close the feed. Shown on D-pad focus (TV) or on
+          mouse hover (browser). */}
+      {layout === "mini" && (miniFocused || (IS_BROWSER && miniHover)) && (
         <div
           style={{
             position: "absolute",
@@ -356,8 +364,11 @@ function PlayerHost({
             pointerEvents: "auto",
           }}
         >
-          <MiniButton label="Full screen" icon={<Maximize2 size={26} />} selected={miniSel === 0} accent={accent} onClick={onGoFull} />
-          <MiniButton label="Close" icon={<X size={26} />} selected={miniSel === 1} accent={accent} onClick={onClose} />
+          {/* The selection ring follows ACTUAL D-pad focus (`miniFocused`), not just the overlay being
+              visible — so keyboard nav highlights the focused button, while a mouse-hover reveal (overlay
+              shown but not focused) leaves no stale ring and the highlight follows the cursor instead. */}
+          <MiniButton label="Full screen" icon={<Maximize2 size={26} />} selected={miniFocused && miniSel === 0} accent={accent} onClick={onGoFull} />
+          <MiniButton label="Close" icon={<X size={26} />} selected={miniFocused && miniSel === 1} accent={accent} onClick={onClose} />
         </div>
       )}
     </motion.div>
@@ -422,10 +433,15 @@ function MiniButton({
   accent: string;
   onClick: () => void;
 }) {
+  // Highlight on D-pad selection OR mouse hover (browser), so the button lights up under the cursor.
+  const [hovered, setHovered] = useState(false);
+  const active = selected || hovered;
   return (
     <button
       onClick={onClick}
       title={label}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -434,7 +450,7 @@ function MiniButton({
         border: "none",
         background: "transparent",
         cursor: "pointer",
-        color: selected ? "#f1f5f9" : "#94a3b8",
+        color: active ? "#f1f5f9" : "#94a3b8",
       }}
     >
       <span
@@ -445,9 +461,9 @@ function MiniButton({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: selected ? accent : "rgba(30,41,59,0.85)",
-          color: selected ? "#06121f" : "#dfe4ec",
-          boxShadow: selected ? `0 0 0 3px ${accent}66` : "none",
+          background: active ? accent : "rgba(30,41,59,0.85)",
+          color: active ? "#06121f" : "#dfe4ec",
+          boxShadow: active ? `0 0 0 3px ${accent}66` : "none",
           transition: "all .12s",
         }}
       >

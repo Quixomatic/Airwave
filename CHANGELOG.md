@@ -2,6 +2,26 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.8] - 2026-09-17
+
+TV web player — a desktop "browser mode" so the Docker / desktop-server web player feels right with a mouse
+and keyboard instead of a 10-foot remote.
+
+### Added
+- tv-web now runs in a **browser mode** on the Docker web player and the packaged desktop server, separate
+  from a real webOS/Samsung TV. It's driven by `VITE_IS_BROWSER` — baked in the Docker build, injected at
+  serve time by the desktop supervisor (wins over the baked value), and defaulted off for the TV `.ipk`.
+- **Keyboard shortcuts** (safe on every platform — no TV remote emits these): `Space` play/pause, `Escape`
+  back, `[` / `]` step channels down/up.
+- **Mouse** (browser mode only): click the video to play/pause and reveal the chrome; moving the mouse
+  reveals the chrome; a top-left Back button on the full-screen player; the docked mini feed reveals its
+  Full-screen / Close buttons on hover (highlight follows the cursor, while keyboard focus still shows the
+  selection ring); and the program Info view gets a Back button.
+
+### Notes
+- A real TV build is unchanged — every browser affordance is gated behind the flag, and the keyboard maps
+  only fire for keys a remote never sends.
+
 ## [0.14.7] - 2026-09-16
 
 Admin — every destructive action uses a proper in-app confirm dialog, and the AI chat history reads cleaner.

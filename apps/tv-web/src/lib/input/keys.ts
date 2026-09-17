@@ -21,6 +21,7 @@ export type SemanticKey =
   | "back"
   | "chUp"
   | "chDown"
+  | "playpause"
   | "red"
   | "green"
   | "yellow"
@@ -44,8 +45,8 @@ export type KeyEvent = {
 
 /**
  * Back. webOS = 461; Tizen = 10009; Samsung Orsay = 88. The string variants cover the different
- * names browsers/webviews report. (Deliberately NOT including "Escape" — no handler in the app
- * responds to Escape today, and adding it would be a behavior change.)
+ * names browsers/webviews report. ("Escape" is handled separately in the switch below, as a
+ * desktop-keyboard alias for Back — a TV remote never emits it.)
  */
 const BACK_CODES = new Set([461, 10009, 88]);
 const BACK_NAMES = new Set(["Backspace", "GoBack", "BrowserBack", "XF86Back"]);
@@ -90,6 +91,17 @@ export function toKeyEvent(raw: KeyboardEvent, repeat: boolean): KeyEvent {
       return { key: "right", raw, repeat };
     case "Enter":
       return { key: "ok", raw, repeat };
+    // Desktop keyboard niceties. No TV remote emits these, so they're safe to map unconditionally and
+    // only ever fire in the browser player. Escape = Back (every screen already handles "back"); Space =
+    // play/pause; `[` / `]` step channels (a keyboard has no CH▲/▼, and the bracket pair reads as prev/next).
+    case "Escape":
+      return { key: "back", raw, repeat };
+    case " ":
+      return { key: "playpause", raw, repeat };
+    case "]":
+      return { key: "chUp", raw, repeat };
+    case "[":
+      return { key: "chDown", raw, repeat };
   }
   // Some TV webviews report Enter only by keyCode.
   if (code === 13) return { key: "ok", raw, repeat };
