@@ -141,8 +141,13 @@ function Write-Meta($dir) {
     --label "airwave.path.gitbash=$($m.gitbash)" `
     --label "airwave.path.unix=$($m.unix)" *> $null
 }
-function Get-MetaPathHere {
-  return (docker volume inspect airwave_meta --format '{{index .Labels "airwave.path.windows"}}' 2>$null)
+function Get-Meta {
+  # Read the airwave_meta labels as JSON (avoids Go-template quoting, which PowerShell mangles for native exes).
+  try {
+    $j = docker volume inspect airwave_meta 2>$null | ConvertFrom-Json
+    if ($j) { return $j[0].Labels }
+  } catch {}
+  return $null
 }
 
 # ---- version -> image tag --------------------------------------------------
@@ -223,21 +228,30 @@ $envPath = Join-Path $Dir ".env"
 # stack already exists from a DIFFERENT directory (e.g. installed via WSL, now running from Windows), a second
 # install here collides on the same containers, volumes, and ports.
 if (-not $existing -and -not $DryRun) {
-  $mp = Get-MetaPathHere
+  $meta = Get-Meta
+  $mp = if ($meta) { [string]$meta.'airwave.path.windows' } else { "" }
   if ($mp -and $mp -ne $dirAbs -and (Test-Path (Join-Path $mp ".env"))) {
-    Info "Airwave is already installed at:"
-    Write-Host "  $mp"
-    $pick = Choose "What do you want to do?" @("Update that install", "Install a separate copy here ($dirAbs)", "Quit")
-    switch -Wildcard ($pick) {
-      "Update*" { $Dir = $mp; $dirAbs = (Resolve-Path $mp).Path; $envPath = Join-Path $Dir ".env"; $existing = $true; Ok "Recentered on $dirAbs." }
-      "Quit"    { Die "Cancelled." }
-    }
-  } else {
-    $other = (docker ps -a --filter "label=com.docker.compose.project=airwave" --format '{{.Label "com.docker.compose.project.working_dir"}}' 2>$null | Select-Object -First 1)
-    if ($other -and $other -ne $dirAbs) {
-      Warn "An Airwave stack already exists (installed at $other), sharing this Docker engine."
-      Warn "A second copy here would clash on the same containers, volumes, and ports."
-      if (-not (Confirm "Continue anyway?")) { Die "Cancelled. Manage the existing install at $other, or uninstall it first." }
+    if ($mp -like '\\wsl*') {
+      # WSL-internal install: docker compose can't be driven from a \\wsl$ dir on Windows, so hand off into WSL.
+      $wslPath = [string]$meta.'airwave.path.wsl'
+      $distro = if ($mp -match '^\\\\wsl[^\\]+\\([^\\]+)\\') { $Matches[1] } else { 'Ubuntu' }
+      Info "Airwave is installed inside WSL ($distro) at:"
+      Write-Host "  $wslPath"
+      switch -Wildcard (Choose "What do you want to do?" @("Update it (runs inside WSL)", "Install a separate Windows copy here", "Quit")) {
+        "Update*" {
+          Info "Handing off to the installer inside WSL ($distro)..."
+          wsl.exe -d $distro bash -lc "curl -fsSL https://www.getairwave.tv/install.sh | sh -s -- --install --dir '$wslPath' --version '$Version' --yes"
+          exit $LASTEXITCODE
+        }
+        "Quit" { Die "Cancelled." }
+      }
+    } else {
+      Info "Airwave is already installed at:"
+      Write-Host "  $mp"
+      switch -Wildcard (Choose "What do you want to do?" @("Update that install", "Install a separate copy here ($dirAbs)", "Quit")) {
+        "Update*" { $Dir = $mp; $dirAbs = (Resolve-Path $mp).Path; $envPath = Join-Path $Dir ".env"; $existing = $true; Ok "Recentered on $dirAbs." }
+        "Quit"    { Die "Cancelled." }
+      }
     }
   }
 }
