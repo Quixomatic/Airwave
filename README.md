@@ -396,7 +396,7 @@ Built and proven in real use:
   self-updating installers; Linux on Wayland + X11)
 - Self-host on TrueNAS **or** the one-click **Airwave Desktop** installer (bundled server + embedded Postgres)
 
-On the roadmap / in progress:
+On the roadmap / in progress (see the full [roadmap](https://www.getairwave.tv/roadmap)):
 
 - Rotation **weighting + freshness** (make a show air more/less often; surface just-added episodes)
 - **Jellyfin / Emby** media-server support
