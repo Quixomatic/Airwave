@@ -186,7 +186,7 @@ land everywhere at once:
 | **iPad** | ✅ Available | App Store |
 | **Android TV** | ✅ Available | Google Play |
 | **Fire TV** | ✅ Available | Amazon Appstore |
-| **LG webOS** | ✅ Available | LG Content Store |
+| **LG webOS** | ✅ Available | packaged web app (build & sideload / from source) |
 | **Windows** | ✅ Available | native **desktop app** (Tauri + mpv) — a signed, self-updating installer |
 | **macOS** | ✅ Available | the same **desktop app** (Tauri + mpv) — Apple Silicon + Intel, Developer-ID signed **and notarized**, self-updating |
 | **Roku** | ✅ Available | native Roku channel (BrighterScript + SceneGraph) — Roku Channel Store |
