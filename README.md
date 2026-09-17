@@ -189,7 +189,7 @@ land everywhere at once:
 | **LG webOS** | ✅ Available | LG Content Store |
 | **Windows** | ✅ Available | native **desktop app** (Tauri + mpv) — a signed, self-updating installer |
 | **macOS** | ✅ Available | the same **desktop app** (Tauri + mpv) — Apple Silicon + Intel, Developer-ID signed **and notarized**, self-updating |
-| **Roku** | ✅ Built | native Roku channel (running on real hardware; Channel Store submission to come) |
+| **Roku** | ✅ Available | native Roku channel (BrighterScript + SceneGraph) — Roku Channel Store |
 | **Any browser** | ✅ Live now | the `tvweb` Docker role — an auth-gated web player (this is what runs at [tv.turboforge.io](https://tv.turboforge.io), served from the compose stack) |
 | **Linux** | ✅ Available | the same **desktop app** (Tauri + mpv) — Wayland + X11, AppImage |
 | **Samsung (Tizen)** | ✅ Available | packaged web app (build & sideload / from source) |
@@ -400,7 +400,6 @@ On the roadmap / in progress:
 
 - Rotation **weighting + freshness** (make a show air more/less often; surface just-added episodes)
 - **Jellyfin / Emby** media-server support
-- **Roku** Channel Store submission; macOS HDR-EDR on HDR displays
 - A manual schedule editor and general pre-1.0 polish
 
 ---
