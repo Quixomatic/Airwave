@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.9] - 2026-09-17
+
+### Fixed
+- tv-web browser mode: Spacebar (play/pause) now works while the full-screen feature panel is open. The
+  key layer that handled it is inactive when the panel is up, so the panel now claims `playpause` itself —
+  previously Space did nothing (e.g. after a click-to-pause opened the panel) until the panel was closed.
+
 ## [0.14.8] - 2026-09-17
 
 TV web player — a desktop "browser mode" so the Docker / desktop-server web player feels right with a mouse

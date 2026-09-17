@@ -223,6 +223,13 @@ export function FeaturePanel({
         return true;
       }
       armHide();
+      // Spacebar toggles play/pause no matter which control is focused (a dropdown keeps its own keys).
+      // Without this the player-chrome layer that normally handles it is inactive while the panel is open,
+      // so Space did nothing until the panel was closed.
+      if (e.key === "playpause" && !openMenu) {
+        onPlayPause();
+        return true;
+      }
       if (infoMode) return false; // details view — Back exits it; no nav
       if (openMenu) return false; // base-ui owns keys while a dropdown is open
       if (focus.row === 0) {
