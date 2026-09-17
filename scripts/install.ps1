@@ -73,8 +73,14 @@ function Confirm($question, $default = "no") {
   if ([string]::IsNullOrWhiteSpace($ans)) { return ($default -eq "yes") }
   return ($ans -match '^(y|Y|yes|YES)$')
 }
+function AskSecret($question) {
+  if ($NonInteractive) { return "" }
+  if ($Gum) { return (& $Gum input --password --prompt "$question > ") }
+  $sec = Read-Host "$question" -AsSecureString
+  return [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec))
+}
 function Choose($header, [string[]]$options) {
-  if ($Gum) { return (& $Gum choose --header $header @options) }
+  if ($Gum) { $sel = & $Gum choose --header $header @options; Write-Host "  ${header}: $sel" -ForegroundColor DarkGray; return $sel }
   Write-Host $header
   for ($i = 0; $i -lt $options.Count; $i++) { Write-Host ("  {0}) {1}" -f ($i + 1), $options[$i]) }
   $n = Read-Host "Choose [1]"
@@ -315,14 +321,29 @@ if (-not $existing -and -not $pgVolume -and -not $DryRun) {
   $pgvol = "airwave_channelguide_pgdata"
   docker volume inspect $pgvol *> $null
   if ($LASTEXITCODE -eq 0) {
-    Warn "A Postgres data volume ($pgvol) already exists from a previous install."
-    Warn "Postgres keeps its original password on an existing volume, so the newly generated one won't match."
-    if (Confirm "Reset that database now? (DELETES it, then re-initializes with the new password)") {
-      Push-Location $Dir; docker compose down -v *> $null; Pop-Location
-      docker volume rm $pgvol *> $null
+    Info "Found an existing Airwave database volume ($pgvol)."
+    Push-Location $Dir
+    docker compose up -d postgres *> $null
+    for ($i = 0; $i -lt 20; $i++) { docker compose exec -T postgres pg_isready -U channelguide *> $null; if ($LASTEXITCODE -eq 0) { break }; Start-Sleep -Seconds 1 }
+    function Test-PgPw($pw) { docker compose exec -T -e "PGPASSWORD=$pw" postgres psql -h 127.0.0.1 -U channelguide -d channelguide -c 'select 1' *> $null; return ($LASTEXITCODE -eq 0) }
+    if (Test-PgPw $pgPass) {
+      Ok "The existing database accepts the configured password - reusing it (your data is kept)."
     } else {
-      Die "Aborting so nothing is wiped. Reuse its POSTGRES_PASSWORD in .env, or remove it: docker volume rm $pgvol"
+      Warn "That database was created with a different password than the one just generated."
+      $pick = Choose "How do you want to handle it?" @("Reuse it - enter the existing password (keeps your data)", "Wipe it and start fresh (DELETES that database)", "Quit")
+      switch -Wildcard ($pick) {
+        "Reuse*" {
+          while ($true) {
+            $ex = AskSecret "  Existing database password"
+            if ($ex -and (Test-PgPw $ex)) { $pgPass = $ex; Set-EnvVar $envPath "POSTGRES_PASSWORD" $ex; Ok "Password accepted - reusing the database."; break }
+            Warn "  That password didn't authenticate. Try again, or Ctrl-C to abort."
+          }
+        }
+        "Wipe*" { docker compose down -v *> $null; docker volume rm $pgvol *> $null; Ok "Old database removed; a fresh one will be created." }
+        default { docker compose down *> $null; Pop-Location; Die "Aborted. Nothing was changed." }
+      }
     }
+    Pop-Location
   }
 }
 

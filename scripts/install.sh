@@ -192,6 +192,20 @@ prompt() { # prompt VAR "Question" "default"  (env value of VAR, if set, wins as
   eval "$_v=\$_ans"
 }
 
+prompt_secret() { # prompt_secret VAR "Question" -> reads without echoing the value to the screen
+  _v=$1; _q=$2
+  if noninteractive; then eval "$_v=''"; return 0; fi
+  if [ -n "$GUM" ]; then
+    _ans=$("$GUM" input --password --prompt "$_q » " < "$TTY") || _ans=''
+  else
+    printf '%s: ' "$_q" > "$TTY"
+    stty -echo 2>/dev/null
+    IFS= read -r _ans < "$TTY" || _ans=''
+    stty echo 2>/dev/null; printf '\n' > "$TTY"
+  fi
+  eval "$_v=\$_ans"
+}
+
 confirm() { # confirm "Question" [default:yes|no] -> 0 = yes. Non-interactive returns the default.
   _q=$1; _def=${2:-no}
   if noninteractive; then [ "$_def" = yes ] && return 0 || return 1; fi
@@ -211,7 +225,9 @@ confirm() { # confirm "Question" [default:yes|no] -> 0 = yes. Non-interactive re
 choose() { # choose "header" "opt1" "opt2" ...  -> prints the chosen option
   _hdr=$1; shift
   if [ -n "$GUM" ]; then
-    "$GUM" choose --header "$_hdr" "$@" < "$TTY"
+    _sel=$("$GUM" choose --header "$_hdr" "$@" < "$TTY") || _sel=''
+    printf '  %s%s: %s%s\n' "$DIM" "$_hdr" "$_sel" "$RST" >&2   # keep it in scrollback (gum clears its UI)
+    printf '%s' "$_sel"
   else
     printf '%s\n' "$_hdr" > "$TTY"
     _i=1; for _o in "$@"; do printf '  %s) %s\n' "$_i" "$_o" > "$TTY"; _i=$((_i + 1)); done
@@ -561,13 +577,39 @@ fi
 if [ "$EXISTING" = 0 ] && [ -z "${POSTGRES_DATA_VOLUME:-}" ] && ! dryrun; then
   _pgvol=airwave_channelguide_pgdata
   if docker volume inspect "$_pgvol" >/dev/null 2>&1; then
-    warn "A Postgres data volume (${_pgvol}) already exists from a previous install."
-    warn "Postgres keeps its original password on an existing volume, so the newly generated one won't match."
-    if confirm "Reset that database now? (DELETES it, then re-initializes with the new password)"; then
-      $DCOMPOSE down -v >/dev/null 2>&1 || true
-      docker volume rm "$_pgvol" >/dev/null 2>&1 || warn "couldn't remove ${_pgvol}; try: cd ${DIR_ABS} && docker compose down -v"
+    section "Found an existing Airwave database volume (${_pgvol})."
+    # Bring up ONLY Postgres against the existing volume (it uses its own baked password, ignoring .env), then
+    # test whether our configured password authenticates. Reuse if it does; otherwise let the user pick.
+    $DCOMPOSE up -d postgres >/dev/null 2>&1 || warn "couldn't start Postgres to check the existing database."
+    _i=0; while [ $_i -lt 20 ]; do
+      $DCOMPOSE exec -T postgres pg_isready -U channelguide >/dev/null 2>&1 && break
+      _i=$((_i + 1)); sleep 1
+    done
+    pg_pw_works() { $DCOMPOSE exec -T -e PGPASSWORD="$1" postgres psql -h 127.0.0.1 -U channelguide -d channelguide -c 'select 1' >/dev/null 2>&1; }
+    if pg_pw_works "$POSTGRES_PASSWORD"; then
+      ok "The existing database accepts the configured password — reusing it (your data is kept)."
     else
-      die "Aborting so nothing is wiped. To reuse that database, restore its POSTGRES_PASSWORD in .env; to start fresh: docker volume rm ${_pgvol}"
+      warn "That database was created with a different password than the one just generated."
+      _pick=$(choose "How do you want to handle it?" \
+        "Reuse it — enter the existing password (keeps your data)" \
+        "Wipe it and start fresh (DELETES that database)" \
+        "Quit")
+      case "$_pick" in
+        Reuse*)
+          while :; do
+            prompt_secret _EXPW "  Existing database password"
+            if [ -n "$_EXPW" ] && pg_pw_works "$_EXPW"; then
+              POSTGRES_PASSWORD=$_EXPW; set_env POSTGRES_PASSWORD "$_EXPW"
+              ok "Password accepted — reusing the database."; break
+            fi
+            warn "  That password didn't authenticate. Try again, or Ctrl-C to abort."
+          done ;;
+        Wipe*)
+          $DCOMPOSE down -v >/dev/null 2>&1 || true
+          docker volume rm "$_pgvol" >/dev/null 2>&1 || warn "couldn't remove ${_pgvol}; try: cd ${DIR_ABS} && docker compose down -v"
+          ok "Old database removed; a fresh one will be created." ;;
+        *) $DCOMPOSE down >/dev/null 2>&1 || true; die "Aborted. Nothing was changed." ;;
+      esac
     fi
   fi
 fi
