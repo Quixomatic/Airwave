@@ -5,7 +5,7 @@
   <a href="LICENSE"><img alt="License: PolyForm Perimeter 1.0.1" src="https://img.shields.io/badge/license-PolyForm%20Perimeter%201.0.1-lightgrey"></a>
   <a href="https://www.getairwave.tv"><img alt="Website: getairwave.tv" src="https://img.shields.io/badge/website-getairwave.tv-orange"></a>
   <a href="https://www.getairwave.tv/docs"><img alt="Docs" src="https://img.shields.io/badge/docs-getairwave.tv%2Fdocs-blue"></a>
-  <img alt="Platforms" src="https://img.shields.io/badge/platforms-Apple%20TV%20%7C%20iPad%20%7C%20Fire%20TV%20%7C%20Android%20TV%20%7C%20webOS%20%7C%20Roku%20%7C%20Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-blueviolet">
+  <img alt="Platforms" src="https://img.shields.io/badge/platforms-Apple%20TV%20%7C%20iPad%20%7C%20Fire%20TV%20%7C%20Android%20TV%20%7C%20webOS%20%7C%20Samsung%20%7C%20Roku%20%7C%20Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-blueviolet">
   <a href="https://github.com/Quixomatic/Airwave/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Quixomatic/Airwave?style=flat&color=yellow"></a>
 </p>
 
@@ -191,8 +191,8 @@ land everywhere at once:
 | **macOS** | ✅ Available | the same **desktop app** (Tauri + mpv) — Apple Silicon + Intel, Developer-ID signed **and notarized**, self-updating |
 | **Roku** | ✅ Built | native Roku channel (running on real hardware; Channel Store submission to come) |
 | **Any browser** | ✅ Live now | the `tvweb` Docker role — an auth-gated web player (this is what runs at [tv.turboforge.io](https://tv.turboforge.io), served from the compose stack) |
-| **Linux** | 🔜 Coming soon | the same desktop app (Tauri + mpv) — build target next |
-| **Samsung (Tizen)** | 🔜 Coming soon | — |
+| **Linux** | ✅ Available | the same **desktop app** (Tauri + mpv) — Wayland + X11, AppImage |
+| **Samsung (Tizen)** | ✅ Available | packaged web app (build & sideload / from source) |
 
 The native apps are distributed through their platform stores (a small paid download — see
 [Why I built this](#why-i-built-this)). Because Airwave is source-available, you can also **build and
@@ -391,15 +391,16 @@ Built and proven in real use:
 - Per-user access control + admin-only admin UI
 - Capability diagnostic + native-first playback (mpv); off-network local/remote/relay
 - Lineup import/export between instances
-- Native apps running on iPad, Apple TV 4K, Android TV, Fire TV, LG webOS, **Roku**, and a **Windows + macOS
-  desktop** client (Tauri + libmpv; Apple Silicon + Intel, signed + notarized, self-updating installers)
+- Native apps running on iPad, Apple TV 4K, Android TV, Fire TV, LG webOS, **Samsung (Tizen)**, **Roku**, and a
+  **Windows + macOS + Linux desktop** client (Tauri + libmpv; Apple Silicon + Intel, signed + notarized,
+  self-updating installers; Linux on Wayland + X11)
 - Self-host on TrueNAS **or** the one-click **Airwave Desktop** installer (bundled server + embedded Postgres)
 
 On the roadmap / in progress:
 
 - Rotation **weighting + freshness** (make a show air more/less often; surface just-added episodes)
 - **Jellyfin / Emby** media-server support
-- **Linux** desktop client + **Samsung (Tizen)** client; **Roku** Channel Store submission; macOS HDR-EDR on HDR displays
+- **Roku** Channel Store submission; macOS HDR-EDR on HDR displays
 - A manual schedule editor and general pre-1.0 polish
 
 ---

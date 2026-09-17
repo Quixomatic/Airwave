@@ -105,7 +105,8 @@ const FEATURES: BentoItem[] = [
   },
 ];
 
-// Fully-supported first (green "Ready"), then partial (amber "WIP"); COMING_SOON renders after (muted "Soon").
+// All clients ship now (green "Ready"); the "WIP" badge (amber) is kept for any future partial platform,
+// and COMING_SOON renders after (muted "Soon").
 const PLATFORMS: { name: string; Icon: ComponentType<{ className?: string }>; badge: "Ready" | "WIP" }[] = [
   { name: "Apple TV", Icon: SiApple, badge: "Ready" },
   { name: "iPad", Icon: SiApple, badge: "Ready" },
@@ -117,7 +118,7 @@ const PLATFORMS: { name: string; Icon: ComponentType<{ className?: string }>; ba
   { name: "Fire TV", Icon: FaAmazon, badge: "Ready" },
   { name: "Samsung (Tizen)", Icon: SiSamsung, badge: "Ready" },
   { name: "Linux", Icon: FaLinux, badge: "Ready" },
-  { name: "Android TV", Icon: SiAndroid, badge: "WIP" },
+  { name: "Android TV", Icon: SiAndroid, badge: "Ready" },
 ];
 
 // Every client platform now ships; nothing pending. (Kept for the "Soon" tile rendering if a future
