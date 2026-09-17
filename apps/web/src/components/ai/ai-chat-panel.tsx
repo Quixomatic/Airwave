@@ -24,6 +24,7 @@ import {
 import { Reasoning, ReasoningContent, ReasoningTrigger, ThinkingIndicator } from "@/components/ai-elements/reasoning";
 import { Response } from "@/components/ai-elements/response";
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput, type ToolState } from "@/components/ai-elements/tool";
+import { useConfirm } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { PanelHeaderTitle } from "@/context/panel-header-provider";
 import { serverUrl } from "@/lib/runtime-env";
@@ -42,6 +43,18 @@ const serverBase = () => {
   return u.startsWith("/") && typeof window !== "undefined" ? `${window.location.origin}${u}` : u;
 };
 
+/** Compact "time since" for the history list (e.g. "3m ago"). */
+function relTime(value: string | Date): string {
+  const diff = Math.max(0, Date.now() - new Date(value).getTime());
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
 const Title = () => (
   <PanelHeaderTitle>
     <span className="flex items-center gap-2">
@@ -53,6 +66,7 @@ const Title = () => (
 
 export function AiChatPanel() {
   const navigate = useNavigate();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [activeId, setActiveId] = useState<string>(() => uuid());
   const [showHistory, setShowHistory] = useState(false);
   const conversations = useQuery(trpc.ai.conversations.queryOptions());
@@ -91,6 +105,13 @@ export function AiChatPanel() {
     setShowHistory(false);
   };
   const del = async (id: string) => {
+    const ok = await confirm({
+      title: "Delete this conversation?",
+      description: "This permanently removes the chat and its messages.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     await trpcClient.ai.deleteConversation.mutate({ id });
     await conversations.refetch();
     if (id === activeId) newChat();
@@ -98,6 +119,7 @@ export function AiChatPanel() {
 
   return (
     <>
+      {confirmDialog}
       <Title />
 
       <div className="flex h-full flex-col">
@@ -113,20 +135,27 @@ export function AiChatPanel() {
         </div>
 
         {showHistory ? (
-          <div className="flex-1 overflow-y-auto p-2">
+          <div className="flex flex-1 flex-col gap-1.5 overflow-y-auto p-2">
             {conversations.data?.length ? (
               conversations.data.map((cv) => (
-                <div key={cv.id} className="group hover:bg-accent flex items-center gap-2 rounded-md p-2">
+                <div key={cv.id} className="group bg-muted/60 hover:bg-muted flex items-start gap-2 rounded-md p-2 transition-colors">
                   <button
-                    className="min-w-0 flex-1 truncate text-left text-sm"
+                    className="min-w-0 flex-1 text-left"
                     onClick={() => {
                       setActiveId(cv.id);
                       setShowHistory(false);
                     }}
                   >
-                    {cv.title ?? "Untitled"}
+                    <p className="truncate text-sm">{cv.title ?? "Untitled"}</p>
+                    <p className="text-muted-foreground mt-1 text-xs tabular-nums">{relTime(cv.updatedAt)}</p>
                   </button>
-                  <Button size="icon" variant="ghost" className="opacity-0 group-hover:opacity-100" aria-label="Delete" onClick={() => void del(cv.id)}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="shrink-0 opacity-0 group-hover:opacity-100"
+                    aria-label="Delete"
+                    onClick={() => void del(cv.id)}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>

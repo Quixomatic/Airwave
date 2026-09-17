@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.7] - 2026-09-16
+
+Admin — every destructive action uses a proper in-app confirm dialog, and the AI chat history reads cleaner.
+
+### Changed
+- Replaced the browser's `window.confirm` and two hand-rolled confirm modals with one shared in-app alert
+  dialog (a new `useConfirm` hook on the base-lyra `alert-dialog`) across the admin app: deleting a channel,
+  package, bumper, user, or AI connection, rebuilding a package from the preset, and refreshing package
+  styling. Destructive actions get a red confirm button.
+- Removing a media source keeps its "type DELETE to confirm" gate, now built on the shared dialog (the
+  confirm button stays disabled until you type DELETE).
+- Deleting an AI connection and deleting an AI chat conversation now ask first (both deleted silently
+  before).
+- The assistant's chat history shows each conversation as a rounded tile with its last-active time.
+
 ## [0.14.6] - 2026-09-16
 
 AI lineup — rebuild a single channel in place (#23), and real in-app confirm dialogs.

@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
 import { HeaderRight } from "@/context/header-provider";
 import { serverBase } from "@/lib/img";
+import { useConfirm } from "@/components/confirm-dialog";
 import { trpc, trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/bumpers")({
@@ -214,6 +215,7 @@ function BumpersPage() {
 }
 
 function MusicLibrary() {
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const tracks = useQuery(trpc.bumperMusic.list.queryOptions());
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -283,7 +285,15 @@ function MusicLibrary() {
   };
 
   const remove = async (id: string, title: string) => {
-    if (!confirm(`Delete “${title}”? This removes the file too.`)) return;
+    if (
+      !(await confirm({
+        title: `Delete “${title}”?`,
+        description: "This removes the file too.",
+        confirmLabel: "Delete",
+        destructive: true,
+      }))
+    )
+      return;
     try {
       await trpcClient.bumperMusic.remove.mutate({ id });
       toast.success(`Deleted “${title}”.`);
@@ -297,6 +307,7 @@ function MusicLibrary() {
 
   return (
     <Frame>
+      {confirmDialog}
       <FrameHeader className="flex-row items-start justify-between gap-3">
         <div>
           <FrameTitle>Music library</FrameTitle>

@@ -14,6 +14,7 @@ import { toast } from "sonner";
 
 import { AccentIconTile } from "@airwave/ui/components/accent-icon-tile";
 
+import { useConfirm } from "@/components/confirm-dialog";
 import { useBreadcrumb } from "@/context/breadcrumb-provider";
 import { HeaderLeft, HeaderRight, TopHeaderRight } from "@/context/header-provider";
 import { resolveTile } from "@/features/icons/app-icon";
@@ -38,6 +39,7 @@ const FORM_ID = "edit-channel-form";
 
 function ChannelDetail() {
   const { channelId } = Route.useParams();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const navigate = useNavigate();
   const channel = useQuery(trpc.channels.get.queryOptions({ id: channelId }));
   useBreadcrumb(channel.data?.name);
@@ -93,7 +95,8 @@ function ChannelDetail() {
   };
 
   const del = async () => {
-    if (!window.confirm("Delete this channel?")) return;
+    if (!(await confirm({ title: "Delete this channel?", confirmLabel: "Delete", destructive: true })))
+      return;
     try {
       await trpcClient.channels.remove.mutate({ id: channelId });
       toast.success("Channel deleted.");
@@ -117,6 +120,7 @@ function ChannelDetail() {
 
   return (
     <div className="space-y-6 pb-32">
+      {confirmDialog}
       {/* Channel identity in the sub-header left: tinted icon tile · callsign · CH NN,
           each piece the same size, dot-separated. */}
       <HeaderLeft>

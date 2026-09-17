@@ -13,7 +13,7 @@ import { KeyRound, Loader2, ShieldCheck, Trash2, User } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { Modal } from "@/components/modal";
+import { useConfirm } from "@/components/confirm-dialog";
 import { trpc, trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/users/$id/")({
@@ -28,10 +28,22 @@ function UserOverview() {
   const u = user.data;
   const a = access.data;
   const admin = u?.role === "admin";
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [deleting, setDeleting] = useState(false);
 
-  const remove = async () => {
+  const confirmDelete = async () => {
+    const ok = await confirm({
+      title: "Delete user?",
+      description: (
+        <>
+          This permanently removes <strong>{u?.name || u?.email}</strong>, including their account,
+          sign-in, and channel access. This can't be undone.
+        </>
+      ),
+      confirmLabel: "Delete user",
+      destructive: true,
+    });
+    if (!ok) return;
     setDeleting(true);
     try {
       await trpcClient.users.delete.mutate({ id });
@@ -70,6 +82,7 @@ function UserOverview() {
 
   return (
     <div className="space-y-6">
+      {confirmDialog}
       <Frame>
       <FramePanel className="space-y-6">
         {/* Hero — big avatar + name. */}
@@ -154,30 +167,21 @@ function UserOverview() {
                 <strong>cannot be undone</strong>.
               </p>
             </div>
-            <Button variant="destructive" className="shrink-0" onClick={() => setDeleteOpen(true)}>
-              <Trash2 className="mr-2 size-4" /> Delete user
+            <Button
+              variant="destructive"
+              className="shrink-0"
+              onClick={confirmDelete}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 size-4" />
+              )}{" "}
+              Delete user
             </Button>
           </FramePanel>
         </Frame>
-      )}
-
-      {deleteOpen && (
-        <Modal open onClose={() => !deleting && setDeleteOpen(false)}>
-          <h3 className="text-lg font-semibold">Delete user?</h3>
-          <p className="text-muted-foreground mt-2 text-sm">
-            This permanently removes <strong>{u?.name || u?.email}</strong> — their account, sign-in,
-            and channel access. This can't be undone.
-          </p>
-          <div className="mt-6 flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={remove} disabled={deleting}>
-              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete user
-            </Button>
-          </div>
-        </Modal>
       )}
     </div>
   );

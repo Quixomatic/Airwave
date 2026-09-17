@@ -17,6 +17,7 @@ import { LayoutGrid, Loader2, Tv } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { useBreadcrumb } from "@/context/breadcrumb-provider";
 import { HeaderRight } from "@/context/header-provider";
@@ -33,6 +34,7 @@ const FORM_ID = "edit-package-form";
 
 function PackageDetail() {
   const { packageId } = Route.useParams();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const navigate = useNavigate();
   const pkg = useQuery(trpc.packages.get.queryOptions({ id: packageId }));
   useBreadcrumb(pkg.data?.name);
@@ -74,7 +76,14 @@ function PackageDetail() {
 
   const regenChannels = async () => {
     if (!pkg.data) return;
-    if (!window.confirm(`Rebuild the channels in "${pkg.data.name}" from the preset? Existing generated channels here are replaced.`))
+    if (
+      !(await confirm({
+        title: "Rebuild channels from the preset?",
+        description: `Existing generated channels in "${pkg.data.name}" are replaced.`,
+        confirmLabel: "Rebuild",
+        destructive: true,
+      }))
+    )
       return;
     setRegenerating(true);
     try {
@@ -98,7 +107,15 @@ function PackageDetail() {
   };
 
   const del = async () => {
-    if (!window.confirm("Delete this package? Its channels stay but become unassigned.")) return;
+    if (
+      !(await confirm({
+        title: "Delete this package?",
+        description: "Its channels stay but become unassigned.",
+        confirmLabel: "Delete",
+        destructive: true,
+      }))
+    )
+      return;
     try {
       await trpcClient.packages.remove.mutate({ id: packageId });
       toast.success("Package deleted.");
@@ -114,6 +131,7 @@ function PackageDetail() {
 
   return (
     <div className="space-y-6">
+      {confirmDialog}
       <HeaderRight>
         {pkg.data.generated && (
           <Button variant="outline" size="sm" onClick={regenChannels} disabled={regenerating}>

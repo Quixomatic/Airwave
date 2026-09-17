@@ -13,6 +13,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/empty-state";
+import { useConfirm } from "@/components/confirm-dialog";
 import { trpc, trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/settings/ai")({
@@ -110,6 +111,7 @@ function SettingsAi() {
   // Z.ai (GLM) only — reasoning-effort level. EFFORT_DEFAULT = leave to the provider default (max).
   const [reasoningEffort, setReasoningEffort] = useState<string>(EFFORT_DEFAULT);
   const [busy, setBusy] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [test, setTest] = useState<Record<string, { ok: boolean; sample?: string; error?: string } | "loading">>({});
 
   const curated = MODELS[provider] ?? [];
@@ -200,6 +202,17 @@ function SettingsAi() {
     }
   };
 
+  const removeConnection = async (c: { id: string; name: string }) => {
+    const ok = await confirm({
+      title: `Delete “${c.name}”?`,
+      description:
+        "This removes the saved connection and its API key. Any roles it holds fall back to the active connection.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (ok) await act(() => trpcClient.ai.delete.mutate({ id: c.id }));
+  };
+
   /** The connection id holding a role, or undefined. */
   const roleHolderId = (role: RoleKey) => connections.find((c) => holdsRole(c, role))?.id;
   const activeId = connections.find((c) => c.isActive)?.id;
@@ -238,6 +251,7 @@ function SettingsAi() {
 
   return (
     <div className="space-y-4">
+      {confirmDialog}
       {/* Saved connections */}
       <Frame>
         <FrameHeader>
@@ -287,7 +301,7 @@ function SettingsAi() {
                   <Button size="icon" variant="ghost" aria-label="Edit" onClick={() => startEdit(c)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" aria-label="Delete" disabled={busy} onClick={() => void act(() => trpcClient.ai.delete.mutate({ id: c.id }))}>
+                  <Button size="icon" variant="ghost" aria-label="Delete" disabled={busy} onClick={() => void removeConnection(c)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>

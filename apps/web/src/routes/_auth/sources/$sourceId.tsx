@@ -1,6 +1,5 @@
 import { Badge } from "@airwave/ui/components/badge";
 import { Button } from "@airwave/ui/components/button";
-import { Card } from "@airwave/ui/components/card";
 import {
   Frame,
   FrameDescription,
@@ -13,10 +12,11 @@ import { Label } from "@airwave/ui/components/label";
 import { Switch } from "@airwave/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/confirm-dialog";
 import { useBreadcrumb } from "@/context/breadcrumb-provider";
 import { trpc, trpcClient } from "@/utils/trpc";
 
@@ -30,10 +30,9 @@ function SourceDetail() {
   const navigate = useNavigate();
   const source = useQuery(trpc.sources.get.queryOptions({ id: sourceId }));
   useBreadcrumb(source.data?.name);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [name, setName] = useState("");
   const [rescanning, setRescanning] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
 
   // The metadata sync runs as a background job; poll it for live status/progress.
@@ -87,8 +86,27 @@ function SourceDetail() {
     }
   };
 
-  // Confirmation lives in the type-DELETE modal (below), so this just performs the delete.
   const remove = async () => {
+    const ok = await confirm({
+      title: `Remove “${source.data?.name ?? "this source"}”?`,
+      description: (
+        <>
+          This permanently deletes the source and <strong>everything built from it</strong>: all its
+          channels, their schedules, and cached metadata. This cannot be undone.
+        </>
+      ),
+      confirmLabel: "Delete source",
+      destructive: true,
+      challenge: {
+        match: "DELETE",
+        label: (
+          <>
+            Type <span className="text-foreground font-mono font-semibold">DELETE</span> to confirm
+          </>
+        ),
+      },
+    });
+    if (!ok) return;
     setDeleting(true);
     try {
       await trpcClient.sources.remove.mutate({ id: sourceId });
@@ -133,6 +151,7 @@ function SourceDetail() {
 
   return (
     <div className="space-y-6">
+      {confirmDialog}
       <Frame>
         <FrameHeader className="flex-row items-start justify-between">
           <div>
@@ -224,91 +243,12 @@ function SourceDetail() {
               channel, their schedules, and all cached metadata. This <strong>cannot be undone</strong>.
             </p>
           </div>
-          <Button
-            variant="destructive"
-            className="shrink-0"
-            onClick={() => {
-              setConfirmText("");
-              setDeleteOpen(true);
-            }}
-          >
+          <Button variant="destructive" className="shrink-0" onClick={remove} disabled={deleting}>
+            {deleting && <Loader2 className="mr-2 size-4 animate-spin" />}
             Remove source
           </Button>
         </FramePanel>
       </Frame>
-
-      {deleteOpen && (
-        <DeleteSourceModal
-          name={source.data.name}
-          value={confirmText}
-          onChange={setConfirmText}
-          deleting={deleting}
-          onCancel={() => setDeleteOpen(false)}
-          onConfirm={remove}
-        />
-      )}
-    </div>
-  );
-}
-
-/** Type-DELETE confirmation for the irreversible cascade-delete of a source. */
-function DeleteSourceModal({
-  name,
-  value,
-  onChange,
-  deleting,
-  onCancel,
-  onConfirm,
-}: {
-  name: string;
-  value: string;
-  onChange: (v: string) => void;
-  deleting: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const armed = value.trim() === "DELETE";
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onCancel}
-    >
-      <Card className="w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start gap-3">
-          <div className="bg-destructive/10 text-destructive flex size-9 shrink-0 items-center justify-center rounded-full">
-            <AlertTriangle className="size-5" />
-          </div>
-          <div className="min-w-0 space-y-1">
-            <h2 className="font-semibold">Remove “{name}”?</h2>
-            <p className="text-muted-foreground text-sm">
-              This permanently deletes the source and <strong>everything built from it</strong> — all
-              its channels, their schedules, and cached metadata. This <strong>cannot be undone</strong>.
-            </p>
-          </div>
-        </div>
-        <div className="mt-4 space-y-2">
-          <Label htmlFor="confirm-delete">
-            Type <span className="text-foreground font-mono font-semibold">DELETE</span> to confirm
-          </Label>
-          <Input
-            id="confirm-delete"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="DELETE"
-            autoComplete="off"
-            autoFocus
-          />
-        </div>
-        <div className="mt-5 flex justify-end gap-2">
-          <Button variant="ghost" onClick={onCancel} disabled={deleting}>
-            Cancel
-          </Button>
-          <Button variant="destructive" onClick={onConfirm} disabled={!armed || deleting}>
-            {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Delete source
-          </Button>
-        </div>
-      </Card>
     </div>
   );
 }
