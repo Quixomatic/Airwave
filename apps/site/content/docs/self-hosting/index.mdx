@@ -21,24 +21,35 @@ tier.
 
 ## Fastest start: the one-line installer
 
-On a Linux or macOS host that has Docker, one command checks Docker, asks a few questions (with sensible
-defaults, including auto-detecting your LAN IP), writes the stack, and brings it up:
+On any machine with Docker, one command checks Docker, asks a few questions (with sensible defaults, including
+auto-detecting your LAN IP), writes the stack, and brings it up.
+
+Linux, macOS, or Windows via WSL / Git Bash (any POSIX shell):
 
 ```bash
 curl -fsSL https://getairwave.tv/install.sh | sh
 ```
 
-- **Pin a version:** `curl -fsSL https://getairwave.tv/install.sh | sh -s -- --version 0.14.13` (latest by default).
-- **Preview only:** add `--dry-run` to see everything it would do without writing or starting anything.
-- **Update:** re-run the same command (or `docker compose pull && docker compose up -d` in the stack dir).
-- **Uninstall:** `curl -fsSL https://getairwave.tv/install.sh | sh -s -- --uninstall` (keeps your data; add
-  `--purge` to delete the volumes and directory too).
-- **Windows (Docker Desktop):** `irm https://getairwave.tv/install.ps1 | iex`.
+Windows native (Docker Desktop, in PowerShell):
 
-The script uses [`gum`](https://github.com/charmbracelet/gum) for the prompts (downloaded to a temp dir and
-checksum-verified if you don't already have it, with a plain-text fallback). It is small and auditable — read
-it first at [getairwave.tv/install.sh](https://getairwave.tv/install.sh) if you prefer. Rather wire it up by
-hand? The manual `docker compose` steps below do exactly the same thing.
+```powershell
+irm https://getairwave.tv/install.ps1 | iex
+```
+
+Both take the same options:
+
+- **Pin a version:** `... | sh -s -- --version 0.14.13` (or `-Version 0.14.13` on PowerShell). Latest by default.
+- **Preview only:** add `--dry-run` (`-DryRun`) to see everything it would do without writing or starting anything.
+- **Update:** re-run the same command (or `docker compose pull && docker compose up -d` in the stack dir).
+- **Uninstall:** add `--uninstall` (`-Uninstall`) — keeps your data; add `--purge` (`-Purge`) to delete the
+  volumes and directory too.
+
+The shell script uses [`gum`](https://github.com/charmbracelet/gum) for the prompts (downloaded to a temp dir
+and checksum-verified if you don't already have it, with a plain-text fallback). On native Windows the
+PowerShell script detects your LAN IP most reliably; under WSL the `curl | sh` line works just as well. Both are
+small and auditable — read them first at [getairwave.tv/install.sh](https://getairwave.tv/install.sh) or
+[/install.ps1](https://getairwave.tv/install.ps1) if you prefer. Rather wire it up by hand? The manual
+`docker compose` steps below do exactly the same thing.
 
 ## The deploy model
 

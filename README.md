@@ -229,19 +229,26 @@ Two ways to run the Airwave **server** (they host the exact same thing, pick whi
 
 ### Quickest: the one-line installer
 
-On a Linux/macOS host with Docker, this checks Docker, asks a few questions (with sensible defaults), writes
-the stack, and brings it up:
+On any machine with Docker, one command checks Docker, asks a few questions (with sensible defaults, including
+auto-detecting your LAN IP), writes the stack, and brings it up.
 
+**Linux, macOS, or Windows via WSL / Git Bash** (any POSIX shell):
 ```bash
 curl -fsSL https://getairwave.tv/install.sh | sh
 ```
 
-Pin a version with `... | sh -s -- --version 0.14.13`, preview without changing anything with `--dry-run`, and
-remove it later with `--uninstall` (add `--purge` to also delete data). Re-running is how you update. Windows
-(Docker Desktop): `irm https://getairwave.tv/install.ps1 | iex`. Prefer to wire it up by hand? The manual
-compose steps below do the same thing.
+**Windows native** (Docker Desktop, in PowerShell):
+```powershell
+irm https://getairwave.tv/install.ps1 | iex
+```
 
-> The script is small and auditable. Read it first if you like: <https://getairwave.tv/install.sh>.
+Both take the same options: **pin a version** (`--version 0.14.13`), **preview** with `--dry-run` (writes and
+starts nothing), **update** by re-running the same command, and **remove** with `--uninstall` (add `--purge` to
+also delete data). Prefer to wire it up by hand? The manual compose steps below do the same thing.
+
+> On native Windows the PowerShell script detects your LAN IP most reliably; under WSL the `curl | sh` line
+> works just as well. The scripts are small and auditable — read them first if you like:
+> <https://getairwave.tv/install.sh> · <https://getairwave.tv/install.ps1>
 
 ### Docker quick start (Dockge or `docker compose`)
 
