@@ -182,6 +182,19 @@ if (-not $DryRun) { New-Item -ItemType Directory -Force -Path $Dir | Out-Null }
 $dirAbs = if (Test-Path $Dir) { (Resolve-Path $Dir).Path } else { $Dir }
 $envPath = Join-Path $Dir ".env"
 
+# ---- cross-environment guard -----------------------------------------------
+# Docker Desktop shares ONE engine across Windows/WSL, and the compose project name is fixed 'airwave'. If a
+# stack already exists from a DIFFERENT directory (e.g. installed via WSL, now running from Windows), a second
+# install here collides on the same containers, volumes, and ports.
+if (-not $existing -and -not $DryRun) {
+  $other = (docker ps -a --filter "label=com.docker.compose.project=airwave" --format '{{.Label "com.docker.compose.project.working_dir"}}' 2>$null | Select-Object -First 1)
+  if ($other -and $other -ne $dirAbs) {
+    Warn "An Airwave stack already exists (installed at $other), sharing this Docker engine."
+    Warn "A second copy here would clash on the same containers, volumes, and ports."
+    if (-not (Confirm "Continue anyway?")) { Die "Cancelled. Manage the existing install at $other, or uninstall it first." }
+  }
+}
+
 # ---- configure -------------------------------------------------------------
 $genPw = $false
 if ($existing) {
@@ -319,8 +332,7 @@ if ($DryRun) {
 # generated one won't match and the server can't connect. Offer to reset it rather than auth-fail loop.
 if (-not $existing -and -not $pgVolume -and -not $DryRun) {
   $pgvol = "airwave_channelguide_pgdata"
-  docker volume inspect $pgvol *> $null
-  if ($LASTEXITCODE -eq 0) {
+  if (@(docker volume ls --format '{{.Name}}' 2>$null) -contains $pgvol) {
     Info "Found an existing Airwave database volume ($pgvol)."
     Push-Location $Dir
     docker compose up -d postgres *> $null

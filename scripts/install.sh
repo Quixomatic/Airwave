@@ -384,6 +384,20 @@ else
   DIR_ABS=$(pwd)
 fi
 
+# ---- cross-environment guard -----------------------------------------------
+# Docker Desktop shares ONE engine across Windows/WSL, and the compose project name is fixed 'airwave'. If a
+# stack is already running from a DIFFERENT directory (e.g. installed via WSL, now running from Windows or a
+# different path), a second install here collides on the same containers, volumes, and ports.
+if [ "$EXISTING" = 0 ] && ! dryrun; then
+  _other=$(docker ps -a --filter "label=com.docker.compose.project=airwave" \
+    --format '{{.Label "com.docker.compose.project.working_dir"}}' 2>/dev/null | head -n1)
+  if [ -n "$_other" ] && [ "$_other" != "$DIR_ABS" ]; then
+    warn "An Airwave stack already exists (installed at ${_other}), sharing this Docker engine."
+    warn "A second copy here would clash on the same containers, volumes, and ports."
+    confirm "Continue anyway?" || die "Cancelled. Manage the existing install at ${_other}, or uninstall it first."
+  fi
+fi
+
 # ---- configure -------------------------------------------------------------
 GEN_PW=0
 if [ "$EXISTING" = 1 ]; then
@@ -576,7 +590,7 @@ fi
 # reset it (data loss) rather than boot into an auth-fail loop.
 if [ "$EXISTING" = 0 ] && [ -z "${POSTGRES_DATA_VOLUME:-}" ] && ! dryrun; then
   _pgvol=airwave_channelguide_pgdata
-  if docker volume inspect "$_pgvol" >/dev/null 2>&1; then
+  if docker volume ls --format '{{.Name}}' 2>/dev/null | grep -qx "$_pgvol"; then
     section "Found an existing Airwave database volume (${_pgvol})."
     # Bring up ONLY Postgres against the existing volume (it uses its own baked password, ignoring .env), then
     # test whether our configured password authenticates. Reuse if it does; otherwise let the user pick.
