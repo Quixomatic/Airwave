@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.11] - 2026-09-17
+
+### Added
+- tv-web browser mode: every full-screen player control now highlights on **mouse hover** — the
+  play/pause, restart, channel-surf, info, and live buttons, the audio/subtitle/quality circles, and the
+  scrubber. Hover drives the same focus the D-pad uses, so the highlight matches the keyboard exactly
+  (matches tv-tauri). TV is unchanged.
+
 ## [0.14.10] - 2026-09-17
 
 TV web player — browser-mode sidebars: mouse hover on the guide rail, a pinned/collapsible settings rail.

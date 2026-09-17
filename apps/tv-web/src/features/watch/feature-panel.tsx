@@ -289,6 +289,11 @@ export function FeaturePanel({
     transition: "background .12s, border-color .12s",
   });
 
+  // Browser: hovering a control focuses it, so it highlights exactly like the D-pad focus (matches
+  // tv-tauri). Returns undefined on TV so there's no mouse behavior there.
+  const hoverCtl = (col: number) => (IS_BROWSER ? () => setFocus({ row: 1, col }) : undefined);
+  const hoverScrubber = IS_BROWSER ? () => setFocus({ row: 0, col: 0 }) : undefined;
+
   // A circular glass icon button that opens the corresponding track picker (OK on the focused button, or
   // click). The picker itself is a centered dialog rendered below (matching tv-native).
   const circleButton = (key: Exclude<MenuKey, null>, col: number, Icon: typeof AudioLines) => (
@@ -298,6 +303,7 @@ export function FeaturePanel({
       }}
       style={glass(col, true)}
       aria-label={key}
+      onMouseEnter={hoverCtl(col)}
       onClick={() => setOpenMenu(key)}
     >
       <Icon size={ICON} />
@@ -385,6 +391,7 @@ export function FeaturePanel({
           <button
             ref={scrubberRef}
             onClick={onPlayPause}
+            onMouseEnter={hoverScrubber}
             style={{ display: "block", width: "100%", textAlign: "left", border: "none", outline: "none", background: "transparent", cursor: "pointer", padding: "6px 0 4px" }}
           >
             <div style={{ position: "relative", height: 8 }}>
@@ -443,23 +450,24 @@ export function FeaturePanel({
 
           {/* Controls */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 20 }}>
-            <button ref={(el) => { ctlRefs.current[0] = el; }} style={glass(0)} onClick={onPlayPause}>
+            <button ref={(el) => { ctlRefs.current[0] = el; }} style={glass(0)} onMouseEnter={hoverCtl(0)} onClick={onPlayPause}>
               {paused ? <Play size={ICON} /> : <Pause size={ICON} />} {paused ? "Play" : "Pause"}
             </button>
             <button
               ref={(el) => { ctlRefs.current[1] = el; }}
               style={{ ...glass(1), opacity: canRestart ? 1 : 0.4 }}
+              onMouseEnter={hoverCtl(1)}
               onClick={doRestart}
             >
               <RotateCcw size={ICON} /> Restart
             </button>
-            <button ref={(el) => { ctlRefs.current[2] = el; }} style={glass(2)} onClick={onChannelSurf}>
+            <button ref={(el) => { ctlRefs.current[2] = el; }} style={glass(2)} onMouseEnter={hoverCtl(2)} onClick={onChannelSurf}>
               <Tv size={ICON} /> Channel Surf
             </button>
-            <button ref={(el) => { ctlRefs.current[3] = el; }} style={glass(3)} onClick={enterInfo}>
+            <button ref={(el) => { ctlRefs.current[3] = el; }} style={glass(3)} onMouseEnter={hoverCtl(3)} onClick={enterInfo}>
               <Info size={ICON} /> Info
             </button>
-            <button ref={(el) => { ctlRefs.current[4] = el; }} style={glass(4)} onClick={jumpToLive}>
+            <button ref={(el) => { ctlRefs.current[4] = el; }} style={glass(4)} onMouseEnter={hoverCtl(4)} onClick={jumpToLive}>
               {atLive ? <Clapperboard size={ICON} /> : <Radio size={ICON} />} {atLive ? "Continue Watching" : "Jump to Live"}
             </button>
 
