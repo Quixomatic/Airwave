@@ -254,6 +254,36 @@ export function AuroraGrid({
     [sidebarItems, onSettings, onAccount, lens],
   );
 
+  // Browser mouse — TWO-STEP click (matches tv-tauri), so browsing with the mouse mirrors the D-pad
+  // without a stray click committing. First click on a PROGRAM focuses it (the featured panel shows its
+  // info); a second click on the already-focused program TUNES. First click on a RAIL focuses it (its
+  // circle becomes the favorite heart); a second click on the already-rail-focused channel TOGGLES favorite.
+  const handleProgramClick = (channelIndex: number, programId: string) => {
+    if (player.miniFocused) return;
+    const ch = channels[channelIndex];
+    if (!ch) return;
+    const pi = ch.programs.findIndex((x) => x.id === programId);
+    if (pi < 0) return;
+    if (zone === "grid" && fc === channelIndex && fp === pi) {
+      onTune(ch.id);
+      return;
+    }
+    setZone("grid");
+    setFc(channelIndex);
+    setFp(pi);
+  };
+  const handleRailClick = (channelIndex: number) => {
+    if (player.miniFocused) return;
+    const ch = channels[channelIndex];
+    if (!ch) return;
+    if (zone === "rail" && fc === channelIndex) {
+      toggleFavorite(ch.id);
+      return;
+    }
+    setZone("rail");
+    setFc(channelIndex);
+  };
+
   // On a lens change, land focus on the first shown channel's live program (the filtered channel
   // list just changed, so the old fc/fp may be stale or out of range).
   useEffect(() => {
@@ -596,7 +626,10 @@ export function AuroraGrid({
                     }
                     setFc(vi.index);
                     setFp(liveProgramIndex(c.programs, now.getTime()));
-                    onTune(c.id);
+                    // Browser: the program cells + rail own a two-step click (focus, then tune/favorite),
+                    // so a bare-row click (gaps between cells) just focuses — never a stray tune. TV/remote
+                    // keeps the single-click tune.
+                    if (!IS_BROWSER) onTune(c.id);
                   }}
                   style={{ position: "absolute", top: 0, left: 0, width: "100%", height: rowPx, transform: `translateY(${vi.start}px)`, cursor: "pointer" }}
                 >
@@ -611,6 +644,9 @@ export function AuroraGrid({
                     railFocused={vi.index === fc && zone === "rail" && !player.miniFocused}
                     favorited={favoriteIds.has(c.id)}
                     onToggleFavorite={() => toggleFavorite(c.id)}
+                    // Browser two-step click (undefined on TV → single-click tune / immediate favorite).
+                    onProgramClick={IS_BROWSER ? (id) => handleProgramClick(vi.index, id) : undefined}
+                    onRailClick={IS_BROWSER ? () => handleRailClick(vi.index) : undefined}
                     now={now}
                     rowPx={rowPx}
                     railPx={railPx}
@@ -800,6 +836,8 @@ function Row({
   railFocused,
   favorited,
   onToggleFavorite,
+  onProgramClick,
+  onRailClick,
   now,
   rowPx,
   railPx,
@@ -816,6 +854,10 @@ function Row({
   railFocused: boolean;
   favorited: boolean;
   onToggleFavorite: () => void;
+  /** Browser two-step (undefined on TV): click a program to focus it (then tune on the 2nd click). */
+  onProgramClick?: (programId: string) => void;
+  /** Browser two-step (undefined on TV): click the rail to focus it (then favorite on the 2nd click). */
+  onRailClick?: () => void;
   now: Date;
   rowPx: number;
   railPx: number;
@@ -836,6 +878,9 @@ function Row({
       }}
     >
       <div
+        // Browser: clicking anywhere on the rail cell (not just the circle) focuses the rail, then a
+        // second click favorites — the whole cell is the target, matching tv-tauri.
+        onClick={onRailClick ? (e) => { e.stopPropagation(); onRailClick(); } : undefined}
         style={{
           // Fixed px (viewport-derived), NOT a % of the row — so the rail keeps its width when the
           // sidebar expands and the column narrows; the time lane absorbs the difference.
@@ -867,7 +912,9 @@ function Row({
             tabIndex={-1}
             onClick={(e) => {
               e.stopPropagation();
-              onToggleFavorite();
+              // Browser: two-step (focus the rail, then favorite). TV/remote: toggle immediately.
+              if (onRailClick) onRailClick();
+              else onToggleFavorite();
             }}
             title={favorited ? "Remove favorite" : "Add favorite"}
             style={{
@@ -977,6 +1024,9 @@ function Row({
             return (
               <div
                 key={p.id}
+                // Browser: click a program to focus it (its info shows in the featured panel), then click
+                // the focused one again to tune. TV/remote has no cell handler → the row-wrapper tunes.
+                onClick={onProgramClick ? (e) => { e.stopPropagation(); onProgramClick(p.id); } : undefined}
                 style={{
                   position: "absolute",
                   top: vw(6),

@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.12] - 2026-09-17
+
+### Added
+- tv-web browser mode: the guide grid now uses a **two-step mouse click** (matching tv-tauri) instead of
+  tuning on any click. Clicking a program focuses it (its info shows in the featured panel); clicking the
+  already-focused program tunes. Clicking a channel's rail focuses it (the circle becomes the favorite
+  heart); clicking the already-focused rail toggles the favorite. TV/remote keeps the single-click tune and
+  immediate favorite.
+
 ## [0.14.11] - 2026-09-17
 
 ### Added
