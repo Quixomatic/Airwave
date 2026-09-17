@@ -32,14 +32,14 @@
 </p>
 
 Airwave is a self-hostable service that builds curated, 24/7 **live TV channels** out of the media you already
-own — a "90s Sitcoms" channel, a "Saturday Morning Cartoons" channel, a channel that quietly marathons your
-favorite show — and streams them to a proper 10-foot TV app with a channel guide, a now/next lineup, and instant
+own (a "90s Sitcoms" channel, a "Saturday Morning Cartoons" channel, a channel that quietly marathons your
+favorite show), and streams them to a proper 10-foot TV app with a channel guide, a now/next lineup, and instant
 tune-in. Think Pluto TV or an old cable box, but every channel is **yours**, running on **your** hardware, from
 **your** library.
 
-The whole system is free and open to self-host — run the server, point it at your media server, make channels.
+The whole system is free and open to self-host: run the server, point it at your media server, make channels.
 It's yours to change and tinker with. The only paid thing is the *optional* convenience of the prebuilt
-Apple TV / iPad apps on the App Store — and you're welcome to build and sideload those yourself, too.
+Apple TV / iPad apps on the App Store, and you're welcome to build and sideload those yourself, too.
 
 > **Status:** actively developed, pre-1.0, and used daily on real hardware (LG webOS TV, Apple TV 4K, TrueNAS).
 > See [Project status](#project-status) for what's solid vs. in progress.
@@ -52,20 +52,20 @@ Apple TV / iPad apps on the App Store — and you're welcome to build and sidelo
 
 ## Why I built this
 
-I built Airwave for myself — to bring back the feeling of flipping on live cable TV as a kid, and to set up
+I built Airwave for myself, to bring back the feeling of flipping on live cable TV as a kid, and to set up
 channels of good content for my own kid to grow up with. I self-host it, I use it every day, and I plan to keep
 maintaining it for many years.
 
 It goes further than the couch, too: on a recent road trip I put on a channel of mixed kids' shows for my son
-instead of being stuck on one Plex title the whole drive and manually changing it — a nice variety kept him from
+instead of being stuck on one Plex title the whole drive and manually changing it. A nice variety kept him from
 getting bored. That worked because Airwave streams from Plex **remotely** whenever your Plex server is reachable
 from outside your network (see [Watch from anywhere](#what-it-does)).
 
-It's yours to run and tinker with. The server, admin UI, and web/browser TV app are free and open — **change
+It's yours to run and tinker with. The server, admin UI, and web/browser TV app are free and open: **change
 whatever you want, that's encouraged.** You're welcome to modify the native TV apps and build/sideload your own
-copies too, and **contributions and PRs are very welcome** — I'm happy to take improvements.
+copies too, and **contributions and PRs are very welcome**. I'm happy to take improvements.
 
-The one thing I ask — and the one thing the license draws a line around — is: **please don't repost my apps to the
+The one thing I ask, and the one thing the license draws a line around, is: **please don't repost my apps to the
 app stores as your own.** The prebuilt, published Apple TV / iPad apps are a small paid download to hedge the time
 and effort I've put in, for folks who just want to grab it and go. Everything else is free. (See [License](#license).)
 
@@ -74,28 +74,28 @@ and effort I've put in, for folks who just want to grab it and go. Everything el
 - **Channels from your library.** Define a channel by a **metadata filter** (genre, year, network, cast, rating,
   resolution, "added in the last 30 days", …), a **Plex collection**, a **Plex playlist**, or a hand-picked list
   of items. Airwave resolves it against your media server and keeps it up to date as your library grows.
-- **A real, continuous schedule.** Every channel plays a deterministic, always-running lineup — like a broadcast
+- **A real, continuous schedule.** Every channel plays a deterministic, always-running lineup, like a broadcast
   station, not a shuffle button. Tune in and you join whatever's "on now," mid-program, with the correct offset;
   you can scrub back within the live buffer (DVR-style) but not skip ahead.
 - **Channel strategies.** Go beyond plain shuffle or in-order: **group** by show and **rotate** across shows
   (round-robin), play **marathons**, size blocks by episode **count** or by **duration** ("~30 minutes of one
   show, then move on"), carve out a specific set (e.g. *Star Wars in release order*) with a filter, and enforce
   rules like *never repeat a show within an hour*. All deterministic and resumable.
-- **Bumpers.** Optional between-program interstitials — a clean "Up Next" card with cover art — plus an optional
+- **Bumpers.** Optional between-program interstitials (a clean "Up Next" card with cover art), plus an optional
   **ambient music bed** you can point at a folder of tracks.
 - **Per-user sharing.** Plex-style access control: give each user everything, a whole package of channels, or
   just specific channels. The admin UI is admin-only; everyone else just watches.
 - **Capability-aware playback.** On first run each device measures **exactly what it can decode** (a short,
-  automatic diagnostic), so Airwave direct-plays natively wherever possible and only transcodes when it must —
+  automatic diagnostic), so Airwave direct-plays natively wherever possible and only transcodes when it must:
   4K HDR HEVC, TrueHD/DTS, the works, per device.
 - **Watch from anywhere.** Off-network playback resolves the right connection to your media server
-  automatically (local → remote → relay), so the same app works at home and on the road — **as long as your
+  automatically (local → remote → relay), so the same app works at home and on the road, **as long as your
   Plex server is set up for remote access** (Plex Remote Access, or a reachable domain/port). Tune in from a
   phone hotspot on a road trip and your channels just play.
 - **Move channels between instances.** Export a lineup (packages + channels + filters) and import it into another
-  Airwave — with dry-run and de-duplication.
+  Airwave, with dry-run and de-duplication.
 - **Optional AI channel builder.** *Off by default.* If you want, bring your own API key and let an assistant
-  draft channel lineups from a prompt — but everything above works fully without it, and it never phones home
+  draft channel lineups from a prompt, but everything above works fully without it, and it never phones home
   otherwise. (See [AI features](#ai-features-optional).)
 
 ---
@@ -106,21 +106,21 @@ Airwave is a small server plus thin clients. The server does the thinking; the c
 
 1. **Resolve.** A channel's definition (filter / collection / playlist / manual list) is resolved against your
    media server into a pool of playable items, with metadata cached locally.
-2. **Schedule.** A deterministic engine lays that pool onto a timeline — seeded, so the same channel always
-   produces the same lineup — and materializes it ahead in **windows**, auto-extending as time moves forward. A
+2. **Schedule.** A deterministic engine lays that pool onto a timeline (seeded, so the same channel always
+   produces the same lineup) and materializes it ahead in **windows**, auto-extending as time moves forward. A
    cursor lets it resume exactly where it left off, so a channel is watchable within seconds of creation even for
    a 2,000-episode pool. Channel **strategies** (grouping, rotation, run-length, no-repeat rules) are just a
-   smarter ordering over that pool, applied at one point in the engine — still deterministic.
+   smarter ordering over that pool, applied at one point in the engine, still deterministic.
 3. **Tune in.** Clients ask "what's on channel N right now?", get the item + the exact offset ("effective time"),
-   and start playing there. There's no server-side transcode queue for the schedule itself — playback streams
+   and start playing there. There's no server-side transcode queue for the schedule itself; playback streams
    from your media server, with the device's measured capabilities deciding direct-play vs. transcode.
 
 **One image, a few roles.** The whole backend ships as a **single Docker image** whose behavior is chosen at
 runtime by `CG_ROLE`:
 
-- `server` — the API (REST + tRPC), scheduling engine, jobs, and Plex integration.
-- `web` — the admin web app (build + serve).
-- `tvweb` *(optional)* — the 10-foot TV app served as an auth-gated browser player, for casting/kiosk setups.
+- `server`: the API (REST + tRPC), scheduling engine, jobs, and Plex integration.
+- `web`: the admin web app (build + serve).
+- `tvweb` *(optional)*: the 10-foot TV app served as an auth-gated browser player, for casting/kiosk setups.
 
 A Postgres database and [`docker-compose.yml`](./docker-compose.yml) wire it together.
 
@@ -172,11 +172,11 @@ The TV app is a full 10-foot experience: an Aurora channel-guide grid, a native-
 scrubber, channel up/down, and the "Up Next" bumper card. The **same app** ships four ways, so features
 land everywhere at once:
 
-- **`tv-native`** — Expo / React Native + **mpv** for the living-room boxes (Apple TV, iPad, Android TV, Fire TV).
-- **`tv-web`** — the same React app as a **browser player** and packaged for **LG webOS**.
-- **`tv-tauri`** — a native **desktop** app (Windows/macOS/Linux) that reuses the `tv-web` React UI in a
+- **`tv-native`**: Expo / React Native + **mpv** for the living-room boxes (Apple TV, iPad, Android TV, Fire TV).
+- **`tv-web`**: the same React app as a **browser player** and packaged for **LG webOS**.
+- **`tv-tauri`**: a native **desktop** app (Windows/macOS/Linux) that reuses the `tv-web` React UI in a
   Tauri shell with its own bundled **libmpv**, plus desktop mouse / picture-in-picture / true fullscreen.
-- **`tv-roku`** — an independent native Roku channel (BrighterScript + SceneGraph) held to strict parity.
+- **`tv-roku`**: an independent native Roku channel (BrighterScript + SceneGraph) held to strict parity.
 
 ### Platform availability
 
@@ -187,14 +187,14 @@ land everywhere at once:
 | **Android TV** | ✅ Available | Google Play |
 | **Fire TV** | ✅ Available | Amazon Appstore |
 | **LG webOS** | ✅ Available | packaged web app (build & sideload / from source) |
-| **Windows** | ✅ Available | native **desktop app** (Tauri + mpv) — a signed, self-updating installer |
-| **macOS** | ✅ Available | the same **desktop app** (Tauri + mpv) — Apple Silicon + Intel, Developer-ID signed **and notarized**, self-updating |
-| **Roku** | ✅ Available | native Roku channel (BrighterScript + SceneGraph) — Roku Channel Store |
-| **Any browser** | ✅ Live now | the `tvweb` Docker role — an auth-gated web player (this is what runs at [tv.turboforge.io](https://tv.turboforge.io), served from the compose stack) |
-| **Linux** | ✅ Available | the same **desktop app** (Tauri + mpv) — Wayland + X11, AppImage |
+| **Windows** | ✅ Available | native **desktop app** (Tauri + mpv): a signed, self-updating installer |
+| **macOS** | ✅ Available | the same **desktop app** (Tauri + mpv): Apple Silicon + Intel, Developer-ID signed **and notarized**, self-updating |
+| **Roku** | ✅ Available | native Roku channel (BrighterScript + SceneGraph): Roku Channel Store |
+| **Any browser** | ✅ Live now | the `tvweb` Docker role: an auth-gated web player (this is what runs at [tv.turboforge.io](https://tv.turboforge.io), served from the compose stack) |
+| **Linux** | ✅ Available | the same **desktop app** (Tauri + mpv): Wayland + X11, AppImage |
 | **Samsung (Tizen)** | ✅ Available | packaged web app (build & sideload / from source) |
 
-The native apps are distributed through their platform stores (a small paid download — see
+The native apps are distributed through their platform stores (a small paid download, see
 [Why I built this](#why-i-built-this)). Because Airwave is source-available, you can also **build and
 sideload** any of them yourself. The browser player and the self-hosted server work today, for free.
 
@@ -205,39 +205,39 @@ and preview lineups.
 
 ## Requirements
 
-- A **media server** — **Plex** today (Jellyfin/Emby support is on the roadmap).
+- A **media server**: **Plex** today (Jellyfin/Emby support is on the roadmap).
 - **Docker** + **PostgreSQL** (the compose file includes Postgres).
-- Somewhere to run it — a NAS (TrueNAS is well-tested), a home server, a VPS, etc. Multi-arch images mean
+- Somewhere to run it: a NAS (TrueNAS is well-tested), a home server, a VPS, etc. Multi-arch images mean
   amd64 **and** arm64 (Raspberry Pi-class hardware) both work.
 
 ---
 
 ## Self-hosting
 
-Two ways to run the Airwave **server** (they host the exact same thing — pick whichever fits):
+Two ways to run the Airwave **server** (they host the exact same thing, pick whichever fits):
 
-- **🖥️ One-click desktop installer** — the easiest path, no Docker. **Airwave Desktop** (`apps/desktop`) is
+- **🖥️ One-click desktop installer**: the easiest path, no Docker. **Airwave Desktop** (`apps/desktop`) is
   a native tray app that bundles the server, admin UI, browser TV player, and an **embedded PostgreSQL**
-  into a single signed installer for Windows / macOS / Linux — install it next to Plex and it just runs.
+  into a single signed installer for Windows / macOS / Linux. Install it next to Plex and it just runs.
   Grab it from the [Releases](https://github.com/Quixomatic/Airwave/releases).
-- **🐳 Docker / compose** — the flexible path for a NAS, home server, or VPS (below).
+- **🐳 Docker / compose**: the flexible path for a NAS, home server, or VPS (below).
 
-> Not to be confused with the desktop **client** (`tv-tauri`) in the platform table above — that's a
+> Not to be confused with the desktop **client** (`tv-tauri`) in the platform table above: that's a
 > *viewer* app you install to watch. Airwave Desktop here is the *server*.
 
-### Docker — quick start (Dockge or `docker compose`)
+### Docker quick start (Dockge or `docker compose`)
 
-1. **Grab the stack files** — [`docker-compose.yml`](./docker-compose.yml) and [`.env.example`](./.env.example).
+1. **Grab the stack files**: [`docker-compose.yml`](./docker-compose.yml) and [`.env.example`](./.env.example).
    In Dockge: create a stack, paste the compose, then the env.
 2. **Copy `.env.example` → `.env`** and set at minimum:
-   - `SERVER_PUBLIC_URL` / `WEB_PUBLIC_URL` — the addresses your **browser and TV** use (your host's LAN IP or a
+   - `SERVER_PUBLIC_URL` / `WEB_PUBLIC_URL`: the addresses your **browser and TV** use (your host's LAN IP or a
      domain + the published ports), e.g. `http://192.168.1.50:36020` and `http://192.168.1.50:36021`. **Not**
-     `localhost` unless you only browse from the host — these are baked into the admin build and used for
+     `localhost` unless you only browse from the host; these are baked into the admin build and used for
      auth/CORS.
-   - `SERVER_PORT` / `WEB_PORT` — published host ports (must match the URLs above).
+   - `SERVER_PORT` / `WEB_PORT`: published host ports (must match the URLs above).
    - `POSTGRES_PASSWORD` and `BETTER_AUTH_SECRET` (`openssl rand -base64 48`).
-   - `ADMIN_EMAIL` / `ADMIN_PASSWORD` — seeds the first admin on first boot.
-   - `PUID` / `PGID` / `TZ` — match your host (important on TrueNAS datasets).
+   - `ADMIN_EMAIL` / `ADMIN_PASSWORD`: seeds the first admin on first boot.
+   - `PUID` / `PGID` / `TZ`: match your host (important on TrueNAS datasets).
 3. **Deploy:**
    ```bash
    docker compose up -d
@@ -302,17 +302,17 @@ pnpm run dev            # start everything (server + admin web)
 - Admin web → http://localhost:3001
 - API → http://localhost:3000
 
-**Environment.** Both `.env.example` files document every variable inline. The server's required set —
-`DATABASE_URL`, `BETTER_AUTH_SECRET` (32+ chars), `BETTER_AUTH_URL`, `CORS_ORIGIN` — is validated at
-boot (`packages/env/src/server.ts`), so the server refuses to start if any is missing. Also set
-`ADMIN_EMAIL` + `ADMIN_PASSWORD` to seed the first admin — there's no public sign-up. The AI provider
+**Environment.** Both `.env.example` files document every variable inline. The server's required set is
+validated at boot (`packages/env/src/server.ts`): `DATABASE_URL`, `BETTER_AUTH_SECRET` (32+ chars),
+`BETTER_AUTH_URL`, and `CORS_ORIGIN`. The server refuses to start if any is missing. Also set
+`ADMIN_EMAIL` + `ADMIN_PASSWORD` to seed the first admin. There's no public sign-up. The AI provider
 keys are **not** env vars; add them in the admin UI (Settings → AI Assistant), stored encrypted.
 
-> **Dev variants.** `pnpm dev` boots *everything* (server, admin web, tv-web, site, tv-native, tv-tauri) —
-> heavy, and `tv-tauri` needs a Rust `cargo` toolchain (without it turbo tears the other dev servers down
-> with it). For day-to-day work use **`pnpm dev:core`**, which boots just the **server + admin web + tv-web**.
+> **Dev variants.** `pnpm dev` boots *everything* (server, admin web, tv-web, site, tv-native, tv-tauri),
+> which is heavy, and `tv-tauri` needs a Rust `cargo` toolchain (without it turbo tears the other dev servers
+> down with it). For day-to-day work use **`pnpm dev:core`**, which boots just the **server + admin web + tv-web**.
 > To test the packaged **desktop supervisor** (server + admin + tv-web + embedded Postgres in an Electrobun
-> tray), run **`pnpm dev:desktop`** — it isn't part of `pnpm dev`.
+> tray), run **`pnpm dev:desktop`**. It isn't part of `pnpm dev`.
 
 > Schema changes go through **Prisma migrations** (`pnpm db:migrate` creates + applies one). `db:push` is for
 > throwaway experiments only; Docker/production runs `prisma migrate deploy`.
@@ -324,10 +324,10 @@ airwave/
 ├── apps/
 │   ├── server/      # API (Hono, tRPC + REST), scheduling engine, jobs, Plex integration
 │   ├── web/         # Admin web app (React + TanStack Router)
-│   ├── tv-web/      # 10-foot TV app for webOS + browser (Vite) — also reused by tv-tauri
+│   ├── tv-web/      # 10-foot TV app for webOS + browser (Vite), also reused by tv-tauri
 │   ├── tv-native/   # Native TV app (Expo/React Native): Apple TV, iPad, Android TV, Fire TV
 │   ├── tv-tauri/    # Native desktop client (Tauri + React/Vite + libmpv): Windows/macOS/Linux
-│   ├── tv-roku/     # Native Roku channel (BrighterScript + SceneGraph) — its own codebase
+│   ├── tv-roku/     # Native Roku channel (BrighterScript + SceneGraph), its own codebase
 │   ├── desktop/     # Airwave Desktop: one-click server installer (Electrobun + embedded Postgres)
 │   └── site/        # getairwave.tv marketing + docs site (Next.js)
 └── packages/
@@ -353,14 +353,14 @@ airwave/
 | `pnpm check-types` | typecheck across the monorepo |
 | `pnpm db:migrate` / `db:studio` / `db:generate` | Prisma migrate / studio / client |
 
-The web apps share shadcn/ui primitives via `@airwave/ui` — edit tokens in `packages/ui/src/styles/globals.css`,
+The web apps share shadcn/ui primitives via `@airwave/ui`: edit tokens in `packages/ui/src/styles/globals.css`,
 primitives in `packages/ui/src/components/*`. Import them with `import { Button } from "@airwave/ui/components/button"`.
 
 ### Documentation
 
 Full guides and "how it works" docs live in **[`docs/`](docs/)** (see the [index](docs/README.md)):
 
-- New here? Start with **[Getting started](docs/getting-started.md)** — connect a source → build a channel → watch.
+- New here? Start with **[Getting started](docs/getting-started.md)**: connect a source → build a channel → watch.
 - **Using it:** [sources](docs/sources.md) · [channels](docs/channels.md) · [packages](docs/packages.md) · [users & access](docs/users-and-access.md) · [AI assistant](docs/ai-assistant.md) · [sessions](docs/sessions.md) · [import/export](docs/import-export.md)
 - **Internals:** [jobs](docs/jobs.md) · [durable workflows](docs/workflows.md) · [capability diagnostic](docs/capability-diagnostic.md)
 
@@ -406,18 +406,18 @@ On the roadmap / in progress:
 
 ## AI features (optional)
 
-Airwave has an **optional** AI assistant for authoring channels — and it's genuinely optional: none of the core
+Airwave has an **optional** AI assistant for authoring channels, and it's genuinely optional: none of the core
 product (channels, scheduling, playback, apps) depends on it, and **nothing is sent to any AI provider unless you
 set one up**.
 
-- **The assistant/chat** activates only when an admin adds an **AI connection** in the admin — *your* provider
+- **The assistant/chat** activates only when an admin adds an **AI connection** in the admin: *your* provider
   and *your* API key (Anthropic, OpenAI, Google, or any OpenAI-compatible endpoint). No connection → no
   assistant, and no external calls.
-- The heavier **durable workflows** — the multi-agent AI *lineup generator* and the *lineup import/export*
-  engine — additionally require `WORKFLOW_ENABLED=1` (off by default). This flag gates the workflow engine
+- The heavier **durable workflows** (the multi-agent AI *lineup generator* and the *lineup import/export*
+  engine) additionally require `WORKFLOW_ENABLED=1` (off by default). This flag gates the workflow engine
   itself, not the chat.
 
-Bring-your-own-key, opt-in, and fully separable — a convenience for authoring, not a dependency.
+Bring-your-own-key, opt-in, and fully separable: a convenience for authoring, not a dependency.
 
 ---
 
@@ -434,19 +434,19 @@ build). Taking part means following the [Code of Conduct](./CODE_OF_CONDUCT.md).
 ## License
 
 Airwave is **source-available** under the [PolyForm Perimeter License 1.0.1](./LICENSE). In plain terms: use it,
-self-host it, change it, and build your own copies freely — for **any purpose except providing a product that
+self-host it, change it, and build your own copies freely, for **any purpose except providing a product that
 competes with Airwave** (which includes republishing/reselling the apps or offering a competing hosted service).
 
 | ✅ You can | ❌ You can't |
 |---|---|
-| Self-host the whole thing (server, admin, web/browser TV) — free | Repost/republish the apps to an app store (Apple / Google / LG) |
-| Read, modify, and change **any** part — encouraged | Sell it, or offer it as a paid product/download |
+| Self-host the whole thing (server, admin, web/browser TV), free | Repost/republish the apps to an app store (Apple / Google / LG) |
+| Read, modify, and change **any** part, encouraged | Sell it, or offer it as a paid product/download |
 | Build & sideload your own apps, with your own tweaks | Offer a hosted service that substitutes for Airwave |
-| Use it for any purpose — personal, family, or business self-host | Remove the copyright / required-notice line |
-| Open pull requests — contributions are welcome | — |
+| Use it for any purpose: personal, family, or business self-host | Remove the copyright / required-notice line |
+| Open pull requests, contributions are welcome | n/a |
 
 As the copyright holder, I publish the official prebuilt apps myself (a small paid convenience on the App Store).
-This isn't legal advice — the [LICENSE](./LICENSE) is the authoritative text.
+This isn't legal advice. The [LICENSE](./LICENSE) is the authoritative text.
 
 ---
 
@@ -454,4 +454,3 @@ This isn't legal advice — the [LICENSE](./LICENSE) is the authoritative text.
 
 Inspired by the self-hosted "make your own live TV" community (NostalgeX / BunnyEars and friends), built on
 [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack).
-</content>
