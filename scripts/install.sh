@@ -208,18 +208,20 @@ lan_ip() {
   # this, so 127.0.0.1 is only the last resort. (Trusting the default route alone can hand back a
   # Docker/VPN address that TVs can't reach.)
   _cands=''
-  if have ip; then
+  # On WSL2, `ip` only sees the NAT'd 172.x vEthernet, not the Windows host's real LAN IP that TVs use; and
+  # Git Bash / MSYS has no `ip`/`ifconfig` at all. In either case, ask Windows directly via PowerShell.
+  _is_wsl=0; grep -qi microsoft /proc/version 2>/dev/null && _is_wsl=1
+  if { [ "$_is_wsl" = 1 ] || ! have ip; } && have powershell.exe; then
+    _cands=$(powershell.exe -NoProfile -Command "Get-NetIPAddress -AddressFamily IPv4 | Select-Object -ExpandProperty IPAddress" 2>/dev/null \
+      | tr -d '\r' | grep -Ev '^(127\.|169\.254\.)')
+  fi
+  if [ -z "$_cands" ] && have ip; then
     _cands=$(ip -4 -o addr show scope global 2>/dev/null \
       | grep -Ev '[[:space:]](docker|veth|br-|virbr|tailscale|wg|tun|tap|zt|vmnet|utun)[0-9a-z]*[[:space:]]' \
       | awk '{print $4}' | sed 's#/.*##')
   fi
   if [ -z "$_cands" ] && have ifconfig; then
     _cands=$(ifconfig 2>/dev/null | awk '/inet /{print $2}' | sed 's/^addr://' | grep -v '^127\.')
-  fi
-  # Git Bash / MSYS on Windows has neither `ip` nor `ifconfig`; borrow the real adapter list from PowerShell.
-  if [ -z "$_cands" ] && have powershell.exe; then
-    _cands=$(powershell.exe -NoProfile -Command "Get-NetIPAddress -AddressFamily IPv4 | Select-Object -ExpandProperty IPAddress" 2>/dev/null \
-      | tr -d '\r' | grep -Ev '^(127\.|169\.254\.)')
   fi
   _pick=''
   for _p in '^192\.168\.' '^172\.(1[6-9]|2[0-9]|3[01])\.' '^10\.' '^[0-9]'; do
