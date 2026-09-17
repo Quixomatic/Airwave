@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.13] - 2026-09-17
+
+TV web player — browser-mode mouse scrubbing: click and drag the DVR scrubber to seek.
+
+### Added
+- tv-web browser mode: the full-screen scrubber now supports **mouse click and drag to seek** (matching
+  tv-tauri). Click anywhere on the bar to jump there; press and drag the thumb to scrub with a live
+  preview, playback paused, committing one seek on release. While dragging, the thumb, fill, and time
+  label track the cursor 1:1 (the easing that would read as lag is turned off for the drag). TV/remote
+  keeps OK for play/pause and the arrow keys for debounced seeking, unchanged.
+
 ## [0.14.12] - 2026-09-17
 
 ### Added

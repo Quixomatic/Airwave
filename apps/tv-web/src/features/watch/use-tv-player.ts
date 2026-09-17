@@ -514,31 +514,39 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
     return bumperEffRef.current;
   }, [now]);
 
+  // The scrubber's anchor program for a given time: the slot you're in, or (in a bumper) the nearest
+  // PROGRAM (prev, else next). Extracted so the mouse-drag path can PIN it (hold the focus fixed during
+  // a drag) and the click→time inverse can use the same anchor.
+  const focusFor = useCallback((effective: number): SlotEntry | null => {
+    const slots = slotsRef.current;
+    const curIdx = slots.findIndex((s) => effective >= s.startS && effective < s.endS);
+    const cur = curIdx >= 0 ? slots[curIdx]! : null;
+    if (!cur) return null;
+    if (cur.slot.kind !== "BUMPER") return cur;
+    let j = curIdx - 1;
+    while (j >= 0 && slots[j]!.slot.kind !== "PROGRAM") j--;
+    if (j >= 0) return slots[j]!;
+    let k = curIdx + 1;
+    while (k < slots.length && slots[k]!.slot.kind !== "PROGRAM") k++;
+    return k < slots.length ? slots[k]! : cur;
+  }, []);
+
   // Build the scrubber view — the PROGRAM you're in is the expanded middle, flanked by a
   // fixed left peek (prev tail + bumper) and right peek (upcoming bumper + next head).
+  // `focusOverride` PINS the anchor program (mouse drag) so the window doesn't re-center mid-drag;
+  // omit it for the normal auto-anchored render.
   const buildScrubber = useCallback(
-    (effective: number, nowS: number): ScrubberView => {
+    (effective: number, nowS: number, focusOverride?: SlotEntry): ScrubberView => {
       const slots = slotsRef.current;
       const behindS = Math.max(0, nowS - effective);
       const atLive = behindS < LIVE_THRESHOLD;
       const curIdx = slots.findIndex((s) => effective >= s.startS && effective < s.endS);
       const cur = curIdx >= 0 ? slots[curIdx]! : null;
-      if (!cur) {
+      const focus = focusOverride ?? focusFor(effective);
+      if (!focus) {
         return { segments: [], thumbPct: 0, livePct: 100, liveVisible: false, slotPositionS: 0, atLive, behindS };
       }
 
-      // Focus = the program you're in; if you're in a bumper, the nearest program (prev, else next).
-      let focus = cur;
-      if (cur.slot.kind === "BUMPER") {
-        let j = curIdx - 1;
-        while (j >= 0 && slots[j]!.slot.kind !== "PROGRAM") j--;
-        if (j >= 0) focus = slots[j]!;
-        else {
-          let k = curIdx + 1;
-          while (k < slots.length && slots[k]!.slot.kind !== "PROGRAM") k++;
-          if (k < slots.length) focus = slots[k]!;
-        }
-      }
       const fStart = focus.startS;
       const fEnd = focus.endS;
       const fDur = Math.max(1, fEnd - fStart);
@@ -568,10 +576,27 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
         const fillPct = isFocus && thumbPct > l ? Math.min(100, ((thumbPct - l) / Math.max(0.0001, widthPct)) * 100) : 0;
         segments.push({ kind: s.slot.kind, leftPct: l, widthPct, current: isFocus, fillPct });
       }
-      return { segments, thumbPct, livePct, liveVisible, slotPositionS: effective - cur.startS, atLive, behindS };
+      return { segments, thumbPct, livePct, liveVisible, slotPositionS: effective - (cur ?? focus).startS, atLive, behindS };
     },
-    [],
+    [focusFor],
   );
+
+  // Mouse-seek support: the pinned drag anchor, the DVR clamp, and the inverse of the scrubber's `mapT`
+  // (bar fraction 0..1 → absolute time, against a given anchor program). See buildScrubber's mapT.
+  const dragFocusRef = useRef<SlotEntry | null>(null);
+  const clampToDvr = useCallback(
+    (t: number) => Math.min(now(), Math.max(slotsRef.current[0]?.startS ?? now(), t)),
+    [now],
+  );
+  const invMapT = useCallback((pct01: number, focus: SlotEntry): number => {
+    const fStart = focus.startS;
+    const fEnd = focus.endS;
+    const fDur = Math.max(1, fEnd - fStart);
+    const f = Math.min(1, Math.max(0, pct01));
+    if (f <= PEEK_L) return fStart - LOOKBACK_S * (1 - f / PEEK_L);
+    if (f >= 1 - PEEK_R) return fEnd + LOOKAHEAD_S * ((f - (1 - PEEK_R)) / PEEK_R);
+    return fStart + fDur * ((f - PEEK_L) / (1 - PEEK_L - PEEK_R));
+  }, []);
 
   // ── The tick: derive effectiveTime, roll at boundaries, publish status ──
   useEffect(() => {
@@ -750,6 +775,34 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
       floor: () => slotsRef.current[0]?.startS ?? now(),
       liveEdge: () => now(),
       previewScrubber: (target: number) => buildScrubber(target, now()),
+      // ── Mouse seeking (browser mode) ──────────────────────────────────
+      // Inverse of the scrubber's non-linear `mapT`: bar fraction (0..1) → absolute effective time,
+      // against a given anchor program. `effectiveAtPct` uses the CURRENT anchor (click); the drag trio
+      // PINS the anchor at `beginDrag` so the window doesn't re-center while dragging.
+      effectiveAtPct: (pct: number) => {
+        const focus = focusFor(currentEffective());
+        return focus ? clampToDvr(invMapT(pct, focus)) : currentEffective();
+      },
+      beginDrag: () => {
+        dragFocusRef.current = focusFor(currentEffective());
+      },
+      dragScrubberAt: (pct: number): { view: ScrubberView; target: number } => {
+        const focus = dragFocusRef.current ?? focusFor(currentEffective());
+        const target = focus ? clampToDvr(invMapT(pct, focus)) : currentEffective();
+        return { view: buildScrubber(target, now(), focus ?? undefined), target };
+      },
+      endDrag: () => {
+        dragFocusRef.current = null;
+      },
+      // Pause without toggling (mouse-drag freezes playback; the release seek resumes via goTo).
+      pause: () => {
+        const cur = currentRef.current;
+        if (cur?.kind === "PROGRAM") {
+          videoRef.current?.pause();
+        }
+        pausedRef.current = true;
+        setStatus((s) => ({ ...s, paused: true }));
+      },
       restart: () => {
         const cur = currentRef.current;
         if (!cur) return;
@@ -759,7 +812,7 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
         else void goTo(cur.startS);
       },
     }),
-    [goTo, now, currentEffective, tryPlay, buildScrubber],
+    [goTo, now, currentEffective, tryPlay, buildScrubber, focusFor, clampToDvr, invMapT],
   );
 
   return {

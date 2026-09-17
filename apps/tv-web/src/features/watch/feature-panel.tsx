@@ -13,7 +13,7 @@ import {
   Star,
   Tv,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 
 import { Button } from "@airwave/ui/components/button";
 
@@ -71,6 +71,10 @@ export function FeaturePanel({
   getLive,
   previewScrubber,
   onSeekTo,
+  beginDrag,
+  dragScrubberAt,
+  endDrag,
+  pauseVideo,
   onPlayPause,
   onLive,
   onRestart,
@@ -100,6 +104,12 @@ export function FeaturePanel({
   previewScrubber: (target: number) => ScrubberView;
   /** The single, debounced real seek. */
   onSeekTo: (target: number) => void;
+  /** Mouse-drag scrubbing (browser): pin the anchor at drag start, map a bar fraction (0..1) → a preview
+   *  view + absolute target while pinned, release the pin, and pause playback for the drag's duration. */
+  beginDrag: () => void;
+  dragScrubberAt: (pct: number) => { view: ScrubberView; target: number };
+  endDrag: () => void;
+  pauseVideo: () => void;
   onPlayPause: () => void;
   onLive: () => void;
   onRestart: () => void;
@@ -126,10 +136,32 @@ export function FeaturePanel({
   // ◄/► move a PREVIEW thumb (accelerating on press-and-hold); the real seek fires ONCE after ~500ms
   // idle. The seek itself (onSeekTo → goTo) is untouched and stays agnostic to direct vs transcode.
   const [preview, setPreview] = useState<ScrubberView | null>(null);
+  // While mouse-dragging, kill the thumb/fill CSS transitions so they track the cursor 1:1 instead of
+  // easing behind it (the 0.35s ease reads as lag during a drag). Keyboard scrubbing keeps the ease.
+  const [dragging, setDragging] = useState(false);
   const settlingRef = useRef(false);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scrubFns = useRef({ getPosition, getFloor, getLive, previewScrubber, onSeekTo });
-  scrubFns.current = { getPosition, getFloor, getLive, previewScrubber, onSeekTo };
+  const dragTargetRef = useRef(0);
+  const barRef = useRef<HTMLDivElement | null>(null);
+  const scrubFns = useRef({ getPosition, getFloor, getLive, previewScrubber, onSeekTo, beginDrag, dragScrubberAt, endDrag, pauseVideo });
+  scrubFns.current = { getPosition, getFloor, getLive, previewScrubber, onSeekTo, beginDrag, dragScrubberAt, endDrag, pauseVideo };
+
+  // Commit a seek and pin the preview thumb until the real position lands (so a slow transcode reload
+  // doesn't snap it back). Shared by the keyboard scrub commit and the mouse-drag release.
+  const commitSeek = useMemo(
+    () => (t: number) => {
+      settlingRef.current = true;
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+      // Safety: drop the pinned preview even if the landing check never matches (e.g. a load error).
+      settleTimer.current = setTimeout(() => {
+        settlingRef.current = false;
+        setPreview(null);
+      }, 3500);
+      scrubFns.current.onSeekTo(t);
+    },
+    [],
+  );
+
   const scrub = useMemo(
     () =>
       createScrubController({
@@ -140,19 +172,44 @@ export function FeaturePanel({
           if (t != null) settlingRef.current = false;
           setPreview(t == null ? null : scrubFns.current.previewScrubber(t));
         },
-        commit: (t) => {
-          settlingRef.current = true;
-          if (settleTimer.current) clearTimeout(settleTimer.current);
-          // Safety: drop the pinned preview even if the landing check never matches (e.g. a load error).
-          settleTimer.current = setTimeout(() => {
-            settlingRef.current = false;
-            setPreview(null);
-          }, 3500);
-          scrubFns.current.onSeekTo(t);
-        },
+        commit: (t) => commitSeek(t),
       }),
-    [],
+    [commitSeek],
   );
+
+  // Mouse click/drag on the scrubber (browser). Click = seek to that point; drag = live preview with the
+  // window pinned + playback paused, committing on release. Pure DOM pointer handling — outside the
+  // key-zone stack (like the control buttons' mouse handlers), so it never touches remote/keyboard input.
+  const onScrubMouseDown = (e: ReactMouseEvent) => {
+    e.preventDefault();
+    scrub.cancel(); // drop any pending keyboard scrub
+    setFocus({ row: 0, col: 0 });
+    setDragging(true);
+    if (!paused) scrubFns.current.pauseVideo();
+    scrubFns.current.beginDrag();
+    const pctFrom = (clientX: number) => {
+      const r = barRef.current?.getBoundingClientRect();
+      if (!r || r.width === 0) return 0;
+      return Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    };
+    const apply = (clientX: number) => {
+      const { view, target } = scrubFns.current.dragScrubberAt(pctFrom(clientX));
+      settlingRef.current = false;
+      setPreview(view);
+      dragTargetRef.current = target;
+    };
+    apply(e.clientX);
+    const onMove = (ev: MouseEvent) => apply(ev.clientX);
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      setDragging(false);
+      scrubFns.current.endDrag();
+      commitSeek(dragTargetRef.current);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
   // After a commit, keep the thumb pinned at the target until the real position lands (so a slow
   // transcode reload doesn't snap it back), then hand back to the live scrubber.
   useEffect(() => {
@@ -390,11 +447,12 @@ export function FeaturePanel({
           {/* Scrubber — borderless */}
           <button
             ref={scrubberRef}
-            onClick={onPlayPause}
+            onClick={IS_BROWSER ? undefined : onPlayPause}
+            onMouseDown={IS_BROWSER ? onScrubMouseDown : undefined}
             onMouseEnter={hoverScrubber}
             style={{ display: "block", width: "100%", textAlign: "left", border: "none", outline: "none", background: "transparent", cursor: "pointer", padding: "6px 0 4px" }}
           >
-            <div style={{ position: "relative", height: 8 }}>
+            <div ref={barRef} style={{ position: "relative", height: 8 }}>
               {/* one rounded segment per slot (tiny gaps); the current slot fills to the thumb in the accent */}
               {sc?.segments.map((seg, i) => (
                 <div
@@ -412,7 +470,7 @@ export function FeaturePanel({
                   }}
                 >
                   {seg.fillPct > 0 && (
-                    <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${seg.fillPct}%`, background: accent, transition: "width 0.35s ease" }} />
+                    <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${seg.fillPct}%`, background: accent, transition: dragging ? "none" : "width 0.35s ease" }} />
                   )}
                 </div>
               ))}
@@ -430,12 +488,12 @@ export function FeaturePanel({
                   background: "#fff",
                   boxShadow: scrubFocused ? `0 0 0 5px ${accent}66` : "0 0 6px rgba(0,0,0,0.5)",
                   transform: "translate(-50%, -50%)",
-                  transition: "width .12s, height .12s, left 0.35s ease",
+                  transition: dragging ? "width .12s, height .12s" : "width .12s, height .12s, left 0.35s ease",
                 }}
               />
             </div>
             <div style={{ position: "relative", height: 26, marginTop: 10 }}>
-              <span style={{ position: "absolute", left: `${posPct}%`, transform: "translateX(-50%)", fontSize: 17, fontWeight: 600, color: scrubFocused ? "#f1f5f9" : "#c3c9d4", transition: "left 0.35s ease" }}>
+              <span style={{ position: "absolute", left: `${posPct}%`, transform: "translateX(-50%)", fontSize: 17, fontWeight: 600, color: scrubFocused ? "#f1f5f9" : "#c3c9d4", transition: dragging ? "none" : "left 0.35s ease" }}>
                 {fmt(sc?.slotPositionS ?? 0)}
               </span>
               <span
