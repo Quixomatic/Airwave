@@ -1,4 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "pnpm install --filter site..."
+  "installCommand": "pnpm install --filter site...",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- ':(top)apps/site' ':(top)packages' ':(top)scripts/install.sh' ':(top)scripts/install.ps1' ':(top)docker-compose.yml' ':(top)CHANGELOG.md'"
 }
