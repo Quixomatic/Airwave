@@ -36,10 +36,16 @@ Windows native (Docker Desktop, in PowerShell):
 irm https://www.getairwave.tv/install.ps1 | iex
 ```
 
+It installs to **`~/airwave`** by default — a stable per-user path, so re-running from anywhere updates the same
+install (override with `--dir` / `-Dir`). Secrets (Postgres password, auth secret, a stable Plex client id) are
+generated for you, and the AI lineup engine is on by default (add an AI provider key in the admin to use it).
+
 Both take the same options:
 
 - **Pin a version:** `... | sh -s -- --version 0.14.13` (or `-Version 0.14.13` on PowerShell). Latest by default.
 - **Preview only:** add `--dry-run` (`-DryRun`) to see everything it would do without writing or starting anything.
+- **Advanced setup:** add `--advanced` (`-Advanced`) to bind host paths for the database and bumper music,
+  serve the browser TV player, or add extra CORS origins. The default keeps it simple (Docker named volumes).
 - **Update:** re-run the same command (or `docker compose pull && docker compose up -d` in the stack dir).
 - **Uninstall:** add `--uninstall` (`-Uninstall`) — keeps your data; add `--purge` (`-Purge`) to delete the
   volumes and directory too.

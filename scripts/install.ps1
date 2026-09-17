@@ -18,10 +18,11 @@
 [CmdletBinding()]
 param(
   [string]$Version = $(if ($env:AIRWAVE_VERSION) { $env:AIRWAVE_VERSION } else { "latest" }),
-  [string]$Dir     = $(if ($env:AIRWAVE_DIR) { $env:AIRWAVE_DIR } else { "./airwave" }),
+  [string]$Dir     = $(if ($env:AIRWAVE_DIR) { $env:AIRWAVE_DIR } else { Join-Path $HOME "airwave" }),
   [switch]$DryRun,
   [switch]$Uninstall,
   [switch]$Purge,
+  [switch]$Advanced,
   [switch]$Yes
 )
 
@@ -50,7 +51,8 @@ function Ask($question, $default) {
   if ($NonInteractive) { return $default }
   if ($Gum) {
     $ans = & $Gum input --prompt "$question > " --value "$default" --placeholder "$default"
-    if ([string]::IsNullOrWhiteSpace($ans)) { return $default }
+    if ([string]::IsNullOrWhiteSpace($ans)) { $ans = $default }
+    Write-Host "  ${question}: $ans" -ForegroundColor DarkGray   # gum clears its UI; keep the answer on screen
     return $ans
   }
   $suffix = if ($default) { " [$default]" } else { "" }
@@ -58,11 +60,28 @@ function Ask($question, $default) {
   if ([string]::IsNullOrWhiteSpace($ans)) { return $default }
   return $ans
 }
-function Confirm($question) {
-  if ($NonInteractive) { return $false }
-  if ($Gum) { & $Gum confirm "$question"; return ($LASTEXITCODE -eq 0) }
-  $ans = Read-Host "$question [y/N]"
+function Confirm($question, $default = "no") {
+  if ($NonInteractive) { return ($default -eq "yes") }
+  if ($Gum) {
+    if ($default -eq "yes") { & $Gum confirm --default=true "$question" } else { & $Gum confirm "$question" }
+    $r = ($LASTEXITCODE -eq 0)
+    Write-Host ("  {0}: {1}" -f $question, $(if ($r) { "yes" } else { "no" })) -ForegroundColor DarkGray
+    return $r
+  }
+  $hint = if ($default -eq "yes") { "[Y/n]" } else { "[y/N]" }
+  $ans = Read-Host "$question $hint"
+  if ([string]::IsNullOrWhiteSpace($ans)) { return ($default -eq "yes") }
   return ($ans -match '^(y|Y|yes|YES)$')
+}
+function Choose($header, [string[]]$options) {
+  if ($Gum) { return (& $Gum choose --header $header @options) }
+  Write-Host $header
+  for ($i = 0; $i -lt $options.Count; $i++) { Write-Host ("  {0}) {1}" -f ($i + 1), $options[$i]) }
+  $n = Read-Host "Choose [1]"
+  if ([string]::IsNullOrWhiteSpace($n)) { return $options[0] }
+  $idx = 0; [int]::TryParse($n, [ref]$idx) | Out-Null
+  if ($idx -ge 1 -and $idx -le $options.Count) { return $options[$idx - 1] }
+  return $options[0]
 }
 function New-Secret([int]$bytes = 24) {
   $b = New-Object 'System.Byte[]' $bytes
@@ -100,6 +119,7 @@ if ([string]::IsNullOrWhiteSpace($Version)) { $Version = "latest" }
 $CgImage = "${ImageRepo}:${Version}"
 
 $mode = if ($Uninstall) { "uninstall" } else { "install" }
+$modeExplicit = $Uninstall.IsPresent
 Info ("=== Airwave {0}{1} ===" -f $mode, $(if ($DryRun) { " (dry run)" } else { "" }))
 
 # ---- preflight -------------------------------------------------------------
@@ -111,6 +131,18 @@ if (-not $dockerOk) {
   if ($DryRun) { Warn "Docker not reachable (dry-run: continuing)." }
   else { Die "Docker Desktop isn't installed or running. Get it at https://docs.docker.com/desktop/, start it, then re-run." }
 } else { Ok "Docker is ready" }
+
+# ---- pick an action (when none was given on the command line) --------------
+if (-not $modeExplicit -and -not $NonInteractive) {
+  $existingHere = (Test-Path (Join-Path $Dir $Marker)) -and (Test-Path (Join-Path $Dir ".env"))
+  $first = if ($existingHere) { "Update Airwave (found in $Dir)" } else { "Install or update Airwave" }
+  $act = Choose "What would you like to do?" @($first, "Uninstall Airwave", "Quit")
+  switch -Wildcard ($act) {
+    "Uninstall*" { $mode = "uninstall" }
+    "Quit"       { Write-Host "Cancelled."; exit 0 }
+    default      { $mode = "install" }
+  }
+}
 
 # ---- uninstall -------------------------------------------------------------
 if ($mode -eq "uninstall") {
@@ -162,40 +194,100 @@ if ($existing) {
   $ip = Get-LanIp
   $serverPort = Ask "Server (API) port" "36020"
   $webPort    = Ask "Admin web port" "36021"
+  $tvPort     = Ask "Browser TV player port" $(if ($env:TV_WEB_PORT) { $env:TV_WEB_PORT } else { "36022" })
   $serverPublicUrl = Ask "Server public URL" "http://${ip}:${serverPort}"
   $webPublicUrl    = Ask "Admin web public URL" "http://${ip}:${webPort}"
+  $tvUrl           = Ask "Browser TV player public URL" $(if ($env:TV_WEB_PUBLIC_URL) { $env:TV_WEB_PUBLIC_URL } else { "http://${ip}:${tvPort}" })
   $adminEmail = Ask "First admin email" "admin@example.com"
   $adminPass  = Ask "First admin password (blank = generate one)" ""
   if ([string]::IsNullOrWhiteSpace($adminPass)) { $adminPass = (New-Secret 12); $genPw = $true }
   $pgPass = New-Secret 24
   $authSecret = New-B64Secret 48
+  $plexId = [guid]::NewGuid().ToString()   # stable, so Plex doesn't re-auth on each redeploy
+
+  # Advanced options — opt-in (env-seedable for unattended use).
+  $adv = $Advanced -or ($env:AIRWAVE_ADVANCED -eq "1")
+  $pgVolume = $env:POSTGRES_DATA_VOLUME; $pgData = $env:PGDATA; $bumperVol = $env:BUMPER_MUSIC_VOLUME
+  $workflow = if ($env:WORKFLOW_ENABLED) { $env:WORKFLOW_ENABLED -eq "1" } else { $true }
+  $profiles = if ($env:COMPOSE_PROFILES) { $env:COMPOSE_PROFILES } else { "tvweb" }
+  $tvServer = $env:TV_SERVER_URL   # reverse-proxy only; else the player uses SERVER_PUBLIC_URL
+  $extraCors = $env:EXTRA_CORS_ORIGINS
+  if (-not $adv -and -not $NonInteractive -and (Confirm "Configure advanced options (data locations, AI engine, TV player)?")) { $adv = $true }
+  if ($adv) {
+    Info "Advanced options"
+    if (Confirm "Store the Postgres database on a host path instead of a Docker volume?") {
+      $pgVolume = Ask "  Postgres data dir (host path)" (Join-Path $dirAbs "data/postgres")
+      Warn "  Bind mounts need correct ownership; if Postgres won't start, chown that dir."
+    }
+    if (Confirm "Keep bumper music on a host path (drop files in, then 'Scan folder')?") {
+      $bumperVol = Ask "  Bumper-music dir (host path)" (Join-Path $dirAbs "data/bumper-music")
+    }
+    if (Confirm "Enable the AI lineup workflow engine? (needs an AI key to use)" "yes") { $workflow = $true } else { $workflow = $false }
+    if (Confirm "Serve the browser TV player (tvweb)?" "yes") {
+      $profiles = "tvweb"
+    } else {
+      $profiles = ""; $tvUrl = ""
+    }
+    $extraCors = Ask "Extra admin origins to allow-list (comma-separated, blank = none)" ""
+  }
+  if ($pgVolume -and -not $pgData) { $pgData = "/var/lib/postgresql/data/pgdata" }
 
   if ($DryRun) {
-    Plan "write .env (SERVER_PUBLIC_URL=$serverPublicUrl, WEB_PUBLIC_URL=$webPublicUrl, CG_IMAGE=$CgImage, generated Postgres password + auth secret)"
+    Plan "write .env (SERVER_PUBLIC_URL=$serverPublicUrl, CG_IMAGE=$CgImage, generated Postgres password + auth secret + Plex client id)"
+    if ($pgVolume) { Plan "bind Postgres data -> $pgVolume (PGDATA=$pgData)" }
+    if ($bumperVol) { Plan "bind bumper music -> $bumperVol" }
+    if ($workflow) { Plan "enable the AI lineup workflow engine" }
+    if ($profiles) { Plan "serve the browser TV player at $tvUrl" }
+    if ($extraCors) { Plan "allow-list extra admin origins: $extraCors" }
   } else {
-@"
-# Airwave self-host config - generated by install.ps1
-CG_IMAGE=$CgImage
-
-SERVER_PUBLIC_URL=$serverPublicUrl
-WEB_PUBLIC_URL=$webPublicUrl
-SERVER_PORT=$serverPort
-WEB_PORT=$webPort
-
-POSTGRES_USER=channelguide
-POSTGRES_PASSWORD=$pgPass
-POSTGRES_DB=channelguide
-
-BETTER_AUTH_SECRET=$authSecret
-
-ADMIN_EMAIL=$adminEmail
-ADMIN_PASSWORD=$adminPass
-
-PUID=1000
-PGID=1000
-UMASK=022
-TZ=UTC
-"@ | Set-Content -Path $envPath -Encoding UTF8
+    if ($pgVolume) { New-Item -ItemType Directory -Force -Path $pgVolume | Out-Null }
+    if ($bumperVol) { New-Item -ItemType Directory -Force -Path $bumperVol | Out-Null }
+    $lines = @(
+      "# Airwave self-host config - generated by install.ps1"
+      "CG_IMAGE=$CgImage"
+      ""
+      "SERVER_PUBLIC_URL=$serverPublicUrl"
+      "WEB_PUBLIC_URL=$webPublicUrl"
+      "SERVER_PORT=$serverPort"
+      "WEB_PORT=$webPort"
+      ""
+      "POSTGRES_USER=channelguide"
+      "POSTGRES_PASSWORD=$pgPass"
+      "POSTGRES_DB=channelguide"
+      ""
+      "# Do NOT change after first boot (stored Plex/AI secrets are encrypted with it)."
+      "BETTER_AUTH_SECRET=$authSecret"
+      "# Stable Plex client identity (kept across updates)."
+      "PLEX_CLIENT_IDENTIFIER=$plexId"
+      ""
+      "ADMIN_EMAIL=$adminEmail"
+      "ADMIN_PASSWORD=$adminPass"
+      ""
+      "PUID=1000"
+      "PGID=1000"
+      "UMASK=022"
+      "TZ=UTC"
+      ""
+      "# ============================ Optional ============================"
+    )
+    if ($pgVolume) { $lines += @("POSTGRES_DATA_VOLUME=$pgVolume", "PGDATA=$pgData") }
+    else { $lines += @("# POSTGRES_DATA_VOLUME=/mnt/tank/apps/airwave/postgres", "# PGDATA=/var/lib/postgresql/data/pgdata") }
+    if ($bumperVol) { $lines += "BUMPER_MUSIC_VOLUME=$bumperVol" }
+    else { $lines += "# BUMPER_MUSIC_VOLUME=/mnt/tank/apps/airwave/bumper-music" }
+    if ($workflow) { $lines += "WORKFLOW_ENABLED=1" }
+    else { $lines += "# WORKFLOW_ENABLED=1   # AI lineup engine (needs an AI provider key in the admin)" }
+    if ($profiles) {
+      $lines += @("COMPOSE_PROFILES=$profiles", "TV_WEB_PORT=$tvPort", "TV_WEB_PUBLIC_URL=$tvUrl")
+      if ($tvServer) { $lines += "TV_SERVER_URL=$tvServer" }
+      else { $lines += @("# Reverse proxy only: to serve the player at its own domain, set TV_WEB_PUBLIC_URL to that",
+                         "# domain and TV_SERVER_URL to the same domain (/api + /img forwarded to the server).",
+                         "# TV_SERVER_URL=https://tv.example.com") }
+    }
+    else { $lines += @("# COMPOSE_PROFILES=tvweb", "# TV_WEB_PORT=36022", "# TV_WEB_PUBLIC_URL=http://<host>:36022") }
+    if ($extraCors) { $lines += "EXTRA_CORS_ORIGINS=$extraCors" }
+    else { $lines += "# EXTRA_CORS_ORIGINS=http://192.168.1.10:36021" }
+    $lines += @("# GOOGLE_CLIENT_ID=   GOOGLE_CLIENT_SECRET=", "# GITHUB_CLIENT_ID=   GITHUB_CLIENT_SECRET=")
+    Set-Content -Path $envPath -Value $lines -Encoding UTF8
     Ok "Wrote .env"
   }
 }
@@ -247,6 +339,7 @@ Write-Host ""
 Ok ("Airwave {0}{1} in {2}" -f $verb, $(if ($DryRun) { " (dry run - nothing changed)" } else { "" }), $dirAbs)
 Write-Host "  Admin:  $webPublicUrl"
 Write-Host "  Server: $serverPublicUrl"
+if ($tvUrl) { Write-Host "  TV:     $tvUrl  (browser TV player)" }
 if ($genPw) { Write-Host "  Admin login: $adminEmail / $adminPass  (generated - save this)" -ForegroundColor Yellow }
 Write-Host ""
 Write-Host "Update later:  cd `"$dirAbs`"; docker compose pull; docker compose up -d"

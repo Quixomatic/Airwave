@@ -29,21 +29,32 @@ TTY=/dev/tty
 
 # ---- args ------------------------------------------------------------------
 VERSION="${AIRWAVE_VERSION:-latest}"
-DIR="${AIRWAVE_DIR:-./airwave}"
+# Default to a stable per-user path (NOT the current dir) so re-running finds the same install to update,
+# and so it never drops a surprise folder wherever you happened to be. Override with --dir / AIRWAVE_DIR.
+DIR="${AIRWAVE_DIR:-${HOME:-.}/airwave}"
 MODE=install
+MODE_EXPLICIT=0
 PURGE=0
+ADVANCED="${AIRWAVE_ADVANCED:-0}"
 DRY_RUN="${AIRWAVE_DRY_RUN:-0}"
 
 usage() {
   cat <<EOF
 Airwave installer
 
+Run with no arguments and it asks whether to install/update or uninstall.
+
 Usage:
-  install.sh [--version <tag>] [--dir <path>] [--dry-run] [--yes]      install / update
-  install.sh --uninstall [--dir <path>] [--purge] [--dry-run] [--yes]  remove
+  install.sh [--install] [--version <tag>] [--dir <path>] [--advanced] [--dry-run] [--yes]
+  install.sh --uninstall [--dir <path>] [--purge] [--dry-run] [--yes]
 
   --version <tag>   Image tag to run (e.g. 0.14.13 or 0.14). Default: latest.
-  --dir <path>      Stack directory. Default: ./airwave
+  --dir <path>      Stack directory. Default: ~/airwave (a stable per-user path,
+                    so re-running finds + updates the same install).
+  --advanced, -a    Ask the extra questions too: data locations (bind a host path
+                    for Postgres / bumper music), the AI lineup engine, the
+                    browser TV player, extra CORS origins. Default: sensible
+                    defaults (Docker named volumes, engine off, no TV player).
   --dry-run, -n     Walk the whole flow and print what WOULD happen; write
                     nothing, pull nothing, start nothing. Safe to test.
   --uninstall       Stop and remove the Airwave containers. Keeps your data
@@ -66,8 +77,10 @@ while [ $# -gt 0 ]; do
     --version=*) VERSION=${1#*=}; shift ;;
     --dir) DIR=${2:-}; shift 2 ;;
     --dir=*) DIR=${1#*=}; shift ;;
-    --uninstall|--remove) MODE=uninstall; shift ;;
+    --install) MODE=install; MODE_EXPLICIT=1; shift ;;
+    --uninstall|--remove) MODE=uninstall; MODE_EXPLICIT=1; shift ;;
     --purge) PURGE=1; shift ;;
+    -a|--advanced) ADVANCED=1; shift ;;
     -n|--dry-run) DRY_RUN=1; shift ;;
     -y|--yes|--noninteractive) AIRWAVE_NONINTERACTIVE=1; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -168,20 +181,44 @@ prompt() { # prompt VAR "Question" "default"  (env value of VAR, if set, wins as
   if noninteractive; then eval "$_v=\$_d"; return 0; fi
   if [ -n "$GUM" ]; then
     _ans=$("$GUM" input --prompt "$_q » " --value "$_d" --placeholder "$_d" < "$TTY") || _ans=$_d
+    [ -z "$_ans" ] && _ans=$_d
+    # gum clears its own UI on submit — echo the answer so it stays in the scrollback.
+    say "${DIM}  ${_q}: ${_ans}${RST}"
   else
     if [ -n "$_d" ]; then printf '%s [%s]: ' "$_q" "$_d" > "$TTY"; else printf '%s: ' "$_q" > "$TTY"; fi
     IFS= read -r _ans < "$TTY" || _ans=''
+    [ -z "$_ans" ] && _ans=$_d
   fi
-  [ -z "$_ans" ] && _ans=$_d
   eval "$_v=\$_ans"
 }
 
-confirm() { # confirm "Question" -> 0 = yes. Non-interactive defaults to NO.
-  if noninteractive; then return 1; fi
-  if [ -n "$GUM" ]; then "$GUM" confirm "$1" < "$TTY"; return $?; fi
-  printf '%s [y/N]: ' "$1" > "$TTY"
+confirm() { # confirm "Question" [default:yes|no] -> 0 = yes. Non-interactive returns the default.
+  _q=$1; _def=${2:-no}
+  if noninteractive; then [ "$_def" = yes ] && return 0 || return 1; fi
+  if [ -n "$GUM" ]; then
+    if [ "$_def" = yes ]; then "$GUM" confirm --default=true "$_q" < "$TTY"; else "$GUM" confirm "$_q" < "$TTY"; fi
+    _r=$?
+    if [ "$_r" = 0 ]; then say "${DIM}  ${_q}: yes${RST}"; else say "${DIM}  ${_q}: no${RST}"; fi
+    return $_r
+  fi
+  _hint='[y/N]'; [ "$_def" = yes ] && _hint='[Y/n]'
+  printf '%s %s: ' "$_q" "$_hint" > "$TTY"
   IFS= read -r _a < "$TTY" || _a=''
+  if [ -z "$_a" ]; then [ "$_def" = yes ] && return 0 || return 1; fi
   case "$_a" in y|Y|yes|YES) return 0 ;; *) return 1 ;; esac
+}
+
+choose() { # choose "header" "opt1" "opt2" ...  -> prints the chosen option
+  _hdr=$1; shift
+  if [ -n "$GUM" ]; then
+    "$GUM" choose --header "$_hdr" "$@" < "$TTY"
+  else
+    printf '%s\n' "$_hdr" > "$TTY"
+    _i=1; for _o in "$@"; do printf '  %s) %s\n' "$_i" "$_o" > "$TTY"; _i=$((_i + 1)); done
+    printf 'Choose [1]: ' > "$TTY"; IFS= read -r _n < "$TTY" || _n=1; [ -z "$_n" ] && _n=1
+    _i=1; for _o in "$@"; do [ "$_i" = "$_n" ] && { printf '%s' "$_o"; return; }; _i=$((_i + 1)); done
+    printf '%s' "$1"  # out-of-range → first option
+  fi
 }
 
 run() { # run a step, with a gum spinner when available; dry-run narrates only
@@ -201,6 +238,12 @@ gen_b64() { # BETTER_AUTH_SECRET: not in a URL, base64 is fine
   if have openssl; then openssl rand -base64 48 | tr -d '\n'
   elif [ -r /dev/urandom ]; then head -c 48 /dev/urandom | base64 | tr -d '\n'
   else die "need openssl or /dev/urandom to generate secrets"; fi
+}
+gen_uuid() { # stable PLEX_CLIENT_IDENTIFIER (like dev-setup), so Plex doesn't see a new client each redeploy
+  if [ -r /proc/sys/kernel/random/uuid ]; then cat /proc/sys/kernel/random/uuid
+  elif have uuidgen; then uuidgen | tr 'A-Z' 'a-z'
+  elif have openssl; then openssl rand -hex 16 | sed 's/\(........\)\(....\)\(....\)\(....\)\(............\)/\1-\2-\3-\4-\5/'
+  else gen_hex | cut -c1-32; fi
 }
 lan_ip() {
   # Enumerate real (non-loopback, non-virtual) IPv4s, then prefer a home LAN address — the same order the
@@ -265,6 +308,20 @@ if have docker; then
 else
   if dryrun; then warn "Docker not found (dry-run: continuing so you can preview the flow)."; else
     die "Docker isn't installed. Get it at https://docs.docker.com/get-docker/ (Linux: curl -fsSL https://get.docker.com | sh), then re-run."; fi
+fi
+
+# ---- pick an action (when none was given on the command line) --------------
+if [ "$MODE_EXPLICIT" = 0 ] && ! noninteractive; then
+  _existing_here=0
+  [ -f "${DIR}/${MARKER}" ] && [ -f "${DIR}/.env" ] && _existing_here=1
+  _first="Install or update Airwave"
+  [ "$_existing_here" = 1 ] && _first="Update Airwave (found in ${DIR})"
+  _act=$(choose "What would you like to do?" "$_first" "Uninstall Airwave" "Quit")
+  case "$_act" in
+    Uninstall*) MODE=uninstall ;;
+    Quit|"") say "Cancelled."; exit 0 ;;
+    *) MODE=install ;;
+  esac
 fi
 
 # ---- uninstall -------------------------------------------------------------
@@ -332,23 +389,71 @@ else
   IP=$(lan_ip)
   prompt SERVER_PORT "Server (API) port" "36020"
   prompt WEB_PORT    "Admin web port"    "36021"
+  prompt TV_WEB_PORT "Browser TV player port" "36022"
   prompt SERVER_PUBLIC_URL "Server public URL" "http://${IP}:${SERVER_PORT}"
   prompt WEB_PUBLIC_URL    "Admin web public URL" "http://${IP}:${WEB_PORT}"
+  prompt TV_WEB_PUBLIC_URL "Browser TV player public URL" "http://${IP}:${TV_WEB_PORT}"
   prompt ADMIN_EMAIL "First admin email" "admin@example.com"
   prompt ADMIN_PASSWORD "First admin password (blank = generate one)" ""
   if [ -z "$ADMIN_PASSWORD" ]; then ADMIN_PASSWORD=$(gen_hex | cut -c1-24); GEN_PW=1; fi
   POSTGRES_PASSWORD=$(gen_hex)
   BETTER_AUTH_SECRET=$(gen_b64)
+  PLEX_CLIENT_IDENTIFIER=$(gen_uuid)   # stable, so Plex doesn't see a new client on each redeploy
   PUID=$(id -u 2>/dev/null || echo 1000)
   PGID=$(id -g 2>/dev/null || echo 1000)
   TZ_VAL=${TZ:-$(cat /etc/timezone 2>/dev/null || echo UTC)}
 
+  # Sensible defaults (batteries included): Docker named volumes, AI lineup engine ON, browser TV player ON.
+  # Pre-seeded from the environment so they can also be set unattended (e.g. WORKFLOW_ENABLED=0 … | sh -s -- -y).
+  POSTGRES_DATA_VOLUME="${POSTGRES_DATA_VOLUME:-}"; PGDATA_OVR="${PGDATA:-}"; BUMPER_MUSIC_VOLUME="${BUMPER_MUSIC_VOLUME:-}"
+  WORKFLOW_ENABLED="${WORKFLOW_ENABLED:-1}"
+  COMPOSE_PROFILES="${COMPOSE_PROFILES:-tvweb}"
+  TV_WEB_PORT="${TV_WEB_PORT:-36022}"
+  TV_WEB_PUBLIC_URL="${TV_WEB_PUBLIC_URL:-http://${IP}:${TV_WEB_PORT}}"
+  TV_SERVER_URL="${TV_SERVER_URL:-}"   # only for reverse-proxy-at-own-domain; else the player uses SERVER_PUBLIC_URL
+  EXTRA_CORS_ORIGINS="${EXTRA_CORS_ORIGINS:-}"
+  if [ "$ADVANCED" != 1 ] && ! noninteractive && confirm "Configure advanced options (data locations, AI engine, TV player)?"; then
+    ADVANCED=1
+  fi
+  # If a Postgres bind path was given (interactively below or via env), default PGDATA to a safe subdir.
+  if [ "$ADVANCED" = 1 ]; then
+    section "Advanced options"
+    if confirm "Store the Postgres database on a host path instead of a Docker volume?"; then
+      prompt POSTGRES_DATA_VOLUME "  Postgres data dir (host path)" "${DIR_ABS}/data/postgres"
+      PGDATA_OVR="/var/lib/postgresql/data/pgdata"
+      warn "  Bind mounts need correct ownership; on TrueNAS/NAS the Postgres user is uid 999. If it won't start, chown that dir."
+    fi
+    if confirm "Keep bumper music on a host path (drop files in, then 'Scan folder')?"; then
+      prompt BUMPER_MUSIC_VOLUME "  Bumper-music dir (host path)" "${DIR_ABS}/data/bumper-music"
+    fi
+    if confirm "Enable the AI lineup workflow engine? (needs an AI key to actually use)" yes; then
+      WORKFLOW_ENABLED=1
+    else
+      WORKFLOW_ENABLED=''
+    fi
+    if confirm "Serve the browser TV player (tvweb)?" yes; then
+      COMPOSE_PROFILES=tvweb
+    else
+      COMPOSE_PROFILES=''; TV_WEB_PUBLIC_URL=''
+    fi
+    prompt EXTRA_CORS_ORIGINS "Extra admin origins to allow-list (comma-separated, blank = none)" ""
+  fi
+  # Postgres bind (from a prompt or from the env) needs PGDATA pointed at an empty subdir for initdb.
+  [ -n "$POSTGRES_DATA_VOLUME" ] && [ -z "$PGDATA_OVR" ] && PGDATA_OVR="/var/lib/postgresql/data/pgdata"
+
   if dryrun; then
-    plan "write .env (SERVER_PUBLIC_URL=${SERVER_PUBLIC_URL}, WEB_PUBLIC_URL=${WEB_PUBLIC_URL}, CG_IMAGE=${CG_IMAGE}, generated Postgres password + auth secret)"
+    plan "write .env (SERVER_PUBLIC_URL=${SERVER_PUBLIC_URL}, CG_IMAGE=${CG_IMAGE}, generated Postgres password + auth secret + Plex client id)"
+    [ -n "$POSTGRES_DATA_VOLUME" ] && plan "bind Postgres data -> ${POSTGRES_DATA_VOLUME} (PGDATA=${PGDATA_OVR})"
+    [ -n "$BUMPER_MUSIC_VOLUME" ] && plan "bind bumper music -> ${BUMPER_MUSIC_VOLUME}"
+    [ "$WORKFLOW_ENABLED" = 1 ] && plan "enable the AI lineup workflow engine"
+    [ -n "$COMPOSE_PROFILES" ] && plan "serve the browser TV player at ${TV_WEB_PUBLIC_URL}"
+    [ -n "$EXTRA_CORS_ORIGINS" ] && plan "allow-list extra admin origins: ${EXTRA_CORS_ORIGINS}"
   else
+    [ -n "$POSTGRES_DATA_VOLUME" ] && mkdir -p "$POSTGRES_DATA_VOLUME" 2>/dev/null
+    [ -n "$BUMPER_MUSIC_VOLUME" ] && mkdir -p "$BUMPER_MUSIC_VOLUME" 2>/dev/null
     umask 077
     cat > .env <<EOF
-# Airwave self-host config — generated by install.sh
+# Airwave self-host config — generated by install.sh $(date -u +%Y-%m-%dT%H:%M:%SZ)
 CG_IMAGE=${CG_IMAGE}
 
 # Where your browser and TVs reach the apps (baked into the admin build + used for auth/CORS).
@@ -362,7 +467,10 @@ POSTGRES_USER=channelguide
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 POSTGRES_DB=channelguide
 
+# Long random secret — do NOT change after first boot (stored Plex/AI secrets are encrypted with it).
 BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+# Stable Plex client identity for this instance (kept across updates).
+PLEX_CLIENT_IDENTIFIER=${PLEX_CLIENT_IDENTIFIER}
 
 # First admin, seeded on first boot.
 ADMIN_EMAIL=${ADMIN_EMAIL}
@@ -373,6 +481,62 @@ PGID=${PGID}
 UMASK=022
 TZ=${TZ_VAL}
 EOF
+    # ---- Optional / advanced: live when chosen, otherwise documented so nothing is hidden ----
+    {
+      echo ""
+      echo "# ============================ Optional ============================"
+      if [ -n "$POSTGRES_DATA_VOLUME" ]; then
+        echo "# Postgres database on a host path (bind mount)."
+        echo "POSTGRES_DATA_VOLUME=${POSTGRES_DATA_VOLUME}"
+        echo "PGDATA=${PGDATA_OVR}"
+      else
+        echo "# Put the Postgres database on a host path instead of the Docker named volume:"
+        echo "#   POSTGRES_DATA_VOLUME=/mnt/tank/apps/airwave/postgres"
+        echo "#   PGDATA=/var/lib/postgresql/data/pgdata"
+      fi
+      if [ -n "$BUMPER_MUSIC_VOLUME" ]; then
+        echo "# Bumper music on a host folder (drop tracks in, then 'Scan folder' in the admin)."
+        echo "BUMPER_MUSIC_VOLUME=${BUMPER_MUSIC_VOLUME}"
+      else
+        echo "# Keep bumper music on a host folder you manage:"
+        echo "#   BUMPER_MUSIC_VOLUME=/mnt/tank/apps/airwave/bumper-music"
+      fi
+      if [ "$WORKFLOW_ENABLED" = 1 ]; then
+        echo "# AI lineup workflow engine (add an AI provider key in the admin to use it)."
+        echo "WORKFLOW_ENABLED=1"
+      else
+        echo "# Enable the AI lineup workflow engine (needs an AI provider key added in the admin):"
+        echo "#   WORKFLOW_ENABLED=1"
+      fi
+      if [ -n "$COMPOSE_PROFILES" ]; then
+        echo "# Browser TV player (auth-gated web player, for casting / kiosk)."
+        echo "COMPOSE_PROFILES=${COMPOSE_PROFILES}"
+        echo "TV_WEB_PORT=${TV_WEB_PORT}"
+        echo "TV_WEB_PUBLIC_URL=${TV_WEB_PUBLIC_URL}"
+        if [ -n "$TV_SERVER_URL" ]; then
+          echo "TV_SERVER_URL=${TV_SERVER_URL}"
+        else
+          echo "# Reverse proxy only: to serve the player at its own domain, set TV_WEB_PUBLIC_URL above to that"
+          echo "# domain and TV_SERVER_URL to the same domain (with /api + /img forwarded to the server) so the"
+          echo "# server never needs exposing. Leave unset for a normal LAN setup (the player uses SERVER_PUBLIC_URL)."
+          echo "#   TV_SERVER_URL=https://tv.example.com"
+        fi
+      else
+        echo "# Serve the 10-foot TV app as a browser player (for casting / kiosk):"
+        echo "#   COMPOSE_PROFILES=tvweb"
+        echo "#   TV_WEB_PORT=36022"
+        echo "#   TV_WEB_PUBLIC_URL=http://<host>:36022"
+      fi
+      if [ -n "$EXTRA_CORS_ORIGINS" ]; then
+        echo "EXTRA_CORS_ORIGINS=${EXTRA_CORS_ORIGINS}"
+      else
+        echo "# Extra admin origins to allow-list beyond WEB_PUBLIC_URL (comma-separated exact origins):"
+        echo "#   EXTRA_CORS_ORIGINS=http://192.168.1.10:36021"
+      fi
+      echo "# Social login (set BOTH id + secret to enable a provider):"
+      echo "#   GOOGLE_CLIENT_ID=      GOOGLE_CLIENT_SECRET="
+      echo "#   GITHUB_CLIENT_ID=      GITHUB_CLIENT_SECRET="
+    } >> .env
     ok "Wrote .env"
   fi
 fi
@@ -414,6 +578,7 @@ say ""
 ok "Airwave ${VERB}$( dryrun && printf ' (dry run — nothing changed)' ) in ${BOLD}${DIR_ABS}${RST}"
 say "  Admin:  ${BOLD}${WEB_PUBLIC_URL}${RST}"
 say "  Server: ${SERVER_PUBLIC_URL}"
+[ -n "${TV_WEB_PUBLIC_URL:-}" ] && say "  TV:     ${TV_WEB_PUBLIC_URL}  ${DIM}(browser TV player)${RST}"
 if [ "$GEN_PW" = 1 ]; then
   say "  Admin login: ${BOLD}${ADMIN_EMAIL}${RST} / ${BOLD}${ADMIN_PASSWORD}${RST}  ${DIM}(generated — save this)${RST}"
 fi

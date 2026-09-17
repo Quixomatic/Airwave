@@ -242,9 +242,13 @@ curl -fsSL https://www.getairwave.tv/install.sh | sh
 irm https://www.getairwave.tv/install.ps1 | iex
 ```
 
-Both take the same options: **pin a version** (`--version 0.14.13`), **preview** with `--dry-run` (writes and
-starts nothing), **update** by re-running the same command, and **remove** with `--uninstall` (add `--purge` to
-also delete data). Prefer to wire it up by hand? The manual compose steps below do the same thing.
+It installs to **`~/airwave`** by default (a stable per-user path, so re-running from anywhere updates the same
+install; override with `--dir`). Both scripts take the same options: **pin a version** (`--version 0.14.13`),
+**preview** with `--dry-run` (writes and starts nothing), **advanced setup** with `--advanced` (bind host paths
+for the database / bumper music, toggle the browser TV player, extra CORS origins), **update** by re-running,
+and **remove** with `--uninstall` (add `--purge` to also delete data). Secrets (Postgres password, auth secret,
+a stable Plex client id) are generated for you, and the AI lineup engine is on by default (add an AI key in the
+admin to use it). Prefer to wire it up by hand? The manual compose steps below do the same thing.
 
 > On native Windows the PowerShell script detects your LAN IP most reliably; under WSL the `curl | sh` line
 > works just as well. The scripts are small and auditable — read them first if you like:
