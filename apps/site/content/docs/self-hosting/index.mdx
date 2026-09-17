@@ -11,11 +11,13 @@ tier.
 
 **Two ways to run it — same server, pick what fits your setup:**
 
+- **Docker (recommended)** — for a NAS, mini-PC, or always-on Linux box. A single prebuilt image plus a
+  Postgres database, wired by `docker compose`. No antivirus false positives, and the easiest to keep
+  updated. This section walks that path in detail below.
 - **[One-click desktop app](/docs/self-hosting/desktop)** — for running Plex on your own Windows, macOS, or
   Linux machine. An installer + a tray app with **embedded Postgres**; no Docker, nothing to configure to
-  start.
-- **Docker** — for a NAS, mini-PC, or always-on Linux box. A single prebuilt image plus a Postgres database,
-  wired by `docker compose`. This section walks that path in detail below.
+  start. The signed installers are still new, so some antivirus / SmartScreen tools may flag them; if yours
+  does, use Docker instead.
 
 ## The deploy model
 

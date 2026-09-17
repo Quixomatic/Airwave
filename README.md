@@ -216,11 +216,13 @@ and preview lineups.
 
 Two ways to run the Airwave **server** (they host the exact same thing, pick whichever fits):
 
-- **🖥️ One-click desktop installer**: the easiest path, no Docker. **Airwave Desktop** (`apps/desktop`) is
-  a native tray app that bundles the server, admin UI, browser TV player, and an **embedded PostgreSQL**
-  into a single signed installer for Windows / macOS / Linux. Install it next to Plex and it just runs.
-  Grab it from the [Releases](https://github.com/Quixomatic/Airwave/releases).
-- **🐳 Docker / compose**: the flexible path for a NAS, home server, or VPS (below).
+- **🐳 Docker / compose (recommended)**: the reliable path for a NAS, home server, or VPS (below). No
+  antivirus false positives, and the easiest to update.
+- **🖥️ One-click desktop installer**: **Airwave Desktop** (`apps/desktop`) is a native tray app that
+  bundles the server, admin UI, browser TV player, and an **embedded PostgreSQL** into a single signed
+  installer for Windows / macOS / Linux. Install it next to Plex and it just runs. Grab it from the
+  [Releases](https://github.com/Quixomatic/Airwave/releases). Note: the installers are signed but still
+  new, so some antivirus / SmartScreen tools may flag them; if yours does, use Docker instead.
 
 > Not to be confused with the desktop **client** (`tv-tauri`) in the platform table above: that's a
 > *viewer* app you install to watch. Airwave Desktop here is the *server*.
