@@ -216,6 +216,11 @@ lan_ip() {
   if [ -z "$_cands" ] && have ifconfig; then
     _cands=$(ifconfig 2>/dev/null | awk '/inet /{print $2}' | sed 's/^addr://' | grep -v '^127\.')
   fi
+  # Git Bash / MSYS on Windows has neither `ip` nor `ifconfig`; borrow the real adapter list from PowerShell.
+  if [ -z "$_cands" ] && have powershell.exe; then
+    _cands=$(powershell.exe -NoProfile -Command "Get-NetIPAddress -AddressFamily IPv4 | Select-Object -ExpandProperty IPAddress" 2>/dev/null \
+      | tr -d '\r' | grep -Ev '^(127\.|169\.254\.)')
+  fi
   _pick=''
   for _p in '^192\.168\.' '^172\.(1[6-9]|2[0-9]|3[01])\.' '^10\.' '^[0-9]'; do
     _pick=$(printf '%s\n' $_cands | grep -E "$_p" | head -n1)

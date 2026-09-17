@@ -31,6 +31,15 @@ $ComposeUrl  = if ($env:AIRWAVE_COMPOSE_URL) { $env:AIRWAVE_COMPOSE_URL } else {
 $Marker      = ".airwave-install"
 $NonInteractive = $Yes -or ($env:AIRWAVE_NONINTERACTIVE -eq "1")
 
+# Pretty prompts via gum if it's on PATH (install once with `winget install charmbracelet.gum`). No
+# auto-download: gum ships no Windows binary on GitHub for this release, and a winget install mid-run
+# wouldn't be on this session's PATH anyway. Falls back to Read-Host.
+$Gum = $null
+if (-not $env:AIRWAVE_NO_GUM) {
+  $g = Get-Command gum -ErrorAction SilentlyContinue
+  if ($g) { $Gum = $g.Source }
+}
+
 function Info($m) { Write-Host "`n$m" -ForegroundColor Cyan }
 function Ok($m)   { Write-Host "OK  $m" -ForegroundColor Green }
 function Warn($m) { Write-Host "!   $m" -ForegroundColor Yellow }
@@ -39,6 +48,11 @@ function Plan($m) { Write-Host "[dry-run] would $m" -ForegroundColor DarkGray }
 
 function Ask($question, $default) {
   if ($NonInteractive) { return $default }
+  if ($Gum) {
+    $ans = & $Gum input --prompt "$question > " --value "$default" --placeholder "$default"
+    if ([string]::IsNullOrWhiteSpace($ans)) { return $default }
+    return $ans
+  }
   $suffix = if ($default) { " [$default]" } else { "" }
   $ans = Read-Host "$question$suffix"
   if ([string]::IsNullOrWhiteSpace($ans)) { return $default }
@@ -46,6 +60,7 @@ function Ask($question, $default) {
 }
 function Confirm($question) {
   if ($NonInteractive) { return $false }
+  if ($Gum) { & $Gum confirm "$question"; return ($LASTEXITCODE -eq 0) }
   $ans = Read-Host "$question [y/N]"
   return ($ans -match '^(y|Y|yes|YES)$')
 }
