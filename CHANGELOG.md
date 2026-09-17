@@ -2,6 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.15] - 2026-09-17
+
+Airwave Desktop: fix the embedded database failing to start on a clean Windows box (#42).
+
+### Fixed
+- The bundled Postgres crashed at first-run database init on Windows machines without a recent Microsoft
+  Visual C++ Runtime (initdb "post-bootstrap initialization" → `0xC0000005`, or it would not start at all, code
+  53). PG18's binaries link `vcruntime140_1.dll`, which older or absent redistributables do not include. The
+  Windows build now bundles the MSVC runtime (`vcruntime140.dll`, `vcruntime140_1.dll`, `msvcp140.dll`) next to
+  `postgres.exe`, so a clean box works with no manual install. It was never an antivirus problem, despite how
+  the crash reads.
+
+### Added
+- If the database still fails to start on Windows, the setup screen now shows a clear message with a one-click
+  link to the VC++ runtime instead of a cryptic crash code.
+- CI verifies and logs that the runtime DLLs are bundled in the Windows package, and fails the build if any are
+  missing, so a broken installer can never ship.
+
 ## [0.14.14] - 2026-09-17
 
 Self-hosting: a one-line installer for the Docker stack (`curl | sh` / `irm | iex`).

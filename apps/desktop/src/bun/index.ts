@@ -1212,6 +1212,19 @@ async function ensureStackUp(): Promise<boolean> {
   } catch (err) {
     stackState = "idle";
     phaseError = errText(err);
+    // A Windows box without a recent Microsoft Visual C++ Runtime crashes the embedded Postgres right here
+    // (initdb "post-bootstrap initialization" → 0xC0000005, or it won't start at all → code 53). We now bundle
+    // the runtime next to postgres.exe, but if it still trips (a genuinely broken/old runtime), point the user
+    // straight at the one-click fix instead of a cryptic crash. See issue #42.
+    if (
+      stackPhase === "database" &&
+      process.platform === "win32" &&
+      /0xC0000005|terminated by exception|code:\s*53|post-bootstrap/i.test(phaseError)
+    ) {
+      phaseError +=
+        "\n\nThe database engine couldn't start — this is almost always a missing Microsoft Visual C++ Runtime. " +
+        "Install it (https://aka.ms/vs/17/release/vc_redist.x64.exe), then relaunch Airwave.";
+    }
     // Record which phase we died in so the log (and the UI, via /status) pinpoint it — no more blank `{}`.
     console.error(`[desktop] failed to start the stack (phase=${stackPhase}): ${phaseError}`);
     return false;

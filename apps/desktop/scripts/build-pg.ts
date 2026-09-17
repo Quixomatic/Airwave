@@ -14,7 +14,8 @@
  * embedded-postgres's `import('@embedded-postgres/<platform>')` to those relocated binaries.
  */
 import { spawnSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -91,5 +92,30 @@ export const initdb = path.join(bin, 'initdb${ext}');
 export const postgres = path.join(bin, 'postgres${ext}');
 `,
 );
+
+// 3. Windows: bundle the MSVC runtime app-local so a clean box (no / older VC++ redistributable) can run the
+//    Postgres binaries. PG18's initdb/postgres link vcruntime140_1.dll (only in the VS2019+ redist); without it
+//    the child dies at initdb "post-bootstrap initialization" with 0xC0000005, or won't start at all. Windows
+//    searches the exe's own dir first, so dropping these next to postgres.exe fixes it with no install/reboot.
+//    (Issue #42. They're Microsoft-redistributable; the windows-2025 CI runner has them in System32.)
+if (process.platform === "win32") {
+  const req = createRequire(import.meta.url);
+  const epReq = createRequire(req.resolve("embedded-postgres/package.json"));
+  const nativeBin = join(realpathSync(dirname(epReq.resolve(`${epPkg}/package.json`))), "native", "bin");
+  const sys32 = join(process.env.SystemRoot ?? "C:\\Windows", "System32");
+  for (const dll of ["vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll"]) {
+    const src = join(sys32, dll);
+    if (existsSync(src)) {
+      copyFileSync(src, join(nativeBin, dll));
+      console.log(`[build-pg] bundled ${dll} → pg/native/bin`);
+    } else {
+      // Fail LOUDLY rather than ship an installer that crashes on a clean box (issue #42). windows-2025 CI has
+      // these; if a runner ever doesn't, install the VC++ 2015-2022 x64 redistributable on the build host, or
+      // switch this to a vendored copy under apps/desktop.
+      console.error(`[build-pg] FATAL: ${src} not found. The Windows build needs the MSVC runtime to bundle it (issue #42).`);
+      process.exit(1);
+    }
+  }
+}
 
 console.log(`[build-pg] built pg-launcher.mjs + stub for ${epPkg} (binaries → pg/native/bin)`);

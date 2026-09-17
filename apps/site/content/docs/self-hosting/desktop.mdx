@@ -106,6 +106,13 @@ so your channels, sources, and admin account carry over. (Built-in auto-update i
 - **Workflows work here too** — unlike a bare container without the bootstrap, the desktop app sets up the
   workflow schema automatically, so Channel Import and AI lineups are available.
 
+## Troubleshooting
+
+**"Starting the database" fails / a `0xC0000005` crash on first run.** The embedded database needs the
+Microsoft Visual C++ Runtime. The installer now bundles it, but on a very old Windows build that's still
+missing it, install the runtime once and relaunch: <https://aka.ms/vs/17/release/vc_redist.x64.exe>. (This is
+not an antivirus issue, despite how the crash reads.)
+
 ## Source map
 
 | Concern | File |

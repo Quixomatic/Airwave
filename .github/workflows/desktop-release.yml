@@ -162,6 +162,22 @@ jobs:
           AIRWAVE_MAC_SIGN: ${{ (runner.os == 'macOS' && env.MAC_SIGN_AVAILABLE == 'true') && '1' || '' }}
         run: pnpm run build:${{ steps.ch.outputs.channel }}
 
+      # Windows only: prove the MSVC runtime got bundled next to postgres.exe (issue #42). Without
+      # vcruntime140_1.dll a clean box crashes the embedded Postgres at init. Logs each bundled DLL so the
+      # tagged release run visibly shows the copy, and FAILS the build if any is missing (never ship broken).
+      - name: Verify bundled MSVC runtime (Windows, issue #42)
+        if: matrix.os == 'windows-2025'
+        working-directory: apps/desktop
+        shell: pwsh
+        run: |
+          $dlls = 'vcruntime140.dll','vcruntime140_1.dll','msvcp140.dll'
+          $found = Get-ChildItem -Path build -Recurse -Include $dlls -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match 'pg[\\/]native[\\/]bin' }
+          $found | ForEach-Object { Write-Host "bundled: $($_.FullName)" }
+          $names = @($found | ForEach-Object { $_.Name } | Sort-Object -Unique)
+          foreach ($d in $dlls) { if ($names -notcontains $d) { Write-Error "MISSING from packaged app: $d (issue #42)"; exit 1 } }
+          Write-Host "OK: all three MSVC runtime DLLs are in the packaged app."
+
       # macOS only: electrobun's own codesign can't handle our nested embedded-Postgres binaries (it walks only
       # Contents/MacOS), so we sign + notarize + staple OURSELVES (mirrors the Windows Inno step). Imports the
       # Developer ID cert into a throwaway keychain, then scripts/build-mac-signed.ts signs every Mach-O leaf-first
