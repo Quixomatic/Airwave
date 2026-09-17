@@ -36,7 +36,7 @@ const die = (msg: string): never => {
 };
 
 // ── target discovery ─────────────────────────────────────────────────────────
-type Kind = "jsonVersion" | "rokuManifest" | "cargoPackage" | "cargoLockPackage" | "tizenConfig";
+type Kind = "jsonVersion" | "rokuManifest" | "cargoPackage" | "cargoLockPackage" | "tizenConfig" | "shInstaller" | "ps1Installer";
 type Target = { path: string; kind: Kind };
 
 function appPackageJsons(): string[] {
@@ -64,6 +64,8 @@ const TARGETS: Target[] = [
   { path: join(ROOT, "apps/tv-tauri/src-tauri/Cargo.toml"), kind: "cargoPackage" },
   { path: join(ROOT, "apps/tv-tauri/src-tauri/Cargo.lock"), kind: "cargoLockPackage" },
   { path: join(ROOT, "apps/tv-roku/manifest"), kind: "rokuManifest" },
+  { path: join(ROOT, "scripts/install.sh"), kind: "shInstaller" }, // one-line installer (POSIX)
+  { path: join(ROOT, "scripts/install.ps1"), kind: "ps1Installer" }, // one-line installer (PowerShell)
 ];
 
 // ── per-kind read/write (all targeted; return [currentVersion, updatedText] ) ──
@@ -139,6 +141,22 @@ function tizenWrite(text: string, next: string): string {
   return text.replace(/(\bversion=")(\d+\.\d+\.\d+)(")/, `$1${next}$3`); // first occurrence only
 }
 
+/** scripts/install.sh: `INSTALLER_VERSION="X.Y.Z"` (no `$` anchor — a checkout may be CRLF). */
+function shInstallerRead(text: string): string | null {
+  return text.match(/INSTALLER_VERSION="(\d+\.\d+\.\d+)"/)?.[1] ?? null;
+}
+function shInstallerWrite(text: string, next: string): string {
+  return text.replace(/(INSTALLER_VERSION=")(\d+\.\d+\.\d+)(")/, `$1${next}$3`);
+}
+
+/** scripts/install.ps1: `$InstallerVersion = "X.Y.Z"`. */
+function ps1InstallerRead(text: string): string | null {
+  return text.match(/\$InstallerVersion\s*=\s*"(\d+\.\d+\.\d+)"/)?.[1] ?? null;
+}
+function ps1InstallerWrite(text: string, next: string): string {
+  return text.replace(/(\$InstallerVersion\s*=\s*")(\d+\.\d+\.\d+)(")/, `$1${next}$3`);
+}
+
 function readVersion(t: Target, text: string): string | null {
   switch (t.kind) {
     case "jsonVersion":
@@ -150,6 +168,10 @@ function readVersion(t: Target, text: string): string | null {
       return cargoRead(text);
     case "tizenConfig":
       return tizenRead(text);
+    case "shInstaller":
+      return shInstallerRead(text);
+    case "ps1Installer":
+      return ps1InstallerRead(text);
   }
 }
 function writeVersion(t: Target, text: string, next: string): string {
@@ -163,6 +185,10 @@ function writeVersion(t: Target, text: string, next: string): string {
       return cargoWrite(text, next);
     case "tizenConfig":
       return tizenWrite(text, next);
+    case "shInstaller":
+      return shInstallerWrite(text, next);
+    case "ps1Installer":
+      return ps1InstallerWrite(text, next);
   }
 }
 

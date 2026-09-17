@@ -2,6 +2,33 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.14] - 2026-09-17
+
+Self-hosting: a one-line installer for the Docker stack (`curl | sh` / `irm | iex`).
+
+### Added
+- **One-line installer**, served from `getairwave.tv/install.sh` (POSIX) and `/install.ps1` (Windows). It
+  checks Docker, asks a short set of questions with sensible defaults (auto-detecting your LAN IP), generates
+  the Postgres password, the auth secret, and a stable Plex client id, writes `docker-compose.yml` + a
+  fully-documented `.env`, and brings the stack up. Latest image by default; pin with `--version`. Pretty
+  prompts via `gum` when available (auto-downloaded and checksum-verified on Linux/macOS/WSL, plain fallback).
+- An action menu (Install/update, Uninstall, Quit) when run with no arguments, plus `--dry-run` (preview only),
+  `--advanced` (bind host paths for Postgres / bumper music, toggle the AI engine or the browser TV player,
+  set extra CORS origins), and `--uninstall [--purge]`.
+- Batteries-included defaults: the AI lineup workflow engine and the browser TV player are on.
+- Re-running updates in place (keeps your secrets); a stable per-user install dir (`~/airwave`); and a shared
+  `airwave_meta` record so a run from any shell (PowerShell / WSL / Git Bash) finds the real install and offers
+  to update it (handing off into WSL when needed) instead of starting a duplicate on the same Docker engine.
+- Robust data handling: reuse an existing database (verifying the password, or offer to reset it), and clean up
+  root-owned bind-mounted data on `--purge`. A build-commit stamp in each served file so you can verify what
+  the CDN is serving.
+
+### Changed
+- `docker-compose.yml`: the Postgres data volume and `PGDATA` are now parameterizable
+  (`POSTGRES_DATA_VOLUME`), backward-compatibly, so a host-path bind is configured entirely in `.env`.
+- `scripts/bump-version.ts` keeps the installer scripts' version in lockstep with the apps; the getairwave.tv
+  build now also runs when the installer scripts or the compose file change.
+
 ## [0.14.13] - 2026-09-17
 
 TV web player — browser-mode mouse scrubbing: click and drag the DVR scrubber to seek.

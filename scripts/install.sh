@@ -21,6 +21,7 @@
 set -eu
 
 # ---- Constants -------------------------------------------------------------
+INSTALLER_VERSION="0.14.14"   # kept in lockstep with the app version by scripts/bump-version.ts
 IMAGE_REPO="ghcr.io/quixomatic/airwave"
 COMPOSE_URL="${AIRWAVE_COMPOSE_URL:-https://www.getairwave.tv/docker-compose.yml}"
 MARKER=".airwave-install"
@@ -364,7 +365,7 @@ meta_path_here() {  # print the recorded install path reachable from THIS shell 
 
 # ============================================================================
 setup_gum || true
-banner "Airwave ${MODE}$( dryrun && printf ' (dry run)' )"
+banner "Airwave ${MODE} v${INSTALLER_VERSION}$( dryrun && printf ' (dry run)' )"
 
 # ---- preflight -------------------------------------------------------------
 if have docker; then

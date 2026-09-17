@@ -27,6 +27,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$InstallerVersion = "0.14.14"   # kept in lockstep with the app version by scripts/bump-version.ts
 $ImageRepo   = "ghcr.io/quixomatic/airwave"
 $ComposeUrl  = if ($env:AIRWAVE_COMPOSE_URL) { $env:AIRWAVE_COMPOSE_URL } else { "https://www.getairwave.tv/docker-compose.yml" }
 $Marker      = ".airwave-install"
@@ -157,7 +158,7 @@ $CgImage = "${ImageRepo}:${Version}"
 
 $mode = if ($Uninstall) { "uninstall" } else { "install" }
 $modeExplicit = $Uninstall.IsPresent
-Info ("=== Airwave {0}{1} ===" -f $mode, $(if ($DryRun) { " (dry run)" } else { "" }))
+Info ("=== Airwave {0} v{1}{2} ===" -f $mode, $InstallerVersion, $(if ($DryRun) { " (dry run)" } else { "" }))
 
 # ---- preflight -------------------------------------------------------------
 $dockerOk = $false
