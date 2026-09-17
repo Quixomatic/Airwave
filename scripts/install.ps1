@@ -119,6 +119,32 @@ function Set-EnvVar($path, $key, $val) {
   Set-Content -Path $path -Value $out -Encoding UTF8
 }
 
+# ── Install-location metadata (cross-environment recenter) ──────────────────
+# Record WHERE the stack physically lives, in every form the other shells can reach, as labels on a tiny
+# `airwave_meta` volume on the shared Docker engine, so a later run from WSL/Git Bash finds the real install.
+function Get-MetaPaths($dir) {
+  $m = @{ windows = $dir; wsl = ""; gitbash = ""; unix = "" }
+  if ($dir -match '^([A-Za-z]):\\(.*)$') {
+    $drive = $Matches[1].ToLower(); $rest = ($Matches[2] -replace '\\', '/')
+    $m.wsl = "/mnt/$drive/$rest"
+    $m.gitbash = "/$drive/$rest"
+  }
+  return $m
+}
+function Write-Meta($dir) {
+  $m = Get-MetaPaths $dir
+  docker volume rm airwave_meta *> $null
+  docker volume create airwave_meta `
+    --label "airwave.origin=windows" `
+    --label "airwave.path.windows=$($m.windows)" `
+    --label "airwave.path.wsl=$($m.wsl)" `
+    --label "airwave.path.gitbash=$($m.gitbash)" `
+    --label "airwave.path.unix=$($m.unix)" *> $null
+}
+function Get-MetaPathHere {
+  return (docker volume inspect airwave_meta --format '{{index .Labels "airwave.path.windows"}}' 2>$null)
+}
+
 # ---- version -> image tag --------------------------------------------------
 $Version = $Version -replace '^v', ''
 if ([string]::IsNullOrWhiteSpace($Version)) { $Version = "latest" }
@@ -161,7 +187,7 @@ if ($mode -eq "uninstall") {
 
   $removeData = $Purge -or (Confirm "Also DELETE all data (the Postgres database + bumper music)? This cannot be undone")
   if ($removeData) {
-    if ($DryRun) { Plan "run: docker compose down -v" } else { docker compose down -v; Ok "Deleted the data volumes." }
+    if ($DryRun) { Plan "run: docker compose down -v" } else { docker compose down -v; docker volume rm airwave_meta *> $null; Ok "Deleted the data volumes." }
     $removeDir = $Purge -or (Confirm "Delete the install directory $dirAbs (.env, docker-compose.yml)?")
     if ($removeDir) {
       if ($DryRun) { Plan "delete $dirAbs" } else { Pop-Location; Remove-Item -Recurse -Force $dirAbs; Ok "Deleted $dirAbs." }
@@ -187,11 +213,22 @@ $envPath = Join-Path $Dir ".env"
 # stack already exists from a DIFFERENT directory (e.g. installed via WSL, now running from Windows), a second
 # install here collides on the same containers, volumes, and ports.
 if (-not $existing -and -not $DryRun) {
-  $other = (docker ps -a --filter "label=com.docker.compose.project=airwave" --format '{{.Label "com.docker.compose.project.working_dir"}}' 2>$null | Select-Object -First 1)
-  if ($other -and $other -ne $dirAbs) {
-    Warn "An Airwave stack already exists (installed at $other), sharing this Docker engine."
-    Warn "A second copy here would clash on the same containers, volumes, and ports."
-    if (-not (Confirm "Continue anyway?")) { Die "Cancelled. Manage the existing install at $other, or uninstall it first." }
+  $mp = Get-MetaPathHere
+  if ($mp -and $mp -ne $dirAbs -and (Test-Path (Join-Path $mp ".env"))) {
+    Info "Airwave is already installed at:"
+    Write-Host "  $mp"
+    $pick = Choose "What do you want to do?" @("Update that install", "Install a separate copy here ($dirAbs)", "Quit")
+    switch -Wildcard ($pick) {
+      "Update*" { $Dir = $mp; $dirAbs = (Resolve-Path $mp).Path; $envPath = Join-Path $Dir ".env"; $existing = $true; Ok "Recentered on $dirAbs." }
+      "Quit"    { Die "Cancelled." }
+    }
+  } else {
+    $other = (docker ps -a --filter "label=com.docker.compose.project=airwave" --format '{{.Label "com.docker.compose.project.working_dir"}}' 2>$null | Select-Object -First 1)
+    if ($other -and $other -ne $dirAbs) {
+      Warn "An Airwave stack already exists (installed at $other), sharing this Docker engine."
+      Warn "A second copy here would clash on the same containers, volumes, and ports."
+      if (-not (Confirm "Continue anyway?")) { Die "Cancelled. Manage the existing install at $other, or uninstall it first." }
+    }
   }
 }
 
@@ -370,6 +407,7 @@ if ($DryRun) {
   docker compose up -d; if ($LASTEXITCODE -ne 0) { Pop-Location; Die "docker compose up failed." }
   Pop-Location
   Set-Content -Path (Join-Path $Dir $Marker) -Value (Get-Date -Format o) -Encoding UTF8
+  Write-Meta $dirAbs
 }
 
 # ---- wait for health -------------------------------------------------------

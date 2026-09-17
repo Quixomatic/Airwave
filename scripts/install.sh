@@ -304,6 +304,64 @@ set_env() { # update-or-append KEY=VALUE in ./.env (no sed; values may hold / : 
   fi
 }
 
+# ── Install-location metadata (cross-environment recenter) ──────────────────
+# Docker Desktop shares ONE engine across Windows/WSL/Git Bash. We record WHERE the stack physically lives —
+# in every form the other shells can reach — as labels on a tiny `airwave_meta` volume, so any later run finds
+# and updates the real install instead of making a parallel one. Forms are computed at install time (where we
+# know the source env + WSL distro), so reading later is just "pick the label for the current shell".
+env_kind() {
+  case "$(uname -s 2>/dev/null)" in
+    Linux) grep -qi microsoft /proc/version 2>/dev/null && echo wsl || echo linux ;;
+    Darwin) echo macos ;;
+    MINGW*|MSYS*|CYGWIN*) echo gitbash ;;
+    *) echo other ;;
+  esac
+}
+# compute_meta_paths <abs-dir> -> sets M_WIN / M_WSL / M_GIT / M_UNIX (blank when N/A for this install)
+compute_meta_paths() {
+  _d=$1; M_WIN=''; M_WSL=''; M_GIT=''; M_UNIX=''
+  case "$(env_kind)" in
+    linux|macos) M_UNIX=$_d ;;
+    wsl)
+      case "$_d" in
+        /mnt/[A-Za-z]/*)  # on a Windows drive → reachable from all three
+          _dl=$(printf %s "$_d" | cut -c6); _rest=$(printf %s "$_d" | cut -c8-)
+          M_WSL=$_d; M_GIT="/$(printf %s "$_dl" | tr 'A-Z' 'a-z')/$_rest"
+          M_WIN="$(printf %s "$_dl" | tr 'a-z' 'A-Z'):\\$(printf %s "$_rest" | sed 's#/#\\#g')" ;;
+        *)  # WSL-internal → Windows/Git Bash reach it via \\wsl$\<distro>
+          M_WSL=$_d
+          if [ -n "${WSL_DISTRO_NAME:-}" ]; then
+            M_WIN="\\\\wsl\$\\${WSL_DISTRO_NAME}$(printf %s "$_d" | sed 's#/#\\#g')"
+            M_GIT="//wsl\$/${WSL_DISTRO_NAME}${_d}"
+          fi ;;
+      esac ;;
+    gitbash)
+      case "$_d" in
+        /[A-Za-z]/*)
+          _dl=$(printf %s "$_d" | cut -c2); _rest=$(printf %s "$_d" | cut -c4-)
+          M_GIT=$_d; M_WSL="/mnt/$(printf %s "$_dl" | tr 'A-Z' 'a-z')/$_rest"
+          M_WIN="$(printf %s "$_dl" | tr 'a-z' 'A-Z'):\\$(printf %s "$_rest" | sed 's#/#\\#g')" ;;
+        *) M_GIT=$_d ;;
+      esac ;;
+  esac
+}
+write_meta() {  # record the current install location on the shared engine (idempotent: rm + recreate)
+  compute_meta_paths "$DIR_ABS"
+  docker volume rm airwave_meta >/dev/null 2>&1 || true
+  docker volume create airwave_meta \
+    --label "airwave.origin=$(env_kind)" \
+    --label "airwave.path.windows=${M_WIN}" \
+    --label "airwave.path.wsl=${M_WSL}" \
+    --label "airwave.path.gitbash=${M_GIT}" \
+    --label "airwave.path.unix=${M_UNIX}" >/dev/null 2>&1 || true
+}
+meta_path_here() {  # print the recorded install path reachable from THIS shell (blank if none/unreachable)
+  case "$(env_kind)" in
+    windows) _k=windows ;; wsl) _k=wsl ;; gitbash) _k=gitbash ;; *) _k=unix ;;
+  esac
+  docker volume inspect airwave_meta --format "{{index .Labels \"airwave.path.${_k}\"}}" 2>/dev/null || true
+}
+
 # ============================================================================
 setup_gum || true
 banner "Airwave ${MODE}$( dryrun && printf ' (dry run)' )"
@@ -356,6 +414,7 @@ if [ "$MODE" = uninstall ]; then
 
   if [ "$REMOVE_DATA" = 1 ]; then
     run "Deleting data volumes" $DCOMPOSE down -v || warn "couldn't remove the data volumes."
+    dryrun || docker volume rm airwave_meta >/dev/null 2>&1 || true
     dryrun || ok "Deleted the data volumes."
     REMOVE_DIR=0
     if [ "$PURGE" = 1 ]; then REMOVE_DIR=1
@@ -384,17 +443,27 @@ else
   DIR_ABS=$(pwd)
 fi
 
-# ---- cross-environment guard -----------------------------------------------
-# Docker Desktop shares ONE engine across Windows/WSL, and the compose project name is fixed 'airwave'. If a
-# stack is already running from a DIFFERENT directory (e.g. installed via WSL, now running from Windows or a
-# different path), a second install here collides on the same containers, volumes, and ports.
+# ---- recenter onto an existing install (cross-environment) ------------------
+# Docker Desktop shares one engine across Windows/WSL/Git Bash and the compose project is fixed 'airwave', so a
+# second install from a different dir collides. Prefer the recorded install location (airwave_meta, translated
+# to a path THIS shell can reach); fall back to the running stack's working-dir label for pre-meta installs.
 if [ "$EXISTING" = 0 ] && ! dryrun; then
-  _other=$(docker ps -a --filter "label=com.docker.compose.project=airwave" \
-    --format '{{.Label "com.docker.compose.project.working_dir"}}' 2>/dev/null | head -n1)
-  if [ -n "$_other" ] && [ "$_other" != "$DIR_ABS" ]; then
-    warn "An Airwave stack already exists (installed at ${_other}), sharing this Docker engine."
-    warn "A second copy here would clash on the same containers, volumes, and ports."
-    confirm "Continue anyway?" || die "Cancelled. Manage the existing install at ${_other}, or uninstall it first."
+  _mp=$(meta_path_here)
+  if [ -n "$_mp" ] && [ "$_mp" != "$DIR_ABS" ] && [ -f "${_mp}/.env" ]; then
+    section "Airwave is already installed at:"
+    say "  ${BOLD}${_mp}${RST}"
+    case "$(choose "What do you want to do?" "Update that install" "Install a separate copy here (${DIR_ABS})" "Quit")" in
+      Update*) DIR=$_mp; cd "$DIR" || die "can't enter $DIR"; DIR_ABS=$(pwd); EXISTING=1; ok "Recentered on ${DIR_ABS}." ;;
+      Quit|"") die "Cancelled." ;;
+    esac
+  else
+    _other=$(docker ps -a --filter "label=com.docker.compose.project=airwave" \
+      --format '{{.Label "com.docker.compose.project.working_dir"}}' 2>/dev/null | head -n1)
+    if [ -n "$_other" ] && [ "$_other" != "$DIR_ABS" ]; then
+      warn "An Airwave stack already exists (installed at ${_other}), sharing this Docker engine."
+      warn "A second copy here would clash on the same containers, volumes, and ports."
+      confirm "Continue anyway?" || die "Cancelled. Manage the existing install at ${_other}, or uninstall it first."
+    fi
   fi
 fi
 
@@ -631,7 +700,7 @@ fi
 # ---- pull + up -------------------------------------------------------------
 run "Pulling images (${CG_IMAGE})" $DCOMPOSE pull || die "docker compose pull failed. Does the tag '${VERSION}' exist? Your running stack is untouched."
 run "Starting Airwave" $DCOMPOSE up -d || die "docker compose up failed."
-if ! dryrun; then date -u +%Y-%m-%dT%H:%M:%SZ > "$MARKER"; fi
+if ! dryrun; then date -u +%Y-%m-%dT%H:%M:%SZ > "$MARKER"; write_meta; fi
 
 # ---- wait for health -------------------------------------------------------
 if dryrun; then
