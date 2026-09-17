@@ -35,6 +35,7 @@ VERSION="${AIRWAVE_VERSION:-latest}"
 DIR="${AIRWAVE_DIR:-${HOME:-.}/airwave}"
 MODE=install
 MODE_EXPLICIT=0
+DIR_EXPLICIT=0
 PURGE=0
 ADVANCED="${AIRWAVE_ADVANCED:-0}"
 DRY_RUN="${AIRWAVE_DRY_RUN:-0}"
@@ -76,8 +77,8 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --version) VERSION=${2:-}; shift 2 ;;
     --version=*) VERSION=${1#*=}; shift ;;
-    --dir) DIR=${2:-}; shift 2 ;;
-    --dir=*) DIR=${1#*=}; shift ;;
+    --dir) DIR=${2:-}; DIR_EXPLICIT=1; shift 2 ;;
+    --dir=*) DIR=${1#*=}; DIR_EXPLICIT=1; shift ;;
     --install) MODE=install; MODE_EXPLICIT=1; shift ;;
     --uninstall|--remove) MODE=uninstall; MODE_EXPLICIT=1; shift ;;
     --purge) PURGE=1; shift ;;
@@ -401,6 +402,11 @@ fi
 
 # ---- uninstall -------------------------------------------------------------
 if [ "$MODE" = uninstall ]; then
+  # Recenter onto the recorded install (unless --dir was given) so we remove the REAL one, not a stale dir.
+  if [ "$DIR_EXPLICIT" = 0 ]; then
+    _mp=$(meta_path_here)
+    [ -n "$_mp" ] && [ -d "$_mp" ] && DIR=$_mp
+  fi
   [ -d "$DIR" ] || die "no Airwave install directory at $DIR (use --dir to point at it)."
   cd "$DIR" || die "can't enter $DIR"
   DIR_ABS=$(pwd)

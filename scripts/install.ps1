@@ -184,6 +184,23 @@ if (-not $modeExplicit -and -not $NonInteractive) {
 
 # ---- uninstall -------------------------------------------------------------
 if ($mode -eq "uninstall") {
+  # Recenter onto the recorded install (unless -Dir / AIRWAVE_DIR was given) so we remove the REAL one.
+  if (-not $PSBoundParameters.ContainsKey('Dir') -and -not $env:AIRWAVE_DIR) {
+    $meta = Get-Meta
+    $mp = if ($meta) { [string]$meta.'airwave.path.windows' } else { "" }
+    if ($mp -like '\\wsl*') {
+      $wslPath = [string]$meta.'airwave.path.wsl'
+      $distro = if ($mp -match '^\\\\wsl[^\\]+\\([^\\]+)\\') { $Matches[1] } else { 'Ubuntu' }
+      Info "Airwave is installed inside WSL ($distro) at $wslPath."
+      $doPurge = $Purge -or (Confirm "Also DELETE all data (the Postgres database + bumper music)? This cannot be undone")
+      $purgeArg = if ($doPurge) { "--purge" } else { "" }
+      Info "Handing off to uninstall inside WSL ($distro)..."
+      wsl.exe -d $distro bash -lc "curl -fsSL https://www.getairwave.tv/install.sh | sh -s -- --uninstall --dir '$wslPath' $purgeArg --yes"
+      exit $LASTEXITCODE
+    } elseif ($mp -and (Test-Path $mp)) {
+      $Dir = $mp
+    }
+  }
   if (-not (Test-Path $Dir)) { Die "no Airwave install directory at $Dir (use -Dir to point at it)." }
   Push-Location $Dir
   $dirAbs = (Get-Location).Path
