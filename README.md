@@ -234,12 +234,12 @@ auto-detecting your LAN IP), writes the stack, and brings it up.
 
 **Linux, macOS, or Windows via WSL / Git Bash** (any POSIX shell):
 ```bash
-curl -fsSL https://getairwave.tv/install.sh | sh
+curl -fsSL https://www.getairwave.tv/install.sh | sh
 ```
 
 **Windows native** (Docker Desktop, in PowerShell):
 ```powershell
-irm https://getairwave.tv/install.ps1 | iex
+irm https://www.getairwave.tv/install.ps1 | iex
 ```
 
 Both take the same options: **pin a version** (`--version 0.14.13`), **preview** with `--dry-run` (writes and
@@ -248,7 +248,7 @@ also delete data). Prefer to wire it up by hand? The manual compose steps below 
 
 > On native Windows the PowerShell script detects your LAN IP most reliably; under WSL the `curl | sh` line
 > works just as well. The scripts are small and auditable — read them first if you like:
-> <https://getairwave.tv/install.sh> · <https://getairwave.tv/install.ps1>
+> <https://www.getairwave.tv/install.sh> · <https://www.getairwave.tv/install.ps1>
 
 ### Docker quick start (Dockge or `docker compose`)
 

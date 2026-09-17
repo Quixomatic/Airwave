@@ -3,9 +3,9 @@
   Airwave one-line installer (Docker path) for Windows.
 
 .EXAMPLE
-  irm https://getairwave.tv/install.ps1 | iex
+  irm https://www.getairwave.tv/install.ps1 | iex
   # with options, download then run:
-  #   iwr https://getairwave.tv/install.ps1 -OutFile install.ps1; ./install.ps1 -Version 0.14.13
+  #   iwr https://www.getairwave.tv/install.ps1 -OutFile install.ps1; ./install.ps1 -Version 0.14.13
   #   ./install.ps1 -DryRun
   #   ./install.ps1 -Uninstall            (add -Purge to also delete data + dir)
 
@@ -27,7 +27,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ImageRepo   = "ghcr.io/quixomatic/airwave"
-$ComposeUrl  = if ($env:AIRWAVE_COMPOSE_URL) { $env:AIRWAVE_COMPOSE_URL } else { "https://getairwave.tv/docker-compose.yml" }
+$ComposeUrl  = if ($env:AIRWAVE_COMPOSE_URL) { $env:AIRWAVE_COMPOSE_URL } else { "https://www.getairwave.tv/docker-compose.yml" }
 $Marker      = ".airwave-install"
 $NonInteractive = $Yes -or ($env:AIRWAVE_NONINTERACTIVE -eq "1")
 

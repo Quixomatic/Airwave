@@ -2,11 +2,11 @@
 # ============================================================================
 #  Airwave one-line installer (Docker path)
 #
-#    curl -fsSL https://getairwave.tv/install.sh | sh
-#    curl -fsSL https://getairwave.tv/install.sh | sh -s -- --version 0.14.13
-#    curl -fsSL https://getairwave.tv/install.sh | AIRWAVE_VERSION=0.14.13 sh
-#    curl -fsSL https://getairwave.tv/install.sh | sh -s -- --dry-run
-#    curl -fsSL https://getairwave.tv/install.sh | sh -s -- --uninstall
+#    curl -fsSL https://www.getairwave.tv/install.sh | sh
+#    curl -fsSL https://www.getairwave.tv/install.sh | sh -s -- --version 0.14.13
+#    curl -fsSL https://www.getairwave.tv/install.sh | AIRWAVE_VERSION=0.14.13 sh
+#    curl -fsSL https://www.getairwave.tv/install.sh | sh -s -- --dry-run
+#    curl -fsSL https://www.getairwave.tv/install.sh | sh -s -- --uninstall
 #
 #  Installs (or updates) a self-hosted Airwave server with docker compose: checks
 #  Docker, writes docker-compose.yml + .env into a target dir, and brings the
@@ -22,7 +22,7 @@ set -eu
 
 # ---- Constants -------------------------------------------------------------
 IMAGE_REPO="ghcr.io/quixomatic/airwave"
-COMPOSE_URL="${AIRWAVE_COMPOSE_URL:-https://getairwave.tv/docker-compose.yml}"
+COMPOSE_URL="${AIRWAVE_COMPOSE_URL:-https://www.getairwave.tv/docker-compose.yml}"
 MARKER=".airwave-install"
 GUM_VERSION="2.0.1"
 TTY=/dev/tty
@@ -412,6 +412,6 @@ if [ "$GEN_PW" = 1 ]; then
 fi
 say ""
 say "Update later:  ${DIM}cd ${DIR_ABS} && docker compose pull && docker compose up -d${RST}"
-say "         or:   ${DIM}curl -fsSL https://getairwave.tv/install.sh | sh${RST}  (add --version X.Y.Z to pin)"
-say "Uninstall:     ${DIM}curl -fsSL https://getairwave.tv/install.sh | sh -s -- --uninstall${RST}"
+say "         or:   ${DIM}curl -fsSL https://www.getairwave.tv/install.sh | sh${RST}  (add --version X.Y.Z to pin)"
+say "Uninstall:     ${DIM}curl -fsSL https://www.getairwave.tv/install.sh | sh -s -- --uninstall${RST}"
 say "Open the TV app and point it at ${SERVER_PUBLIC_URL} to watch."
