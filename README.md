@@ -227,6 +227,22 @@ Two ways to run the Airwave **server** (they host the exact same thing, pick whi
 > Not to be confused with the desktop **client** (`tv-tauri`) in the platform table above: that's a
 > *viewer* app you install to watch. Airwave Desktop here is the *server*.
 
+### Quickest: the one-line installer
+
+On a Linux/macOS host with Docker, this checks Docker, asks a few questions (with sensible defaults), writes
+the stack, and brings it up:
+
+```bash
+curl -fsSL https://getairwave.tv/install.sh | sh
+```
+
+Pin a version with `... | sh -s -- --version 0.14.13`, preview without changing anything with `--dry-run`, and
+remove it later with `--uninstall` (add `--purge` to also delete data). Re-running is how you update. Windows
+(Docker Desktop): `irm https://getairwave.tv/install.ps1 | iex`. Prefer to wire it up by hand? The manual
+compose steps below do the same thing.
+
+> The script is small and auditable. Read it first if you like: <https://getairwave.tv/install.sh>.
+
 ### Docker quick start (Dockge or `docker compose`)
 
 1. **Grab the stack files**: [`docker-compose.yml`](./docker-compose.yml) and [`.env.example`](./.env.example).

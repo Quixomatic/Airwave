@@ -8,6 +8,11 @@
 # generated from the root CHANGELOG.md by scripts/gen-changelog-doc.mjs (see next.config.mjs)
 /content/docs/changelog.mdx
 
+# installer assets copied from the repo root by scripts/sync-install-assets.mjs (see next.config.mjs)
+/public/install.sh
+/public/install.ps1
+/public/docker-compose.yml
+
 # production
 /build
 
