@@ -5,6 +5,7 @@ import { Heart, Star } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { GuideGridChannel, GuideGridProgram } from "../../lib/api";
+import { IS_BROWSER } from "../../lib/browser-mode";
 import { LAYER, useKeyLayer } from "../../lib/input";
 import { C } from "../../lib/theme";
 import { channelTint } from "../../lib/tint";
@@ -526,6 +527,11 @@ export function AuroraGrid({
         sel={sidebarSel}
         lens={lens}
         onActivate={activateSidebar}
+        // Browser: hovering the sidebar drives the SAME zone/selection the D-pad uses — so it expands,
+        // highlights the hovered item, shows the scrim, and clicks activate, all through the keyboard paths.
+        onHoverEnter={IS_BROWSER ? () => setZone("sidebar") : undefined}
+        onHoverLeave={IS_BROWSER ? () => setZone("grid") : undefined}
+        onHoverItem={IS_BROWSER ? (i) => setSidebarSel(i) : undefined}
       />
       {/* Reserves the sliver's space, since the sidebar itself is out of flow. */}
       <div style={{ width: SIDEBAR_SLIVER_W, flexShrink: 0 }} />

@@ -2,8 +2,9 @@ import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/
 import { ArrowLeft, Cpu, Info, Server, SlidersHorizontal, UserRound } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { SettingsSidebar, SETTINGS_SLIVER_W } from "../../../features/settings/settings-sidebar";
+import { SettingsSidebar, SETTINGS_SLIVER_W, SETTINGS_EXPANDED_W } from "../../../features/settings/settings-sidebar";
 import { SettingsCtx } from "../../../features/settings/settings-ui";
+import { IS_BROWSER } from "../../../lib/browser-mode";
 import { LAYER, useKeyLayer } from "../../../lib/input";
 
 /**
@@ -44,6 +45,8 @@ function SettingsShell() {
   // opens the rail.
   const [zone, setZone] = useState<"rail" | "content">("content");
   const [sel, setSel] = useState(() => Math.max(1, NAV.findIndex((n) => n.key === activeKey)));
+  // Browser: the rail is pinned open by default, with a toggle to collapse it to the sliver.
+  const [collapsed, setCollapsed] = useState(false);
 
   // Keep the rail highlight on the current route if it changes from elsewhere.
   useEffect(() => {
@@ -97,8 +100,9 @@ function SettingsShell() {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "#060a14", color: "#f1f5f9", overflow: "hidden" }}>
-      {/* Scrim behind the expanded rail (no blur — perf), so the content reads as "behind". */}
-      {expanded && <div style={{ position: "absolute", inset: 0, background: "rgba(6,10,20,0.5)", zIndex: 24 }} />}
+      {/* Scrim behind the expanded rail (no blur — perf), so the content reads as "behind". Not in
+          browser mode: there the pinned rail sits in the layout (content is pushed over), not overlaid. */}
+      {!IS_BROWSER && expanded && <div style={{ position: "absolute", inset: 0, background: "rgba(6,10,20,0.5)", zIndex: 24 }} />}
 
       <SettingsSidebar
         items={NAV.map((n) => ({ key: n.key, label: n.label, icon: n.icon }))}
@@ -107,9 +111,21 @@ function SettingsShell() {
         sel={sel}
         activeKey={activeKey}
         onActivate={activate}
+        collapsed={collapsed}
+        onToggleCollapse={IS_BROWSER ? () => setCollapsed((c) => !c) : undefined}
       />
 
-      <div style={{ marginLeft: SETTINGS_SLIVER_W, height: "100%", overflowY: "auto" }}>
+      {/* Browser pins the rail open, so the content reserves the full (or collapsed) rail width instead of
+          just the sliver, so the pinned rail never overlays it. TV always reserves the sliver (overlay). */}
+      <div
+        style={{
+          marginLeft: IS_BROWSER ? (collapsed ? SETTINGS_SLIVER_W : SETTINGS_EXPANDED_W) : SETTINGS_SLIVER_W,
+          // Ease the content edge roughly in step with the rail's spring so it doesn't snap on toggle.
+          transition: "margin-left 0.3s cubic-bezier(0.2, 0, 0, 1)",
+          height: "100%",
+          overflowY: "auto",
+        }}
+      >
         {/* Inset the content: a centered, max-width column so it doesn't hug the sidebar on a wide panel. */}
         <div style={{ maxWidth: 1024, margin: "0 auto", padding: "56px 64px" }}>
           <SettingsCtx.Provider value={{ active: zone === "content", returnToRail }}>

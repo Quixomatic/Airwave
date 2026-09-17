@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.10] - 2026-09-17
+
+TV web player — browser-mode sidebars: mouse hover on the guide rail, a pinned/collapsible settings rail.
+
+### Added
+- Browser mode: the guide's left sidebar expands and highlights on **mouse hover** (and collapses on leave),
+  driving the same selection / scrim / activate paths as the D-pad — click an item to apply a lens. The
+  sidebar's layout is unchanged (still the edge rail, not inset).
+- Browser mode: the settings sidebar is **pinned open** with a bottom **Collapse/Expand** toggle (folds to
+  the icon sliver), hover-highlights its rows, and the content reserves the rail's width so it's never
+  overlaid.
+
+### Notes
+- A real TV build is unchanged — both are gated on the browser flag, and D-pad navigation is untouched.
+
 ## [0.14.9] - 2026-09-17
 
 ### Fixed

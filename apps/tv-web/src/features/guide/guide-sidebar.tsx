@@ -121,6 +121,9 @@ export function GuideSidebar({
   sel,
   lens,
   onActivate,
+  onHoverEnter,
+  onHoverLeave,
+  onHoverItem,
 }: {
   items: SidebarItem[];
   expanded: boolean;
@@ -128,6 +131,12 @@ export function GuideSidebar({
   sel: number;
   lens: Lens;
   onActivate: (index: number) => void;
+  /** Browser mouse hover (undefined on TV): entering/leaving the sidebar expands/collapses it, and
+   *  hovering an item focuses it — all by driving the grid's zone/selection, so the highlight, scrim,
+   *  and click-to-activate reuse the exact keyboard paths. */
+  onHoverEnter?: () => void;
+  onHoverLeave?: () => void;
+  onHoverItem?: (index: number) => void;
 }) {
   const actions = items.filter((i) => i.group === "action");
   const filters = items.filter((i) => i.group === "filter");
@@ -151,6 +160,8 @@ export function GuideSidebar({
         boxShadow: expanded ? "24px 0px 60px rgba(0,0,0,0.5)" : "24px 0px 60px rgba(0,0,0,0)",
       }}
       transition={{ type: "spring", stiffness: 320, damping: 34 }}
+      onMouseEnter={onHoverEnter}
+      onMouseLeave={onHoverLeave}
       style={{
         // An OVERLAY: pinned to the left edge, out of flow, growing over the guide. The layout
         // reserves only SIDEBAR_SLIVER_W, so nothing shifts or reflows when this expands.
@@ -170,7 +181,12 @@ export function GuideSidebar({
       }}
     >
       {actions.map((it, i) => (
-        <div key={it.key} ref={(el) => void (itemRefs.current[i] = el)} style={{ flexShrink: 0 }}>
+        <div
+          key={it.key}
+          ref={(el) => void (itemRefs.current[i] = el)}
+          onMouseEnter={onHoverItem ? () => onHoverItem(i) : undefined}
+          style={{ flexShrink: 0 }}
+        >
           <GlassCircleButton
             icon={it.icon}
             label={it.label}
@@ -214,6 +230,7 @@ export function GuideSidebar({
               <motion.div
                 key={it.key}
                 ref={(el) => void (itemRefs.current[idx] = el)}
+                onMouseEnter={onHoverItem ? () => onHoverItem(idx) : undefined}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.03 * i, duration: 0.18 }}
