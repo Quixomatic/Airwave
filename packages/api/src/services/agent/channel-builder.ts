@@ -52,8 +52,12 @@ export type ChannelBuildResult = {
   key: string;
   name: string;
   number: number;
-  /** `cancelled` = the run was stopped and this build's in-flight loop was aborted (#28) — not a failure. */
-  status: "created" | "skipped" | "failed" | "cancelled";
+  /**
+   * `cancelled` = the run was stopped and this build's in-flight loop was aborted (#28) — not a failure.
+   * `skipped-over` = the workflow deliberately never processed this channel (a non-target channel in a
+   * rebuild, #23) — intentionally left alone, not a warning.
+   */
+  status: "created" | "skipped" | "failed" | "cancelled" | "skipped-over";
   channelId?: string;
   poolSize?: number;
   reason?: string;

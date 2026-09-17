@@ -26,6 +26,7 @@ import { FatalError, getStepMetadata, getWorkflowMetadata } from "workflow";
 import { hydrateResourceIO, observabilityRevivers } from "workflow/observability";
 import { getWorld } from "workflow/runtime";
 
+import { channelAccentAt } from "@airwave/api/services/accents";
 import type { ChannelBuildResult } from "@airwave/api/services/agent/channel-builder";
 import { buildPlannedChannel } from "@airwave/api/services/agent/channel-builder";
 import type { LibraryProfile } from "@airwave/api/services/agent/library-profile";
@@ -214,17 +215,30 @@ async function loadSeed(seed: LineupSeed): Promise<ResolvedSeed> {
   const steps = rows.map(hydrate);
   const nameOf = (s: Loose) => String(pick(s, "stepName", "step_name") ?? "");
 
+  // The draft comes from planLineup (a normal / dry run). A SEEDED source run (apply / rebuild) has no
+  // planLineup step — it ran its OWN loadSeed step whose output carries the draft, so chain through that.
+  // This is what lets you rebuild a channel off an applied run.
   const planStep = steps.find((s) => nameOf(s).includes("planLineup"));
-  const draft = (planStep ? pick(planStep, "output") : undefined) as LineupPlanDraft | undefined;
+  let draft = (planStep ? pick(planStep, "output") : undefined) as LineupPlanDraft | undefined;
+  if (!draft?.packages?.length) {
+    const seedStep = steps.find((s) => nameOf(s).includes("loadSeed"));
+    draft = (seedStep ? (pick(seedStep, "output") as { draft?: LineupPlanDraft } | undefined)?.draft : undefined) as
+      | LineupPlanDraft
+      | undefined;
+  }
   if (!draft?.packages?.length) {
     // Deterministic: a run with no plan draft can never be seeded from. Fail terminally, don't retry.
     throw new FatalError(`Seed run ${seed.fromRunId} has no plan draft to build from.`);
   }
 
+  // Match every kind of per-channel build step so a seeded source run works too: buildChannel (normal/dry),
+  // materializeChannel (an apply run), and rebuildChannel (a rebuild run). All take (channel, packageId, …).
+  const isBuildStep = (name: string) =>
+    name.includes("buildChannel") || name.includes("materializeChannel") || name.includes("rebuildChannel");
   const outcomes: Record<string, SeedOutcome> = {};
   const sourceChannels: Record<string, { number?: number; packageId?: string }> = {};
   for (const s of steps) {
-    if (!nameOf(s).includes("buildChannel")) continue;
+    if (!isBuildStep(nameOf(s))) continue;
     const input = pick(s, "input");
     const tuple = ((Array.isArray(input) ? input : (input as { args?: unknown[] } | undefined)?.args) ?? []) as unknown[];
     const channel = tuple[0] as { key?: string; number?: number } | undefined;
@@ -296,11 +310,7 @@ export async function aiLineupWorkflow(args: LineupRunArgs): Promise<LineupRepor
   // Seed (Workstreams C+D): reuse a previous run's data instead of planning fresh.
   const seed = args.seed ? await loadSeed(args.seed) : null;
   const apply = seed?.mode === "apply";
-  if (seed?.mode === "rebuild") {
-    // #23 rebuild-single lands in a follow-up. Guard here so a rebuild dispatch can NEVER reach the
-    // destructive wipe below through a half-implemented path.
-    throw new FatalError("rebuild-single (#23) is not yet implemented.");
-  }
+  const rebuild = seed?.mode === "rebuild";
 
   // APPLY skips the AI entirely: the library analysis + shared context exist only to author filters, which
   // apply reuses from the dry run. A normal run does the full analysis before planning.
@@ -313,15 +323,19 @@ export async function aiLineupWorkflow(args: LineupRunArgs): Promise<LineupRepor
   const existingPackages = seed ? [] : await listExistingPackages();
   const draft = seed ? seed.draft : await planLineup(libraryContext, existingPackages, args.plannerMaxOutputTokens);
 
-  // Packages first, so each channel has a real packageId to attach to. This also wipes any previous AI
-  // lineup — destructive, hence the confirmation on the admin action. APPLY wipes + recreates just like a
-  // normal run (it replaces the lineup with what the dry run verified). In a DRY RUN it does NEITHER and
-  // returns placeholder ids so the verify step can still run. See #22 dry-run.
-  const packageIds = await createPackages(draft, dryRun);
-
-  // Numbering runs AFTER the wipe, against real packages — which is exactly why APPLY re-numbers instead of
-  // reusing the dry run's placeholder-based numbers. Its own step, so a resumed run replays it identically.
-  const plan = await assignNumbers(draft, packageIds);
+  // Packages + numbering.
+  //  - normal / apply: create packages (which WIPES the previous AI lineup — apply replaces it with what the
+  //    dry run verified; a dry run does NEITHER and returns placeholder ids) then assign fresh numbers against
+  //    the real packages (why apply re-numbers rather than reusing the dry run's placeholder-based numbers).
+  //  - REBUILD: reuse the source run's existing packages + numbers. NEVER wipes, never renumbers.
+  let plan: LineupPlan;
+  let packageIds: Record<string, string>;
+  if (rebuild && seed) {
+    ({ plan, packageIds } = seededRebuildPlan(draft, seed));
+  } else {
+    packageIds = await createPackages(draft, dryRun);
+    plan = await assignNumbers(draft, packageIds);
+  }
 
   // Flatten so the concurrency cap applies across the WHOLE lineup rather than per
   // package (package sizes vary, so per-package batching would idle).
@@ -339,31 +353,44 @@ export async function aiLineupWorkflow(args: LineupRunArgs): Promise<LineupRepor
     console.log(`[lineup] planned ${allJobs.length} channels; building ${jobs.length} (limit)`);
   }
 
+  // REBUILD only touches the target channels; everything else is left alone and reported "skipped over".
+  const targetKeys = new Set(seed?.channelKeys ?? []);
+  const buildJobs = rebuild ? jobs.filter((job) => targetKeys.has(job.channel.key)) : jobs;
+  const skippedOverChannels = rebuild
+    ? jobs.filter((job) => !targetKeys.has(job.channel.key)).map((job) => job.channel)
+    : [];
+
   // Fan out in bounded waves. Each build is its own durable step, so a crash resumes
   // only the unfinished ones. The cap keeps us under the provider's rate limit — every
   // build is an agent loop with several tool calls of its own.
   const built: ChannelBuildResult[] = [];
   const concurrency = args.concurrency ?? BUILD_CONCURRENCY; // AppSettings.channelBuildConcurrency, else default
-  for (let i = 0; i < jobs.length; i += concurrency) {
-    const wave = jobs.slice(i, i + concurrency);
+  for (let i = 0; i < buildJobs.length; i += concurrency) {
+    const wave = buildJobs.slice(i, i + concurrency);
     const results = await Promise.all(
       wave.map((job) =>
         apply
           ? // APPLY: persist the dry run's verified outcome, no agent loop.
             materializeChannel(job.channel, job.packageId, seed!.outcomes[job.channel.key], args.userId, args.sourceId)
-          : buildChannel(
-              job.channel,
-              job.packageId,
-              args.sourceId,
-              args.userId,
-              libraryContext,
-              args.mode ?? "quality",
-              dryRun,
-            ),
+          : rebuild
+            ? // REBUILD: re-run the agent for this one channel, reusing its package + number.
+              rebuildChannel(job.channel, job.packageId, args.sourceId, args.userId, libraryContext, args.mode ?? "quality")
+            : buildChannel(
+                job.channel,
+                job.packageId,
+                args.sourceId,
+                args.userId,
+                libraryContext,
+                args.mode ?? "quality",
+                dryRun,
+              ),
       ),
     );
     built.push(...results);
   }
+
+  // Record the channels a rebuild left untouched, so they show as "skipped over" rather than vanishing.
+  if (skippedOverChannels.length) built.push(...(await recordSkippedOver(skippedOverChannels)));
 
   return await reportLineup(args.sourceId, plan, built, dryRun);
 }
@@ -398,6 +425,33 @@ function sampleAcrossPackages<T extends { packageId: string }>(jobs: T[], limit:
     if (!placed) break; // every queue exhausted
   }
   return out;
+}
+
+/**
+ * Build a {@link LineupPlan} for a REBUILD (#23) from the source run's stored data — no wipe, no renumber.
+ * Each channel keeps its EXISTING number + package (from `seed.sourceChannels`); the accent here is only a
+ * fallback (`rebuildChannel` preserves the live channel's tint). Pure — safe in the workflow body.
+ */
+function seededRebuildPlan(
+  draft: LineupPlanDraft,
+  seed: ResolvedSeed,
+): { plan: LineupPlan; packageIds: Record<string, string> } {
+  const packageIds: Record<string, string> = {};
+  let idx = 0;
+  const packages = draft.packages.map((pkg) => {
+    // The real packageId is whatever the source run filed this package's channels into.
+    const realId = pkg.channels
+      .map((c) => seed.sourceChannels[c.key]?.packageId)
+      .find((p): p is string => !!p);
+    if (realId) packageIds[pkg.key] = realId;
+    const channels = pkg.channels.map((c) => ({
+      ...c,
+      number: seed.sourceChannels[c.key]?.number ?? 0,
+      accent: channelAccentAt(idx++),
+    }));
+    return { ...pkg, numberBase: 0, channels };
+  });
+  return { plan: { packages }, packageIds };
 }
 
 // ---------------------------------------------------------------------------
@@ -758,6 +812,93 @@ async function materializeChannel(
     output: { status: "created", poolSize: outcome.poolSize, channelId },
   });
   return { ...base, status: "created", channelId, poolSize: outcome.poolSize };
+}
+
+/**
+ * REBUILD (#23) — re-run the AI build for ONE channel from a completed run's stored plan data, reusing its
+ * existing package + number. Frees the existing channel first (so `buildPlannedChannel` can re-reserve the
+ * number), preserving its accent/package, then runs the normal agent build (with cooperative cancel) + the
+ * windowed schedule. NEVER wipes; only touches AI-generated channels.
+ */
+async function rebuildChannel(
+  channel: PlannedChannel,
+  packageId: string,
+  sourceId: string,
+  userId: string,
+  libraryContext: string,
+  mode: "quality" | "fast",
+): Promise<ChannelBuildResult> {
+  "use step";
+  const base = { key: channel.key, name: channel.name, number: channel.number };
+
+  // Read the live channel at this number so we can (a) refuse to touch a non-AI channel, (b) preserve its
+  // accent + package, and (c) free the number for re-reservation.
+  const existing = await prisma.channel.findUnique({
+    where: { number: channel.number },
+    select: { id: true, tint: true, aiGenerated: true, packageId: true },
+  });
+  if (existing && !existing.aiGenerated) {
+    return { ...base, status: "skipped", reason: `Channel ${channel.number} is not AI-generated — refusing to rebuild it.` };
+  }
+  const accent = existing?.tint ?? channel.accent;
+  const pkgId = existing?.packageId ?? packageId;
+  if (existing) await prisma.channel.delete({ where: { id: existing.id } }).catch(() => {});
+
+  const trace = traceContext();
+  // #28 cooperative cancel applies here too.
+  const result = await withRunCancellation((abortSignal) =>
+    buildPlannedChannel(prisma, {
+      channel: { ...channel, accent },
+      packageId: pkgId,
+      mediaSourceId: sourceId,
+      userId,
+      libraryContext,
+      mode,
+      dryRun: false,
+      trace,
+      abortSignal,
+    }),
+  );
+  if (result.status === "created" && result.channelId) {
+    try {
+      await generateChannelSchedule(prisma, result.channelId, { windowSeconds: INITIAL_WINDOW_SECONDS });
+    } catch (err) {
+      console.warn(`[lineup] ${channel.name}: schedule build failed (backfill will retry):`, err);
+    }
+  }
+  console.log(`[lineup] ${channel.number} ${channel.name}: rebuilt — ${result.status}`);
+  return result;
+}
+
+/**
+ * Record the channels a rebuild deliberately left alone (#23) as "skipped over", in ONE step (cheap: N trace
+ * writes, no AI, no channel writes), so the run page shows them as intentionally-inert rather than absent.
+ */
+async function recordSkippedOver(channels: PlannedChannel[]): Promise<ChannelBuildResult[]> {
+  "use step";
+  const trace = traceContext();
+  const startedAt = new Date();
+  for (const channel of channels) {
+    await recordTrace(prisma, {
+      ...trace,
+      stepName: "skipChannel",
+      phase: "build",
+      channelKey: channel.key,
+      channelNumber: channel.number,
+      channelName: channel.name,
+      status: "skipped-over",
+      reason: "Not part of this rebuild.",
+      output: { status: "skipped-over" },
+      startedAt,
+    });
+  }
+  return channels.map((c) => ({
+    key: c.key,
+    name: c.name,
+    number: c.number,
+    status: "skipped-over" as const,
+    reason: "Not part of this rebuild.",
+  }));
 }
 
 /** §4.5 — summarize what was built. */

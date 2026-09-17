@@ -62,6 +62,7 @@ import { JsonView, darkStyles, defaultStyles } from "react-json-view-lite";
 import "react-json-view-lite/dist/index.css";
 
 import { Response } from "@/components/ai-elements/response";
+import { useConfirm } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { useTheme } from "@/components/theme-provider";
 import { trpc } from "@/utils/trpc";
@@ -180,10 +181,16 @@ function StatusIcon({ status, className = "" }: { status: string; className?: st
       return <XCircle className={`${cls} text-red-600`} />;
     case "cancelled":
       return <Ban className={`${cls} text-muted-foreground`} />;
+    case "skipped-over":
+      // Deliberately not processed (a non-target channel in a rebuild) — ghost/dashed, lower-key than the rest.
+      return <CircleDashed className={`${cls} text-muted-foreground/60`} />;
     default:
       return <CircleDashed className={`${cls} text-muted-foreground`} />;
   }
 }
+
+/** Pretty-print a raw status value for badges/labels (only `skipped-over` needs it today). */
+const prettyStatus = (s: string) => (s === "skipped-over" ? "skipped over" : s);
 
 const STATUS_TONE: Record<string, string> = {
   ok: "text-emerald-600",
@@ -192,6 +199,7 @@ const STATUS_TONE: Record<string, string> = {
   skipped: "text-amber-600",
   failed: "text-red-600",
   cancelled: "text-muted-foreground",
+  "skipped-over": "text-muted-foreground/60",
 };
 
 /**
@@ -517,6 +525,7 @@ type BuildTrace = {
   attempt: number;
   status: string;
   reason: string | null;
+  channelKey: string | null;
   channelNumber: number | null;
   channelName: string | null;
   agentSteps: number;
@@ -561,11 +570,16 @@ function BuildCard({
   domId,
   open,
   onToggle,
+  onRebuild,
+  rebuilding,
 }: {
   attempts: BuildTrace[];
   domId: string;
   open: boolean;
   onToggle: () => void;
+  /** Present only on a completed real run — rebuilds just this channel (#23). */
+  onRebuild?: (channelKey: string) => void;
+  rebuilding?: boolean;
 }) {
   const ordered = [...attempts].sort((a, b) => a.attempt - b.attempt);
   const terminal = ordered[ordered.length - 1];
@@ -608,7 +622,7 @@ function BuildCard({
           <div className="flex items-start justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1.5">
               <Badge variant="outline" className={STATUS_TONE[current.status] ?? ""}>
-                {current.status}
+                {prettyStatus(current.status)}
               </Badge>
               <Badge variant="outline">{current.agentSteps} agent steps</Badge>
               <Badge variant="outline">{n(current.inputTokens)} in</Badge>
@@ -616,14 +630,31 @@ function BuildCard({
               {secs != null && <Badge variant="outline">{secs}s</Badge>}
               {pool != null && <Badge variant="outline">pool {n(pool)}</Badge>}
             </div>
-            {ordered.length > 1 && (
-              <AttemptSwitcher
-                idx={idx}
-                count={ordered.length}
-                status={current.status}
-                onChange={setIdx}
-              />
-            )}
+            <div className="flex shrink-0 items-center gap-2">
+              {onRebuild && terminal.channelKey && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onRebuild(terminal.channelKey!)}
+                  disabled={rebuilding}
+                >
+                  {rebuilding ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Rebuild
+                </Button>
+              )}
+              {ordered.length > 1 && (
+                <AttemptSwitcher
+                  idx={idx}
+                  count={ordered.length}
+                  status={current.status}
+                  onChange={setIdx}
+                />
+              )}
+            </div>
           </div>
 
           {current.reason && (
@@ -797,6 +828,7 @@ const SCRUB_BAR: Record<string, string> = {
   failed: "bg-red-500",
   skipped: "bg-amber-500",
   cancelled: "bg-muted-foreground/40",
+  "skipped-over": "bg-muted-foreground/20",
   upcoming: "bg-muted-foreground/25",
 };
 
@@ -976,6 +1008,7 @@ function RunDetail() {
   // Global replay scrub — an instant the user dragged to via the floating bar (null = pinned to the live
   // edge). When scrubbed back, the WHOLE page renders "as observed at T". See the derivation below.
   const [scrub, setScrub] = useState<number | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   // The authoritative run status + return value. Only `plan`/`build` phases write trace rows, so the
   // report (which carries `dryRun`) and the overall status live on the run itself, not in a trace.
@@ -1158,8 +1191,15 @@ function RunDetail() {
       },
     }),
   );
-  const stopRun = () => {
-    if (window.confirm("Stop this run? A build in progress will leave a partially-built lineup.")) {
+  const stopRun = async () => {
+    if (
+      await confirm({
+        title: "Stop this run?",
+        description: "A build in progress will leave a partially-built lineup.",
+        confirmLabel: "Stop run",
+        destructive: true,
+      })
+    ) {
       cancelRun.mutate({ runId });
     }
   };
@@ -1174,16 +1214,47 @@ function RunDetail() {
       },
     }),
   );
-  const applyThisPlan = () => {
+  const applyThisPlan = async () => {
     if (!report?.sourceId) return;
     if (
-      window.confirm(
-        "Build this plan for real? This replaces the current AI lineup with the channels this dry run verified (no AI, no re-planning).",
-      )
+      await confirm({
+        title: "Build this plan for real?",
+        description:
+          "This replaces the current AI lineup with the channels this dry run verified — no AI, no re-planning.",
+        confirmLabel: "Build lineup",
+        destructive: true,
+      })
     ) {
       applyRun.mutate({ fromRunId: runId, sourceId: report.sourceId });
     }
   };
+
+  // Rebuild-single (#23): re-run the AI for one channel from this (completed, real) run, in place. Offered
+  // only on a completed non-dry run — that's the run whose live channels a rebuild reuses.
+  const rebuildMut = useMutation(
+    trpc.ai.rebuildChannels.mutationOptions({
+      onSuccess: (data: { runId: string }) => {
+        void navigate({ to: "/settings/workflows/ai-lineup/$runId", params: { runId: data.runId } });
+      },
+    }),
+  );
+  const onRebuild =
+    !isLive && !isDryRun && run.data?.status === "completed" && report?.sourceId
+      ? async (channelKey: string) => {
+          const sourceId = report?.sourceId;
+          if (!sourceId) return;
+          if (
+            await confirm({
+              title: "Rebuild this channel?",
+              description:
+                "Re-runs the AI for just this channel and replaces it in place — every other channel is left alone.",
+              confirmLabel: "Rebuild",
+            })
+          ) {
+            rebuildMut.mutate({ fromRunId: runId, sourceId, channelKeys: [channelKey] });
+          }
+        }
+      : undefined;
 
   // Timeline → jump-to. Clicking a step scrolls to (and, for builds, opens) the thing it produced.
   // Single-open accordion: only one channel build is expanded at a time.
@@ -1216,6 +1287,7 @@ function RunDetail() {
 
   return (
     <div className="space-y-4 pb-32">
+      {confirmDialog}
       {/* Header + summary. Rendered immediately; the stat tiles fill in as data lands. */}
       <Frame>
         <FrameHeader className="flex-row items-center justify-between">
@@ -1431,6 +1503,8 @@ function RunDetail() {
                 domId={buildDomId(key)}
                 open={openBuild === key}
                 onToggle={() => toggleBuild(key)}
+                onRebuild={onRebuild}
+                rebuilding={rebuildMut.isPending}
               />
             );
           })}

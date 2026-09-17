@@ -2,6 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.6] - 2026-09-16
+
+AI lineup — rebuild a single channel in place (#23), and real in-app confirm dialogs.
+
+### Added
+- **Rebuild** on any channel of a completed AI-lineup run. It re-runs the AI for just that one channel and
+  replaces it in place — reusing its existing number and package, with no wipe, no re-plan, and no
+  renumbering. Every other channel is left untouched (shown as "skipped over"). Refuses to touch a channel
+  that isn't AI-generated. Works off any completed run — an originally-planned run, an applied dry run, or a
+  prior rebuild — because the seed loader chains through seeded runs to recover the plan.
+- `ai.rebuildChannels` procedure and a `rebuild` seed mode on the lineup workflow.
+- A "skipped over" run-page status (a muted, dashed marker) for channels a rebuild deliberately left alone —
+  distinct from "skipped" (the builder gave up) and "cancelled" (the run was stopped).
+
+### Changed
+- The run page's Stop, Build this plan, and Rebuild actions now use a proper in-app confirmation dialog
+  (a new base-lyra `alert-dialog` component + a `useConfirm` hook) instead of the browser's `window.confirm`.
+
 ## [0.14.5] - 2026-09-16
 
 AI lineup — build a real lineup from a completed dry run, without re-running the AI (#32).

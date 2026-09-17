@@ -129,6 +129,31 @@ export const aiRouter = router({
       });
     }),
 
+  /**
+   * Rebuild specific channels (#23) from a completed run's stored plan data — re-runs the AI for just those
+   * channels, reusing each one's existing package + number. No wipe, no re-plan, no renumber; every other
+   * channel is left untouched. Good for retrying the handful a run skipped/failed.
+   */
+  rebuildChannels: adminProcedure
+    .input(z.object({ fromRunId: z.string(), sourceId: z.string(), channelKeys: z.array(z.string()).min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const readiness = await getSourceReadiness(ctx.prisma, input.sourceId);
+      if (!readiness?.ready) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: readiness ? notReadyReason(readiness.fields, "rebuild channels")! : "Media source not found.",
+        });
+      }
+      const settings = await getAppSettings(ctx.prisma);
+      return requireLineupRunner().start({
+        sourceId: input.sourceId,
+        userId: ctx.session.user.id,
+        concurrency: settings.channelBuildConcurrency,
+        plannerMaxOutputTokens: settings.plannerMaxOutputTokens,
+        seed: { fromRunId: input.fromRunId, mode: "rebuild", channelKeys: input.channelKeys },
+      });
+    }),
+
   /** Recent AI lineup runs for the observability page (metadata + step counts). */
   lineupRuns: adminProcedure
     .input(z.object({ limit: z.number().int().positive().max(100).optional() }).optional())

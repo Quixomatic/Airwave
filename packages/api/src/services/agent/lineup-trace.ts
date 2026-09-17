@@ -58,7 +58,7 @@ export type TraceInput = {
   channelKey?: string | null;
   channelNumber?: number | null;
   channelName?: string | null;
-  status: "running" | "ok" | "skipped" | "failed" | "cancelled";
+  status: "running" | "ok" | "skipped" | "failed" | "cancelled" | "skipped-over";
   reason?: string | null;
   input?: unknown;
   output?: unknown;
