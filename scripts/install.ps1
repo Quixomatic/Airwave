@@ -308,6 +308,24 @@ if ($DryRun) {
   Ok "Wrote docker-compose.yml"
 }
 
+# ---- stale-volume guard ----------------------------------------------------
+# Fresh install on a Docker named volume: an existing DB volume keeps its original password, so the newly
+# generated one won't match and the server can't connect. Offer to reset it rather than auth-fail loop.
+if (-not $existing -and -not $pgVolume -and -not $DryRun) {
+  $pgvol = "airwave_channelguide_pgdata"
+  docker volume inspect $pgvol *> $null
+  if ($LASTEXITCODE -eq 0) {
+    Warn "A Postgres data volume ($pgvol) already exists from a previous install."
+    Warn "Postgres keeps its original password on an existing volume, so the newly generated one won't match."
+    if (Confirm "Reset that database now? (DELETES it, then re-initializes with the new password)") {
+      Push-Location $Dir; docker compose down -v *> $null; Pop-Location
+      docker volume rm $pgvol *> $null
+    } else {
+      Die "Aborting so nothing is wiped. Reuse its POSTGRES_PASSWORD in .env, or remove it: docker volume rm $pgvol"
+    }
+  }
+}
+
 # ---- pull + up -------------------------------------------------------------
 if ($DryRun) {
   Plan "run: docker compose pull"; Plan "run: docker compose up -d"

@@ -554,6 +554,24 @@ else
   ok "Wrote docker-compose.yml"
 fi
 
+# ---- stale-volume guard ----------------------------------------------------
+# Fresh install on a Docker named volume: if the DB volume already exists from a previous install, Postgres
+# keeps its ORIGINAL password and ignores the one we just generated, so the server can't connect. Offer to
+# reset it (data loss) rather than boot into an auth-fail loop.
+if [ "$EXISTING" = 0 ] && [ -z "${POSTGRES_DATA_VOLUME:-}" ] && ! dryrun; then
+  _pgvol=airwave_channelguide_pgdata
+  if docker volume inspect "$_pgvol" >/dev/null 2>&1; then
+    warn "A Postgres data volume (${_pgvol}) already exists from a previous install."
+    warn "Postgres keeps its original password on an existing volume, so the newly generated one won't match."
+    if confirm "Reset that database now? (DELETES it, then re-initializes with the new password)"; then
+      $DCOMPOSE down -v >/dev/null 2>&1 || true
+      docker volume rm "$_pgvol" >/dev/null 2>&1 || warn "couldn't remove ${_pgvol}; try: cd ${DIR_ABS} && docker compose down -v"
+    else
+      die "Aborting so nothing is wiped. To reuse that database, restore its POSTGRES_PASSWORD in .env; to start fresh: docker volume rm ${_pgvol}"
+    fi
+  fi
+fi
+
 # ---- pull + up -------------------------------------------------------------
 run "Pulling images (${CG_IMAGE})" $DCOMPOSE pull || die "docker compose pull failed. Does the tag '${VERSION}' exist? Your running stack is untouched."
 run "Starting Airwave" $DCOMPOSE up -d || die "docker compose up failed."
