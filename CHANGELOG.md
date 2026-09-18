@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.16] - 2026-09-17
+
+Desktop CI: the v0.14.15 MSVC-runtime check now looks at the right artifact, so the Windows build passes (#42).
+
+### Fixed
+- The "Verify bundled MSVC runtime" step added in v0.14.15 scanned the build output for the loose
+  `vcruntime140.dll` / `vcruntime140_1.dll` / `msvcp140.dll`, but the release build packs the whole app into a
+  compressed `Resources/*.tar.zst`, so there was no loose `pg/native/bin` on disk at that point and the check
+  always failed, taking the whole Windows desktop build down with it. It now runs after the Inno installer step
+  (which extracts the bundle to `build/inno-src/`) and scans that, the exact files the installer ships. The
+  runtime DLLs were bundled correctly the whole time; only the verification looked in the wrong place. No
+  load-bearing build/sign/upload step was reordered.
+
 ## [0.14.15] - 2026-09-17
 
 Airwave Desktop: fix the embedded database failing to start on a clean Windows box (#42).
