@@ -1,8 +1,17 @@
 import "./global.css";
 import { RootProvider } from "fumadocs-ui/provider/next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
+
+// Umami — self-hosted, privacy-friendly analytics. Configured via env so nothing instance-specific lives in
+// the (source-available) repo: set NEXT_PUBLIC_UMAMI_SRC + NEXT_PUBLIC_UMAMI_WEBSITE_ID in the Vercel
+// PRODUCTION environment. Rendered only on the production deploy (and only when both are set), so local dev,
+// Vercel previews, and anyone who clones the repo don't count against the real stats. Umami auto-tracks App
+// Router client-side navigation, so no per-route pageview calls are needed.
+const UMAMI_SRC = process.env.NEXT_PUBLIC_UMAMI_SRC;
+const UMAMI_WEBSITE_ID = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID;
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -63,6 +72,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {/* Default to dark — the navy 10-foot brand is the intended first impression. The theme toggle still
             works and persists per-visitor; we just don't follow the OS preference by default. */}
         <RootProvider theme={{ defaultTheme: "dark", enableSystem: false }}>{children}</RootProvider>
+        {process.env.VERCEL_ENV === "production" && UMAMI_SRC && UMAMI_WEBSITE_ID ? (
+          <Script src={UMAMI_SRC} data-website-id={UMAMI_WEBSITE_ID} strategy="afterInteractive" />
+        ) : null}
       </body>
     </html>
   );

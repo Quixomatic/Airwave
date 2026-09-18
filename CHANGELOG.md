@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.18] - 2026-09-18
+
+getairwave.tv: privacy-friendly analytics.
+
+### Added
+- Self-hosted [Umami](https://umami.is) analytics on getairwave.tv, loaded via `next/script`
+  (`afterInteractive`, non-blocking) in the root layout. Cookieless and no personal data, so no consent
+  banner is needed. Configured entirely through `NEXT_PUBLIC_UMAMI_SRC` / `NEXT_PUBLIC_UMAMI_WEBSITE_ID`
+  (nothing instance-specific in the repo), and rendered only on the production deploy so local dev and Vercel
+  previews don't count against the stats. Umami auto-tracks App Router client-side navigation.
+
 ## [0.14.17] - 2026-09-18
 
 getairwave.tv: the second Airwave Weekly post, and a self-hosting docs refresh.
