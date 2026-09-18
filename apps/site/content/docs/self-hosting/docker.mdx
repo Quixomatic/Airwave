@@ -3,31 +3,41 @@ title: "Docker quick start"
 description: "Grab the stack files, fill in .env, and bring Airwave up with docker compose — first boot, the seeded admin, and reaching the panel."
 ---
 
-This walks the deploy end to end with `docker-compose.yml` and `.env.example` from the repo root. It
-works the same in a terminal (`docker compose`) or a UI like **Dockge** / **Portainer** — paste the
-compose and the env, then deploy.
+This is the hands-on Docker deploy, and the recommended way to run Airwave: grab `docker-compose.yml`
+and `.env.example`, fill in a few values, and bring the stack up. It works the same in a terminal
+(`docker compose`) or a UI like **Dockge** / **Portainer**: paste the compose and the env, then deploy.
+
+<Alert type="info" title="Just want it running?">
+There's a [one-line installer](/docs/self-hosting#one-command-fastest) that does everything on this page
+for you. Setting it up by hand (below) is worth it if you want to understand your deployment, tweak volumes
+and ports, or drop it into Dockge / Portainer.
+</Alert>
 
 For what every variable means, see [Configuration](/docs/self-hosting/configuration). For why the same
 image runs as more than one service, see [Roles & the single image](/docs/self-hosting/roles).
 
-## 1. Grab the stack files
+<Steps>
 
-You need two files from the repo root: **`docker-compose.yml`** and **`.env.example`**. In Dockge,
-create a stack and paste the compose in; in a terminal, drop both in a directory. The compose already
-points at the published image — you don't build anything.
+<Step>
 
-```yaml
-# docker-compose.yml — the three services (optional tvweb omitted)
-services:
-  postgres:   # postgres:16-alpine, healthchecked
-  server:     # CG_ROLE=server — API + TV REST, applies migrations
-  web:        # CG_ROLE=web — builds + serves the admin SPA
-```
+### Grab the stack files
 
-Both `server` and `web` run the same image, defaulting to
-`ghcr.io/quixomatic/airwave:latest` (override with `CG_IMAGE`).
+You need two files from the repo root: **`docker-compose.yml`** and **`.env.example`**. Both are shown
+in full below (switch tabs, and use the copy button or the GitHub link):
 
-## 2. Fill in `.env`
+<DockerConfig />
+
+In Dockge, create a stack and paste the compose in; in a terminal, drop both in a directory and copy
+`.env.example` to `.env`. The compose already points at the published image
+(`ghcr.io/quixomatic/airwave:latest`, override with `CG_IMAGE`), so you don't build anything. Postgres,
+`server`, and `web` all run from it; the optional `tvweb` browser player stays off unless you enable its
+profile (see [Roles](/docs/self-hosting/roles)).
+
+</Step>
+
+<Step>
+
+### Fill in `.env`
 
 Copy `.env.example` to `.env` and set, at minimum:
 
@@ -45,6 +55,11 @@ WEB_PORT=36021
 POSTGRES_PASSWORD=a-strong-password
 BETTER_AUTH_SECRET=change-me-to-a-long-random-string-at-least-32-chars
 
+# A STABLE id for this Airwave instance when it talks to Plex. Set it once to any UUID and never change
+# it — Plex ties your sign-in and device to this value, so a new id on each boot means re-authenticating.
+# The one-line installer generates this for you; on a manual deploy, set it yourself.
+PLEX_CLIENT_IDENTIFIER=paste-a-uuid-here
+
 # First admin, seeded on first boot
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=change-me
@@ -55,19 +70,25 @@ PGID=1000
 TZ=UTC
 ```
 
-Generate the auth secret with:
+Generate the two secrets with:
 
 ```bash
-openssl rand -base64 48
+openssl rand -base64 48   # BETTER_AUTH_SECRET
+uuidgen                   # PLEX_CLIENT_IDENTIFIER (any stable UUID; on Windows use [guid]::NewGuid())
 ```
 
-> **Get the public URLs right.** `SERVER_PUBLIC_URL` and `WEB_PUBLIC_URL` are **baked into the admin
-> SPA at build time** and drive auth + CORS, so they must be the addresses your browser and TV really
-> reach — a LAN IP or a domain, with the **published** ports. `localhost` only works from the host
-> machine. Getting these wrong is the most common first-deploy snag (see
-> [Gotchas](#gotchas-that-actually-bite)).
+<Alert type="warn" title="Get the public URLs right">
+`SERVER_PUBLIC_URL` and `WEB_PUBLIC_URL` are **baked into the admin SPA at build time** and drive auth and
+CORS, so they must be the addresses your browser and TV really reach: a LAN IP or a domain, with the
+**published** ports. `localhost` only works from the host machine. Getting these wrong is the most common
+first-deploy snag (see [Gotchas](#gotchas-that-actually-bite)).
+</Alert>
 
-## 3. Bring it up
+</Step>
+
+<Step>
+
+### Bring it up
 
 ```bash
 docker compose up -d
@@ -86,7 +107,11 @@ Watch the logs on first boot — the sequence is:
 The build-on-start for `web` is by design: each self-host lives at a different address, so the admin
 SPA is compiled for *your* server URL rather than shipped pre-baked.
 
-## 4. Sign in and connect Plex
+</Step>
+
+<Step>
+
+### Sign in and connect Plex
 
 1. Open the admin at your **`WEB_PUBLIC_URL`** (e.g. `http://192.168.1.50:36021`).
 2. Sign in with the **`ADMIN_EMAIL` / `ADMIN_PASSWORD`** you set. That account is seeded on first boot
@@ -95,15 +120,25 @@ SPA is compiled for *your* server URL rather than shipped pre-baked.
 3. From there, follow the [Quick Start](/docs/getting-started): connect your Plex
    [source](/docs/sources), run a metadata sync, and build your first channel.
 
-> **The admin seed is optional but recommended.** If you leave `ADMIN_EMAIL` / `ADMIN_PASSWORD` unset
-> (e.g. a pure Plex/OAuth deployment), no admin is created — the seed is a no-op. The seed is also
-> **idempotent**: on later boots it just re-asserts the `admin` role, it doesn't reset the password.
+<Alert type="info" title="The admin seed is optional but recommended">
+If you leave `ADMIN_EMAIL` / `ADMIN_PASSWORD` unset (e.g. a pure Plex/OAuth deployment), no admin is
+created and the seed is a no-op. The seed is also **idempotent**: on later boots it just re-asserts the
+`admin` role, it doesn't reset the password.
+</Alert>
 
-## 5. Watch
+</Step>
+
+<Step>
+
+### Watch
 
 Open a TV app and point it at the server. The native apps scan your LAN automatically; if that misses,
 enter `SERVER_PUBLIC_URL` by hand. Want a browser instead of a native app? Enable the optional
 **`tvweb`** role — see [Roles & the single image](/docs/self-hosting/roles).
+
+</Step>
+
+</Steps>
 
 ## Gotchas that actually bite
 

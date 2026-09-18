@@ -9,22 +9,30 @@ Airwave is built to be **self-hosted**: you run the server next to your media, p
 library, and stream your own channels to the TV apps. There's nothing to sign up for and no hosted
 tier.
 
-**Two ways to run it — same server, pick what fits your setup:**
+**Two ways to run it, same server, pick what fits your setup:**
 
-- **Docker (recommended)** — for a NAS, mini-PC, or always-on Linux box. A single prebuilt image plus a
-  Postgres database, wired by `docker compose`. No antivirus false positives, and the easiest to keep
-  updated. This section walks that path in detail below.
-- **[One-click desktop app](/docs/self-hosting/desktop)** — for running Plex on your own Windows, macOS, or
-  Linux machine. An installer + a tray app with **embedded Postgres**; no Docker, nothing to configure to
-  start. The signed installers are still new, so some antivirus / SmartScreen tools may flag them; if yours
-  does, use Docker instead.
+- **Docker (recommended)**: for a NAS, mini-PC, or always-on Linux box. A single prebuilt image plus a
+  Postgres database, wired by `docker compose`. No antivirus false positives, and the easiest to keep updated.
+  Two ways to set it up:
+  - **[Docker quick start](/docs/self-hosting/docker)**: the recommended walkthrough. The full compose and
+    `.env`, set up by hand, in a terminal or a UI like Dockge / Portainer.
+  - **[One-line installer](#one-command-fastest)**: the fastest start if you already have Docker. One command
+    does everything for you.
+- **[One-click desktop app](/docs/self-hosting/desktop)**: for running Plex on your own Windows, macOS, or
+  Linux machine, and the way most people run Airwave. A signed installer plus a tray app with **embedded
+  Postgres**: no Docker, and nothing to configure to start. (A brand-new installer can occasionally trip
+  antivirus or SmartScreen; if it does, Docker is always there.)
 
-## Fastest start: the one-line installer
+## Set up the Docker stack
 
-On any machine with Docker, one command checks Docker, asks a few questions (with sensible defaults, including
-auto-detecting your LAN IP), writes the stack, and brings it up.
+Same stack either way. Pick whichever fits how you like to work.
 
-Linux, macOS, or Windows via WSL / Git Bash (any POSIX shell):
+### One command (fastest)
+
+Already have Docker and just want it running? One command checks Docker, asks a few questions (sensible
+defaults, including auto-detecting your LAN IP), generates your secrets, writes the stack, and brings it up.
+
+Linux, macOS, or Windows via WSL / Git Bash:
 
 ```bash
 curl -fsSL https://www.getairwave.tv/install.sh | sh
@@ -36,26 +44,16 @@ Windows native (Docker Desktop, in PowerShell):
 irm https://www.getairwave.tv/install.ps1 | iex
 ```
 
-It installs to **`~/airwave`** by default — a stable per-user path, so re-running from anywhere updates the same
-install (override with `--dir` / `-Dir`). Secrets (Postgres password, auth secret, a stable Plex client id) are
-generated for you, and the AI lineup engine is on by default (add an AI provider key in the admin to use it).
+It installs to `~/airwave`, tracks `:latest` (pin a release with `--version`), and re-running updates in
+place. Preview everything with `--dry-run`, bind host paths and toggle extras with `--advanced`, or remove it
+with `--uninstall`. The scripts are small and auditable, so read them first if you like:
+[install.sh](https://www.getairwave.tv/install.sh) or [install.ps1](https://www.getairwave.tv/install.ps1).
 
-Both take the same options:
+### By hand (recommended for full control)
 
-- **Pin a version:** `... | sh -s -- --version 0.14.13` (or `-Version 0.14.13` on PowerShell). Latest by default.
-- **Preview only:** add `--dry-run` (`-DryRun`) to see everything it would do without writing or starting anything.
-- **Advanced setup:** add `--advanced` (`-Advanced`) to bind host paths for the database and bumper music,
-  serve the browser TV player, or add extra CORS origins. The default keeps it simple (Docker named volumes).
-- **Update:** re-run the same command (or `docker compose pull && docker compose up -d` in the stack dir).
-- **Uninstall:** add `--uninstall` (`-Uninstall`) — keeps your data; add `--purge` (`-Purge`) to delete the
-  volumes and directory too.
-
-The shell script uses [`gum`](https://github.com/charmbracelet/gum) for the prompts (downloaded to a temp dir
-and checksum-verified if you don't already have it, with a plain-text fallback). On native Windows the
-PowerShell script detects your LAN IP most reliably; under WSL the `curl | sh` line works just as well. Both are
-small and auditable — read them first at [getairwave.tv/install.sh](https://www.getairwave.tv/install.sh) or
-[/install.ps1](https://www.getairwave.tv/install.ps1) if you prefer. Rather wire it up by hand? The manual
-`docker compose` steps below do exactly the same thing.
+Want to see exactly what you're deploying, tweak volumes and ports, or paste it into Dockge / Portainer? The
+[Docker quick start](/docs/self-hosting/docker) walks through the full `docker-compose.yml` and `.env` end to
+end. Same result, and the better path if you want to understand and own your setup.
 
 ## The deploy model
 

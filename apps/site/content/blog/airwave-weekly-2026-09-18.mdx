@@ -1,0 +1,109 @@
+---
+title: "Airwave Weekly (18 September 2026)"
+description: "Three modes for building channels, an AI assistant that works with all of them, smoother scrubbing on every platform, and one-command self-hosting."
+author: James
+date: "2026-09-18"
+image: /blog/airwave-weekly-2026-09-18.webp
+---
+
+## Weekly highlights
+
+- You can now build a channel three ways: a metadata filter, Plex playlists and collections, or a hand-picked list. Playlists and collections was one of the most-requested items on the roadmap.
+- The AI assistant now understands and edits all three kinds of channel, playlists and manual picks included.
+- The AI lineup builder is now something you can watch and control while it runs: live progress for every step, a scrubber to replay a run, a Stop button that really stops the work, applying a preview without paying to re-plan, and rebuilding a single channel.
+- Rewinding and fast-forwarding now show a live preview and commit one seek when you stop, on every platform except Roku.
+- On the desktop app and in the browser, you can click and drag the scrubber with a mouse.
+- The web player has a proper mouse-and-keyboard mode.
+- Self-hosting with Docker is now a single command.
+- Android TV is approved, so every major TV platform is covered. The Linux desktop client shipped too.
+
+## Three modes for building a channel
+
+A channel used to always be a metadata filter. That is still the default and the most powerful option, but it
+isn't how everyone thinks about a channel, so the editor now starts by asking how you want to build this one.
+
+With a filter, you pick a genre, rating, or decade and Airwave turns it into a rolling schedule. That is the
+default, and it works exactly as before.
+
+Playlists and collections lets you choose one or more of your Plex playlists or collections, and Airwave
+combines them into the channel. Shows and seasons expand to their episodes on their own, and the order you
+list them in is the play order. This was one of the most-requested items on the roadmap, and it's the quickest
+way to turn work you already did in Plex into a live channel.
+
+Manual mode lets you hand-pick individual movies, shows, seasons, and episodes with an instant library search.
+Drill into a show for a whole season or specific episodes. A whole show stays live, so a newly added episode
+joins the channel on the next build.
+
+Ordering, strategy, weighting, bumpers, and scheduling all work the same whichever mode you pick.
+
+## The AI assistant now works with all three modes
+
+The channel assistant now understands all three kinds of channel. It reports each channel's mode, a playlist
+channel's sources, and a sample of a manual channel's items, instead of showing them as blank filters, and it
+can build or edit any of the three (it asks for your approval before it changes anything). It can also browse
+your playlists and collections and drill into a show's episodes. Filters stay the default, and it only creates
+a playlist or manual channel when you ask for one.
+
+## Watch the AI build your lineup, and control it
+
+If you use the AI to build a whole lineup, it is no longer a black box.
+
+- Every step now shows live progress on a timeline as it happens: analyzing your library, planning, building each channel, and assigning numbers, with token and cost counts along the way.
+- A scrubber at the bottom of the run page lets you drag back through a run and see what happened, and in what order.
+- Stop really stops now. It aborts the model calls in progress, so the work and the billing end right away, and a stalled run can no longer resume later and quietly rebuild your lineup with old settings.
+- A dry run already checks every channel's filter, so you can turn that preview into a real lineup with no AI and no re-planning, which costs nothing.
+- If one channel isn't right, rebuild just that one in place. It keeps its number and package and leaves the rest alone.
+
+## Smoother rewinding and fast-forwarding
+
+Rewinding used to fire a full seek on every press, so backing up a minute meant six reloads. Now the arrows
+slide a live preview while the video keeps playing, and the real seek happens once, about half a second after
+you stop. This works on every client except Roku: the webOS and browser player, the desktop app, and the
+Apple TV, Fire TV, Android TV, and iPad apps, including press-and-hold on the remote. If you use a mouse, you
+can also click anywhere on the bar to jump, or drag the thumb to scrub, on the desktop app and in the browser.
+
+## A mouse-and-keyboard mode for the web player
+
+Plenty of people run the web player in a browser instead of on a TV, so it now has a mode built for that:
+keyboard shortcuts for play, pause, back, and changing channels; click the video to play or pause; hover to
+highlight controls; click once in the guide to focus a program and again to tune it; and the mouse scrubbing
+above. A real TV build is unaffected, since all of this is limited to the browser.
+
+## Install the Docker stack with one command
+
+You can now set up the whole Docker stack in one line. On Linux, macOS, or WSL:
+
+```bash
+curl -fsSL https://www.getairwave.tv/install.sh | sh
+```
+
+On Windows, in PowerShell:
+
+```powershell
+irm https://www.getairwave.tv/install.ps1 | iex
+```
+
+It checks for Docker, asks a few questions with sensible defaults (including finding your local IP), generates
+your passwords and secrets, writes the compose file and a documented `.env`, and starts everything. Run the
+same command again any time to update in place, or to uninstall. Docker is now the recommended way to
+self-host.
+
+## Platforms
+
+Android TV is approved. With that, every major TV platform is covered: Apple TV, Fire TV, Roku, and Android TV
+in their stores, Samsung and LG sideloadable today, the browser everywhere, and native Windows, macOS, and
+Linux desktop apps. The Linux desktop client became fully available this week too, and it self-updates like
+the others.
+
+<PlatformTiles />
+
+Pick your platform on the [downloads page](/docs/downloads).
+
+## Site and docs
+
+Blog posts have comments now, so you can sign in with your GitHub account to reply and react. The home page
+got a redesign, and shipped roadmap items now move to the top of the list with a green check so you can see
+what's done.
+
+That's the week. If you want to steer what comes next, the [roadmap](/roadmap) is where you vote, and the full
+history is always in the [changelog](/docs/changelog).

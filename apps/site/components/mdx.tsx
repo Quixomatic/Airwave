@@ -3,6 +3,10 @@ import { ImageZoom } from "fumadocs-ui/components/image-zoom";
 import type { MDXComponents } from "mdx/types";
 import type { ComponentProps } from "react";
 import { PlatformMatrix } from "@/components/platform-matrix";
+import { PlatformTiles } from "@/components/platform-tiles";
+import { DockerConfig } from "@/components/docker-config";
+import { Alert } from "@/components/alert";
+import { Steps, Step } from "fumadocs-ui/components/steps";
 import { ClientDownloads, ServerDownloads } from "@/components/downloads-table";
 import { Cta } from "@/components/blog-cta";
 import { Mermaid } from "@/components/mdx/mermaid";
@@ -47,6 +51,11 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
     Video,
     PromoVideo,
     PlatformMatrix,
+    PlatformTiles,
+    DockerConfig,
+    Alert,
+    Steps,
+    Step,
     ClientDownloads,
     ServerDownloads,
     Cta,

@@ -1,6 +1,6 @@
 ---
 title: "Desktop app"
-description: "Run the whole Airwave server on your own Windows, macOS, or Linux machine with a one-click installer — no Docker, no NAS. Embedded Postgres, a tray app, and the browser as the UI."
+description: "Run the whole Airwave server on your own Windows, macOS, or Linux machine with a one-click installer: no Docker, no NAS. Embedded Postgres, a tray app, and the browser as the UI."
 ---
 
 import { Cards, Card } from "fumadocs-ui/components/card";
@@ -30,25 +30,32 @@ TV player in your default browser; TVs on your network connect to this machine.
 | Feature parity | Full (workflows included) | Full |
 | Always-on | Runs while your machine is on (launch-at-login) | Runs 24/7 on the host |
 
-## 1. Download
+<Steps>
 
-Grab the installer for your platform from the **[GitHub Releases](https://github.com/Quixomatic/Airwave/releases)**
-page (each `v*` release attaches them):
+<Step>
+
+### Download
+
+Grab the installer for your platform from the [downloads page](/docs/downloads):
 
 - **Windows** — `Airwave-Setup.exe` (x64)
-- **macOS** — Apple Silicon (arm64)
+- **macOS** — Apple Silicon (arm64) and Intel (x64)
 - **Linux** — x64 and arm64
 
 The installer is small (~70 MB). The ~430 MB of TV capability-probe clips are **downloaded on first run**, not
-bundled — see step 2.
+bundled (see the next step).
 
-## 2. Install &amp; first run
+</Step>
+
+<Step>
+
+### Install &amp; first run
 
 Run the installer. Airwave lands in your system tray and opens a short **onboarding** window:
 
 1. **Create your admin account** — the email + password you'll sign in to the panel with. (Public sign-up is
    off; this is the owner account, same as the Docker `ADMIN_EMAIL` / `ADMIN_PASSWORD` seed.)
-2. **Pick your options** — *Expose on my network* (let TVs connect — see step 3), the *TV web player*, and
+2. **Pick your options** — *Expose on my network* (let TVs connect, covered in the next step), the *TV web player*, and
    *AI lineup workflows*. All changeable later.
 3. **Provisioning** — Airwave starts embedded Postgres, applies migrations, bootstraps the workflow schema,
    downloads the capability media (you'll see a live progress bar), and starts the server. First run takes a
@@ -59,10 +66,16 @@ Run the installer. Airwave lands in your system tray and opens a short **onboard
 If you close the onboarding window before finishing, reopen it from the tray — until setup is complete it
 shows **"Set up Airwave"** (and *Open Admin* / *Open TV player* stay disabled).
 
-## 3. The tray &amp; reaching Airwave
+</Step>
+
+<Step>
+
+### The tray &amp; reaching Airwave
 
 The tray menu is your control surface: **Open Admin**, **Open TV player**, the **server address** for TVs,
 **Settings**, and **Quit**.
+
+![The Airwave desktop tray menu](/screenshots/desktop-tray-menu.webp)
 
 - **On this machine**, the admin opens at `localhost` — nothing to configure.
 - **TVs and other devices on your LAN** connect to *this machine's* LAN IP (e.g.
@@ -77,7 +90,13 @@ The tray menu is your control surface: **Open Admin**, **Open TV player**, the *
 Ports auto-resolve to free ones (defaults: server `36020`, admin `36021`, TV player `36022`) so nothing
 clashes with an existing service.
 
-## 4. Where your data lives
+![The desktop Settings window: network exposure, ports, and remote access](/screenshots/desktop-server-settings.webp)
+
+</Step>
+
+</Steps>
+
+## Where your data lives
 
 Everything the app owns — config, the Postgres data directory, the capability media, and logs — lives in one
 per-OS user-data folder:
@@ -91,15 +110,16 @@ per-OS user-data folder:
 To **reset to a clean first-run**, quit the app (so Postgres releases the data dir) and delete that folder.
 `desktop.log` in there is the first place to look if something misbehaves.
 
-## 5. Updating
+## Updating
 
-Download the newer installer from the Releases page and run it over the top — your data folder is untouched,
-so your channels, sources, and admin account carry over. (Built-in auto-update is planned.)
+Download the newer installer from the [downloads page](/docs/downloads) and run it over the top. Your data
+folder is untouched, so your channels, sources, and admin account carry over. (Built-in auto-update is
+planned.)
 
 ## Notes
 
-- **macOS builds are currently unsigned**, so Gatekeeper will warn on first launch — right-click the app and
-  choose **Open** once to allow it. (Signing/notarization is on the roadmap.)
+- **macOS builds are signed and notarized** (Apple Silicon and Intel), so they open without a Gatekeeper
+  warning.
 - **The capability media downloads on first run** (~430 MB, from a public assets release). It's non-blocking —
   the server works immediately; the TV codec-probe clips just appear once the download finishes. It's cached,
   so it only happens once.
@@ -108,11 +128,13 @@ so your channels, sources, and admin account carry over. (Built-in auto-update i
 
 ## Troubleshooting
 
-**"Starting the database" fails / a `0xC0000005` crash on first run.** The embedded database needs the
-Microsoft Visual C++ Runtime. The installer now bundles it, but on a very old Windows build that's still
-missing it, install the runtime once and relaunch:
-[aka.ms/vs/17/release/vc_redist.x64.exe](https://aka.ms/vs/17/release/vc_redist.x64.exe). (This is not an
-antivirus issue, despite how the crash reads.)
+<Alert type="warn" title="The database won't start on Windows">
+If setup fails at "Starting the database", or you see a `0xC0000005` crash on first run, the embedded database
+is missing the Microsoft Visual C++ Runtime. The installer now bundles it, but on a very old Windows build
+that's still missing it, install the runtime once and relaunch:
+[aka.ms/vs/17/release/vc_redist.x64.exe](https://aka.ms/vs/17/release/vc_redist.x64.exe). This is not an
+antivirus issue, despite how the crash reads.
+</Alert>
 
 ## Source map
 

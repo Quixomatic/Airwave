@@ -2,6 +2,32 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.17] - 2026-09-18
+
+getairwave.tv: the second Airwave Weekly post, and a self-hosting docs refresh.
+
+### Added
+- **Airwave Weekly (18 September 2026)** blog post covering the week: the three channel-building modes, the AI
+  assistant working with all of them, the observable AI lineup builder, cross-platform scrubbing, the browser
+  player mode, and one-command self-hosting. Branded featured image generated with `gen-blog-image.py`.
+- Reusable MDX components for the docs: `PlatformTiles` (a compact platform grid linking to the downloads
+  page), `DockerConfig` (the full `docker-compose.yml` + `.env.example` viewer, sharing the home page's
+  source), and `Alert` (a minimal tinted banner: info/warn/danger). Registered fumadocs `Steps`/`Step` too.
+
+### Changed
+- Self-hosting docs restructured. The landing leads with Docker (the quick start and the one-line installer
+  nested under it) and keeps the one-click desktop app as a first-class option. The Docker and desktop quick
+  starts are now numbered steppers; the Docker page shows the full compose + `.env` and documents a stable
+  `PLEX_CLIENT_IDENTIFIER`; both point at `/docs/downloads` instead of GitHub Releases.
+- Desktop docs: corrected the macOS note (builds are signed and notarized, Apple Silicon and Intel), added
+  tray-menu and settings screenshots, and moved the Windows database-runtime note into an `Alert`.
+- Prose styling hooks: `prose-enhanced` / `prose-docs` / `prose-blog` (renamed from `blog-prose`), so any
+  typography override lives in one place; nested lists now indent clearly.
+
+### Fixed
+- Blog post dates showed a day early in behind-UTC timezones (the date was parsed as UTC midnight); dates now
+  format in UTC so they render as written.
+
 ## [0.14.16] - 2026-09-17
 
 Desktop CI: the v0.14.15 MSVC-runtime check now looks at the right artifact, so the Windows build passes (#42).

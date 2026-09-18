@@ -14,7 +14,9 @@ type Params = { params: Promise<{ slug: string }> };
 const SITE = "https://getairwave.tv";
 
 function formatDate(date: string) {
-  return new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  // The frontmatter date is a plain calendar date (YYYY-MM-DD), which `new Date` parses as UTC midnight.
+  // Format in UTC so it renders as the date written, not shifted a day back in a behind-UTC timezone.
+  return new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
 }
 
 export default async function BlogPost(props: Params) {
@@ -125,7 +127,7 @@ export default async function BlogPost(props: Params) {
 
       {/* Body in fumadocs prose, with a collapsible inline TOC */}
       <article className="mx-auto w-full max-w-3xl px-6 py-10">
-        <div className="prose blog-prose max-w-none">
+        <div className="prose prose-enhanced prose-blog max-w-none">
           <Mdx components={getMDXComponents()} />
         </div>
       </article>

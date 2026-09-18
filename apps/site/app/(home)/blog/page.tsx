@@ -11,7 +11,9 @@ export const metadata = {
 };
 
 function formatDate(date: string) {
-  return new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  // Frontmatter dates are plain calendar dates (YYYY-MM-DD), parsed as UTC midnight. Format in UTC so they
+  // render as written instead of shifting a day back in a behind-UTC timezone.
+  return new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
 }
 
 export default function BlogIndex() {

@@ -23,7 +23,7 @@ export default async function Page(props: PageParams) {
     <DocsPage toc={page.data.toc} full={page.data.full}>
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
-      <DocsBody>
+      <DocsBody className="prose-enhanced prose-docs">
         <MDXContent
           components={getMDXComponents({
             a: createRelativeLink(source, page),
