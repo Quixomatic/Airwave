@@ -70,7 +70,7 @@ Also triggered when James says "tag a release", "cut the release", or "draft rel
   - `## 🚀 Improvements`
   - `## 🐛 Fixes`
   - `## 🔧 Under the hood`
-  - `## 📚 Docs` (and site / marketing)
+  - `## 📚 Docs` (docs pages under `apps/site` ONLY, never site or marketing)
   - `## 📦 Platforms` (availability changes)
   - `## ⚠️ Breaking / Migration`
 - Tight, user-facing bullets. Dedupe items that repeated across patch versions; group related ones.
@@ -83,6 +83,7 @@ The taxonomy is a default, adjust the sections per release if the changes call f
 - **Catalog first, distill last.** Capture everything in the file before paring down; write the highlights at the end.
 - **Only reorganize what is already in `CHANGELOG.md`.** Never invent features, fixes, or claims. If the
   changelog doesn't record something (e.g. a store approval), say so and flag it, don't assert it.
+- **Never mention site or marketing.** The getairwave.tv home page, hero, promo reel, blog (posts and comments), SEO, analytics, and roadmap UX are OUT of release notes entirely. Only the docs pages under `apps/site` (self-hosting, configuration, local/self-hosted models, and the like) may appear, under Docs.
 - **Never edit `CHANGELOG.md`** here, it is the source of truth; this skill reads it.
 - **No em dashes** (user-facing copy). Use commas, colons, parentheses, or periods.
 - **No commit trailers** (`Co-Authored-By: Claude`, `Claude-Session:`), standing repo rule.
