@@ -1,0 +1,84 @@
+name: Release notes
+
+# Publishes the GitHub Release BODY (the human-facing patch notes) the moment a `v*` tag is pushed.
+#
+# This job has no build steps, so it reaches its "create release" step in seconds — well before
+# desktop-release.yml / docker-publish.yml / tv-tauri-release.yml finish building. It therefore CREATES the
+# release first with the curated notes as the base body, and those workflows then `append_body: true` their
+# per-platform install sections BELOW it. The release publishes immediately; the assets attach over the next
+# few minutes as the builds finish (intentional — the notes are the point).
+#
+# Body source, in order:
+#   1. `.release/patch-notes/<tag>.md` — the curated notes the `release-notes` skill writes + commits BEFORE
+#      tagging (so the file exists at the tag). This is the normal path.
+#   2. Fallback: the matching `## [<version>]` section of CHANGELOG.md — so a release is never just install
+#      instructions even if the curated file was skipped (or an old version is tagged).
+#   3. Last resort: a one-line pointer to the changelog.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-notes-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # create / update the GitHub Release
+
+jobs:
+  publish-notes:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # Resolve the release body: curated file → CHANGELOG section → minimal fallback. Writes it to
+      # release-body.md in the workspace and hands the path to action-gh-release.
+      - name: Resolve release body
+        id: body
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          NOTES_FILE=".release/patch-notes/${TAG}.md"
+          OUT="release-body.md"
+
+          if [ -f "$NOTES_FILE" ]; then
+            echo "Using curated notes: $NOTES_FILE"
+            cp "$NOTES_FILE" "$OUT"
+          else
+            echo "No curated notes for $TAG — falling back to the CHANGELOG.md [$VERSION] section."
+            # Print the lines between "## [<version>]" and the next "## [" header (exclusive).
+            awk -v ver="## [${VERSION}]" '
+              index($0, ver) == 1 { grab = 1; next }
+              grab && /^## \[/ { exit }
+              grab { print }
+            ' CHANGELOG.md > "$OUT" || true
+          fi
+
+          # Strip leading blank lines. A non-empty body is required; otherwise use a pointer to the changelog.
+          sed -i '/./,$!d' "$OUT" || true
+          if [ ! -s "$OUT" ]; then
+            echo "No curated notes and no CHANGELOG section — using a minimal fallback."
+            printf 'Release %s.\n\nSee the [changelog](https://www.getairwave.tv/docs/changelog) for the full list of changes.\n' "$TAG" > "$OUT"
+          fi
+
+          echo "----- release body -----"
+          cat "$OUT"
+          echo "------------------------"
+
+      - name: Create / publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: release-body.md
+          # This job owns the BASE body (it runs first). The build workflows append their install sections
+          # below with append_body: true.
+          append_body: false
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-canary') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
