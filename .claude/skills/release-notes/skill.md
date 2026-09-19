@@ -66,13 +66,14 @@ Also triggered when James says "tag a release", "cut the release", or "draft rel
 
 - A 1–2 sentence **highlights** intro (what this release is about) — written LAST.
 - Categorized sections, omit any that are empty:
-  - `## ✨ Features`
-  - `## 🚀 Improvements`
-  - `## 🐛 Fixes`
-  - `## 🔧 Under the hood`
-  - `## 📚 Docs` (docs pages under `apps/site` ONLY, never site or marketing)
-  - `## 📦 Platforms` (availability changes)
-  - `## ⚠️ Breaking / Migration`
+  - `## New Features`
+  - `## Improvements`
+  - `## Fixes`
+  - `## Under the hood`
+  - `## Docs` (docs pages under `apps/site` ONLY, never site or marketing)
+  - `## Platforms` (availability changes)
+  - `## Breaking / Migration`
+  - No emoji on headings.
 - Tight, user-facing bullets. Dedupe items that repeated across patch versions; group related ones.
 - End with the compare link: `**Full changelog:** https://github.com/Quixomatic/Airwave/compare/<from-tag>...v<target>`.
 
