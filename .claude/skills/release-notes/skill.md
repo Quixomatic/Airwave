@@ -69,7 +69,7 @@ Also triggered when James says "tag a release", "cut the release", or "draft rel
   - `## New Features`
   - `## Improvements`
   - `## Fixes`
-  - `## Under the hood`
+  - `## Under the hood` (optional; usually dropped for a user-facing release)
   - `## Docs` (docs pages under `apps/site` ONLY, never site or marketing)
   - `## Platforms` (availability changes)
   - `## Breaking / Migration`
