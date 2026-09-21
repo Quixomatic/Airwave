@@ -66,7 +66,10 @@ export const presetRouter = router({
         filter: ch.filter,
         sortField: ch.sortField,
         sortDir: ch.sortDir,
-        detail: input.detail ?? "default",
+        // Lean read: poster-grid fields only, and skip the per-file Stream tree — the staging card only
+        // needs the count + artwork, not codecs/HDR/audio.
+        detail: input.detail ?? "tiles",
+        includeStreams: false,
       });
       return {
         count: result.totalItems,

@@ -2,7 +2,30 @@
 
 All notable changes to Airwave are documented here.
 
-## [0.14.21] - 2026-09-21
+## [0.14.22] - 2026-09-21
+
+Preset generator revamp: staging page polish + a reusable Stepper, and a leaner preview.
+
+### Added
+- A reusable **Stepper** component in `@airwave/ui` (ported from reui): `Stepper` / `StepperNav` /
+  `StepperItem` / `StepperTrigger` / `StepperIndicator` / `StepperSeparator` / `StepperTitle` /
+  `StepperContent`, with per-step `loading` (spinner) and `completed` states and overridable indicators.
+- A lean `tiles` preview projection (id, title, year, episode/season counts, artwork thumb only) and an
+  `includeStreams` flag on the filter resolver, so the preset preview skips the heavy per-file Stream tree
+  and returns only what a poster grid needs.
+
+### Changed
+- Preset staging page: metrics / stepper / actions moved into the sub-header portals; the 1-2-3 stepper now
+  uses the shared component (green completed, spinner on the active step). Each channel is a two-row entry
+  (name + pinned diff badge; description + resolved count), with a stacked hovercard (tinted icon + name +
+  description header, then a scrollable big-tile preview with a loading skeleton) that opens quickly and only
+  for enabled channels in preview mode. The net-outcome confirm dialog is now a proper create/update/delete
+  breakdown with count badges and per-channel lists.
+- Default selection is the Basic package plus any already-generated channels; the preview streams each
+  channel as its own request (no batching) so one slow filter no longer stalls the rest.
+
+### Removed
+- The preset catalog's "Everything Channel" (a zero-filter channel that pulled the entire library).
 
 Preset generator revamp, Phase 2: the staging page. The "Preset generator" tile now opens a staged,
 human-in-the-loop flow instead of firing a destructive rebuild.

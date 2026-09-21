@@ -98,8 +98,9 @@ export type PreviewResult = {
   items: PreviewItem[]; // shows (episodes coalesced, by episode count desc) then movies, capped
 };
 
-/** How much per-item metadata the preview carries. */
-export type PreviewDetail = "compact" | "quick" | "default" | "verbose";
+/** How much per-item metadata the preview carries. `tiles` is the leanest UI projection: just enough to
+ *  render a poster grid (ratingKey, title, year, episode/season counts, artwork thumb) and nothing else. */
+export type PreviewDetail = "tiles" | "compact" | "quick" | "default" | "verbose";
 
 /**
  * Fields kept by the "compact" projection — enough to judge "does this pool match the theme?"
@@ -119,6 +120,27 @@ function compactItem(i: PreviewItem): Record<string, unknown> {
     ...(g.genres?.length ? { genres: g.genres.slice(0, 4) } : {}),
     ...(g.studio ? { studio: g.studio } : {}),
     ...(i.episodes ? { episodes: i.episodes, seasons: i.seasons } : {}),
+  };
+}
+
+/**
+ * The leanest UI projection — only what a poster tile renders: the id, title, year, the coalesced
+ * episode/season counts for a show, and the artwork thumb. Drops the whole heavy guide (genres, cast,
+ * summary, studio, ratings, codecs, resolution, art). Used by the preset staging preview.
+ */
+function tileItem(i: PreviewItem): PreviewItem {
+  return {
+    ratingKey: i.ratingKey,
+    title: i.title,
+    durationMs: i.durationMs,
+    ...(i.year != null ? { year: i.year } : {}),
+    ...(i.episodes != null ? { episodes: i.episodes, seasons: i.seasons } : {}),
+    guide: {
+      title: i.guide.title,
+      ...(i.guide.type ? { type: i.guide.type } : {}),
+      ...(i.guide.thumb ? { thumb: i.guide.thumb } : {}),
+      ...(i.guide.year != null ? { year: i.guide.year } : {}),
+    },
   };
 }
 
@@ -196,6 +218,8 @@ export async function previewItems(
   showItems.sort((x, y) => (y.episodes ?? 0) - (x.episodes ?? 0));
 
   const out: PreviewItem[] = [...showItems.slice(0, SHOW_CAP), ...movies.slice(0, MOVIE_CAP)];
+  // Tiles: the leanest projection — poster-grid fields only (id, title, year, counts, thumb).
+  if (detail === "tiles") return { ...header, items: out.map(tileItem) };
   // Compact keeps every item but only the fields needed to judge fit — see `compactItem`.
   if (detail === "compact")
     return { ...header, items: out.map(compactItem) as unknown as PreviewItem[] };
@@ -205,11 +229,22 @@ export async function previewItems(
 
 export async function previewFilter(
   prisma: PrismaClient,
-  args: { mediaSourceId: string; mediaTypes: MediaType[]; filter?: FilterNode; sortField?: string; sortDir?: "asc" | "desc"; detail?: PreviewDetail },
+  args: {
+    mediaSourceId: string;
+    mediaTypes: MediaType[];
+    filter?: FilterNode;
+    sortField?: string;
+    sortDir?: "asc" | "desc";
+    detail?: PreviewDetail;
+    /** Skip the per-file Stream tree in the Plex query — lean reads (preview) that only need counts + artwork. */
+    includeStreams?: boolean;
+  },
 ) {
   const source = await requireSource(prisma, args.mediaSourceId);
   const sort = channelSortParam("SHUFFLE", args.sortField ?? "title", args.sortDir ?? "asc");
-  const items = await resolveFilter(prisma, source, args.mediaTypes, asFilterNode(args.filter), sort);
+  const items = await resolveFilter(prisma, source, args.mediaTypes, asFilterNode(args.filter), sort, {
+    includeStreams: args.includeStreams,
+  });
   return previewItems(prisma, args.mediaSourceId, items, args.detail);
 }
 

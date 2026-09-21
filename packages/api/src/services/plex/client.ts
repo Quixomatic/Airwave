@@ -477,13 +477,16 @@ export async function getSectionItemsRaw(
   filterParams: string[],
   sort = "titleSort",
   limit = 800,
+  includeStreams = true,
 ): Promise<PlexItem[]> {
   const qs = [
     `type=${type}`,
     `sort=${encodeURIComponent(sort)}`,
     `X-Plex-Container-Size=${limit}`,
-    // per-file streams inline (HDR / object-audio); not for shows (type 2 → Plex 500s, no streams)
-    ...(type === 2 ? [] : ["includeElements=Stream"]),
+    // per-file streams inline (HDR / object-audio); not for shows (type 2 → Plex 500s, no streams). Skipped
+    // for lean reads (e.g. the preset preview) that only need counts + artwork, which drops the heaviest
+    // part of the response and speeds the query up materially.
+    ...(type === 2 || !includeStreams ? [] : ["includeElements=Stream"]),
     ...filterParams,
   ].join("&");
   const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/all?${qs}`, {

@@ -187,7 +187,6 @@ export const PRESET_PACKAGES: PresetPackage[] = [
     tint: "sky",
     sortIndex: 1,
     channels: [
-      { key: "everything", name: "The Everything Channel", callsign: "EVRTV", number: 2, minItems: 1, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:Shuffle", description: "Zero filters — your entire library, all mixed together." },
       { key: "prime-time", name: "Prime Time", callsign: "PRIME", number: 3, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:Star", description: "Rated 7.0+ by audiences and 6.0+ by critics.", filter: and(aud("7"), crit("6")) },
       { key: "fresh", name: "Fresh Off the Press", callsign: "FRESH", number: 4, minItems: 1, mediaTypes: both, ordering: "IN_ORDER", sortField: "addedAt", sortDir: "desc", icon: "lucide:Sparkles", description: "Added to your library in the last 30 days.", filter: addedWithin("30") },
       { key: "unwatched", name: "The Unwatched Pile", callsign: "UNWCH", number: 5, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:Eye", description: "Everything you haven't watched yet.", filter: unwatched() },

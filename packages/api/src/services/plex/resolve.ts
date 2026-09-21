@@ -25,6 +25,8 @@ type LibCtx = {
   tv: boolean;
   sort: string;
   tagCache: Map<string, Promise<Map<string, string>>>;
+  /** Skip the per-file Stream tree in the Plex response (lean reads that only need counts + artwork). */
+  includeStreams: boolean;
 };
 
 async function resolveTag(ctx: LibCtx, plexField: string, title: string): Promise<string | undefined> {
@@ -43,7 +45,9 @@ function toMap(items: PlexItem[]): Map<string, PlexItem> {
 }
 
 async function queryParams(ctx: LibCtx, params: string[]): Promise<Map<string, PlexItem>> {
-  return toMap(await getSectionItemsRaw(ctx.baseUrl, ctx.token, ctx.sectionKey, ctx.type, params, ctx.sort));
+  return toMap(
+    await getSectionItemsRaw(ctx.baseUrl, ctx.token, ctx.sectionKey, ctx.type, params, ctx.sort, 800, ctx.includeStreams),
+  );
 }
 
 async function resolveNode(node: FilterNode, ctx: LibCtx): Promise<Map<string, PlexItem>> {
@@ -101,6 +105,7 @@ export async function resolveFilter(
   mediaTypes: string[],
   tree: FilterNode | undefined,
   sort: string,
+  opts: { includeStreams?: boolean } = {},
 ): Promise<PlexItem[]> {
   const libs = await prisma.mediaLibrary.findMany({
     where: { mediaSourceId: source.id, enabled: true, type: { in: mediaTypes } },
@@ -117,6 +122,7 @@ export async function resolveFilter(
       tv: isShow,
       sort,
       tagCache: new Map(),
+      includeStreams: opts.includeStreams ?? true,
     };
     const matched = tree ? await resolveNode(tree, ctx) : await queryParams(ctx, []);
     for (const [k, v] of matched) out.set(k, v);

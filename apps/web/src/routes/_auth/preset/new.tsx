@@ -1,23 +1,27 @@
 import { AccentIconTile } from "@airwave/ui/components/accent-icon-tile";
 import { Button } from "@airwave/ui/components/button";
+import { Frame, FramePanel } from "@airwave/ui/components/frame";
 import {
-  Frame,
-  FrameDescription,
-  FrameHeader,
-  FramePanel,
-  FrameTitle,
-} from "@airwave/ui/components/frame";
+  Stepper,
+  StepperIndicator,
+  StepperItem,
+  StepperNav,
+  StepperSeparator,
+  StepperTitle,
+  StepperTrigger,
+} from "@airwave/ui/components/stepper";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@airwave/ui/components/preview-card";
 import { Switch } from "@airwave/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Blocks, Check, Eye, Loader2, PackageCheck, Tv, X } from "lucide-react";
+import { Blocks, CheckIcon, Eye, Loader2, LoaderCircleIcon, PackageCheck, Tv, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useConfirm } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
-import { ChannelPreviewTiles, type ChannelPreviewData } from "@/features/channels/channel-preview";
+import { HeaderCenter, HeaderLeft, HeaderRight } from "@/context/header-provider";
+import { ChannelPreviewTiles, PreviewSkeleton } from "@/features/channels/channel-preview";
 import { resolveTile } from "@/features/icons/app-icon";
 import { trpc, trpcClient } from "@/utils/trpc";
 
@@ -49,7 +53,14 @@ function usePresetPreviews(sourceId: string | undefined, active: boolean, enable
   const [map, setMap] = useState<Record<string, PreviewEntry>>({});
   const seen = useRef(new Set<string>());
   const alive = useRef(true);
-  useEffect(() => () => void (alive.current = false), []);
+  // Set true on (re)mount, false on unmount. Must reset to true on remount, or React StrictMode's
+  // dev mount→unmount→remount leaves it stuck false and every result is silently dropped (perma-spinner).
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
 
   const enabledKey = enabledKeys.join(",");
   useEffect(() => {
@@ -68,7 +79,13 @@ function usePresetPreviews(sourceId: string | undefined, active: boolean, enable
       while (i < todo.length) {
         const k = todo[i++]!;
         try {
-          const r = await trpcClient.preset.preview.query({ channelKey: k, sourceId });
+          // skipBatch: each preview is its own HTTP request, so the bounded pool truly streams — one slow
+          // filter occupies a single slot instead of stalling a whole batch (httpBatchLink resolves a batch
+          // atomically, which would defeat the sliding window).
+          const r = await trpcClient.preset.preview.query(
+            { channelKey: k, sourceId },
+            { context: { skipBatch: true } },
+          );
           if (alive.current) setMap((m) => ({ ...m, [k]: { status: "done", ...r } }));
         } catch (e) {
           if (alive.current)
@@ -97,9 +114,13 @@ function PresetStagingPage() {
 
   useEffect(() => {
     if (catalog.data && enabled === null) {
-      const all = new Set<string>();
-      for (const p of catalog.data.packages) for (const c of p.channels) all.add(c.key);
-      setEnabled(all);
+      // Default ON: the Basic package, plus any channels that already exist (a previously-generated lineup),
+      // so a re-run preserves what you built and only Basic is opt-in for a first run.
+      const seed = new Set<string>();
+      for (const p of catalog.data.packages) for (const c of p.channels) {
+        if (p.key === "basic" || c.exists) seed.add(c.key);
+      }
+      setEnabled(seed);
     }
   }, [catalog.data, enabled]);
 
@@ -164,6 +185,9 @@ function PresetStagingPage() {
   };
 
   const stepIndex = reviewing || submitting ? 2 : previewMode ? 1 : 0;
+  const stepValue = stepIndex + 1;
+  const previewBusy = previewMode && Object.values(previews).some((e) => e.status === "loading");
+  const busyStep = submitting ? 3 : previewBusy ? 2 : 0;
 
   if (catalog.isLoading || !catalog.data || !enabled) {
     return (
@@ -188,83 +212,90 @@ function PresetStagingPage() {
   const packages = catalog.data.packages;
 
   return (
-    <Frame>
+    <>
       {confirmDialog}
-      <FrameHeader className="bg-muted border-border sticky top-0 z-20 -mx-2 -mt-2 space-y-3 rounded-t-2xl border-b">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <FrameTitle>Preset generator</FrameTitle>
-            <FrameDescription>
-              {totals.selected} of {totals.channels} channels selected across {packages.length} packages.
-              {previewMode ? " Toggle any channel to resolve it live." : " Pick what you want, then preview."}
-            </FrameDescription>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/channels" })}>
-              <X className="mr-2 size-4" /> Cancel
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setPreviewMode(true)} disabled={previewMode || totals.selected === 0}>
-              <Eye className="mr-2 size-4" />
-              {previewMode ? "Live preview on" : "Preview"}
-            </Button>
-            <Button size="sm" onClick={onSubmit} disabled={totals.selected === 0 || submitting}>
-              {submitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : <PackageCheck className="mr-2 size-4" />}
-              Submit
-            </Button>
-          </div>
+      <HeaderLeft>
+        <p className="text-sm">
+          <span className="text-foreground font-medium tabular-nums">{totals.selected}</span>
+          <span className="text-muted-foreground">
+            {" "}
+            of {totals.channels} channels · {packages.length} packages
+          </span>
+        </p>
+      </HeaderLeft>
+      <HeaderCenter>
+        <Stepper
+          value={stepValue}
+          className="w-full"
+          indicators={{
+            completed: <CheckIcon className="size-3.5" />,
+            loading: <LoaderCircleIcon className="size-3.5 animate-spin" />,
+          }}
+        >
+          <StepperNav>
+            {STEPS.map((label, i) => {
+              const step = i + 1;
+              return (
+                <StepperItem key={label} step={step} loading={step === busyStep} className="not-last:flex-1">
+                  <StepperTrigger className="cursor-default">
+                    <StepperIndicator className="data-[state=completed]:bg-green-500 data-[state=completed]:text-white">
+                      {step}
+                    </StepperIndicator>
+                    <StepperTitle className="data-[state=inactive]:text-muted-foreground data-[state=inactive]:font-normal">
+                      {label}
+                    </StepperTitle>
+                  </StepperTrigger>
+                  {i < STEPS.length - 1 && (
+                    <StepperSeparator className="data-[state=completed]:bg-green-500" />
+                  )}
+                </StepperItem>
+              );
+            })}
+          </StepperNav>
+        </Stepper>
+      </HeaderCenter>
+      <HeaderRight>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/channels" })}>
+            <X className="mr-2 size-4" /> Cancel
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPreviewMode(true)}
+            disabled={previewMode || totals.selected === 0}
+          >
+            <Eye className="mr-2 size-4" />
+            {previewMode ? "Live preview on" : "Preview"}
+          </Button>
+          <Button size="sm" onClick={onSubmit} disabled={totals.selected === 0 || submitting}>
+            {submitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : <PackageCheck className="mr-2 size-4" />}
+            Submit
+          </Button>
         </div>
-        <Stepper index={stepIndex} />
-      </FrameHeader>
+      </HeaderRight>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {packages.map((pkg) => (
-          <PackageCard
-            key={pkg.key}
-            pkg={pkg}
-            sourceId={catalog.data.sourceId}
-            isOn={isOn}
-            onToggleChannel={toggle}
-            onTogglePackage={() => togglePackage(pkg.channels)}
-            previewMode={previewMode}
-            previews={previews}
-          />
-        ))}
-      </div>
-    </Frame>
+      <Frame>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {packages.map((pkg) => (
+            <PackageCard
+              key={pkg.key}
+              pkg={pkg}
+              sourceId={catalog.data.sourceId}
+              isOn={isOn}
+              onToggleChannel={toggle}
+              onTogglePackage={() => togglePackage(pkg.channels)}
+              previewMode={previewMode}
+              previews={previews}
+            />
+          ))}
+        </div>
+      </Frame>
+    </>
   );
 }
 
 const STEPS = ["Select", "Preview", "Review & build"];
-
-/** A compact horizontal 1-2-3 progress stepper. */
-function Stepper({ index }: { index: number }) {
-  return (
-    <ol className="flex items-center gap-2 text-xs">
-      {STEPS.map((label, i) => {
-        const done = i < index;
-        const active = i === index;
-        return (
-          <li key={label} className="flex items-center gap-2">
-            <span
-              className={
-                "flex size-5 items-center justify-center rounded-full border text-[10px] font-semibold " +
-                (done
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : active
-                    ? "border-primary text-primary"
-                    : "border-border text-muted-foreground")
-              }
-            >
-              {done ? <Check className="size-3" /> : i + 1}
-            </span>
-            <span className={active ? "text-foreground font-medium" : "text-muted-foreground"}>{label}</span>
-            {i < STEPS.length - 1 && <span className="bg-border mx-1 h-px w-6" />}
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
 
 function PackageCard({
   pkg,
@@ -315,11 +346,17 @@ function PackageCard({
           onToggle={() => onToggleChannel(ch.key)}
           previewMode={previewMode}
           entry={previews[ch.key]}
+          inheritedIcon={pkg.icon}
+          inheritedTint={pkg.tint}
         />
       ))}
     </FramePanel>
   );
 }
+
+/** A fixed, larger-poster grid for the hovercard (the shared tiles' default grid is viewport-responsive,
+ *  which renders tiny cramped tiles inside a fixed-width card). */
+const HOVER_GRID = "grid grid-cols-4 gap-3";
 
 function ChannelRow({
   ch,
@@ -328,6 +365,8 @@ function ChannelRow({
   onToggle,
   previewMode,
   entry,
+  inheritedIcon,
+  inheritedTint,
 }: {
   ch: CatalogChannel;
   sourceId: string;
@@ -335,26 +374,88 @@ function ChannelRow({
   onToggle: () => void;
   previewMode: boolean;
   entry?: PreviewEntry;
+  inheritedIcon?: string | null;
+  inheritedTint?: string | null;
 }) {
-  const badge = diffBadge(ch.exists, ch.presetChanged, on);
-  return (
-    <div className={"flex items-center gap-3 p-3" + (on ? "" : " opacity-60")}>
-      <Switch checked={on} onCheckedChange={onToggle} aria-label={`Toggle ${ch.name}`} />
+  // Once a NEW channel's preview resolves below its min-items floor, the build will skip it — surface that as
+  // a "Skip" badge (overriding "New") so the outcome is unmistakable before submit.
+  const willSkip =
+    on && !ch.exists && entry?.status === "done" && entry.minItems != null && (entry.count ?? 0) < entry.minItems;
+  const badge = willSkip
+    ? { label: "Skip", cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400" }
+    : diffBadge(ch.exists, ch.presetChanged, on);
+  const tile = resolveTile({ icon: ch.icon, tint: ch.tint, inheritedIcon, inheritedTint, defaultIcon: Tv });
+
+  const rowBody = (
+    <div
+      className={"hover:bg-muted/50 flex items-start gap-3 p-3 transition-colors" + (on ? "" : " opacity-60")}
+    >
+      <Switch checked={on} onCheckedChange={onToggle} className="mt-0.5" aria-label={`Toggle ${ch.name}`} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm">
-          <span className="text-muted-foreground tabular-nums">{ch.number}</span> {ch.name}
-          {ch.callsign ? <span className="text-muted-foreground"> · {ch.callsign}</span> : null}
-        </p>
+        {/* Row 1: number + name + callsign, with the diff badge pinned right (never shifts). */}
+        <div className="flex items-center justify-between gap-2">
+          <p className="truncate text-sm font-medium">
+            <span className="text-muted-foreground tabular-nums">{ch.number}</span> {ch.name}
+            {ch.callsign ? <span className="text-muted-foreground font-normal"> · {ch.callsign}</span> : null}
+          </p>
+          {badge && (
+            <span className={"shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium " + badge.cls}>
+              {badge.label}
+            </span>
+          )}
+        </div>
+        {/* Row 2: truncated description, with the resolved count / spinner pinned right. */}
+        <div className="mt-0.5 flex items-center justify-between gap-2">
+          <p className="text-muted-foreground truncate text-xs">{ch.description}</p>
+          {previewMode && on && <PreviewMetric ch={ch} entry={entry} />}
+        </div>
       </div>
-      {badge && (
-        <span className={"shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium " + badge.cls}>{badge.label}</span>
-      )}
-      {previewMode && on && <PreviewCount ch={ch} sourceId={sourceId} entry={entry} />}
     </div>
+  );
+
+  // No hovercard for a disabled channel — it isn't being previewed, so there's nothing to show.
+  if (!on) return rowBody;
+
+  return (
+    <HoverCard>
+      <HoverCardTrigger delay={100} render={<div />}>
+        {rowBody}
+      </HoverCardTrigger>
+      <HoverCardContent className="flex w-[34rem] flex-col p-0">
+        {/* Header: tinted tile + name/description. */}
+        <div className={"flex shrink-0 items-center gap-3 p-4" + (previewMode ? " border-b" : "")}>
+          <AccentIconTile icon={tile.Icon} tint={tile.tint} size="xl" />
+          <div className="min-w-0">
+            <p className="truncate font-medium">{ch.name}</p>
+            <p className="text-muted-foreground text-xs">{ch.description}</p>
+          </div>
+        </div>
+        {/* Scrollable preview tiles — only once we're actually previewing (nothing resolves before that). */}
+        {previewMode && (
+          <div className="p-4">
+            {entry?.status === "done" ? (
+              <ChannelPreviewTiles
+                sourceId={sourceId}
+                gridClassName={HOVER_GRID}
+                data={{
+                  totalItems: entry.count ?? 0,
+                  showCount: entry.showCount ?? 0,
+                  movieCount: entry.movieCount ?? 0,
+                  items: entry.items ?? [],
+                }}
+              />
+            ) : (
+              <PreviewSkeleton count={8} gridClassName={HOVER_GRID} />
+            )}
+          </div>
+        )}
+      </HoverCardContent>
+    </HoverCard>
   );
 }
 
-function PreviewCount({ ch, sourceId, entry }: { ch: CatalogChannel; sourceId: string; entry?: PreviewEntry }) {
+/** Row-2 metric: a spinner while resolving, then the exact count (amber if it will be skipped). */
+function PreviewMetric({ ch, entry }: { ch: CatalogChannel; entry?: PreviewEntry }) {
   if (!entry || entry.status === "loading") {
     return <Loader2 className="text-muted-foreground size-3.5 shrink-0 animate-spin" />;
   }
@@ -362,31 +463,14 @@ function PreviewCount({ ch, sourceId, entry }: { ch: CatalogChannel; sourceId: s
     return <span className="text-destructive shrink-0 text-[10px]">failed</span>;
   }
   const count = entry.count ?? 0;
-  // A NEW channel under its min-items floor will be skipped on build; flag it.
   const willSkip = !ch.exists && entry.minItems != null && count < entry.minItems;
-  const data: ChannelPreviewData = {
-    totalItems: count,
-    showCount: entry.showCount ?? 0,
-    movieCount: entry.movieCount ?? 0,
-    items: entry.items ?? [],
-  };
   return (
-    <HoverCard>
-      <HoverCardTrigger
-        render={
-          <button
-            type="button"
-            className={"shrink-0 text-xs tabular-nums " + (willSkip ? "text-amber-500" : "text-muted-foreground")}
-            title={willSkip ? `Below the ${entry.minItems}-item minimum — will be skipped` : undefined}
-          />
-        }
-      >
-        {count.toLocaleString()}
-      </HoverCardTrigger>
-      <HoverCardContent className="w-96">
-        <ChannelPreviewTiles sourceId={sourceId} data={data} />
-      </HoverCardContent>
-    </HoverCard>
+    <span
+      className={"shrink-0 text-xs tabular-nums " + (willSkip ? "text-amber-500" : "text-muted-foreground")}
+      title={willSkip ? `Below the ${entry.minItems}-item minimum — will be skipped` : undefined}
+    >
+      {count.toLocaleString()}
+    </span>
   );
 }
 
@@ -399,29 +483,42 @@ function diffBadge(exists: boolean, presetChanged: boolean, on: boolean): { labe
   return null;
 }
 
-/** The net-outcome summary shown in the confirm dialog. */
+/** The net-outcome breakdown shown in the confirm dialog: a labeled section per op with a count badge and
+ *  the affected channels listed beneath it. */
 function NetOutcome({ plan }: { plan: PlanResult }) {
-  const { counts } = plan;
-  const line = (n: number, verb: string) => (n === 1 ? `${n} channel to ${verb}` : `${n} channels to ${verb}`);
+  const groups = [
+    { label: "Will create", items: plan.create, cls: "bg-green-500/15 text-green-600 dark:text-green-400" },
+    { label: "Will update", items: plan.update, cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400" },
+    { label: "Will delete", items: plan.delete, cls: "bg-red-500/15 text-red-600 dark:text-red-400" },
+  ];
   return (
-    <div className="space-y-2 text-sm">
-      <p>
-        This will <strong className="text-green-600 dark:text-green-400">{line(counts.create, "create")}</strong>,{" "}
-        <strong className="text-amber-600 dark:text-amber-400">{line(counts.update, "update")}</strong>, and{" "}
-        <strong className="text-red-600 dark:text-red-400">{line(counts.delete, "delete")}</strong>.{" "}
-        <span className="text-muted-foreground">{counts.unchanged} left unchanged.</span>
-      </p>
-      {counts.delete > 0 && (
-        <div className="text-muted-foreground max-h-32 overflow-y-auto text-xs">
-          <p className="text-foreground font-medium">Deleting:</p>
-          <ul className="list-disc pl-4">
-            {plan.delete.map((d) => (
-              <li key={d.channelKey}>
-                {d.channelName} <span className="opacity-70">({d.packageName})</span>
-              </li>
-            ))}
-          </ul>
+    <div className="max-h-[24rem] space-y-3 overflow-y-auto pr-1">
+      {groups.map((g) => (
+        <div key={g.label}>
+          <div className="mb-1 flex items-center gap-2">
+            <span className="text-sm font-medium">{g.label}</span>
+            <span className={"rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums " + g.cls}>
+              {g.items.length}
+            </span>
+          </div>
+          {g.items.length > 0 ? (
+            <ul className="space-y-0.5 pl-0.5 text-xs">
+              {g.items.map((c) => (
+                <li key={c.channelKey} className="truncate">
+                  <span className="text-muted-foreground tabular-nums">{c.number}</span> {c.channelName}
+                  <span className="text-muted-foreground"> · {c.packageName}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-muted-foreground pl-0.5 text-xs">None</p>
+          )}
         </div>
+      ))}
+      {plan.counts.unchanged > 0 && (
+        <p className="text-muted-foreground border-t pt-2 text-xs">
+          {plan.counts.unchanged} unchanged, left as-is.
+        </p>
       )}
     </div>
   );

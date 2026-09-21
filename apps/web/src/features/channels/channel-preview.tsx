@@ -32,6 +32,7 @@ export function ChannelPreviewTiles({
   sourceId,
   data,
   loading,
+  gridClassName,
 }: {
   /** Artwork proxy key: a SAVED channel (edit page). */
   channelId?: string;
@@ -39,13 +40,15 @@ export function ChannelPreviewTiles({
   sourceId?: string;
   data?: ChannelPreviewData;
   loading?: boolean;
+  /** Override the responsive tile grid (e.g. a fixed, larger-poster grid inside a hovercard). */
+  gridClassName?: string;
 }) {
   // While (re)resolving, show layout-matched skeletons, not a bare spinner. When there are results on screen
   // already (a reload), render the SAME number of tile skeletons so the area doesn't jump; on the first load
   // (no results yet) a single desktop row is enough.
   if (loading) {
     const count = data && data.items.length > 0 ? data.items.length : ONE_ROW;
-    return <PreviewSkeleton count={count} />;
+    return <PreviewSkeleton count={count} gridClassName={gridClassName} />;
   }
   if (!data) return null;
   if (data.totalItems === 0) {
@@ -67,7 +70,7 @@ export function ChannelPreviewTiles({
         {data.movieCount > 0 && ` · ${plural(data.movieCount, "movie")}`}
       </p>
       {/* Capped to ~2 rows of posters (tuned for the wide lg:8-col desktop layout); the rest scrolls. */}
-      <div className={cn(GRID_CLASS, "max-h-[30rem] overflow-y-auto pr-1")}>
+      <div className={cn(gridClassName ?? GRID_CLASS, "max-h-[30rem] overflow-y-auto pr-1")}>
         {data.items.map((it) => (
           <PreviewTile key={it.ratingKey} channelId={channelId} sourceId={sourceId} item={it} />
         ))}
@@ -81,12 +84,12 @@ export function ChannelPreviewTiles({
  * skeletons (poster at the same 2/3 aspect, plus title + subtitle bars) on the same responsive grid. `count`
  * matches the on-screen results during a reload; it's ONE_ROW on the first-ever load.
  */
-export function PreviewSkeleton({ count }: { count: number }) {
+export function PreviewSkeleton({ count, gridClassName }: { count: number; gridClassName?: string }) {
   return (
     <div className="space-y-2.5">
       {/* stand-in for the "N items · X shows · Y movies" metric line */}
       <Skeleton className="h-3.5 w-44" />
-      <div className={cn(GRID_CLASS, "max-h-[30rem] overflow-hidden pr-1")}>
+      <div className={cn(gridClassName ?? GRID_CLASS, "max-h-[30rem] overflow-hidden pr-1")}>
         {Array.from({ length: count }, (_, i) => (
           <div key={i} className="flex flex-col gap-1">
             <Skeleton className="aspect-[2/3] rounded-md border" />
