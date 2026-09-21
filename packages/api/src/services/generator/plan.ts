@@ -2,7 +2,7 @@ import type { PrismaClient } from "@airwave/db";
 
 import { channelAccentAt } from "../accents";
 import { normalizeCallsign, uniqueCallsign } from "./callsign";
-import { hashPresetChannel, PRESET_PACKAGES, type PresetChannel, type PresetPackage } from "./presets";
+import { hashPresetChannel, type MediaType, PRESET_PACKAGES, type PresetChannel, type PresetPackage } from "./presets";
 
 /**
  * - "all": reconcile every generated package + channel against the selection.
@@ -179,4 +179,71 @@ export async function planPresetBuild(
   }
 
   return { create, update, delete: del, unchanged };
+}
+
+// --- catalog (staging grid, badges before any resolve) ---------------------
+
+export type PresetCatalogChannel = {
+  key: string;
+  name: string;
+  callsign: string;
+  number: number;
+  description: string;
+  icon?: string;
+  tint?: string;
+  mediaTypes: MediaType[];
+  /** A generated channel with this preset key already exists for the source. */
+  exists: boolean;
+  /** It exists AND its stored `presetRev` differs from the current preset hash (would be updated). */
+  presetChanged: boolean;
+};
+
+export type PresetCatalogPackage = {
+  key: string;
+  name: string;
+  description: string;
+  icon: string;
+  tint: string;
+  sortIndex: number;
+  channels: PresetCatalogChannel[];
+};
+
+/**
+ * The full preset catalog annotated with each channel's current diff state (`exists`, `presetChanged`), so
+ * the staging grid can render package cards + New/Update/Unchanged/Remove badges BEFORE resolving any filter.
+ */
+export async function getPresetCatalog(
+  prisma: PrismaClient,
+  sourceId: string,
+): Promise<PresetCatalogPackage[]> {
+  const existing = await prisma.channel.findMany({
+    where: { generated: true, mediaSourceId: sourceId },
+    select: { presetKey: true, presetRev: true },
+  });
+  const revByKey = new Map<string, string | null>();
+  for (const c of existing) if (c.presetKey) revByKey.set(c.presetKey, c.presetRev);
+
+  return PRESET_PACKAGES.map((pkg) => ({
+    key: pkg.key,
+    name: pkg.name,
+    description: pkg.description,
+    icon: pkg.icon,
+    tint: pkg.tint,
+    sortIndex: pkg.sortIndex,
+    channels: pkg.channels.map((ch) => {
+      const exists = revByKey.has(ch.key);
+      return {
+        key: ch.key,
+        name: ch.name,
+        callsign: ch.callsign,
+        number: ch.number,
+        description: ch.description,
+        icon: ch.icon,
+        tint: ch.tint,
+        mediaTypes: ch.mediaTypes,
+        exists,
+        presetChanged: exists && revByKey.get(ch.key) !== hashPresetChannel(ch),
+      };
+    }),
+  }));
 }

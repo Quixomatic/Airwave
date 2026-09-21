@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.20] - 2026-09-21
+
+Preset generator revamp, Phase 1: the server side of the staging/preview experience. No UI yet.
+
+### Added
+- A `preset` tRPC router with three read procedures:
+  - `catalog` — the full preset catalog annotated per channel with its diff state (`exists`, `presetChanged`),
+    so the staging grid can badge New / Update / Unchanged / Remove before resolving anything.
+  - `preview` — one disposable, exact resolve of a single preset channel, returning both the exact count and
+    the poster-tile artwork (reuses the channel builder's `previewFilter`). Nothing is persisted.
+  - `plan` — the net-outcome tally + lists (create / update / delete / unchanged) for a selection, backing
+    the pre-submit confirm dialog. A thin wrapper over the same diff engine the build runs.
+
 ## [0.14.19] - 2026-09-21
 
 Preset generator revamp, Phase 0: the foundation for a staged, non-destructive preset build. No user-facing
