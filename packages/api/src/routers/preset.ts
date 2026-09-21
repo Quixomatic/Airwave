@@ -5,6 +5,7 @@ import { adminProcedure, router } from "../index";
 import { generateLineup } from "../services/generator/generate";
 import { type PresetChannelOp, getPresetCatalog, planPresetBuild } from "../services/generator/plan";
 import { finishPresetRun, startPresetRun } from "../services/generator/preset-run";
+import { getPresetRunner } from "../services/generator/preset-runner";
 import { PRESET_CHANNELS_BY_KEY } from "../services/generator/presets";
 import { previewFilter } from "../services/agent/tools";
 
@@ -104,23 +105,44 @@ export const presetRouter = router({
     }),
 
   /**
-   * Dispatch a reconcile build for the selection and return its `runId`. This phase runs the sequential
-   * JOB path in the background (the dedicated workflow fanout + workflow-vs-job dispatch branch land in
-   * later phases); a crash mid-run is recovered by the resume sweep. Idempotent per channel, so re-running
-   * is safe.
+   * Dispatch a reconcile build for the selection and return OUR `runId` (the `PresetRun.id`). When the
+   * workflow engine is up, it runs as the durable fanout workflow; otherwise it runs the sequential JOB path
+   * in the background (recovered by the startup resume sweep if the process dies mid-run). Idempotent per
+   * channel, so re-running is safe either way.
    */
   build: adminProcedure
     .input(z.object({ selection: selectionSchema, sourceId: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const sourceId = await resolveSourceId(ctx.prisma, input.sourceId);
+      const runner = getPresetRunner();
+
+      if (runner) {
+        // Workflow path: create the run row first (our id is the identity), dispatch, then record the WDK
+        // run id on the row so Stop can cancel the durable run.
+        const runId = await startPresetRun(ctx.prisma, {
+          sourceId,
+          userId: ctx.session.user.id,
+          mode: "workflow",
+          selection: input.selection,
+        });
+        try {
+          const { workflowRunId } = await runner.start({ sourceId, userId: ctx.session.user.id, selection: input.selection, runId });
+          await ctx.prisma.presetRun.update({ where: { id: runId }, data: { workflowRunId } });
+        } catch (err) {
+          await finishPresetRun(ctx.prisma, runId, { status: "failed" });
+          throw err;
+        }
+        return { runId };
+      }
+
+      // Job fallback: fire-and-forget the sequential build (returns the runId immediately). finishPresetRun
+      // is called inside generateLineup on success; guard failures here.
       const runId = await startPresetRun(ctx.prisma, {
         sourceId,
         userId: ctx.session.user.id,
         mode: "job",
         selection: input.selection,
       });
-      // Fire-and-forget the sequential build; the request returns the runId immediately (like the AI
-      // lineup dispatch). finishPresetRun is called inside generateLineup on success; guard failures here.
       void generateLineup(ctx.prisma, sourceId, { selection: input.selection, runId }).catch(async (err) => {
         console.error("[preset.build] build failed:", err);
         await finishPresetRun(ctx.prisma, runId, { status: "failed" });

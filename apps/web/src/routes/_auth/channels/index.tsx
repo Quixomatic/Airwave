@@ -535,7 +535,7 @@ function ChannelsList() {
             desc="Stage a lineup from the built-in preset catalog: pick channels, preview, then build. Fast, deterministic, no AI."
             onClick={() => {
               setGenOpen(false);
-              void navigate({ to: "/preset/new" });
+              void navigate({ to: "/channels/preset" });
             }}
             disabled={genRunning}
           />

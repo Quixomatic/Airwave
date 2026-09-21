@@ -25,7 +25,7 @@ import { ChannelPreviewTiles, PreviewSkeleton } from "@/features/channels/channe
 import { resolveTile } from "@/features/icons/app-icon";
 import { trpc, trpcClient } from "@/utils/trpc";
 
-export const Route = createFileRoute("/_auth/preset/new")({
+export const Route = createFileRoute("/_auth/channels/preset")({
   staticData: { breadcrumb: "Preset generator" },
   component: PresetStagingPage,
 });
@@ -256,9 +256,6 @@ function PresetStagingPage() {
       </HeaderCenter>
       <HeaderRight>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/channels" })}>
-            <X className="mr-2 size-4" /> Cancel
-          </Button>
           <Button
             variant="outline"
             size="sm"

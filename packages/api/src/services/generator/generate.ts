@@ -166,8 +166,15 @@ async function rebuildSchedule(prisma: PrismaClient, channelId: string, label: s
   }
 }
 
+/** Load the resolve source (decrypted token) for a media source, or throw if it isn't connected. */
+export async function loadPresetSource(prisma: PrismaClient, sourceId: string): Promise<ResolveSource> {
+  const source = await prisma.mediaSource.findUnique({ where: { id: sourceId } });
+  if (!source?.baseUrl) throw new Error("Source is not connected.");
+  return { id: source.id, baseUrl: source.baseUrl, token: decryptToken(source.token) };
+}
+
 /** Upsert the generated package metadata for the scope, keeping ids stable across builds. */
-async function upsertPackages(prisma: PrismaClient, scope: GenerateScope): Promise<Map<string, string>> {
+export async function upsertPresetPackages(prisma: PrismaClient, scope: GenerateScope): Promise<Map<string, string>> {
   const pkgIdByKey = new Map<string, string>();
   for (const pkg of packagesFor(scope)) {
     const row = await prisma.channelPackage.upsert({
@@ -218,11 +225,9 @@ export async function generateLineup(
   } = {},
 ): Promise<GenerateResult> {
   const scope = opts.scope ?? "all";
-  const source = await prisma.mediaSource.findUnique({ where: { id: sourceId } });
-  if (!source?.baseUrl) throw new Error("Source is not connected.");
-  const src: ResolveSource = { id: source.id, baseUrl: source.baseUrl, token: decryptToken(source.token) };
+  const src = await loadPresetSource(prisma, sourceId);
 
-  const pkgIdByKey = await upsertPackages(prisma, scope);
+  const pkgIdByKey = await upsertPresetPackages(prisma, scope);
 
   if (scope === "packages") {
     return { scope: "packages", packages: pkgIdByKey.size, channelsCreated: 0, channelsUpdated: 0, channelsDeleted: 0, skipped: [] };
@@ -301,4 +306,28 @@ export async function generateLineup(
     channelsDeleted: deleted,
     skipped,
   };
+}
+
+/**
+ * Resume any JOB-mode preset build left `running` by a process that died mid-run — called once on server
+ * startup (regardless of `WORKFLOW_ENABLED`, since job runs happen when the engine is off). Recomputes the
+ * diff from CURRENT state and finishes the remainder: already-applied ops drop out naturally (created/updated
+ * channels now match their `presetRev` → unchanged; deleted ones are already gone), so it is idempotent with
+ * no wipe/bookkeeping to reconcile. Workflow-mode runs resume via the WDK itself, not here.
+ */
+export async function resumePresetJobRuns(prisma: PrismaClient): Promise<void> {
+  const stuck = await prisma.presetRun.findMany({
+    where: { status: "running", mode: "job" },
+    select: { id: true, sourceId: true, selection: true },
+  });
+  if (stuck.length === 0) return;
+  console.log(`[preset] resuming ${stuck.length} interrupted job run(s)`);
+  for (const run of stuck) {
+    const sel = run.selection as { channelKeys?: string[] } | null;
+    const selection = sel?.channelKeys ? { channelKeys: sel.channelKeys } : undefined;
+    void generateLineup(prisma, run.sourceId, { selection, runId: run.id }).catch(async (err) => {
+      console.error(`[preset] resume failed for ${run.id}:`, err);
+      await finishPresetRun(prisma, run.id, { status: "failed" });
+    });
+  }
 }

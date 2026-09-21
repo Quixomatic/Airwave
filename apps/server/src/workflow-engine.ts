@@ -21,11 +21,13 @@
  */
 import prisma from "@airwave/db";
 import { setLineupRunner } from "@airwave/api/services/agent/lineup-runner";
+import { setPresetRunner } from "@airwave/api/services/generator/preset-runner";
 import { setImportRunner } from "@airwave/api/services/transfer/import-runner";
 import { getAppSettings } from "@airwave/api/services/settings/index";
 
 import { importLineupWorkflow } from "../workflows/import";
 import { aiLineupWorkflow } from "../workflows/lineup";
+import { presetWorkflow } from "../workflows/preset";
 
 /** Run statuses that mean a run is over. Anything else is still "live" and could be resumed. */
 const TERMINAL_RUN_STATUS = new Set(["completed", "failed", "cancelled", "aborted", "expired"]);
@@ -257,6 +259,27 @@ export async function startWorkflowEngine(): Promise<void> {
     },
     async cancel(runId) {
       const run = await getRun(runId);
+      await run?.cancel();
+    },
+  });
+
+  setPresetRunner({
+    // The WDK run id is returned so the dispatch can store it on `PresetRun.workflowRunId` (for cancel);
+    // OUR `args.runId` is the identity everything else reads.
+    async start(args) {
+      const run = await start(presetWorkflow, [args]);
+      console.log(`[workflow] preset run started: WDK ${run.runId} (PresetRun ${args.runId})`);
+      return { workflowRunId: run.runId };
+    },
+    async status(workflowRunId) {
+      const run = await getRun(workflowRunId);
+      if (!run) return null;
+      const status = await run.status;
+      const output = status === "completed" ? await run.returnValue : undefined;
+      return { runId: workflowRunId, status, output };
+    },
+    async cancel(workflowRunId) {
+      const run = await getRun(workflowRunId);
       await run?.cancel();
     },
   });

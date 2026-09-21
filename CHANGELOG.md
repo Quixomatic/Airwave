@@ -2,7 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
-## [0.14.22] - 2026-09-21
+## [0.14.23] - 2026-09-21
+
+Preset generator revamp, Phases 3-4: the dedicated build workflow + the workflow-vs-job dispatch and resume.
+
+### Added
+- A dedicated **preset build workflow** (`apps/server/workflows/preset.ts`) run under the durable engine:
+  a deterministic prepare (upsert packages + diff plan) then a bounded fan-out of per-channel create / update
+  / delete ops, each a retryable step that traces its outcome. Registered via a runner (`preset-runner.ts`),
+  same indirection as the AI-lineup / import workflows.
+- `preset.build` now dispatches the durable workflow when the engine is up, or the sequential job otherwise —
+  both write the same owned `PresetRun` / `PresetRunTrace` rows, so observability is mode-agnostic.
+- A startup **resume sweep**: a job-mode build interrupted by a crash/restart is finished on next boot by
+  recomputing the diff from current state (already-applied ops drop out; idempotent, no bookkeeping).
+- `PresetRun.workflowRunId` — the WDK run id (workflow mode), so a Stop can cancel the durable run.
+
+### Changed
+- The preset staging page moved to `/channels/preset` (under the Channels section) so it carries the
+  "Channels" breadcrumb that navigates back; the redundant Cancel button was removed.
 
 Preset generator revamp: staging page polish + a reusable Stepper, and a leaner preview.
 

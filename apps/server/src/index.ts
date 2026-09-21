@@ -3,6 +3,7 @@ import { appRouter } from "@airwave/api/routers/index";
 import { runAgentChat } from "@airwave/api/services/agent/chat";
 import { createFromUpload } from "@airwave/api/services/bumper-music/library";
 import { contentTypeFor } from "@airwave/api/services/bumper-music/store";
+import { resumePresetJobRuns } from "@airwave/api/services/generator/generate";
 import { startJobs } from "@airwave/api/services/jobs/scheduler";
 import { resolveChannelSource, resolveMediaSource } from "@airwave/api/services/playback/broker";
 import { buildAuthUrl, createPin } from "@airwave/api/services/plex/client";
@@ -286,6 +287,14 @@ try {
   await startWorkflowEngine();
 } catch (err) {
   console.error("Workflow engine startup failed:", err);
+}
+
+// Resume any JOB-mode preset build interrupted by a crash/restart (recomputes the diff from current state).
+// Independent of WORKFLOW_ENABLED — job runs happen when the engine is off. Best-effort, non-blocking.
+try {
+  await resumePresetJobRuns(prisma);
+} catch (err) {
+  console.error("Preset job resume failed:", err);
 }
 
 // Bun's default idleTimeout is 10s, which kills long streaming responses — an AI chat turn (extended

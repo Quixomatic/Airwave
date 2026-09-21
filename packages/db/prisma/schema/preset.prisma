@@ -21,6 +21,11 @@ model PresetRun {
   /// "running" | "done" | "failed" | "cancelled".
   status String @default("running")
 
+  /// The WDK workflow run id (mode="workflow" only), so a Stop can cancel the durable run. Our own `id`
+  /// stays the key everything else reads (traces, the observability page), mode-agnostically. Job mode has
+  /// no separate id — `id` is the job's identity, cancelled via an in-memory AbortController keyed by it.
+  workflowRunId String?
+
   /// The staging selection this run was launched with — the toggled packages/channels. The resume
   /// sweep does NOT trust this as the plan; it recomputes the diff from current state. Kept for audit.
   selection Json

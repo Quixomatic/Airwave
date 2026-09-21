@@ -27,7 +27,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$InstallerVersion = "0.14.22"   # kept in lockstep with the app version by scripts/bump-version.ts
+$InstallerVersion = "0.14.23"   # kept in lockstep with the app version by scripts/bump-version.ts
 $ImageRepo   = "ghcr.io/quixomatic/airwave"
 $ComposeUrl  = if ($env:AIRWAVE_COMPOSE_URL) { $env:AIRWAVE_COMPOSE_URL } else { "https://www.getairwave.tv/docker-compose.yml" }
 $Marker      = ".airwave-install"
