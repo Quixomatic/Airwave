@@ -9,7 +9,7 @@ import {
   FrameTitle,
 } from "@airwave/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import cronstrue from "cronstrue";
 import { ArrowUpRight, CalendarClock, Clock, Hand, History, Loader2, Pencil, Play, X } from "lucide-react";
 import { useState } from "react";
@@ -46,8 +46,15 @@ function SettingsJobs() {
     refetchInterval: (q) => (q.state.data?.some((j) => j.running) ? 1500 : 5000),
   });
   const [editing, setEditing] = useState<Job | null>(null);
+  const navigate = useNavigate();
 
   const run = async (job: Job) => {
+    // The preset generator is now a staged, human-in-the-loop flow — send this to the staging page instead
+    // of firing the old destructive wipe-and-rebuild job.
+    if (job.id === "lineup-generate") {
+      void navigate({ to: "/channels/preset" });
+      return;
+    }
     try {
       await trpcClient.jobs.run.mutate({ id: job.id });
       toast.success(`${job.name} started.`);
@@ -220,6 +227,10 @@ function JobRow({
         {job.running ? (
           <Button variant="outline" size="sm" onClick={() => void onCancel(job)}>
             <X className="mr-1 h-3.5 w-3.5" /> Cancel
+          </Button>
+        ) : job.id === "lineup-generate" ? (
+          <Button variant="outline" size="sm" onClick={() => void onRun(job)}>
+            <ArrowUpRight className="mr-1 h-3.5 w-3.5" /> Open
           </Button>
         ) : (
           <Button variant="outline" size="sm" onClick={() => void onRun(job)}>

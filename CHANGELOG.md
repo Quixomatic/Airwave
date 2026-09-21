@@ -2,6 +2,12 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.26] - 2026-09-21
+
+### Changed
+- The "Auto-Generate Lineup" manual job (Settings → Jobs & Cache) now has an **Open** button that navigates
+  to the staged preset generator (`/channels/preset`) instead of firing the old destructive wipe-and-rebuild.
+
 ## [0.14.25] - 2026-09-21
 
 ### Changed
