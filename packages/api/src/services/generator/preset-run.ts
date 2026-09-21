@@ -2,6 +2,33 @@ import type { Prisma, PrismaClient } from "@airwave/db";
 
 import type { PresetChannelOp, PresetSelection } from "./plan";
 
+// ── Job-mode cancellation registry ────────────────────────────────────────
+// Job builds run in-process (fire-and-forget), so Stop can't go through the WDK. We keep an in-memory
+// AbortController per running job-mode run, keyed by OUR run id; `generateLineup` polls its signal between
+// ops and finishes as "cancelled". In-process only (a restart drops these — but a restart also ends the
+// in-flight build, and the resume sweep recomputes from current state).
+const jobAbortControllers = new Map<string, AbortController>();
+
+/** Register (and return) an AbortController for a job-mode run; pass its signal to `generateLineup`. */
+export function registerPresetAbort(runId: string): AbortController {
+  const controller = new AbortController();
+  jobAbortControllers.set(runId, controller);
+  return controller;
+}
+
+/** Abort a running job-mode build. Returns true if one was registered here. */
+export function abortPresetRun(runId: string): boolean {
+  const controller = jobAbortControllers.get(runId);
+  if (!controller) return false;
+  controller.abort();
+  return true;
+}
+
+/** Drop a run's controller once the build settles. */
+export function clearPresetAbort(runId: string): void {
+  jobAbortControllers.delete(runId);
+}
+
 export type PresetRunMode = "workflow" | "job";
 export type PresetRunStatus = "running" | "done" | "failed" | "cancelled";
 export type PresetTraceStatus = "pending" | "resolving" | "done" | "failed";

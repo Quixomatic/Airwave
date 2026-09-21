@@ -2,7 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
-## [0.14.23] - 2026-09-21
+## [0.14.24] - 2026-09-21
+
+Preset generator revamp, Phase 5: the observability page + Stop.
+
+### Added
+- A **preset build observability page** at `/settings/preset-runs` (runs list + per-run detail), reachable
+  from Settings → Workflows. The detail is package-first: each package a section with its channels lit up
+  create / update / delete / skip and live status, plus a replay timeline and a floating action bar with a
+  global scrubber (drag back to see the build as-observed at any instant) and Stop. Reads our own run/trace
+  tables, so it's identical for workflow- and job-mode builds.
+- `preset.runs` / `preset.run` read procedures and `preset.cancel` — Stop cancels the durable workflow
+  (workflow mode) or aborts the in-process build via an AbortController registry (job mode).
+- Submitting a preset build now navigates straight to its run page.
 
 Preset generator revamp, Phases 3-4: the dedicated build workflow + the workflow-vs-job dispatch and resume.
 

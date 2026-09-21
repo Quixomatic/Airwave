@@ -4,7 +4,13 @@ import { z } from "zod";
 import { adminProcedure, router } from "../index";
 import { generateLineup } from "../services/generator/generate";
 import { type PresetChannelOp, getPresetCatalog, planPresetBuild } from "../services/generator/plan";
-import { finishPresetRun, startPresetRun } from "../services/generator/preset-run";
+import {
+  abortPresetRun,
+  clearPresetAbort,
+  finishPresetRun,
+  registerPresetAbort,
+  startPresetRun,
+} from "../services/generator/preset-run";
 import { getPresetRunner } from "../services/generator/preset-runner";
 import { PRESET_CHANNELS_BY_KEY } from "../services/generator/presets";
 import { previewFilter } from "../services/agent/tools";
@@ -143,10 +149,76 @@ export const presetRouter = router({
         mode: "job",
         selection: input.selection,
       });
-      void generateLineup(ctx.prisma, sourceId, { selection: input.selection, runId }).catch(async (err) => {
-        console.error("[preset.build] build failed:", err);
-        await finishPresetRun(ctx.prisma, runId, { status: "failed" });
-      });
+      const controller = registerPresetAbort(runId);
+      void generateLineup(ctx.prisma, sourceId, { selection: input.selection, runId, signal: controller.signal })
+        .catch(async (err) => {
+          console.error("[preset.build] build failed:", err);
+          await finishPresetRun(ctx.prisma, runId, { status: "failed" });
+        })
+        .finally(() => clearPresetAbort(runId));
       return { runId };
     }),
+
+  /** A list of recent preset runs (for the observability page's run list). */
+  runs: adminProcedure.input(z.object({ limit: z.number().min(1).max(100).optional() }).optional()).query(({ ctx, input }) =>
+    ctx.prisma.presetRun.findMany({
+      orderBy: { startedAt: "desc" },
+      take: input?.limit ?? 25,
+      select: {
+        id: true,
+        mode: true,
+        status: true,
+        created: true,
+        updated: true,
+        deleted: true,
+        startedAt: true,
+        finishedAt: true,
+      },
+    }),
+  ),
+
+  /** One preset run + its per-channel trace rows (the observability detail; mode-agnostic Prisma read). */
+  run: adminProcedure.input(z.object({ runId: z.string() })).query(async ({ ctx, input }) => {
+    const run = await ctx.prisma.presetRun.findUnique({ where: { id: input.runId } });
+    if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found." });
+    const traces = await ctx.prisma.presetRunTrace.findMany({
+      where: { runId: input.runId },
+      orderBy: { startedAt: "asc" },
+      select: {
+        id: true,
+        packageKey: true,
+        packageName: true,
+        channelKey: true,
+        channelName: true,
+        channelNumber: true,
+        op: true,
+        status: true,
+        reason: true,
+        itemCount: true,
+        startedAt: true,
+        finishedAt: true,
+      },
+    });
+    return { run, traces };
+  }),
+
+  /** Stop a running build: cancel the durable workflow (workflow mode) or abort the in-process job. */
+  cancel: adminProcedure.input(z.object({ runId: z.string() })).mutation(async ({ ctx, input }) => {
+    const run = await ctx.prisma.presetRun.findUnique({
+      where: { id: input.runId },
+      select: { id: true, mode: true, status: true, workflowRunId: true },
+    });
+    if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found." });
+    if (run.status !== "running") return { ok: true };
+
+    if (run.mode === "workflow" && run.workflowRunId) {
+      const runner = getPresetRunner();
+      await runner?.cancel(run.workflowRunId).catch((err) => console.warn("[preset.cancel] workflow cancel failed:", err));
+    } else {
+      abortPresetRun(run.id);
+    }
+    // Mark cancelled immediately for a responsive UI; the build's own finish is idempotent.
+    await finishPresetRun(ctx.prisma, run.id, { status: "cancelled" });
+    return { ok: true };
+  }),
 });

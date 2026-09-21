@@ -14,7 +14,7 @@ import {
 } from "@airwave/ui/components/frame";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronRight, DownloadCloud, Workflow } from "lucide-react";
+import { Blocks, ChevronRight, DownloadCloud, Workflow } from "lucide-react";
 
 import { trpc } from "@/utils/trpc";
 
@@ -28,6 +28,8 @@ function WorkflowsIndex() {
   const runCount = runs.data?.length ?? 0;
   const importRuns = useQuery(trpc.transfer.importRuns.queryOptions({ limit: 100 }));
   const importCount = importRuns.data?.length ?? 0;
+  const presetRuns = useQuery(trpc.preset.runs.queryOptions({ limit: 100 }));
+  const presetCount = presetRuns.data?.length ?? 0;
 
   return (
     <Frame>
@@ -64,6 +66,19 @@ function WorkflowsIndex() {
             <div className="text-muted-foreground text-xs">
               Recreate packages + channels from an uploaded lineup — progress and results
               {importCount > 0 ? ` · ${importCount} run${importCount === 1 ? "" : "s"}` : ""}
+            </div>
+          </div>
+          <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
+        </Link>
+        <Link to="/settings/preset-runs" className="hover:bg-muted/50 flex items-center gap-3 p-4">
+          <span className="bg-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-md">
+            <Blocks className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium">Preset Generator</div>
+            <div className="text-muted-foreground text-xs">
+              Reconcile the built-in preset catalog into channels — create / update / delete, per build
+              {presetCount > 0 ? ` · ${presetCount} run${presetCount === 1 ? "" : "s"}` : ""}
             </div>
           </div>
           <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />

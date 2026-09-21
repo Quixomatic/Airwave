@@ -11,7 +11,7 @@ import {
   packagesFor,
   planPresetBuild,
 } from "./plan";
-import { finishPresetRun, startChannelTrace, updateChannelTrace } from "./preset-run";
+import { clearPresetAbort, finishPresetRun, registerPresetAbort, startChannelTrace, updateChannelTrace } from "./preset-run";
 import { PRESET_CHANNELS_BY_KEY, type PresetChannel } from "./presets";
 
 export type { GenerateScope, PresetSelection } from "./plan";
@@ -325,9 +325,12 @@ export async function resumePresetJobRuns(prisma: PrismaClient): Promise<void> {
   for (const run of stuck) {
     const sel = run.selection as { channelKeys?: string[] } | null;
     const selection = sel?.channelKeys ? { channelKeys: sel.channelKeys } : undefined;
-    void generateLineup(prisma, run.sourceId, { selection, runId: run.id }).catch(async (err) => {
-      console.error(`[preset] resume failed for ${run.id}:`, err);
-      await finishPresetRun(prisma, run.id, { status: "failed" });
-    });
+    const controller = registerPresetAbort(run.id);
+    void generateLineup(prisma, run.sourceId, { selection, runId: run.id, signal: controller.signal })
+      .catch(async (err) => {
+        console.error(`[preset] resume failed for ${run.id}:`, err);
+        await finishPresetRun(prisma, run.id, { status: "failed" });
+      })
+      .finally(() => clearPresetAbort(run.id));
   }
 }
