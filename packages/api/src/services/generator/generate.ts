@@ -1,52 +1,175 @@
-import type { PrismaClient } from "@airwave/db";
+import { Prisma, type PrismaClient } from "@airwave/db";
 
-import { channelAccentAt } from "../accents";
 import type { SyncProgress } from "../media/media-item";
 import { resolveFilter } from "../plex/resolve";
 import { decryptToken } from "../plex/token";
 import { INITIAL_WINDOW_SECONDS, generateChannelSchedule } from "../schedule/generate";
-import { normalizeCallsign, uniqueCallsign } from "./callsign";
-import { PRESET_PACKAGES, type PresetPackage } from "./presets";
+import {
+  type GenerateScope,
+  type PresetChannelOp,
+  type PresetSelection,
+  packagesFor,
+  planPresetBuild,
+} from "./plan";
+import { finishPresetRun, startChannelTrace, updateChannelTrace } from "./preset-run";
+import { PRESET_CHANNELS_BY_KEY, type PresetChannel } from "./presets";
 
-/**
- * - "all": rebuild every generated package + channel.
- * - "packages": refresh only package metadata (name/icon/tint/…), leave channels.
- * - { packageKey }: rebuild just that one package's channels.
- */
-export type GenerateScope = "all" | "packages" | { packageKey: string };
+export type { GenerateScope, PresetSelection } from "./plan";
+
+type ResolveSource = { id: string; baseUrl: string; token: string };
 
 export type GenerateResult = {
   scope: string;
   packages: number;
   channelsCreated: number;
+  channelsUpdated: number;
+  channelsDeleted: number;
   skipped: { name: string; count: number; needed: number }[];
 };
 
-function packagesFor(scope: GenerateScope): PresetPackage[] {
-  if (typeof scope === "object") return PRESET_PACKAGES.filter((p) => p.key === scope.packageKey);
-  return PRESET_PACKAGES;
+export type MaterializeResult =
+  | { status: "created"; channelId: string; itemCount: number }
+  | { status: "updated"; channelId: string; itemCount: number }
+  | { status: "skipped"; itemCount: number; needed: number; reason?: string };
+
+const errMsg = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+/** The PREDICATE definition payload for a preset channel. */
+function predicateDef(ch: PresetChannel) {
+  return {
+    kind: "PREDICATE" as const,
+    plexFilter: {
+      mediaTypes: ch.mediaTypes,
+      ...(ch.filter ? { filter: JSON.parse(JSON.stringify(ch.filter)) } : {}),
+    } as Prisma.InputJsonValue,
+  };
 }
 
-/**
- * Auto-lineup generator. Presets are evaluated against the library and instantiated
- * into packages + channels where enough content matches. Idempotent: packages upsert
- * by key (stable ids), generated channels in scope are wiped + rebuilt — manual
- * channels/packages are never touched.
- */
-export async function generateLineup(
-  prisma: PrismaClient,
-  sourceId: string,
-  opts: { scope?: GenerateScope; onProgress?: SyncProgress } = {},
-): Promise<GenerateResult> {
-  const scope = opts.scope ?? "all";
-  const source = await prisma.mediaSource.findUnique({ where: { id: sourceId } });
-  if (!source?.baseUrl) throw new Error("Source is not connected.");
-  const src = { id: source.id, baseUrl: source.baseUrl, token: decryptToken(source.token) };
-  const targets = packagesFor(scope);
+const strategyValue = (ch: PresetChannel) =>
+  ch.strategy ? (JSON.parse(JSON.stringify(ch.strategy)) as Prisma.InputJsonValue) : Prisma.JsonNull;
 
-  // Upsert package metadata (all scopes) — keeps ids stable across regens.
+/**
+ * Create or update ONE preset channel — the shared per-channel op used by both the workflow fanout step
+ * and the sequential job loop. Resolves the filter, then:
+ *  - CREATE (op.channelId absent): skip if under `minItems`, else create the channel + PREDICATE def at the
+ *    reserved number/callsign, and lay a windowed initial schedule. Idempotent on the unique `number`
+ *    (a prior attempt that already created it counts as created).
+ *  - UPDATE (op.channelId set): overwrite the preset-defined fields + `presetRev`, replace the PREDICATE
+ *    def, and rebuild the schedule. Keeps the channel's number, callsign, tint, and enabled flag.
+ *
+ * Only ever touches `generated` channels (callers pass ops derived from the diff, never manual/AI channels).
+ */
+export async function materializePresetChannel(
+  prisma: PrismaClient,
+  src: ResolveSource,
+  op: PresetChannelOp,
+): Promise<MaterializeResult> {
+  const entry = PRESET_CHANNELS_BY_KEY.get(op.channelKey);
+  if (!entry) return { status: "skipped", itemCount: 0, needed: 0, reason: "unknown preset key" };
+  const ch = entry.channel;
+
+  const pkg = await prisma.channelPackage.findUnique({ where: { key: op.packageKey }, select: { id: true } });
+  if (!pkg) throw new Error(`preset package "${op.packageKey}" not found — upsert packages before materializing`);
+
+  const items = await resolveFilter(prisma, src, ch.mediaTypes, ch.filter, "titleSort");
+  const presetRev = op.presetRev!;
+
+  // ---- UPDATE -------------------------------------------------------------
+  if (op.channelId) {
+    await prisma.channel.update({
+      where: { id: op.channelId },
+      data: {
+        name: ch.name,
+        description: ch.description,
+        icon: ch.icon ?? null,
+        ordering: ch.ordering,
+        sortField: ch.sortField ?? "title",
+        sortDir: ch.sortDir ?? "asc",
+        strategy: strategyValue(ch),
+        packageId: pkg.id,
+        presetRev,
+      },
+    });
+    // Replace the channel's definition with the current PREDICATE (preset channels are single-def).
+    await prisma.channelDefinition.deleteMany({ where: { channelId: op.channelId } });
+    await prisma.channelDefinition.create({ data: { channelId: op.channelId, ...predicateDef(ch) } });
+    await rebuildSchedule(prisma, op.channelId, ch.name);
+    return { status: "updated", channelId: op.channelId, itemCount: items.length };
+  }
+
+  // ---- CREATE -------------------------------------------------------------
+  if (items.length < ch.minItems) {
+    return { status: "skipped", itemCount: items.length, needed: ch.minItems };
+  }
+
+  const number = op.assignedNumber!;
+  // Idempotent: a prior attempt (WDK re-dispatch / job resume) may already have created this exact channel.
+  const already = await prisma.channel.findUnique({
+    where: { number },
+    select: { id: true, presetKey: true },
+  });
+  if (already?.presetKey === op.channelKey) {
+    return { status: "created", channelId: already.id, itemCount: items.length };
+  }
+
+  try {
+    const created = await prisma.channel.create({
+      data: {
+        name: ch.name,
+        number,
+        callsign: op.assignedCallsign ?? null,
+        description: ch.description,
+        mediaSourceId: src.id,
+        ordering: ch.ordering,
+        sortField: ch.sortField ?? "title",
+        sortDir: ch.sortDir ?? "asc",
+        strategy: strategyValue(ch),
+        icon: ch.icon ?? null,
+        tint: op.tint ?? null,
+        packageId: pkg.id,
+        generated: true,
+        presetKey: ch.key,
+        presetRev,
+        definitions: { create: predicateDef(ch) },
+      },
+      select: { id: true },
+    });
+    await rebuildSchedule(prisma, created.id, ch.name);
+    return { status: "created", channelId: created.id, itemCount: items.length };
+  } catch (err) {
+    // A unique-constraint hit on `number` means a concurrent attempt won the slot — treat ours as created.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      const existing = await prisma.channel.findUnique({ where: { number }, select: { id: true, presetKey: true } });
+      if (existing?.presetKey === op.channelKey) return { status: "created", channelId: existing.id, itemCount: items.length };
+    }
+    throw err;
+  }
+}
+
+/** Delete one generated preset channel (cascades its definitions + schedule). Idempotent. */
+export async function removePresetChannel(prisma: PrismaClient, channelId: string): Promise<void> {
+  try {
+    await prisma.channel.delete({ where: { id: channelId } });
+  } catch (err) {
+    // Already gone (a prior attempt / concurrent delete) — fine.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") return;
+    throw err;
+  }
+}
+
+/** Build the windowed initial schedule so a channel is watchable the moment the build finishes. Best-effort. */
+async function rebuildSchedule(prisma: PrismaClient, channelId: string, label: string): Promise<void> {
+  try {
+    await generateChannelSchedule(prisma, channelId, { windowSeconds: INITIAL_WINDOW_SECONDS });
+  } catch (err) {
+    console.warn(`[generator] initial schedule build failed for "${label}" (backfill will retry):`, err);
+  }
+}
+
+/** Upsert the generated package metadata for the scope, keeping ids stable across builds. */
+async function upsertPackages(prisma: PrismaClient, scope: GenerateScope): Promise<Map<string, string>> {
   const pkgIdByKey = new Map<string, string>();
-  for (const pkg of targets) {
+  for (const pkg of packagesFor(scope)) {
     const row = await prisma.channelPackage.upsert({
       where: { key: pkg.key },
       create: {
@@ -66,100 +189,116 @@ export async function generateLineup(
         sortIndex: pkg.sortIndex,
         generated: true,
       },
+      select: { id: true },
     });
     pkgIdByKey.set(pkg.key, row.id);
   }
+  return pkgIdByKey;
+}
+
+/**
+ * Auto-lineup generator — the SEQUENTIAL (job) executor. Reconciles the generated channel set to the
+ * selection via {@link planPresetBuild}: creates new channels, updates changed ones, leaves unchanged ones
+ * alone, and deletes turned-off / orphaned ones. Manual + AI channels are never touched. When a `runId` is
+ * given, per-channel outcomes are traced into the owned `PresetRun` ledger; the run row itself is created
+ * and finished by the caller (job dispatch), except here where we finish it if we own the whole run.
+ *
+ * The workflow path does NOT go through this function — it fans the same ops out across steps. This is the
+ * `WORKFLOW_ENABLED=0` fallback (and race-free, being one-at-a-time on the unique `number`).
+ */
+export async function generateLineup(
+  prisma: PrismaClient,
+  sourceId: string,
+  opts: {
+    scope?: GenerateScope;
+    selection?: PresetSelection;
+    onProgress?: SyncProgress;
+    runId?: string;
+    signal?: AbortSignal;
+  } = {},
+): Promise<GenerateResult> {
+  const scope = opts.scope ?? "all";
+  const source = await prisma.mediaSource.findUnique({ where: { id: sourceId } });
+  if (!source?.baseUrl) throw new Error("Source is not connected.");
+  const src: ResolveSource = { id: source.id, baseUrl: source.baseUrl, token: decryptToken(source.token) };
+
+  const pkgIdByKey = await upsertPackages(prisma, scope);
 
   if (scope === "packages") {
-    return { scope: "packages", packages: targets.length, channelsCreated: 0, skipped: [] };
+    return { scope: "packages", packages: pkgIdByKey.size, channelsCreated: 0, channelsUpdated: 0, channelsDeleted: 0, skipped: [] };
   }
 
-  // Wipe the generated channels in scope (all, or just this package's).
-  await prisma.channel.deleteMany({
-    where: {
-      generated: true,
-      mediaSourceId: sourceId,
-      ...(typeof scope === "object" ? { package: { key: scope.packageKey } } : {}),
-    },
-  });
+  const plan = await planPresetBuild(prisma, sourceId, { scope, selection: opts.selection });
+  const { runId } = opts;
 
-  // Reserve numbers used by the surviving (manual + other-scope) channels.
-  const existing = await prisma.channel.findMany({ select: { number: true, callsign: true } });
-  const used = new Set(existing.map((c) => c.number));
-  const nextFree = (n: number) => {
-    let x = n;
-    while (used.has(x)) x++;
-    used.add(x);
-    return x;
-  };
-  const usedCallsigns = new Set(
-    existing.map((c) => c.callsign).filter((c): c is string => !!c),
-  );
-
-  const total = targets.reduce((s, p) => s + p.channels.length, 0);
-  let done = 0;
-  let channelsCreated = 0;
+  let created = 0;
+  let updated = 0;
+  let deleted = 0;
   const skipped: GenerateResult["skipped"] = [];
 
-  for (const pkg of targets) {
-    for (const ch of pkg.channels) {
-      opts.onProgress?.({ current: done++, total, label: ch.name });
-      const items = await resolveFilter(prisma, src, ch.mediaTypes, ch.filter, "titleSort");
-      if (items.length < ch.minItems) {
-        skipped.push({ name: ch.name, count: items.length, needed: ch.minItems });
-        continue;
+  const total = plan.delete.length + plan.create.length + plan.update.length;
+  let done = 0;
+
+  // Deletes first (frees numbers, though the plan already reserved around current state).
+  for (const op of plan.delete) {
+    if (opts.signal?.aborted) break;
+    opts.onProgress?.({ current: done++, total, label: op.channelName });
+    const traceId = runId ? await startChannelTrace(prisma, runId, op) : null;
+    try {
+      await removePresetChannel(prisma, op.channelId!);
+      deleted++;
+      await updateChannelTrace(prisma, traceId, { status: "done" });
+    } catch (err) {
+      console.warn(`[generator] delete failed for "${op.channelName}":`, err);
+      await updateChannelTrace(prisma, traceId, { status: "failed", reason: errMsg(err) });
+    }
+  }
+
+  for (const op of [...plan.create, ...plan.update]) {
+    if (opts.signal?.aborted) break;
+    opts.onProgress?.({ current: done++, total, label: op.channelName });
+    const traceId = runId ? await startChannelTrace(prisma, runId, op) : null;
+    try {
+      const r = await materializePresetChannel(prisma, src, op);
+      if (r.status === "created") {
+        created++;
+        await updateChannelTrace(prisma, traceId, { status: "done", itemCount: r.itemCount });
+      } else if (r.status === "updated") {
+        updated++;
+        await updateChannelTrace(prisma, traceId, { status: "done", itemCount: r.itemCount });
+      } else {
+        skipped.push({ name: op.channelName, count: r.itemCount, needed: r.needed });
+        await updateChannelTrace(prisma, traceId, {
+          status: "done",
+          reason: `only ${r.itemCount} of ${r.needed} needed`,
+          itemCount: r.itemCount,
+        });
       }
-      const created = await prisma.channel.create({
-        data: {
-          name: ch.name,
-          number: nextFree(ch.number),
-          callsign: uniqueCallsign(normalizeCallsign(ch.callsign), usedCallsigns),
-          description: ch.description,
-          mediaSourceId: sourceId,
-          ordering: ch.ordering,
-          sortField: ch.sortField ?? "title",
-          sortDir: ch.sortDir ?? "asc",
-          icon: ch.icon ?? null,
-          // Per-channel accent for guide VARIANCE: cycle the palette by a running index so
-          // adjacent channels contrast, instead of every channel inheriting its package's one
-          // color (which banded the guide). A preset that sets its own `tint` still wins.
-          tint: ch.tint ?? channelAccentAt(channelsCreated),
-          packageId: pkgIdByKey.get(pkg.key)!,
-          generated: true,
-          presetKey: ch.key,
-          definitions: {
-            create: {
-              kind: "PREDICATE",
-              plexFilter: {
-                mediaTypes: ch.mediaTypes,
-                ...(ch.filter ? { filter: JSON.parse(JSON.stringify(ch.filter)) } : {}),
-              },
-            },
-          },
-        },
-      });
-      // Build a WINDOWED initial schedule inline (like the AI + manual paths) so each generated
-      // channel is watchable the moment generation finishes rather than trickling in via
-      // schedule-backfill (25/10min); `schedule-refresh` grows it out from the stored cursor.
-      // Best-effort — a failure leaves it for backfill instead of aborting the whole run. (Note: the
-      // filter resolves twice here — once above for the min-items check, once inside — the same
-      // double-resolve the AI path has; passing the pool through is a future optimisation.)
-      try {
-        await generateChannelSchedule(prisma, created.id, { windowSeconds: INITIAL_WINDOW_SECONDS });
-      } catch (err) {
-        console.warn(`[generator] initial schedule build failed for "${ch.name}" (backfill will retry):`, err);
-      }
-      channelsCreated++;
+    } catch (err) {
+      console.warn(`[generator] build failed for "${op.channelName}":`, err);
+      await updateChannelTrace(prisma, traceId, { status: "failed", reason: errMsg(err) });
     }
   }
 
   // Drop any generated package that ended up with no channels.
   await prisma.channelPackage.deleteMany({ where: { generated: true, channels: { none: {} } } });
 
+  if (runId) {
+    await finishPresetRun(prisma, runId, {
+      status: opts.signal?.aborted ? "cancelled" : "done",
+      created,
+      updated,
+      deleted,
+      skipped,
+    });
+  }
+
   return {
     scope: typeof scope === "object" ? scope.packageKey : scope,
     packages: pkgIdByKey.size,
-    channelsCreated,
+    channelsCreated: created,
+    channelsUpdated: updated,
+    channelsDeleted: deleted,
     skipped,
   };
 }

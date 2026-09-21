@@ -82,6 +82,12 @@ model Channel {
   // they came from, so a regen deletes + rebuilds them without wiping manual channels.
   generated Boolean @default(false)
   presetKey String?
+  // The content HASH of the preset definition this channel was last built from (SHA-256 of the
+  // preset's defining fields, see services/generator/presets.ts `hashPresetChannel`). The diff-reconcile
+  // build compares this to the current preset hash: equal = Unchanged (leave alone), differs = Update.
+  // Unlike `bumperRev` (an incrementing counter bumped on a mutable config), this is a hash because
+  // there is no runtime record to bump when the static `presets.ts` definition changes.
+  presetRev String?
   // Distinct provenance for the AI assistant / workflow (separate from the static generator), so
   // those can be listed + cleanly reverted via `clear_ai_generated`.
   aiGenerated Boolean @default(false)

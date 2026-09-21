@@ -1,0 +1,80 @@
+/// A single run of the non-AI PRESET channel generator (the staged, diff-reconcile build).
+///
+/// WHY THIS TABLE EXISTS — unlike the AI lineup and import runs (whose run row lives in the WDK
+/// `workflow.*` schema and whose traces only join back to it by `workflowRunId`), the preset build
+/// runs in TWO modes: a dedicated workflow when `WORKFLOW_ENABLED`, or the `lineup-generate` job when
+/// not. Owning our own run + trace rows makes the observability page mode-agnostic (it reads Prisma in
+/// either case) and makes the JOB mode resumable: on restart we find `mode="job", status="running"`
+/// rows and recompute the diff from current state to finish the remainder.
+///
+/// A build reconciles the generated channel set to the user's selection via a diff (create new / update
+/// changed / leave unchanged / delete turned-off), so `created`/`updated`/`deleted` are the net tallies.
+model PresetRun {
+  id       String @id @default(cuid())
+  /// The media source the channels were generated against.
+  sourceId String
+  /// Who launched it (null for a scheduled/headless run).
+  userId   String?
+
+  /// "workflow" (WDK fanout) | "job" (sequential fallback). Only the job mode is resumed by us.
+  mode   String
+  /// "running" | "done" | "failed" | "cancelled".
+  status String @default("running")
+
+  /// The staging selection this run was launched with — the toggled packages/channels. The resume
+  /// sweep does NOT trust this as the plan; it recomputes the diff from current state. Kept for audit.
+  selection Json
+
+  /// Net outcome tallies, updated as ops complete.
+  created Int @default(0)
+  updated Int @default(0)
+  deleted Int @default(0)
+  /// Channels skipped for being under `minItems`: [{ name, count, needed }].
+  skipped Json?
+
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  traces PresetRunTrace[]
+
+  @@index([status])
+  @@index([sourceId])
+  @@index([startedAt])
+  @@map("preset_run")
+}
+
+/// One unit of work inside a PresetRun — a package or a single channel op — recorded for the
+/// package-first observability page. Both run modes write these (best-effort; a trace write must never
+/// fail a build op). `kind="package"` rows are the group headers; `kind="channel"` rows are the ops.
+model PresetRunTrace {
+  id    String    @id @default(cuid())
+  runId String
+  run   PresetRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  /// Which package this row belongs to (group key), and its display name.
+  packageKey  String
+  packageName String
+
+  /// The channel this row is about (null for a `kind="package"` header row).
+  channelKey    String?
+  channelName   String?
+  channelNumber Int?
+
+  /// "package" | "channel".
+  kind String
+  /// The diff op for a channel row: "create" | "update" | "delete" | "skip".
+  op   String?
+  /// "pending" | "resolving" | "done" | "failed".
+  status String @default("pending")
+  /// Why it was skipped, or the error summary.
+  reason String?
+  /// Resolved match count for a created/updated channel's filter.
+  itemCount Int?
+
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([runId])
+  @@index([runId, packageKey])
+  @@map("preset_run_trace")
+}

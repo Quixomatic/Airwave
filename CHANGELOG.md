@@ -2,6 +2,33 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.19] - 2026-09-21
+
+Preset generator revamp, Phase 0: the foundation for a staged, non-destructive preset build. No user-facing
+surface yet — this replaces the destructive core and lays the diff engine + run ledger the staging/preview
+and observability work will build on.
+
+### Changed
+- **The preset generator now reconciles instead of wipe-and-rebuild.** `generateLineup` diffs the preset
+  catalog against the generated channels that already exist and only creates new ones, updates changed ones,
+  deletes turned-off / orphaned ones, and leaves unchanged ones alone (schedule and cursor intact). Before,
+  every run deleted all generated channels in scope and rebuilt them from scratch. Manual and AI channels are
+  never touched, exactly as before. (First run after upgrade backfills `presetRev` on existing generated
+  channels, so they read as one-time "updates".)
+
+### Added
+- `Channel.presetRev` — a SHA-256 content hash of a preset channel's defining fields (media types, ordering,
+  sort, filter, strategy, min items, name, callsign, description, icon; excludes the runtime-assigned number
+  and cycled tint). The diff compares this to the current preset hash to decide Unchanged vs Update. The
+  channel `strategy` (grouping/rotation) is part of the hash, so adding a strategy to a preset will correctly
+  flag those channels for update.
+- `planPresetBuild` — the diff-reconcile engine (create / update / delete / unchanged), with two-pass free
+  `number` reservation and callsign de-duplication. Backs both the future staging badges and the build.
+- Shared per-channel ops `materializePresetChannel` (create-or-update, idempotent on the unique number) and
+  `removePresetChannel`, used by both the workflow and job build paths.
+- `PresetRun` + `PresetRunTrace` tables and a `preset-run` trace service — an owned run ledger both build
+  modes write, so the coming observability page reads one Prisma shape regardless of workflow-vs-job.
+
 ## [0.14.18] - 2026-09-18
 
 getairwave.tv: privacy-friendly analytics.

@@ -1,4 +1,7 @@
+import { createHash } from "node:crypto";
+
 import type { FilterCondition, FilterGroupNode, FilterNode, FilterOp } from "../plex/filter-fields";
+import type { ChannelStrategy } from "../schedule/timeline";
 
 export type MediaType = "movie" | "show";
 
@@ -19,6 +22,8 @@ export type PresetChannel = {
   sortDir?: "asc" | "desc";
   /** Undefined = the whole library (of the chosen media types). */
   filter?: FilterNode;
+  /** OPTIONAL grouping/rotation strategy layered over `ordering` (§7.6). Stored on `Channel.strategy`. */
+  strategy?: ChannelStrategy;
   /** Skip this channel if the library has fewer than this many matching items. */
   minItems: number;
 };
@@ -509,3 +514,48 @@ export const PRESET_PACKAGES: PresetPackage[] = [
     ],
   },
 ];
+
+// --- preset content hash (presetRev) ---------------------------------------
+
+/**
+ * Deterministic JSON: object keys sorted recursively so key ORDER never changes the string, while ARRAY
+ * order is preserved (a filter's `children` order and `mediaTypes` order are semantically meaningful).
+ */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`).join(",")}}`;
+}
+
+/**
+ * The content hash stored on a generated channel as `presetRev`. It fingerprints ONLY the fields that
+ * define what the channel is and how it schedules, normalized to the same effective values the channel
+ * row stores (so omitting an optional field hashes identically to setting it to its default). A build
+ * compares this to the stored `presetRev`: equal → Unchanged (leave alone), differ → Update.
+ *
+ * Excludes `number` (runtime-assigned, bumped on collision) and `tint` (accent-cycled at generation) —
+ * neither changes what the channel is.
+ */
+export function hashPresetChannel(ch: PresetChannel): string {
+  const defining = {
+    mediaTypes: ch.mediaTypes,
+    ordering: ch.ordering,
+    sortField: ch.sortField ?? "title",
+    sortDir: ch.sortDir ?? "asc",
+    filter: ch.filter ?? null,
+    strategy: ch.strategy ?? null,
+    minItems: ch.minItems,
+    name: ch.name,
+    callsign: ch.callsign,
+    description: ch.description,
+    icon: ch.icon ?? null,
+  };
+  return createHash("sha256").update(stableStringify(defining)).digest("hex");
+}
+
+/** Flat lookup of every preset channel by its stable `key`, across all packages. */
+export const PRESET_CHANNELS_BY_KEY: Map<string, { pkg: PresetPackage; channel: PresetChannel }> = new Map(
+  PRESET_PACKAGES.flatMap((pkg) => pkg.channels.map((channel) => [channel.key, { pkg, channel }] as const)),
+);
