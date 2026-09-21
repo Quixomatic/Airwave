@@ -19,6 +19,7 @@ import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 
+import { mcpToolsApi } from "./mcp-tools";
 import { restApi } from "./rest";
 import { tvAuthApi } from "./tv-auth";
 import { startWorkflowEngine } from "./workflow-engine";
@@ -235,6 +236,10 @@ app.get("/img/:channelId", async (c) => {
     return c.text("error", 500);
   }
 });
+
+// Admin-key MCP tool dispatch — mounted BEFORE /api/v1 so its own x-api-key guard handles these paths
+// instead of the viewer session middleware in restApi.
+app.route("/api/v1/tools", mcpToolsApi);
 
 app.route("/api/v1", restApi);
 

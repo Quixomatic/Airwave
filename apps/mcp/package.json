@@ -1,0 +1,23 @@
+{
+  "name": "@airwave/mcp",
+  "version": "0.14.28",
+  "private": true,
+  "type": "module",
+  "description": "MCP server exposing a running Airwave server's tools to any MCP-capable agent.",
+  "bin": {
+    "airwave-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "bun build ./src/index.ts --outfile dist/index.js --target bun",
+    "start": "bun run dist/index.js",
+    "dev": "bun run src/index.ts",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.19.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "catalog:"
+  }
+}

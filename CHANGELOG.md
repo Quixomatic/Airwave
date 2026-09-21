@@ -2,7 +2,24 @@
 
 All notable changes to Airwave are documented here.
 
-## [0.14.27] - 2026-09-21
+## [0.14.28] - 2026-09-21
+
+MCP: expose a running server's tools to any MCP-capable agent (infrastructure; key-management UI still to come).
+
+### Added
+- **`apps/mcp`** — a bun stdio MCP server that proxies to a running Airwave server. On start it fetches the
+  server's tool list and declares each as an MCP tool, forwarding calls over HTTP with an admin API key. Thin
+  transport shim: no DB/Plex/auth of its own. `pnpm build` bundles it to a runnable `dist/index.js`.
+- **Admin API keys** via the better-auth `apiKey` plugin (`@better-auth/api-key`), keys prefixed `airwave_`
+  and tied to an admin user; new `apikey` table + migration.
+- **Authenticated tool dispatch on the server** — `/api/v1/tools/list` + `/api/v1/tools/call`
+  (`apps/server/src/mcp-tools.ts`), key-authed (`x-api-key`) and admin-scoped, backed by the SAME
+  `buildAgentTools` registry the AI assistant uses, so MCP has automatic parity with every assistant tool.
+
+### Notes
+- Still pending: generating the admin key at first-run onboarding + an AI-settings UI to create/copy/regenerate
+  it (so there's a way to mint the key), and an optional embedded remote `/mcp` endpoint. See
+  `.plans/airwave-mcp.md`.
 
 ### Changed
 - Channels → Auto-generate: selecting the **AI lineup** tile no longer fires the build immediately. It now

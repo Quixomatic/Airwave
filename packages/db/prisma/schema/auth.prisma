@@ -31,6 +31,7 @@ model User {
   aiConversations AiConversation[]
   packageAccess   UserPackageAccess[]
   channelAccess   UserChannelAccess[]
+  apiKeys         ApiKey[]
 
   @@unique([email])
   @@map("user")
@@ -104,4 +105,34 @@ model DeviceCode {
   updatedAt       DateTime  @updatedAt
 
   @@map("device_code")
+}
+
+// apiKey plugin (better-auth) — long-lived machine keys (MCP tool surface). Field names match what
+// better-auth's adapter expects; the table is `apikey`.
+model ApiKey {
+  id                  String    @id
+  name                String?
+  start               String?
+  prefix              String?
+  key                 String
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refillInterval      Int?
+  refillAmount        Int?
+  lastRefillAt        DateTime?
+  enabled             Boolean   @default(true)
+  rateLimitEnabled    Boolean   @default(true)
+  rateLimitTimeWindow Int?
+  rateLimitMax        Int?
+  requestCount        Int       @default(0)
+  remaining           Int?
+  lastRequest         DateTime?
+  expiresAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  permissions         String?
+  metadata            String?
+
+  @@index([userId])
+  @@map("apikey")
 }

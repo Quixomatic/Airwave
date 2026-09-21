@@ -13,6 +13,7 @@
   "dependencies": {
     "@airwave/db": "workspace:*",
     "@airwave/env": "workspace:*",
+    "@better-auth/api-key": "^1.7.5",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
     "zod": "catalog:"

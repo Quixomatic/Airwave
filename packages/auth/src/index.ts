@@ -2,6 +2,7 @@ import { createPrismaClient } from "@airwave/db";
 import { env } from "@airwave/env/server";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { apiKey } from "@better-auth/api-key";
 import { admin, bearer, deviceAuthorization, genericOAuth, magicLink } from "better-auth/plugins";
 
 import { PLEX_CLIENT_ID, getPinToken, getPlexAccount } from "./lib/plex-login";
@@ -104,6 +105,11 @@ export function createAuth() {
       // session; bearer makes it a token the TV app sends on every REST call.
       // On sign-in the token comes back in the `set-auth-token` response header.
       bearer(),
+
+      // Long-lived API keys (for the MCP tool surface + any machine client). Keys are minted server-side
+      // with an `airwave_` prefix + tied to an admin user, sent as `x-api-key`, and verified via
+      // `auth.api.verifyApiKey`. `enableMetadata` lets a key carry flags (e.g. `readOnly`) for the dispatcher.
+      apiKey({ enableMetadata: true }),
 
       // RFC 8628 device grant — lets a TV log into an EXISTING Airwave
       // account via a user code approved at /device on a phone/computer. This
