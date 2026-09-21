@@ -2,6 +2,29 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.21] - 2026-09-21
+
+Preset generator revamp, Phase 2: the staging page. The "Preset generator" tile now opens a staged,
+human-in-the-loop flow instead of firing a destructive rebuild.
+
+### Added
+- **A preset staging page (`/preset/new`)** reached from Channels → Auto-generate → Preset generator. A
+  1-2-3 stepper (Select → Preview → Review & build) frames the flow:
+  - **Select:** package cards (accent-tinted icons) with per-channel toggles and a per-package toggle, each
+    channel badged from the diff (New / Update / Unchanged / Remove) before anything resolves.
+  - **Preview:** hit Preview to resolve the exact count + poster-tile artwork (on hover) for the enabled
+    channels, streamed with bounded concurrency and cached per channel. Preview is then live: toggling a
+    channel on resolves it, off drops it, re-on is instant from cache. New channels under their item floor
+    are flagged as will-skip.
+  - **Review & build:** Submit opens a net-outcome confirm dialog (create N, update M, delete K, with the
+    delete list) built from the same diff engine, then dispatches the reconcile build.
+- `preset.build` — dispatches a reconcile build for a selection and returns its run id (sequential job path
+  for now; the dedicated workflow and the workflow-vs-job dispatch branch land in the following phases).
+
+### Changed
+- `useConfirm` now takes an optional `body` node — a bespoke content area between the header and footer for
+  richer confirmations (lists, summaries) than a single description line.
+
 ## [0.14.20] - 2026-09-21
 
 Preset generator revamp, Phase 1: the server side of the staging/preview experience. No UI yet.

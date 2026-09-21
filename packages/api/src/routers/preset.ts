@@ -2,7 +2,9 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
+import { generateLineup } from "../services/generator/generate";
 import { type PresetChannelOp, getPresetCatalog, planPresetBuild } from "../services/generator/plan";
+import { finishPresetRun, startPresetRun } from "../services/generator/preset-run";
 import { PRESET_CHANNELS_BY_KEY } from "../services/generator/presets";
 import { previewFilter } from "../services/agent/tools";
 
@@ -96,5 +98,30 @@ export const presetRouter = router({
         update: plan.update.map(toSummary),
         delete: plan.delete.map(toSummary),
       };
+    }),
+
+  /**
+   * Dispatch a reconcile build for the selection and return its `runId`. This phase runs the sequential
+   * JOB path in the background (the dedicated workflow fanout + workflow-vs-job dispatch branch land in
+   * later phases); a crash mid-run is recovered by the resume sweep. Idempotent per channel, so re-running
+   * is safe.
+   */
+  build: adminProcedure
+    .input(z.object({ selection: selectionSchema, sourceId: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const sourceId = await resolveSourceId(ctx.prisma, input.sourceId);
+      const runId = await startPresetRun(ctx.prisma, {
+        sourceId,
+        userId: ctx.session.user.id,
+        mode: "job",
+        selection: input.selection,
+      });
+      // Fire-and-forget the sequential build; the request returns the runId immediately (like the AI
+      // lineup dispatch). finishPresetRun is called inside generateLineup on success; guard failures here.
+      void generateLineup(ctx.prisma, sourceId, { selection: input.selection, runId }).catch(async (err) => {
+        console.error("[preset.build] build failed:", err);
+        await finishPresetRun(ctx.prisma, runId, { status: "failed" });
+      });
+      return { runId };
     }),
 });

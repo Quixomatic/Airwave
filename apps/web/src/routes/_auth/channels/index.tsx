@@ -532,8 +532,11 @@ function ChannelsList() {
           <GeneratorTile
             icon={Blocks}
             title="Preset generator"
-            desc="Rebuild the lineup from the built-in preset catalog. Fast, deterministic, and needs no AI."
-            onClick={() => void runGenerator("lineup-generate")}
+            desc="Stage a lineup from the built-in preset catalog: pick channels, preview, then build. Fast, deterministic, no AI."
+            onClick={() => {
+              setGenOpen(false);
+              void navigate({ to: "/preset/new" });
+            }}
             disabled={genRunning}
           />
           <GeneratorTile

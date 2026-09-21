@@ -13,7 +13,13 @@ import { useCallback, useState, type ReactNode } from "react";
 
 type ConfirmOptions = {
   title: ReactNode;
+  /** Short muted text under the title (rendered inside the description paragraph — keep it inline-level). */
   description?: ReactNode;
+  /**
+   * A bespoke content area rendered between the header and the footer — for richer confirmations that need
+   * block content (lists, tables, a net-outcome summary) rather than a single line of description text.
+   */
+  body?: ReactNode;
   /** Confirm button label. Defaults to "Confirm". */
   confirmLabel?: string;
   /** Cancel button label. Defaults to "Cancel". */
@@ -80,6 +86,7 @@ export function useConfirm() {
                 <AlertDialogDescription>{pending.description}</AlertDialogDescription>
               )}
             </AlertDialogHeader>
+            {pending.body && <div className="px-6 pb-2">{pending.body}</div>}
             {pending.challenge && (
               <div className="space-y-1.5 px-6 pb-4">
                 <Label htmlFor="confirm-challenge">
