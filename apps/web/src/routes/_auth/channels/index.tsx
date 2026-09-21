@@ -146,20 +146,34 @@ function ChannelsList() {
   const aiAvailable = aiConns.some((c) => c.isPlanner) && aiConns.some((c) => c.isWorker);
   const [genOpen, setGenOpen] = useState(false);
   const [genRunning, setGenRunning] = useState(false);
+  // Which generator the user selected in the modal (arms the AI confirm footer). Reset on open/close.
+  const [aiArmed, setAiArmed] = useState(false);
 
-  const runGenerator = async (id: "lineup-generate" | "ai-lineup-build") => {
+  const openGenModal = () => {
+    setAiArmed(false);
+    setGenOpen(true);
+  };
+  const closeGenModal = () => {
+    if (genRunning) return;
+    setAiArmed(false);
+    setGenOpen(false);
+  };
+
+  // Start a real AI lineup build (destructive — replaces the AI lineup) and jump straight to its run page.
+  const startAiLineup = async () => {
+    const sourceId = sources.data?.find((s) => s.ready)?.id;
+    if (!sourceId) {
+      toast.error("Connect and sync a media source first.");
+      return;
+    }
     setGenRunning(true);
     try {
-      await trpcClient.jobs.run.mutate({ id });
-      toast.success(
-        id === "lineup-generate"
-          ? "Generating lineup…"
-          : "AI lineup build started — watch progress under Settings → Workflows.",
-      );
-      await jobs.refetch();
+      const { runId } = await trpcClient.ai.buildLineup.mutate({ sourceId });
       setGenOpen(false);
+      setAiArmed(false);
+      void navigate({ to: "/settings/workflows/ai-lineup/$runId", params: { runId } });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to start generation");
+      toast.error(err instanceof Error ? err.message : "Failed to start the AI lineup build.");
     } finally {
       setGenRunning(false);
     }
@@ -359,7 +373,7 @@ function ChannelsList() {
             <FrameTitle>Channels</FrameTitle>
             <FrameDescription>Live channels built from your enabled libraries.</FrameDescription>
           </div>
-          <Button variant="outline" size="sm" className="shrink-0" onClick={() => setGenOpen(true)} disabled={generating}>
+          <Button variant="outline" size="sm" className="shrink-0" onClick={openGenModal} disabled={generating}>
             {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
             Auto-generate
           </Button>
@@ -522,7 +536,7 @@ function ChannelsList() {
         </FramePanel>
       </Frame>
 
-      <Modal open={genOpen} onClose={() => !genRunning && setGenOpen(false)} className="max-w-lg">
+      <Modal open={genOpen} onClose={closeGenModal} className="max-w-lg">
         <h2 className="font-semibold">Generate a lineup</h2>
         <p className="text-muted-foreground mt-1 text-sm">
           Pick how to build your channels. Each rebuilds only the channels it created before — your
@@ -543,7 +557,8 @@ function ChannelsList() {
             icon={Sparkles}
             title="AI lineup"
             desc="Design a custom lineup with AI, curated from your library's actual content."
-            onClick={() => void runGenerator("ai-lineup-build")}
+            onClick={() => setAiArmed(true)}
+            selected={aiArmed}
             disabled={genRunning || !aiAvailable}
             footer={
               !aiAvailable ? (
@@ -554,6 +569,26 @@ function ChannelsList() {
             }
           />
         </div>
+
+        {aiArmed && (
+          <div className="mt-4 rounded-lg border border-violet-500/30 bg-violet-500/10 p-4">
+            <p className="text-sm font-medium text-violet-700 dark:text-violet-300">Heads up — this replaces your AI lineup</p>
+            <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+              Building an AI lineup <strong>deletes your existing AI-generated channels</strong> and removes any
+              AI packages left empty, then designs and builds a fresh one. Your preset and manual channels are
+              untouched. You can watch it build (and Stop it) on the run page.
+            </p>
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setAiArmed(false)} disabled={genRunning}>
+                Back
+              </Button>
+              <Button size="sm" onClick={() => void startAiLineup()} disabled={genRunning}>
+                {genRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                Continue
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
@@ -567,6 +602,7 @@ function GeneratorTile({
   desc,
   onClick,
   disabled,
+  selected,
   footer,
 }: {
   icon: LucideIcon;
@@ -574,6 +610,7 @@ function GeneratorTile({
   desc: string;
   onClick: () => void;
   disabled?: boolean;
+  selected?: boolean;
   footer?: ReactNode;
 }) {
   const body = (
@@ -597,7 +634,10 @@ function GeneratorTile({
     <button
       type="button"
       onClick={onClick}
-      className="hover:border-primary/60 hover:bg-accent/40 focus-visible:ring-ring rounded-xl border p-4 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+      className={
+        "hover:border-primary/60 hover:bg-accent/40 focus-visible:ring-ring rounded-xl border p-4 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none" +
+        (selected ? " border-violet-500 ring-2 ring-violet-500/40" : "")
+      }
     >
       {body}
     </button>

@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.27] - 2026-09-21
+
+### Changed
+- Channels → Auto-generate: selecting the **AI lineup** tile no longer fires the build immediately. It now
+  highlights the tile and shows a confirm footer warning that the build deletes your existing AI-generated
+  channels (and removes emptied AI packages), with Back / Continue. Continue starts the build and takes you
+  straight to that run's observability page.
+
 ## [0.14.26] - 2026-09-21
 
 ### Changed
