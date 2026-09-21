@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.29] - 2026-09-21
+
+### Fixed
+- Pinned `@better-auth/api-key` to `1.6.23` to match `@better-auth/core` — the caret range had resolved to
+  1.7.5, whose newer core expects a `getIP` export our 1.6.23 core doesn't have, crashing server boot.
+
+### Changed
+- The `apps/mcp` server now reports its real package version to MCP clients (was hardcoded), so it tracks the
+  lockstep bump. (The bump script already auto-discovers `apps/mcp`; no script/skill change needed.)
+
 ## [0.14.28] - 2026-09-21
 
 MCP: expose a running server's tools to any MCP-capable agent (infrastructure; key-management UI still to come).

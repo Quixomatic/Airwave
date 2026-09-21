@@ -17,6 +17,8 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
+import pkg from "../package.json" with { type: "json" };
+
 const BASE = process.env.AIRWAVE_URL?.replace(/\/+$/, "");
 const KEY = process.env.AIRWAVE_API_KEY;
 
@@ -39,7 +41,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 type ToolDescriptor = { name: string; description: string; inputSchema: Record<string, unknown> };
 
 const server = new Server(
-  { name: "airwave", version: "1.0.0" },
+  { name: "airwave", version: pkg.version },
   { capabilities: { tools: {} } },
 );
 
