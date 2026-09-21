@@ -7,10 +7,11 @@
 import { Badge } from "@airwave/ui/components/badge";
 import { Button } from "@airwave/ui/components/button";
 import { Frame, FrameHeader, FramePanel, FrameTitle } from "@airwave/ui/components/frame";
+import { Switch } from "@airwave/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Ban, Check, Loader2, Pencil, Plus, SkipForward, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { Ban, Check, Clock, Loader2, Pencil, Plus, RefreshCw, SkipForward, Trash2, X } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 
 import { useConfirm } from "@/components/confirm-dialog";
@@ -54,15 +55,31 @@ function StatusIcon({ status }: { status: string }) {
   return <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" />;
 }
 
+function StatTile({ icon: Icon, label, value, sub }: { icon: typeof Clock; label: string; value: ReactNode; sub?: ReactNode }) {
+  return (
+    <div className="bg-muted/30 flex items-center gap-3 rounded-md border px-3 py-2.5">
+      <Icon className="text-muted-foreground h-4 w-4 shrink-0" />
+      <div className="min-w-0">
+        <p className="text-muted-foreground text-[11px] tracking-wide uppercase">{label}</p>
+        <p className="truncate text-sm font-semibold">{value}</p>
+        {sub && <p className="text-muted-foreground truncate text-[11px]">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
 function PresetRunDetail() {
   const { runId } = Route.useParams();
   const [scrub, setScrub] = useState<number | null>(null);
   const [stopping, setStopping] = useState(false);
+  // Auto-refresh (default on) polls live runs; off makes Refresh the only way to update.
+  const [autoPoll, setAutoPoll] = useState(true);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   const q = useQuery({
     ...trpc.preset.run.queryOptions({ runId }),
     refetchInterval: (query) => {
+      if (!autoPoll) return false;
       const s = query.state.data?.run.status;
       return s && TERMINAL.has(s) ? false : 2500;
     },
@@ -92,6 +109,16 @@ function PresetRunDetail() {
   const packages = groupByPackage(observed);
 
   const runStatus = scrubbing ? "running" : (run?.status ?? null);
+
+  // Live tallies straight from the trace rows (accurate before the run's final counts are written). A
+  // "create" whose reason mentions the item floor was skipped, not created.
+  const doneRows = observed.filter((t) => t.status === "done");
+  const isSkipRow = (t: Trace) => t.op === "create" && !!t.reason?.includes("needed");
+  const createdCount = doneRows.filter((t) => t.op === "create" && !isSkipRow(t)).length;
+  const updatedCount = doneRows.filter((t) => t.op === "update").length;
+  const deletedCount = doneRows.filter((t) => t.op === "delete").length;
+  const skippedCount = doneRows.filter(isSkipRow).length;
+  const runSecs = scrubMs.length ? Math.round(((isLive ? Date.now() : tEnd) - tMin) / 1000) : null;
 
   const onStop = async () => {
     if (!(await confirm({ title: "Stop this build?", confirmLabel: "Stop", destructive: true }))) return;
@@ -129,14 +156,51 @@ function PresetRunDetail() {
 
       {/* Summary */}
       <Frame>
-        <FrameHeader className="flex-row items-center justify-between gap-2">
-          <FrameTitle className="text-sm">Preset build</FrameTitle>
-          <span className="text-muted-foreground text-xs tabular-nums">
-            <span className="text-emerald-600 dark:text-emerald-400">+{run.created}</span>{" "}
-            <span className="text-amber-600 dark:text-amber-400">~{run.updated}</span>{" "}
-            <span className="text-red-600 dark:text-red-400">-{run.deleted}</span> · {run.mode}
-          </span>
+        <FrameHeader className="flex-row flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            {isLive && <Loader2 className="h-4 w-4 animate-spin text-blue-600" />}
+            <FrameTitle className="font-mono text-sm">{runId}</FrameTitle>
+            {runStatus && (
+              <Badge variant="outline" className={STATUS_TONE[runStatus] ?? ""}>
+                {runStatus[0].toUpperCase() + runStatus.slice(1)}
+              </Badge>
+            )}
+            <Badge variant="outline" className="text-muted-foreground">
+              {run.mode}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="text-muted-foreground flex items-center gap-1.5 text-xs whitespace-nowrap select-none">
+              <Switch checked={autoPoll} onCheckedChange={(v) => setAutoPoll(v === true)} />
+              Auto-refresh
+            </label>
+            <Button size="sm" variant="outline" onClick={() => void q.refetch()} disabled={q.isFetching}>
+              {q.isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Refresh
+            </Button>
+          </div>
         </FrameHeader>
+        <FramePanel>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <StatTile
+              icon={Plus}
+              label="Created"
+              value={<span className="text-emerald-600 dark:text-emerald-400">{createdCount}</span>}
+              sub={skippedCount > 0 ? `${skippedCount} skipped` : undefined}
+            />
+            <StatTile
+              icon={Pencil}
+              label="Updated"
+              value={<span className="text-amber-600 dark:text-amber-400">{updatedCount}</span>}
+            />
+            <StatTile
+              icon={Trash2}
+              label="Deleted"
+              value={<span className="text-red-600 dark:text-red-400">{deletedCount}</span>}
+            />
+            <StatTile icon={Clock} label="Duration" value={runSecs != null ? `${runSecs}s` : isLive ? "running…" : "—"} />
+          </div>
+        </FramePanel>
       </Frame>
 
       {/* Package-first grid */}

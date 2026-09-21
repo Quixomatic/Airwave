@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.25] - 2026-09-21
+
+### Changed
+- Preset build run page: the summary frame now matches the AI-lineup observability — the run id + status/mode
+  badges + a live spinner, an Auto-refresh toggle and a Refresh button, and a Created / Updated / Deleted /
+  Duration stat-tile breakdown (with skipped as a sub-count), derived live from the trace rows.
+
 ## [0.14.24] - 2026-09-21
 
 Preset generator revamp, Phase 5: the observability page + Stop.
