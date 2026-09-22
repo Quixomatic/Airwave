@@ -1,3 +1,4 @@
+import { apiKeyClient } from "@better-auth/api-key/client";
 import {
   adminClient,
   deviceAuthorizationClient,
@@ -43,6 +44,7 @@ export const authClient = createAuthClient({
   baseURL: new URL("/api/auth", getServerUrl(serverUrl())).toString(),
   plugins: [
     adminClient(),
+    apiKeyClient(),
     deviceAuthorizationClient(),
     genericOAuthClient(),
     magicLinkClient(),

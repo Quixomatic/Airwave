@@ -1,6 +1,6 @@
 {
   "name": "server",
-  "version": "0.14.29",
+  "version": "0.14.30",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
@@ -27,8 +27,7 @@
     "hono": "catalog:",
     "pg": "^8.22.0",
     "workflow": "4.3.0",
-    "zod": "catalog:",
-    "zod-to-json-schema": "^3.25.2"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@airwave/config": "workspace:*",

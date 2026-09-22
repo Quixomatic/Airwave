@@ -3,7 +3,6 @@ import { auth } from "@airwave/auth";
 import prisma from "@airwave/db";
 import { Hono } from "hono";
 import type { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 /**
  * Authenticated tool dispatch for the MCP server (`apps/mcp`) and any machine client. Exposes the SAME tool
@@ -25,7 +24,8 @@ app.use("*", async (c, next) => {
   const key = c.req.header("x-api-key");
   if (!key) return c.json({ error: "Missing x-api-key" }, 401);
   const res = await auth.api.verifyApiKey({ body: { key } });
-  const userId = res.valid ? res.key?.userId : undefined;
+  // better-auth 1.6 carries the owning user in `referenceId` (renamed from `userId`).
+  const userId = res.valid ? (res.key as { referenceId?: string } | null)?.referenceId : undefined;
   if (!userId) return c.json({ error: "Invalid API key" }, 401);
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true } });
   if (user?.role !== "admin") return c.json({ error: "Admin API key required" }, 403);
@@ -41,11 +41,19 @@ type AgentTool = {
 
 app.get("/list", (c) => {
   const registry = buildAgentTools(prisma, c.get("userId")) as unknown as Record<string, AgentTool>;
-  const tools = Object.entries(registry).map(([name, t]) => ({
-    name,
-    description: t.description ?? "",
-    inputSchema: zodToJsonSchema(t.inputSchema, { target: "openApi3" }),
-  }));
+  const tools = Object.entries(registry).map(([name, t]) => {
+    // The tool schemas are ZOD 4 — use its native JSON Schema conversion. (The external `zod-to-json-schema`
+    // pkg is zod-3-only and silently returns an empty schema on zod-4 objects, which is why MCP clients showed
+    // "no tools available".) Guarantee an object schema as a fallback.
+    // `unrepresentable: "any"` so `.transform()`s in the filter schema don't throw; `cycles: "ref"` for the
+    // recursive filter node.
+    const toJson = t.inputSchema as unknown as {
+      toJSONSchema: (o: { unrepresentable: "any"; cycles: "ref" }) => Record<string, unknown>;
+    };
+    const raw = toJson.toJSONSchema({ unrepresentable: "any", cycles: "ref" });
+    const inputSchema = raw.type === "object" ? raw : { type: "object", properties: {}, ...raw };
+    return { name, description: t.description ?? "", inputSchema };
+  });
   return c.json({ tools });
 });
 

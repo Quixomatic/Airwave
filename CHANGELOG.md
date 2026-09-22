@@ -2,6 +2,26 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.30] - 2026-09-21
+
+MCP is live end to end: an admin can generate an API key and drive the server's tools from any MCP client.
+
+### Added
+- An **API Keys** settings page (`/settings/api-keys`) — generate / copy / regenerate / revoke a single admin
+  `airwave_` key (via the better-auth `apiKey` client plugin), with an MCP client-config snippet.
+- The `apps/mcp` stdio server now works end to end against `/api/v1/tools/list` + `/call`, exposing all 30
+  assistant tools to any MCP client (Claude Desktop, etc.).
+
+### Fixed
+- MCP tool dispatch: read the key owner from `referenceId` (better-auth 1.6 renamed it from `userId`), and
+  serialize tool schemas with zod 4's native `toJSONSchema({ unrepresentable: "any", cycles: "ref" })` instead
+  of the zod-3-only `zod-to-json-schema` package (which returned empty schemas, so clients saw "no tools").
+- The `apikey` Prisma model is named `Apikey` (so the client accessor is `apikey`, matching better-auth) with
+  `referenceId` + `configId` fields.
+
+### Changed
+- Removed the unused `zod-to-json-schema` dependency from the server.
+
 ## [0.14.29] - 2026-09-21
 
 ### Fixed

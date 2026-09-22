@@ -31,7 +31,6 @@ model User {
   aiConversations AiConversation[]
   packageAccess   UserPackageAccess[]
   channelAccess   UserChannelAccess[]
-  apiKeys         ApiKey[]
 
   @@unique([email])
   @@map("user")
@@ -107,16 +106,17 @@ model DeviceCode {
   @@map("device_code")
 }
 
-// apiKey plugin (better-auth) — long-lived machine keys (MCP tool surface). Field names match what
-// better-auth's adapter expects; the table is `apikey`.
-model ApiKey {
+// apiKey plugin (better-auth) — long-lived machine keys (MCP tool surface). The model is `Apikey` (not
+// `ApiKey`) on purpose: the Prisma client accessor is camelCase(modelName), and better-auth's adapter reads
+// `db.apikey` — `Apikey`→`apikey` matches, whereas `ApiKey`→`apiKey` would not. Table stays `apikey`.
+model Apikey {
   id                  String    @id
   name                String?
   start               String?
   prefix              String?
   key                 String
-  userId              String
-  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referenceId         String
+  configId            String?
   refillInterval      Int?
   refillAmount        Int?
   lastRefillAt        DateTime?
@@ -133,6 +133,6 @@ model ApiKey {
   permissions         String?
   metadata            String?
 
-  @@index([userId])
+  @@index([referenceId])
   @@map("apikey")
 }

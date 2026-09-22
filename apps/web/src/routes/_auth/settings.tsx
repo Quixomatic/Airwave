@@ -8,6 +8,7 @@ const TABS = [
   { label: "Sessions", to: "/settings/sessions" },
   { label: "AI Assistant", to: "/settings/ai" },
   { label: "Jobs & Cache", to: "/settings/jobs" },
+  { label: "API Keys", to: "/settings/api-keys" },
   { label: "Workflows", to: "/settings/workflows" },
   { label: "Import / Export", to: "/settings/transfer" },
   { label: "About", to: "/settings/about" },
