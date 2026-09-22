@@ -2,6 +2,54 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.53] - 2026-09-22
+
+### Fixed
+- v2 resolver: a filter that fully drops for a library (a field that can't apply there as the only predicate,
+  e.g. a TV-only field like episode title on the movie library) now correctly makes that library contribute
+  nothing, instead of falling back to querying the whole library. Matches v1's behavior. Found via a manual
+  test; the diff probe missed it because no preset or real channel has a sole inapplicable-field filter.
+
+### Added
+- `scripts/probe-predicate-matrix.ts` (v1-vs-v2 across every predicate shape: single / AND / OR / nested /
+  deep / negation / absent / inapplicable-field / range / recency / boolean / no-filter),
+  `scripts/probe-episodetitle.ts`, and `scripts/probe-neg-determinism.ts`.
+
+## [0.14.52] - 2026-09-22
+
+### Changed
+- The channel builder's pool previews now skip the heavy per-file Stream tree and use the lean `tiles`
+  projection, the same as the preset preview: both the live unsaved-filter preview and the saved-channel
+  preview shown on the edit page's initial load. The preview is a poster grid that never used the
+  codec / HDR / audio data, so this drops a large part of the payload. Added an opt-in `includeStreams` to
+  `resolveChannel` so only the preview and count paths go lean; the scheduler (which needs durations and
+  stream details) is unchanged. Combined with the v2 resolver, channel previews are much lighter and faster.
+
+## [0.14.51] - 2026-09-22
+
+### Changed
+- The filter resolver now defaults to the v2 advanced-filter path: `resolveFilter` delegates to
+  `resolveFilterAdvanced` unless a caller passes `resolver: "v1"`. A single `DEFAULT_RESOLVER` constant in
+  `resolve.ts` flips it globally, and the per-call `opts.resolver` overrides it, so switching between the two
+  is instant. v2 is on by default on this branch for field testing.
+
+## [0.14.50] - 2026-09-22
+
+Experimental: a faster filter resolver, built alongside the current one and not yet wired in.
+
+### Added
+- **`resolveFilterAdvanced`** (`services/plex/resolve-advanced.ts`) — a v2 filter resolver that translates a
+  channel's whole filter tree into a single Plex advanced-filter query per library (the native
+  `push` / `or` / `pop` grouping grammar), instead of fanning OR and nested filters out into many queries and
+  combining them in memory. It is result-equivalent to the live `resolveFilter` (which is untouched) and only
+  collapses the per-branch fan-out. It is not called anywhere yet; it will replace `resolveFilter` once
+  validated in the field.
+- Dev probes: `scripts/probe-advanced-grammar.ts` (empirically pins down Plex's advanced-filter grammar) and
+  `scripts/probe-resolve-diff.ts` (diffs the old and new resolvers' result sets + timing per channel, with a
+  `--live` mode over real saved channels). Validation so far: identical result sets across the preset catalog
+  and 46 real saved channels (AI-generated and manual filter channels), 4.6x faster overall and up to ~78x on
+  the heaviest OR/nested filters.
+
 ## [0.14.49] - 2026-09-22
 
 ### Added

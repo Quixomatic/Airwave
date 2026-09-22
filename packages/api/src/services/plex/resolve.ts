@@ -11,6 +11,11 @@ import {
   getShowEpisodes,
 } from "./client";
 import { type FilterCondition, type FilterNode, buildParam, fieldMeta } from "./filter-fields";
+import { resolveFilterAdvanced } from "./resolve-advanced";
+
+/** The filter resolver used when a caller doesn't specify one. Flip to "v1" to route everything back through
+ *  the legacy fan-out resolver in one place. Per-call `opts.resolver` still overrides this. */
+const DEFAULT_RESOLVER: "v1" | "v2" = "v2";
 import { channelSortParam } from "./sort-fields";
 import { decryptToken } from "./token";
 
@@ -141,8 +146,15 @@ export async function resolveFilter(
   mediaTypes: string[],
   tree: FilterNode | undefined,
   sort: string,
-  opts: { includeStreams?: boolean } = {},
+  opts: { includeStreams?: boolean; resolver?: "v1" | "v2" } = {},
 ): Promise<PlexItem[]> {
+  // v2 = the single-query advanced-filter resolver (default). Pass `resolver: "v1"` to force the legacy
+  // fan-out path below, or flip DEFAULT_RESOLVER to change it everywhere at once. Toggleable per call so we
+  // can A/B and fall back instantly if v2 ever misbehaves.
+  if ((opts.resolver ?? DEFAULT_RESOLVER) === "v2") {
+    return resolveFilterAdvanced(prisma, source, mediaTypes, tree, sort, { includeStreams: opts.includeStreams });
+  }
+
   const libs = await prisma.mediaLibrary.findMany({
     where: { mediaSourceId: source.id, enabled: true, type: { in: mediaTypes } },
   });
@@ -291,6 +303,9 @@ function applyResolvedOrdering(pool: PlexItem[], ordering: string): PlexItem[] {
 export async function resolveChannel(
   prisma: PrismaClient,
   channelId: string,
+  // Default true so the SCHEDULER (which needs durationMs + per-file HDR/codec/audio) is unchanged. Only the
+  // lightweight preview/count callers pass false to skip the heavy Stream tree (they render a poster grid).
+  opts: { includeStreams?: boolean } = {},
 ): Promise<PlexItem[]> {
   const channel = await prisma.channel.findUnique({
     where: { id: channelId },
@@ -313,5 +328,5 @@ export async function resolveChannel(
   const filter = (def.plexFilter as unknown as ChannelFilter | null) ?? {};
   const mediaTypes = filter.mediaTypes?.length ? filter.mediaTypes : ["movie", "show"];
   const sort = channelSortParam(channel.ordering, channel.sortField, channel.sortDir);
-  return resolveFilter(prisma, src, mediaTypes, filter.filter, sort);
+  return resolveFilter(prisma, src, mediaTypes, filter.filter, sort, { includeStreams: opts.includeStreams });
 }

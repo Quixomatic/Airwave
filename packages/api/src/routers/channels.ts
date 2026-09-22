@@ -475,7 +475,7 @@ export const channelsRouter = router({
 
   /** Resolve a channel's candidate pool — count + a title sample. */
   resolve: adminProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
-    const items = await resolveChannel(ctx.prisma, input.id);
+    const items = await resolveChannel(ctx.prisma, input.id, { includeStreams: false });
     return { count: items.length, sample: items.slice(0, 8).map((i) => i.title) };
   }),
 
@@ -488,8 +488,9 @@ export const channelsRouter = router({
     .query(async ({ ctx, input }) => {
       const channel = await ctx.prisma.channel.findUnique({ where: { id: input.id }, select: { mediaSourceId: true } });
       if (!channel) throw new TRPCError({ code: "NOT_FOUND", message: "Channel not found" });
-      const items = await resolveChannel(ctx.prisma, input.id);
-      return previewItems(ctx.prisma, channel.mediaSourceId, items, input.detail ?? "default");
+      // Poster-grid preview: skip the per-file Stream tree and use the lean `tiles` projection.
+      const items = await resolveChannel(ctx.prisma, input.id, { includeStreams: false });
+      return previewItems(ctx.prisma, channel.mediaSourceId, items, input.detail ?? "tiles");
     }),
 
   /**
@@ -516,7 +517,10 @@ export const channelsRouter = router({
         filter: input.filter,
         sortField: input.sortField,
         sortDir: input.sortDir,
-        detail: input.detail,
+        // The channel builder's preview is a poster grid (no codec/HDR/audio badges), so skip the heavy
+        // per-file Stream tree and return the lean `tiles` projection — same as the preset preview.
+        detail: input.detail ?? "tiles",
+        includeStreams: false,
       }),
     ),
 
