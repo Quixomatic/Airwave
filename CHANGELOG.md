@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.49] - 2026-09-22
+
+### Added
+- A shared provenance badge shown across the channel and package surfaces: **PRESET** (sky, bricks icon) for
+  built-in preset channels and **AI** (violet, sparkles icon) for AI-generated ones. It appears on the
+  packages list, the channels list (left of the package badge), the channel edit header (next to the channel
+  number), the package edit header, and each channel in a package's channel list. The old "Auto" label is now
+  "Preset".
+
+### Changed
+- The package edit header now shows the package's tinted icon, a truncated description, and the provenance
+  badge (dot-separated), matching the channel edit header.
+- On a preset-generated package, the "Regenerate channels" button now opens the staged preset generator
+  (`/channels/preset`) instead of firing an immediate, untracked rebuild.
+
 ## [0.14.48] - 2026-09-22
 
 ### Changed

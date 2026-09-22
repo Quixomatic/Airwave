@@ -49,6 +49,7 @@ import { toast } from "sonner";
 
 import { EmptyState } from "@/components/empty-state";
 import { Modal } from "@/components/modal";
+import { ProvenanceBadge } from "@/components/provenance-badge";
 import { HeaderLeft, HeaderRight, TopHeaderRight } from "@/context/header-provider";
 import { resolveTile } from "@/features/icons/app-icon";
 import { trpc, trpcClient } from "@/utils/trpc";
@@ -467,6 +468,7 @@ function ChannelsList() {
                           Inactive
                         </span>
                       )}
+                      <ProvenanceBadge generated={c.generated} aiGenerated={c.aiGenerated} />
                       {c.package && pkgTile && (
                         <HoverCard>
                           <HoverCardTrigger

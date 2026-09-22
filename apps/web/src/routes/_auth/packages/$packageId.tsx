@@ -13,14 +13,15 @@ import { Switch } from "@airwave/ui/components/switch";
 import { Textarea } from "@airwave/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { LayoutGrid, Loader2, Tv } from "lucide-react";
+import { Blocks, LayoutGrid, Loader2, Tv } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { useConfirm } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { useBreadcrumb } from "@/context/breadcrumb-provider";
-import { HeaderRight } from "@/context/header-provider";
+import { HeaderLeft, HeaderRight } from "@/context/header-provider";
+import { ProvenanceBadge } from "@/components/provenance-badge";
 import { IconTintField } from "@/features/icons/icon-tint-field";
 import { resolveTile } from "@/features/icons/app-icon";
 import { trpc, trpcClient } from "@/utils/trpc";
@@ -43,7 +44,6 @@ function PackageDetail() {
   const [icon, setIcon] = useState<string | null>(null);
   const [tint, setTint] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
     if (pkg.data) {
@@ -74,28 +74,6 @@ function PackageDetail() {
     }
   };
 
-  const regenChannels = async () => {
-    if (!pkg.data) return;
-    if (
-      !(await confirm({
-        title: "Rebuild channels from the preset?",
-        description: `Existing generated channels in "${pkg.data.name}" are replaced.`,
-        confirmLabel: "Rebuild",
-        destructive: true,
-      }))
-    )
-      return;
-    setRegenerating(true);
-    try {
-      const r = await trpcClient.generator.regeneratePackage.mutate({ packageKey: pkg.data.key });
-      toast.success(`Rebuilt — ${r.channelsCreated} channels.`);
-      await pkg.refetch();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Regenerate failed");
-    } finally {
-      setRegenerating(false);
-    }
-  };
 
   const toggleChannel = async (id: string, enabled: boolean) => {
     try {
@@ -129,13 +107,31 @@ function PackageDetail() {
     return <div className="text-muted-foreground mx-auto max-w-2xl text-sm">Loading…</div>;
   }
 
+  const headerTile = resolveTile({ icon: pkg.data.icon, tint: pkg.data.tint, defaultIcon: Blocks });
+
   return (
     <div className="space-y-6">
       {confirmDialog}
+      <HeaderLeft>
+        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+          <AccentIconTile icon={headerTile.Icon} tint={headerTile.tint} size="md" />
+          {pkg.data.description && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="max-w-[32rem] truncate">{pkg.data.description}</span>
+            </>
+          )}
+          {(pkg.data.generated || pkg.data.aiGenerated) && (
+            <>
+              <span aria-hidden>·</span>
+              <ProvenanceBadge generated={pkg.data.generated} aiGenerated={pkg.data.aiGenerated} />
+            </>
+          )}
+        </div>
+      </HeaderLeft>
       <HeaderRight>
         {pkg.data.generated && (
-          <Button variant="outline" size="sm" onClick={regenChannels} disabled={regenerating}>
-            {regenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          <Button variant="outline" size="sm" render={<Link to="/channels/preset" />}>
             Regenerate channels
           </Button>
         )}
@@ -214,6 +210,7 @@ function PackageDetail() {
                           <span className="text-muted-foreground ml-2 font-mono text-xs">{c.callsign}</span>
                         )}
                       </span>
+                      <ProvenanceBadge generated={c.generated} aiGenerated={c.aiGenerated} />
                       {!c.enabled && (
                         <span className="border-border text-muted-foreground rounded border px-1.5 py-0.5 text-xs">
                           Inactive

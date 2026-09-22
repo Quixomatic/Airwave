@@ -30,6 +30,7 @@ import { toast } from "sonner";
 
 import { EmptyState } from "@/components/empty-state";
 import { useConfirm } from "@/components/confirm-dialog";
+import { ProvenanceBadge } from "@/components/provenance-badge";
 import { HeaderLeft, HeaderRight, TopHeaderRight } from "@/context/header-provider";
 import { resolveTile } from "@/features/icons/app-icon";
 import { trpc, trpcClient } from "@/utils/trpc";
@@ -42,7 +43,7 @@ const SORT_LABEL: Record<SortKey, string> = { order: "Order", name: "Name", chan
  *  omitted from the URL (empty = the default view). */
 type Provenance = "preset" | "ai" | "manual";
 type PackagesSearch = { q?: string; gen?: Provenance; sort?: SortKey; dir?: "desc" };
-const PROVENANCE_LABEL: Record<Provenance, string> = { preset: "Auto", ai: "AI", manual: "Manual" };
+const PROVENANCE_LABEL: Record<Provenance, string> = { preset: "Preset", ai: "AI", manual: "Manual" };
 
 export const Route = createFileRoute("/_auth/packages/")({
   validateSearch: (search: Record<string, unknown>): PackagesSearch => ({
@@ -167,7 +168,7 @@ function PackagesList() {
                     onValueChange={(v) => setSearch({ gen: v === "all" ? undefined : (v as Provenance) })}
                   >
                     <DropdownMenuRadioItem value="all">Any</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="preset">Auto (preset)</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="preset">Preset</DropdownMenuRadioItem>
                     <DropdownMenuRadioItem value="ai">AI-generated</DropdownMenuRadioItem>
                     <DropdownMenuRadioItem value="manual">Manual</DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
@@ -282,16 +283,7 @@ function PackagesList() {
                     <div className="min-w-0 flex-1">
                       <p className="flex items-center gap-2 text-sm font-medium">
                         {p.name}
-                        {p.generated && (
-                          <span className="border-border text-muted-foreground rounded border px-1 text-[10px] uppercase">
-                            Auto
-                          </span>
-                        )}
-                        {p.aiGenerated && (
-                          <span className="rounded border border-violet-500/30 px-1 text-[10px] uppercase text-violet-600">
-                            AI
-                          </span>
-                        )}
+                        <ProvenanceBadge generated={p.generated} aiGenerated={p.aiGenerated} />
                       </p>
                       {p.description && (
                         <p className="text-muted-foreground truncate text-xs">{p.description}</p>

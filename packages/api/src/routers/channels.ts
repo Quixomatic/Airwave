@@ -162,6 +162,8 @@ export const channelsRouter = router({
           enabled: true,
           icon: true,
           tint: true,
+          generated: true,
+          aiGenerated: true,
           package: {
             select: {
               id: true,
@@ -207,6 +209,8 @@ export const channelsRouter = router({
       packageId: channel.packageId,
       icon: channel.icon,
       tint: channel.tint,
+      generated: channel.generated,
+      aiGenerated: channel.aiGenerated,
       packageIcon: channel.package?.icon ?? null,
       packageTint: channel.package?.tint ?? null,
       // How the pool is defined: PREDICATE (filter) or MEMBERSHIP (playlists/collections).

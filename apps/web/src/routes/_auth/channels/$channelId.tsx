@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { AccentIconTile } from "@airwave/ui/components/accent-icon-tile";
 
 import { useConfirm } from "@/components/confirm-dialog";
+import { ProvenanceBadge } from "@/components/provenance-badge";
 import { useBreadcrumb } from "@/context/breadcrumb-provider";
 import { HeaderLeft, HeaderRight, TopHeaderRight } from "@/context/header-provider";
 import { resolveTile } from "@/features/icons/app-icon";
@@ -134,6 +135,12 @@ function ChannelDetail() {
             </>
           )}
           <span className="tabular-nums">CH {String(channel.data.number).padStart(2, "0")}</span>
+          {(channel.data.generated || channel.data.aiGenerated) && (
+            <>
+              <span aria-hidden>·</span>
+              <ProvenanceBadge generated={channel.data.generated} aiGenerated={channel.data.aiGenerated} />
+            </>
+          )}
         </div>
       </HeaderLeft>
 

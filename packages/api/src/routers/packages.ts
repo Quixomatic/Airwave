@@ -95,6 +95,8 @@ export const packagesRouter = router({
             icon: true,
             tint: true,
             ordering: true,
+            generated: true,
+            aiGenerated: true,
           },
         },
       },
