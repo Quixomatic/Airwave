@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.52] - 2026-09-22
+
+### Changed
+- The channel builder's pool previews now skip the heavy per-file Stream tree and use the lean `tiles`
+  projection, the same as the preset preview: both the live unsaved-filter preview and the saved-channel
+  preview shown on the edit page's initial load. The preview is a poster grid that never used the
+  codec / HDR / audio data, so this drops a large part of the payload. Added an opt-in `includeStreams` to
+  `resolveChannel` so only the preview and count paths go lean; the scheduler (which needs durations and
+  stream details) is unchanged. Combined with the v2 resolver, channel previews are much lighter and faster.
+
 ## [0.14.51] - 2026-09-22
 
 ### Changed
