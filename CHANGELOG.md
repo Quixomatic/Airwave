@@ -2,6 +2,28 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.32] - 2026-09-22
+
+Preset filter quality, part 1: the resolver now handles a predicate it can't evaluate in a given library
+instead of silently emptying the channel.
+
+### Fixed
+- **Filter resolver: an unevaluable predicate drops out of its group instead of wiping it.** Before, if any
+  condition in an AND resolved to nothing for a library, the whole library returned zero. So a `both` channel
+  with a movie-only clause (like duration) was silently movie-only, and a genre exclusion for a genre a
+  library doesn't have (`genre isNot "Anime"` on a library with no Anime tag) emptied the channel entirely.
+  Now: a field that doesn't apply to a library type (duration on TV, network on movies), or a negation whose
+  value is absent, is dropped from its group; a positive match on an absent value still matches nothing; and
+  a group left with no usable gate contributes nothing. This mirrors how the Plex web UI treats the same mixed
+  filter. Applies to every filter channel (presets, AI-generated, manual filter mode) and the auto-lineup
+  analyzer, so some existing `both` channels with mixed filters will start including the other library on
+  their next rebuild (more correct).
+
+### Added
+- `scripts/probe-preset-filters.ts` and `scripts/probe-preset.ts` — dev probes that resolve preset channels
+  against the connected library (exact counts, show/movie split, domination + skip flags, sample titles) so
+  the catalog can be tuned against real data.
+
 ## [0.14.31] - 2026-09-22
 
 ### Fixed
