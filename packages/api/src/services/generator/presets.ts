@@ -574,7 +574,7 @@ const RAW_PACKAGES: PresetPackage[] = [
       { key: "new-this-month", name: "New This Month", callsign: "NWMTH", number: 403, minItems: 1, mediaTypes: both, ordering: "IN_ORDER", sortField: "addedAt", sortDir: "desc", description: "Added in the last 30 days.", filter: addedWithin("30") },
       { key: "unwatched-movies", name: "Unwatched Movies", callsign: "UNWMV", number: 405, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Unwatched movies.", filter: unwatched() },
       { key: "unwatched-series", name: "Unwatched Series", callsign: "UNWSR", number: 406, minItems: 5, mediaTypes: tv, ordering: "SHUFFLE", description: "Unwatched episodes.", filter: unwatched() },
-      { key: "lunch-break", name: "Lunch Break", callsign: "LNCHB", number: 408, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Under 45 minutes.", filter: durLte("45") },
+      { key: "lunch-break", name: "Lunch Break", callsign: "LNCHB", number: 408, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Short movies under 45 minutes.", filter: durLte("45") },
       { key: "movie-matinee", name: "Movie Matinee", callsign: "MVMAT", number: 409, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Movies 60–100 min.", filter: and(durGte("60"), durLte("100")) },
       { key: "top-shelf", name: "Top Shelf", callsign: "TPSHF", number: 415, minItems: 3, mediaTypes: both, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "9.0+.", filter: aud("9") },
       { key: "family-safe", name: "Family Safe", callsign: "FMSAF", number: 417, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "G / PG / TV-G / TV-PG / TV-Y / TV-Y7.", filter: familySafe() },

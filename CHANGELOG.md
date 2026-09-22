@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.44] - 2026-09-22
+
+Preset catalog quality: the Special Purpose package.
+
+### Changed
+- The Special Purpose channels stay mechanical utility filters (4K, HD, unwatched, recently added, runtime,
+  family-safe, mature). Lunch Break is now honestly movie-only, since its "under 45 minutes" duration filter
+  can't gate TV episodes.
+
 ## [0.14.43] - 2026-09-22
 
 Preset catalog quality: the Curated & Mood package.
