@@ -11,6 +11,11 @@ import {
   getShowEpisodes,
 } from "./client";
 import { type FilterCondition, type FilterNode, buildParam, fieldMeta } from "./filter-fields";
+import { resolveFilterAdvanced } from "./resolve-advanced";
+
+/** The filter resolver used when a caller doesn't specify one. Flip to "v1" to route everything back through
+ *  the legacy fan-out resolver in one place. Per-call `opts.resolver` still overrides this. */
+const DEFAULT_RESOLVER: "v1" | "v2" = "v2";
 import { channelSortParam } from "./sort-fields";
 import { decryptToken } from "./token";
 
@@ -141,8 +146,15 @@ export async function resolveFilter(
   mediaTypes: string[],
   tree: FilterNode | undefined,
   sort: string,
-  opts: { includeStreams?: boolean } = {},
+  opts: { includeStreams?: boolean; resolver?: "v1" | "v2" } = {},
 ): Promise<PlexItem[]> {
+  // v2 = the single-query advanced-filter resolver (default). Pass `resolver: "v1"` to force the legacy
+  // fan-out path below, or flip DEFAULT_RESOLVER to change it everywhere at once. Toggleable per call so we
+  // can A/B and fall back instantly if v2 ever misbehaves.
+  if ((opts.resolver ?? DEFAULT_RESOLVER) === "v2") {
+    return resolveFilterAdvanced(prisma, source, mediaTypes, tree, sort, { includeStreams: opts.includeStreams });
+  }
+
   const libs = await prisma.mediaLibrary.findMany({
     where: { mediaSourceId: source.id, enabled: true, type: { in: mediaTypes } },
   });

@@ -95,7 +95,8 @@ async function main() {
     const sort = channelSortParam(ch.ordering, ch.sortField ?? "title", ch.sortDir ?? "asc");
 
     const t0 = performance.now();
-    const oldItems = await resolveFilter(prisma, src, ch.mediaTypes, ch.filter, sort, { includeStreams: false });
+    // Force v1 explicitly — resolveFilter now defaults to v2, so this pins the legacy fan-out for the diff.
+    const oldItems = await resolveFilter(prisma, src, ch.mediaTypes, ch.filter, sort, { includeStreams: false, resolver: "v1" });
     const t1 = performance.now();
     const newItems = await resolveFilterAdvanced(prisma, src, ch.mediaTypes, ch.filter, sort, { includeStreams: false });
     const t2 = performance.now();

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Airwave",
     "slug": "airwave",
-    "version": "0.14.50",
+    "version": "0.14.51",
     "scheme": "airwave",
     "orientation": "landscape",
     "userInterfaceStyle": "dark",

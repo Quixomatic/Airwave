@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.51] - 2026-09-22
+
+### Changed
+- The filter resolver now defaults to the v2 advanced-filter path: `resolveFilter` delegates to
+  `resolveFilterAdvanced` unless a caller passes `resolver: "v1"`. A single `DEFAULT_RESOLVER` constant in
+  `resolve.ts` flips it globally, and the per-call `opts.resolver` overrides it, so switching between the two
+  is instant. v2 is on by default on this branch for field testing.
+
 ## [0.14.50] - 2026-09-22
 
 Experimental: a faster filter resolver, built alongside the current one and not yet wired in.
