@@ -14,10 +14,13 @@ import { Ban, Check, Clock, Loader2, Pencil, Plus, RefreshCw, SkipForward, Trash
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "@airwave/api/routers/index";
+
 import { useConfirm } from "@/components/confirm-dialog";
 import { trpc, trpcClient } from "@/utils/trpc";
 
-export const Route = createFileRoute("/_auth/settings/preset-runs/$runId")({
+export const Route = createFileRoute("/_auth/settings/workflows/preset-runs/$runId")({
   component: PresetRunDetail,
 });
 
@@ -47,7 +50,7 @@ const SCRUB_BAR: Record<string, string> = {
   failed: "bg-red-500",
 };
 
-type Trace = Awaited<ReturnType<typeof trpcClient.preset.run.query>>["traces"][number];
+type Trace = inferRouterOutputs<AppRouter>["preset"]["run"]["traces"][number];
 
 function StatusIcon({ status }: { status: string }) {
   if (status === "done") return <Check className="size-4 shrink-0 text-emerald-500" />;

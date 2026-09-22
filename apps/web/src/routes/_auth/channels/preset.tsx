@@ -191,7 +191,7 @@ function PresetStagingPage() {
     try {
       const { runId } = await trpcClient.preset.build.mutate({ selection: { channelKeys: [...enabled] } });
       toast.success("Preset build started.");
-      void navigate({ to: "/settings/preset-runs/$runId", params: { runId } });
+      void navigate({ to: "/settings/workflows/preset-runs/$runId", params: { runId } });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't start the build.");
     } finally {

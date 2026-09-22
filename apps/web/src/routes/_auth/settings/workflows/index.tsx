@@ -70,7 +70,7 @@ function WorkflowsIndex() {
           </div>
           <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
         </Link>
-        <Link to="/settings/preset-runs" className="hover:bg-muted/50 flex items-center gap-3 p-4">
+        <Link to="/settings/workflows/preset-runs" className="hover:bg-muted/50 flex items-center gap-3 p-4">
           <span className="bg-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-md">
             <Blocks className="h-4 w-4" />
           </span>

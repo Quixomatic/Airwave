@@ -16,7 +16,7 @@ import { ChevronRight, Loader2, RefreshCw } from "lucide-react";
 
 import { trpc } from "@/utils/trpc";
 
-export const Route = createFileRoute("/_auth/settings/preset-runs/")({
+export const Route = createFileRoute("/_auth/settings/workflows/preset-runs/")({
   component: PresetRuns,
 });
 
@@ -56,7 +56,7 @@ function PresetRuns() {
           {runs.data?.map((r) => (
             <Link
               key={r.id}
-              to="/settings/preset-runs/$runId"
+              to="/settings/workflows/preset-runs/$runId"
               params={{ runId: r.id }}
               className="hover:bg-muted/50 flex items-center gap-3 p-4 text-left"
             >

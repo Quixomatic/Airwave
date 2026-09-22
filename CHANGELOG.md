@@ -2,6 +2,12 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.48] - 2026-09-22
+
+### Changed
+- The preset build observability page moved under Settings → Workflows (`/settings/workflows/preset-runs`),
+  alongside the AI-lineup and import run pages, instead of a separate top-level settings route.
+
 ## [0.14.47] - 2026-09-22
 
 ### Changed
