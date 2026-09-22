@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.42] - 2026-09-22
+
+Preset catalog quality: the Time Machine package.
+
+### Changed
+- Peak TV goes grown-up (acclaimed 2000s-2010s series: Walking Dead, Brooklyn Nine-Nine, Parks and
+  Recreation), dropping the kids cartoons and anime that aren't "peak TV."
+- Decade channel descriptions now read plainly ("Movies and TV from the 1960s") instead of the awkward
+  doubled name ("from the The Now"). The decade channels stay broad on purpose: all of an era's content
+  belongs, and show rotation keeps any one series from dominating.
+
 ## [0.14.41] - 2026-09-22
 
 ### Fixed

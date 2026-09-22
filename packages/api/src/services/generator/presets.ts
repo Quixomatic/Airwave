@@ -242,7 +242,7 @@ const decadeChannel = (
   minItems: 10,
   mediaTypes: types,
   ordering: "SHUFFLE",
-  description: `${types.length === 1 ? (types[0] === "movie" ? "Movies" : "TV") : "Movies and TV"} from the ${name}.`,
+  description: `${types.length === 1 ? (types[0] === "movie" ? "Movies" : "TV") : "Movies and TV"} from the ${d}s.`,
   filter: extra ? and(decade(d), extra) : decade(d),
 });
 
@@ -438,7 +438,7 @@ const RAW_PACKAGES: PresetPackage[] = [
       decadeChannel("y2k", 206, "Y2K Era", "Y2KER", "2000"),
       decadeChannel("twenty-tens", 207, "Twenty-Tens", "TN10S", "2010"),
       decadeChannel("the-now", 208, "The Now", "THNOW", "2020"),
-      { key: "peak-tv", name: "Peak TV", callsign: "PKTV", number: 212, minItems: 5, mediaTypes: tv, ordering: "SHUFFLE", description: "TV from the 2000s–2010s, 8.0+.", filter: and(or(decade("2000"), decade("2010")), aud("8")) },
+      { key: "peak-tv", name: "Peak TV", callsign: "PKTV", number: 212, minItems: 5, mediaTypes: tv, ordering: "SHUFFLE", description: "Acclaimed 2000s–2010s series, 8.0+.", filter: and(or(decade("2000"), decade("2010")), aud("8"), grownUp()) },
       { key: "retro-cartoons", name: "Retro Cartoons", callsign: "RTCRN", number: 216, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Animation, 1950s–1990s.", filter: and(genre("Animation"), or(decade("1950"), decade("1960"), decade("1970"), decade("1980"), decade("1990"))) },
       { key: "classic-tv", name: "Classic TV", callsign: "CLKTV", number: 217, minItems: 5, mediaTypes: tv, ordering: "SHUFFLE", description: "TV, 1950s–1980s.", filter: or(decade("1950"), decade("1960"), decade("1970"), decade("1980")) },
     ],
