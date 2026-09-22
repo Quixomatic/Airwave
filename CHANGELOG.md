@@ -2,6 +2,209 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.47] - 2026-09-22
+
+### Changed
+- The preset Recommended button stays visible in preview mode, and is disabled when the current selection
+  already matches the recommended set.
+
+## [0.14.46] - 2026-09-22
+
+### Added
+- A curated **Recommended** starter lineup for the preset generator (a broad, high-quality set spanning
+  packages), plus a **Recommended** button in the staging bar that selects exactly that set.
+
+### Changed
+- The preset staging page now defaults to the recommended lineup on a first run, instead of turning on the
+  entire Basic package. A previously-generated lineup still pre-selects exactly the channels you already have,
+  so a re-run preserves what you built.
+
+## [0.14.45] - 2026-09-22
+
+### Changed
+- Dropped the Lunch Break channel: its only filter was "under 45 minutes," making it an exact duplicate of
+  Quick Bites. Moved Quick Bites out of Basic into Special Purpose, where the runtime filters live, so Basic
+  stays a tight set of essentials.
+
+### Removed
+- An unused internal `anyNetwork` filter helper.
+
+## [0.14.44] - 2026-09-22
+
+Preset catalog quality: the Special Purpose package.
+
+### Changed
+- The Special Purpose channels stay mechanical utility filters (4K, HD, unwatched, recently added, runtime,
+  family-safe, mature). Lunch Break is now honestly movie-only, since its "under 45 minutes" duration filter
+  can't gate TV episodes.
+
+## [0.14.43] - 2026-09-22
+
+Preset catalog quality: the Curated & Mood package.
+
+### Changed
+- The adult-discovery channels (Binge Worthy, Critics' Darlings, Hidden Gems, Rewatchable, The Unwatched
+  Vault) go grown-up, so the highly-rated kids anime that flooded them (Naruto, Bluey) give way to acclaimed
+  adult titles (The Sopranos, Game of Thrones, Better Call Saul). Binge Worthy also gates to grown-up ratings.
+- Feel Good, Nostalgia Trip (90s kids nostalgia belongs), and the 4K / recency channels stay broad.
+
+## [0.14.42] - 2026-09-22
+
+Preset catalog quality: the Time Machine package.
+
+### Changed
+- Peak TV goes grown-up (acclaimed 2000s-2010s series: Walking Dead, Brooklyn Nine-Nine, Parks and
+  Recreation), dropping the kids cartoons and anime that aren't "peak TV."
+- Decade channel descriptions now read plainly ("Movies and TV from the 1960s") instead of the awkward
+  doubled name ("from the The Now"). The decade channels stay broad on purpose: all of an era's content
+  belongs, and show rotation keeps any one series from dominating.
+
+## [0.14.41] - 2026-09-22
+
+### Fixed
+- Kids & Family: Anime Adventures no longer sweeps in dark TV-14 anime (Re:ZERO, Fullmetal Alchemist
+  Brotherhood, Hell's Paradise, Solo Leveling). It is now capped at family ratings (TV-PG and below) and
+  excludes the horror / thriller genres, leaving genuinely family-friendly anime (Pokémon, Naruto, One-Punch
+  Man). Toon Town also excludes horror.
+
+## [0.14.40] - 2026-09-22
+
+Preset catalog quality: the Documentary package.
+
+### Changed
+- Doc Central goes grown-up (drops kids nature shows that carry a documentary tag); War Stories matches both
+  the `War` and `War & Politics` genres. (These channels are content-limited on libraries with few
+  documentaries and populate on doc-rich ones.)
+
+## [0.14.39] - 2026-09-22
+
+Preset catalog quality: the Horror package.
+
+### Fixed
+- Elevated Horror was empty (it required A24 / Neon / Blumhouse studios that many libraries don't tag). It is
+  now simply the best-rated horror films (7.0+, highest first).
+
+### Changed
+- Fright Night, Horror Series, and Horror Comedy go grown-up, dropping the shonen anime (Re:ZERO, Jujutsu
+  Kaisen) that carry a horror tag but aren't horror.
+- Classic Monsters' floor is lowered so a small vintage-horror shelf still airs; Creature Feature uses the
+  correct sci-fi genre names.
+
+## [0.14.38] - 2026-09-22
+
+Preset catalog quality: the Crime & Mystery package, plus a Love Stories fix.
+
+### Changed
+- Crime & Mystery goes grown-up (Crime Central, Mystery Theater, Thriller Peak, Crime Series), dropping the
+  kids/anime that carried a secondary crime/mystery/thriller tag (Blue's Clues out of Mystery, Black Clover
+  out of Thriller). Suspense Theater drops its critic clause (null on TV) for a straight audience 7.5+ cut and
+  adds the Suspense genre.
+- Love Stories is now genuine soft romance. "Romance" is a noisy Plex tag that rides along on big films with a
+  love subplot, so the channel now excludes the high-concept genres (action, adventure, thriller, crime, war,
+  sci-fi, horror, ...). Spartacus, True Blood, WandaVision, and Cast Away are out; Seeking Persephone, Crazy
+  Rich Asians, and the Hallmark-style romances are in.
+
+## [0.14.37] - 2026-09-22
+
+Preset catalog quality: the Drama & Romance package.
+
+### Fixed
+- Prestige TV was empty (it gated on critic rating, which is null on TV episodes). It now uses audience 8.0+
+  plus a TV-14 / TV-MA gate, grown-up, so it fills with acclaimed drama series.
+
+### Changed
+- Drama Central, Drama Series, and Love Stories go grown-up (drop the kids cartoons and anime that matched
+  the drama/romance genres and flooded them).
+- War & Honor matches both `War` and `War & Politics` TV genres (grown-up), so it carries House of the Dragon,
+  Shōgun, The Pacific.
+- Indie Drama uses the `Indie` genre in addition to the indie-studio list.
+
+## [0.14.36] - 2026-09-22
+
+Preset catalog quality: the Comedy & Fun package.
+
+### Changed
+- The Comedy Channel, Sitcom City, and Comedy Classics are now grown-up (they drop the kids cartoons and
+  anime that flooded them, so Sitcom City is Beverly Hillbillies / Home Improvement / Boy Meets World, not
+  Pokémon). Family Comedy keeps the all-ages content.
+- Dark Laughs is now genuinely dark (comedy crossed with horror / thriller / crime: The Boys, Barry, What We
+  Do in the Shadows), so it no longer duplicates Late Night Laughs (general mature comedy).
+- Rom-Com Radio is live-action romantic comedy films (excludes the animated Romance+Comedy titles like
+  Aladdin that aren't rom-coms).
+- Comedy Gold is movie-only best-rated comedies (dropped the critic clause that silently emptied TV);
+  Animated Laughs is western adult animation (excludes anime).
+
+## [0.14.35] - 2026-09-22
+
+Preset catalog quality: the Studio Spotlight package.
+
+### Changed
+- TV brands (HBO, FX, AMC, Netflix, Apple, Paramount, Showtime) now match on `network` (the channel a show
+  aired on), not just `studio` (the production company), so they finally carry their series (HBO: The
+  Sopranos, Game of Thrones, Succession; AMC: Breaking Bad, Mad Men; FX: Fargo, The Bear). They stay `both`
+  (network series + studio films) and exclude the kids cartoons that merely air on them (Sesame Street on
+  HBO/Max no longer lands in HBO Theater).
+- Film studios (Disney, Warner, Universal, Sony, MGM, Lionsgate, Studio Ghibli, A24, Blumhouse, Criterion)
+  are movie-only, since their TV arms carry different studio names.
+
+## [0.14.34] - 2026-09-22
+
+Preset catalog quality, part 1: show rotation + the Basic, Action & Sci-Fi, and Kids & Family packages.
+(Verified against a live library with `scripts/probe-preset.ts`.)
+
+### Added
+- **Group-by-show rotation on every shuffle channel that can pull TV.** A `SHOW_ROTATION` strategy (round
+  robin, 1-3 episode blocks per show, reshuffled each lap) so a long-running series (Sesame Street 682 eps)
+  no longer hogs airtime in a plain shuffle. It changes the play order, not eligibility. IN_ORDER channels
+  (sorted by rating / added date) keep their sort; movie-only channels are unaffected.
+- A `Sci-Fi Cinema` channel (sci-fi films) alongside `Sci-Fi Universe` (now series) — sci-fi is deep in both.
+
+### Changed
+- **Channels now pick a lane.** Genre channels are movie OR TV where the content clearly leans one way, with
+  `both` reserved for genuine variety (Shuffle, Late Night, Fresh, 4K/HD). Action & Sci-Fi: Action Zone, Sci-Fi
+  Universe, Fantasy Realm, Western Frontier → series; Adventure Hour, Sci-Fi Classics → films. Kids: Toon Town,
+  Saturday Morning, Laugh Track Jr, Anime Adventures, Tween Scene → series; Bedtime Stories → films.
+- **Basic trimmed to essentials (16 → 12):** removed The Unwatched Pile, HD Showcase, The Back Catalog, and
+  New Millennium (redundant with Special Purpose / Time Machine). Prime Time is now "rated 7.5+" (dropped the
+  critic clause that silently emptied TV) minus kids/anime; Critics' Choice and Quick Bites are movie-only
+  (their filters can't gate TV); Popcorn Classics renamed Popcorn Movies.
+- Correct TV genre names via helpers (`Sci-Fi & Fantasy`, `Action/Adventure`), so sci-fi/action/adventure
+  channels actually match TV. Grown-up genre channels exclude the anime/kids-cartoon genres that don't belong.
+- Kids channels use kid-appropriate rating allow-lists (so shonen anime isn't in "Bedtime Stories"), and the
+  two duplicate pairs are differentiated (Storytime → fairy-tale/fantasy films; Saturday Morning → younger).
+
+## [0.14.33] - 2026-09-22
+
+### Changed
+- Preset generator staging: the per-channel preview hovercard now opens to the side (right, flipping left near
+  the screen edge) instead of below, with a longer hover delay, and it's styled like a Frame (muted surround,
+  heading, then a bordered panel of preview tiles with a single scroll).
+
+### Fixed
+- A latent type error in the staging page (`ChannelPreviewData` was used without being imported).
+
+## [0.14.32] - 2026-09-22
+
+Preset filter quality, part 1: the resolver now handles a predicate it can't evaluate in a given library
+instead of silently emptying the channel.
+
+### Fixed
+- **Filter resolver: an unevaluable predicate drops out of its group instead of wiping it.** Before, if any
+  condition in an AND resolved to nothing for a library, the whole library returned zero. So a `both` channel
+  with a movie-only clause (like duration) was silently movie-only, and a genre exclusion for a genre a
+  library doesn't have (`genre isNot "Anime"` on a library with no Anime tag) emptied the channel entirely.
+  Now: a field that doesn't apply to a library type (duration on TV, network on movies), or a negation whose
+  value is absent, is dropped from its group; a positive match on an absent value still matches nothing; and
+  a group left with no usable gate contributes nothing. This mirrors how the Plex web UI treats the same mixed
+  filter. Applies to every filter channel (presets, AI-generated, manual filter mode) and the auto-lineup
+  analyzer, so some existing `both` channels with mixed filters will start including the other library on
+  their next rebuild (more correct).
+
+### Added
+- `scripts/probe-preset-filters.ts` and `scripts/probe-preset.ts` — dev probes that resolve preset channels
+  against the connected library (exact counts, show/movie split, domination + skip flags, sample titles) so
+  the catalog can be tuned against real data.
+
 ## [0.14.31] - 2026-09-22
 
 ### Fixed

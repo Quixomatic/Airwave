@@ -14,14 +14,14 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@airwave/ui/compo
 import { Switch } from "@airwave/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Blocks, CheckIcon, Eye, Loader2, LoaderCircleIcon, PackageCheck, Tv, X } from "lucide-react";
+import { Blocks, CheckIcon, Eye, Loader2, LoaderCircleIcon, PackageCheck, Sparkles, Tv, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useConfirm } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { HeaderCenter, HeaderLeft, HeaderRight } from "@/context/header-provider";
-import { ChannelPreviewTiles, PreviewSkeleton } from "@/features/channels/channel-preview";
+import { ChannelPreviewTiles, PreviewSkeleton, type ChannelPreviewData } from "@/features/channels/channel-preview";
 import { resolveTile } from "@/features/icons/app-icon";
 import { trpc, trpcClient } from "@/utils/trpc";
 
@@ -114,15 +114,30 @@ function PresetStagingPage() {
 
   useEffect(() => {
     if (catalog.data && enabled === null) {
-      // Default ON: the Basic package, plus any channels that already exist (a previously-generated lineup),
-      // so a re-run preserves what you built and only Basic is opt-in for a first run.
+      // Default ON: a previously-generated lineup pre-selects exactly those channels (a re-run preserves what
+      // you built). On a FIRST run (nothing generated yet), seed the curated "recommended" starter set.
+      const anyExisting = catalog.data.packages.some((p) => p.channels.some((c) => c.exists));
       const seed = new Set<string>();
       for (const p of catalog.data.packages) for (const c of p.channels) {
-        if (p.key === "basic" || c.exists) seed.add(c.key);
+        if (anyExisting ? c.exists : c.recommended) seed.add(c.key);
       }
       setEnabled(seed);
     }
   }, [catalog.data, enabled]);
+
+  /** The curated recommended set (keys), derived from the catalog's `recommended` flag. */
+  const recommendedKeys = useMemo(() => {
+    const s = new Set<string>();
+    if (catalog.data) for (const p of catalog.data.packages) for (const c of p.channels) if (c.recommended) s.add(c.key);
+    return s;
+  }, [catalog.data]);
+
+  /** Reset the selection to exactly the curated recommended set (the "Recommended" button). */
+  const selectRecommended = () => setEnabled(new Set(recommendedKeys));
+
+  /** The current selection already IS the recommended set — the button has nothing to do. */
+  const matchesRecommended =
+    enabled != null && enabled.size === recommendedKeys.size && [...recommendedKeys].every((k) => enabled.has(k));
 
   const enabledKeys = useMemo(() => (enabled ? [...enabled] : []), [enabled]);
   const previews = usePresetPreviews(catalog.data?.sourceId, previewMode, enabledKeys);
@@ -256,6 +271,16 @@ function PresetStagingPage() {
       </HeaderCenter>
       <HeaderRight>
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={selectRecommended}
+            disabled={matchesRecommended}
+            title="Select the curated recommended lineup"
+          >
+            <Sparkles className="mr-2 size-4" />
+            Recommended
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -415,21 +440,21 @@ function ChannelRow({
 
   return (
     <HoverCard>
-      <HoverCardTrigger delay={100} render={<div />}>
+      <HoverCardTrigger delay={450} render={<div />}>
         {rowBody}
       </HoverCardTrigger>
-      <HoverCardContent className="flex w-[34rem] flex-col p-0">
-        {/* Header: tinted tile + name/description. */}
-        <div className={"flex shrink-0 items-center gap-3 p-4" + (previewMode ? " border-b" : "")}>
+      <HoverCardContent side="right" align="start" sideOffset={8} className="flex w-[34rem] flex-col gap-2 rounded-2xl bg-muted p-2">
+        {/* Header sits on the frame bg. */}
+        <div className="flex shrink-0 items-center gap-3 px-2 pt-1">
           <AccentIconTile icon={tile.Icon} tint={tile.tint} size="xl" />
           <div className="min-w-0">
             <p className="truncate font-medium">{ch.name}</p>
             <p className="text-muted-foreground text-xs">{ch.description}</p>
           </div>
         </div>
-        {/* Scrollable preview tiles — only once we're actually previewing (nothing resolves before that). */}
+        {/* Main content: a bordered white panel, scrollable — only once we're actually previewing. */}
         {previewMode && (
-          <div className="p-4">
+          <div className="rounded-xl border bg-background p-3">
             {entry?.status === "done" ? (
               <ChannelPreviewTiles
                 sourceId={sourceId}

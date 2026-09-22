@@ -10,7 +10,7 @@ import {
   getSectionItemsRaw,
   getShowEpisodes,
 } from "./client";
-import { type FilterCondition, type FilterNode, buildParam } from "./filter-fields";
+import { type FilterCondition, type FilterNode, buildParam, fieldMeta } from "./filter-fields";
 import { channelSortParam } from "./sort-fields";
 import { decryptToken } from "./token";
 
@@ -50,11 +50,41 @@ async function queryParams(ctx: LibCtx, params: string[]): Promise<Map<string, P
   );
 }
 
-async function resolveNode(node: FilterNode, ctx: LibCtx): Promise<Map<string, PlexItem>> {
-  const opts = { libType: ctx.tv ? ("show" as const) : ("movie" as const) };
+/** Negation operators — "not X". For these, an unresolvable value means "exclude nothing", not "match nothing". */
+const NEGATION_OPS = new Set(["isNot", "notContains", "notEquals"]);
+const isNegation = (c: FilterCondition) => NEGATION_OPS.has(c.op);
+
+/** Does this field resolve at all in this library type? An unknown field, or one whose `appliesTo` excludes
+ *  this type (e.g. `duration` on TV, `network` on movies), does not. */
+function fieldApplies(field: string, libType: "movie" | "show"): boolean {
+  const meta = fieldMeta(field);
+  if (!meta) return false;
+  return !meta.appliesTo || meta.appliesTo.includes(libType);
+}
+
+/**
+ * A resolved node is either a Map of matches OR `DROP` (null) meaning "this predicate/group can't be evaluated
+ * in this library, so ignore it in the parent group". DROP is distinct from an empty Map: an empty Map means
+ * "evaluated, matched nothing" (a real FALSE that wipes an AND), while DROP is the group identity — skip it.
+ *
+ * A predicate DROPs when it can't be a gate in this library: the field doesn't apply to this library type
+ * (`duration` on TV), or its tag value isn't present AND the op is a negation (excluding an absent value
+ * excludes nothing). A POSITIVE op whose value is absent matches NOTHING (empty), because you asked for a
+ * value this library doesn't have. A group where every child DROPs itself DROPs; if the whole filter DROPs
+ * for a library, that library contributes nothing (a filter with no gate it can apply → 0). This mirrors how
+ * the Plex web UI treats a mixed filter across a movie + TV library. Verified: `scripts/probe-preset.ts`.
+ */
+type NodeResult = Map<string, PlexItem> | null;
+const DROP: NodeResult = null;
+
+async function resolveNode(node: FilterNode, ctx: LibCtx): Promise<NodeResult> {
+  const libType = ctx.tv ? ("show" as const) : ("movie" as const);
+  const opts = { libType };
+
   if (node.type === "condition") {
+    if (!fieldApplies(node.field, libType)) return DROP; // not a gate in this library → ignore it
     const param = await buildParam(node, (f, t) => resolveTag(ctx, f, t), opts);
-    if (!param) return new Map();
+    if (!param) return isNegation(node) ? DROP : new Map(); // absent value: exclude-nothing vs match-nothing
     return queryParams(ctx, [param]);
   }
 
@@ -62,26 +92,32 @@ async function resolveNode(node: FilterNode, ctx: LibCtx): Promise<Map<string, P
   if (node.combinator === "and" && node.children.every((c) => c.type === "condition")) {
     const params: string[] = [];
     for (const c of node.children as FilterCondition[]) {
+      if (!fieldApplies(c.field, libType)) continue; // drop: not a gate here
       const p = await buildParam(c, (f, t) => resolveTag(ctx, f, t), opts);
-      if (!p) return new Map(); // a tag value missing → AND yields nothing here
+      if (!p) {
+        if (isNegation(c)) continue; // drop: excluding an absent value removes nothing
+        return new Map(); // a POSITIVE required value is absent → the AND matches nothing
+      }
       params.push(p);
     }
-    return queryParams(ctx, params);
+    return params.length ? queryParams(ctx, params) : DROP; // every gate dropped → group drops out
   }
 
-  const childMaps: Map<string, PlexItem>[] = [];
-  for (const child of node.children) childMaps.push(await resolveNode(child, ctx));
+  // General path: resolve each child, ignore the DROPs, then combine the rest.
+  const childResults: NodeResult[] = [];
+  for (const child of node.children) childResults.push(await resolveNode(child, ctx));
+  const real = childResults.filter((r): r is Map<string, PlexItem> => r !== DROP);
+  if (real.length === 0) return DROP; // nothing evaluable here → this group drops out of its parent
 
   if (node.combinator === "or") {
     const out = new Map<string, PlexItem>();
-    for (const m of childMaps) for (const [k, v] of m) out.set(k, v);
+    for (const m of real) for (const [k, v] of m) out.set(k, v);
     return out;
   }
-  // AND: intersect
-  if (childMaps.length === 0) return queryParams(ctx, []);
-  let acc = childMaps[0]!;
-  for (let i = 1; i < childMaps.length; i++) {
-    const next = childMaps[i]!;
+  // AND: intersect the real gates.
+  let acc = real[0]!;
+  for (let i = 1; i < real.length; i++) {
+    const next = real[i]!;
     const inter = new Map<string, PlexItem>();
     for (const [k, v] of acc) if (next.has(k)) inter.set(k, v);
     acc = inter;
@@ -124,8 +160,9 @@ export async function resolveFilter(
       tagCache: new Map(),
       includeStreams: opts.includeStreams ?? true,
     };
+    // A top-level DROP = the whole filter had no gate this library can apply → it contributes nothing.
     const matched = tree ? await resolveNode(tree, ctx) : await queryParams(ctx, []);
-    for (const [k, v] of matched) out.set(k, v);
+    if (matched) for (const [k, v] of matched) out.set(k, v);
   }
   return [...out.values()];
 }

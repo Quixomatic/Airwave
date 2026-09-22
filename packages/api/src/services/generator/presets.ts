@@ -66,15 +66,72 @@ const durLte = (max: string) => cond("duration", "lte", max);
 const res = (v: string) => cond("resolution", "is", v);
 const addedWithin = (days: string) => cond("addedWithin", "is", days);
 const unwatched = () => cond("unwatched", "is", "true");
+const notGenre = (g: string) => cond("genre", "isNot", g);
+// TV brands live in `network` (the airing channel); `studio` on a show is the production company, so TV
+// brands (HBO/FX/…) must match on network or come up empty. Verified against the library.
+const network = (n: string) => cond("network", "is", n);
+
+// Genre aliases — Plex's movie agent and TV agent tag the same concept differently, and both spellings
+// coexist in the show library. Verified present via scripts/probe-preset-filters.ts:
+//   movies: "Science Fiction", "Action", "Adventure", "War"
+//   shows:  ALSO "Sci-Fi & Fantasy", "Action/Adventure", "War & Politics"  (and "Science Fiction"/"Action" too)
+// There is no plain "Sci-Fi" tag in either library. Match every spelling a concept can wear.
+const SCIFI = () => anyGenre("Science Fiction", "Sci-Fi & Fantasy");
+const ACTION = () => anyGenre("Action", "Action/Adventure");
+const ADVENTURE = () => anyGenre("Adventure", "Action/Adventure");
+const WAR = () => anyGenre("War", "War & Politics");
+const KIDS_GENRE = () => anyGenre("Children", "Family", "Animation");
 
 const FAMILY_SAFE = ["G", "PG", "TV-Y", "TV-Y7", "TV-G", "TV-PG"];
 const MATURE = ["R", "TV-MA", "NC-17"];
 const familySafe = () => or(...FAMILY_SAFE.map(rating));
 const mature = () => or(...MATURE.map(rating));
+// Stricter than familySafe: drops TV-PG, which is where shōnen anime (Naruto etc.) leaks into kids channels.
+const KIDS = ["G", "PG", "TV-Y", "TV-Y7", "TV-G"];
+const kidsSafe = () => or(...KIDS.map(rating));
+const TWEEN = ["PG", "PG-13", "TV-PG", "TV-14"];
+const tweenRated = () => or(...TWEEN.map(rating));
+const GROWN_UP_RATINGS = ["PG-13", "R", "TV-14", "TV-MA"];
+const grownUpRated = () => or(...GROWN_UP_RATINGS.map(rating));
+// Keeps adult western animation (Rick and Morty, Invincible) but drops the anime + kids-cartoon episode
+// floods (Pokémon 587ep, Naruto 500ep, Sesame Street 682ep) from grown-up genre channels. Relies on the
+// resolver dropping an absent-tag negation, so it's a safe no-op on libraries without those genres.
+const grownUp = () => and(notGenre("Anime"), notGenre("Children"));
+// "Romance" is a noisy Plex tag — it rides along on big films with a love subplot (Cast Away, Titanic-scale
+// epics) and Plex does not rank genres. For a soft "Hallmark" romance channel, keep Romance but drop every
+// high-concept / action / crime genre, leaving only romance that is otherwise drama / comedy / family.
+const softRomance = () =>
+  and(
+    genre("Romance"),
+    notGenre("Horror"),
+    notGenre("Action"),
+    notGenre("Adventure"),
+    notGenre("Action/Adventure"),
+    notGenre("Thriller"),
+    notGenre("Mystery"),
+    notGenre("Crime"),
+    notGenre("War"),
+    notGenre("Western"),
+    notGenre("Science Fiction"),
+    notGenre("Sci-Fi & Fantasy"),
+  );
 
 const both: MediaType[] = ["movie", "show"];
 const movie: MediaType[] = ["movie"];
 const tv: MediaType[] = ["show"];
+
+// Group-by-show round robin. Any channel that resolves TV resolves it at the EPISODE level, so a long-runner
+// (Sesame Street 682ep, Pokémon 587ep) would hog the airtime in a plain shuffle. This does NOT change WHICH
+// items are eligible (the filter decides that) — it changes what PLAYS: a short block of 1-3 episodes per
+// show (seeded per lap), show order reshuffled each lap, so every eligible show gets fair rotation regardless
+// of episode count. `[1, 3]` is the natural TV-channel feel (a couple in a row, then move on) — a plain count,
+// not the duration-block form (which is only needed for very short episodes like Bluey). Applied (via
+// `withShowRotation` below) to every SHUFFLE channel that can pull TV; IN_ORDER channels keep their sort.
+const SHOW_ROTATION: ChannelStrategy = {
+  rotation: "round_robin",
+  rotationOrder: "shuffle",
+  grouping: [{ scope: "show", run: [1, 3] }],
+};
 
 const directorChannel = (
   key: string,
@@ -114,28 +171,40 @@ const actorChannel = (
   filter: floor ? and(actor(who), aud(floor)) : actor(who),
 });
 
+/**
+ * A studio / network brand channel. `studio` on a show is the PRODUCTION COMPANY (e.g. "Revolution Sun
+ * Studios" for Game of Thrones), NOT the channel it aired on — that's `network`. So film studios (Disney,
+ * Warner, ...) match on `studio` and are movie-only (their TV arms use different studio names), while TV
+ * brands / streamers (HBO, FX, Netflix, ...) must also match on `network` and are `both`. Pass `networks` to
+ * make a channel a TV brand; without it the channel is film-studio, movie-only.
+ */
 const studioChannel = (
   key: string,
   number: number,
   name: string,
   callsign: string,
   studios: string[],
-  floor?: string,
-): PresetChannel => ({
-  key,
-  name,
-  callsign,
-  number,
-  minItems: 5,
-  mediaTypes: both,
-  ordering: "SHUFFLE",
-  description: `Everything from ${name}.`,
-  filter: floor
-    ? and(anyStudio(...studios), aud(floor))
-    : studios.length > 1
-      ? anyStudio(...studios)
-      : studio(studios[0]!),
-});
+  opts: { networks?: string[]; floor?: string; types?: MediaType[]; grownUp?: boolean } = {},
+): PresetChannel => {
+  const who = [...studios.map(studio), ...(opts.networks ?? []).map(network)];
+  const match = who.length > 1 ? or(...who) : who[0]!;
+  // `grownUp` drops the kids cartoons that network-match a prestige brand (Sesame Street airs on HBO/Max but
+  // does not belong in "HBO Theater"). Opt-in so a future kids-network brand isn't wrongly stripped.
+  const parts: FilterNode[] = [match];
+  if (opts.grownUp) parts.push(grownUp());
+  if (opts.floor) parts.push(aud(opts.floor));
+  return {
+    key,
+    name,
+    callsign,
+    number,
+    minItems: 5,
+    mediaTypes: opts.types ?? (opts.networks ? both : movie),
+    ordering: "SHUFFLE",
+    description: `Everything from ${name}.`,
+    filter: parts.length > 1 ? and(...parts) : parts[0]!,
+  };
+};
 
 const countryChannel = (
   key: string,
@@ -172,13 +241,13 @@ const decadeChannel = (
   minItems: 10,
   mediaTypes: types,
   ordering: "SHUFFLE",
-  description: `${types.length === 1 ? (types[0] === "movie" ? "Movies" : "TV") : "Movies and TV"} from the ${name}.`,
+  description: `${types.length === 1 ? (types[0] === "movie" ? "Movies" : "TV") : "Movies and TV"} from the ${d}s.`,
   filter: extra ? and(decade(d), extra) : decade(d),
 });
 
 // --- catalog ---------------------------------------------------------------
 
-export const PRESET_PACKAGES: PresetPackage[] = [
+const RAW_PACKAGES: PresetPackage[] = [
   {
     key: "basic",
     name: "Basic",
@@ -187,19 +256,14 @@ export const PRESET_PACKAGES: PresetPackage[] = [
     tint: "sky",
     sortIndex: 1,
     channels: [
-      { key: "prime-time", name: "Prime Time", callsign: "PRIME", number: 3, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:Star", description: "Rated 7.0+ by audiences and 6.0+ by critics.", filter: and(aud("7"), crit("6")) },
+      { key: "prime-time", name: "Prime Time", callsign: "PRIME", number: 3, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:Star", description: "The good stuff: rated 7.5+ by audiences.", filter: and(aud("7.5"), grownUp()) },
       { key: "fresh", name: "Fresh Off the Press", callsign: "FRESH", number: 4, minItems: 1, mediaTypes: both, ordering: "IN_ORDER", sortField: "addedAt", sortDir: "desc", icon: "lucide:Sparkles", description: "Added to your library in the last 30 days.", filter: addedWithin("30") },
-      { key: "unwatched", name: "The Unwatched Pile", callsign: "UNWCH", number: 5, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:Eye", description: "Everything you haven't watched yet.", filter: unwatched() },
       { key: "family-hour", name: "Family Hour", callsign: "FAMHR", number: 6, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:Baby", description: "G / PG / TV-Y / TV-Y7 / TV-G / TV-PG only.", filter: familySafe() },
       { key: "movie-marquee", name: "Movie Marquee", callsign: "MOVMQ", number: 7, minItems: 10, mediaTypes: movie, ordering: "SHUFFLE", icon: "lucide:Film", description: "Movies only, 60+ minutes.", filter: durGte("60") },
       { key: "series-central", name: "Series Central", callsign: "SRSCT", number: 8, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", icon: "lucide:MonitorPlay", description: "Every TV series in your library." },
-      { key: "quick-bites", name: "Quick Bites", callsign: "QKBTS", number: 9, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:Timer", description: "Under 45 minutes.", filter: durLte("45") },
-      { key: "popcorn", name: "Popcorn Classics", callsign: "PPCLS", number: 10, minItems: 10, mediaTypes: movie, ordering: "SHUFFLE", icon: "lucide:Popcorn", description: "Movies 7.5+ audience, 6.0+ critic, 75+ min.", filter: and(aud("7.5"), crit("6"), durGte("75")) },
+      { key: "popcorn", name: "Popcorn Movies", callsign: "PPCRN", number: 10, minItems: 10, mediaTypes: movie, ordering: "SHUFFLE", icon: "lucide:Popcorn", description: "Crowd-pleasing movies, 7.5+ audience, 75+ min.", filter: and(aud("7.5"), crit("6"), durGte("75")) },
       { key: "uhd", name: "Ultra HD Theater", callsign: "UHD4K", number: 12, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:Tv", description: "4K content only.", filter: res("4K") },
-      { key: "hd", name: "HD Showcase", callsign: "HDSHW", number: 13, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:MonitorSmartphone", description: "1080p or higher.", filter: or(res("1080p"), res("4K")) },
-      { key: "critics-choice", name: "Critics' Choice", callsign: "CRITC", number: 14, minItems: 5, mediaTypes: both, ordering: "IN_ORDER", sortField: "criticRating", sortDir: "desc", icon: "lucide:Award", description: "8.0+ audience, 7.5+ critic.", filter: and(aud("8"), crit("7.5")) },
-      { key: "back-catalog", name: "The Back Catalog", callsign: "BKCAT", number: 15, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:Archive", description: "1950s–2000s.", filter: or(decade("1950"), decade("1960"), decade("1970"), decade("1980"), decade("1990"), decade("2000")) },
-      { key: "new-millennium", name: "New Millennium", callsign: "NWMLN", number: 16, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:CalendarClock", description: "2000s onward.", filter: or(decade("2000"), decade("2010"), decade("2020")) },
+      { key: "critics-choice", name: "Critics' Choice", callsign: "CRITC", number: 14, minItems: 5, mediaTypes: movie, ordering: "IN_ORDER", sortField: "criticRating", sortDir: "desc", icon: "lucide:Award", description: "Movies rated 8.0+ audience, 7.5+ critic.", filter: and(aud("8"), crit("7.5")) },
       { key: "late-night", name: "Late Night", callsign: "LTNIT", number: 17, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:Moon", description: "Rated R / TV-MA / NC-17.", filter: mature() },
       { key: "double-feature", name: "Double Feature", callsign: "DBLFT", number: 18, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", icon: "lucide:Clapperboard", description: "Movies 2h+, rated 6.5+.", filter: and(durGte("120"), aud("6.5")) },
       { key: "shuffle", name: "The Shuffle", callsign: "SHFFL", number: 19, minItems: 1, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:Dices", description: "A completely random mix." },
@@ -213,16 +277,16 @@ export const PRESET_PACKAGES: PresetPackage[] = [
     tint: "green",
     sortIndex: 2,
     channels: [
-      { key: "toon-town", name: "Toon Town", callsign: "TOONS", number: 20, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:Palette", description: "Animation, family-safe.", filter: and(genre("Animation"), familySafe()) },
+      { key: "toon-town", name: "Toon Town", callsign: "TOONS", number: 20, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", icon: "lucide:Palette", description: "Animated series for the whole family.", filter: and(genre("Animation"), familySafe(), notGenre("Horror")) },
       { key: "family-movie-night", name: "Family Movie Night", callsign: "FMMOV", number: 21, minItems: 10, mediaTypes: movie, ordering: "SHUFFLE", description: "Family movies, 60+ min, G–PG.", filter: and(anyGenre("Family", "Comedy", "Adventure", "Animation"), durGte("60"), or(rating("G"), rating("PG"))) },
-      { key: "saturday-morning", name: "Saturday Morning", callsign: "SATAM", number: 22, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", description: "Animated kids TV.", filter: and(genre("Animation"), familySafe()) },
-      { key: "laugh-track-jr", name: "Laugh Track Jr", callsign: "LTJR", number: 24, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Kids comedy.", filter: and(genre("Comedy"), anyGenre("Family", "Animation"), familySafe()) },
-      { key: "bedtime-stories", name: "Bedtime Stories", callsign: "BEDTM", number: 27, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Gentle animation under 90 min.", filter: and(genre("Animation"), durLte("90"), familySafe()) },
-      { key: "musical-kids", name: "Musical Kids", callsign: "MUSKD", number: 29, minItems: 3, mediaTypes: both, ordering: "SHUFFLE", description: "Kids musicals.", filter: and(genre("Musical"), anyGenre("Family", "Animation"), familySafe()) },
-      { key: "anime-adventures", name: "Anime Adventures", callsign: "ANMAD", number: 30, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Family-friendly anime.", filter: and(anyGenre("Anime", "Animation"), or(rating("G"), rating("PG"), rating("TV-Y"), rating("TV-Y7"), rating("TV-G"), rating("TV-PG"), rating("TV-14"))) },
-      { key: "tween-scene", name: "Tween Scene", callsign: "TWEEN", number: 32, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Family + comedy/drama, PG–TV-14.", filter: and(genre("Family"), anyGenre("Comedy", "Drama")) },
+      { key: "saturday-morning", name: "Saturday Morning", callsign: "SATAM", number: 22, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", description: "Kids TV for younger viewers.", filter: and(KIDS_GENRE(), kidsSafe()) },
+      { key: "laugh-track-jr", name: "Laugh Track Jr", callsign: "LTJR", number: 24, minItems: 5, mediaTypes: tv, ordering: "SHUFFLE", description: "Kids comedy series.", filter: and(genre("Comedy"), KIDS_GENRE(), kidsSafe()) },
+      { key: "bedtime-stories", name: "Bedtime Stories", callsign: "BEDTM", number: 27, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Gentle animated films under 90 minutes.", filter: and(genre("Animation"), durLte("90"), kidsSafe()) },
+      { key: "musical-kids", name: "Musical Kids", callsign: "MUSKD", number: 29, minItems: 3, mediaTypes: both, ordering: "SHUFFLE", description: "Kids musicals and sing-alongs.", filter: and(anyGenre("Musical", "Music"), KIDS_GENRE(), kidsSafe()) },
+      { key: "anime-adventures", name: "Anime Adventures", callsign: "ANMAD", number: 30, minItems: 5, mediaTypes: tv, ordering: "SHUFFLE", description: "Family-friendly anime series.", filter: and(genre("Anime"), familySafe(), notGenre("Horror"), notGenre("Thriller")) },
+      { key: "tween-scene", name: "Tween Scene", callsign: "TWEEN", number: 32, minItems: 5, mediaTypes: tv, ordering: "SHUFFLE", description: "Tween series, PG–TV-14.", filter: and(genre("Family"), anyGenre("Comedy", "Drama"), tweenRated()) },
       { key: "cartoon-classics", name: "Cartoon Classics", callsign: "CLSCR", number: 33, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Animation, 1950s–1990s.", filter: and(genre("Animation"), or(decade("1950"), decade("1960"), decade("1970"), decade("1980"), decade("1990"))) },
-      { key: "storytime", name: "Storytime Theater", callsign: "STORY", number: 34, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Family films, 60+ min.", filter: and(anyGenre("Family", "Fantasy", "Adventure"), durGte("60"), familySafe()) },
+      { key: "storytime", name: "Storytime Theater", callsign: "STORY", number: 34, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Fairy tales and fantasy family films.", filter: and(genre("Fantasy"), durGte("60"), familySafe()) },
     ],
   },
   {
@@ -233,16 +297,16 @@ export const PRESET_PACKAGES: PresetPackage[] = [
     tint: "yellow",
     sortIndex: 3,
     channels: [
-      { key: "comedy-channel", name: "The Comedy Channel", callsign: "COMDY", number: 40, minItems: 15, mediaTypes: both, ordering: "SHUFFLE", description: "All comedy, 5.0+.", filter: and(genre("Comedy"), aud("5")) },
-      { key: "sitcom-city", name: "Sitcom City", callsign: "SITCM", number: 41, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", description: "TV comedy.", filter: genre("Comedy") },
+      { key: "comedy-channel", name: "The Comedy Channel", callsign: "COMDY", number: 40, minItems: 15, mediaTypes: both, ordering: "SHUFFLE", description: "Grown-up comedy, 5.0+.", filter: and(genre("Comedy"), aud("5"), grownUp()) },
+      { key: "sitcom-city", name: "Sitcom City", callsign: "SITCM", number: 41, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", description: "TV comedy and sitcoms.", filter: and(genre("Comedy"), grownUp()) },
       { key: "comedy-cinema", name: "Comedy Cinema", callsign: "CMDCN", number: 42, minItems: 10, mediaTypes: movie, ordering: "SHUFFLE", description: "Comedy movies, 60+ min.", filter: and(genre("Comedy"), durGte("60")) },
-      { key: "dark-laughs", name: "Dark Laughs", callsign: "DRKLF", number: 43, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Dark comedy, mature, 5.5+.", filter: and(genre("Comedy"), mature(), aud("5.5")) },
-      { key: "rom-com", name: "Rom-Com Radio", callsign: "ROMCM", number: 46, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Romance + comedy, 5.0+.", filter: and(genre("Romance"), genre("Comedy"), aud("5")) },
-      { key: "animated-laughs", name: "Animated Laughs", callsign: "ANLFS", number: 47, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Adult animated comedy.", filter: and(genre("Comedy"), genre("Animation"), mature()) },
-      { key: "family-comedy", name: "Family Comedy", callsign: "FAMCM", number: 49, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Comedy + family, G–TV-14.", filter: and(genre("Comedy"), genre("Family")) },
-      { key: "comedy-gold", name: "Comedy Gold", callsign: "CMDGD", number: 50, minItems: 10, mediaTypes: both, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "Comedy 7.5+ audience, 6.5+ critic.", filter: and(genre("Comedy"), aud("7.5"), crit("6.5")) },
+      { key: "dark-laughs", name: "Dark Laughs", callsign: "DRKLF", number: 43, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Dark comedy: laughs with a body count.", filter: and(genre("Comedy"), anyGenre("Horror", "Thriller", "Crime"), mature()) },
+      { key: "rom-com", name: "Rom-Com Radio", callsign: "ROMCM", number: 46, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Romantic comedy films.", filter: and(genre("Romance"), genre("Comedy"), notGenre("Animation")) },
+      { key: "animated-laughs", name: "Animated Laughs", callsign: "ANLFS", number: 47, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Grown-up cartoons: the Adult Swim vibe.", filter: and(genre("Comedy"), genre("Animation"), notGenre("Anime"), or(rating("TV-14"), rating("TV-MA"), rating("R"))) },
+      { key: "family-comedy", name: "Family Comedy", callsign: "FAMCM", number: 49, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Comedy the whole family can watch.", filter: and(genre("Comedy"), genre("Family")) },
+      { key: "comedy-gold", name: "Comedy Gold", callsign: "CMDGD", number: 50, minItems: 10, mediaTypes: movie, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "The best-rated comedy films, 7.5+.", filter: and(genre("Comedy"), aud("7.5")) },
       { key: "late-night-laughs", name: "Late Night Laughs", callsign: "LTNLF", number: 52, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Mature comedy, 5.0+.", filter: and(genre("Comedy"), mature(), aud("5")) },
-      { key: "comedy-classics", name: "Comedy Classics", callsign: "CLSCM", number: 56, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Comedy, 1950s–1980s.", filter: and(genre("Comedy"), or(decade("1950"), decade("1960"), decade("1970"), decade("1980"))) },
+      { key: "comedy-classics", name: "Comedy Classics", callsign: "CLSCM", number: 56, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Classic comedy, 1950s–1980s.", filter: and(genre("Comedy"), or(decade("1950"), decade("1960"), decade("1970"), decade("1980")), grownUp()) },
     ],
   },
   {
@@ -253,14 +317,14 @@ export const PRESET_PACKAGES: PresetPackage[] = [
     tint: "rose",
     sortIndex: 4,
     channels: [
-      { key: "drama-central", name: "Drama Central", callsign: "DRCTV", number: 60, minItems: 15, mediaTypes: both, ordering: "SHUFFLE", description: "All drama, 5.5+.", filter: and(genre("Drama"), aud("5.5")) },
+      { key: "drama-central", name: "Drama Central", callsign: "DRCTV", number: 60, minItems: 15, mediaTypes: both, ordering: "SHUFFLE", description: "All drama, 5.5+.", filter: and(genre("Drama"), aud("5.5"), grownUp()) },
       { key: "movie-dramas", name: "Movie Dramas", callsign: "DRMAM", number: 61, minItems: 10, mediaTypes: movie, ordering: "SHUFFLE", description: "Drama movies, 75+ min, 5.5+.", filter: and(genre("Drama"), durGte("75"), aud("5.5")) },
-      { key: "drama-series", name: "Drama Series", callsign: "DRMAS", number: 62, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", description: "TV drama, 5.5+.", filter: and(genre("Drama"), aud("5.5")) },
-      { key: "love-stories", name: "Love Stories", callsign: "LOVSN", number: 63, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Romance, 5.0+.", filter: and(genre("Romance"), aud("5")) },
-      { key: "prestige-tv", name: "Prestige TV", callsign: "PRSTG", number: 69, minItems: 5, mediaTypes: tv, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "TV drama 8.0+ audience, 7.0+ critic.", filter: and(genre("Drama"), aud("8"), crit("7")) },
-      { key: "war-honor", name: "War & Honor", callsign: "WARHN", number: 75, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "War + drama, 5.5+.", filter: and(genre("War"), genre("Drama"), aud("5.5")) },
-      { key: "the-stage", name: "The Stage", callsign: "STAGE", number: 78, minItems: 3, mediaTypes: both, ordering: "SHUFFLE", description: "Musical + drama, 5.5+.", filter: and(genre("Musical"), genre("Drama"), aud("5.5")) },
-      { key: "indie-drama", name: "Indie Drama", callsign: "INDIE", number: 79, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Indie-studio drama.", filter: and(genre("Drama"), anyStudio("A24", "IFC Films", "Fox Searchlight", "Searchlight Pictures", "Focus Features", "Neon", "Bleecker Street")) },
+      { key: "drama-series", name: "Drama Series", callsign: "DRMAS", number: 62, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", description: "TV drama, 5.5+.", filter: and(genre("Drama"), aud("5.5"), grownUp()) },
+      { key: "love-stories", name: "Love Stories", callsign: "LOVSN", number: 63, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Romance movies and series, the Hallmark kind.", filter: and(softRomance(), grownUp()) },
+      { key: "prestige-tv", name: "Prestige TV", callsign: "PRSTG", number: 69, minItems: 5, mediaTypes: tv, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "Acclaimed drama series, 8.0+ (TV-14 / TV-MA).", filter: and(genre("Drama"), aud("8"), grownUp(), or(rating("TV-14"), rating("TV-MA"))) },
+      { key: "war-honor", name: "War & Honor", callsign: "WARHN", number: 75, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "War drama, 5.5+.", filter: and(WAR(), genre("Drama"), aud("5.5"), grownUp()) },
+      { key: "the-stage", name: "The Stage", callsign: "STAGE", number: 78, minItems: 3, mediaTypes: both, ordering: "SHUFFLE", description: "Musicals and stage-to-screen drama.", filter: and(genre("Musical"), genre("Drama"), aud("5.5"), grownUp()) },
+      { key: "indie-drama", name: "Indie Drama", callsign: "INDIE", number: 79, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Independent drama.", filter: and(genre("Drama"), or(genre("Indie"), anyStudio("A24", "IFC Films", "Fox Searchlight", "Searchlight Pictures", "Focus Features", "Neon", "Bleecker Street"))) },
     ],
   },
   {
@@ -271,14 +335,15 @@ export const PRESET_PACKAGES: PresetPackage[] = [
     tint: "orange",
     sortIndex: 5,
     channels: [
-      { key: "action-zone", name: "Action Zone", callsign: "ACTZN", number: 80, minItems: 15, mediaTypes: both, ordering: "SHUFFLE", description: "All action, 5.0+.", filter: and(genre("Action"), aud("5")) },
+      { key: "action-zone", name: "Action Zone", callsign: "ACTZN", number: 80, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", description: "Action and adventure series, 5.0+.", filter: and(ACTION(), aud("5"), grownUp()) },
       { key: "action-movies", name: "Action Movies", callsign: "ACTMV", number: 81, minItems: 10, mediaTypes: movie, ordering: "SHUFFLE", description: "Action movies, 75+ min, 5.0+.", filter: and(genre("Action"), durGte("75"), aud("5")) },
-      { key: "scifi-universe", name: "Sci-Fi Universe", callsign: "SCIUN", number: 82, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Science fiction, 5.0+.", filter: and(anyGenre("Science Fiction", "Sci-Fi"), aud("5")) },
-      { key: "fantasy-realm", name: "Fantasy Realm", callsign: "FNTSY", number: 83, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Fantasy, 5.0+.", filter: and(genre("Fantasy"), aud("5")) },
+      { key: "scifi-universe", name: "Sci-Fi Universe", callsign: "SCIUN", number: 82, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", description: "Science-fiction series, 5.0+.", filter: and(SCIFI(), aud("5"), grownUp()) },
+      { key: "scifi-cinema", name: "Sci-Fi Cinema", callsign: "SCICN", number: 84, minItems: 10, mediaTypes: movie, ordering: "SHUFFLE", description: "Science-fiction films, 5.0+.", filter: and(SCIFI(), aud("5")) },
+      { key: "fantasy-realm", name: "Fantasy Realm", callsign: "FNTSY", number: 83, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", description: "Fantasy series, 5.0+.", filter: and(genre("Fantasy"), aud("5"), grownUp()) },
       { key: "explosive", name: "Explosive Cinema", callsign: "EXPLO", number: 87, minItems: 10, mediaTypes: movie, ordering: "SHUFFLE", description: "Action movies 75+ min, 6.0+ aud, 4.0+ crit.", filter: and(genre("Action"), durGte("75"), aud("6"), crit("4")) },
-      { key: "adventure-hour", name: "Adventure Hour", callsign: "ADVHR", number: 96, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Adventure, 5.0+.", filter: and(genre("Adventure"), aud("5")) },
-      { key: "western-frontier", name: "Western Frontier", callsign: "WSTFR", number: 98, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Westerns, 5.0+.", filter: and(genre("Western"), aud("5")) },
-      { key: "scifi-classics", name: "Sci-Fi Classics", callsign: "SFCLC", number: 99, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Sci-fi, 1950s–1990s.", filter: and(anyGenre("Science Fiction", "Sci-Fi"), or(decade("1950"), decade("1960"), decade("1970"), decade("1980"), decade("1990"))) },
+      { key: "adventure-hour", name: "Adventure Hour", callsign: "ADVHR", number: 96, minItems: 10, mediaTypes: movie, ordering: "SHUFFLE", description: "Adventure films, 5.0+.", filter: and(ADVENTURE(), aud("5")) },
+      { key: "western-frontier", name: "Western Frontier", callsign: "WSTFR", number: 98, minItems: 5, mediaTypes: tv, ordering: "SHUFFLE", description: "Western series, 5.0+.", filter: and(genre("Western"), aud("5")) },
+      { key: "scifi-classics", name: "Sci-Fi Classics", callsign: "SFCLC", number: 99, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Classic sci-fi films, 1950s–1990s.", filter: and(SCIFI(), or(decade("1950"), decade("1960"), decade("1970"), decade("1980"), decade("1990"))) },
     ],
   },
   {
@@ -289,12 +354,12 @@ export const PRESET_PACKAGES: PresetPackage[] = [
     tint: "indigo",
     sortIndex: 6,
     channels: [
-      { key: "crime-central", name: "Crime Central", callsign: "CRMCN", number: 100, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Crime, mature, 5.0+.", filter: and(genre("Crime"), aud("5")) },
-      { key: "mystery-theater", name: "Mystery Theater", callsign: "MYSTR", number: 101, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Mystery, 5.5+.", filter: and(genre("Mystery"), aud("5.5")) },
-      { key: "thriller-peak", name: "Thriller Peak", callsign: "THRLP", number: 102, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Thriller, 5.5+.", filter: and(genre("Thriller"), aud("5.5")) },
-      { key: "suspense-theater", name: "Suspense Theater", callsign: "SSPNS", number: 110, minItems: 5, mediaTypes: both, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "Thriller/mystery 7.0+ aud, 6.0+ crit.", filter: and(anyGenre("Thriller", "Mystery"), aud("7"), crit("6")) },
+      { key: "crime-central", name: "Crime Central", callsign: "CRMCN", number: 100, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Crime, 5.0+.", filter: and(genre("Crime"), aud("5"), grownUp()) },
+      { key: "mystery-theater", name: "Mystery Theater", callsign: "MYSTR", number: 101, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Mystery, 5.5+.", filter: and(genre("Mystery"), aud("5.5"), grownUp()) },
+      { key: "thriller-peak", name: "Thriller Peak", callsign: "THRLP", number: 102, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Thriller, 5.5+.", filter: and(genre("Thriller"), aud("5.5"), grownUp()) },
+      { key: "suspense-theater", name: "Suspense Theater", callsign: "SSPNS", number: 110, minItems: 5, mediaTypes: both, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "The best-rated thrillers and mysteries, 7.5+.", filter: and(anyGenre("Thriller", "Mystery", "Suspense"), aud("7.5"), grownUp()) },
       { key: "crime-movies", name: "Crime Movies", callsign: "CRMMV", number: 111, minItems: 10, mediaTypes: movie, ordering: "SHUFFLE", description: "Crime movies, 75+ min, 5.5+.", filter: and(genre("Crime"), durGte("75"), aud("5.5")) },
-      { key: "crime-series", name: "Crime Series", callsign: "CRMSR", number: 112, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", description: "TV crime, 5.5+.", filter: and(genre("Crime"), aud("5.5")) },
+      { key: "crime-series", name: "Crime Series", callsign: "CRMSR", number: 112, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", description: "TV crime, 5.5+.", filter: and(genre("Crime"), aud("5.5"), grownUp()) },
     ],
   },
   {
@@ -305,13 +370,13 @@ export const PRESET_PACKAGES: PresetPackage[] = [
     tint: "red",
     sortIndex: 7,
     channels: [
-      { key: "fright-night", name: "Fright Night", callsign: "FRGHT", number: 120, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Horror, mature, 4.5+.", filter: and(genre("Horror"), aud("4.5")) },
+      { key: "fright-night", name: "Fright Night", callsign: "FRGHT", number: 120, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Horror, 4.5+.", filter: and(genre("Horror"), aud("4.5"), grownUp()) },
       { key: "horror-movies", name: "Horror Movies", callsign: "HORRM", number: 121, minItems: 10, mediaTypes: movie, ordering: "SHUFFLE", description: "Horror movies, 70+ min.", filter: and(genre("Horror"), durGte("70"), aud("4.5")) },
-      { key: "horror-series", name: "Horror Series", callsign: "HRRSR", number: 122, minItems: 5, mediaTypes: tv, ordering: "SHUFFLE", description: "TV horror, 5.0+.", filter: and(genre("Horror"), aud("5")) },
-      { key: "horror-comedy", name: "Horror Comedy", callsign: "HRCMD", number: 123, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Horror + comedy.", filter: and(genre("Horror"), genre("Comedy"), aud("5")) },
-      { key: "elevated-horror", name: "Elevated Horror", callsign: "ELVHR", number: 124, minItems: 3, mediaTypes: movie, ordering: "SHUFFLE", description: "Prestige-studio horror, 7.0+ aud.", filter: and(genre("Horror"), aud("7"), anyStudio("A24", "Neon", "Blumhouse Productions", "IFC Films")) },
-      { key: "classic-monsters", name: "Classic Monsters", callsign: "CLSMN", number: 127, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Horror, 1930s–1980s.", filter: and(genre("Horror"), or(decade("1930"), decade("1940"), decade("1950"), decade("1960"), decade("1970"), decade("1980"))) },
-      { key: "creature-feature", name: "Creature Feature", callsign: "CRFTR", number: 133, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Horror + sci-fi.", filter: and(genre("Horror"), anyGenre("Science Fiction", "Sci-Fi")) },
+      { key: "horror-series", name: "Horror Series", callsign: "HRRSR", number: 122, minItems: 5, mediaTypes: tv, ordering: "SHUFFLE", description: "TV horror, 5.0+.", filter: and(genre("Horror"), aud("5"), grownUp()) },
+      { key: "horror-comedy", name: "Horror Comedy", callsign: "HRCMD", number: 123, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Horror + comedy.", filter: and(genre("Horror"), genre("Comedy"), aud("5"), grownUp()) },
+      { key: "elevated-horror", name: "Elevated Horror", callsign: "ELVHR", number: 124, minItems: 3, mediaTypes: movie, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "The best-rated horror films, 7.0+.", filter: and(genre("Horror"), aud("7")) },
+      { key: "classic-monsters", name: "Classic Monsters", callsign: "CLSMN", number: 127, minItems: 3, mediaTypes: movie, ordering: "SHUFFLE", description: "Horror, 1930s–1980s.", filter: and(genre("Horror"), or(decade("1930"), decade("1940"), decade("1950"), decade("1960"), decade("1970"), decade("1980"))) },
+      { key: "creature-feature", name: "Creature Feature", callsign: "CRFTR", number: 133, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Monsters, creatures, and horror sci-fi.", filter: and(genre("Horror"), SCIFI()) },
     ],
   },
   {
@@ -322,9 +387,9 @@ export const PRESET_PACKAGES: PresetPackage[] = [
     tint: "teal",
     sortIndex: 8,
     channels: [
-      { key: "doc-central", name: "Doc Central", callsign: "DOCCN", number: 140, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "All documentaries, 5.0+.", filter: and(genre("Documentary"), aud("5")) },
-      { key: "history-vault", name: "History Vault", callsign: "HSTVT", number: 142, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Doc + history, 5.5+.", filter: and(genre("Documentary"), genre("History"), aud("5.5")) },
-      { key: "war-stories", name: "War Stories", callsign: "WARST", number: 144, minItems: 3, mediaTypes: both, ordering: "SHUFFLE", description: "Doc + war.", filter: and(genre("Documentary"), genre("War")) },
+      { key: "doc-central", name: "Doc Central", callsign: "DOCCN", number: 140, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "All documentaries, 5.0+.", filter: and(genre("Documentary"), aud("5"), grownUp()) },
+      { key: "history-vault", name: "History Vault", callsign: "HSTVT", number: 142, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "History documentaries, 5.5+.", filter: and(genre("Documentary"), genre("History"), aud("5.5")) },
+      { key: "war-stories", name: "War Stories", callsign: "WARST", number: 144, minItems: 3, mediaTypes: both, ordering: "SHUFFLE", description: "War documentaries.", filter: and(genre("Documentary"), WAR()) },
       { key: "music-docs", name: "Music Docs", callsign: "MUSDC", number: 150, minItems: 3, mediaTypes: both, ordering: "SHUFFLE", description: "Doc + music, 5.0+.", filter: and(genre("Documentary"), genre("Music"), aud("5")) },
       { key: "sports-stories", name: "Sports Stories", callsign: "SPTST", number: 154, minItems: 3, mediaTypes: both, ordering: "SHUFFLE", description: "Doc + sport, 5.5+.", filter: and(genre("Documentary"), genre("Sport"), aud("5.5")) },
     ],
@@ -371,7 +436,7 @@ export const PRESET_PACKAGES: PresetPackage[] = [
       decadeChannel("y2k", 206, "Y2K Era", "Y2KER", "2000"),
       decadeChannel("twenty-tens", 207, "Twenty-Tens", "TN10S", "2010"),
       decadeChannel("the-now", 208, "The Now", "THNOW", "2020"),
-      { key: "peak-tv", name: "Peak TV", callsign: "PKTV", number: 212, minItems: 5, mediaTypes: tv, ordering: "SHUFFLE", description: "TV from the 2000s–2010s, 8.0+.", filter: and(or(decade("2000"), decade("2010")), aud("8")) },
+      { key: "peak-tv", name: "Peak TV", callsign: "PKTV", number: 212, minItems: 5, mediaTypes: tv, ordering: "SHUFFLE", description: "Acclaimed 2000s–2010s series, 8.0+.", filter: and(or(decade("2000"), decade("2010")), aud("8"), grownUp()) },
       { key: "retro-cartoons", name: "Retro Cartoons", callsign: "RTCRN", number: 216, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Animation, 1950s–1990s.", filter: and(genre("Animation"), or(decade("1950"), decade("1960"), decade("1970"), decade("1980"), decade("1990"))) },
       { key: "classic-tv", name: "Classic TV", callsign: "CLKTV", number: 217, minItems: 5, mediaTypes: tv, ordering: "SHUFFLE", description: "TV, 1950s–1980s.", filter: or(decade("1950"), decade("1960"), decade("1970"), decade("1980")) },
     ],
@@ -452,23 +517,25 @@ export const PRESET_PACKAGES: PresetPackage[] = [
     tint: "blue",
     sortIndex: 17,
     channels: [
+      // Film studios — match on `studio`, movie-only (their TV arms carry different studio names).
       studioChannel("a24", 380, "A24 Presents", "A24TV", ["A24"]),
-      studioChannel("hbo", 381, "HBO Theater", "HBOTH", ["HBO", "HBO Films", "HBO Max"]),
-      studioChannel("fx", 382, "FX Originals", "FXORG", ["FX", "FX Productions"]),
-      studioChannel("amc", 383, "AMC Premiere", "AMCPR", ["AMC", "AMC Studios"]),
       studioChannel("blumhouse", 384, "Blumhouse Horror", "BLMHS", ["Blumhouse Productions"]),
-      studioChannel("netflix", 385, "Netflix Originals", "NFLXO", ["Netflix"]),
-      studioChannel("apple", 386, "Apple Originals", "APLOR", ["Apple TV+", "Apple Studios"]),
-      studioChannel("criterion", 389, "Criterion Collection", "CRITN", ["The Criterion Collection", "Janus Films"], "7"),
+      studioChannel("criterion", 389, "Criterion Collection", "CRITN", ["The Criterion Collection", "Janus Films"], { floor: "7" }),
       studioChannel("disney", 390, "Disney Vault", "DSNVT", ["Walt Disney Pictures", "Walt Disney Animation Studios", "Walt Disney Studios"]),
       studioChannel("warner", 391, "Warner Bros Classics", "WRNBR", ["Warner Bros. Pictures", "New Line Cinema"]),
       studioChannel("universal", 392, "Universal Pictures", "UNIVP", ["Universal Pictures"]),
-      studioChannel("paramount", 393, "Paramount Theater", "PRMNT", ["Paramount Pictures", "Paramount+"]),
       studioChannel("lionsgate", 394, "Lionsgate", "LNSGR", ["Lionsgate", "Summit Entertainment"]),
       studioChannel("sony", 395, "Sony Pictures", "SNYPC", ["Sony Pictures", "Columbia Pictures", "TriStar Pictures"]),
       studioChannel("mgm", 396, "MGM Classics", "MGMCL", ["Metro-Goldwyn-Mayer", "United Artists"]),
       studioChannel("ghibli", 397, "Studio Ghibli", "GHBLI", ["Studio Ghibli"]),
-      studioChannel("showtime", 398, "Showtime Originals", "SHWTM", ["Showtime", "Showtime Networks"]),
+      // TV brands / streamers — also match on `network` (the airing channel), so they carry series too.
+      studioChannel("hbo", 381, "HBO Theater", "HBOTH", ["HBO", "HBO Films"], { networks: ["HBO", "HBO Max", "Max"], grownUp: true }),
+      studioChannel("fx", 382, "FX Originals", "FXORG", ["FX Productions"], { networks: ["FX", "FXX"], grownUp: true }),
+      studioChannel("amc", 383, "AMC Premiere", "AMCPR", ["AMC Studios"], { networks: ["AMC", "AMC+"], grownUp: true }),
+      studioChannel("netflix", 385, "Netflix Originals", "NFLXO", ["Netflix"], { networks: ["Netflix"], grownUp: true }),
+      studioChannel("apple", 386, "Apple Originals", "APLOR", ["Apple Studios", "Apple TV+"], { networks: ["Apple TV"], grownUp: true }),
+      studioChannel("paramount", 393, "Paramount Theater", "PRMNT", ["Paramount Pictures"], { networks: ["Paramount+", "Paramount Network"], grownUp: true }),
+      studioChannel("showtime", 398, "Showtime Originals", "SHWTM", ["Showtime Networks"], { networks: ["Showtime"], grownUp: true }),
     ],
   },
   {
@@ -479,16 +546,16 @@ export const PRESET_PACKAGES: PresetPackage[] = [
     tint: "purple",
     sortIndex: 15,
     channels: [
-      { key: "binge-worthy", name: "Binge Worthy", callsign: "BNGWR", number: 310, minItems: 5, mediaTypes: tv, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "TV 8.0+.", filter: aud("8") },
-      { key: "critics-darlings", name: "Critics' Darlings", callsign: "CRTDR", number: 313, minItems: 5, mediaTypes: both, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "8.5+.", filter: aud("8.5") },
-      { key: "hidden-gems", name: "Hidden Gems", callsign: "HIDGM", number: 316, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "7.0–8.0.", filter: and(aud("7"), cond("audienceRating", "lte", "8")) },
+      { key: "binge-worthy", name: "Binge Worthy", callsign: "BNGWR", number: 310, minItems: 5, mediaTypes: tv, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "Grown-up series, 8.0+.", filter: and(aud("8"), grownUp(), grownUpRated()) },
+      { key: "critics-darlings", name: "Critics' Darlings", callsign: "CRTDR", number: 313, minItems: 5, mediaTypes: both, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "The highest-rated, 8.5+.", filter: and(aud("8.5"), grownUp()) },
+      { key: "hidden-gems", name: "Hidden Gems", callsign: "HIDGM", number: 316, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Underseen keepers, 7.0–8.0.", filter: and(aud("7"), cond("audienceRating", "lte", "8"), grownUp()) },
       { key: "4k-theater", name: "4K Theater", callsign: "4KTHR", number: 318, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "4K, 7.0+.", filter: and(res("4K"), aud("7")) },
       { key: "feel-good", name: "Feel Good", callsign: "FLGCH", number: 321, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Comedy/family/romance, 7.0+.", filter: and(anyGenre("Comedy", "Family", "Romance"), aud("7")) },
       { key: "nostalgia-trip", name: "Nostalgia Trip", callsign: "NSTTR", number: 329, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "1980s–1990s, 7.0+.", filter: and(or(decade("1980"), decade("1990")), aud("7")) },
       { key: "fresh-picks", name: "Fresh Picks", callsign: "FRSHP", number: 330, minItems: 3, mediaTypes: both, ordering: "IN_ORDER", sortField: "addedAt", sortDir: "desc", description: "Added last 60 days, 6.5+.", filter: and(addedWithin("60"), aud("6.5")) },
       { key: "epic-length", name: "Epic Length", callsign: "EPICL", number: 332, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Movies 150+ min, 7.0+.", filter: and(durGte("150"), aud("7")) },
-      { key: "rewatchable", name: "Rewatchable", callsign: "RWCHB", number: 335, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "8.0+.", filter: aud("8") },
-      { key: "unwatched-vault", name: "The Unwatched Vault", callsign: "UNWVT", number: 339, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "7.0+, unwatched.", filter: and(aud("7"), unwatched()) },
+      { key: "rewatchable", name: "Rewatchable", callsign: "RWCHB", number: 335, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Comfort favorites, 8.0+.", filter: and(aud("8"), grownUp()) },
+      { key: "unwatched-vault", name: "The Unwatched Vault", callsign: "UNWVT", number: 339, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "The good stuff you haven't watched, 7.0+.", filter: and(aud("7"), unwatched(), grownUp()) },
     ],
   },
   {
@@ -505,7 +572,7 @@ export const PRESET_PACKAGES: PresetPackage[] = [
       { key: "new-this-month", name: "New This Month", callsign: "NWMTH", number: 403, minItems: 1, mediaTypes: both, ordering: "IN_ORDER", sortField: "addedAt", sortDir: "desc", description: "Added in the last 30 days.", filter: addedWithin("30") },
       { key: "unwatched-movies", name: "Unwatched Movies", callsign: "UNWMV", number: 405, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Unwatched movies.", filter: unwatched() },
       { key: "unwatched-series", name: "Unwatched Series", callsign: "UNWSR", number: 406, minItems: 5, mediaTypes: tv, ordering: "SHUFFLE", description: "Unwatched episodes.", filter: unwatched() },
-      { key: "lunch-break", name: "Lunch Break", callsign: "LNCHB", number: 408, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Under 45 minutes.", filter: durLte("45") },
+      { key: "quick-bites", name: "Quick Bites", callsign: "QKBTS", number: 408, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", icon: "lucide:Timer", description: "Short films under 45 minutes.", filter: durLte("45") },
       { key: "movie-matinee", name: "Movie Matinee", callsign: "MVMAT", number: 409, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Movies 60–100 min.", filter: and(durGte("60"), durLte("100")) },
       { key: "top-shelf", name: "Top Shelf", callsign: "TPSHF", number: 415, minItems: 3, mediaTypes: both, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "9.0+.", filter: aud("9") },
       { key: "family-safe", name: "Family Safe", callsign: "FMSAF", number: 417, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "G / PG / TV-G / TV-PG / TV-Y / TV-Y7.", filter: familySafe() },
@@ -513,6 +580,21 @@ export const PRESET_PACKAGES: PresetPackage[] = [
     ],
   },
 ];
+
+/**
+ * Give every SHUFFLE channel that can pull TV a group-by-show rotation, unless it already sets its own
+ * strategy. IN_ORDER channels are left alone — their sort (by rating, by added date) IS the intended play
+ * order, and round-robin would throw it away. Movie-only channels are unaffected (no shows to group).
+ */
+const withShowRotation = (ch: PresetChannel): PresetChannel =>
+  ch.strategy || ch.ordering !== "SHUFFLE" || !ch.mediaTypes.includes("show")
+    ? ch
+    : { ...ch, strategy: SHOW_ROTATION };
+
+export const PRESET_PACKAGES: PresetPackage[] = RAW_PACKAGES.map((pkg) => ({
+  ...pkg,
+  channels: pkg.channels.map(withShowRotation),
+}));
 
 // --- preset content hash (presetRev) ---------------------------------------
 
@@ -558,3 +640,27 @@ export function hashPresetChannel(ch: PresetChannel): string {
 export const PRESET_CHANNELS_BY_KEY: Map<string, { pkg: PresetPackage; channel: PresetChannel }> = new Map(
   PRESET_PACKAGES.flatMap((pkg) => pkg.channels.map((channel) => [channel.key, { pkg, channel }] as const)),
 );
+
+/**
+ * The curated "recommended" starter lineup — a broad, high-quality default dial spanning packages, used to
+ * pre-select the staging grid on a FIRST run (a previously-generated lineup pre-selects those channels
+ * instead), and by the "Recommended" button. A tuneable list, not tied to any one package.
+ */
+export const RECOMMENDED_KEYS: ReadonlySet<string> = new Set([
+  // Basic essentials
+  "prime-time", "movie-marquee", "series-central", "shuffle", "family-hour", "late-night", "popcorn", "fresh",
+  // Comedy
+  "comedy-channel", "sitcom-city",
+  // Drama & Romance
+  "drama-central", "love-stories", "prestige-tv",
+  // Action & Sci-Fi
+  "action-zone", "action-movies", "scifi-universe", "scifi-cinema",
+  // Crime / Horror
+  "crime-central", "fright-night",
+  // Kids & Family
+  "toon-town", "family-movie-night",
+  // Curated
+  "feel-good", "critics-darlings", "binge-worthy",
+  // Documentary
+  "doc-central",
+]);
