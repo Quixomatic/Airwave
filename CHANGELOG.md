@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.37] - 2026-09-22
+
+Preset catalog quality: the Drama & Romance package.
+
+### Fixed
+- Prestige TV was empty (it gated on critic rating, which is null on TV episodes). It now uses audience 8.0+
+  plus a TV-14 / TV-MA gate, grown-up, so it fills with acclaimed drama series.
+
+### Changed
+- Drama Central, Drama Series, and Love Stories go grown-up (drop the kids cartoons and anime that matched
+  the drama/romance genres and flooded them).
+- War & Honor matches both `War` and `War & Politics` TV genres (grown-up), so it carries House of the Dragon,
+  Shōgun, The Pacific.
+- Indie Drama uses the `Indie` genre in addition to the indie-studio list.
+
 ## [0.14.36] - 2026-09-22
 
 Preset catalog quality: the Comedy & Fun package.
