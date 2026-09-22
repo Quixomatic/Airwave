@@ -125,13 +125,19 @@ function PresetStagingPage() {
     }
   }, [catalog.data, enabled]);
 
-  /** Reset the selection to exactly the curated recommended set (the "Recommended" button). */
-  const selectRecommended = () => {
-    if (!catalog.data) return;
+  /** The curated recommended set (keys), derived from the catalog's `recommended` flag. */
+  const recommendedKeys = useMemo(() => {
     const s = new Set<string>();
-    for (const p of catalog.data.packages) for (const c of p.channels) if (c.recommended) s.add(c.key);
-    setEnabled(s);
-  };
+    if (catalog.data) for (const p of catalog.data.packages) for (const c of p.channels) if (c.recommended) s.add(c.key);
+    return s;
+  }, [catalog.data]);
+
+  /** Reset the selection to exactly the curated recommended set (the "Recommended" button). */
+  const selectRecommended = () => setEnabled(new Set(recommendedKeys));
+
+  /** The current selection already IS the recommended set — the button has nothing to do. */
+  const matchesRecommended =
+    enabled != null && enabled.size === recommendedKeys.size && [...recommendedKeys].every((k) => enabled.has(k));
 
   const enabledKeys = useMemo(() => (enabled ? [...enabled] : []), [enabled]);
   const previews = usePresetPreviews(catalog.data?.sourceId, previewMode, enabledKeys);
@@ -265,12 +271,16 @@ function PresetStagingPage() {
       </HeaderCenter>
       <HeaderRight>
         <div className="flex items-center gap-2">
-          {!previewMode && (
-            <Button variant="ghost" size="sm" onClick={selectRecommended} title="Select the curated recommended lineup">
-              <Sparkles className="mr-2 size-4" />
-              Recommended
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={selectRecommended}
+            disabled={matchesRecommended}
+            title="Select the curated recommended lineup"
+          >
+            <Sparkles className="mr-2 size-4" />
+            Recommended
+          </Button>
           <Button
             variant="outline"
             size="sm"

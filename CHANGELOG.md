@@ -2,6 +2,12 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.47] - 2026-09-22
+
+### Changed
+- The preset Recommended button stays visible in preview mode, and is disabled when the current selection
+  already matches the recommended set.
+
 ## [0.14.46] - 2026-09-22
 
 ### Added
