@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { useConfirm } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { HeaderCenter, HeaderLeft, HeaderRight } from "@/context/header-provider";
-import { ChannelPreviewTiles, PreviewSkeleton } from "@/features/channels/channel-preview";
+import { ChannelPreviewTiles, PreviewSkeleton, type ChannelPreviewData } from "@/features/channels/channel-preview";
 import { resolveTile } from "@/features/icons/app-icon";
 import { trpc, trpcClient } from "@/utils/trpc";
 
@@ -415,21 +415,21 @@ function ChannelRow({
 
   return (
     <HoverCard>
-      <HoverCardTrigger delay={100} render={<div />}>
+      <HoverCardTrigger delay={450} render={<div />}>
         {rowBody}
       </HoverCardTrigger>
-      <HoverCardContent className="flex w-[34rem] flex-col p-0">
-        {/* Header: tinted tile + name/description. */}
-        <div className={"flex shrink-0 items-center gap-3 p-4" + (previewMode ? " border-b" : "")}>
+      <HoverCardContent side="right" align="start" sideOffset={8} className="flex w-[34rem] flex-col gap-2 rounded-2xl bg-muted p-2">
+        {/* Header sits on the frame bg. */}
+        <div className="flex shrink-0 items-center gap-3 px-2 pt-1">
           <AccentIconTile icon={tile.Icon} tint={tile.tint} size="xl" />
           <div className="min-w-0">
             <p className="truncate font-medium">{ch.name}</p>
             <p className="text-muted-foreground text-xs">{ch.description}</p>
           </div>
         </div>
-        {/* Scrollable preview tiles — only once we're actually previewing (nothing resolves before that). */}
+        {/* Main content: a bordered white panel, scrollable — only once we're actually previewing. */}
         {previewMode && (
-          <div className="p-4">
+          <div className="rounded-xl border bg-background p-3">
             {entry?.status === "done" ? (
               <ChannelPreviewTiles
                 sourceId={sourceId}

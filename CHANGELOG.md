@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.33] - 2026-09-22
+
+### Changed
+- Preset generator staging: the per-channel preview hovercard now opens to the side (right, flipping left near
+  the screen edge) instead of below, with a longer hover delay, and it's styled like a Frame (muted surround,
+  heading, then a bordered panel of preview tiles with a single scroll).
+
+### Fixed
+- A latent type error in the staging page (`ChannelPreviewData` was used without being imported).
+
 ## [0.14.32] - 2026-09-22
 
 Preset filter quality, part 1: the resolver now handles a predicate it can't evaluate in a given library
