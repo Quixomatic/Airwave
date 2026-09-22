@@ -2,6 +2,23 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.50] - 2026-09-22
+
+Experimental: a faster filter resolver, built alongside the current one and not yet wired in.
+
+### Added
+- **`resolveFilterAdvanced`** (`services/plex/resolve-advanced.ts`) — a v2 filter resolver that translates a
+  channel's whole filter tree into a single Plex advanced-filter query per library (the native
+  `push` / `or` / `pop` grouping grammar), instead of fanning OR and nested filters out into many queries and
+  combining them in memory. It is result-equivalent to the live `resolveFilter` (which is untouched) and only
+  collapses the per-branch fan-out. It is not called anywhere yet; it will replace `resolveFilter` once
+  validated in the field.
+- Dev probes: `scripts/probe-advanced-grammar.ts` (empirically pins down Plex's advanced-filter grammar) and
+  `scripts/probe-resolve-diff.ts` (diffs the old and new resolvers' result sets + timing per channel, with a
+  `--live` mode over real saved channels). Validation so far: identical result sets across the preset catalog
+  and 46 real saved channels (AI-generated and manual filter channels), 4.6x faster overall and up to ~78x on
+  the heaviest OR/nested filters.
+
 ## [0.14.49] - 2026-09-22
 
 ### Added
