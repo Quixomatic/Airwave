@@ -2,6 +2,32 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.34] - 2026-09-22
+
+Preset catalog quality, part 1: show rotation + the Basic, Action & Sci-Fi, and Kids & Family packages.
+(Verified against a live library with `scripts/probe-preset.ts`.)
+
+### Added
+- **Group-by-show rotation on every shuffle channel that can pull TV.** A `SHOW_ROTATION` strategy (round
+  robin, 1-3 episode blocks per show, reshuffled each lap) so a long-running series (Sesame Street 682 eps)
+  no longer hogs airtime in a plain shuffle. It changes the play order, not eligibility. IN_ORDER channels
+  (sorted by rating / added date) keep their sort; movie-only channels are unaffected.
+- A `Sci-Fi Cinema` channel (sci-fi films) alongside `Sci-Fi Universe` (now series) — sci-fi is deep in both.
+
+### Changed
+- **Channels now pick a lane.** Genre channels are movie OR TV where the content clearly leans one way, with
+  `both` reserved for genuine variety (Shuffle, Late Night, Fresh, 4K/HD). Action & Sci-Fi: Action Zone, Sci-Fi
+  Universe, Fantasy Realm, Western Frontier → series; Adventure Hour, Sci-Fi Classics → films. Kids: Toon Town,
+  Saturday Morning, Laugh Track Jr, Anime Adventures, Tween Scene → series; Bedtime Stories → films.
+- **Basic trimmed to essentials (16 → 12):** removed The Unwatched Pile, HD Showcase, The Back Catalog, and
+  New Millennium (redundant with Special Purpose / Time Machine). Prime Time is now "rated 7.5+" (dropped the
+  critic clause that silently emptied TV) minus kids/anime; Critics' Choice and Quick Bites are movie-only
+  (their filters can't gate TV); Popcorn Classics renamed Popcorn Movies.
+- Correct TV genre names via helpers (`Sci-Fi & Fantasy`, `Action/Adventure`), so sci-fi/action/adventure
+  channels actually match TV. Grown-up genre channels exclude the anime/kids-cartoon genres that don't belong.
+- Kids channels use kid-appropriate rating allow-lists (so shonen anime isn't in "Bedtime Stories"), and the
+  two duplicate pairs are differentiated (Storytime → fairy-tale/fantasy films; Saturday Morning → younger).
+
 ## [0.14.33] - 2026-09-22
 
 ### Changed
