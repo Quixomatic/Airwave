@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.39] - 2026-09-22
+
+Preset catalog quality: the Horror package.
+
+### Fixed
+- Elevated Horror was empty (it required A24 / Neon / Blumhouse studios that many libraries don't tag). It is
+  now simply the best-rated horror films (7.0+, highest first).
+
+### Changed
+- Fright Night, Horror Series, and Horror Comedy go grown-up, dropping the shonen anime (Re:ZERO, Jujutsu
+  Kaisen) that carry a horror tag but aren't horror.
+- Classic Monsters' floor is lowered so a small vintage-horror shelf still airs; Creature Feature uses the
+  correct sci-fi genre names.
+
 ## [0.14.38] - 2026-09-22
 
 Preset catalog quality: the Crime & Mystery package, plus a Love Stories fix.
