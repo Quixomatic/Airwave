@@ -154,28 +154,40 @@ const actorChannel = (
   filter: floor ? and(actor(who), aud(floor)) : actor(who),
 });
 
+/**
+ * A studio / network brand channel. `studio` on a show is the PRODUCTION COMPANY (e.g. "Revolution Sun
+ * Studios" for Game of Thrones), NOT the channel it aired on — that's `network`. So film studios (Disney,
+ * Warner, ...) match on `studio` and are movie-only (their TV arms use different studio names), while TV
+ * brands / streamers (HBO, FX, Netflix, ...) must also match on `network` and are `both`. Pass `networks` to
+ * make a channel a TV brand; without it the channel is film-studio, movie-only.
+ */
 const studioChannel = (
   key: string,
   number: number,
   name: string,
   callsign: string,
   studios: string[],
-  floor?: string,
-): PresetChannel => ({
-  key,
-  name,
-  callsign,
-  number,
-  minItems: 5,
-  mediaTypes: both,
-  ordering: "SHUFFLE",
-  description: `Everything from ${name}.`,
-  filter: floor
-    ? and(anyStudio(...studios), aud(floor))
-    : studios.length > 1
-      ? anyStudio(...studios)
-      : studio(studios[0]!),
-});
+  opts: { networks?: string[]; floor?: string; types?: MediaType[]; grownUp?: boolean } = {},
+): PresetChannel => {
+  const who = [...studios.map(studio), ...(opts.networks ?? []).map(network)];
+  const match = who.length > 1 ? or(...who) : who[0]!;
+  // `grownUp` drops the kids cartoons that network-match a prestige brand (Sesame Street airs on HBO/Max but
+  // does not belong in "HBO Theater"). Opt-in so a future kids-network brand isn't wrongly stripped.
+  const parts: FilterNode[] = [match];
+  if (opts.grownUp) parts.push(grownUp());
+  if (opts.floor) parts.push(aud(opts.floor));
+  return {
+    key,
+    name,
+    callsign,
+    number,
+    minItems: 5,
+    mediaTypes: opts.types ?? (opts.networks ? both : movie),
+    ordering: "SHUFFLE",
+    description: `Everything from ${name}.`,
+    filter: parts.length > 1 ? and(...parts) : parts[0]!,
+  };
+};
 
 const countryChannel = (
   key: string,
@@ -489,23 +501,25 @@ const RAW_PACKAGES: PresetPackage[] = [
     tint: "blue",
     sortIndex: 17,
     channels: [
+      // Film studios — match on `studio`, movie-only (their TV arms carry different studio names).
       studioChannel("a24", 380, "A24 Presents", "A24TV", ["A24"]),
-      studioChannel("hbo", 381, "HBO Theater", "HBOTH", ["HBO", "HBO Films", "HBO Max"]),
-      studioChannel("fx", 382, "FX Originals", "FXORG", ["FX", "FX Productions"]),
-      studioChannel("amc", 383, "AMC Premiere", "AMCPR", ["AMC", "AMC Studios"]),
       studioChannel("blumhouse", 384, "Blumhouse Horror", "BLMHS", ["Blumhouse Productions"]),
-      studioChannel("netflix", 385, "Netflix Originals", "NFLXO", ["Netflix"]),
-      studioChannel("apple", 386, "Apple Originals", "APLOR", ["Apple TV+", "Apple Studios"]),
-      studioChannel("criterion", 389, "Criterion Collection", "CRITN", ["The Criterion Collection", "Janus Films"], "7"),
+      studioChannel("criterion", 389, "Criterion Collection", "CRITN", ["The Criterion Collection", "Janus Films"], { floor: "7" }),
       studioChannel("disney", 390, "Disney Vault", "DSNVT", ["Walt Disney Pictures", "Walt Disney Animation Studios", "Walt Disney Studios"]),
       studioChannel("warner", 391, "Warner Bros Classics", "WRNBR", ["Warner Bros. Pictures", "New Line Cinema"]),
       studioChannel("universal", 392, "Universal Pictures", "UNIVP", ["Universal Pictures"]),
-      studioChannel("paramount", 393, "Paramount Theater", "PRMNT", ["Paramount Pictures", "Paramount+"]),
       studioChannel("lionsgate", 394, "Lionsgate", "LNSGR", ["Lionsgate", "Summit Entertainment"]),
       studioChannel("sony", 395, "Sony Pictures", "SNYPC", ["Sony Pictures", "Columbia Pictures", "TriStar Pictures"]),
       studioChannel("mgm", 396, "MGM Classics", "MGMCL", ["Metro-Goldwyn-Mayer", "United Artists"]),
       studioChannel("ghibli", 397, "Studio Ghibli", "GHBLI", ["Studio Ghibli"]),
-      studioChannel("showtime", 398, "Showtime Originals", "SHWTM", ["Showtime", "Showtime Networks"]),
+      // TV brands / streamers — also match on `network` (the airing channel), so they carry series too.
+      studioChannel("hbo", 381, "HBO Theater", "HBOTH", ["HBO", "HBO Films"], { networks: ["HBO", "HBO Max", "Max"], grownUp: true }),
+      studioChannel("fx", 382, "FX Originals", "FXORG", ["FX Productions"], { networks: ["FX", "FXX"], grownUp: true }),
+      studioChannel("amc", 383, "AMC Premiere", "AMCPR", ["AMC Studios"], { networks: ["AMC", "AMC+"], grownUp: true }),
+      studioChannel("netflix", 385, "Netflix Originals", "NFLXO", ["Netflix"], { networks: ["Netflix"], grownUp: true }),
+      studioChannel("apple", 386, "Apple Originals", "APLOR", ["Apple Studios", "Apple TV+"], { networks: ["Apple TV"], grownUp: true }),
+      studioChannel("paramount", 393, "Paramount Theater", "PRMNT", ["Paramount Pictures"], { networks: ["Paramount+", "Paramount Network"], grownUp: true }),
+      studioChannel("showtime", 398, "Showtime Originals", "SHWTM", ["Showtime Networks"], { networks: ["Showtime"], grownUp: true }),
     ],
   },
   {

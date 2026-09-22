@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.35] - 2026-09-22
+
+Preset catalog quality: the Studio Spotlight package.
+
+### Changed
+- TV brands (HBO, FX, AMC, Netflix, Apple, Paramount, Showtime) now match on `network` (the channel a show
+  aired on), not just `studio` (the production company), so they finally carry their series (HBO: The
+  Sopranos, Game of Thrones, Succession; AMC: Breaking Bad, Mad Men; FX: Fargo, The Bear). They stay `both`
+  (network series + studio films) and exclude the kids cartoons that merely air on them (Sesame Street on
+  HBO/Max no longer lands in HBO Theater).
+- Film studios (Disney, Warner, Universal, Sony, MGM, Lionsgate, Studio Ghibli, A24, Blumhouse, Criterion)
+  are movie-only, since their TV arms carry different studio names.
+
 ## [0.14.34] - 2026-09-22
 
 Preset catalog quality, part 1: show rotation + the Basic, Action & Sci-Fi, and Kids & Family packages.
