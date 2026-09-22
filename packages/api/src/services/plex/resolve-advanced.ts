@@ -130,8 +130,11 @@ export async function resolveFilterAdvanced(
     };
 
     const adv = tree ? await buildAdvancedFilter(tree, ctx) : ({ params: [] } as Adv);
-    if (adv === "none") continue; // the whole filter matches nothing in this library
-    const params = adv === "drop" ? [] : adv.params;
+    // A real filter that resolves to "none" (impossible) OR "drop" (no gate it can apply here, e.g. a TV-only
+    // field on the movie library) means this library contributes NOTHING. Only a genuinely absent tree (no
+    // filter at all) falls through to an empty param list = the whole library pool.
+    if (adv === "none" || adv === "drop") continue;
+    const params = adv.params;
     // `advancedFilters=1` only when we actually emitted a grouping token; a pure-AND query stays identical to
     // the live resolver's (a plain `&`-joined param list), which keeps the common case byte-for-byte the same.
     const grouped = params.some((p) => p === "push=1" || p === "or=1");

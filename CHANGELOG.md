@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.53] - 2026-09-22
+
+### Fixed
+- v2 resolver: a filter that fully drops for a library (a field that can't apply there as the only predicate,
+  e.g. a TV-only field like episode title on the movie library) now correctly makes that library contribute
+  nothing, instead of falling back to querying the whole library. Matches v1's behavior. Found via a manual
+  test; the diff probe missed it because no preset or real channel has a sole inapplicable-field filter.
+
+### Added
+- `scripts/probe-predicate-matrix.ts` (v1-vs-v2 across every predicate shape: single / AND / OR / nested /
+  deep / negation / absent / inapplicable-field / range / recency / boolean / no-filter),
+  `scripts/probe-episodetitle.ts`, and `scripts/probe-neg-determinism.ts`.
+
 ## [0.14.52] - 2026-09-22
 
 ### Changed
