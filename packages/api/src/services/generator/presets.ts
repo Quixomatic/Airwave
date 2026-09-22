@@ -98,6 +98,24 @@ const grownUpRated = () => or(...GROWN_UP_RATINGS.map(rating));
 // floods (Pokémon 587ep, Naruto 500ep, Sesame Street 682ep) from grown-up genre channels. Relies on the
 // resolver dropping an absent-tag negation, so it's a safe no-op on libraries without those genres.
 const grownUp = () => and(notGenre("Anime"), notGenre("Children"));
+// "Romance" is a noisy Plex tag — it rides along on big films with a love subplot (Cast Away, Titanic-scale
+// epics) and Plex does not rank genres. For a soft "Hallmark" romance channel, keep Romance but drop every
+// high-concept / action / crime genre, leaving only romance that is otherwise drama / comedy / family.
+const softRomance = () =>
+  and(
+    genre("Romance"),
+    notGenre("Horror"),
+    notGenre("Action"),
+    notGenre("Adventure"),
+    notGenre("Action/Adventure"),
+    notGenre("Thriller"),
+    notGenre("Mystery"),
+    notGenre("Crime"),
+    notGenre("War"),
+    notGenre("Western"),
+    notGenre("Science Fiction"),
+    notGenre("Sci-Fi & Fantasy"),
+  );
 
 const both: MediaType[] = ["movie", "show"];
 const movie: MediaType[] = ["movie"];
@@ -304,7 +322,7 @@ const RAW_PACKAGES: PresetPackage[] = [
       { key: "drama-central", name: "Drama Central", callsign: "DRCTV", number: 60, minItems: 15, mediaTypes: both, ordering: "SHUFFLE", description: "All drama, 5.5+.", filter: and(genre("Drama"), aud("5.5"), grownUp()) },
       { key: "movie-dramas", name: "Movie Dramas", callsign: "DRMAM", number: 61, minItems: 10, mediaTypes: movie, ordering: "SHUFFLE", description: "Drama movies, 75+ min, 5.5+.", filter: and(genre("Drama"), durGte("75"), aud("5.5")) },
       { key: "drama-series", name: "Drama Series", callsign: "DRMAS", number: 62, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", description: "TV drama, 5.5+.", filter: and(genre("Drama"), aud("5.5"), grownUp()) },
-      { key: "love-stories", name: "Love Stories", callsign: "LOVSN", number: 63, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Romance, 5.0+.", filter: and(genre("Romance"), aud("5"), grownUp()) },
+      { key: "love-stories", name: "Love Stories", callsign: "LOVSN", number: 63, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Romance movies and series, the Hallmark kind.", filter: and(softRomance(), grownUp()) },
       { key: "prestige-tv", name: "Prestige TV", callsign: "PRSTG", number: 69, minItems: 5, mediaTypes: tv, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "Acclaimed drama series, 8.0+ (TV-14 / TV-MA).", filter: and(genre("Drama"), aud("8"), grownUp(), or(rating("TV-14"), rating("TV-MA"))) },
       { key: "war-honor", name: "War & Honor", callsign: "WARHN", number: 75, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "War drama, 5.5+.", filter: and(WAR(), genre("Drama"), aud("5.5"), grownUp()) },
       { key: "the-stage", name: "The Stage", callsign: "STAGE", number: 78, minItems: 3, mediaTypes: both, ordering: "SHUFFLE", description: "Musicals and stage-to-screen drama.", filter: and(genre("Musical"), genre("Drama"), aud("5.5"), grownUp()) },
@@ -338,12 +356,12 @@ const RAW_PACKAGES: PresetPackage[] = [
     tint: "indigo",
     sortIndex: 6,
     channels: [
-      { key: "crime-central", name: "Crime Central", callsign: "CRMCN", number: 100, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Crime, mature, 5.0+.", filter: and(genre("Crime"), aud("5")) },
-      { key: "mystery-theater", name: "Mystery Theater", callsign: "MYSTR", number: 101, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Mystery, 5.5+.", filter: and(genre("Mystery"), aud("5.5")) },
-      { key: "thriller-peak", name: "Thriller Peak", callsign: "THRLP", number: 102, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Thriller, 5.5+.", filter: and(genre("Thriller"), aud("5.5")) },
-      { key: "suspense-theater", name: "Suspense Theater", callsign: "SSPNS", number: 110, minItems: 5, mediaTypes: both, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "Thriller/mystery 7.0+ aud, 6.0+ crit.", filter: and(anyGenre("Thriller", "Mystery"), aud("7"), crit("6")) },
+      { key: "crime-central", name: "Crime Central", callsign: "CRMCN", number: 100, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Crime, 5.0+.", filter: and(genre("Crime"), aud("5"), grownUp()) },
+      { key: "mystery-theater", name: "Mystery Theater", callsign: "MYSTR", number: 101, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Mystery, 5.5+.", filter: and(genre("Mystery"), aud("5.5"), grownUp()) },
+      { key: "thriller-peak", name: "Thriller Peak", callsign: "THRLP", number: 102, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "Thriller, 5.5+.", filter: and(genre("Thriller"), aud("5.5"), grownUp()) },
+      { key: "suspense-theater", name: "Suspense Theater", callsign: "SSPNS", number: 110, minItems: 5, mediaTypes: both, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "The best-rated thrillers and mysteries, 7.5+.", filter: and(anyGenre("Thriller", "Mystery", "Suspense"), aud("7.5"), grownUp()) },
       { key: "crime-movies", name: "Crime Movies", callsign: "CRMMV", number: 111, minItems: 10, mediaTypes: movie, ordering: "SHUFFLE", description: "Crime movies, 75+ min, 5.5+.", filter: and(genre("Crime"), durGte("75"), aud("5.5")) },
-      { key: "crime-series", name: "Crime Series", callsign: "CRMSR", number: 112, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", description: "TV crime, 5.5+.", filter: and(genre("Crime"), aud("5.5")) },
+      { key: "crime-series", name: "Crime Series", callsign: "CRMSR", number: 112, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", description: "TV crime, 5.5+.", filter: and(genre("Crime"), aud("5.5"), grownUp()) },
     ],
   },
   {

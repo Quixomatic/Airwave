@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.38] - 2026-09-22
+
+Preset catalog quality: the Crime & Mystery package, plus a Love Stories fix.
+
+### Changed
+- Crime & Mystery goes grown-up (Crime Central, Mystery Theater, Thriller Peak, Crime Series), dropping the
+  kids/anime that carried a secondary crime/mystery/thriller tag (Blue's Clues out of Mystery, Black Clover
+  out of Thriller). Suspense Theater drops its critic clause (null on TV) for a straight audience 7.5+ cut and
+  adds the Suspense genre.
+- Love Stories is now genuine soft romance. "Romance" is a noisy Plex tag that rides along on big films with a
+  love subplot, so the channel now excludes the high-concept genres (action, adventure, thriller, crime, war,
+  sci-fi, horror, ...). Spartacus, True Blood, WandaVision, and Cast Away are out; Seeking Persephone, Crazy
+  Rich Asians, and the Hallmark-style romances are in.
+
 ## [0.14.37] - 2026-09-22
 
 Preset catalog quality: the Drama & Romance package.
