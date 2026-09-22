@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.54] - 2026-09-22
+
+Dark theme polish: the admin's dark mode was retuned from a warm, flat near-black to a cooler, more cohesive blue-black.
+
+### Changed
+- The dark theme's surface and text colors were retuned. The neutral surfaces shift off the stock violet-black to a cooler blue-black and are lifted slightly so the page no longer reads as a flat near-black, text gets a subtle cool tint with stronger muted-text contrast, and the primary accent is re-hued toward the light theme's blue. The shadcn conventions (translucent white borders, surface structure) are unchanged.
+- The onboarding checklist card in the sidebar now uses a solid background instead of a 60% translucent one, so it reads as a proper elevated panel in dark mode.
+- The dark sidebar noise texture (`apps/web/public/textures/noisy-dark.jpg`) was re-toned from a warm neutral gray to a cool blue-black so the grain matches the theme.
+
+### Fixed
+- The dark theme now defines its own `--border-light`, `--border-strong`, and `--row-selected` values instead of inheriting the light theme's near-white ones, which previously leaked into dark mode.
+
 ## [0.14.53] - 2026-09-22
 
 ### Fixed

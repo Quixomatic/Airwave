@@ -116,7 +116,7 @@ export function OnboardingChecklist() {
   return (
     // Hidden when the sidebar is collapsed to icons (matches the nav group behaviour).
     <div className="mt-3 px-2 pb-2 group-data-[collapsible=icon]:hidden">
-      <div className="rounded-xl border border-border bg-card/60 p-3 shadow-sm">
+      <div className="rounded-xl border border-border bg-card p-3 shadow-sm">
         <Collapsible open={!collapsed} onOpenChange={(o) => setCollapsed(!o)}>
           <CollapsibleTrigger
             render={

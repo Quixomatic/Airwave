@@ -68,38 +68,48 @@
 }
 
 .dark {
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.398 0.195 277.366);
-  --primary-foreground: oklch(0.962 0.018 272.314);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground: oklch(0.985 0 0);
+  /* Dark theme: standard shadcn structure kept intact (translucent white borders, secondary ==
+     muted == accent, popover == card). Only the surfaces and text were retuned — the neutral
+     ramp is shifted off the stock violet (hue 285) to a cool blue-black (~258) and lifted a touch
+     so it doesn't read as a flat near-black, and the accent is re-hued toward the light theme's
+     blue. Everything a GitHub-dark-inspired direction, not a literal copy. */
+  --background: oklch(0.176 0.013 258); /* was 0.141 violet: lighter + bluer, less flat */
+  --foreground: oklch(0.97 0.009 250); /* slight cool tint instead of pure white */
+  --card: oklch(0.216 0.015 257);
+  --card-foreground: oklch(0.97 0.009 250);
+  --popover: oklch(0.216 0.015 257);
+  --popover-foreground: oklch(0.97 0.009 250);
+  --primary: oklch(0.52 0.2 262); /* was 0.398/277 (muddy): brighter, hue toward light's blue */
+  --primary-foreground: oklch(0.985 0.01 255);
+  --secondary: oklch(0.272 0.013 257);
+  --secondary-foreground: oklch(0.97 0.009 250);
+  --muted: oklch(0.272 0.013 257);
+  --muted-foreground: oklch(0.68 0.016 254); /* bluer, keeps strong contrast on dark */
+  --accent: oklch(0.272 0.013 257);
+  --accent-foreground: oklch(0.97 0.009 250);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.552 0.016 285.938);
+  --border: oklch(1 0 0 / 10%); /* shadcn translucent — unchanged */
+  --border-light: oklch(1 0 0 / 6%); /* dark values added (were leaking the light theme's) */
+  --border-strong: oklch(1 0 0 / 18%);
+  --input: oklch(1 0 0 / 15%); /* shadcn translucent — unchanged */
+  --ring: oklch(0.552 0.02 258);
+  --row-selected: oklch(0.27 0.032 262); /* dark value added (was leaking near-white) */
+  --shadow-light: 0 1px 0 oklch(0 0 0 / 0.3), 0 1px 3px oklch(0 0 0 / 0.4);
+  --shadow-strong: 0 8px 24px oklch(0 0 0 / 0.55);
   --chart-1: oklch(0.845 0.143 164.978);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.596 0.145 163.225);
   --chart-4: oklch(0.508 0.118 165.612);
   --chart-5: oklch(0.432 0.095 166.913);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.585 0.233 277.117);
-  --sidebar-primary-foreground: oklch(0.962 0.018 272.314);
-  --sidebar-accent: oklch(1 0 0 / 0.059);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.552 0.016 285.938);
-  --t-background-noisy: url("/textures/noisy-dark.jpg");
+  --sidebar: oklch(0.2 0.014 258); /* bluer, keeps the noise texture reading well */
+  --sidebar-foreground: oklch(0.97 0.009 250);
+  --sidebar-primary: oklch(0.585 0.2 262);
+  --sidebar-primary-foreground: oklch(0.985 0.01 255);
+  --sidebar-accent: oklch(1 0 0 / 0.059); /* shadcn translucent — unchanged */
+  --sidebar-accent-foreground: oklch(0.97 0.009 250);
+  --sidebar-border: oklch(1 0 0 / 10%); /* shadcn translucent — unchanged */
+  --sidebar-ring: oklch(0.552 0.02 258);
+  --t-background-noisy: url("/textures/noisy-dark.jpg"); /* kept */
   --destructive-foreground: var(--color-red-400);
   --info: var(--color-blue-500);
   --info-foreground: var(--color-blue-400);
