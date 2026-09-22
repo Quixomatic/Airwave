@@ -70,7 +70,6 @@ const notGenre = (g: string) => cond("genre", "isNot", g);
 // TV brands live in `network` (the airing channel); `studio` on a show is the production company, so TV
 // brands (HBO/FX/…) must match on network or come up empty. Verified against the library.
 const network = (n: string) => cond("network", "is", n);
-const anyNetwork = (...ns: string[]) => or(...ns.map(network));
 
 // Genre aliases — Plex's movie agent and TV agent tag the same concept differently, and both spellings
 // coexist in the show library. Verified present via scripts/probe-preset-filters.ts:
@@ -262,7 +261,6 @@ const RAW_PACKAGES: PresetPackage[] = [
       { key: "family-hour", name: "Family Hour", callsign: "FAMHR", number: 6, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:Baby", description: "G / PG / TV-Y / TV-Y7 / TV-G / TV-PG only.", filter: familySafe() },
       { key: "movie-marquee", name: "Movie Marquee", callsign: "MOVMQ", number: 7, minItems: 10, mediaTypes: movie, ordering: "SHUFFLE", icon: "lucide:Film", description: "Movies only, 60+ minutes.", filter: durGte("60") },
       { key: "series-central", name: "Series Central", callsign: "SRSCT", number: 8, minItems: 10, mediaTypes: tv, ordering: "SHUFFLE", icon: "lucide:MonitorPlay", description: "Every TV series in your library." },
-      { key: "quick-bites", name: "Quick Bites", callsign: "QKBTS", number: 9, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", icon: "lucide:Timer", description: "Short films under 45 minutes.", filter: durLte("45") },
       { key: "popcorn", name: "Popcorn Movies", callsign: "PPCRN", number: 10, minItems: 10, mediaTypes: movie, ordering: "SHUFFLE", icon: "lucide:Popcorn", description: "Crowd-pleasing movies, 7.5+ audience, 75+ min.", filter: and(aud("7.5"), crit("6"), durGte("75")) },
       { key: "uhd", name: "Ultra HD Theater", callsign: "UHD4K", number: 12, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", icon: "lucide:Tv", description: "4K content only.", filter: res("4K") },
       { key: "critics-choice", name: "Critics' Choice", callsign: "CRITC", number: 14, minItems: 5, mediaTypes: movie, ordering: "IN_ORDER", sortField: "criticRating", sortDir: "desc", icon: "lucide:Award", description: "Movies rated 8.0+ audience, 7.5+ critic.", filter: and(aud("8"), crit("7.5")) },
@@ -574,7 +572,7 @@ const RAW_PACKAGES: PresetPackage[] = [
       { key: "new-this-month", name: "New This Month", callsign: "NWMTH", number: 403, minItems: 1, mediaTypes: both, ordering: "IN_ORDER", sortField: "addedAt", sortDir: "desc", description: "Added in the last 30 days.", filter: addedWithin("30") },
       { key: "unwatched-movies", name: "Unwatched Movies", callsign: "UNWMV", number: 405, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Unwatched movies.", filter: unwatched() },
       { key: "unwatched-series", name: "Unwatched Series", callsign: "UNWSR", number: 406, minItems: 5, mediaTypes: tv, ordering: "SHUFFLE", description: "Unwatched episodes.", filter: unwatched() },
-      { key: "lunch-break", name: "Lunch Break", callsign: "LNCHB", number: 408, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Short movies under 45 minutes.", filter: durLte("45") },
+      { key: "quick-bites", name: "Quick Bites", callsign: "QKBTS", number: 408, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", icon: "lucide:Timer", description: "Short films under 45 minutes.", filter: durLte("45") },
       { key: "movie-matinee", name: "Movie Matinee", callsign: "MVMAT", number: 409, minItems: 5, mediaTypes: movie, ordering: "SHUFFLE", description: "Movies 60–100 min.", filter: and(durGte("60"), durLte("100")) },
       { key: "top-shelf", name: "Top Shelf", callsign: "TPSHF", number: 415, minItems: 3, mediaTypes: both, ordering: "IN_ORDER", sortField: "audienceRating", sortDir: "desc", description: "9.0+.", filter: aud("9") },
       { key: "family-safe", name: "Family Safe", callsign: "FMSAF", number: 417, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "G / PG / TV-G / TV-PG / TV-Y / TV-Y7.", filter: familySafe() },

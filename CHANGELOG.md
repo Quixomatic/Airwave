@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.45] - 2026-09-22
+
+### Changed
+- Dropped the Lunch Break channel: its only filter was "under 45 minutes," making it an exact duplicate of
+  Quick Bites. Moved Quick Bites out of Basic into Special Purpose, where the runtime filters live, so Basic
+  stays a tight set of essentials.
+
+### Removed
+- An unused internal `anyNetwork` filter helper.
+
 ## [0.14.44] - 2026-09-22
 
 Preset catalog quality: the Special Purpose package.
