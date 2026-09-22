@@ -109,7 +109,11 @@ export function createAuth() {
       // Long-lived API keys (for the MCP tool surface + any machine client). Keys are minted server-side
       // with an `airwave_` prefix + tied to an admin user, sent as `x-api-key`, and verified via
       // `auth.api.verifyApiKey`. `enableMetadata` lets a key carry flags (e.g. `readOnly`) for the dispatcher.
-      apiKey({ enableMetadata: true }),
+      // `rateLimit.enabled: false` turns OFF the plugin's built-in per-key rate limiting (default is on at
+      // ~10 req/day, which 429s an active MCP client). `evaluateRateLimit` short-circuits on this global flag
+      // before any per-key column, so it covers the seeded admin key, UI-created keys, and any future ones.
+      // These are trusted admin machine keys on a self-hosted server; we don't want to throttle them.
+      apiKey({ enableMetadata: true, rateLimit: { enabled: false } }),
 
       // RFC 8628 device grant — lets a TV log into an EXISTING Airwave
       // account via a user code approved at /device on a phone/computer. This

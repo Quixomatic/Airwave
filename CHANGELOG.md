@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.31] - 2026-09-22
+
+### Fixed
+- API keys no longer get rate limited. The better-auth `apiKey` plugin defaults to per-key rate limiting
+  (about 10 requests a day), which was 429ing an active MCP client after a handful of tool calls
+  (`Failed to validate API key: Rate limit exceeded`, returned as a 401). Turned it off globally with
+  `rateLimit: { enabled: false }`, which short-circuits before any per-key setting, so it covers the seeded
+  admin key, keys created from the admin UI, and any future keys. Requires a server restart to take effect.
+
 ## [0.14.30] - 2026-09-21
 
 MCP is live end to end: an admin can generate an API key and drive the server's tools from any MCP client.
