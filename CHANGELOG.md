@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.36] - 2026-09-22
+
+Preset catalog quality: the Comedy & Fun package.
+
+### Changed
+- The Comedy Channel, Sitcom City, and Comedy Classics are now grown-up (they drop the kids cartoons and
+  anime that flooded them, so Sitcom City is Beverly Hillbillies / Home Improvement / Boy Meets World, not
+  Pokémon). Family Comedy keeps the all-ages content.
+- Dark Laughs is now genuinely dark (comedy crossed with horror / thriller / crime: The Boys, Barry, What We
+  Do in the Shadows), so it no longer duplicates Late Night Laughs (general mature comedy).
+- Rom-Com Radio is live-action romantic comedy films (excludes the animated Romance+Comedy titles like
+  Aladdin that aren't rom-coms).
+- Comedy Gold is movie-only best-rated comedies (dropped the critic clause that silently emptied TV);
+  Animated Laughs is western adult animation (excludes anime).
+
 ## [0.14.35] - 2026-09-22
 
 Preset catalog quality: the Studio Spotlight package.
