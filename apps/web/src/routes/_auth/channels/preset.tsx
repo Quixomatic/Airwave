@@ -14,7 +14,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@airwave/ui/compo
 import { Switch } from "@airwave/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Blocks, CheckIcon, Eye, Loader2, LoaderCircleIcon, PackageCheck, Tv, X } from "lucide-react";
+import { Blocks, CheckIcon, Eye, Loader2, LoaderCircleIcon, PackageCheck, Sparkles, Tv, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -114,15 +114,24 @@ function PresetStagingPage() {
 
   useEffect(() => {
     if (catalog.data && enabled === null) {
-      // Default ON: the Basic package, plus any channels that already exist (a previously-generated lineup),
-      // so a re-run preserves what you built and only Basic is opt-in for a first run.
+      // Default ON: a previously-generated lineup pre-selects exactly those channels (a re-run preserves what
+      // you built). On a FIRST run (nothing generated yet), seed the curated "recommended" starter set.
+      const anyExisting = catalog.data.packages.some((p) => p.channels.some((c) => c.exists));
       const seed = new Set<string>();
       for (const p of catalog.data.packages) for (const c of p.channels) {
-        if (p.key === "basic" || c.exists) seed.add(c.key);
+        if (anyExisting ? c.exists : c.recommended) seed.add(c.key);
       }
       setEnabled(seed);
     }
   }, [catalog.data, enabled]);
+
+  /** Reset the selection to exactly the curated recommended set (the "Recommended" button). */
+  const selectRecommended = () => {
+    if (!catalog.data) return;
+    const s = new Set<string>();
+    for (const p of catalog.data.packages) for (const c of p.channels) if (c.recommended) s.add(c.key);
+    setEnabled(s);
+  };
 
   const enabledKeys = useMemo(() => (enabled ? [...enabled] : []), [enabled]);
   const previews = usePresetPreviews(catalog.data?.sourceId, previewMode, enabledKeys);
@@ -256,6 +265,12 @@ function PresetStagingPage() {
       </HeaderCenter>
       <HeaderRight>
         <div className="flex items-center gap-2">
+          {!previewMode && (
+            <Button variant="ghost" size="sm" onClick={selectRecommended} title="Select the curated recommended lineup">
+              <Sparkles className="mr-2 size-4" />
+              Recommended
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"

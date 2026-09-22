@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.46] - 2026-09-22
+
+### Added
+- A curated **Recommended** starter lineup for the preset generator (a broad, high-quality set spanning
+  packages), plus a **Recommended** button in the staging bar that selects exactly that set.
+
+### Changed
+- The preset staging page now defaults to the recommended lineup on a first run, instead of turning on the
+  entire Basic package. A previously-generated lineup still pre-selects exactly the channels you already have,
+  so a re-run preserves what you built.
+
 ## [0.14.45] - 2026-09-22
 
 ### Changed

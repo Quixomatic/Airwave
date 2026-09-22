@@ -2,7 +2,7 @@ import type { PrismaClient } from "@airwave/db";
 
 import { channelAccentAt } from "../accents";
 import { normalizeCallsign, uniqueCallsign } from "./callsign";
-import { hashPresetChannel, type MediaType, PRESET_PACKAGES, type PresetChannel, type PresetPackage } from "./presets";
+import { hashPresetChannel, type MediaType, PRESET_PACKAGES, type PresetChannel, type PresetPackage, RECOMMENDED_KEYS } from "./presets";
 
 /**
  * - "all": reconcile every generated package + channel against the selection.
@@ -196,6 +196,8 @@ export type PresetCatalogChannel = {
   exists: boolean;
   /** It exists AND its stored `presetRev` differs from the current preset hash (would be updated). */
   presetChanged: boolean;
+  /** Part of the curated "recommended" starter lineup (pre-selected on a first run). */
+  recommended: boolean;
 };
 
 export type PresetCatalogPackage = {
@@ -243,6 +245,7 @@ export async function getPresetCatalog(
         mediaTypes: ch.mediaTypes,
         exists,
         presetChanged: exists && revByKey.get(ch.key) !== hashPresetChannel(ch),
+        recommended: RECOMMENDED_KEYS.has(ch.key),
       };
     }),
   }));

@@ -640,3 +640,27 @@ export function hashPresetChannel(ch: PresetChannel): string {
 export const PRESET_CHANNELS_BY_KEY: Map<string, { pkg: PresetPackage; channel: PresetChannel }> = new Map(
   PRESET_PACKAGES.flatMap((pkg) => pkg.channels.map((channel) => [channel.key, { pkg, channel }] as const)),
 );
+
+/**
+ * The curated "recommended" starter lineup — a broad, high-quality default dial spanning packages, used to
+ * pre-select the staging grid on a FIRST run (a previously-generated lineup pre-selects those channels
+ * instead), and by the "Recommended" button. A tuneable list, not tied to any one package.
+ */
+export const RECOMMENDED_KEYS: ReadonlySet<string> = new Set([
+  // Basic essentials
+  "prime-time", "movie-marquee", "series-central", "shuffle", "family-hour", "late-night", "popcorn", "fresh",
+  // Comedy
+  "comedy-channel", "sitcom-city",
+  // Drama & Romance
+  "drama-central", "love-stories", "prestige-tv",
+  // Action & Sci-Fi
+  "action-zone", "action-movies", "scifi-universe", "scifi-cinema",
+  // Crime / Horror
+  "crime-central", "fright-night",
+  // Kids & Family
+  "toon-town", "family-movie-night",
+  // Curated
+  "feel-good", "critics-darlings", "binge-worthy",
+  // Documentary
+  "doc-central",
+]);
