@@ -389,9 +389,9 @@ const RAW_PACKAGES: PresetPackage[] = [
     tint: "teal",
     sortIndex: 8,
     channels: [
-      { key: "doc-central", name: "Doc Central", callsign: "DOCCN", number: 140, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "All documentaries, 5.0+.", filter: and(genre("Documentary"), aud("5")) },
-      { key: "history-vault", name: "History Vault", callsign: "HSTVT", number: 142, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "Doc + history, 5.5+.", filter: and(genre("Documentary"), genre("History"), aud("5.5")) },
-      { key: "war-stories", name: "War Stories", callsign: "WARST", number: 144, minItems: 3, mediaTypes: both, ordering: "SHUFFLE", description: "Doc + war.", filter: and(genre("Documentary"), genre("War")) },
+      { key: "doc-central", name: "Doc Central", callsign: "DOCCN", number: 140, minItems: 10, mediaTypes: both, ordering: "SHUFFLE", description: "All documentaries, 5.0+.", filter: and(genre("Documentary"), aud("5"), grownUp()) },
+      { key: "history-vault", name: "History Vault", callsign: "HSTVT", number: 142, minItems: 5, mediaTypes: both, ordering: "SHUFFLE", description: "History documentaries, 5.5+.", filter: and(genre("Documentary"), genre("History"), aud("5.5")) },
+      { key: "war-stories", name: "War Stories", callsign: "WARST", number: 144, minItems: 3, mediaTypes: both, ordering: "SHUFFLE", description: "War documentaries.", filter: and(genre("Documentary"), WAR()) },
       { key: "music-docs", name: "Music Docs", callsign: "MUSDC", number: 150, minItems: 3, mediaTypes: both, ordering: "SHUFFLE", description: "Doc + music, 5.0+.", filter: and(genre("Documentary"), genre("Music"), aud("5")) },
       { key: "sports-stories", name: "Sports Stories", callsign: "SPTST", number: 154, minItems: 3, mediaTypes: both, ordering: "SHUFFLE", description: "Doc + sport, 5.5+.", filter: and(genre("Documentary"), genre("Sport"), aud("5.5")) },
     ],

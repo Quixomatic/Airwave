@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.40] - 2026-09-22
+
+Preset catalog quality: the Documentary package.
+
+### Changed
+- Doc Central goes grown-up (drops kids nature shows that carry a documentary tag); War Stories matches both
+  the `War` and `War & Politics` genres. (These channels are content-limited on libraries with few
+  documentaries and populate on doc-rich ones.)
+
 ## [0.14.39] - 2026-09-22
 
 Preset catalog quality: the Horror package.
