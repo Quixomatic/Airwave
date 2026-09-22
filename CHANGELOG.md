@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.43] - 2026-09-22
+
+Preset catalog quality: the Curated & Mood package.
+
+### Changed
+- The adult-discovery channels (Binge Worthy, Critics' Darlings, Hidden Gems, Rewatchable, The Unwatched
+  Vault) go grown-up, so the highly-rated kids anime that flooded them (Naruto, Bluey) give way to acclaimed
+  adult titles (The Sopranos, Game of Thrones, Better Call Saul). Binge Worthy also gates to grown-up ratings.
+- Feel Good, Nostalgia Trip (90s kids nostalgia belongs), and the 4K / recency channels stay broad.
+
 ## [0.14.42] - 2026-09-22
 
 Preset catalog quality: the Time Machine package.
