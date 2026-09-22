@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.41] - 2026-09-22
+
+### Fixed
+- Kids & Family: Anime Adventures no longer sweeps in dark TV-14 anime (Re:ZERO, Fullmetal Alchemist
+  Brotherhood, Hell's Paradise, Solo Leveling). It is now capped at family ratings (TV-PG and below) and
+  excludes the horror / thriller genres, leaving genuinely family-friendly anime (Pokémon, Naruto, One-Punch
+  Man). Toon Town also excludes horror.
+
 ## [0.14.40] - 2026-09-22
 
 Preset catalog quality: the Documentary package.
