@@ -32,6 +32,10 @@ export const env = createEnv({
 
     // Stable X-Plex-Client-Identifier for the Plex login handshake.
     PLEX_CLIENT_IDENTIFIER: z.string().optional(),
+
+    // Airwave Cloud (airwave.software) base URL for Remote Access pairing. Optional override; the stored
+    // RemoteAccess.cloudBaseUrl (default https://api.airwave.software) is used when unset.
+    AIRWAVE_CLOUD_URL: z.string().optional(),
   },
   runtimeEnv: process.env,
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,

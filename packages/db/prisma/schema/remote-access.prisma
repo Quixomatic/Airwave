@@ -1,0 +1,36 @@
+/// Airwave Cloud remote-access pairing — a **singleton** (one row, key "global"). Holds this self-hosted
+/// server's pairing state with Airwave Cloud (airwave.software): the codes it generated, and the subdomain +
+/// tunnel secret the cloud assigns once the user binds it in the portal. The server generates the codes and
+/// DISPLAYS the short one; the user pastes it into the cloud portal to bind. See the airwave-cloud repo.
+model RemoteAccess {
+  id           String @id @default(cuid())
+  /// Singleton guard: always "global" so upsert-by-key returns the one row.
+  key          String @unique @default("global")
+
+  enabled      Boolean @default(false)
+  /// Which cloud to pair with (the control API base). Overridable for dev/staging.
+  cloudBaseUrl String  @default("https://api.airwave.software")
+
+  /// Long, server-only secret we register + poll the cloud with (never shown to the user).
+  registrationToken String?
+  /// Per-server secret both sides derive the rotating 6-digit bind code from (TOTP-style, 30s step). We
+  /// DISPLAY the current code (computed on read, never stored); the user pastes it into the cloud portal to
+  /// bind. A throwaway secret shared with the cloud — deliberately NOT the server's auth secret.
+  bindSecret        String?
+  /// disconnected | pending | bound
+  status            String  @default("disconnected")
+
+  /// Assigned by the cloud once the user binds this server.
+  subdomain    String?
+  tunnelSecret String?
+  relayHost    String?
+
+  /// The hostname we report to the cloud (shown as "Found your server: <hostname>").
+  hostname     String?
+  lastPolledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("remote_access")
+}
