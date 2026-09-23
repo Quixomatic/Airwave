@@ -36,6 +36,9 @@ export const env = createEnv({
     // Airwave Cloud (airwave.software) base URL for Remote Access pairing. Optional override; the stored
     // RemoteAccess.cloudBaseUrl (default https://api.airwave.software) is used when unset.
     AIRWAVE_CLOUD_URL: z.string().optional(),
+    // The relay's WebSocket control URL to dial. Optional override (handy for local testing, e.g.
+    // ws://127.0.0.1:3020/__relay/connect); otherwise the URL the cloud returns at register is used.
+    AIRWAVE_RELAY_URL: z.string().optional(),
   },
   runtimeEnv: process.env,
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
