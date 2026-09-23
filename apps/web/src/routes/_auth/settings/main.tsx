@@ -24,6 +24,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Modal } from "@/components/modal";
+import { useConfirm } from "@/components/confirm-dialog";
 import { authClient, useSession } from "@/lib/auth-client";
 import { trpc, trpcClient } from "@/utils/trpc";
 
@@ -224,11 +225,33 @@ function RemoteAccessFrame() {
       return s.status === "pending" ? 1000 : s.status === "bound" ? 30_000 : false;
     },
   });
+  const { confirm, dialog } = useConfirm();
   const [busy, setBusy] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const d = ra.data;
   const on = !!d?.enabled;
   const paired = !!d && d.status !== "disconnected";
+
+  const forget = async () => {
+    const ok = await confirm({
+      title: "Forget this server?",
+      description:
+        "Unpairs this server from Airwave Cloud and removes it from your account. You'll need to pair again to use remote access.",
+      confirmLabel: "Forget",
+      destructive: true,
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await trpcClient.remoteAccess.unpair.mutate();
+      await ra.refetch();
+      setCodeOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Unpair failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const setEnabled = async (enable: boolean) => {
     setBusy(true);
@@ -301,6 +324,20 @@ function RemoteAccessFrame() {
             Off — pairing kept{d?.address ? ` (${d.address})` : ""}. Turn on to reconnect.
           </p>
         )}
+
+        {paired && (
+          <div className="flex items-center justify-between gap-4 border-t pt-4">
+            <div className="min-w-0">
+              <Label>Forget this server</Label>
+              <p className="text-muted-foreground text-xs">
+                Unpair from Airwave Cloud and remove it from your account. Pair again to reconnect.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" className="shrink-0" onClick={() => void forget()} disabled={busy}>
+              Forget this server
+            </Button>
+          </div>
+        )}
       </FramePanel>
 
       <Modal open={codeOpen} onClose={() => setCodeOpen(false)}>
@@ -326,6 +363,7 @@ function RemoteAccessFrame() {
           </Button>
         </div>
       </Modal>
+      {dialog}
     </Frame>
   );
 }

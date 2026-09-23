@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.57] - 2026-09-23
+
+Cloud Service: two-way unbind + a "Forget this server" action. Still on the `feat/remote-access` branch.
+
+### Added
+- **"Forget this server"** in Settings → Cloud Service (shown once paired): unpairs from Airwave Cloud, and now also notifies the cloud (`POST /api/instances/unpair`) so the instance is revoked on both sides. Confirmed via the shared confirm dialog.
+
+### Changed
+- **Revoke reconciliation**: if the server is unbound from the Airwave Cloud portal, the next register poll (the Cloud Service Sync job or opening the settings page) sees the `revoked` state, wipes the dead pairing, and — if Cloud Service is still on — re-registers fresh so a new binding code is offered. (The live tunnel is dropped by the relay immediately regardless.)
+
 ## [0.14.56] - 2026-09-23
 
 Cloud Service, part two: the tunnel connector. The self-hosted end of the Airwave Cloud reverse tunnel — a pure-TypeScript module (no bundled binary, no subprocess) that dials the cloud relay over WebSocket and forwards requests to this server, so a paired server becomes reachable at `theirname.airwave.software`. Still on the `feat/remote-access` branch; the relay it dials lives in the airwave-cloud repo.

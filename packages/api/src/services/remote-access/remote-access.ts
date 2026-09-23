@@ -20,6 +20,10 @@ export async function getRemoteAccess(prisma: PrismaClient) {
   return prisma.remoteAccess.upsert({ where: { key: SINGLETON_KEY }, create: { key: SINGLETON_KEY }, update: {} });
 }
 
+// The RemoteAccess row type — annotated on the mutually-recursive enable/reconcile fns to break TS's
+// return-type inference cycle (reconcileRevoked ⇄ enableRemoteAccess).
+type RemoteAccessRow = Awaited<ReturnType<typeof getRemoteAccess>>;
+
 /** The cloud base URL — an env override wins, else the stored value (default airwave.software). */
 function cloudUrl(row: { cloudBaseUrl: string }): string {
   return (env.AIRWAVE_CLOUD_URL ?? row.cloudBaseUrl).replace(/\/$/, "");
@@ -47,12 +51,34 @@ async function callRegister(
 }
 
 /**
+ * The cloud told us this pairing was revoked (the user unbound this server in the portal). Wipe the dead
+ * pairing; if Cloud Service is still enabled, immediately re-register fresh so the server offers a new bind
+ * code — as if freshly enabled. (The live tunnel was already dropped by the relay's gate.)
+ */
+async function reconcileRevoked(prisma: PrismaClient): Promise<RemoteAccessRow> {
+  const cleared = await prisma.remoteAccess.update({
+    where: { key: SINGLETON_KEY },
+    data: {
+      status: "disconnected",
+      registrationToken: null,
+      bindSecret: null,
+      subdomain: null,
+      tunnelSecret: null,
+      relayHost: null,
+      relayUrl: null,
+      lastPolledAt: new Date(),
+    },
+  });
+  return cleared.enabled ? enableRemoteAccess(prisma) : cleared;
+}
+
+/**
  * Turn the cloud service ON.
  * - If this server was already set up (has a registrationToken), RECONNECT: re-register with the cloud
  *   (idempotent) to confirm/refresh the existing binding — no new pairing. Resumes bound or pending as-is.
  * - If it's a fresh server (never paired), start a new registration and go pending.
  */
-export async function enableRemoteAccess(prisma: PrismaClient) {
+export async function enableRemoteAccess(prisma: PrismaClient): Promise<RemoteAccessRow> {
   const row = await getRemoteAccess(prisma);
   const host = row.hostname ?? hostname();
 
@@ -63,6 +89,7 @@ export async function enableRemoteAccess(prisma: PrismaClient) {
       bindSecret: row.bindSecret,
       hostname: host,
     });
+    if (result.status === "revoked") return reconcileRevoked(prisma);
     const bound = result.status !== "pending" && !!result.subdomain;
     return prisma.remoteAccess.update({
       where: { key: SINGLETON_KEY },
@@ -119,6 +146,7 @@ export async function refreshRemoteAccess(prisma: PrismaClient) {
       bindSecret: row.bindSecret,
       hostname: row.hostname ?? hostname(),
     });
+    if (result.status === "revoked") return reconcileRevoked(prisma);
     const bound = result.status !== "pending" && !!result.subdomain;
     return prisma.remoteAccess.update({
       where: { key: SINGLETON_KEY },
@@ -149,6 +177,20 @@ export async function disableRemoteAccess(prisma: PrismaClient) {
  * fresh. The user should also remove the instance from the Airwave Cloud portal.
  */
 export async function unpairRemoteAccess(prisma: PrismaClient) {
+  const row = await getRemoteAccess(prisma);
+  // Tell the cloud to revoke this instance too, so it clears on both sides (best-effort — local unpair
+  // proceeds regardless; the cloud would tombstone on its own gate sweep anyway).
+  if (row.registrationToken) {
+    try {
+      await fetch(`${cloudUrl(row)}/api/instances/unpair`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ registrationToken: row.registrationToken }),
+      });
+    } catch {
+      /* offline / cloud unreachable — ignore */
+    }
+  }
   return prisma.remoteAccess.update({
     where: { key: SINGLETON_KEY },
     data: {
