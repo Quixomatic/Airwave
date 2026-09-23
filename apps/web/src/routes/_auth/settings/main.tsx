@@ -309,12 +309,22 @@ function RemoteAccessFrame() {
         )}
 
         {on && d?.status === "bound" && (
-          <div className="flex items-center gap-3 border-t pt-4">
-            <Badge>Connected</Badge>
-            {d.address && (
-              <a href={`https://${d.address}`} target="_blank" rel="noreferrer" className="font-mono text-sm underline">
-                {d.address}
-              </a>
+          <div className="flex flex-col gap-2 border-t pt-4">
+            <div className="flex items-center gap-3">
+              <Badge>Connected</Badge>
+              {d.address && (
+                <a href={`https://${d.address}`} target="_blank" rel="noreferrer" className="font-mono text-sm underline">
+                  {d.address}
+                </a>
+              )}
+            </div>
+            {d.tvAddress && (
+              <div className="text-muted-foreground flex items-center gap-2 pl-1 text-xs">
+                <span className="opacity-70">↳ TV player</span>
+                <a href={`https://${d.tvAddress}`} target="_blank" rel="noreferrer" className="font-mono underline">
+                  {d.tvAddress}
+                </a>
+              </div>
             )}
           </div>
         )}

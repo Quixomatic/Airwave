@@ -32,6 +32,7 @@ function cloudUrl(row: { cloudBaseUrl: string }): string {
 type RegisterResult = {
   status: string;
   subdomain: string | null;
+  tvSubdomain: string | null;
   tunnelSecret: string | null;
   relayHost: string | null;
   relayControlUrl: string | null;
@@ -63,6 +64,7 @@ async function reconcileRevoked(prisma: PrismaClient): Promise<RemoteAccessRow> 
       registrationToken: null,
       bindSecret: null,
       subdomain: null,
+      tvSubdomain: null,
       tunnelSecret: null,
       relayHost: null,
       relayUrl: null,
@@ -99,6 +101,7 @@ export async function enableRemoteAccess(prisma: PrismaClient): Promise<RemoteAc
         ...(bound
           ? {
               subdomain: result.subdomain,
+              tvSubdomain: result.tvSubdomain,
               tunnelSecret: result.tunnelSecret,
               relayHost: result.relayHost,
               relayUrl: result.relayControlUrl,
@@ -154,6 +157,7 @@ export async function refreshRemoteAccess(prisma: PrismaClient) {
         ? {
             status: "bound",
             subdomain: result.subdomain,
+            tvSubdomain: result.tvSubdomain,
             tunnelSecret: result.tunnelSecret,
             relayHost: result.relayHost,
             relayUrl: result.relayControlUrl,
@@ -202,6 +206,7 @@ export function remoteAccessView(row: {
   status: string;
   bindSecret: string | null;
   subdomain: string | null;
+  tvSubdomain: string | null;
   relayHost: string | null;
   hostname: string | null;
 }) {
@@ -214,6 +219,9 @@ export function remoteAccessView(row: {
     secondsRemaining: code ? codeSecondsRemaining() : null,
     subdomain: row.subdomain,
     address: row.subdomain ? `${row.subdomain}.${domain}` : null,
+    // The tv-web player's own address over the tunnel (offshoot of the main URL).
+    tvSubdomain: row.tvSubdomain,
+    tvAddress: row.tvSubdomain ? `${row.tvSubdomain}.${domain}` : null,
     hostname: row.hostname,
   };
 }

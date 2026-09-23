@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.58] - 2026-09-23
+
+Cloud Service groundwork for reaching the admin UI + tv-web over the tunnel (still on `feat/remote-access`; the cloud side shipped as airwave-cloud v0.0.12).
+
+### Added
+- **Connector is now a router**: it forwards `/api`, `/trpc`, `/api/auth`, `/img`, `/caps`, `/bumper-music` to this server, and — when configured — requests arriving on the tv subdomain to the tv-web service and everything else to the admin web service, so one tunnel origin can serve the API, admin UI, and tv-web together. New optional `AIRWAVE_WEB_ORIGIN` / `AIRWAVE_TVWEB_ORIGIN` env vars point at those static services; when unset the connector forwards to this server (unchanged single-service behavior).
+- **TV player address**: Cloud Service stores the assigned tv-web subdomain (`RemoteAccess.tvSubdomain`, migration `add_remote_access_tv_subdomain`, kept current by the sync job) and shows it as an offshoot of the main address on Settings → Cloud Service.
+
+### Changed
+- **Dynamic `trustedOrigins`**: better-auth now unions the env origins (`CORS_ORIGIN` / `TV_APP_ORIGIN` / `EXTRA_CORS_ORIGINS`) with this server's assigned Airwave Cloud subdomains (main + tv), so the admin/tv-web are accepted over the tunnel without baking the subdomain into env. Existing reverse-proxy setups are unaffected — the cloud subdomains are purely additive.
+
 ## [0.14.57] - 2026-09-23
 
 Cloud Service: two-way unbind + a "Forget this server" action. Still on the `feat/remote-access` branch.
