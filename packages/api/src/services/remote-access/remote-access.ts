@@ -176,7 +176,7 @@ export async function disableRemoteAccess(prisma: PrismaClient) {
  * Forget the pairing entirely (a deliberate unpair) — clears all pairing state so the next enable starts
  * fresh. The user should also remove the instance from the Airwave Cloud portal.
  */
-export async function unpairRemoteAccess(prisma: PrismaClient) {
+export async function unpairRemoteAccess(prisma: PrismaClient): Promise<RemoteAccessRow> {
   const row = await getRemoteAccess(prisma);
   // Tell the cloud to revoke this instance too, so it clears on both sides (best-effort — local unpair
   // proceeds regardless; the cloud would tombstone on its own gate sweep anyway).
@@ -191,19 +191,9 @@ export async function unpairRemoteAccess(prisma: PrismaClient) {
       /* offline / cloud unreachable — ignore */
     }
   }
-  return prisma.remoteAccess.update({
-    where: { key: SINGLETON_KEY },
-    data: {
-      enabled: false,
-      status: "disconnected",
-      registrationToken: null,
-      bindSecret: null,
-      subdomain: null,
-      tunnelSecret: null,
-      relayHost: null,
-      relayUrl: null,
-    },
-  });
+  // Drop the pairing but leave the Cloud Service toggle as-is: if it's still on, re-offer a fresh pairing
+  // (new code) rather than silently switching Cloud Service off. Same reset the cloud-revoke path uses.
+  return reconcileRevoked(prisma);
 }
 
 /** The client-safe view — the CURRENT rotating code + countdown while pending; never any secret. */
