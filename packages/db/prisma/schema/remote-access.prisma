@@ -24,6 +24,9 @@ model RemoteAccess {
   subdomain    String?
   tunnelSecret String?
   relayHost    String?
+  /// The WebSocket control URL this server dials to open its tunnel (e.g.
+  /// "wss://relay.airwave.software/__relay/connect"), returned by the cloud register call.
+  relayUrl     String?
 
   /// The hostname we report to the cloud (shown as "Found your server: <hostname>").
   hostname     String?

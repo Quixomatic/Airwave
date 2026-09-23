@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.56] - 2026-09-23
+
+Cloud Service, part two: the tunnel connector. The self-hosted end of the Airwave Cloud reverse tunnel — a pure-TypeScript module (no bundled binary, no subprocess) that dials the cloud relay over WebSocket and forwards requests to this server, so a paired server becomes reachable at `theirname.airwave.software`. Still on the `feat/remote-access` branch; the relay it dials lives in the airwave-cloud repo.
+
+### Added
+- **Relay connector** (`packages/api/src/services/remote-access/connector.ts`): opens one WebSocket to the relay, authenticates with the per-server `tunnelSecret`, then forwards each tunneled request to this server over loopback and streams the response back chunk-by-chunk (SSE and chunked responses stream, not buffer). Reconnects with backoff; heartbeats; only the control plane travels the tunnel (media stays Plex-direct). Started when Cloud Service is enabled + bound, stopped on disable/unpair, reconciled on boot and by the `remote-access-sync` job.
+- **Wire protocol** (`relay-protocol.ts`): a small framed protocol (JSON control frames + binary body frames keyed by request id), kept byte-compatible with the relay's copy.
+- `RemoteAccess.relayUrl` (migration `add_remote_access_relay_url`) + `AIRWAVE_RELAY_URL` env override: the WebSocket control URL to dial, learned from the cloud at register (or overridden for local testing).
+
+### Notes
+- The connector is plain TypeScript that runs inside the existing Bun server — nothing new to install or bundle into the Docker image or desktop app.
+
 ## [0.14.55] - 2026-09-23
 
 Cloud Service (remote access to Airwave Cloud): the self-hosted server side of the pairing loop. This is the first slice of the tunnel-as-a-service feature and pairs a self-hosted server to an Airwave Cloud account. The tunnel itself (frp relay) is a later phase; this ships the account binding only. Landed on the `feat/remote-access` branch so it stays off main until the relay is done.

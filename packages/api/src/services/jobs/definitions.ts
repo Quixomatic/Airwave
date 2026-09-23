@@ -9,6 +9,7 @@ import { getGlobalBumperConfig } from "../bumpers/bumper-config";
 import { generateLineup } from "../generator/generate";
 import { syncMediaItems } from "../media/sync-media";
 import { syncRecentlyAdded } from "../media/sync-recent";
+import { syncConnector } from "../remote-access/connector";
 import { refreshRemoteAccess } from "../remote-access/remote-access";
 import { getAppSettings } from "../settings";
 import { firstReadySource } from "../sources/readiness";
@@ -490,6 +491,8 @@ JOB_DEFINITIONS.push({
   defaultCron: "0 */2 * * * *",
   run: async () => {
     await refreshRemoteAccess(prisma);
+    // Reconcile the tunnel: pick up a newly-bound pairing, or a subdomain/secret change, without a restart.
+    await syncConnector(prisma);
   },
 });
 

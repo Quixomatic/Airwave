@@ -30,6 +30,7 @@ type RegisterResult = {
   subdomain: string | null;
   tunnelSecret: string | null;
   relayHost: string | null;
+  relayControlUrl: string | null;
 };
 
 async function callRegister(
@@ -69,7 +70,12 @@ export async function enableRemoteAccess(prisma: PrismaClient) {
         enabled: true,
         status: bound ? "bound" : "pending",
         ...(bound
-          ? { subdomain: result.subdomain, tunnelSecret: result.tunnelSecret, relayHost: result.relayHost }
+          ? {
+              subdomain: result.subdomain,
+              tunnelSecret: result.tunnelSecret,
+              relayHost: result.relayHost,
+              relayUrl: result.relayControlUrl,
+            }
           : {}),
         hostname: host,
         lastPolledAt: new Date(),
@@ -122,6 +128,7 @@ export async function refreshRemoteAccess(prisma: PrismaClient) {
             subdomain: result.subdomain,
             tunnelSecret: result.tunnelSecret,
             relayHost: result.relayHost,
+            relayUrl: result.relayControlUrl,
             lastPolledAt: new Date(),
           }
         : { lastPolledAt: new Date() },
@@ -152,6 +159,7 @@ export async function unpairRemoteAccess(prisma: PrismaClient) {
       subdomain: null,
       tunnelSecret: null,
       relayHost: null,
+      relayUrl: null,
     },
   });
 }

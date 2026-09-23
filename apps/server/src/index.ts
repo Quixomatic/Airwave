@@ -4,6 +4,7 @@ import { runAgentChat } from "@airwave/api/services/agent/chat";
 import { createFromUpload } from "@airwave/api/services/bumper-music/library";
 import { contentTypeFor } from "@airwave/api/services/bumper-music/store";
 import { resumePresetJobRuns } from "@airwave/api/services/generator/generate";
+import { syncConnector } from "@airwave/api/services/remote-access/connector";
 import { startJobs } from "@airwave/api/services/jobs/scheduler";
 import { resolveChannelSource, resolveMediaSource } from "@airwave/api/services/playback/broker";
 import { buildAuthUrl, createPin } from "@airwave/api/services/plex/client";
@@ -300,6 +301,14 @@ try {
   await resumePresetJobRuns(prisma);
 } catch (err) {
   console.error("Preset job resume failed:", err);
+}
+
+// Bring the Airwave Cloud tunnel up if this server is already paired + Cloud Service is on. Best-effort; the
+// connector reconnects on its own, and the remote-access-sync job re-reconciles every couple of minutes.
+try {
+  await syncConnector(prisma);
+} catch (err) {
+  console.error("Cloud Service connector startup failed:", err);
 }
 
 // Bun's default idleTimeout is 10s, which kills long streaming responses — an AI chat turn (extended
