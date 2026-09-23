@@ -29,6 +29,25 @@ import { getRemoteAccess } from "./remote-access";
 
 /** This server's own loopback origin — the connector forwards tunneled requests here. */
 const LOCAL_ORIGIN = `http://127.0.0.1:${process.env.PORT || 3000}`;
+
+/** Path prefixes the SERVER owns (everything else is a static frontend). Kept short + explicit — extend here
+ * if a new top-level server route is added. Matched segment-aware so e.g. "/caps" and "/caps/x" hit the
+ * server but "/capsule" would not. `/api` covers `/api/auth`, `/api/v1`, `/api/health`, etc. */
+const SERVER_PREFIXES = ["/api", "/trpc", "/img", "/caps", "/bumper-music"];
+function isServerPath(rawUrl: string): boolean {
+  const path = rawUrl.split("?")[0] ?? rawUrl;
+  return SERVER_PREFIXES.some((pre) => path === pre || path.startsWith(pre + "/"));
+}
+function headerValue(headers: [string, string][], name: string): string | undefined {
+  const lower = name.toLowerCase();
+  for (const [k, v] of headers) if (k.toLowerCase() === lower) return v;
+  return undefined;
+}
+
+/** Where the connector fans a tunneled request: the server (API + owned routes), the admin web static
+ * service, or the tv-web static service. Unset web/tvweb origins fall back to the server (today's behavior). */
+export type ConnectorRouting = { webOrigin?: string; tvwebOrigin?: string; tvHost?: string };
+
 const PING_INTERVAL_MS = 25_000;
 const MAX_BACKOFF_MS = 30_000;
 const DENIED_BACKOFF_MS = 60_000;
@@ -51,7 +70,19 @@ export class RelayConnector {
     private readonly url: string,
     private readonly token: string,
     private readonly serverHostname: string,
+    private readonly routing: ConnectorRouting = {},
   ) {}
+
+  /** Choose the upstream origin for a tunneled request: server for owned paths; else the tv-web service when
+   * the request arrived on the tv subdomain; else the admin web service; falling back to the server. */
+  private pickUpstream(frame: ReqFrame): string {
+    if (isServerPath(frame.url)) return LOCAL_ORIGIN;
+    const host = headerValue(frame.headers, "x-forwarded-host") ?? headerValue(frame.headers, "host");
+    if (this.routing.tvHost && this.routing.tvwebOrigin && host === this.routing.tvHost) {
+      return this.routing.tvwebOrigin;
+    }
+    return this.routing.webOrigin ?? LOCAL_ORIGIN;
+  }
 
   start(): void {
     this.stopped = false;
@@ -224,7 +255,7 @@ export class RelayConnector {
     }
 
     try {
-      const res = await fetch(`${LOCAL_ORIGIN}${frame.url}`, {
+      const res = await fetch(`${this.pickUpstream(frame)}${frame.url}`, {
         method: frame.method,
         headers,
         body,
@@ -301,10 +332,19 @@ export async function syncConnector(prisma: PrismaClient): Promise<void> {
     return;
   }
 
-  const key = `${url}|${row.tunnelSecret}`;
+  // The tv-web reaches the tunnel at `<tvSubdomain>.<relayHost>`; the connector routes requests on that Host
+  // to the tv-web service. Web/tv-web upstreams come from env (unset → fall back to the server).
+  const tvHost = row.tvSubdomain && row.relayHost ? `${row.tvSubdomain}.${row.relayHost}` : undefined;
+  const routing: ConnectorRouting = {
+    webOrigin: env.AIRWAVE_WEB_ORIGIN,
+    tvwebOrigin: env.AIRWAVE_TVWEB_ORIGIN,
+    tvHost,
+  };
+
+  const key = `${url}|${row.tunnelSecret}|${routing.webOrigin ?? ""}|${routing.tvwebOrigin ?? ""}|${tvHost ?? ""}`;
   if (connector && key === currentKey) return; // already running with the same config
   connector?.stop();
-  connector = new RelayConnector(url!, row.tunnelSecret!, row.hostname ?? osHostname());
+  connector = new RelayConnector(url!, row.tunnelSecret!, row.hostname ?? osHostname(), routing);
   currentKey = key;
   connector.start();
 }

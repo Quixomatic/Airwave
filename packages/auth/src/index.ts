@@ -50,11 +50,30 @@ export function createAuth() {
     baseURL: env.BETTER_AUTH_URL,
     // Admin web origin + the TV app origin (when set) + any EXTRA_CORS_ORIGINS (comma-separated,
     // e.g. a LAN IP alongside the public domain) — for OAuth/device flows and cross-origin auth.
-    trustedOrigins: [
-      env.CORS_ORIGIN,
-      ...(env.TV_APP_ORIGIN ? [env.TV_APP_ORIGIN] : []),
-      ...(env.EXTRA_CORS_ORIGINS ?? "").split(",").map((o) => o.trim()).filter(Boolean),
-    ],
+    // A FUNCTION so we can UNION in the Airwave Cloud subdomains dynamically: when this server is paired,
+    // reaching the admin/tv-web at `<subdomain>.<relayHost>` over the tunnel arrives with that Origin, which
+    // must be trusted for auth to accept it. The env origins (a self-hosted reverse-proxy setup) keep working
+    // unchanged — the cloud subdomains are purely additive.
+    trustedOrigins: async () => {
+      const origins = [
+        env.CORS_ORIGIN,
+        ...(env.TV_APP_ORIGIN ? [env.TV_APP_ORIGIN] : []),
+        ...(env.EXTRA_CORS_ORIGINS ?? "").split(",").map((o) => o.trim()).filter(Boolean),
+      ];
+      try {
+        const ra = await prisma.remoteAccess.findUnique({
+          where: { key: "global" },
+          select: { status: true, subdomain: true, tvSubdomain: true, relayHost: true },
+        });
+        if (ra?.status === "bound" && ra.relayHost) {
+          if (ra.subdomain) origins.push(`https://${ra.subdomain}.${ra.relayHost}`);
+          if (ra.tvSubdomain) origins.push(`https://${ra.tvSubdomain}.${ra.relayHost}`);
+        }
+      } catch {
+        /* DB hiccup — fall back to the static env origins */
+      }
+      return origins;
+    },
 
     // Regular email/password login is always available. Linking a personal
     // Plex account is optional (playback falls back to the owner's connection).

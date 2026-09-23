@@ -39,6 +39,11 @@ export const env = createEnv({
     // The relay's WebSocket control URL to dial. Optional override (handy for local testing, e.g.
     // ws://127.0.0.1:3020/__relay/connect); otherwise the URL the cloud returns at register is used.
     AIRWAVE_RELAY_URL: z.string().optional(),
+    // Internal HTTP origins the connector proxies the admin web + tv-web static services to, so the cloud
+    // tunnel can serve them alongside the API (e.g. in Docker: http://web:3001 / http://tvweb:3002). When
+    // unset, the connector forwards those requests to the server itself (today's single-service behavior).
+    AIRWAVE_WEB_ORIGIN: z.string().optional(),
+    AIRWAVE_TVWEB_ORIGIN: z.string().optional(),
   },
   runtimeEnv: process.env,
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,

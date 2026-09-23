@@ -22,6 +22,9 @@ model RemoteAccess {
 
   /// Assigned by the cloud once the user binds this server.
   subdomain    String?
+  /// The sibling subdomain the tv-web player is reachable at over the tunnel (e.g. "<main>-tv"). The connector
+  /// routes requests whose Host is this subdomain to the tv-web service; everything else (non-API) to admin.
+  tvSubdomain  String?
   tunnelSecret String?
   relayHost    String?
   /// The WebSocket control URL this server dials to open its tunnel (e.g.
