@@ -10,6 +10,7 @@ import { packagesRouter } from "./packages";
 import { playbackRouter } from "./playback";
 import { plexRouter } from "./plex";
 import { presetRouter } from "./preset";
+import { remoteAccessRouter } from "./remote-access";
 import { settingsRouter } from "./settings";
 import { sourcesRouter } from "./sources";
 import { transferRouter } from "./transfer";
@@ -36,6 +37,7 @@ export const appRouter = router({
   playback: playbackRouter,
   plex: plexRouter,
   preset: presetRouter,
+  remoteAccess: remoteAccessRouter,
   settings: settingsRouter,
   sources: sourcesRouter,
   transfer: transferRouter,

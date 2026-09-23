@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.55] - 2026-09-23
+
+Cloud Service (remote access to Airwave Cloud): the self-hosted server side of the pairing loop. This is the first slice of the tunnel-as-a-service feature and pairs a self-hosted server to an Airwave Cloud account. The tunnel itself (frp relay) is a later phase; this ships the account binding only. Landed on the `feat/remote-access` branch so it stays off main until the relay is done.
+
+### Added
+- **"Cloud Service" frame on Settings → General**: a toggle to connect this server to your Airwave Cloud account, plus a "Generate binding code" button that opens a dialog with a rotating 6-digit code (changes every 30 seconds, TOTP-style countdown). You paste that code into the Airwave Cloud portal to bind the server. Once bound, the frame shows a Connected badge with the assigned `subdomain.airwave.software` address; when turned off after pairing, it shows an "off, pairing kept" state.
+- **`RemoteAccess` singleton** (`packages/db/prisma/schema/remote-access.prisma`, migration `20260923041849_add_remote_access`) storing the pairing: `enabled`, `cloudBaseUrl` (default `https://api.airwave.software`), a throwaway per-server `bindSecret` + `registrationToken`, `status` (`disconnected`/`pending`/`bound`), and the cloud-assigned `subdomain` / `tunnelSecret` / `relayHost`.
+- **`remote-access` service + tRPC router** (`get`/`enable`/`disable`/`unpair`, admin-only): server-originated bind. On enable, the server generates its own secrets, registers itself unclaimed with the cloud, and displays a rotating HMAC-SHA1 code; the cloud verifies the code (±1 30s step) when the user pastes it. The rotating code is computed server-side (Node crypto, safe over plain HTTP); the browser only displays it.
+- **`remote-access-sync` background job** (every 2 minutes): re-registers with the cloud while paired to pick up a just-bound state and to keep the stored subdomain / tunnel secret current if the subdomain is changed in the portal.
+- **`AIRWAVE_CLOUD_URL`** optional env override for which cloud to talk to (defaults to production).
+
+### Notes
+- `bindSecret` is a deliberately low-stakes throwaway secret, never `BETTER_AUTH_SECRET`; it is beamed to the cloud for the symmetric code verification and cleared on bind. The auth secret is never sent to the cloud.
+- Turning the toggle off pauses the connection but keeps the pairing (turning it back on reconnects); unpairing is a separate, deliberate action that forgets it entirely.
+
 ## [0.14.54] - 2026-09-22
 
 Dark theme polish: the admin's dark mode was retuned from a warm, flat near-black to a cooler, more cohesive blue-black.
