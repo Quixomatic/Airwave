@@ -19,14 +19,26 @@ import {
 import { Switch } from "@airwave/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Loader2 } from "lucide-react";
+import { Check, Copy, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Modal } from "@/components/modal";
 import { useConfirm } from "@/components/confirm-dialog";
 import { authClient, useSession } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
 import { trpc, trpcClient } from "@/utils/trpc";
+
+/** A centered section label flanked by dashed rules (matches the binding-code dialog's reference design). */
+function DashedLabel({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn("flex items-center gap-3", className)}>
+      <span className="border-border h-px flex-1 border-t border-dashed" />
+      <span className="text-muted-foreground text-xs font-medium">{children}</span>
+      <span className="border-border h-px flex-1 border-t border-dashed" />
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/_auth/settings/main")({
   staticData: { breadcrumb: "General" },
@@ -228,7 +240,18 @@ function RemoteAccessFrame() {
   const { confirm, dialog } = useConfirm();
   const [busy, setBusy] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const d = ra.data;
+  const copyCode = () => {
+    if (!d?.code) return;
+    void navigator.clipboard?.writeText(d.code).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      },
+      () => toast.error("Couldn't copy the code."),
+    );
+  };
   // Close the code dialog automatically once the server is bound. Declared BEFORE the feature-flag early
   // return so the hook order stays stable across renders.
   useEffect(() => {
@@ -355,19 +378,45 @@ function RemoteAccessFrame() {
 
       <Modal open={codeOpen} onClose={() => setCodeOpen(false)}>
         <h2 className="text-lg font-semibold">Binding code</h2>
-        <p className="text-muted-foreground mt-1 text-sm">
-          In Airwave Cloud → <span className="font-medium">Add instance</span>, enter this code. It rotates
-          every 30 seconds.
-        </p>
-        <div className="my-6 flex flex-col items-center gap-2">
-          <span className="font-mono text-4xl font-semibold tracking-[0.3em] tabular-nums">
-            {d?.code ? `${d.code.slice(0, 3)} ${d.code.slice(3)}` : "— — —"}
-          </span>
+
+        {/* How to use — a tinted explainer, mirroring the dashed-divider sections in the reference design. */}
+        <DashedLabel className="mt-4">How to use this code</DashedLabel>
+        <div className="border-primary/25 bg-primary/5 text-muted-foreground mt-3 rounded-lg border p-3 text-sm">
+          Visit{" "}
+          <a
+            href="https://airwave.software"
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary font-medium underline underline-offset-2"
+          >
+            Airwave Cloud
+          </a>
+          , open <span className="text-foreground font-medium">Add instance</span> and enter the code below to
+          connect this server. The code rotates every 30 seconds, so use the one shown here.
+        </div>
+
+        {/* The code itself — one cohesive block (not split), click to copy. */}
+        <DashedLabel className="mt-5">Binding code</DashedLabel>
+        <div className="mt-3 flex flex-col items-center gap-2">
+          <button
+            type="button"
+            onClick={copyCode}
+            title="Click to copy"
+            className="border-border bg-muted/40 hover:bg-muted/70 focus-visible:ring-ring group relative flex w-full items-center justify-center rounded-lg border py-4 font-mono text-4xl font-semibold tracking-[0.15em] tabular-nums transition focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {d?.code ?? "••••••"}
+            <span className="text-muted-foreground absolute right-3 opacity-0 transition-opacity group-hover:opacity-100">
+              {copied ? <Check className="size-4 text-emerald-500" /> : <Copy className="size-4" />}
+            </span>
+          </button>
           {d?.secondsRemaining != null && (
-            <span className="text-muted-foreground text-xs">changes in {d.secondsRemaining}s</span>
+            <span className="text-muted-foreground text-xs tabular-nums">
+              {copied ? "Copied" : `Changes in ${d.secondsRemaining}s`}
+            </span>
           )}
         </div>
-        <p className="text-muted-foreground flex items-center justify-center gap-1.5 text-xs">
+
+        <p className="text-muted-foreground mt-5 flex items-center justify-center gap-1.5 text-xs">
           <Loader2 className="size-3.5 animate-spin" /> Waiting for you to connect it in Airwave Cloud…
         </p>
         <div className="mt-6 flex justify-end">
