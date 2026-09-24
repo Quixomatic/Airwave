@@ -63,7 +63,76 @@ app.use("/trpc/*", cookieCors);
 app.use("/api/ai/*", cookieCors);
 app.use("/api/admin/*", cookieCors);
 
-app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+// The host baked into BETTER_AUTH_URL. When a request arrives with a DIFFERENT x-forwarded-host, it came
+// through a proxy that fronts this server at another origin — for us, the Airwave Cloud relay tunnel.
+const BAKED_AUTH_HOST = (() => {
+  try {
+    return new URL(env.BETTER_AUTH_URL).host;
+  } catch {
+    return "";
+  }
+})();
+
+/** Swap `url`'s origin (protocol + host, dropping any old port) to the given proto/host, preserving path +
+ * query + hash. Built by string so the source origin's port (e.g. localhost:3000) can't leak through — the
+ * URL `host` setter keeps the existing port when the new value has none. `host` may itself include a port. */
+function withOrigin(url: string, proto: string, host: string): string {
+  try {
+    const u = new URL(url);
+    return `${proto}://${host}${u.pathname}${u.search}${u.hash}`;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Rewrite the Plex sign-in authorize URL to the forwarded public host when this request reached us through
+ * the Airwave Cloud relay (x-forwarded-host differs from the baked BETTER_AUTH_URL host). Rewrites both the
+ * authorize URL's own origin (so the browser can reach /api/plex/authorize over the tunnel) and its nested
+ * redirect_uri (so Plex's forwardUrl returns to the tunnel host where the state cookie lives). Scoped to the
+ * Plex authorize URL and a no-op for consistent-origin setups; all other auth responses pass through as-is.
+ */
+async function rewriteTunnelAuthorizeUrl(c: Context, res: Response): Promise<Response> {
+  // x-forwarded-* can arrive as a comma-joined list (a proxy chain, or the relay + connector each appending);
+  // the first value is the original client-facing host/proto.
+  const host = c.req.header("x-forwarded-host")?.split(",")[0]?.trim();
+  if (!host || host === BAKED_AUTH_HOST) return res;
+  if (!(res.headers.get("content-type") ?? "").includes("application/json")) return res;
+  const proto = c.req.header("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+  try {
+    const data = (await res.clone().json()) as { url?: string; redirect?: boolean };
+    if (typeof data.url !== "string" || !data.url.includes("/api/plex/authorize")) return res;
+    const u = new URL(withOrigin(data.url, proto, host));
+    const ru = u.searchParams.get("redirect_uri");
+    if (ru) u.searchParams.set("redirect_uri", withOrigin(ru, proto, host));
+    const body = JSON.stringify({ ...data, url: u.toString() });
+    // Rebuild the response, preserving every header (Set-Cookie in particular — the OAuth state cookie) and
+    // only dropping the now-stale content-length. getSetCookie() keeps multiple cookies from collapsing.
+    const headers = new Headers(res.headers);
+    const cookies = res.headers.getSetCookie?.() ?? [];
+    if (cookies.length) {
+      headers.delete("set-cookie");
+      for (const ck of cookies) headers.append("set-cookie", ck);
+    }
+    headers.delete("content-length");
+    return new Response(body, { status: res.status, statusText: res.statusText, headers });
+  } catch {
+    return res;
+  }
+}
+
+app.on(["POST", "GET"], "/api/auth/*", async (c) => {
+  const res = await auth.handler(c.req.raw);
+  // Airwave Cloud relay only (over the tunnel): the Plex web sign-in returns an authorize URL at this server's
+  // /api/plex/authorize on the baked BETTER_AUTH_URL (e.g. http://localhost:3000). Over the tunnel the
+  // browser is on a different origin (arctic.airwave.software) and (a) can't reach localhost and (b) set its
+  // OAuth state cookie on the tunnel host — so Plex's forwardUrl (built from that URL's redirect_uri) sends
+  // the callback to localhost, where the cookie is absent → state_mismatch. Rewrite both the authorize
+  // URL's origin and its redirect_uri to the forwarded public host. No-op for consistent-origin setups
+  // (reverse proxy / localhost), where x-forwarded-host equals the baked host, so nothing else is affected.
+  if (c.req.path === "/api/auth/sign-in/oauth2") return rewriteTunnelAuthorizeUrl(c, res);
+  return res;
+});
 
 // AI assistant chat — cookie-authed admin surface. Streams a UI-message response (Vercel AI SDK)
 // from the active connection; DefaultChatTransport posts { id, messages }, id = the conversation id.
@@ -146,12 +215,17 @@ const MEDIA_MIME: Record<string, string> = {
 // reject octet-stream for the native <video> element).
 app.use("/caps/media/*", async (c, next) => {
   await next();
+  if (!c.res) return;
   const ext = c.req.path.split(".").pop()?.toLowerCase() ?? "";
   const mt = MEDIA_MIME[ext];
-  if (mt && c.res) {
-    c.res = new Response(c.res.body, c.res);
-    c.res.headers.set("Content-Type", mt);
-  }
+  c.res = new Response(c.res.body, c.res);
+  if (mt) c.res.headers.set("Content-Type", mt);
+  // These probe fixtures are large (~6-8MB each, ~50 of them) but static and identical for every install,
+  // keyed by test id in the filename. Cache them hard on the device so each clip is fetched at most once —
+  // a big deal over the Airwave Cloud relay, where every re-fetch is Railway egress. `immutable` means a
+  // returning viewer re-probes with zero network. (If a fixture's bytes ever change, give it a new filename
+  // / bump the test id so the URL changes — an in-place overwrite under the same name would serve stale.)
+  c.res.headers.set("Cache-Control", "public, max-age=31536000, immutable");
 });
 app.use(
   "/caps/media/*",
