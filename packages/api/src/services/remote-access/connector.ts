@@ -327,10 +327,27 @@ export class RelayConnector {
   }
 }
 
-// ── Singleton manager ─────────────────────────────────────────────────────────
+// ── Singleton manager (hot-reload safe) ────────────────────────────────────────
 
-let connector: RelayConnector | null = null;
-let currentKey = ""; // url|token — so we only restart when they actually change
+// The connector lives on globalThis, NOT a module-level `let`. In dev, `bun --hot` re-evaluates modules on
+// every change but leaves the previous module's live WebSocket + reconnect/ping timers running. A module-level
+// singleton would reset to null on each re-eval, so `syncConnector` would spin up a fresh connector on top of
+// the old (still-connected) one; since the relay allows one socket per server, the duplicates fight over the
+// slot and reconnect forever ("tunnel up" spam). Keying off globalThis means a re-eval reuses the SAME
+// connector (matching `key` → no-op), so exactly one stays connected. (Prod never hot-reloads; this is inert.)
+type RelayState = { instance: RelayConnector | null; key: string };
+const RELAY_STATE_KEY = Symbol.for("airwave.relayConnectorState");
+const relay: RelayState = ((globalThis as Record<symbol, unknown>)[RELAY_STATE_KEY] ??= {
+  instance: null,
+  key: "",
+}) as RelayState;
+
+// Runs at module-eval time. On a fresh boot `relay.instance` is null (quiet); on a `bun --hot` re-eval it's
+// the connector that survived the reload — log it so an unchanged "no tunnel up" line isn't mistaken for a
+// dropped tunnel. The existing socket + reconnect timers keep running, so the tunnel stays up across reloads.
+if (relay.instance) {
+  console.info("[connector] hot-reload: keeping existing tunnel connection (still up)");
+}
 
 /** Resolve the relay WS URL: explicit override → the URL the cloud returned → derived from the cloud base. */
 function resolveRelayUrl(row: { relayUrl: string | null; cloudBaseUrl: string }): string | null {
@@ -358,10 +375,10 @@ export async function syncConnector(prisma: PrismaClient): Promise<void> {
   const shouldRun = cloudServiceEnabled() && row.enabled && row.status === "bound" && !!row.tunnelSecret && !!url;
 
   if (!shouldRun) {
-    if (connector) {
-      connector.stop();
-      connector = null;
-      currentKey = "";
+    if (relay.instance) {
+      relay.instance.stop();
+      relay.instance = null;
+      relay.key = "";
     }
     return;
   }
@@ -376,15 +393,15 @@ export async function syncConnector(prisma: PrismaClient): Promise<void> {
   };
 
   const key = `${url}|${row.tunnelSecret}|${routing.webOrigin ?? ""}|${routing.tvwebOrigin ?? ""}|${tvHost ?? ""}`;
-  if (connector && key === currentKey) return; // already running with the same config
-  connector?.stop();
-  connector = new RelayConnector(url!, row.tunnelSecret!, row.hostname ?? osHostname(), routing);
-  currentKey = key;
-  connector.start();
+  if (relay.instance && key === relay.key) return; // already running with the same config (survives hot-reload)
+  relay.instance?.stop();
+  relay.instance = new RelayConnector(url!, row.tunnelSecret!, row.hostname ?? osHostname(), routing);
+  relay.key = key;
+  relay.instance.start();
 }
 
 export function stopConnector(): void {
-  connector?.stop();
-  connector = null;
-  currentKey = "";
+  relay.instance?.stop();
+  relay.instance = null;
+  relay.key = "";
 }

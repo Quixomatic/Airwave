@@ -21,7 +21,7 @@
 set -eu
 
 # ---- Constants -------------------------------------------------------------
-INSTALLER_VERSION="0.14.60"   # kept in lockstep with the app version by scripts/bump-version.ts
+INSTALLER_VERSION="0.14.61"   # kept in lockstep with the app version by scripts/bump-version.ts
 IMAGE_REPO="ghcr.io/quixomatic/airwave"
 COMPOSE_URL="${AIRWAVE_COMPOSE_URL:-https://www.getairwave.tv/docker-compose.yml}"
 MARKER=".airwave-install"

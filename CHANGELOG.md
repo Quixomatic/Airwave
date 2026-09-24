@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.61] - 2026-09-24
+
+Cloud Service: Plex web sign-in over the tunnel, a hot-reload connector fix, and cheaper capability probing (still on `feat/remote-access`, behind the feature flag).
+
+### Fixed
+- **"Sign in with Plex" now works over the Airwave Cloud tunnel.** When the admin is reached at the tunnel host (e.g. `arctic.airwave.software`), the Plex authorize URL and its `redirect_uri` are rewritten from the baked `localhost` origin to the forwarded tunnel host, so the browser can reach the authorize proxy and Plex returns the callback to the same origin the OAuth state cookie was set on. This clears the `state_mismatch` error. The rewrite fires only when `x-forwarded-host` differs from `BETTER_AUTH_URL` (i.e. over the relay), so reverse-proxy and localhost setups are untouched. The Plex PIN login is unchanged.
+- **Dev connector no longer stacks tunnels on hot-reload.** The relay connector is now held on `globalThis`, so a `bun --hot` module re-evaluation reuses the existing connection instead of opening a new one on top of the old (which previously spammed "tunnel up" and fought over the relay's single per-server socket). Production is unaffected (it never hot-reloads).
+
+### Changed
+- **Capability-probe media is cached hard.** `/caps/media` now sends `Cache-Control: public, max-age=31536000, immutable`. The probe clips are large (~6-8MB each) and static, so a device now fetches each at most once, which sharply cuts repeat network egress, especially over the tunnel.
+
 ## [0.14.60] - 2026-09-24
 
 Cloud Service binding-code dialog redesign (still on `feat/remote-access`, behind the feature flag).
