@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.60] - 2026-09-24
+
+Cloud Service binding-code dialog redesign (still on `feat/remote-access`, behind the feature flag).
+
+### Changed
+- The "Binding code" dialog (Settings → Cloud Service → Generate binding code) was reworked to read as one clear card: the rotating code now shows as a single cohesive block (no more split-apart digits), with dashed-divider section labels, a tinted "how to use" explainer that links to Airwave Cloud, and click-to-copy on the code. The auto-rotating countdown and the "waiting to connect" state are unchanged.
+
 ## [0.14.59] - 2026-09-23
 
 Cloud Service: the full admin UI + tv-web over the tunnel, behind a feature flag (off by default). Still on `feat/remote-access`.
