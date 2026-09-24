@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Check, ChevronDown, EyeOff, Globe, Power, Sparkles, Tv, Wifi } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Cloud, EyeOff, Globe, Power, Sparkles, Tv, Wifi } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -15,6 +15,7 @@ type Cfg = {
   expose: boolean;
   tvwebEnabled: boolean;
   workflowEnabled: boolean;
+  cloudServiceEnabled: boolean;
   runOnStartup: boolean;
   silentStartup: boolean;
   adminEmail: string;
@@ -60,6 +61,7 @@ export function App() {
   const [expose, setExpose] = useState(true);
   const [tvweb, setTvweb] = useState(true);
   const [workflow, setWorkflow] = useState(true);
+  const [cloudService, setCloudService] = useState(false);
   const [runOnStartup, setRunOnStartup] = useState(false);
   const [silentStartup, setSilentStartup] = useState(false);
   const [serverAddress, setServerAddress] = useState("");
@@ -85,6 +87,7 @@ export function App() {
         setExpose(c.expose);
         setTvweb(c.tvwebEnabled);
         setWorkflow(c.workflowEnabled);
+        setCloudService(c.cloudServiceEnabled ?? false);
         setRunOnStartup(c.runOnStartup);
         setSilentStartup(c.silentStartup);
         setServerAddress(c.serverAddress ?? "");
@@ -111,7 +114,7 @@ export function App() {
           .catch(() => {});
       })
       .catch(() =>
-        setCfg({ configured: false, expose: true, tvwebEnabled: true, workflowEnabled: true, runOnStartup: false, silentStartup: false, adminEmail: "" }),
+        setCfg({ configured: false, expose: true, tvwebEnabled: true, workflowEnabled: true, cloudServiceEnabled: false, runOnStartup: false, silentStartup: false, adminEmail: "" }),
       );
   }, []);
 
@@ -200,6 +203,7 @@ export function App() {
           expose,
           tvwebEnabled: tvweb,
           workflowEnabled: workflow,
+          cloudServiceEnabled: cloudService,
           runOnStartup,
           silentStartup,
           serverAddress,
@@ -328,6 +332,13 @@ export function App() {
                     hint="Enable the durable AI channel-builder engine."
                     checked={workflow}
                     onChange={setWorkflow}
+                  />
+                  <Toggle
+                    icon={Cloud}
+                    label="Cloud Service (remote access)"
+                    hint="Reach this server from anywhere at your own airwave.software subdomain. Off by default."
+                    checked={cloudService}
+                    onChange={setCloudService}
                   />
                   <Toggle
                     icon={Power}

@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.59] - 2026-09-23
+
+Cloud Service: the full admin UI + tv-web over the tunnel, behind a feature flag (off by default). Still on `feat/remote-access`.
+
+### Added
+- **Full tunnel serving**: the connector now serves the admin UI (main subdomain) and tv-web (the `-tv` subdomain) over the Airwave Cloud tunnel, not just the API. It injects the tunnel origin into each SPA's HTML shell — MERGING into `window.__AIRWAVE_ENV__` so a serving layer's other keys (e.g. the desktop's `VITE_IS_BROWSER`) survive — so the apps call back through the tunnel instead of the URL they were built with. tv-web's server-URL resolution now prefers an injected origin over a stored onboarding URL, and better-auth `trustedOrigins` dynamically unions the assigned cloud subdomains (main + tv).
+- New optional `AIRWAVE_WEB_ORIGIN` / `AIRWAVE_TVWEB_ORIGIN` env for the connector's admin/tv-web upstreams (defaults wired in docker-compose + the desktop supervisor, so a self-hoster sets nothing).
+
+### Changed
+- **Feature flag `AIRWAVE_CLOUD_SERVICE_ENABLED` (default OFF)** gates the entire Cloud Service: the settings section is hidden, the connector never dials, the polling job isn't registered, and the enable/refresh calls no-op — the feature ships dark until you set it to `1`. Wired into docker-compose (+ `.env.example`), the desktop supervisor + setup-wizard toggle, `dev:setup`, and the getairwave.tv self-host samples, all defaulting off.
+
 ## [0.14.58] - 2026-09-23
 
 Cloud Service groundwork for reaching the admin UI + tv-web over the tunnel (still on `feat/remote-access`; the cloud side shipped as airwave-cloud v0.0.12).

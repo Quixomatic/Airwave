@@ -55,6 +55,15 @@ services:
       # Extra admin origins allow-listed for CORS + auth, beyond CORS_ORIGIN — a comma-separated list
       # (e.g. reach the admin at a LAN IP too when CORS_ORIGIN is a public domain). See .env.example.
       EXTRA_CORS_ORIGINS: ${EXTRA_CORS_ORIGINS:-}
+      # Airwave Cloud tunnel: where the connector forwards non-API requests so the tunnel serves the admin
+      # web + tv-web alongside the API (over the compose network, by service name). Defaults point at the
+      # `web`/`tvweb` services below; override only if you rename them. The connector injects the tunnel
+      # origin into their HTML so they call back through the tunnel — no per-service URL config needed.
+      AIRWAVE_WEB_ORIGIN: ${AIRWAVE_WEB_ORIGIN:-http://web:3001}
+      AIRWAVE_TVWEB_ORIGIN: ${AIRWAVE_TVWEB_ORIGIN:-http://tvweb:3002}
+      # Cloud Service (Airwave Cloud remote access) is hidden + inert unless this is "1". Off by default while
+      # the feature is still being rolled out; set AIRWAVE_CLOUD_SERVICE_ENABLED=1 in .env to expose it.
+      AIRWAVE_CLOUD_SERVICE_ENABLED: ${AIRWAVE_CLOUD_SERVICE_ENABLED:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}

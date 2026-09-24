@@ -25,7 +25,7 @@ import {
   encodeControl,
   sanitizeHeaders,
 } from "./relay-protocol";
-import { getRemoteAccess } from "./remote-access";
+import { cloudServiceEnabled, getRemoteAccess } from "./remote-access";
 
 /** This server's own loopback origin — the connector forwards tunneled requests here. */
 const LOCAL_ORIGIN = `http://127.0.0.1:${process.env.PORT || 3000}`;
@@ -255,7 +255,8 @@ export class RelayConnector {
     }
 
     try {
-      const res = await fetch(`${this.pickUpstream(frame)}${frame.url}`, {
+      const upstream = this.pickUpstream(frame);
+      const res = await fetch(`${upstream}${frame.url}`, {
         method: frame.method,
         headers,
         body,
@@ -264,6 +265,38 @@ export class RelayConnector {
         // Streaming a request body requires half-duplex; harmless when body is undefined.
         ...(body ? ({ duplex: "half" } as Record<string, unknown>) : {}),
       });
+
+      // Runtime-config injection for a FRONTEND's HTML shell (admin / tv-web): the connector is the serving
+      // layer here, so — exactly like the desktop supervisor injects the local port — it injects the TUNNEL
+      // ORIGIN as `window.__AIRWAVE_ENV__.VITE_SERVER_URL`. The SPA reads that first, so it calls back through
+      // this same origin (→ relay → connector → server) instead of the LAN/localhost URL it was built with.
+      // Only the small index.html is buffered; assets + all API responses stream untouched.
+      const ctype = res.headers.get("content-type") ?? "";
+      const isFrontend = upstream === this.routing.webOrigin || upstream === this.routing.tvwebOrigin;
+      if (isFrontend && res.body && ctype.includes("text/html")) {
+        const host = headerValue(frame.headers, "x-forwarded-host");
+        const proto = headerValue(frame.headers, "x-forwarded-proto") ?? "https";
+        const origin = host ? `${proto}://${host}` : "";
+        // MERGE (not replace) so we only override VITE_SERVER_URL and preserve any other runtime-injected
+        // keys the serving layer set first — e.g. the desktop supervisor's `VITE_IS_BROWSER: "true"`.
+        const snippet = `<script>window.__AIRWAVE_ENV__=Object.assign({},window.__AIRWAVE_ENV__,${JSON.stringify({ VITE_SERVER_URL: origin })});</script>`;
+        const original = await res.text();
+        const html = original.includes("</head>")
+          ? original.replace("</head>", `${snippet}</head>`)
+          : snippet + original;
+        const bytes = new TextEncoder().encode(html);
+        // Drop content-length (the body length changed) + content-encoding (fetch already decompressed the
+        // body, so a leftover gzip/br header would corrupt it). The relay sends it as a single chunk.
+        const outHeaders = sanitizeHeaders(res.headers.entries()).filter(
+          ([k]) => k.toLowerCase() !== "content-length" && k.toLowerCase() !== "content-encoding",
+        );
+        this.send(
+          encodeControl({ t: "res", id: frame.id, status: res.status, statusText: res.statusText, headers: outHeaders }),
+        );
+        if (bytes.byteLength) this.send(encodeBody(BODY_RES, frame.id, bytes));
+        this.send(encodeControl({ t: "res-end", id: frame.id }));
+        return;
+      }
 
       this.send(
         encodeControl({
@@ -321,7 +354,8 @@ function resolveRelayUrl(row: { relayUrl: string | null; cloudBaseUrl: string })
 export async function syncConnector(prisma: PrismaClient): Promise<void> {
   const row = await getRemoteAccess(prisma);
   const url = resolveRelayUrl(row);
-  const shouldRun = row.enabled && row.status === "bound" && !!row.tunnelSecret && !!url;
+  // Feature-flagged off → never dial (and tear down a live connector), even if a prior pairing exists.
+  const shouldRun = cloudServiceEnabled() && row.enabled && row.status === "bound" && !!row.tunnelSecret && !!url;
 
   if (!shouldRun) {
     if (connector) {

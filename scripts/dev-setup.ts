@@ -438,6 +438,12 @@ async function main() {
     PLEX_CLIENT_IDENTIFIER: plexId,
     BUMPER_MUSIC_DIR: bumperDir,
     WORKFLOW_ENABLED: workflowEnabled ? "1" : "0",
+    // Cloud Service (Airwave Cloud remote access): where the connector serves the admin + tv-web over the
+    // tunnel (the dev Vite ports), plus the feature flag — off by default; preserved across re-runs so a dev
+    // who flipped it to 1 keeps it. Set AIRWAVE_CLOUD_SERVICE_ENABLED=1 to work on / test remote access.
+    AIRWAVE_WEB_ORIGIN: CORS_ORIGIN,
+    AIRWAVE_TVWEB_ORIGIN: tvAppOrigin,
+    AIRWAVE_CLOUD_SERVICE_ENABLED: prev.AIRWAVE_CLOUD_SERVICE_ENABLED || "0",
   };
   if (workflowEnabled) {
     serverVars.WORKFLOW_TARGET_WORLD = "postgres";

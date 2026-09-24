@@ -10,7 +10,7 @@ import { generateLineup } from "../generator/generate";
 import { syncMediaItems } from "../media/sync-media";
 import { syncRecentlyAdded } from "../media/sync-recent";
 import { syncConnector } from "../remote-access/connector";
-import { refreshRemoteAccess } from "../remote-access/remote-access";
+import { cloudServiceEnabled, refreshRemoteAccess } from "../remote-access/remote-access";
 import { getAppSettings } from "../settings";
 import { firstReadySource } from "../sources/readiness";
 import { getPlexUser, resolveConnectionUrls, stopTranscode } from "../plex/client";
@@ -482,19 +482,23 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
   },
 ];
 
-JOB_DEFINITIONS.push({
-  id: "remote-access-sync",
-  name: "Cloud Service Sync",
-  description:
-    "While the Cloud Service is on, re-registers with Airwave Cloud every couple of minutes so the pairing stays current — a subdomain changed in the portal (or a reconnect) is picked up. No-op when off.",
-  interval: "minutes",
-  defaultCron: "0 */2 * * * *",
-  run: async () => {
-    await refreshRemoteAccess(prisma);
-    // Reconcile the tunnel: pick up a newly-bound pairing, or a subdomain/secret change, without a restart.
-    await syncConnector(prisma);
-  },
-});
+// Only register the Cloud Service sync job when the feature is enabled — otherwise it never appears in the
+// Jobs list at all (not just a no-op run), keeping the feature fully dark until AIRWAVE_CLOUD_SERVICE_ENABLED=1.
+if (cloudServiceEnabled()) {
+  JOB_DEFINITIONS.push({
+    id: "remote-access-sync",
+    name: "Cloud Service Sync",
+    description:
+      "While the Cloud Service is on, re-registers with Airwave Cloud every couple of minutes so the pairing stays current — a subdomain changed in the portal (or a reconnect) is picked up.",
+    interval: "minutes",
+    defaultCron: "0 */2 * * * *",
+    run: async () => {
+      await refreshRemoteAccess(prisma);
+      // Reconcile the tunnel: pick up a newly-bound pairing, or a subdomain/secret change, without a restart.
+      await syncConnector(prisma);
+    },
+  });
+}
 
 export const jobDefinition = (id: string): JobDefinition | undefined =>
   JOB_DEFINITIONS.find((d) => d.id === id);
