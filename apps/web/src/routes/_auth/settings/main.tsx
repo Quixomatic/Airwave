@@ -229,6 +229,14 @@ function RemoteAccessFrame() {
   const [busy, setBusy] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const d = ra.data;
+  // Close the code dialog automatically once the server is bound. Declared BEFORE the feature-flag early
+  // return so the hook order stays stable across renders.
+  useEffect(() => {
+    if (d?.status === "bound") setCodeOpen(false);
+  }, [d?.status]);
+  // Feature-flagged: the whole Cloud Service section is hidden until AIRWAVE_CLOUD_SERVICE_ENABLED=1 on the
+  // server. Render nothing (not even a loading state) while off or still loading, so it never flashes.
+  if (!d?.featureEnabled) return null;
   const on = !!d?.enabled;
   const paired = !!d && d.status !== "disconnected";
 
@@ -266,11 +274,6 @@ function RemoteAccessFrame() {
       setBusy(false);
     }
   };
-
-  // Close the code dialog automatically once the server is bound.
-  useEffect(() => {
-    if (d?.status === "bound") setCodeOpen(false);
-  }, [d?.status]);
 
   return (
     <Frame>

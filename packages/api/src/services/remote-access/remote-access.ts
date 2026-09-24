@@ -20,6 +20,15 @@ export async function getRemoteAccess(prisma: PrismaClient) {
   return prisma.remoteAccess.upsert({ where: { key: SINGLETON_KEY }, create: { key: SINGLETON_KEY }, update: {} });
 }
 
+/**
+ * Feature flag for the entire Cloud Service (Airwave Cloud remote access). Off by default — the settings frame
+ * is hidden, the connector never dials, and the sync job no-ops — so the code ships dark until we announce it.
+ * Set AIRWAVE_CLOUD_SERVICE_ENABLED=1 to expose + activate it.
+ */
+export function cloudServiceEnabled(): boolean {
+  return env.AIRWAVE_CLOUD_SERVICE_ENABLED === "1";
+}
+
 // The RemoteAccess row type — annotated on the mutually-recursive enable/reconcile fns to break TS's
 // return-type inference cycle (reconcileRevoked ⇄ enableRemoteAccess).
 type RemoteAccessRow = Awaited<ReturnType<typeof getRemoteAccess>>;
@@ -81,6 +90,7 @@ async function reconcileRevoked(prisma: PrismaClient): Promise<RemoteAccessRow> 
  * - If it's a fresh server (never paired), start a new registration and go pending.
  */
 export async function enableRemoteAccess(prisma: PrismaClient): Promise<RemoteAccessRow> {
+  if (!cloudServiceEnabled()) throw new Error("Cloud Service isn't enabled on this server.");
   const row = await getRemoteAccess(prisma);
   const host = row.hostname ?? hostname();
 
@@ -140,6 +150,7 @@ export async function enableRemoteAccess(prisma: PrismaClient): Promise<RemoteAc
  * Called on each admin-page read and by the background sync job.
  */
 export async function refreshRemoteAccess(prisma: PrismaClient) {
+  if (!cloudServiceEnabled()) return getRemoteAccess(prisma);
   const row = await getRemoteAccess(prisma);
   const active = row.enabled && (row.status === "pending" || row.status === "bound");
   if (!active || !row.registrationToken || !row.bindSecret) return row;

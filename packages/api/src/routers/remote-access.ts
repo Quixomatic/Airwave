@@ -1,6 +1,7 @@
 import { adminProcedure, router } from "../index";
 import { syncConnector } from "../services/remote-access/connector";
 import {
+  cloudServiceEnabled,
   disableRemoteAccess,
   enableRemoteAccess,
   refreshRemoteAccess,
@@ -13,9 +14,11 @@ export const remoteAccessRouter = router({
   // each read so a just-bound pairing is picked up (the admin page polls this while pending), then reconciles
   // the tunnel connector with the (possibly newly-bound) state.
   get: adminProcedure.query(async ({ ctx }) => {
+    // `featureEnabled` gates the whole Cloud Service UI. When off, refresh/sync self-no-op, so this just
+    // returns the (untouched) stored view + the flag, and the settings frame hides itself.
     const view = remoteAccessView(await refreshRemoteAccess(ctx.prisma));
     await syncConnector(ctx.prisma);
-    return view;
+    return { ...view, featureEnabled: cloudServiceEnabled() };
   }),
 
   enable: adminProcedure.mutation(async ({ ctx }) => {

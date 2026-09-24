@@ -15,15 +15,22 @@ const KEY = "cg-tv-server-url";
  * admin uses — see apps/desktop `serveDir()`). A real TV app (webOS) has neither → this is "" → it onboards to a
  * user-chosen server. Injected value wins over the baked one, so one prebuilt bundle serves any launch's port.
  */
-function autoPointServerUrl(): string {
+function injectedServerUrl(): string {
   if (typeof window !== "undefined") {
     const injected = (window as { __AIRWAVE_ENV__?: Record<string, string> }).__AIRWAVE_ENV__?.VITE_SERVER_URL;
     if (typeof injected === "string" && injected.trim()) return injected.trim();
   }
-  return (import.meta.env.VITE_SERVER_URL as string | undefined) || "";
+  return "";
 }
 
-const BAKED = autoPointServerUrl().replace(/\/+$/, "");
+// A runtime-INJECTED server URL (the serving layer's authority): the desktop supervisor injects the local
+// port, and — over the Airwave Cloud tunnel — the connector injects the tunnel origin. It wins over a stored
+// onboarding URL, because "how you're reaching me right now" beats a saved address.
+const INJECTED = injectedServerUrl().replace(/\/+$/, "");
+// A build-time baked URL (the Docker web player's fixed server); only a dev/deploy default.
+const ENV_BAKED = ((import.meta.env.VITE_SERVER_URL as string | undefined) || "").replace(/\/+$/, "");
+// Any fixed (non-onboarding) server — injected or baked.
+const BAKED = INJECTED || ENV_BAKED;
 
 /** Coerce user input into a usable base URL (add http:// if missing, drop a trailing slash). */
 export function normalizeServerUrl(raw: string): string {
@@ -56,11 +63,15 @@ export function clearStoredServerUrl() {
 }
 
 /**
- * The active server base URL: a stored (onboarded) address wins, else the build-time dev default.
- * Evaluated at module load — onboarding stores the URL and reloads, so the whole app re-initialises
- * against it (the better-auth client + REST base are all derived from this).
+ * The active server base URL, in precedence order:
+ *   1. INJECTED  — the serving layer's runtime authority (desktop supervisor's local port; the cloud relay
+ *      connector's tunnel origin). "How you're reaching me right now" wins.
+ *   2. stored    — the address chosen during onboarding (webOS TVs, dev).
+ *   3. ENV_BAKED — a build-time default (Docker web player).
+ * Evaluated at module load — onboarding stores the URL and reloads, so the whole app re-initialises against
+ * it (the better-auth client + REST base are all derived from this).
  */
-export const SERVER_URL = getStoredServerUrl() || BAKED;
+export const SERVER_URL = INJECTED || getStoredServerUrl() || ENV_BAKED;
 
 /** Whether we have a server to talk to yet (else the app shows the setup screen). */
 export function hasServerUrl(): boolean {

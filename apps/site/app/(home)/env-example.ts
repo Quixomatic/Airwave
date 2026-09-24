@@ -86,4 +86,13 @@ TZ=UTC
 # Off by default. Uncomment to enable the AI lineup builder's workflow engine.
 # (Its Postgres connection is derived from the Postgres settings above.)
 # WORKFLOW_ENABLED=1
+
+# --- Optional: Cloud Service (Airwave Cloud remote access) -------------------
+# Reach this server from anywhere at your own airwave.software subdomain (no port-forwarding), via an
+# Airwave Cloud account. Hidden by default. Uncomment to expose the "Cloud Service" section in the admin.
+# AIRWAVE_CLOUD_SERVICE_ENABLED=1
+# The connector serves the admin + tv-web over the tunnel by forwarding to those services on the compose
+# network. The defaults below already point at the web / tvweb services — only override if you renamed them.
+# AIRWAVE_WEB_ORIGIN=http://web:3001
+# AIRWAVE_TVWEB_ORIGIN=http://tvweb:3002
 `;

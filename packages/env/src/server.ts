@@ -44,6 +44,10 @@ export const env = createEnv({
     // unset, the connector forwards those requests to the server itself (today's single-service behavior).
     AIRWAVE_WEB_ORIGIN: z.string().optional(),
     AIRWAVE_TVWEB_ORIGIN: z.string().optional(),
+    // Feature flag for the whole "Cloud Service" (Airwave Cloud remote access). Hidden + inert by default
+    // (the settings frame doesn't render, the connector never dials, the sync job no-ops). Set to "1" to
+    // expose + activate it. Lets us ship the code dark until remote access is ready to announce.
+    AIRWAVE_CLOUD_SERVICE_ENABLED: z.string().optional(),
   },
   runtimeEnv: process.env,
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,

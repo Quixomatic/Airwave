@@ -75,6 +75,8 @@ type Config = {
   expose: boolean;
   workflowEnabled: boolean;
   tvwebEnabled: boolean;
+  /** Airwave Cloud remote access (the "Cloud Service"). Off by default while the feature rolls out. */
+  cloudServiceEnabled: boolean;
   autoStart: boolean;
   /** Register an OS login item so the supervisor launches at user login (packaged only). */
   runOnStartup: boolean;
@@ -100,6 +102,7 @@ const DEFAULT_CONFIG: Config = {
   expose: true,
   workflowEnabled: true,
   tvwebEnabled: true,
+  cloudServiceEnabled: false,
   autoStart: true,
   runOnStartup: false,
   silentStartup: false,
@@ -1087,6 +1090,15 @@ async function startStack(): Promise<void> {
         CORS_ORIGIN: corsPrimary,
         TV_APP_ORIGIN: tvAppOrigin,
         EXTRA_CORS_ORIGINS: extraOrigins,
+        // Airwave Cloud tunnel: point the connector at the admin + tv-web we serve locally this launch, so the
+        // tunnel serves them alongside the API. The connector injects the tunnel origin into their HTML (over
+        // the supervisor's own local injection, which wins for direct localhost access).
+        AIRWAVE_WEB_ORIGIN: `http://127.0.0.1:${config.ports.admin}`,
+        ...(config.tvwebEnabled ? { AIRWAVE_TVWEB_ORIGIN: `http://127.0.0.1:${config.ports.tvweb}` } : {}),
+        // Cloud Service (Airwave Cloud remote access) — off by default; toggled in setup/settings. A shell
+        // AIRWAVE_CLOUD_SERVICE_ENABLED=1 also force-enables it (handy for `pnpm -F desktop dev` testing).
+        AIRWAVE_CLOUD_SERVICE_ENABLED:
+          config.cloudServiceEnabled || process.env.AIRWAVE_CLOUD_SERVICE_ENABLED === "1" ? "1" : "",
         // The bootstrap above created the `workflow.*` schema (dev via pnpm, packaged via the bundled runner),
         // so the engine can run in both — honor the toggle.
         WORKFLOW_ENABLED: config.workflowEnabled ? "1" : "",
@@ -1277,6 +1289,7 @@ function startSetupServer(): void {
           expose?: boolean;
           tvwebEnabled?: boolean;
           workflowEnabled?: boolean;
+          cloudServiceEnabled?: boolean;
           runOnStartup?: boolean;
           silentStartup?: boolean;
           serverAddress?: string;
@@ -1300,6 +1313,7 @@ function startSetupServer(): void {
           expose: !!body.expose,
           tvwebEnabled: body.tvwebEnabled !== false,
           workflowEnabled: !!body.workflowEnabled,
+          cloudServiceEnabled: !!body.cloudServiceEnabled,
           runOnStartup: !!body.runOnStartup,
           silentStartup: !!body.silentStartup,
           serverAddress: (body.serverAddress ?? "").trim().replace(/\/+$/, ""),
@@ -1335,6 +1349,7 @@ function startSetupServer(): void {
           expose: config.expose,
           tvwebEnabled: config.tvwebEnabled,
           workflowEnabled: config.workflowEnabled,
+          cloudServiceEnabled: config.cloudServiceEnabled,
           runOnStartup: config.runOnStartup,
           silentStartup: config.silentStartup,
           adminEmail: loadAdminCreds()?.email ?? "",
@@ -1446,6 +1461,7 @@ function setupHtml(): string {
     <div class="toggle"><input id="expose" type="checkbox"${chk(config.expose)}><label for="expose" style="margin:0">Expose on my network (let TVs on the LAN connect)</label></div>
     <div class="toggle"><input id="tvweb" type="checkbox"${chk(config.tvwebEnabled)}><label for="tvweb" style="margin:0">Enable the TV web player</label></div>
     <div class="toggle"><input id="workflow" type="checkbox"${chk(config.workflowEnabled)}><label for="workflow" style="margin:0">Enable AI lineup workflows</label></div>
+    <div class="toggle"><input id="cloud" type="checkbox"${chk(config.cloudServiceEnabled)}><label for="cloud" style="margin:0">Enable Cloud Service (remote access)</label></div>
     <button id="save" type="submit">${firstRun ? "Create & start Airwave" : "Save & restart"}</button>
   </form>
   <div id="status"></div>
@@ -1456,7 +1472,7 @@ function setupHtml(): string {
     e.preventDefault();
     var btn=document.getElementById('save');btn.disabled=true;st.className='';st.textContent='';
     var em=document.getElementById('email'),pw=document.getElementById('password');
-    var body={expose:document.getElementById('expose').checked,tvwebEnabled:document.getElementById('tvweb').checked,workflowEnabled:document.getElementById('workflow').checked};
+    var body={expose:document.getElementById('expose').checked,tvwebEnabled:document.getElementById('tvweb').checked,workflowEnabled:document.getElementById('workflow').checked,cloudServiceEnabled:document.getElementById('cloud').checked};
     if(em)body.adminEmail=em.value; if(pw)body.adminPassword=pw.value;
     fetch('/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)})
       .then(function(r){return r.json();})
