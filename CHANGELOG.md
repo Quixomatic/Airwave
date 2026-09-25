@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.63] - 2026-09-25
+
+### Added
+- **Public `/api/identity` discovery endpoint** returning `{ product: "airwave", version, instanceId }`. `/api/health` stays the bare `{ok:true}` liveness probe; identity/version/fingerprint live on their own endpoint (the Plex `/identity` / Jellyfin public-info pattern), so a client can confirm a server is genuinely Airwave and recognize a specific install. `instanceId` is a stable per-install UUID on the `AppSettings` singleton, generated once and never changed (self-healing: existing installs backfill it on first read), cached in memory and warmed at boot so the endpoint does no DB lookup on the hot path. It is a local discovery fingerprint only, never phoned home.
+
+### Migration
+- `add_app_settings_instance_id` adds the nullable `app_settings.instanceId` column (applied on the server's pre-deploy `prisma migrate deploy`).
+
 ## [0.14.62] - 2026-09-25
 
 ### Changed

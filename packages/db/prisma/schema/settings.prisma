@@ -5,6 +5,11 @@ model AppSettings {
   /// Singleton guard: always "global" so upsert-by-key returns the one row.
   key String @unique @default("global")
 
+  /// Stable per-install fingerprint (a UUID), generated once on first read and never changed. Surfaced in the
+  /// public /api/health handshake so clients can confirm a server is Airwave and recognize a specific install.
+  /// Nullable + self-healing: existing installs backfill it on the next read. See getInstanceId.
+  instanceId String?
+
   /// Max channels the AI lineup builder builds in parallel. Lower it (down to 1) for slow local models
   /// that can't keep up with parallel agent loops; default 6 (the previous hardcoded value).
   channelBuildConcurrency Int @default(6)

@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@airwave/db";
+import { randomUUID } from "node:crypto";
 
 /**
  * App-wide settings — a singleton row (`key = "global"`), mirroring the global bumper config. Get-or-create
@@ -12,6 +13,26 @@ export async function getAppSettings(prisma: PrismaClient) {
     create: { key: SINGLETON_KEY },
     update: {},
   });
+}
+
+/**
+ * The server's stable per-install fingerprint (a UUID on the AppSettings singleton). Generated once on first
+ * read and never changed (immutable); self-healing so installs created before this existed backfill it. Cached
+ * in module memory after the first read, so the hot path (the public /api/health handshake) does no DB lookup.
+ * Warm it once at boot (see the server entry) so even the first request hits the cache.
+ */
+let cachedInstanceId: string | null = null;
+
+export async function getInstanceId(prisma: PrismaClient): Promise<string> {
+  if (cachedInstanceId) return cachedInstanceId;
+  const settings = await getAppSettings(prisma);
+  if (settings.instanceId) return (cachedInstanceId = settings.instanceId);
+  const id = randomUUID();
+  const updated = await prisma.appSettings.update({
+    where: { key: SINGLETON_KEY },
+    data: { instanceId: id },
+  });
+  return (cachedInstanceId = updated.instanceId ?? id);
 }
 
 export type AppSettingsPatch = {

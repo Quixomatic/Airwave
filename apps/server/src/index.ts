@@ -6,6 +6,7 @@ import { contentTypeFor } from "@airwave/api/services/bumper-music/store";
 import { resumePresetJobRuns } from "@airwave/api/services/generator/generate";
 import { syncConnector } from "@airwave/api/services/remote-access/connector";
 import { startJobs } from "@airwave/api/services/jobs/scheduler";
+import { getInstanceId } from "@airwave/api/services/settings/index";
 import { resolveChannelSource, resolveMediaSource } from "@airwave/api/services/playback/broker";
 import { buildAuthUrl, createPin } from "@airwave/api/services/plex/client";
 import { encryptExistingSourceTokens } from "@airwave/api/services/plex/token";
@@ -13,6 +14,7 @@ import prisma from "@airwave/db";
 import { auth } from "@airwave/auth";
 import { PLEX_CLIENT_ID } from "@airwave/auth/lib/plex-login";
 import { seedAdmin } from "@airwave/auth/lib/seed-admin";
+import pkg from "../package.json";
 import { env } from "@airwave/env/server";
 import { trpcServer } from "@hono/trpc-server";
 import { Hono, type Context } from "hono";
@@ -46,6 +48,9 @@ app.use("/api/tv/auth/*", bearerCors);
 // The health probe is how a TV app discovers/validates a server (LAN scan + manual entry), from a
 // different origin — so it needs permissive CORS like the rest of the bearer surface.
 app.use("/api/health", bearerCors);
+// The public identity/discovery endpoint (product + version + stable install id) — same permissive CORS,
+// hit cross-origin during scan/manual-entry before login.
+app.use("/api/identity", bearerCors);
 
 // Cookie/admin surface (tRPC + web auth) — allowlisted origins + credentials. CORS_ORIGIN is the
 // primary admin origin; EXTRA_CORS_ORIGINS (comma-separated) allow-lists additional admin addresses
@@ -325,6 +330,13 @@ app.route("/api/tv/auth", tvAuthApi);
 // Lightweight health check (used by the Docker healthcheck / uptime monitors).
 app.get("/api/health", (c) => c.json({ ok: true }));
 
+// Public identity / discovery handshake. Lets a TV client confirm a server is genuinely Airwave (vs. any host
+// that happens to return {ok:true}) and recognize a specific install. `instanceId` is served from an in-memory
+// cache (warmed at boot); a cold cache falls back to a DB read and self-heals a missing id. No auth, no secrets.
+app.get("/api/identity", async (c) =>
+  c.json({ product: "airwave", version: pkg.version, instanceId: await getInstanceId(prisma) }),
+);
+
 // Single-container deploy: serve the built admin SPA when SERVE_WEB_DIR points at it. Registered
 // LAST so it never shadows the API routes above; the `*` GET fallback returns index.html so
 // client-side routes (deep links, reloads) work. Unset in dev — the admin runs on its own Vite
@@ -342,6 +354,14 @@ try {
   await seedAdmin();
 } catch (err) {
   console.error("Admin seeding failed:", err);
+}
+
+// Ensure this install's stable fingerprint exists (generated once, like the admin seed) and warm the
+// in-memory cache, so the public /api/identity handshake serves it without a DB lookup. Idempotent + best-effort.
+try {
+  await getInstanceId(prisma);
+} catch (err) {
+  console.error("Instance fingerprint init failed:", err);
 }
 
 // Encrypt any Plex owner token still stored as plaintext (one-time, idempotent — no-op once
