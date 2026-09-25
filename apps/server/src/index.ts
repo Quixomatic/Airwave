@@ -6,7 +6,7 @@ import { contentTypeFor } from "@airwave/api/services/bumper-music/store";
 import { resumePresetJobRuns } from "@airwave/api/services/generator/generate";
 import { syncConnector } from "@airwave/api/services/remote-access/connector";
 import { startJobs } from "@airwave/api/services/jobs/scheduler";
-import { getInstanceId } from "@airwave/api/services/settings/index";
+import { getInstanceId, getServerName } from "@airwave/api/services/settings/index";
 import { resolveChannelSource, resolveMediaSource } from "@airwave/api/services/playback/broker";
 import { buildAuthUrl, createPin } from "@airwave/api/services/plex/client";
 import { encryptExistingSourceTokens } from "@airwave/api/services/plex/token";
@@ -334,7 +334,12 @@ app.get("/api/health", (c) => c.json({ ok: true }));
 // that happens to return {ok:true}) and recognize a specific install. `instanceId` is served from an in-memory
 // cache (warmed at boot); a cold cache falls back to a DB read and self-heals a missing id. No auth, no secrets.
 app.get("/api/identity", async (c) =>
-  c.json({ product: "airwave", version: pkg.version, instanceId: await getInstanceId(prisma) }),
+  c.json({
+    product: "airwave",
+    version: pkg.version,
+    instanceId: await getInstanceId(prisma),
+    name: await getServerName(prisma),
+  }),
 );
 
 // Single-container deploy: serve the built admin SPA when SERVE_WEB_DIR points at it. Registered
@@ -356,12 +361,16 @@ try {
   console.error("Admin seeding failed:", err);
 }
 
-// Ensure this install's stable fingerprint exists (generated once, like the admin seed) and warm the
-// in-memory cache, so the public /api/identity handshake serves it without a DB lookup. Idempotent + best-effort.
+// Ensure this install's stable fingerprint AND friendly display name exist (both generated once, like the
+// admin seed) and warm their in-memory caches, so the public /api/identity handshake serves them without a
+// DB lookup. Idempotent + best-effort. The instanceId is immutable; the server name is editable in settings.
 try {
+  // Sequential (not Promise.all): both seed the AppSettings singleton, so on a brand-new DB running them
+  // concurrently could race two create-upserts into a unique-key conflict. getInstanceId creates the row.
   await getInstanceId(prisma);
+  await getServerName(prisma);
 } catch (err) {
-  console.error("Instance fingerprint init failed:", err);
+  console.error("Instance identity init failed:", err);
 }
 
 // Encrypt any Plex owner token still stored as plaintext (one-time, idempotent — no-op once

@@ -78,21 +78,28 @@ function SettingsGeneral() {
   // Server-wide app settings (parallelism knobs for the AI lineup builder + importer). The NumberField
   // component enforces the 1–16 bounds itself; `null` = the field was cleared.
   const settingsQ = useQuery(trpc.settings.get.queryOptions());
+  const [serverName, setServerName] = useState("");
   const [buildConc, setBuildConc] = useState<number | null>(null);
   const [importConc, setImportConc] = useState<number | null>(null);
   const [plannerTokens, setPlannerTokens] = useState<number | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   useEffect(() => {
     if (settingsQ.data) {
+      setServerName(settingsQ.data.serverName ?? "");
       setBuildConc(settingsQ.data.channelBuildConcurrency);
       setImportConc(settingsQ.data.importConcurrency);
       setPlannerTokens(settingsQ.data.plannerMaxOutputTokens);
     }
   }, [settingsQ.data]);
   const saveSettings = async () => {
+    if (!serverName.trim()) {
+      toast.error("Server name is required.");
+      return;
+    }
     setSavingSettings(true);
     try {
       await trpcClient.settings.update.mutate({
+        serverName: serverName.trim(),
         channelBuildConcurrency: buildConc ?? 6,
         importConcurrency: importConc ?? 4,
         plannerMaxOutputTokens: plannerTokens ?? 32000,
@@ -158,6 +165,21 @@ function SettingsGeneral() {
           </Button>
         </FrameHeader>
         <FramePanel className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="serverName">Server name</Label>
+            <p className="text-muted-foreground text-xs">
+              A friendly display name for this server, shown when a client discovers it on your network. You can
+              rename it anytime; it doesn&apos;t affect the server&apos;s identity.
+            </p>
+            <Input
+              id="serverName"
+              value={serverName}
+              onChange={(e) => setServerName(e.target.value)}
+              placeholder="Sapphire Vole - Airwave Server"
+              maxLength={60}
+              className="max-w-sm"
+            />
+          </div>
           <div className="grid grid-cols-[1fr_auto] items-center gap-4">
             <div className="min-w-0">
               <Label>Max parallel AI channel builds</Label>

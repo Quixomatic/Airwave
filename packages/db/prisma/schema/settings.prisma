@@ -10,6 +10,11 @@ model AppSettings {
   /// Nullable + self-healing: existing installs backfill it on the next read. See getInstanceId.
   instanceId String?
 
+  /// Friendly DISPLAY name for this server (e.g. "Blue Turtle Airwave"), shown in scan pickers and the
+  /// /api/identity handshake. Unlike instanceId this is MUTABLE — seeded with a generated name on first read
+  /// but editable in General settings. Nullable + self-healing: existing installs backfill it. See getServerName.
+  serverName String?
+
   /// Max channels the AI lineup builder builds in parallel. Lower it (down to 1) for slow local models
   /// that can't keep up with parallel agent loops; default 6 (the previous hardcoded value).
   channelBuildConcurrency Int @default(6)

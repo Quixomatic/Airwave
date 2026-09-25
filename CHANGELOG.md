@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.64] - 2026-09-25
+
+### Added
+- **Editable server display name.** A new `serverName` on the `AppSettings` singleton gives each install a friendly, human-facing label (e.g. "Sapphire Vole - Airwave Server"), shown in `/api/identity` as `name` so a client can label a discovered server. It's seeded once at boot alongside `instanceId` using a generated word-pair (the same `unique-names-generator` approach as the Airwave Cloud subdomain generator, title-cased with an "- Airwave Server" suffix), self-heals if missing, and is cached in memory for the identity hot path. Unlike the immutable `instanceId`, it's editable anytime under Settings → General (the cache refreshes on change).
+
+### Migration
+- `add_app_settings_server_name` adds the nullable `app_settings.serverName` column (applied on the server's pre-deploy `prisma migrate deploy`).
+
 ## [0.14.63] - 2026-09-25
 
 ### Added
