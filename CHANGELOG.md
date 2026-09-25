@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.62] - 2026-09-25
+
+### Changed
+- Refreshed the login page: a faded grid pattern plus a subtle cool aurora glow hugging the bottom edge, both layered over the app's noise texture (light and dark, matching the rest of the shell). The logo lockup moved inside the card, the title and subtitle sizing was tightened, and the card shadow softened. Backed by two new reusable components, `GridPattern` and `AuroraBackground`.
+
 ## [0.14.61] - 2026-09-24
 
 Cloud Service: Plex web sign-in over the tunnel, a hot-reload connector fix, and cheaper capability probing (still on `feat/remote-access`, behind the feature flag).

@@ -13,6 +13,8 @@ import {
 } from "@airwave/ui/components/card";
 import { Input } from "@airwave/ui/components/input";
 
+import { AuroraBackground } from "@/components/aurora-background";
+import { GridPattern } from "@/components/grid-pattern";
 import { PlexIcon } from "@/components/icons/plex-icon";
 import { Logo } from "@/components/logo";
 import { signIn } from "@/lib/auth-client";
@@ -91,8 +93,10 @@ export function LoginPage() {
   // ── "check your email" screen after a magic link was sent ─────────
   if (magicLinkSent) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-sm">
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background bg-noisy p-4">
+        <AuroraBackground />
+        <GridPattern cellSize={6} fade="top" fadeStop="60%" opacity={0.4} />
+        <Card className="relative z-10 w-full max-w-sm shadow-lg">
           <CardHeader className="text-center">
             <div className="bg-primary/10 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full">
               <Mail className="text-primary h-6 w-6" />
@@ -125,12 +129,16 @@ export function LoginPage() {
 
   // ── Default: Plex / social + email sign-in ────────────────────────
   return (
-    <div className="text-foreground flex min-h-screen flex-col items-center justify-center gap-8 bg-background p-4">
-      <Logo markWidth={72} wordmark animate />
-      <Card className="w-full max-w-sm">
+    <div className="text-foreground relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background bg-noisy p-4">
+      <AuroraBackground />
+      <GridPattern cellSize={6} fade="top" fadeStop="60%" opacity={0.4} />
+      <Card className="relative z-10 w-full max-w-sm shadow-lg">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl">Sign In</CardTitle>
-          <CardDescription className="text-base">
+          <div className="mb-3 flex justify-center">
+            <Logo markWidth={60} wordmark animate />
+          </div>
+          <CardTitle className="text-2xl">Sign In</CardTitle>
+          <CardDescription className="text-sm">
             Sign in with Plex, or with your email.
           </CardDescription>
         </CardHeader>
