@@ -242,7 +242,10 @@ choose() { # choose "header" "opt1" "opt2" ...  -> prints the chosen option
 run() { # run a step, with a gum spinner when available; dry-run narrates only
   _title=$1; shift
   if dryrun; then plan "run: $*"; return 0; fi
-  if [ -n "$GUM" ]; then "$GUM" spin --spinner dot --title "$_title" -- "$@"
+  # `</dev/null`: gum spin is a bubbletea TUI that reads stdin. Under `curl | sh` stdin IS the
+  # script pipe, so without this it would drain the rest of the script and the install would end
+  # early (no `up -d`). A spinner needs no input, so detach its stdin. (The prompts use `< "$TTY"`.)
+  if [ -n "$GUM" ]; then "$GUM" spin --spinner dot --title "$_title" -- "$@" </dev/null
   else section "$_title"; "$@"; fi
 }
 
