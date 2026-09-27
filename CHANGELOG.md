@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.67] - 2026-09-27
+
+### Added
+- Public API (`/api/public/v1`): channels — `GET /channels`, `GET /channels/{id}`,
+  `GET /channels/by-number/{number}`, `GET /channels/{id}/now` (now & next with the live offset), and
+  `GET /channels/{id}/schedule` (upcoming programs, `?hours=`). The clean `Channel` shape carries id, number,
+  name, callsign, description, icon, tint, `mode` (filter/membership/manual/mixed, derived from the channel's
+  definitions), `provenance` (preset/ai/manual), and its package; `?include=definition` adds the authoring
+  internals (filter tree / membership sources / manual items + ordering/strategy), documented as opaque and
+  outside the stability guarantee. Everything is scoped to what the API key's user may access.
+
 ## [0.14.66] - 2026-09-27
 
 ### Added

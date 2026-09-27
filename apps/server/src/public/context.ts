@@ -1,10 +1,11 @@
 import type { Context, Next } from "hono";
 
+import { accessibleChannels, type AccessSet } from "@airwave/api/services/access/access";
 import { auth } from "@airwave/auth";
 import prisma from "@airwave/db";
 
 /** Request-scoped vars the public API's key auth sets for downstream handlers. */
-export type PublicVars = { userId: string; isAdmin: boolean };
+export type PublicVars = { userId: string; isAdmin: boolean; access: AccessSet };
 
 /**
  * Public API auth. Accepts the same `airwave_` API key minted on Settings → API Keys (the one MCP uses),
@@ -31,7 +32,11 @@ export async function apiKeyAuth(c: Context<{ Variables: PublicVars }>, next: Ne
     return c.json({ error: { code: "unauthorized", message: "Invalid or revoked API key." } }, 401);
   }
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  const isAdmin = user?.role === "admin";
   c.set("userId", userId);
-  c.set("isAdmin", user?.role === "admin");
+  c.set("isAdmin", isAdmin);
+  // Resolve the key owner's channel access once (admins/all-access → "all"; else a concrete id set) so every
+  // endpoint scopes to what this key may see (§7.13).
+  c.set("access", isAdmin ? "all" : await accessibleChannels(prisma, userId));
   return next();
 }

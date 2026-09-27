@@ -58,6 +58,29 @@ async function main() {
       console.log(`${ok} GET ${p} → ${res.status}  ${snippet(body)}`);
     }
 
+    // 2b. Sample parameterized channel routes against a real channel, if any exist.
+    const chRes = await publicApi.request("/channels", { headers: { "x-api-key": key } });
+    if (chRes.ok) {
+      const { channels } = (await chRes.json()) as { channels: Array<{ id: string; number: number }> };
+      const ch = channels[0];
+      if (ch) {
+        const sampled = [
+          `/channels/${ch.id}`,
+          `/channels/by-number/${ch.number}`,
+          `/channels/${ch.id}?include=definition`,
+          `/channels/${ch.id}/now`,
+          `/channels/${ch.id}/schedule?hours=3`,
+        ];
+        for (const p of sampled) {
+          const r = await publicApi.request(p, { headers: { "x-api-key": key } });
+          const b = await r.text();
+          console.log(`${r.status < 400 ? "✓" : "✗"} GET ${p} → ${r.status}  ${snippet(b)}`);
+        }
+      } else {
+        console.log("(no channels — skipped parameterized channel probes)");
+      }
+    }
+
     // 3. Auth negative check.
     const noKey = await publicApi.request("/status");
     const badKey = await publicApi.request("/status", { headers: { "x-api-key": "airwave_bogus" } });
