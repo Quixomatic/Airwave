@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.66] - 2026-09-27
+
+### Added
+- Public API (`/api/public/v1`): `GET /status` now also reports uptime and live counts (channels, packages,
+  active viewers), and a new `GET /capabilities` advertises the API version, optional server features (the AI
+  workflow engine), and whether webhooks / the SSE event stream are available (both false until those phases
+  land). Both carry example responses in the spec.
+
 ## [0.14.65] - 2026-09-27
 
 Groundwork for a public integration API (Home Assistant, Tidbyt, Tauri, generic REST). Behind an API key; no

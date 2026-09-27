@@ -3,6 +3,7 @@ import { Scalar } from "@scalar/hono-api-reference";
 
 import pkg from "../../package.json";
 import { apiKeyAuth, type PublicVars } from "./context";
+import { capabilitiesRoutes } from "./routes/capabilities";
 import { statusRoutes } from "./routes/status";
 
 /**
@@ -45,6 +46,7 @@ publicApi.use("*", (c, next) => {
 
 // Resource routers (grow per feature).
 publicApi.route("/", statusRoutes);
+publicApi.route("/", capabilitiesRoutes);
 
 // OpenAPI 3.1 document (public) — the single source consumed by Scalar, the fumadocs reference, and the mock.
 publicApi.doc31("/openapi.json", {
