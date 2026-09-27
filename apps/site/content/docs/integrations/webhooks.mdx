@@ -1,0 +1,27 @@
+---
+title: Webhooks
+description: Get pushed a signed event when something happens on your Airwave server.
+icon: Terminal
+---
+
+<Callout title="Coming soon">
+Webhooks are on the way. This page will cover subscribing an endpoint, the event catalog, and verifying
+signatures.
+</Callout>
+
+Today the public API is pull-only: you poll `/api/public/v1` for the guide, sessions, and channels. Webhooks
+will flip that around — Airwave will **push** a small signed JSON payload to a URL you register whenever
+something happens, so an integration reacts instantly instead of polling on a timer.
+
+## What to expect
+
+- Register one or more delivery URLs from **Settings → Webhooks** in the admin.
+- Subscribe to event types like playback starting and stopping, a viewer tuning a channel, the schedule
+  regenerating, or new content being added.
+- Each delivery is signed with the [Standard Webhooks](https://www.standardwebhooks.com/) scheme
+  (`webhook-id` / `webhook-timestamp` / `webhook-signature`, HMAC-SHA256) so you can verify it really came from
+  your server.
+- Failed deliveries retry with backoff; the docs and events will also appear in the [API Reference](/api-reference)
+  once shipped.
+
+Until then, poll `/guide/now` and `/sessions` on an interval — see [Generic REST](/docs/integrations/rest).
