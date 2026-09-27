@@ -1,6 +1,6 @@
 {
   "name": "server",
-  "version": "0.14.64",
+  "version": "0.14.65",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
@@ -20,6 +20,8 @@
     "@airwave/db": "workspace:*",
     "@airwave/env": "workspace:*",
     "@hono/trpc-server": "^0.4.2",
+    "@hono/zod-openapi": "^1.6.3",
+    "@scalar/hono-api-reference": "^0.12.6",
     "@trpc/server": "catalog:",
     "@workflow/world-postgres": "4.3.0",
     "better-auth": "catalog:",

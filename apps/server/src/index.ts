@@ -23,6 +23,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 
 import { mcpToolsApi } from "./mcp-tools";
+import { publicApi } from "./public";
 import { restApi } from "./rest";
 import { tvAuthApi } from "./tv-auth";
 import { startWorkflowEngine } from "./workflow-engine";
@@ -51,6 +52,9 @@ app.use("/api/health", bearerCors);
 // The public identity/discovery endpoint (product + version + stable install id) — same permissive CORS,
 // hit cross-origin during scan/manual-entry before login.
 app.use("/api/identity", bearerCors);
+// The public integration API (Home Assistant / Tidbyt / Tauri / generic REST) — key-authed, no cookies, so
+// permissive CORS is fine and lets browser/Tauri dashboards + the docs playground call it cross-origin.
+app.use("/api/public/v1/*", bearerCors);
 
 // Cookie/admin surface (tRPC + web auth) — allowlisted origins + credentials. CORS_ORIGIN is the
 // primary admin origin; EXTRA_CORS_ORIGINS (comma-separated) allow-lists additional admin addresses
@@ -322,6 +326,9 @@ app.get("/img/:channelId", async (c) => {
 app.route("/api/v1/tools", mcpToolsApi);
 
 app.route("/api/v1", restApi);
+
+// Public integration API — separate stable, key-authed surface (see ./public + .plans/public-api-and-webhooks).
+app.route("/api/public/v1", publicApi);
 
 // TV device-code login (Plex plex.tv/link flow). Unauthenticated — these
 // establish the session the TV carries as a bearer token to /api/v1.

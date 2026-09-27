@@ -2,6 +2,26 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.65] - 2026-09-27
+
+Groundwork for a public integration API (Home Assistant, Tidbyt, Tauri, generic REST). Behind an API key; no
+public data or endpoints of consequence yet beyond server status.
+
+### Added
+- **`/api/public/v1`** — a new, SEPARATE integration surface, distinct from the internal `/api/v1` (TV clients)
+  and `/trpc` (admin app), so its contract can stay stable for outside consumers. Authenticated by the existing
+  `airwave_` API key (Settings → API Keys), accepted as either `X-API-Key` or `Authorization: Bearer`. Built on
+  `@hono/zod-openapi`, so the zod DTOs generate a first-party **OpenAPI 3.1 spec** at
+  `/api/public/v1/openapi.json`, with an interactive **Scalar** reference at `/api/public/v1/docs`. First
+  endpoint: `GET /status` (product, version, install id, display name, time). More endpoints + webhooks to come
+  (see the plan).
+- **`scripts/probe-public-api.ts`** — a dev probe that mints a temporary admin key, calls every parameterless
+  GET in the spec in-process, and checks that missing/bad keys are rejected.
+
+### Fixed
+- Re-synced the non-package version files (installers, Roku manifest, tv-tauri Cargo) that a prior hand-bump of
+  v0.14.64 left at 0.14.63; all version files are back in lockstep via `pnpm version:bump`.
+
 ## [0.14.64] - 2026-09-25
 
 ### Added
