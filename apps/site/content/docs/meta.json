@@ -21,6 +21,9 @@
     "capability-diagnostic",
     "---Development---",
     "development",
+    "---Extend Airwave---",
+    "integrations",
+    "[API Reference](/api-reference)",
     "---Release notes---",
     "changelog"
   ]

@@ -1,0 +1,58 @@
+---
+title: Home Assistant
+description: Surface Airwave viewers and what's on as Home Assistant sensors.
+icon: House
+---
+
+Home Assistant's built-in [RESTful sensor](https://www.home-assistant.io/integrations/sensor.rest/) can poll
+the public API directly — no custom integration needed. Use an API key from **Settings → API Keys**.
+
+## Viewer count
+
+A simple numeric sensor for "how many people are watching," great for automations (dim the lights when someone
+starts watching, etc.):
+
+```yaml
+# configuration.yaml
+sensor:
+  - platform: rest
+    name: Airwave Viewers
+    resource: http://192.168.1.10:36020/api/public/v1/sessions/count
+    headers:
+      X-API-Key: !secret airwave_api_key
+    value_template: "{{ value_json.count }}"
+    scan_interval: 30
+```
+
+## What's playing
+
+Pull `/now-playing` and expose the first viewer's title, with the rest as attributes:
+
+```yaml
+sensor:
+  - platform: rest
+    name: Airwave Now Playing
+    resource: http://192.168.1.10:36020/api/public/v1/now-playing
+    headers:
+      Authorization: !secret airwave_api_bearer   # "Bearer airwave_your_key"
+    value_template: >
+      {{ value_json.nowPlaying[0].title if value_json.nowPlaying else 'Nothing playing' }}
+    json_attributes_path: "$.nowPlaying[0]"
+    json_attributes:
+      - user
+      - channelName
+      - showTitle
+      - progress
+    scan_interval: 30
+```
+
+Store the key in `secrets.yaml`:
+
+```yaml
+# secrets.yaml
+airwave_api_key: airwave_your_key
+airwave_api_bearer: Bearer airwave_your_key
+```
+
+Point `resource` at your server's address. For everything available to build sensors from (the full guide,
+channels, packages), see the [API Reference](/api-reference).

@@ -56,9 +56,10 @@ publicApi.route("/", packageRoutes);
 publicApi.route("/", guideRoutes);
 publicApi.route("/", sessionRoutes);
 
-// OpenAPI 3.1 document (public) — the single source consumed by Scalar, the fumadocs reference, and the mock.
-publicApi.doc31("/openapi.json", {
-  openapi: "3.1.0",
+// OpenAPI 3.1 document config — exported so a build script can emit the same spec for the getairwave.tv
+// reference (the site can't import this app at build: no DB), and Scalar/the fumadocs playground all share it.
+export const openApiConfig = {
+  openapi: "3.1.0" as const,
   info: {
     title: "Airwave Public API",
     version: pkg.version,
@@ -68,7 +69,10 @@ publicApi.doc31("/openapi.json", {
       "`Authorization: Bearer`.",
   },
   servers: [{ url: "/api/public/v1", description: "This server" }],
-});
+};
+
+// The public spec, served for Scalar + as a fallback source for the docs site.
+publicApi.doc31("/openapi.json", openApiConfig);
 
 // Interactive reference UI (public) — a self-host convenience; the primary docs live on getairwave.tv.
 publicApi.get("/docs", Scalar({ url: "/api/public/v1/openapi.json", pageTitle: "Airwave Public API" }));

@@ -1,0 +1,40 @@
+---
+title: Tidbyt
+description: Show what's on Airwave on a Tidbyt.
+icon: Tv
+---
+
+A Tidbyt app ([pixlet](https://tidbyt.dev/)) fetches an HTTP endpoint on a schedule and renders pixels. The
+public API's compact endpoints (`/guide/now`, `/now-playing`, `/sessions/count`) are a good fit. Use an API
+key from **Settings → API Keys**.
+
+## Example: "now playing" on channel 101
+
+```python
+load("render.star", "render")
+load("http.star", "http")
+load("encoding/json.star", "json")
+
+AIRWAVE = "http://192.168.1.10:36020/api/public/v1"
+KEY = "airwave_your_key"  # store as a Tidbyt app config/secret in practice
+
+def main():
+    resp = http.get(AIRWAVE + "/channels/by-number/101/now", headers = {"X-API-Key": KEY})
+    if resp.status_code != 200:
+        return render.Root(child = render.Text("Airwave offline"))
+
+    now = resp.json().get("current")
+    title = now["title"] if now else "Off air"
+
+    return render.Root(
+        child = render.Column(
+            children = [
+                render.Text("CH 101", color = "#4a9fe0"),
+                render.Marquee(width = 64, child = render.Text(title)),
+            ],
+        ),
+    )
+```
+
+For a whole-lineup view, fetch `/guide/now` (one row per channel) and render a few. Poll no faster than you
+need — every request hits your server. See the [API Reference](/api-reference) for the response shapes.

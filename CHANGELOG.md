@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.69] - 2026-09-27
+
+### Added
+- **getairwave.tv API Reference.** A new `/api-reference` docs root (fumadocs-openapi) renders the public API's
+  OpenAPI 3.1 spec with an interactive playground, grouped by tag, reachable from the sidebar's root-switcher
+  dropdown. The playground's "Try it" targets a same-origin, spec-driven **mock** (`/api/mock/public/v1`) so it
+  returns example data with no real Airwave server; a second server entry points at a self-hosted address.
+- **Integration recipes** under a new "Extend Airwave" docs group: Generic REST, Home Assistant (REST
+  sensors), and Tidbyt (pixlet), plus an Integrations overview — beside a link to the API Reference near the
+  changelog.
+- **`apps/server/scripts/gen-openapi.ts`** emits the committed spec (`apps/site/openapi/spec.json`) that the
+  site renders; fumadocs bumped to ^16.15 for fumadocs-openapi v12 compatibility.
+
 ## [0.14.68] - 2026-09-27
 
 ### Added

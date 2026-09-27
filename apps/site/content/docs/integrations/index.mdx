@@ -1,0 +1,30 @@
+---
+title: Integrations
+description: Pull your Airwave server's live data into Home Assistant, Tidbyt, or anything that speaks HTTP.
+icon: Plug
+---
+
+Airwave exposes a public REST API at `/api/public/v1` so you can read your server's live data — the guide,
+channels, packages, and who's watching — from outside the Airwave apps.
+
+Authenticate with an **API key** from **Settings → API Keys** in the admin (the same key the MCP server uses),
+sent as either header:
+
+```
+X-API-Key: airwave_your_key
+# or
+Authorization: Bearer airwave_your_key
+```
+
+The base URL is your server's address plus `/api/public/v1`, for example
+`http://192.168.1.10:36020/api/public/v1`.
+
+For every endpoint, request/response shapes, and an interactive playground, see the
+[API Reference](/api-reference). The guides below are quick starts for common tools:
+
+- [Generic REST](/docs/integrations/rest) — curl and any HTTP client
+- [Home Assistant](/docs/integrations/home-assistant) — REST sensors
+- [Tidbyt](/docs/integrations/tidbyt) — a pixlet app
+
+Nothing here streams video — media always plays directly from your Plex. This API is read-only data about your
+lineup and viewing.

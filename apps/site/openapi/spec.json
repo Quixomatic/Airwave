@@ -1,0 +1,1834 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Airwave Public API",
+    "version": "0.14.68",
+    "description": "Read your self-hosted Airwave server's live data (guide, channels, now-watching) and subscribe to webhooks. Authenticate with an API key from Settings → API Keys, sent as either `X-API-Key` or `Authorization: Bearer`."
+  },
+  "servers": [
+    {
+      "url": "/api/public/v1",
+      "description": "This server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "ServerStatus": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "type": "string",
+            "enum": [
+              "airwave"
+            ]
+          },
+          "version": {
+            "type": "string"
+          },
+          "instanceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "The server's friendly display name (editable in Settings → General)."
+          },
+          "time": {
+            "type": "string",
+            "description": "Current server time, ISO-8601 UTC."
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "uptimeSeconds": {
+            "type": "integer",
+            "description": "Seconds since this server process started."
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "channels": {
+                "type": "integer"
+              },
+              "packages": {
+                "type": "integer"
+              },
+              "activeSessions": {
+                "type": "integer",
+                "description": "Viewers currently watching."
+              }
+            },
+            "required": [
+              "channels",
+              "packages",
+              "activeSessions"
+            ]
+          }
+        },
+        "required": [
+          "product",
+          "version",
+          "instanceId",
+          "name",
+          "time",
+          "timezone",
+          "uptimeSeconds",
+          "counts"
+        ],
+        "example": {
+          "product": "airwave",
+          "version": "0.14.65",
+          "instanceId": "a91d2ea1-5f7f-4c2e-9b0a-1e2d3c4b5a6f",
+          "name": "Blue Turtle - Airwave Server",
+          "time": "2026-09-27T18:20:00.000Z",
+          "timezone": "UTC",
+          "uptimeSeconds": 43210,
+          "counts": {
+            "channels": 42,
+            "packages": 8,
+            "activeSessions": 2
+          }
+        }
+      },
+      "Capabilities": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "enum": [
+              "v1"
+            ]
+          },
+          "serverVersion": {
+            "type": "string"
+          },
+          "features": {
+            "type": "object",
+            "properties": {
+              "workflowEngine": {
+                "type": "boolean",
+                "description": "The AI lineup workflow engine is enabled on this server."
+              }
+            },
+            "required": [
+              "workflowEngine"
+            ],
+            "description": "Optional server features a consumer might branch on."
+          },
+          "webhooks": {
+            "type": "object",
+            "properties": {
+              "supported": {
+                "type": "boolean"
+              },
+              "eventTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Subscribable webhook event types (empty until webhooks ship)."
+              }
+            },
+            "required": [
+              "supported",
+              "eventTypes"
+            ]
+          },
+          "sse": {
+            "type": "object",
+            "properties": {
+              "supported": {
+                "type": "boolean",
+                "description": "Whether GET /events (Server-Sent Events) is available."
+              }
+            },
+            "required": [
+              "supported"
+            ]
+          }
+        },
+        "required": [
+          "apiVersion",
+          "serverVersion",
+          "features",
+          "webhooks",
+          "sse"
+        ],
+        "example": {
+          "apiVersion": "v1",
+          "serverVersion": "0.14.65",
+          "features": {
+            "workflowEngine": true
+          },
+          "webhooks": {
+            "supported": false,
+            "eventTypes": []
+          },
+          "sse": {
+            "supported": false
+          }
+        }
+      },
+      "Channel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "callsign": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ChannelMode"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "package": {
+            "$ref": "#/components/schemas/PackageRef"
+          },
+          "definition": {
+            "description": "Present only with ?include=definition. The channel's authoring internals (filter tree / membership sources / manual items, plus ordering + strategy). Opaque and NOT covered by the API stability guarantee."
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "name",
+          "callsign",
+          "description",
+          "icon",
+          "tint",
+          "enabled",
+          "mode",
+          "provenance",
+          "package"
+        ],
+        "example": {
+          "id": "clx9k2p0a0001abcd",
+          "number": 101,
+          "name": "90s Sitcoms",
+          "callsign": "SITCOM",
+          "description": "Comfort-watch classics from the decade of the sitcom.",
+          "icon": "lucide:Tv",
+          "tint": "amber",
+          "enabled": true,
+          "mode": "filter",
+          "provenance": "preset",
+          "package": {
+            "id": "clx9pkg01",
+            "key": "comedy",
+            "name": "Comedy & Fun",
+            "icon": "lucide:Laugh",
+            "tint": "amber"
+          }
+        }
+      },
+      "ChannelMode": {
+        "type": "string",
+        "enum": [
+          "filter",
+          "membership",
+          "manual",
+          "mixed"
+        ],
+        "description": "How the channel's pool is built: a metadata filter, Plex playlists/collections (membership), a hand-picked list (manual), or a mix."
+      },
+      "Provenance": {
+        "type": "string",
+        "enum": [
+          "preset",
+          "ai",
+          "manual"
+        ]
+      },
+      "PackageRef": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "icon",
+          "tint"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "example": {
+          "error": {
+            "code": "not_found",
+            "message": "Channel not found."
+          }
+        }
+      },
+      "NowSlot": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "ratingKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Plex media ratingKey, or null (e.g. an interstitial bumper)."
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "\"movie\" | \"episode\" | \"show\"."
+          },
+          "showTitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "season": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "episode": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "year": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startsAt": {
+            "type": "string",
+            "description": "ISO-8601 UTC."
+          },
+          "endsAt": {
+            "type": "string",
+            "description": "ISO-8601 UTC."
+          },
+          "durationSeconds": {
+            "type": "integer"
+          },
+          "artworkPath": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Relative artwork path; serve it through this server's public /img proxy."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "program",
+              "bumper"
+            ]
+          },
+          "offsetSeconds": {
+            "type": "integer",
+            "description": "Seconds elapsed into the current slot (present on the current slot only)."
+          }
+        },
+        "required": [
+          "ratingKey",
+          "title",
+          "type",
+          "showTitle",
+          "season",
+          "episode",
+          "year",
+          "summary",
+          "startsAt",
+          "endsAt",
+          "durationSeconds",
+          "artworkPath",
+          "kind"
+        ],
+        "example": {
+          "ratingKey": "45217",
+          "title": "The One With the Blackout",
+          "type": "episode",
+          "showTitle": "Friends",
+          "season": 1,
+          "episode": 7,
+          "year": 1994,
+          "summary": "A blackout traps the gang in various parts of the city.",
+          "startsAt": "2026-09-27T18:00:00.000Z",
+          "endsAt": "2026-09-27T18:22:00.000Z",
+          "durationSeconds": 1320,
+          "artworkPath": "/library/metadata/45217/thumb",
+          "kind": "program",
+          "offsetSeconds": 540
+        }
+      },
+      "Program": {
+        "type": "object",
+        "properties": {
+          "ratingKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Plex media ratingKey, or null (e.g. an interstitial bumper)."
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "\"movie\" | \"episode\" | \"show\"."
+          },
+          "showTitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "season": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "episode": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "year": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startsAt": {
+            "type": "string",
+            "description": "ISO-8601 UTC."
+          },
+          "endsAt": {
+            "type": "string",
+            "description": "ISO-8601 UTC."
+          },
+          "durationSeconds": {
+            "type": "integer"
+          },
+          "artworkPath": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Relative artwork path; serve it through this server's public /img proxy."
+          }
+        },
+        "required": [
+          "ratingKey",
+          "title",
+          "type",
+          "showTitle",
+          "season",
+          "episode",
+          "year",
+          "summary",
+          "startsAt",
+          "endsAt",
+          "durationSeconds",
+          "artworkPath"
+        ],
+        "example": {
+          "ratingKey": "45217",
+          "title": "The One With the Blackout",
+          "type": "episode",
+          "showTitle": "Friends",
+          "season": 1,
+          "episode": 7,
+          "year": 1994,
+          "summary": "A blackout traps the gang in various parts of the city.",
+          "startsAt": "2026-09-27T18:00:00.000Z",
+          "endsAt": "2026-09-27T18:22:00.000Z",
+          "durationSeconds": 1320,
+          "artworkPath": "/library/metadata/45217/thumb"
+        }
+      },
+      "Package": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "channelCount": {
+            "type": "integer",
+            "description": "Channels in this package that you can access."
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "icon",
+          "tint",
+          "channelCount"
+        ],
+        "example": {
+          "id": "clx9pkg01",
+          "key": "comedy",
+          "name": "Comedy & Fun",
+          "icon": "lucide:Laugh",
+          "tint": "amber",
+          "channelCount": 6
+        }
+      },
+      "PackageDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "channelCount": {
+            "type": "integer",
+            "description": "Channels in this package that you can access."
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Channel"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "icon",
+          "tint",
+          "channelCount",
+          "channels"
+        ],
+        "example": {
+          "id": "clx9pkg01",
+          "key": "comedy",
+          "name": "Comedy & Fun",
+          "icon": "lucide:Laugh",
+          "tint": "amber",
+          "channelCount": 6,
+          "channels": []
+        }
+      },
+      "GuideChannel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "callsign": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "package": {
+            "$ref": "#/components/schemas/PackageRef"
+          },
+          "programs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Program"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "name",
+          "callsign",
+          "icon",
+          "tint",
+          "package",
+          "programs"
+        ]
+      },
+      "GuideNowChannel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "callsign": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "package": {
+            "$ref": "#/components/schemas/PackageRef"
+          },
+          "now": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Program"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "next": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Program"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "name",
+          "callsign",
+          "icon",
+          "tint",
+          "package",
+          "now",
+          "next"
+        ]
+      },
+      "Session": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "user": {
+            "type": "string",
+            "description": "The viewer's display name (or email)."
+          },
+          "channel": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "number": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "callsign": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "number",
+              "name",
+              "callsign"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "description": "\"program\" | \"bumper\" | \"off\"."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "showTitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "season": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "episode": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "year": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "progress": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "positionSeconds": {
+                "type": "number"
+              },
+              "durationSeconds": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "positionSeconds",
+              "durationSeconds"
+            ]
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "device": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "model": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "platform": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "model",
+              "platform"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "user",
+          "channel",
+          "state",
+          "title",
+          "showTitle",
+          "season",
+          "episode",
+          "year",
+          "progress",
+          "startedAt",
+          "device"
+        ],
+        "example": {
+          "id": "clx9sess01",
+          "user": "James",
+          "channel": {
+            "number": 101,
+            "name": "90s Sitcoms",
+            "callsign": "SITCOM"
+          },
+          "state": "program",
+          "title": "The One With the Blackout",
+          "showTitle": "Friends",
+          "season": 1,
+          "episode": 7,
+          "year": 1994,
+          "progress": {
+            "positionSeconds": 540,
+            "durationSeconds": 1320
+          },
+          "startedAt": "2026-09-27T18:10:00.000Z",
+          "device": {
+            "model": "Apple TV 4K",
+            "platform": "tvOS"
+          }
+        }
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/status": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Server status",
+        "description": "This server's identity (product, version, install id, display name), current time, uptime, and live counts (channels, packages, active viewers). The one-stop endpoint for a Home Assistant sensor.",
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/capabilities": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "API capabilities",
+        "description": "What this public API supports on this server: API version, optional server features, and whether webhooks and the SSE event stream are available. Lets a consumer degrade gracefully.",
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Capabilities.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Capabilities"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/channels": {
+      "get": {
+        "tags": [
+          "Channels"
+        ],
+        "summary": "List channels",
+        "description": "Every channel you can access, in guide order. Add ?include=definition for authoring internals.",
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "definition"
+            },
+            "required": false,
+            "name": "include",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channels.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "channels": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Channel"
+                      }
+                    }
+                  },
+                  "required": [
+                    "channels"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/channels/by-number/{number}": {
+      "get": {
+        "tags": [
+          "Channels"
+        ],
+        "summary": "Get a channel by its guide number",
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "example": 101
+            },
+            "required": false,
+            "name": "number",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "definition"
+            },
+            "required": false,
+            "name": "include",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channel.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Channel"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/channels/{id}": {
+      "get": {
+        "tags": [
+          "Channels"
+        ],
+        "summary": "Get a channel",
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "clx9k2p0a0001abcd"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "definition"
+            },
+            "required": false,
+            "name": "include",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channel.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Channel"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/channels/{id}/now": {
+      "get": {
+        "tags": [
+          "Channels"
+        ],
+        "summary": "What's on now & next",
+        "description": "The currently-airing slot (with its live offset) and the one after it.",
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Now & next.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "current": {
+                      "$ref": "#/components/schemas/NowSlot"
+                    },
+                    "next": {
+                      "$ref": "#/components/schemas/NowSlot"
+                    },
+                    "endsAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When the materialized schedule runs out; ISO-8601 UTC."
+                    }
+                  },
+                  "required": [
+                    "current",
+                    "next",
+                    "endsAt"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/channels/{id}/schedule": {
+      "get": {
+        "tags": [
+          "Channels"
+        ],
+        "summary": "Upcoming schedule",
+        "description": "The channel's upcoming programs over the next N hours (default 3, max 24).",
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 24,
+              "example": 6
+            },
+            "required": false,
+            "name": "hours",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Upcoming programs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "channelId": {
+                      "type": "string"
+                    },
+                    "serverTime": {
+                      "type": "string"
+                    },
+                    "programs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Program"
+                      }
+                    }
+                  },
+                  "required": [
+                    "channelId",
+                    "serverTime",
+                    "programs"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages": {
+      "get": {
+        "tags": [
+          "Packages"
+        ],
+        "summary": "List packages",
+        "description": "Packages that contain at least one channel you can access.",
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Packages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "packages": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Package"
+                      }
+                    }
+                  },
+                  "required": [
+                    "packages"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages/{id}": {
+      "get": {
+        "tags": [
+          "Packages"
+        ],
+        "summary": "Get a package and its channels",
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Package.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/guide": {
+      "get": {
+        "tags": [
+          "Guide"
+        ],
+        "summary": "Guide grid (now/next across all channels)",
+        "description": "Every accessible channel with its programs over a window. The marquee endpoint for a full EPG view.",
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 30,
+              "maximum": 1440,
+              "example": 180
+            },
+            "required": false,
+            "name": "forwardMinutes",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1440,
+              "example": 60
+            },
+            "required": false,
+            "name": "backMinutes",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Guide grid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "serverTime": {
+                      "type": "string"
+                    },
+                    "windowMinutes": {
+                      "type": "integer"
+                    },
+                    "backMinutes": {
+                      "type": "integer"
+                    },
+                    "channels": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GuideChannel"
+                      }
+                    }
+                  },
+                  "required": [
+                    "serverTime",
+                    "windowMinutes",
+                    "backMinutes",
+                    "channels"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/guide/now": {
+      "get": {
+        "tags": [
+          "Guide"
+        ],
+        "summary": "What's on right now (one row per channel)",
+        "description": "A compact now/next per channel — ideal for a Tidbyt or a small dashboard.",
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Now/next per channel.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "serverTime": {
+                      "type": "string"
+                    },
+                    "channels": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GuideNowChannel"
+                      }
+                    }
+                  },
+                  "required": [
+                    "serverTime",
+                    "channels"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions": {
+      "get": {
+        "tags": [
+          "Now watching"
+        ],
+        "summary": "Active watch sessions",
+        "description": "Who's watching what right now (heartbeated within the last 30 seconds).",
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active sessions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sessions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Session"
+                      }
+                    }
+                  },
+                  "required": [
+                    "sessions"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/count": {
+      "get": {
+        "tags": [
+          "Now watching"
+        ],
+        "summary": "Active viewer count",
+        "description": "The number of active watch sessions — the cheapest sensor for 'is anyone watching'.",
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Count.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "count"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/now-playing": {
+      "get": {
+        "tags": [
+          "Now watching"
+        ],
+        "summary": "Now playing (compact)",
+        "description": "A friendly, compact view of what each active viewer is watching.",
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Now playing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "nowPlaying": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "user": {
+                            "type": "string"
+                          },
+                          "channelNumber": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "channelName": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "title": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "showTitle": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "progress": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "positionSeconds": {
+                                "type": "number"
+                              },
+                              "durationSeconds": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "positionSeconds",
+                              "durationSeconds"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "user",
+                          "channelNumber",
+                          "channelName",
+                          "title",
+                          "showTitle",
+                          "progress"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "nowPlaying"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

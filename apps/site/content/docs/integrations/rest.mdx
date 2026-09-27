@@ -1,0 +1,55 @@
+---
+title: Generic REST
+description: Read Airwave data from curl or any HTTP client.
+icon: Terminal
+---
+
+Every endpoint lives under `/api/public/v1` and needs your API key (from **Settings → API Keys**). Set a
+couple of shell variables and go:
+
+```bash
+AIRWAVE=http://192.168.1.10:36020/api/public/v1
+KEY=airwave_your_key
+```
+
+## Server status
+
+```bash
+curl -s -H "X-API-Key: $KEY" "$AIRWAVE/status"
+```
+
+```json
+{
+  "product": "airwave",
+  "version": "0.14.68",
+  "name": "Blue Turtle - Airwave Server",
+  "uptimeSeconds": 43210,
+  "counts": { "channels": 42, "packages": 8, "activeSessions": 2 }
+}
+```
+
+## What's on right now
+
+`/guide/now` returns one row per channel — ideal for a dashboard:
+
+```bash
+curl -s -H "Authorization: Bearer $KEY" "$AIRWAVE/guide/now"
+```
+
+## Who's watching
+
+```bash
+curl -s -H "X-API-Key: $KEY" "$AIRWAVE/sessions/count"   # {"count":2}
+curl -s -H "X-API-Key: $KEY" "$AIRWAVE/now-playing"       # compact per-viewer view
+```
+
+## Channels and the full guide
+
+```bash
+curl -s -H "X-API-Key: $KEY" "$AIRWAVE/channels"
+curl -s -H "X-API-Key: $KEY" "$AIRWAVE/channels/by-number/101/now"
+curl -s -H "X-API-Key: $KEY" "$AIRWAVE/guide?forwardMinutes=180"
+```
+
+Add `?include=definition` to a channel request to also get its authoring internals (filter/sources/manual +
+ordering). See the [API Reference](/api-reference) for the complete list and a live playground.
