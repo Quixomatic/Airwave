@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.68] - 2026-09-27
+
+### Added
+- Public API (`/api/public/v1`), read endpoints round two:
+  - **Packages**: `GET /packages` (each with an accessible channel count) and `GET /packages/{id}` (the package
+    plus its channels).
+  - **Guide / EPG**: `GET /guide` (the now/next grid across all accessible channels, `?forwardMinutes` /
+    `?backMinutes`) and `GET /guide/now` (a compact one-row-per-channel now/next, ideal for a Tidbyt).
+  - **Now watching**: `GET /sessions` (active watch sessions), `GET /sessions/count` (the cheapest
+    "is anyone watching" sensor), and `GET /now-playing` (a friendly compact view).
+  - All scoped to the API key user's channel access.
+
 ## [0.14.67] - 2026-09-27
 
 ### Added

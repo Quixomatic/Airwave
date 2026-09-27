@@ -18,7 +18,7 @@ import {
 import { toNowSlot, toProgram } from "../mappers";
 
 // ── DTO ───────────────────────────────────────────────────────────────────────────
-const ChannelDTO = z
+export const ChannelDTO = z
   .object({
     id: z.string(),
     number: z.number().int(),
@@ -58,7 +58,7 @@ const ChannelDTO = z
   });
 
 // ── mapping ─────────────────────────────────────────────────────────────────────────
-const channelSelect = (withDef: boolean) =>
+export const channelSelect = (withDef: boolean) =>
   ({
     id: true,
     number: true,
@@ -99,7 +99,7 @@ function deriveMode(defs: Array<{ kind: string; mode: string }>): z.infer<typeof
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function toChannelDTO(ch: any, withDef: boolean): z.infer<typeof ChannelDTO> {
+export function toChannelDTO(ch: any, withDef: boolean): z.infer<typeof ChannelDTO> {
   const provenance: z.infer<typeof ProvenanceDTO> = ch.aiGenerated
     ? "ai"
     : ch.generated

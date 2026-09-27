@@ -5,6 +5,9 @@ import pkg from "../../package.json";
 import { apiKeyAuth, type PublicVars } from "./context";
 import { capabilitiesRoutes } from "./routes/capabilities";
 import { channelRoutes } from "./routes/channels";
+import { guideRoutes } from "./routes/guide";
+import { packageRoutes } from "./routes/packages";
+import { sessionRoutes } from "./routes/sessions";
 import { statusRoutes } from "./routes/status";
 
 /**
@@ -49,6 +52,9 @@ publicApi.use("*", (c, next) => {
 publicApi.route("/", statusRoutes);
 publicApi.route("/", capabilitiesRoutes);
 publicApi.route("/", channelRoutes);
+publicApi.route("/", packageRoutes);
+publicApi.route("/", guideRoutes);
+publicApi.route("/", sessionRoutes);
 
 // OpenAPI 3.1 document (public) — the single source consumed by Scalar, the fumadocs reference, and the mock.
 publicApi.doc31("/openapi.json", {
