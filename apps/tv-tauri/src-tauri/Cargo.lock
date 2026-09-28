@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "airwave"
-version = "0.14.71"
+version = "0.14.72"
 dependencies = [
  "futures",
  "gtk",

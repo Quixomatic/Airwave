@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.72] - 2026-09-28
+
+Webhook events now fire from real viewing activity, plus a dispatcher fix. Still on `feat/public-webhooks-sse`.
+
+### Added
+- **Playback & session webhook events**: `session.started` / `session.ended`, `playback.started` / `playback.stopped`, and `channel.tuned`, emitted from the watch-session heartbeat on state transitions only (never per-heartbeat). Each payload carries the viewer, the channel, and the current program. Emission is gated on an in-memory subscriber check, so a server with no webhooks configured does zero extra work on the hot heartbeat path. Verified end-to-end against a local receiver with valid Standard Webhooks signatures.
+
+### Fixed
+- Webhook dispatcher lost-wakeup: a `wake` arriving while a drain was already in progress was dropped by the concurrency guard, so deliveries enqueued mid-drain waited for the ~20s safety tick. Added a re-run flag so the dispatcher immediately drains again.
+
 ## [0.14.71] - 2026-09-28
 
 Webhook delivery infrastructure (Standard Webhooks) — Phase 2 groundwork, on `feat/public-webhooks-sse`. Events don't fire from real activity yet (that wiring comes next); the pipeline, storage, and management surfaces are in place.

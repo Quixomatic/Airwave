@@ -2,6 +2,56 @@ import type { PrismaClient } from "@airwave/db";
 
 import { type GuideMeta, pingTranscode, stopTranscode } from "../plex/client";
 import { decryptToken } from "../plex/token";
+import { emitEvent, hasWebhookSubscribers, type WebhookEventType } from "../webhooks";
+
+/** Playback/session events emitted from the heartbeat path; gated so an idle box does zero extra work. */
+const HEARTBEAT_EVENTS = ["session.started", "channel.tuned", "playback.started", "playback.stopped"] as const;
+
+/** Compact payload shared by every session/playback webhook event. */
+type PlaybackEventData = {
+  userId: string;
+  user: string | null;
+  channel: { id: string; number: number | null; name: string | null } | null;
+  program: { ratingKey: string | null; title: string | null } | null;
+};
+
+async function buildEventData(
+  prisma: PrismaClient,
+  userId: string,
+  channelId: string | null,
+  ratingKey: string | null | undefined,
+  title: string | null | undefined,
+): Promise<PlaybackEventData> {
+  const [user, channel] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } }),
+    channelId ? prisma.channel.findUnique({ where: { id: channelId }, select: { number: true, name: true } }) : null,
+  ]);
+  return {
+    userId,
+    user: user?.name ?? user?.email ?? null,
+    channel: channelId ? { id: channelId, number: channel?.number ?? null, name: channel?.name ?? null } : null,
+    program: ratingKey || title ? { ratingKey: ratingKey ?? null, title: title ?? null } : null,
+  };
+}
+
+/** Emit the heartbeat transition events (called only when a subscriber wants them; enriches once). */
+async function emitHeartbeatEvents(
+  prisma: PrismaClient,
+  userId: string,
+  prior: { channelId: string | null; state: string } | null,
+  input: HeartbeatInput,
+): Promise<void> {
+  const events: WebhookEventType[] = [];
+  if (!prior) events.push("session.started");
+  if (prior && prior.channelId !== input.channelId) events.push("channel.tuned");
+  const wasPlaying = !!prior && prior.state !== "off";
+  const isPlaying = input.state !== "off";
+  if (!wasPlaying && isPlaying) events.push("playback.started");
+  if (wasPlaying && !isPlaying) events.push("playback.stopped");
+  if (events.length === 0) return;
+  const data = await buildEventData(prisma, userId, input.channelId, input.ratingKey, input.title);
+  for (const type of events) emitEvent(type, data);
+}
 
 /** A session is "active" while it's heartbeated within this window. */
 export const SESSION_ACTIVE_MS = 30_000;
@@ -27,6 +77,13 @@ export async function heartbeatSession(
   input: HeartbeatInput,
 ) {
   const now = new Date();
+  // Only read the prior row (to detect transitions) when a webhook actually wants one of these events —
+  // keeps the ~10s heartbeat free of extra work on an idle box.
+  const wantEvents = HEARTBEAT_EVENTS.some((t) => hasWebhookSubscribers(t));
+  const prior = wantEvents
+    ? await prisma.watchSession.findUnique({ where: { userId }, select: { channelId: true, state: true } })
+    : null;
+
   const data = {
     channelId: input.channelId,
     state: input.state,
@@ -42,6 +99,10 @@ export async function heartbeatSession(
     create: { userId, startedAt: now, ...data },
     update: data,
   });
+
+  // Fire webhook events for state TRANSITIONS only (never per-heartbeat). Fire-and-forget so a slow/failed
+  // emit can't affect the heartbeat's latency or success.
+  if (wantEvents) void emitHeartbeatEvents(prisma, userId, prior, input).catch(() => {});
 
   // Keep the Plex transcode session alive. Plex reaps a transcode as "paused for too long" (~5½ min) unless it
   // gets a periodic liveness ping — active segment fetching does NOT count (GitHub #13). `transcodeSession` is
@@ -112,6 +173,16 @@ export async function endWatchSession(prisma: PrismaClient, userId: string) {
     );
   }
   await prisma.watchSession.delete({ where: { userId } });
+
+  // Webhook: the viewer stopped watching. Enrich + emit only if a subscriber wants it.
+  if (hasWebhookSubscribers("session.ended") || hasWebhookSubscribers("playback.stopped")) {
+    void buildEventData(prisma, userId, existing.channelId, existing.ratingKey, existing.title)
+      .then((data) => {
+        if (existing.state !== "off") emitEvent("playback.stopped", data);
+        emitEvent("session.ended", data);
+      })
+      .catch(() => {});
+  }
   return { ok: true as const };
 }
 

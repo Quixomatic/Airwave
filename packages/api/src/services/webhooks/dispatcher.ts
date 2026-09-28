@@ -16,6 +16,7 @@ const BACKOFF_MS = [30_000, 120_000, 600_000, 1_800_000, 3_600_000];
 
 let timer: ReturnType<typeof setInterval> | null = null;
 let running = false; // guard: only ever one drain in flight (ticks no-op instead of stacking)
+let rerun = false; // a wake arrived mid-drain → drain again (closes the lost-wakeup gap)
 
 /** Start the in-process dispatcher. Called once at boot (see apps/server/src/index.ts). Idempotent. */
 export function startWebhookDispatcher(): void {
@@ -33,23 +34,35 @@ export function stopWebhookDispatcher(): void {
 
 /** Low-latency poke from emitEvent so a new delivery goes out without waiting for the safety tick. */
 export function wakeDispatcher(): void {
+  // If a drain is already running, remember to drain again — a wake dropped here would otherwise leave
+  // just-inserted rows waiting for the safety tick (a lost wakeup).
+  if (running) {
+    rerun = true;
+    return;
+  }
   void tick();
 }
 
 async function tick(): Promise<void> {
-  if (running) return;
+  if (running) {
+    rerun = true;
+    return;
+  }
   running = true;
   try {
-    for (;;) {
-      const due = await prisma.webhookDelivery.findMany({
-        where: { status: "pending", nextAttemptAt: { lte: new Date() } },
-        orderBy: { nextAttemptAt: "asc" },
-        take: BATCH_SIZE,
-      });
-      if (due.length === 0) break;
-      await mapWithConcurrency(due, CONCURRENCY, deliver);
-      if (due.length < BATCH_SIZE) break; // drained
-    }
+    do {
+      rerun = false;
+      for (;;) {
+        const due = await prisma.webhookDelivery.findMany({
+          where: { status: "pending", nextAttemptAt: { lte: new Date() } },
+          orderBy: { nextAttemptAt: "asc" },
+          take: BATCH_SIZE,
+        });
+        if (due.length === 0) break;
+        await mapWithConcurrency(due, CONCURRENCY, deliver);
+        if (due.length < BATCH_SIZE) break; // drained this pass
+      }
+    } while (rerun); // a wake landed while we were draining → go again
   } catch (err) {
     console.error("[webhooks] dispatcher tick failed:", err);
   } finally {
