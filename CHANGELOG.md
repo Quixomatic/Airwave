@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.74] - 2026-09-28
+
+Restore and wire `playback.paused` / `playback.resumed` (0.14.73 over-trimmed them). Still on `feat/public-webhooks-sse`.
+
+### Added
+- **`playback.paused` / `playback.resumed`** now fire from the heartbeat: within an active session, playing→off is a pause and off→playing is a resume. `playback.started` is now specifically the first play of a new session, and `playback.stopped` is the terminal event when the session ends. Only `schedule.*` and `content.*` remain removed from the catalog.
+
 ## [0.14.73] - 2026-09-28
 
 Focus the webhook event catalog on actionable viewing activity. Still on `feat/public-webhooks-sse`.

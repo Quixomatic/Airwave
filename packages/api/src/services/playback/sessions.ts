@@ -5,7 +5,13 @@ import { decryptToken } from "../plex/token";
 import { emitEvent, hasWebhookSubscribers, type WebhookEventType } from "../webhooks";
 
 /** Playback/session events emitted from the heartbeat path; gated so an idle box does zero extra work. */
-const HEARTBEAT_EVENTS = ["session.started", "channel.tuned", "playback.started", "playback.stopped"] as const;
+const HEARTBEAT_EVENTS = [
+  "session.started",
+  "channel.tuned",
+  "playback.started",
+  "playback.paused",
+  "playback.resumed",
+] as const;
 
 /** Compact payload shared by every session/playback webhook event. */
 type PlaybackEventData = {
@@ -42,12 +48,18 @@ async function emitHeartbeatEvents(
   input: HeartbeatInput,
 ): Promise<void> {
   const events: WebhookEventType[] = [];
-  if (!prior) events.push("session.started");
-  if (prior && prior.channelId !== input.channelId) events.push("channel.tuned");
-  const wasPlaying = !!prior && prior.state !== "off";
   const isPlaying = input.state !== "off";
-  if (!wasPlaying && isPlaying) events.push("playback.started");
-  if (wasPlaying && !isPlaying) events.push("playback.stopped");
+  if (!prior) {
+    // Brand-new session: it opened, and if content is rolling, playback began.
+    events.push("session.started");
+    if (isPlaying) events.push("playback.started");
+  } else {
+    if (prior.channelId !== input.channelId) events.push("channel.tuned");
+    const wasPlaying = prior.state !== "off";
+    // Within an existing session, off↔playing is a resume/pause (a true stop is session end).
+    if (!wasPlaying && isPlaying) events.push("playback.resumed");
+    if (wasPlaying && !isPlaying) events.push("playback.paused");
+  }
   if (events.length === 0) return;
   const data = await buildEventData(prisma, userId, input.channelId, input.ratingKey, input.title);
   for (const type of events) emitEvent(type, data);
@@ -174,11 +186,12 @@ export async function endWatchSession(prisma: PrismaClient, userId: string) {
   }
   await prisma.watchSession.delete({ where: { userId } });
 
-  // Webhook: the viewer stopped watching. Enrich + emit only if a subscriber wants it.
+  // Webhook: the viewer stopped watching (the terminal event — a mid-session pause is playback.paused).
+  // Enrich + emit only if a subscriber wants it.
   if (hasWebhookSubscribers("session.ended") || hasWebhookSubscribers("playback.stopped")) {
     void buildEventData(prisma, userId, existing.channelId, existing.ratingKey, existing.title)
       .then((data) => {
-        if (existing.state !== "off") emitEvent("playback.stopped", data);
+        emitEvent("playback.stopped", data);
         emitEvent("session.ended", data);
       })
       .catch(() => {});

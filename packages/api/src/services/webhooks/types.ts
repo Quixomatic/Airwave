@@ -14,6 +14,8 @@ export const WEBHOOK_EVENT_TYPES = [
   "session.ended",
   "playback.started",
   "playback.stopped",
+  "playback.paused",
+  "playback.resumed",
   "channel.tuned",
   "ping",
 ] as const;
@@ -24,7 +26,15 @@ export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number];
 export const WEBHOOK_EVENT_GROUPS: { group: string; types: WebhookEventType[] }[] = [
   {
     group: "Playback",
-    types: ["session.started", "session.ended", "playback.started", "playback.stopped", "channel.tuned"],
+    types: [
+      "session.started",
+      "session.ended",
+      "playback.started",
+      "playback.stopped",
+      "playback.paused",
+      "playback.resumed",
+      "channel.tuned",
+    ],
   },
   { group: "Test", types: ["ping"] },
 ];
