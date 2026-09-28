@@ -2,11 +2,13 @@
  * Map internal schedule/guide slot shapes → the public Program / NowSlot DTOs. Kept in one place so every
  * endpoint that returns programs (now/next, schedule, guide) presents them identically.
  */
+import { buildArtworkUrl } from "./dtos";
 
 type GuideLike = {
   title?: string;
   type?: string;
   showTitle?: string;
+  showRatingKey?: string; // grandparentRatingKey — the parent show, whose poster we use for an episode
   season?: number;
   episode?: number;
   year?: number;
@@ -22,10 +24,16 @@ type SlotLike = {
   guide?: GuideLike;
 };
 
-export function toProgram(slot: SlotLike) {
+/**
+ * @param channelId  the channel the slot belongs to — needed to build the artwork proxy URL (the proxy resolves
+ *                   the Plex source/token from the channel). Omit for slots with no channel (artwork is null).
+ */
+export function toProgram(slot: SlotLike, channelId?: string | null) {
   const start = slot.startsAt instanceof Date ? slot.startsAt : new Date(slot.startsAt);
   const end = new Date(start.getTime() + slot.durationSeconds * 1000);
   const g = slot.guide ?? {};
+  // The portrait POSTER: the show's key for an episode, else the item itself. Same choice the admin makes.
+  const posterKey = g.showRatingKey ?? slot.ratingKey ?? null;
   return {
     ratingKey: slot.ratingKey ?? null,
     title: g.title ?? "Unavailable",
@@ -38,13 +46,13 @@ export function toProgram(slot: SlotLike) {
     startsAt: start.toISOString(),
     endsAt: end.toISOString(),
     durationSeconds: slot.durationSeconds,
-    artworkPath: g.thumb ?? null,
+    artworkUrl: buildArtworkUrl(channelId, posterKey, "poster"),
   };
 }
 
-export function toNowSlot(slot: SlotLike, offsetSeconds?: number) {
+export function toNowSlot(slot: SlotLike, channelId?: string | null, offsetSeconds?: number) {
   return {
-    ...toProgram(slot),
+    ...toProgram(slot, channelId),
     kind: (slot.kind === "BUMPER" ? "bumper" : "program") as "program" | "bumper",
     ...(offsetSeconds != null ? { offsetSeconds } : {}),
   };

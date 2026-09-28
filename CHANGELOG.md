@@ -2,6 +2,30 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.70] - 2026-09-28
+
+Enriches the public API with ready-to-use program artwork, and fixes a `tsc -b` false-flag on every public route.
+
+### Added
+- **Public artwork proxy** — `GET /api/public/v1/channels/{channelId}/artwork/{ratingKey}`, a tokenless image
+  endpoint that streams a program's poster (or `?kind=background` for landscape fanart) from the channel's Plex
+  source. No API key or Plex token needed, so the URL drops straight into an `<img>`, a Home Assistant
+  `entity_picture`, or a Tidbyt. It's owned by the public contract and never exposes the internal image proxy
+  or raw Plex metadata paths.
+- **`artworkUrl` on every program and session** — `/sessions`, `/now-playing`, `/channels/{id}/now`,
+  `/channels/{id}/schedule`, `/guide`, and `/guide/now` each now carry a ready-to-use, host-relative
+  `artworkUrl` (the portrait poster). The REST and Home Assistant recipes show how to use it.
+
+### Changed
+- The program DTO's raw `artworkPath` (a bare Plex path an outside consumer couldn't actually fetch) is
+  replaced by the usable `artworkUrl` above. The docs playground mock returns a placeholder poster for the new
+  image endpoint so "Try it" still renders something.
+
+### Fixed
+- `apiKeySecurity` was declared `as const` — a readonly tuple that isn't assignable to the OpenAPI
+  `SecurityRequirementObject[]`, so `tsc -b` false-flagged every public route and cascaded into `never`
+  inference on request validation. Typed it as a mutable array; the server typechecks clean again.
+
 ## [0.14.69] - 2026-09-27
 
 ### Added

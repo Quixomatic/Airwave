@@ -5,7 +5,7 @@ import { listActiveSessions } from "@airwave/api/services/playback/sessions";
 import prisma from "@airwave/db";
 
 import type { PublicVars } from "../context";
-import { apiKeySecurity, errorResponses } from "../dtos";
+import { apiKeySecurity, buildArtworkUrl, errorResponses } from "../dtos";
 
 const SessionDTO = z
   .object({
@@ -20,6 +20,13 @@ const SessionDTO = z
     season: z.number().int().nullable(),
     episode: z.number().int().nullable(),
     year: z.number().int().nullable(),
+    artworkUrl: z
+      .string()
+      .nullable()
+      .describe(
+        "Ready-to-use, tokenless poster URL for what's playing. Host-relative; prepend your server's base " +
+          "URL and use it directly in an <img> / entity_picture.",
+      ),
     progress: z
       .object({ positionSeconds: z.number(), durationSeconds: z.number() })
       .nullable(),
@@ -37,6 +44,7 @@ const SessionDTO = z
       season: 1,
       episode: 7,
       year: 1994,
+      artworkUrl: "/api/public/v1/channels/clx9k2p0a0001abcd/artwork/45210?kind=poster",
       progress: { positionSeconds: 540, durationSeconds: 1320 },
       startedAt: "2026-09-27T18:10:00.000Z",
       device: { model: "Apple TV 4K", platform: "tvOS" },
@@ -57,6 +65,7 @@ function toSession(s: any): z.infer<typeof SessionDTO> {
     season: s.season ?? null,
     episode: s.episode ?? null,
     year: s.year ?? null,
+    artworkUrl: buildArtworkUrl(s.channelId, s.posterRatingKey, "poster"),
     progress: s.progress
       ? { positionSeconds: s.progress.positionSeconds, durationSeconds: s.progress.durationSeconds }
       : null,
@@ -139,6 +148,7 @@ sessionRoutes.openapi(
                   channelName: z.string().nullable(),
                   title: z.string().nullable(),
                   showTitle: z.string().nullable(),
+                  artworkUrl: z.string().nullable(),
                   progress: z
                     .object({ positionSeconds: z.number(), durationSeconds: z.number() })
                     .nullable(),
@@ -161,6 +171,7 @@ sessionRoutes.openapi(
           channelName: s.channel?.name ?? null,
           title: s.title ?? null,
           showTitle: s.showTitle ?? null,
+          artworkUrl: buildArtworkUrl(s.channelId, s.posterRatingKey, "poster"),
           progress: s.progress
             ? { positionSeconds: s.progress.positionSeconds, durationSeconds: s.progress.durationSeconds }
             : null,

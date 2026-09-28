@@ -3,6 +3,7 @@ import { Scalar } from "@scalar/hono-api-reference";
 
 import pkg from "../../package.json";
 import { apiKeyAuth, type PublicVars } from "./context";
+import { artworkRoutes } from "./routes/artwork";
 import { capabilitiesRoutes } from "./routes/capabilities";
 import { channelRoutes } from "./routes/channels";
 import { guideRoutes } from "./routes/guide";
@@ -41,10 +42,11 @@ publicApi.openAPIRegistry.registerComponent("securitySchemes", "BearerAuth", {
   scheme: "bearer",
 });
 
-// Key auth on everything except the public docs + spec.
+// Key auth on everything except the public docs + spec, and the artwork proxy (tokenless by design — an
+// <img> / entity_picture can't send a key; see routes/artwork.ts).
 publicApi.use("*", (c, next) => {
   const p = c.req.path;
-  if (p.endsWith("/openapi.json") || p.endsWith("/docs")) return next();
+  if (p.endsWith("/openapi.json") || p.endsWith("/docs") || p.includes("/artwork/")) return next();
   return apiKeyAuth(c, next);
 });
 
@@ -55,6 +57,7 @@ publicApi.route("/", channelRoutes);
 publicApi.route("/", packageRoutes);
 publicApi.route("/", guideRoutes);
 publicApi.route("/", sessionRoutes);
+publicApi.route("/", artworkRoutes);
 
 // OpenAPI 3.1 document config — exported so a build script can emit the same spec for the getairwave.tv
 // reference (the site can't import this app at build: no DB), and Scalar/the fumadocs playground all share it.

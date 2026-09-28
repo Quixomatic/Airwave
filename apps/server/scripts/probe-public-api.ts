@@ -12,6 +12,12 @@
  *    up automatically as they're added to the spec.
  *  - Sanity-checks that a missing/bad key returns 401.
  *  - Revokes the temporary key on the way out.
+ *
+ * To probe with YOUR OWN key instead of a minted temp one (e.g. to see how a real key's channel access scopes
+ * the results), pass it as an argument or env var — the script then skips minting/revoking:
+ *
+ *   bun --env-file=.env run scripts/probe-public-api.ts airwave_your_key
+ *   AIRWAVE_PROBE_KEY=airwave_your_key bun --env-file=.env run scripts/probe-public-api.ts
  */
 import { auth } from "@airwave/auth";
 import prisma from "@airwave/db";
@@ -21,21 +27,32 @@ import { publicApi } from "../src/public";
 const snippet = (s: string, n = 280) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
 async function main() {
-  const admin = await prisma.user.findFirst({
-    where: { role: "admin" },
-    orderBy: { createdAt: "asc" },
-    select: { id: true, email: true },
-  });
-  if (!admin) throw new Error("No admin user found — run the app once so seedAdmin creates one.");
-  console.log(`Admin user: ${admin.email} (${admin.id})`);
+  // Use a provided key (arg or env) as-is; otherwise mint a temporary admin key.
+  const providedKey = process.argv[2]?.trim() || process.env.AIRWAVE_PROBE_KEY?.trim();
 
-  const created = (await auth.api.createApiKey({
-    body: { name: "probe-public-api (temp)", prefix: "airwave_", userId: admin.id, metadata: { probe: true } },
-  })) as { id: string; key: string };
-  const keyId = created.id;
-  const key = created.key;
-  if (!key) throw new Error(`createApiKey returned no plaintext key: ${JSON.stringify(created)}`);
-  console.log(`Minted temp key: ${key.slice(0, 12)}…\n`);
+  let key: string;
+  let keyId: string | null = null; // set only when we mint (so we know to revoke)
+
+  if (providedKey) {
+    key = providedKey;
+    console.log(`Using provided key: ${key.slice(0, 12)}… (not minted — will not be revoked)\n`);
+  } else {
+    const admin = await prisma.user.findFirst({
+      where: { role: "admin" },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, email: true },
+    });
+    if (!admin) throw new Error("No admin user found — run the app once so seedAdmin creates one.");
+    console.log(`Admin user: ${admin.email} (${admin.id})`);
+
+    const created = (await auth.api.createApiKey({
+      body: { name: "probe-public-api (temp)", prefix: "airwave_", userId: admin.id, metadata: { probe: true } },
+    })) as { id: string; key: string };
+    keyId = created.id;
+    key = created.key;
+    if (!key) throw new Error(`createApiKey returned no plaintext key: ${JSON.stringify(created)}`);
+    console.log(`Minted temp key: ${key.slice(0, 12)}…\n`);
+  }
 
   try {
     // 1. The spec (no auth).
@@ -90,9 +107,12 @@ async function main() {
       }`,
     );
   } finally {
-    // Revoke the temp key (delete the row directly — server-side deleteApiKey wants a session).
-    await prisma.apikey.delete({ where: { id: keyId } }).catch(() => {});
-    console.log(`\nRevoked temp key ${keyId}.`);
+    // Only revoke a key we minted; never touch a user-provided key.
+    if (keyId) {
+      // Revoke the temp key (delete the row directly — server-side deleteApiKey wants a session).
+      await prisma.apikey.delete({ where: { id: keyId } }).catch(() => {});
+      console.log(`\nRevoked temp key ${keyId}.`);
+    }
   }
 }
 

@@ -53,3 +53,17 @@ curl -s -H "X-API-Key: $KEY" "$AIRWAVE/guide?forwardMinutes=180"
 
 Add `?include=definition` to a channel request to also get its authoring internals (filter/sources/manual +
 ordering). See the [API Reference](/api-reference) for the complete list and a live playground.
+
+## Artwork
+
+Sessions and programs include an `artworkUrl` — a tokenless, host-relative poster path. Prepend your server's
+base URL and use it directly in an `<img>` or a dashboard; it needs no API key and no Plex token:
+
+```bash
+# artworkUrl looks like: /api/public/v1/channels/{channelId}/artwork/{ratingKey}?kind=poster
+curl -s "http://192.168.1.10:36020$(curl -s -H "X-API-Key: $KEY" "$AIRWAVE/now-playing" \
+  | jq -r '.nowPlaying[0].artworkUrl')" --output now-playing.jpg
+```
+
+`kind` selects `poster` (portrait, the default), `background` (landscape fanart), or `thumb`.
+

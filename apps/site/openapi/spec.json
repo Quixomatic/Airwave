@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Airwave Public API",
-    "version": "0.14.68",
+    "version": "0.14.70",
     "description": "Read your self-hosted Airwave server's live data (guide, channels, now-watching) and subscribe to webhooks. Authenticate with an API key from Settings → API Keys, sent as either `X-API-Key` or `Authorization: Bearer`."
   },
   "servers": [
@@ -414,12 +414,12 @@
           "durationSeconds": {
             "type": "integer"
           },
-          "artworkPath": {
+          "artworkUrl": {
             "type": [
               "string",
               "null"
             ],
-            "description": "Relative artwork path; serve it through this server's public /img proxy."
+            "description": "Ready-to-use, tokenless artwork URL (the portrait poster). Host-relative, so prepend your server's base URL and use it directly in an <img> / entity_picture. Null when there's no artwork (e.g. a bumper). Backed by GET /channels/{channelId}/artwork/{ratingKey}."
           },
           "kind": {
             "type": "string",
@@ -445,7 +445,7 @@
           "startsAt",
           "endsAt",
           "durationSeconds",
-          "artworkPath",
+          "artworkUrl",
           "kind"
         ],
         "example": {
@@ -460,7 +460,7 @@
           "startsAt": "2026-09-27T18:00:00.000Z",
           "endsAt": "2026-09-27T18:22:00.000Z",
           "durationSeconds": 1320,
-          "artworkPath": "/library/metadata/45217/thumb",
+          "artworkUrl": "/api/public/v1/channels/clx9k2p0a0001abcd/artwork/45210?kind=poster",
           "kind": "program",
           "offsetSeconds": 540
         }
@@ -526,12 +526,12 @@
           "durationSeconds": {
             "type": "integer"
           },
-          "artworkPath": {
+          "artworkUrl": {
             "type": [
               "string",
               "null"
             ],
-            "description": "Relative artwork path; serve it through this server's public /img proxy."
+            "description": "Ready-to-use, tokenless artwork URL (the portrait poster). Host-relative, so prepend your server's base URL and use it directly in an <img> / entity_picture. Null when there's no artwork (e.g. a bumper). Backed by GET /channels/{channelId}/artwork/{ratingKey}."
           }
         },
         "required": [
@@ -546,7 +546,7 @@
           "startsAt",
           "endsAt",
           "durationSeconds",
-          "artworkPath"
+          "artworkUrl"
         ],
         "example": {
           "ratingKey": "45217",
@@ -560,7 +560,7 @@
           "startsAt": "2026-09-27T18:00:00.000Z",
           "endsAt": "2026-09-27T18:22:00.000Z",
           "durationSeconds": 1320,
-          "artworkPath": "/library/metadata/45217/thumb"
+          "artworkUrl": "/api/public/v1/channels/clx9k2p0a0001abcd/artwork/45210?kind=poster"
         }
       },
       "Package": {
@@ -861,6 +861,13 @@
               "null"
             ]
           },
+          "artworkUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ready-to-use, tokenless poster URL for what's playing. Host-relative; prepend your server's base URL and use it directly in an <img> / entity_picture."
+          },
           "progress": {
             "type": [
               "object",
@@ -917,6 +924,7 @@
           "season",
           "episode",
           "year",
+          "artworkUrl",
           "progress",
           "startedAt",
           "device"
@@ -935,6 +943,7 @@
           "season": 1,
           "episode": 7,
           "year": 1994,
+          "artworkUrl": "/api/public/v1/channels/clx9k2p0a0001abcd/artwork/45210?kind=poster",
           "progress": {
             "positionSeconds": 540,
             "durationSeconds": 1320
@@ -945,6 +954,15 @@
             "platform": "tvOS"
           }
         }
+      },
+      "ArtworkKind": {
+        "type": "string",
+        "enum": [
+          "poster",
+          "background",
+          "thumb"
+        ],
+        "example": "poster"
       }
     },
     "parameters": {}
@@ -1779,6 +1797,12 @@
                               "null"
                             ]
                           },
+                          "artworkUrl": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "progress": {
                             "type": [
                               "object",
@@ -1804,6 +1828,7 @@
                           "channelName",
                           "title",
                           "showTitle",
+                          "artworkUrl",
                           "progress"
                         ]
                       }
@@ -1818,6 +1843,66 @@
           },
           "401": {
             "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/channels/{channelId}/artwork/{ratingKey}": {
+      "get": {
+        "tags": [
+          "Artwork"
+        ],
+        "summary": "Program artwork (image proxy)",
+        "description": "Streams program artwork from the channel's Plex source. No API key or Plex token needed, so the URL drops straight into an <img>, a Home Assistant entity_picture, or a Tidbyt. `kind` selects the poster (portrait, default), the background (landscape fanart), or the item's own thumb. Prefer the `artworkUrl` a program or session gives you.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "clx9k2p0a0001abcd"
+            },
+            "required": true,
+            "name": "channelId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "45210"
+            },
+            "required": true,
+            "name": "ratingKey",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/ArtworkKind"
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The image (streamed from Plex).",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
             "content": {
               "application/json": {
                 "schema": {

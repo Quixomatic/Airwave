@@ -8,6 +8,7 @@ import { syncConnector } from "@airwave/api/services/remote-access/connector";
 import { startJobs } from "@airwave/api/services/jobs/scheduler";
 import { getInstanceId, getServerName } from "@airwave/api/services/settings/index";
 import { resolveChannelSource, resolveMediaSource } from "@airwave/api/services/playback/broker";
+import { streamPlexArt } from "./lib/plex-art";
 import { buildAuthUrl, createPin } from "@airwave/api/services/plex/client";
 import { encryptExistingSourceTokens } from "@airwave/api/services/plex/token";
 import prisma from "@airwave/db";
@@ -271,30 +272,8 @@ app.use(
 // Plex artwork proxy — PUBLIC (a CSS/<img> background can't send a bearer token), so
 // the TV can use program cover art (blurred bumper backgrounds, guide thumbnails). Only
 // proxies Plex image paths (/library, /photo) through the channel's own media source,
-// injecting the admin token. `w`/`h` optionally resize via Plex's photo transcoder.
-// Stream one Plex art path through a resolved source, injecting the admin token. Shared by the channel-keyed
-// and source-keyed proxies below. `w`/`h` optionally resize via Plex's photo transcoder.
-async function streamPlexArt(
-  c: Context,
-  // The resolvers hand back the full MediaSource; both guarantee a non-null baseUrl before returning (they throw
-  // otherwise), so accept the broader `string | null` here rather than force a narrow at each call site.
-  source: { baseUrl: string | null; token: string },
-  path: string,
-): Promise<Response> {
-  const token = encodeURIComponent(source.token);
-  const w = c.req.query("w");
-  const h = c.req.query("h");
-  const upstream =
-    w || h
-      ? `${source.baseUrl}/photo/:/transcode?url=${encodeURIComponent(path)}&width=${w ?? h}&height=${h ?? w}&minSize=1&X-Plex-Token=${token}`
-      : `${source.baseUrl}${path}${path.includes("?") ? "&" : "?"}X-Plex-Token=${token}`;
-  const res = await fetch(upstream);
-  if (!res.ok) return c.text("not found", 404);
-  const headers = new Headers();
-  headers.set("Content-Type", res.headers.get("Content-Type") ?? "image/jpeg");
-  headers.set("Cache-Control", "public, max-age=3600");
-  return new Response(res.body, { status: 200, headers });
-}
+// injecting the admin token. `w`/`h` optionally resize via Plex's photo transcoder. The
+// streaming helper is shared with the public artwork endpoint (see ./lib/plex-art).
 
 // Source-keyed variant — registered FIRST (more specific: 3 segments) so it's never shadowed by the
 // channel route. Lets the admin's channel CREATE page preview artwork before a channel exists (no channelId

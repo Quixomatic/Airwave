@@ -43,8 +43,28 @@ sensor:
       - channelName
       - showTitle
       - progress
+      - artworkUrl
     scan_interval: 30
 ```
+
+### Poster artwork
+
+Each session and program carries an `artworkUrl`: a tokenless, host-relative poster path you can drop straight
+into a picture-entity or a Lovelace card. Prepend your server's base URL (the `artworkUrl` above is captured as
+an attribute):
+
+```yaml
+# a template sensor that builds a full entity_picture from the attribute
+template:
+  - sensor:
+      - name: Airwave Now Playing Art
+        state: "{{ states('sensor.airwave_now_playing') }}"
+        picture: >
+          {% set path = state_attr('sensor.airwave_now_playing', 'artworkUrl') %}
+          {{ 'http://192.168.1.10:36020' ~ path if path else none }}
+```
+
+The image needs no API key, so it loads directly in the dashboard.
 
 Store the key in `secrets.yaml`:
 

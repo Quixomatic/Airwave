@@ -198,6 +198,9 @@ export async function listActiveSessions(prisma: PrismaClient) {
         year: guide?.year ?? null,
         // Relative Plex poster path for the /img proxy (show/movie poster — portrait).
         thumbPath: posterKey ? `/library/metadata/${posterKey}/thumb` : null,
+        // The poster's rating key (show key for episodes, else the item) — the public API builds its tokenless
+        // artwork URL from this rather than the raw thumbPath, so the Plex path stays internal.
+        posterRatingKey: posterKey ?? null,
         ratingKey: r.ratingKey,
         delaySeconds: r.delaySeconds,
         progress,

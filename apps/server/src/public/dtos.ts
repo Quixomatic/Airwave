@@ -21,8 +21,12 @@ export const errorResponses = {
   },
 } as const;
 
-/** Both API-key auth styles, spread into a route's `security`. */
-export const apiKeySecurity = [{ ApiKeyHeader: [] }, { BearerAuth: [] }] as const;
+/**
+ * Both API-key auth styles, for a route's `security`. NOT `as const` — a readonly tuple isn't assignable to
+ * openapi3-ts's mutable `SecurityRequirementObject[]`, which made `tsc -b` false-flag every route (and cascade
+ * into `never` inference on `c.req.valid(...)`).
+ */
+export const apiKeySecurity: Array<Record<string, string[]>> = [{ ApiKeyHeader: [] }, { BearerAuth: [] }];
 
 /** A channel's package, as embedded in channel/guide responses. */
 export const PackageRefDTO = z
@@ -38,6 +42,23 @@ export const PackageRefDTO = z
 
 /** How a channel was authored, for at-a-glance provenance. */
 export const ProvenanceDTO = z.enum(["preset", "ai", "manual"]).openapi("Provenance");
+
+/**
+ * Build the tokenless, host-relative URL for a program's artwork, served by the public artwork proxy
+ * (`GET /channels/{channelId}/artwork/{ratingKey}`). Returns null when we can't key it (no channel or no
+ * rating key). `kind` selects poster (portrait, default), background (landscape fanart), or thumb; callers pass
+ * the right rating key for the kind (e.g. the SHOW's key for an episode's poster). The consumer uses this
+ * string as-is and prepends their server's base URL, so the internal image path stays decoupled from the
+ * public contract.
+ */
+export function buildArtworkUrl(
+  channelId: string | null | undefined,
+  ratingKey: string | null | undefined,
+  kind: "poster" | "background" | "thumb" = "poster",
+): string | null {
+  if (!channelId || !ratingKey) return null;
+  return `/api/public/v1/channels/${channelId}/artwork/${ratingKey}?kind=${kind}`;
+}
 
 /** A channel's content mode, derived from its definition(s). */
 export const ChannelModeDTO = z
@@ -60,10 +81,14 @@ const programShape = z.object({
   startsAt: z.string().describe("ISO-8601 UTC."),
   endsAt: z.string().describe("ISO-8601 UTC."),
   durationSeconds: z.number().int(),
-  artworkPath: z
+  artworkUrl: z
     .string()
     .nullable()
-    .describe("Relative artwork path; serve it through this server's public /img proxy."),
+    .describe(
+      "Ready-to-use, tokenless artwork URL (the portrait poster). Host-relative, so prepend your server's " +
+        "base URL and use it directly in an <img> / entity_picture. Null when there's no artwork (e.g. a " +
+        "bumper). Backed by GET /channels/{channelId}/artwork/{ratingKey}.",
+    ),
 });
 
 const programExample = {
@@ -78,7 +103,7 @@ const programExample = {
   startsAt: "2026-09-27T18:00:00.000Z",
   endsAt: "2026-09-27T18:22:00.000Z",
   durationSeconds: 1320,
-  artworkPath: "/library/metadata/45217/thumb",
+  artworkUrl: "/api/public/v1/channels/clx9k2p0a0001abcd/artwork/45210?kind=poster",
 };
 
 /** A scheduled program (or bumper) slot. */

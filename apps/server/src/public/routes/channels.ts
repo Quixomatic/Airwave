@@ -296,8 +296,8 @@ channelRoutes.openapi(
     const nn = await getNowNext(prisma, id);
     return c.json(
       {
-        current: nn.current ? toNowSlot(nn.current, nn.current.offsetSeconds) : null,
-        next: nn.next ? toNowSlot(nn.next) : null,
+        current: nn.current ? toNowSlot(nn.current, id, nn.current.offsetSeconds) : null,
+        next: nn.next ? toNowSlot(nn.next, id) : null,
         endsAt: nn.endsAt ? nn.endsAt.toISOString() : null,
       },
       200,
@@ -341,7 +341,7 @@ channelRoutes.openapi(
     }
     const hours = c.req.valid("query").hours ?? 3;
     const win = await getTimelineWindow(prisma, id, 0, hours * 60);
-    const programs = win.slots.filter((s) => s.kind === "PROGRAM").map((s) => toProgram(s));
+    const programs = win.slots.filter((s) => s.kind === "PROGRAM").map((s) => toProgram(s, id));
     return c.json({ channelId: id, serverTime: win.serverTime.toISOString(), programs }, 200);
   },
 );
