@@ -1,0 +1,60 @@
+/// A registered webhook endpoint (Standard Webhooks — standardwebhooks.com). Server-wide, managed by admins in
+/// Settings → Webhooks and via /api/public/v1/webhooks. The signing secret is stored ENCRYPTED at rest (reuse
+/// the Plex-token encryption), never hashed, because we must retrieve it to sign each delivery.
+model Webhook {
+  id          String  @id @default(cuid())
+  url         String
+  /// Encrypted `whsec_...` signing secret. Returned raw only once (on create / rotate), never again.
+  secretEnc   String
+  /// Subscribed event types (dotted names, e.g. "playback.started"). Empty array = every event type.
+  eventTypes  String[]
+  description String?
+  enabled     Boolean @default(true)
+
+  /// Set when the dispatcher auto-disables the endpoint after too many consecutive hard failures.
+  disabledAt          DateTime?
+  disabledReason      String?
+  /// Consecutive delivery failures; reset to 0 on any success. Drives auto-disable.
+  consecutiveFailures Int       @default(0)
+
+  deliveries WebhookDelivery[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("webhook")
+}
+
+/// The delivery outbox: one row per (event × subscribed endpoint). The in-process dispatcher claims due rows
+/// (status=pending AND nextAttemptAt<=now), POSTs the signed envelope, and records the outcome. On failure the
+/// row backs off via nextAttemptAt/attempt until it maxes out → failed. At-least-once; consumers dedupe on the
+/// `webhook-id` header (== eventId).
+model WebhookDelivery {
+  id        String  @id @default(cuid())
+  webhookId String
+  webhook   Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  /// Stable per-event id; also the `webhook-id` header the consumer dedupes on.
+  eventId   String
+  eventType String
+  /// The full envelope { id, type, timestamp, data } we POST, stored so a delivery can be replayed verbatim.
+  payload   Json
+
+  /// pending | delivered | failed.
+  status        String    @default("pending")
+  attempt       Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  /// Last attempt's outcome (for the delivery log).
+  responseCode  Int?
+  error         String?
+  durationMs    Int?
+  deliveredAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// The dispatcher's claim query rides this index (find pending rows that are due).
+  @@index([status, nextAttemptAt])
+  @@index([webhookId, createdAt])
+  @@map("webhook_delivery")
+}

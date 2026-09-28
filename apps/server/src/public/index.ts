@@ -6,10 +6,12 @@ import { apiKeyAuth, type PublicVars } from "./context";
 import { artworkRoutes } from "./routes/artwork";
 import { capabilitiesRoutes } from "./routes/capabilities";
 import { channelRoutes } from "./routes/channels";
+import { eventRoutes } from "./routes/events";
 import { guideRoutes } from "./routes/guide";
 import { packageRoutes } from "./routes/packages";
 import { sessionRoutes } from "./routes/sessions";
 import { statusRoutes } from "./routes/status";
+import { webhookRoutes } from "./routes/webhooks";
 
 /**
  * The public integration API — mounted at `/api/public/v1`. A SEPARATE, stable, API-key-authed surface for
@@ -46,7 +48,10 @@ publicApi.openAPIRegistry.registerComponent("securitySchemes", "BearerAuth", {
 // <img> / entity_picture can't send a key; see routes/artwork.ts).
 publicApi.use("*", (c, next) => {
   const p = c.req.path;
-  if (p.endsWith("/openapi.json") || p.endsWith("/docs") || p.includes("/artwork/")) return next();
+  // /events does its own auth (header OR ?api_key, so a browser EventSource works); artwork is tokenless.
+  if (p.endsWith("/openapi.json") || p.endsWith("/docs") || p.includes("/artwork/") || p.endsWith("/events")) {
+    return next();
+  }
   return apiKeyAuth(c, next);
 });
 
@@ -58,6 +63,8 @@ publicApi.route("/", packageRoutes);
 publicApi.route("/", guideRoutes);
 publicApi.route("/", sessionRoutes);
 publicApi.route("/", artworkRoutes);
+publicApi.route("/", webhookRoutes);
+publicApi.route("/", eventRoutes);
 
 // OpenAPI 3.1 document config — exported so a build script can emit the same spec for the getairwave.tv
 // reference (the site can't import this app at build: no DB), and Scalar/the fumadocs playground all share it.

@@ -15,6 +15,7 @@ import { settingsRouter } from "./settings";
 import { sourcesRouter } from "./sources";
 import { transferRouter } from "./transfer";
 import { usersRouter } from "./users";
+import { webhooksRouter } from "./webhooks";
 
 export const appRouter = router({
   healthCheck: publicProcedure.query(() => {
@@ -42,5 +43,6 @@ export const appRouter = router({
   sources: sourcesRouter,
   transfer: transferRouter,
   users: usersRouter,
+  webhooks: webhooksRouter,
 });
 export type AppRouter = typeof appRouter;

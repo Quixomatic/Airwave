@@ -1,25 +1,69 @@
 ---
 title: Live events (SSE)
-description: Stream real-time updates from your Airwave server for a Tauri app or a live dashboard.
+description: Stream Airwave events in real time over a single connection, for a Tauri app or a live dashboard.
 icon: Terminal
 ---
 
-<Callout title="Coming soon">
-A server-sent events (SSE) stream is on the way for live, always-connected clients like a Tauri desktop app.
-This page will cover connecting, the event stream, and reconnection.
-</Callout>
+For an always-connected client, a Tauri desktop app or a wall-mounted dashboard, Airwave streams events over
+[Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) instead of pushing to
+a URL. You hold one long-lived connection and receive the same envelopes the [webhooks](/docs/integrations/webhooks)
+deliver, the moment they happen.
 
-Polling is fine for a Tidbyt or a Home Assistant sensor, but a desktop app or a live wall-mounted dashboard
-wants updates the moment they happen. An SSE endpoint at `/api/public/v1/events` will let a client hold one
-long-lived connection and receive events (now playing, the guide advancing, sessions starting and stopping) as
-a stream.
+## Connect
 
-## What to expect
+```
+GET /api/public/v1/events
+```
 
-- One authenticated `GET /api/public/v1/events` connection using your API key.
-- The same event types as webhooks, delivered as an SSE stream instead of individual HTTP pushes — ideal for a
-  [Tauri](https://tauri.app/) client that stays open.
-- Automatic reconnection with last-event resumption.
+Authenticate with an API key from **Settings → API Keys**, as either the `X-API-Key` header (for a fetch-based
+client) or, since a browser `EventSource` can't set headers, the `?api_key=` query parameter. Add
+`?types=session.started,session.ended` to receive only certain events.
 
-Until then, poll `/guide/now` and `/now-playing` on a short interval — see
-[Generic REST](/docs/integrations/rest).
+```js
+// browser / webview
+const es = new EventSource(
+  "http://192.168.1.10:36020/api/public/v1/events?api_key=airwave_your_key",
+);
+es.addEventListener("session.started", (e) => {
+  const { data } = JSON.parse(e.data);
+  console.log(`${data.user} started watching ${data.channel.name}`);
+});
+es.addEventListener("session.ended", (e) => {
+  /* … */
+});
+```
+
+```bash
+# curl — watch the raw stream
+curl -N -H "X-API-Key: airwave_your_key" \
+  "http://192.168.1.10:36020/api/public/v1/events?types=session.started,session.ended"
+```
+
+## The stream
+
+Each message is an SSE frame whose `event:` is the event type and whose `data:` is the JSON envelope
+(`{ id, type, timestamp, data }`, the same shape as a webhook). On connect you get a `hello` frame, and a
+`keepalive` frame arrives periodically so idle proxies don't drop the connection:
+
+```
+event: hello
+data: {"product":"airwave","filter":"all"}
+
+event: session.started
+data: {"id":"evt_2a9f…","type":"session.started","timestamp":"2026-09-28T18:04:11.000Z","data":{"user":"James","channel":{"number":101,"name":"90s Sitcoms"},"program":{"title":"Friends"}}}
+
+event: keepalive
+data: {"t":1790000666000}
+```
+
+A browser `EventSource` reconnects on its own if the connection drops. For a fetch-based client, reconnect on
+error with a short backoff.
+
+## SSE or webhooks?
+
+- **SSE** suits a client that stays open and wants events live (a Tauri app, a dashboard). Nothing is stored;
+  if the client is disconnected it simply misses events while away.
+- **[Webhooks](/docs/integrations/webhooks)** suit a server-side integration (Home Assistant, n8n): Airwave
+  POSTs to your URL with retries, so you don't need to hold a connection.
+
+Both carry the same events and the same payloads.

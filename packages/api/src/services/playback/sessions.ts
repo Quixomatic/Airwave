@@ -2,9 +2,30 @@ import type { PrismaClient } from "@airwave/db";
 
 import { type GuideMeta, pingTranscode, stopTranscode } from "../plex/client";
 import { decryptToken } from "../plex/token";
+import { emitEvent, hasEventSubscribers } from "../webhooks";
 
 /** A session is "active" while it's heartbeated within this window. */
 export const SESSION_ACTIVE_MS = 30_000;
+
+/** Compact payload for the session.* webhook events. */
+async function sessionEventData(
+  prisma: PrismaClient,
+  userId: string,
+  channelId: string | null,
+  ratingKey: string | null | undefined,
+  title: string | null | undefined,
+) {
+  const [user, channel] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } }),
+    channelId ? prisma.channel.findUnique({ where: { id: channelId }, select: { number: true, name: true } }) : null,
+  ]);
+  return {
+    userId,
+    user: user?.name ?? user?.email ?? null,
+    channel: channelId ? { id: channelId, number: channel?.number ?? null, name: channel?.name ?? null } : null,
+    program: ratingKey || title ? { ratingKey: ratingKey ?? null, title: title ?? null } : null,
+  };
+}
 
 export type HeartbeatInput = {
   channelId: string;
@@ -37,11 +58,21 @@ export async function heartbeatSession(
     transcodeSession: input.transcodeSession ?? null,
     lastHeartbeatAt: now,
   };
-  await prisma.watchSession.upsert({
+  const row = await prisma.watchSession.upsert({
     where: { userId },
     create: { userId, startedAt: now, ...data },
     update: data,
   });
+
+  // session.started webhook: this upsert CREATED the session row (a fresh watch), not just updated a heartbeat.
+  // `startedAt` is only set on create, so it equals this call's `now` exactly iff the row is new — atomic, no
+  // race, no dupes. A channel change is a real stop+start in our model (the client ends + recreates), so it
+  // surfaces as session.ended + session.started, which is correct. Fire-and-forget; gated to zero cost when idle.
+  if (row.startedAt.getTime() === now.getTime() && hasEventSubscribers("session.started")) {
+    void sessionEventData(prisma, userId, input.channelId, input.ratingKey, input.title)
+      .then((d) => emitEvent("session.started", d))
+      .catch(() => {});
+  }
 
   // Keep the Plex transcode session alive. Plex reaps a transcode as "paused for too long" (~5½ min) unless it
   // gets a periodic liveness ping — active segment fetching does NOT count (GitHub #13). `transcodeSession` is
@@ -112,6 +143,12 @@ export async function endWatchSession(prisma: PrismaClient, userId: string) {
     );
   }
   await prisma.watchSession.delete({ where: { userId } });
+  // session.ended webhook: the session row is gone. Fire-and-forget; gated to zero cost when idle.
+  if (hasEventSubscribers("session.ended")) {
+    void sessionEventData(prisma, userId, existing.channelId, existing.ratingKey, existing.title)
+      .then((d) => emitEvent("session.ended", d))
+      .catch(() => {});
+  }
   return { ok: true as const };
 }
 

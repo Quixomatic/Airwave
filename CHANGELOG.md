@@ -2,6 +2,61 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.76] - 2026-09-28
+
+Phase 3: live event streaming (SSE), webhook log cleanup, and real integration docs. Still on `feat/public-webhooks-sse`.
+
+### Added
+- **SSE event stream** — `GET /api/public/v1/events`, a single long-lived connection that receives the same events webhooks deliver (`{ id, type, timestamp, data }`) the moment they happen, for always-connected clients like a Tauri app or a live dashboard. Authenticate with the `X-API-Key` header or, for a browser `EventSource`, an `?api_key=` query parameter; `?types=` filters to specific events. It streams to connected clients in memory alongside webhook delivery, with a connection cap and prompt disconnect cleanup. `/capabilities` now reports `sse.supported: true`.
+- **Webhook Log Cleanup job** — a daily maintenance job that prunes delivered and permanently-failed webhook deliveries older than two weeks (pending retries are always kept), so the delivery outbox can't grow without bound. Visible and schedulable under Settings → Jobs.
+- **Docs**: the Webhooks and Live events (SSE) integration guides are now complete — setup, the event catalog, the payload shape, signature verification, a Home Assistant recipe, and when to choose SSE vs webhooks.
+
+## [0.14.75] - 2026-09-28
+
+Webhooks Phase 2: the admin UI, plus a finalized event model that emits straight from the watch-session store. Still on `feat/public-webhooks-sse`.
+
+### Added
+- **Settings → Webhooks tab.** Add and edit endpoints (URL, description, event-type checkboxes grouped by category), see the signing secret once on create, toggle enabled, rotate the secret, send a test event, and view a per-endpoint delivery log. Admin-only, over the shared webhook service; "New webhook" sits in the frame header like the other list pages.
+- **`scripts/webhook-listen.ts`** — a live listener for local testing: it registers a temporary webhook on the running server, prints each event as it arrives (signature verified), and cleans up on exit. Handy for watching events while you play content.
+
+### Changed
+- **Webhook events now come straight from the watch-session store.** `session.started` fires when a session row is created (detected atomically, so rapid heartbeats never double-fire) and `session.ended` fires immediately when the session ends. A channel change is a genuine stop + start in Airwave's model (the client ends and recreates the session), so it surfaces as `session.ended` then `session.started` — no smoothing, no delay.
+- **Event catalog** is now `session.started`, `session.ended`, and `ping` (emitted today); `playback.started` / `playback.stopped` / `playback.paused` / `playback.resumed` are reserved and shown as "coming soon" (they need the client to report real play/pause state). `channel.tuned` was removed, since a channel change already surfaces as a stop + start.
+
+## [0.14.74] - 2026-09-28
+
+Restore and wire `playback.paused` / `playback.resumed` (0.14.73 over-trimmed them). Still on `feat/public-webhooks-sse`.
+
+### Added
+- **`playback.paused` / `playback.resumed`** now fire from the heartbeat: within an active session, playing→off is a pause and off→playing is a resume. `playback.started` is now specifically the first play of a new session, and `playback.stopped` is the terminal event when the session ends. Only `schedule.*` and `content.*` remain removed from the catalog.
+
+## [0.14.73] - 2026-09-28
+
+Focus the webhook event catalog on actionable viewing activity. Still on `feat/public-webhooks-sse`.
+
+### Changed
+- Trimmed the subscribable webhook event types to the set that fires from real viewing activity and is genuinely actionable for automation: `session.started` / `session.ended`, `playback.started` / `playback.stopped`, `channel.tuned`, plus `ping`. Dropped `content.added` / `content.removed` and `schedule.regenerated` / `schedule.horizon_extended` (library and schedule churn isn't actionable for an integration, and consumers poll the guide anyway), along with the unwired `playback.paused` / `playback.resumed`. The catalog is additive-only, so any of these can return later if a real use emerges.
+
+## [0.14.72] - 2026-09-28
+
+Webhook events now fire from real viewing activity, plus a dispatcher fix. Still on `feat/public-webhooks-sse`.
+
+### Added
+- **Playback & session webhook events**: `session.started` / `session.ended`, `playback.started` / `playback.stopped`, and `channel.tuned`, emitted from the watch-session heartbeat on state transitions only (never per-heartbeat). Each payload carries the viewer, the channel, and the current program. Emission is gated on an in-memory subscriber check, so a server with no webhooks configured does zero extra work on the hot heartbeat path. Verified end-to-end against a local receiver with valid Standard Webhooks signatures.
+
+### Fixed
+- Webhook dispatcher lost-wakeup: a `wake` arriving while a drain was already in progress was dropped by the concurrency guard, so deliveries enqueued mid-drain waited for the ~20s safety tick. Added a re-run flag so the dispatcher immediately drains again.
+
+## [0.14.71] - 2026-09-28
+
+Webhook delivery infrastructure (Standard Webhooks) — Phase 2 groundwork, on `feat/public-webhooks-sse`. Events don't fire from real activity yet (that wiring comes next); the pipeline, storage, and management surfaces are in place.
+
+### Added
+- **Webhook data model + migration** — `Webhook` (url, encrypted `whsec_` secret, subscribed event types, auto-disable state) and a `WebhookDelivery` outbox (one row per event × endpoint, indexed for the dispatcher's claim).
+- **Webhook service** (`services/webhooks`): `emitEvent(type, data)`, a fire-and-forget hook that's near-free when idle (an in-memory subscription cache short-circuits with zero DB/network when nothing's subscribed); a **dedicated in-process dispatcher** started at boot next to the job scheduler (not a cron job) that drains the outbox with Standard Webhooks HMAC-SHA256 signing, bounded batches + concurrency, per-request timeouts, exponential backoff, and auto-disable after repeated failures; and management (create/list/update/delete, rotate-secret, send-test, delivery log, redeliver).
+- **Two surfaces over the shared service:** public API `/api/public/v1/webhooks/*` (admin-key-gated, for integrations like n8n that self-register) and an admin tRPC `webhooks` router (for the upcoming Settings → Webhooks tab).
+- `/capabilities` now advertises `webhooks.supported: true` and the subscribable event-type catalog.
+
 ## [0.14.70] - 2026-09-28
 
 Enriches the public API with ready-to-use program artwork, and fixes a `tsc -b` false-flag on every public route.
