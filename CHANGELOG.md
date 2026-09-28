@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.73] - 2026-09-28
+
+Focus the webhook event catalog on actionable viewing activity. Still on `feat/public-webhooks-sse`.
+
+### Changed
+- Trimmed the subscribable webhook event types to the set that fires from real viewing activity and is genuinely actionable for automation: `session.started` / `session.ended`, `playback.started` / `playback.stopped`, `channel.tuned`, plus `ping`. Dropped `content.added` / `content.removed` and `schedule.regenerated` / `schedule.horizon_extended` (library and schedule churn isn't actionable for an integration, and consumers poll the guide anyway), along with the unwired `playback.paused` / `playback.resumed`. The catalog is additive-only, so any of these can return later if a real use emerges.
+
 ## [0.14.72] - 2026-09-28
 
 Webhook events now fire from real viewing activity, plus a dispatcher fix. Still on `feat/public-webhooks-sse`.

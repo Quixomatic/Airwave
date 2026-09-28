@@ -4,22 +4,17 @@
  * within the public v1 contract — add new types freely, never rename/repurpose an existing one.
  */
 
-/** Event types wired to real sources now (Phase 2). */
+/**
+ * The webhook event catalog. Deliberately tight: only events that fire from real VIEWING activity (the
+ * actionable ones for home automation) plus a test ping. The catalog is additive-only within the public v1
+ * contract, so it's better to add later than to advertise weak events we can't remove.
+ */
 export const WEBHOOK_EVENT_TYPES = [
-  // Playback / viewing
-  "playback.started",
-  "playback.stopped",
-  "playback.paused",
-  "playback.resumed",
-  "channel.tuned",
   "session.started",
   "session.ended",
-  // Scheduling / content
-  "schedule.regenerated",
-  "schedule.horizon_extended",
-  "content.added",
-  "content.removed",
-  // Test
+  "playback.started",
+  "playback.stopped",
+  "channel.tuned",
   "ping",
 ] as const;
 
@@ -29,17 +24,8 @@ export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number];
 export const WEBHOOK_EVENT_GROUPS: { group: string; types: WebhookEventType[] }[] = [
   {
     group: "Playback",
-    types: [
-      "playback.started",
-      "playback.stopped",
-      "playback.paused",
-      "playback.resumed",
-      "channel.tuned",
-      "session.started",
-      "session.ended",
-    ],
+    types: ["session.started", "session.ended", "playback.started", "playback.stopped", "channel.tuned"],
   },
-  { group: "Scheduling & content", types: ["schedule.regenerated", "schedule.horizon_extended", "content.added", "content.removed"] },
   { group: "Test", types: ["ping"] },
 ];
 

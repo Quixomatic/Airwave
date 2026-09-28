@@ -27,7 +27,10 @@ const CapabilitiesDTO = z
       apiVersion: "v1",
       serverVersion: "0.14.65",
       features: { workflowEngine: true },
-      webhooks: { supported: true, eventTypes: ["playback.started", "playback.stopped", "channel.tuned", "ping"] },
+      webhooks: {
+        supported: true,
+        eventTypes: ["session.started", "session.ended", "playback.started", "playback.stopped", "channel.tuned", "ping"],
+      },
       sse: { supported: false },
     },
   });

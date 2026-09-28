@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Airwave Public API",
-    "version": "0.14.71",
+    "version": "0.14.73",
     "description": "Read your self-hosted Airwave server's live data (guide, channels, now-watching) and subscribe to webhooks. Authenticate with an API key from Settings → API Keys, sent as either `X-API-Key` or `Authorization: Bearer`."
   },
   "servers": [
@@ -173,6 +173,8 @@
           "webhooks": {
             "supported": true,
             "eventTypes": [
+              "session.started",
+              "session.ended",
               "playback.started",
               "playback.stopped",
               "channel.tuned",
@@ -2176,17 +2178,11 @@
                     "items": {
                       "type": "string",
                       "enum": [
-                        "playback.started",
-                        "playback.stopped",
-                        "playback.paused",
-                        "playback.resumed",
-                        "channel.tuned",
                         "session.started",
                         "session.ended",
-                        "schedule.regenerated",
-                        "schedule.horizon_extended",
-                        "content.added",
-                        "content.removed",
+                        "playback.started",
+                        "playback.stopped",
+                        "channel.tuned",
                         "ping"
                       ]
                     },
@@ -2441,17 +2437,11 @@
                     "items": {
                       "type": "string",
                       "enum": [
-                        "playback.started",
-                        "playback.stopped",
-                        "playback.paused",
-                        "playback.resumed",
-                        "channel.tuned",
                         "session.started",
                         "session.ended",
-                        "schedule.regenerated",
-                        "schedule.horizon_extended",
-                        "content.added",
-                        "content.removed",
+                        "playback.started",
+                        "playback.stopped",
+                        "channel.tuned",
                         "ping"
                       ]
                     }
