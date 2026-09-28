@@ -480,6 +480,21 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
       }
     },
   },
+  {
+    id: "webhook-delivery-prune",
+    name: "Webhook Log Cleanup",
+    description:
+      "Trims the webhook delivery log: removes delivered and permanently-failed attempts older than two weeks so the outbox table can't grow without bound. Pending retries are always kept.",
+    interval: "days",
+    defaultCron: "0 30 3 * * *",
+    run: async () => {
+      const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+      const { count } = await prisma.webhookDelivery.deleteMany({
+        where: { status: { in: ["delivered", "failed"] }, createdAt: { lt: cutoff } },
+      });
+      if (count > 0) console.log(`[jobs] webhook-delivery-prune removed ${count} old deliveries`);
+    },
+  },
 ];
 
 // Only register the Cloud Service sync job when the feature is enabled — otherwise it never appears in the

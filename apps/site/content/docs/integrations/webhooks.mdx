@@ -1,27 +1,104 @@
 ---
 title: Webhooks
-description: Get pushed a signed event when something happens on your Airwave server.
+description: Get a signed event pushed to your endpoint when someone starts or stops watching.
 icon: Terminal
 ---
 
-<Callout title="Coming soon">
-Webhooks are on the way. This page will cover subscribing an endpoint, the event catalog, and verifying
-signatures.
-</Callout>
+Airwave can **push** a signed event to any HTTPS endpoint the moment something happens, so an integration
+reacts instantly instead of polling. Deliveries use the [Standard Webhooks](https://www.standardwebhooks.com/)
+scheme, so you can verify them with an off-the-shelf library in most languages.
 
-Today the public API is pull-only: you poll `/api/public/v1` for the guide, sessions, and channels. Webhooks
-will flip that around — Airwave will **push** a small signed JSON payload to a URL you register whenever
-something happens, so an integration reacts instantly instead of polling on a timer.
+## Add a webhook
 
-## What to expect
+In the admin, go to **Settings → Webhooks → New webhook**:
 
-- Register one or more delivery URLs from **Settings → Webhooks** in the admin.
-- Subscribe to event types like playback starting and stopping, a viewer tuning a channel, the schedule
-  regenerating, or new content being added.
-- Each delivery is signed with the [Standard Webhooks](https://www.standardwebhooks.com/) scheme
-  (`webhook-id` / `webhook-timestamp` / `webhook-signature`, HMAC-SHA256) so you can verify it really came from
-  your server.
-- Failed deliveries retry with backoff; the docs and events will also appear in the [API Reference](/api-reference)
-  once shipped.
+1. Enter the **delivery URL** (where Airwave POSTs events).
+2. Tick the **events** you want, or leave them all unchecked to receive every event.
+3. Save. The **signing secret** (`whsec_…`) is shown once, right then. Copy it now, you can't see it again
+   (you can rotate it later).
 
-Until then, poll `/guide/now` and `/sessions` on an interval — see [Generic REST](/docs/integrations/rest).
+You can also manage webhooks over the [API](/api-reference) (`/api/public/v1/webhooks`) with an admin API
+key, which is how an integration like n8n registers its own endpoint.
+
+## Events
+
+| Event | When |
+| --- | --- |
+| `session.started` | A viewer starts watching a channel |
+| `session.ended` | A viewer stops watching |
+| `ping` | A test event you trigger from the webhook's **Send test** button |
+
+A channel change is a real stop then start, so it arrives as a `session.ended` followed by a `session.started`.
+
+The `playback.started` / `playback.stopped` / `playback.paused` / `playback.resumed` events are defined but not
+emitted yet (they need the player to report actual play/pause state); they're marked "coming soon" in the UI.
+
+## The payload
+
+Every delivery is a POST with a JSON envelope:
+
+```json
+{
+  "id": "evt_2a9f…",
+  "type": "session.started",
+  "timestamp": "2026-09-28T18:04:11.000Z",
+  "data": {
+    "userId": "clx9user01",
+    "user": "James",
+    "channel": { "id": "clx9ch01", "number": 101, "name": "90s Sitcoms" },
+    "program": { "ratingKey": "45210", "title": "Friends" }
+  }
+}
+```
+
+`id` is unique per event (also sent as the `webhook-id` header) so you can dedupe. `type` is the dotted event
+name. `data` carries the viewer, channel, and program.
+
+## Verify the signature
+
+Each POST carries three headers:
+
+```
+webhook-id: evt_2a9f…
+webhook-timestamp: 1790000651
+webhook-signature: v1,g0hM9SsE…
+```
+
+The signature is `v1,` plus the base64 HMAC-SHA256 of `{id}.{timestamp}.{body}`, keyed by the secret's bytes
+(the part after `whsec_`, base64-decoded). Verify with a Standard Webhooks library:
+
+```python
+# pip install standardwebhooks
+from standardwebhooks import Webhook
+
+wh = Webhook("whsec_your_secret")
+payload = wh.verify(request_body_bytes, dict(request.headers))  # raises on a bad signature
+```
+
+Reject anything that fails verification, and optionally reject a `webhook-timestamp` more than a few minutes
+old to prevent replay.
+
+## Home Assistant
+
+Create an automation with a **webhook trigger**, which gives you a URL like
+`https://ha.example.com/api/webhook/airwave-xyz`. Add that URL as an Airwave webhook subscribed to
+`session.started` and `session.ended`, then act on the payload:
+
+```yaml
+# automation: dim the lights when someone starts watching
+automation:
+  - alias: Airwave – lights down on watch
+    trigger:
+      - platform: webhook
+        webhook_id: airwave-xyz
+        allowed_methods: [POST]
+        local_only: false
+    condition:
+      - "{{ trigger.json.type == 'session.started' }}"
+    action:
+      - service: light.turn_off
+        target: { entity_id: light.living_room }
+```
+
+Delivery attempts (and retries) show up per endpoint under **Settings → Webhooks**, where you can also send a
+test event or redeliver a past one.

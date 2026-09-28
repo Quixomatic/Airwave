@@ -9,9 +9,10 @@
  *  - subscriptions             — the in-memory "is anyone listening?" cache.
  *  - manage                    — CRUD + rotate + test + delivery log (used by the API + Settings tab).
  */
-export { emitEvent } from "./webhooks/emit";
+export { emitEvent, hasEventSubscribers } from "./webhooks/emit";
 export { startWebhookDispatcher, stopWebhookDispatcher, wakeDispatcher } from "./webhooks/dispatcher";
 export { refreshWebhookSubscriptions, hasWebhookSubscribers } from "./webhooks/subscriptions";
+export { addSseClient, removeSseClient, hasSseClients, sseClientCount, sseAtCapacity, type SseClient } from "./webhooks/sse";
 export {
   listWebhooks,
   getWebhook,

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Airwave Public API",
-    "version": "0.14.75",
+    "version": "0.14.76",
     "description": "Read your self-hosted Airwave server's live data (guide, channels, now-watching) and subscribe to webhooks. Authenticate with an API key from Settings → API Keys, sent as either `X-API-Key` or `Authorization: Bearer`."
   },
   "servers": [
@@ -179,7 +179,7 @@
             ]
           },
           "sse": {
-            "supported": false
+            "supported": true
           }
         }
       },

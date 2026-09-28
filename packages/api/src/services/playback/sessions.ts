@@ -2,7 +2,7 @@ import type { PrismaClient } from "@airwave/db";
 
 import { type GuideMeta, pingTranscode, stopTranscode } from "../plex/client";
 import { decryptToken } from "../plex/token";
-import { emitEvent, hasWebhookSubscribers } from "../webhooks";
+import { emitEvent, hasEventSubscribers } from "../webhooks";
 
 /** A session is "active" while it's heartbeated within this window. */
 export const SESSION_ACTIVE_MS = 30_000;
@@ -68,7 +68,7 @@ export async function heartbeatSession(
   // `startedAt` is only set on create, so it equals this call's `now` exactly iff the row is new — atomic, no
   // race, no dupes. A channel change is a real stop+start in our model (the client ends + recreates), so it
   // surfaces as session.ended + session.started, which is correct. Fire-and-forget; gated to zero cost when idle.
-  if (row.startedAt.getTime() === now.getTime() && hasWebhookSubscribers("session.started")) {
+  if (row.startedAt.getTime() === now.getTime() && hasEventSubscribers("session.started")) {
     void sessionEventData(prisma, userId, input.channelId, input.ratingKey, input.title)
       .then((d) => emitEvent("session.started", d))
       .catch(() => {});
@@ -144,7 +144,7 @@ export async function endWatchSession(prisma: PrismaClient, userId: string) {
   }
   await prisma.watchSession.delete({ where: { userId } });
   // session.ended webhook: the session row is gone. Fire-and-forget; gated to zero cost when idle.
-  if (hasWebhookSubscribers("session.ended")) {
+  if (hasEventSubscribers("session.ended")) {
     void sessionEventData(prisma, userId, existing.channelId, existing.ratingKey, existing.title)
       .then((d) => emitEvent("session.ended", d))
       .catch(() => {});

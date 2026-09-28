@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.76] - 2026-09-28
+
+Phase 3: live event streaming (SSE), webhook log cleanup, and real integration docs. Still on `feat/public-webhooks-sse`.
+
+### Added
+- **SSE event stream** — `GET /api/public/v1/events`, a single long-lived connection that receives the same events webhooks deliver (`{ id, type, timestamp, data }`) the moment they happen, for always-connected clients like a Tauri app or a live dashboard. Authenticate with the `X-API-Key` header or, for a browser `EventSource`, an `?api_key=` query parameter; `?types=` filters to specific events. It streams to connected clients in memory alongside webhook delivery, with a connection cap and prompt disconnect cleanup. `/capabilities` now reports `sse.supported: true`.
+- **Webhook Log Cleanup job** — a daily maintenance job that prunes delivered and permanently-failed webhook deliveries older than two weeks (pending retries are always kept), so the delivery outbox can't grow without bound. Visible and schedulable under Settings → Jobs.
+- **Docs**: the Webhooks and Live events (SSE) integration guides are now complete — setup, the event catalog, the payload shape, signature verification, a Home Assistant recipe, and when to choose SSE vs webhooks.
+
 ## [0.14.75] - 2026-09-28
 
 Webhooks Phase 2: the admin UI, plus a finalized event model that emits straight from the watch-session store. Still on `feat/public-webhooks-sse`.
