@@ -2,6 +2,10 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.0] - 2026-09-28
+
+Opens the 0.15 line on the **public integration API**: a stable, documented, key-authenticated way to read your self-hosted Airwave's live data and receive events, for Home Assistant, Tidbyt, Tauri, n8n, and anything that speaks HTTP. This graduates the work shipped incrementally across 0.14.63–0.14.76 (the read API, the getairwave.tv reference + mock playground, program artwork, webhooks, and the SSE event stream) into a minor release. No functional changes since 0.14.76.
+
 ## [0.14.76] - 2026-09-28
 
 Phase 3: live event streaming (SSE), webhook log cleanup, and real integration docs. Still on `feat/public-webhooks-sse`.
