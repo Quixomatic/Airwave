@@ -6,6 +6,7 @@ import { contentTypeFor } from "@airwave/api/services/bumper-music/store";
 import { resumePresetJobRuns } from "@airwave/api/services/generator/generate";
 import { syncConnector } from "@airwave/api/services/remote-access/connector";
 import { startJobs } from "@airwave/api/services/jobs/scheduler";
+import { refreshWebhookSubscriptions, startWebhookDispatcher } from "@airwave/api/services/webhooks";
 import { getInstanceId, getServerName } from "@airwave/api/services/settings/index";
 import { resolveChannelSource, resolveMediaSource } from "@airwave/api/services/playback/broker";
 import { streamPlexArt } from "./lib/plex-art";
@@ -373,6 +374,16 @@ try {
   await startJobs();
 } catch (err) {
   console.error("Job scheduler startup failed:", err);
+}
+
+// Webhook delivery: warm the in-memory subscription cache, then start the DEDICATED in-process dispatcher that
+// drains the delivery outbox (a long-lived worker poked by emitEvent + a slow safety tick — NOT a cron job).
+// Best-effort; a failure here must never stop the server booting.
+try {
+  await refreshWebhookSubscriptions();
+  startWebhookDispatcher();
+} catch (err) {
+  console.error("Webhook dispatcher startup failed:", err);
 }
 
 // Durable workflow engine for the AI lineup build (§7.3a). Independent of the job

@@ -10,6 +10,7 @@ import { guideRoutes } from "./routes/guide";
 import { packageRoutes } from "./routes/packages";
 import { sessionRoutes } from "./routes/sessions";
 import { statusRoutes } from "./routes/status";
+import { webhookRoutes } from "./routes/webhooks";
 
 /**
  * The public integration API — mounted at `/api/public/v1`. A SEPARATE, stable, API-key-authed surface for
@@ -58,6 +59,7 @@ publicApi.route("/", packageRoutes);
 publicApi.route("/", guideRoutes);
 publicApi.route("/", sessionRoutes);
 publicApi.route("/", artworkRoutes);
+publicApi.route("/", webhookRoutes);
 
 // OpenAPI 3.1 document config — exported so a build script can emit the same spec for the getairwave.tv
 // reference (the site can't import this app at build: no DB), and Scalar/the fumadocs playground all share it.

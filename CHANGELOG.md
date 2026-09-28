@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.71] - 2026-09-28
+
+Webhook delivery infrastructure (Standard Webhooks) — Phase 2 groundwork, on `feat/public-webhooks-sse`. Events don't fire from real activity yet (that wiring comes next); the pipeline, storage, and management surfaces are in place.
+
+### Added
+- **Webhook data model + migration** — `Webhook` (url, encrypted `whsec_` secret, subscribed event types, auto-disable state) and a `WebhookDelivery` outbox (one row per event × endpoint, indexed for the dispatcher's claim).
+- **Webhook service** (`services/webhooks`): `emitEvent(type, data)`, a fire-and-forget hook that's near-free when idle (an in-memory subscription cache short-circuits with zero DB/network when nothing's subscribed); a **dedicated in-process dispatcher** started at boot next to the job scheduler (not a cron job) that drains the outbox with Standard Webhooks HMAC-SHA256 signing, bounded batches + concurrency, per-request timeouts, exponential backoff, and auto-disable after repeated failures; and management (create/list/update/delete, rotate-secret, send-test, delivery log, redeliver).
+- **Two surfaces over the shared service:** public API `/api/public/v1/webhooks/*` (admin-key-gated, for integrations like n8n that self-register) and an admin tRPC `webhooks` router (for the upcoming Settings → Webhooks tab).
+- `/capabilities` now advertises `webhooks.supported: true` and the subscribable event-type catalog.
+
 ## [0.14.70] - 2026-09-28
 
 Enriches the public API with ready-to-use program artwork, and fixes a `tsc -b` false-flag on every public route.

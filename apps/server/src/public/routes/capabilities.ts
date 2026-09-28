@@ -1,5 +1,7 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 
+import { WEBHOOK_EVENT_TYPES } from "@airwave/api/services/webhooks";
+
 import pkg from "../../../package.json";
 import type { PublicVars } from "../context";
 
@@ -25,7 +27,7 @@ const CapabilitiesDTO = z
       apiVersion: "v1",
       serverVersion: "0.14.65",
       features: { workflowEngine: true },
-      webhooks: { supported: false, eventTypes: [] },
+      webhooks: { supported: true, eventTypes: ["playback.started", "playback.stopped", "channel.tuned", "ping"] },
       sse: { supported: false },
     },
   });
@@ -52,8 +54,8 @@ capabilitiesRoutes.openapi(
         apiVersion: "v1" as const,
         serverVersion: pkg.version,
         features: { workflowEngine: process.env.WORKFLOW_ENABLED === "1" },
-        // Webhooks + SSE land in later phases; report them honestly so consumers don't assume support.
-        webhooks: { supported: false, eventTypes: [] as string[] },
+        // Webhooks are live (Phase 2); SSE lands in Phase 3.
+        webhooks: { supported: true, eventTypes: [...WEBHOOK_EVENT_TYPES] },
         sse: { supported: false },
       },
       200,

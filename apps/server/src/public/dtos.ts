@@ -11,6 +11,10 @@ export const errorResponses = {
     description: "Missing or invalid API key.",
     content: { "application/json": { schema: ErrorDTO } },
   },
+  403: {
+    description: "The API key's user isn't allowed to perform this action.",
+    content: { "application/json": { schema: ErrorDTO } },
+  },
   404: {
     description: "Resource not found.",
     content: { "application/json": { schema: ErrorDTO } },
