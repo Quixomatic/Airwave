@@ -2,32 +2,19 @@ import type { PrismaClient } from "@airwave/db";
 
 import { type GuideMeta, pingTranscode, stopTranscode } from "../plex/client";
 import { decryptToken } from "../plex/token";
-import { emitEvent, hasWebhookSubscribers, type WebhookEventType } from "../webhooks";
+import { emitEvent, hasWebhookSubscribers } from "../webhooks";
 
-/** Playback/session events emitted from the heartbeat path; gated so an idle box does zero extra work. */
-const HEARTBEAT_EVENTS = [
-  "session.started",
-  "channel.tuned",
-  "playback.started",
-  "playback.paused",
-  "playback.resumed",
-] as const;
+/** A session is "active" while it's heartbeated within this window. */
+export const SESSION_ACTIVE_MS = 30_000;
 
-/** Compact payload shared by every session/playback webhook event. */
-type PlaybackEventData = {
-  userId: string;
-  user: string | null;
-  channel: { id: string; number: number | null; name: string | null } | null;
-  program: { ratingKey: string | null; title: string | null } | null;
-};
-
-async function buildEventData(
+/** Compact payload for the session.* webhook events. */
+async function sessionEventData(
   prisma: PrismaClient,
   userId: string,
   channelId: string | null,
   ratingKey: string | null | undefined,
   title: string | null | undefined,
-): Promise<PlaybackEventData> {
+) {
   const [user, channel] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } }),
     channelId ? prisma.channel.findUnique({ where: { id: channelId }, select: { number: true, name: true } }) : null,
@@ -39,34 +26,6 @@ async function buildEventData(
     program: ratingKey || title ? { ratingKey: ratingKey ?? null, title: title ?? null } : null,
   };
 }
-
-/** Emit the heartbeat transition events (called only when a subscriber wants them; enriches once). */
-async function emitHeartbeatEvents(
-  prisma: PrismaClient,
-  userId: string,
-  prior: { channelId: string | null; state: string } | null,
-  input: HeartbeatInput,
-): Promise<void> {
-  const events: WebhookEventType[] = [];
-  const isPlaying = input.state !== "off";
-  if (!prior) {
-    // Brand-new session: it opened, and if content is rolling, playback began.
-    events.push("session.started");
-    if (isPlaying) events.push("playback.started");
-  } else {
-    if (prior.channelId !== input.channelId) events.push("channel.tuned");
-    const wasPlaying = prior.state !== "off";
-    // Within an existing session, off↔playing is a resume/pause (a true stop is session end).
-    if (!wasPlaying && isPlaying) events.push("playback.resumed");
-    if (wasPlaying && !isPlaying) events.push("playback.paused");
-  }
-  if (events.length === 0) return;
-  const data = await buildEventData(prisma, userId, input.channelId, input.ratingKey, input.title);
-  for (const type of events) emitEvent(type, data);
-}
-
-/** A session is "active" while it's heartbeated within this window. */
-export const SESSION_ACTIVE_MS = 30_000;
 
 export type HeartbeatInput = {
   channelId: string;
@@ -89,13 +48,6 @@ export async function heartbeatSession(
   input: HeartbeatInput,
 ) {
   const now = new Date();
-  // Only read the prior row (to detect transitions) when a webhook actually wants one of these events —
-  // keeps the ~10s heartbeat free of extra work on an idle box.
-  const wantEvents = HEARTBEAT_EVENTS.some((t) => hasWebhookSubscribers(t));
-  const prior = wantEvents
-    ? await prisma.watchSession.findUnique({ where: { userId }, select: { channelId: true, state: true } })
-    : null;
-
   const data = {
     channelId: input.channelId,
     state: input.state,
@@ -106,15 +58,21 @@ export async function heartbeatSession(
     transcodeSession: input.transcodeSession ?? null,
     lastHeartbeatAt: now,
   };
-  await prisma.watchSession.upsert({
+  const row = await prisma.watchSession.upsert({
     where: { userId },
     create: { userId, startedAt: now, ...data },
     update: data,
   });
 
-  // Fire webhook events for state TRANSITIONS only (never per-heartbeat). Fire-and-forget so a slow/failed
-  // emit can't affect the heartbeat's latency or success.
-  if (wantEvents) void emitHeartbeatEvents(prisma, userId, prior, input).catch(() => {});
+  // session.started webhook: this upsert CREATED the session row (a fresh watch), not just updated a heartbeat.
+  // `startedAt` is only set on create, so it equals this call's `now` exactly iff the row is new — atomic, no
+  // race, no dupes. A channel change is a real stop+start in our model (the client ends + recreates), so it
+  // surfaces as session.ended + session.started, which is correct. Fire-and-forget; gated to zero cost when idle.
+  if (row.startedAt.getTime() === now.getTime() && hasWebhookSubscribers("session.started")) {
+    void sessionEventData(prisma, userId, input.channelId, input.ratingKey, input.title)
+      .then((d) => emitEvent("session.started", d))
+      .catch(() => {});
+  }
 
   // Keep the Plex transcode session alive. Plex reaps a transcode as "paused for too long" (~5½ min) unless it
   // gets a periodic liveness ping — active segment fetching does NOT count (GitHub #13). `transcodeSession` is
@@ -185,15 +143,10 @@ export async function endWatchSession(prisma: PrismaClient, userId: string) {
     );
   }
   await prisma.watchSession.delete({ where: { userId } });
-
-  // Webhook: the viewer stopped watching (the terminal event — a mid-session pause is playback.paused).
-  // Enrich + emit only if a subscriber wants it.
-  if (hasWebhookSubscribers("session.ended") || hasWebhookSubscribers("playback.stopped")) {
-    void buildEventData(prisma, userId, existing.channelId, existing.ratingKey, existing.title)
-      .then((data) => {
-        emitEvent("playback.stopped", data);
-        emitEvent("session.ended", data);
-      })
+  // session.ended webhook: the session row is gone. Fire-and-forget; gated to zero cost when idle.
+  if (hasWebhookSubscribers("session.ended")) {
+    void sessionEventData(prisma, userId, existing.channelId, existing.ratingKey, existing.title)
+      .then((d) => emitEvent("session.ended", d))
       .catch(() => {});
   }
   return { ok: true as const };

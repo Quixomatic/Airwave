@@ -28,6 +28,7 @@ export {
 export {
   WEBHOOK_EVENT_TYPES,
   WEBHOOK_EVENT_GROUPS,
+  RESERVED_WEBHOOK_EVENT_TYPES,
   type WebhookEventType,
   type EventEnvelope,
 } from "./webhooks/types";

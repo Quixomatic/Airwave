@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.14.75] - 2026-09-28
+
+Webhooks Phase 2: the admin UI, plus a finalized event model that emits straight from the watch-session store. Still on `feat/public-webhooks-sse`.
+
+### Added
+- **Settings → Webhooks tab.** Add and edit endpoints (URL, description, event-type checkboxes grouped by category), see the signing secret once on create, toggle enabled, rotate the secret, send a test event, and view a per-endpoint delivery log. Admin-only, over the shared webhook service; "New webhook" sits in the frame header like the other list pages.
+- **`scripts/webhook-listen.ts`** — a live listener for local testing: it registers a temporary webhook on the running server, prints each event as it arrives (signature verified), and cleans up on exit. Handy for watching events while you play content.
+
+### Changed
+- **Webhook events now come straight from the watch-session store.** `session.started` fires when a session row is created (detected atomically, so rapid heartbeats never double-fire) and `session.ended` fires immediately when the session ends. A channel change is a genuine stop + start in Airwave's model (the client ends and recreates the session), so it surfaces as `session.ended` then `session.started` — no smoothing, no delay.
+- **Event catalog** is now `session.started`, `session.ended`, and `ping` (emitted today); `playback.started` / `playback.stopped` / `playback.paused` / `playback.resumed` are reserved and shown as "coming soon" (they need the client to report real play/pause state). `channel.tuned` was removed, since a channel change already surfaces as a stop + start.
+
 ## [0.14.74] - 2026-09-28
 
 Restore and wire `playback.paused` / `playback.resumed` (0.14.73 over-trimmed them). Still on `feat/public-webhooks-sse`.

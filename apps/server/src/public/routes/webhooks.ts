@@ -186,7 +186,13 @@ webhookRoutes.openapi(
           "application/json": {
             schema: z.object({
               eventTypes: z.array(z.string()),
-              groups: z.array(z.object({ group: z.string(), types: z.array(z.string()) })),
+              groups: z.array(
+                z.object({
+                  group: z.string(),
+                  types: z.array(z.string()),
+                  reserved: z.boolean().optional().describe("Defined + subscribable but not emitted yet (coming soon)."),
+                }),
+              ),
             }),
           },
         },
