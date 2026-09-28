@@ -1,5 +1,5 @@
 {
   "title": "Integrations",
-  "icon": "Plug",
+  "icon": "Cable",
   "pages": ["rest", "home-assistant", "tidbyt", "webhooks", "tauri"]
 }
