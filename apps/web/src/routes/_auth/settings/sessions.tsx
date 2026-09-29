@@ -10,9 +10,10 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import type { inferRouterOutputs } from "@trpc/server";
-import { History, Monitor, Radio, Tv, User } from "lucide-react";
+import { Circle, History, Loader, Monitor, Pause, Play, Radio, Tv, User } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
+import { deviceBrand } from "@/lib/device-brand";
 import { channelImg } from "@/lib/img";
 import { trpc } from "@/utils/trpc";
 
@@ -124,6 +125,11 @@ function SessionTile({ s }: { s: ActiveSession }) {
                   .join(" · ") || (s.year ? String(s.year) : "")}
               </p>
             )}
+            {s.playbackState && (
+              <div className="mt-1.5">
+                <PlaybackBadge state={s.playbackState} />
+              </div>
+            )}
           </div>
         </div>
         {s.channel && (
@@ -140,7 +146,15 @@ function SessionTile({ s }: { s: ActiveSession }) {
         {/* Device + connection */}
         <div className="bg-muted/40 space-y-1.5 p-4">
           <DetailRow icon={<Monitor className="size-3.5" />} label="Device">
-            {s.device ? (s.device.model ?? s.device.platform ?? s.device.id) : "Unknown"}
+            {(() => {
+              const brand = deviceBrand(s.device);
+              return (
+                <span className="inline-flex items-center gap-1.5">
+                  <brand.Icon className="size-3.5 shrink-0" />
+                  <span className="truncate">{brand.label}</span>
+                </span>
+              );
+            })()}
           </DetailRow>
           <DetailRow icon={<Radio className="size-3.5" />} label="Connection">
             <ConnectionBadge connection={s.connection} />
@@ -214,6 +228,41 @@ function UnknownBadge() {
   return (
     <Badge variant="outline" className={MUTED_BADGE}>
       Unknown
+    </Badge>
+  );
+}
+
+/**
+ * The player's live state (Playing / Paused / Buffering / Idle), from the client's heartbeat. Legacy clients
+ * that don't report `playbackState` send null — the badge renders nothing then, so those sessions look exactly
+ * as they did before.
+ */
+function PlaybackBadge({ state }: { state: string | null }) {
+  if (!state) return null;
+  const map: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
+    playing: {
+      label: "Playing",
+      cls: "border-emerald-500/30 bg-emerald-500/15 text-emerald-600",
+      icon: <Play className="size-3" />,
+    },
+    paused: {
+      label: "Paused",
+      cls: "border-amber-500/30 bg-amber-500/15 text-amber-600",
+      icon: <Pause className="size-3" />,
+    },
+    buffering: {
+      label: "Buffering",
+      cls: "border-sky-500/30 bg-sky-500/15 text-sky-600",
+      icon: <Loader className="size-3" />,
+    },
+    idle: { label: "Idle", cls: MUTED_BADGE, icon: <Circle className="size-3" /> },
+  };
+  const m = map[state];
+  if (!m) return null;
+  return (
+    <Badge variant="outline" className={`shrink-0 gap-1 ${m.cls}`}>
+      {m.icon}
+      {m.label}
     </Badge>
   );
 }

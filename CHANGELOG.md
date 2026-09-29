@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.9] - 2026-09-29
+
+The admin Sessions page now shows real device info with brand logos, plus each viewer's live playback state.
+
+### Added
+- **Brand device info on Active sessions.** Each session tile shows the device's brand logo (LG, Samsung, Roku, Apple, Android, Windows, or a browser) and a friendly label (e.g. "LG OLED77C2AUA", "Roku Streaming Stick 4K", "Apple TV") instead of a bare model string or "Unknown". A Samsung Tizen TV is recognized as Samsung even before the client reports its `tizen` platform (sniffed from the user agent).
+- **Live playback state per session.** A Playing / Paused / Buffering / Idle badge on each tile, driven by the `playbackState` the client reports. Legacy clients that don't report it show no badge, exactly as before.
+
+### Changed
+- **Session device resolution is now hybrid.** `listActiveSessions` resolves a session's device from its own `deviceId` first (reliable for every modern client since per-device sessions), falling back to the play-log's device for legacy sessions, and returns richer facts (platform, model, OS version, HDR, isTV, user agent). Added `react-icons` to the admin app for the brand logos.
+
 ## [0.15.8] - 2026-09-29
 
 Documents the now-live playback events, per-device sessions, and the enriched event payload.
