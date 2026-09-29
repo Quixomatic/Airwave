@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Airwave Public API",
-    "version": "0.14.76",
+    "version": "0.15.2",
     "description": "Read your self-hosted Airwave server's live data (guide, channels, now-watching) and subscribe to webhooks. Authenticate with an API key from Settings → API Keys, sent as either `X-API-Key` or `Authorization: Bearer`."
   },
   "servers": [
@@ -175,6 +175,11 @@
             "eventTypes": [
               "session.started",
               "session.ended",
+              "channel.tuned",
+              "playback.started",
+              "playback.stopped",
+              "playback.paused",
+              "playback.resumed",
               "ping"
             ]
           },
@@ -806,6 +811,10 @@
             "type": "string",
             "description": "The viewer's display name (or email)."
           },
+          "deviceId": {
+            "type": "string",
+            "description": "The device this session is on (one session per user + device)."
+          },
           "channel": {
             "type": [
               "object",
@@ -833,7 +842,14 @@
           },
           "state": {
             "type": "string",
-            "description": "\"program\" | \"bumper\" | \"off\"."
+            "description": "The schedule slot: \"program\" | \"bumper\" | \"off\"."
+          },
+          "playbackState": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The player state, when the client reports it: \"playing\" | \"paused\" | \"buffering\" | \"idle\"."
           },
           "title": {
             "type": [
@@ -921,8 +937,10 @@
         "required": [
           "id",
           "user",
+          "deviceId",
           "channel",
           "state",
+          "playbackState",
           "title",
           "showTitle",
           "season",
@@ -936,12 +954,14 @@
         "example": {
           "id": "clx9sess01",
           "user": "James",
+          "deviceId": "living-room-tv",
           "channel": {
             "number": 101,
             "name": "90s Sitcoms",
             "callsign": "SITCOM"
           },
           "state": "program",
+          "playbackState": "playing",
           "title": "The One With the Blackout",
           "showTitle": "Friends",
           "season": 1,
@@ -2177,6 +2197,7 @@
                       "enum": [
                         "session.started",
                         "session.ended",
+                        "channel.tuned",
                         "playback.started",
                         "playback.stopped",
                         "playback.paused",
@@ -2441,6 +2462,7 @@
                       "enum": [
                         "session.started",
                         "session.ended",
+                        "channel.tuned",
                         "playback.started",
                         "playback.stopped",
                         "playback.paused",

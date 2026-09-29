@@ -10,13 +10,13 @@
  * contract, so it's better to add later than to advertise weak events we can't remove.
  */
 export const WEBHOOK_EVENT_TYPES = [
-  // Viewing sessions — emitted straight from the watch-session store. A session begins when a user starts
-  // watching a channel and ends when they stop; a channel change is a real stop + start (the client ends and
-  // recreates the session), so it surfaces as session.ended then session.started. These fire today.
+  // Viewing sessions — from the per-device watch-session store. A session begins when a device starts watching
+  // and ends when it stops; channel.tuned fires when a device changes channel within a session.
   "session.started",
   "session.ended",
-  // Playback state — RESERVED. Defined + subscribable, but not emitted yet: the heartbeat reports the schedule
-  // slot, not the player's actual play/pause state. They'll fire once the client reports real playback state.
+  "channel.tuned",
+  // Playback state — emitted when the client reports its player state (playbackState in the heartbeat). Clients
+  // that don't report it simply won't fire these (older clients / some platforms).
   "playback.started",
   "playback.stopped",
   "playback.paused",
@@ -27,22 +27,13 @@ export const WEBHOOK_EVENT_TYPES = [
 
 export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number];
 
-/** Subscribable but not emitted yet (see the note above). Marked "coming soon" in the UI + docs. */
-export const RESERVED_WEBHOOK_EVENT_TYPES: WebhookEventType[] = [
-  "playback.started",
-  "playback.stopped",
-  "playback.paused",
-  "playback.resumed",
-];
+/** Subscribable but not emitted yet. Empty now that playback.* fire from the client's reported playback state. */
+export const RESERVED_WEBHOOK_EVENT_TYPES: WebhookEventType[] = [];
 
 /** Grouping for the Settings → Webhooks event-type checkboxes and the docs catalog. `reserved` = coming soon. */
 export const WEBHOOK_EVENT_GROUPS: { group: string; types: WebhookEventType[]; reserved?: boolean }[] = [
-  { group: "Viewing sessions", types: ["session.started", "session.ended"] },
-  {
-    group: "Playback state",
-    types: ["playback.started", "playback.stopped", "playback.paused", "playback.resumed"],
-    reserved: true,
-  },
+  { group: "Viewing sessions", types: ["session.started", "session.ended", "channel.tuned"] },
+  { group: "Playback state", types: ["playback.started", "playback.stopped", "playback.paused", "playback.resumed"] },
   { group: "Test", types: ["ping"] },
 ];
 

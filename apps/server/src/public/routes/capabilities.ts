@@ -29,7 +29,16 @@ const CapabilitiesDTO = z
       features: { workflowEngine: true },
       webhooks: {
         supported: true,
-        eventTypes: ["session.started", "session.ended", "ping"],
+        eventTypes: [
+          "session.started",
+          "session.ended",
+          "channel.tuned",
+          "playback.started",
+          "playback.stopped",
+          "playback.paused",
+          "playback.resumed",
+          "ping",
+        ],
       },
       sse: { supported: true },
     },

@@ -2,30 +2,85 @@ import type { PrismaClient } from "@airwave/db";
 
 import { type GuideMeta, pingTranscode, stopTranscode } from "../plex/client";
 import { decryptToken } from "../plex/token";
-import { emitEvent, hasEventSubscribers } from "../webhooks";
+import { emitEvent, hasEventSubscribers, type WebhookEventType } from "../webhooks";
+
+/** Session/playback events the heartbeat can emit — gates the prior-state read so an idle box does no work. */
+const HEARTBEAT_EVENTS: WebhookEventType[] = [
+  "session.started",
+  "channel.tuned",
+  "playback.started",
+  "playback.paused",
+  "playback.resumed",
+];
 
 /** A session is "active" while it's heartbeated within this window. */
 export const SESSION_ACTIVE_MS = 30_000;
 
 /** Compact payload for the session.* webhook events. */
-async function sessionEventData(
-  prisma: PrismaClient,
-  userId: string,
-  deviceId: string,
-  channelId: string | null,
-  ratingKey: string | null | undefined,
-  title: string | null | undefined,
-) {
+type SessionEventCtx = {
+  userId: string;
+  deviceId: string;
+  channelId: string | null;
+  playbackState: string | null;
+  delaySeconds: number;
+  positionAt: Date | null;
+  ratingKey: string | null;
+  title: string | null;
+};
+
+/**
+ * Build the enriched event payload shared by every session/playback webhook + SSE event — the same detail the
+ * "Now Watching" view has: who + which device, the channel, the current program (with show/episode from the
+ * guide), the live playback state, how far behind live, and where they are in the program. Runs only on a
+ * transition (rare), so the extra lookups are cheap.
+ */
+async function sessionEventData(prisma: PrismaClient, ctx: SessionEventCtx) {
   const [user, channel] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } }),
-    channelId ? prisma.channel.findUnique({ where: { id: channelId }, select: { number: true, name: true } }) : null,
+    prisma.user.findUnique({ where: { id: ctx.userId }, select: { name: true, email: true } }),
+    ctx.channelId
+      ? prisma.channel.findUnique({ where: { id: ctx.channelId }, select: { number: true, name: true, callsign: true } })
+      : null,
   ]);
+
+  // Resolve the current PROGRAM slot for progress + rich guide metadata (mirrors listActiveSessions).
+  const position = ctx.positionAt ?? new Date(Date.now() - ctx.delaySeconds * 1000);
+  const slot = ctx.channelId
+    ? await prisma.scheduleItem.findFirst({
+        where: { channelId: ctx.channelId, kind: "PROGRAM", startsAt: { lte: position } },
+        orderBy: { startsAt: "desc" },
+        include: { mediaItem: { select: { guide: true } } },
+      })
+    : null;
+  const inSlot = slot != null && position.getTime() < slot.startsAt.getTime() + slot.durationSeconds * 1000;
+  const guide = inSlot ? ((slot!.mediaItem?.guide as GuideMeta | null) ?? null) : null;
+  const progress = inSlot
+    ? {
+        positionSeconds: Math.max(0, Math.floor((position.getTime() - slot!.startsAt.getTime()) / 1000)),
+        durationSeconds: slot!.durationSeconds,
+      }
+    : null;
+
   return {
-    userId,
-    deviceId,
+    userId: ctx.userId,
+    deviceId: ctx.deviceId,
     user: user?.name ?? user?.email ?? null,
-    channel: channelId ? { id: channelId, number: channel?.number ?? null, name: channel?.name ?? null } : null,
-    program: ratingKey || title ? { ratingKey: ratingKey ?? null, title: title ?? null } : null,
+    channel: ctx.channelId
+      ? { id: ctx.channelId, number: channel?.number ?? null, name: channel?.name ?? null, callsign: channel?.callsign ?? null }
+      : null,
+    program:
+      ctx.ratingKey || ctx.title || guide
+        ? {
+            ratingKey: ctx.ratingKey ?? null,
+            title: guide?.title ?? ctx.title ?? null,
+            showTitle: guide?.showTitle ?? null,
+            season: guide?.season ?? null,
+            episode: guide?.episode ?? null,
+            year: guide?.year ?? null,
+          }
+        : null,
+    playbackState: ctx.playbackState,
+    delaySeconds: ctx.delaySeconds,
+    progress,
   };
 }
 
@@ -69,20 +124,55 @@ export async function heartbeatSession(
     lastHeartbeatAt: now,
   };
   const deviceId = sessionDeviceId(input.deviceId);
+
+  // Read prior state BEFORE the upsert to detect transitions (channel change, play/pause). Gated on there being
+  // a relevant subscriber so an idle box does no extra query.
+  const wantEvents = HEARTBEAT_EVENTS.some((t) => hasEventSubscribers(t));
+  const prior = wantEvents
+    ? await prisma.watchSession.findUnique({
+        where: { userId_deviceId: { userId, deviceId } },
+        select: { channelId: true, playbackState: true },
+      })
+    : null;
+
   const row = await prisma.watchSession.upsert({
     where: { userId_deviceId: { userId, deviceId } },
     create: { userId, deviceId, startedAt: now, ...data },
     update: data,
   });
 
-  // session.started webhook: this upsert CREATED the session row (a fresh watch), not just updated a heartbeat.
-  // `startedAt` is only set on create, so it equals this call's `now` exactly iff the row is new — atomic, no
-  // race, no dupes. A channel change is a real stop+start in our model (the client ends + recreates), so it
-  // surfaces as session.ended + session.started, which is correct. Fire-and-forget; gated to zero cost when idle.
-  if (row.startedAt.getTime() === now.getTime() && hasEventSubscribers("session.started")) {
-    void sessionEventData(prisma, userId, deviceId, input.channelId, input.ratingKey, input.title)
-      .then((d) => emitEvent("session.started", d))
-      .catch(() => {});
+  if (wantEvents) {
+    // `startedAt` is only set on create, so it equals this call's `now` exactly iff the row is new — atomic, no
+    // race, no dupes.
+    const created = row.startedAt.getTime() === now.getTime();
+    const events: WebhookEventType[] = [];
+    if (created) {
+      events.push("session.started");
+      if (input.playbackState === "playing") events.push("playback.started");
+    } else if (prior) {
+      if (prior.channelId !== input.channelId) events.push("channel.tuned");
+      // Play/pause transitions — only when the client reports playbackState (older clients don't).
+      if (input.playbackState) {
+        if (prior.playbackState === "paused" && input.playbackState === "playing") events.push("playback.resumed");
+        else if (prior.playbackState === "playing" && input.playbackState === "paused") events.push("playback.paused");
+      }
+    }
+    if (events.length > 0) {
+      const ctx: SessionEventCtx = {
+        userId,
+        deviceId,
+        channelId: input.channelId,
+        playbackState: input.playbackState ?? null,
+        delaySeconds: input.delaySeconds ?? 0,
+        positionAt: data.positionAt,
+        ratingKey: input.ratingKey ?? null,
+        title: input.title ?? null,
+      };
+      // Fire-and-forget so a slow emit can't affect the heartbeat; each emitEvent self-gates per type.
+      void sessionEventData(prisma, ctx)
+        .then((d) => events.forEach((t) => emitEvent(t, d)))
+        .catch(() => {});
+    }
   }
 
   // Keep the Plex transcode session alive. Plex reaps a transcode as "paused for too long" (~5½ min) unless it
@@ -155,10 +245,22 @@ export async function endWatchSession(prisma: PrismaClient, userId: string, devi
     );
   }
   await prisma.watchSession.delete({ where: { userId_deviceId: { userId, deviceId: dev } } });
-  // session.ended webhook: the session row is gone. Fire-and-forget; gated to zero cost when idle.
-  if (hasEventSubscribers("session.ended")) {
-    void sessionEventData(prisma, userId, dev, existing.channelId, existing.ratingKey, existing.title)
-      .then((d) => emitEvent("session.ended", d))
+  // session.ended (+ playback.stopped when the client was reporting playback state). Fire-and-forget; gated.
+  if (hasEventSubscribers("session.ended") || hasEventSubscribers("playback.stopped")) {
+    const events: WebhookEventType[] = ["session.ended"];
+    if (existing.playbackState) events.push("playback.stopped");
+    const ctx: SessionEventCtx = {
+      userId,
+      deviceId: dev,
+      channelId: existing.channelId,
+      playbackState: existing.playbackState,
+      delaySeconds: existing.delaySeconds,
+      positionAt: existing.positionAt,
+      ratingKey: existing.ratingKey,
+      title: existing.title,
+    };
+    void sessionEventData(prisma, ctx)
+      .then((d) => events.forEach((t) => emitEvent(t, d)))
       .catch(() => {});
   }
   return { ok: true as const };
@@ -240,6 +342,7 @@ export async function listActiveSessions(prisma: PrismaClient) {
           ? { number: r.channel.number, name: r.channel.name, callsign: r.channel.callsign }
           : null,
         state: r.state,
+        playbackState: r.playbackState,
         // Prefer the current program's guide (structured), fall back to the session's title snapshot.
         title: guide?.title ?? r.title,
         showTitle: guide?.showTitle ?? null,

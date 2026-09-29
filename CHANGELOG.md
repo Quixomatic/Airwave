@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.2] - 2026-09-29
+
+Webhook + SSE events now report live playback state and rich detail, and the `playback.*` events are live.
+
+### Added
+- **`playback.started` / `playback.stopped` / `playback.paused` / `playback.resumed`** now fire (no longer reserved), driven by a `playbackState` the client reports in its heartbeat. **`channel.tuned`** returns too, firing when a device changes channel within a session.
+- **Enriched event payloads.** Every session/playback event (webhook and SSE) now carries the same detail as "Now Watching": the device id, the channel (number/name/callsign), the current program (title/show/season/episode/year), the live `playbackState`, how far behind live (`delaySeconds`), and `progress` (position/duration in the program).
+- The public API's session shape (`/sessions`, `/now-playing`) gains `deviceId` and `playbackState`.
+
+### Notes
+- `playback.*` only fire for clients that report `playbackState`; the client rollout starts with tv-web. `channel.tuned` fires for clients that keep a session across channel changes (the mpv clients do today).
+
 ## [0.15.1] - 2026-09-29
 
 Live watch sessions are now per-device, so the same account watching different things on two TVs shows as two sessions.

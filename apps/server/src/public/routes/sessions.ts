@@ -11,10 +11,15 @@ const SessionDTO = z
   .object({
     id: z.string(),
     user: z.string().describe("The viewer's display name (or email)."),
+    deviceId: z.string().describe("The device this session is on (one session per user + device)."),
     channel: z
       .object({ number: z.number().int(), name: z.string(), callsign: z.string().nullable() })
       .nullable(),
-    state: z.string().describe('"program" | "bumper" | "off".'),
+    state: z.string().describe('The schedule slot: "program" | "bumper" | "off".'),
+    playbackState: z
+      .string()
+      .nullable()
+      .describe('The player state, when the client reports it: "playing" | "paused" | "buffering" | "idle".'),
     title: z.string().nullable(),
     showTitle: z.string().nullable(),
     season: z.number().int().nullable(),
@@ -37,8 +42,10 @@ const SessionDTO = z
     example: {
       id: "clx9sess01",
       user: "James",
+      deviceId: "living-room-tv",
       channel: { number: 101, name: "90s Sitcoms", callsign: "SITCOM" },
       state: "program",
+      playbackState: "playing",
       title: "The One With the Blackout",
       showTitle: "Friends",
       season: 1,
@@ -56,10 +63,12 @@ function toSession(s: any): z.infer<typeof SessionDTO> {
   return {
     id: s.id,
     user: s.user,
+    deviceId: s.deviceId ?? "legacy",
     channel: s.channel
       ? { number: s.channel.number, name: s.channel.name, callsign: s.channel.callsign ?? null }
       : null,
     state: s.state,
+    playbackState: s.playbackState ?? null,
     title: s.title ?? null,
     showTitle: s.showTitle ?? null,
     season: s.season ?? null,
