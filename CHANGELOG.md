@@ -2,7 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
-## [0.15.9] - 2026-09-29
+## [0.15.10] - 2026-09-29
+
+Samsung TVs are recognized as their own platform, and the public API's session endpoints now carry device info.
+
+### Added
+- **Samsung Tizen is its own platform.** The tv-web client now reports `platform: "tizen"` (instead of a generic `browser`) on a Samsung TV, parses the Tizen OS version from the user agent, and fills in the real panel model via Samsung's `webapis.productinfo` (e.g. "QN55Q7F"). So a Samsung shows as a Samsung TV, with its model, in the admin Sessions view and everywhere device info surfaces.
+- **Device info on the public session endpoints.** `GET /api/public/v1/sessions` now includes a richer `device` (`id`, `platform`, `model`, `osVersion`, `hdr`) when the device is registered, and `GET /now-playing` gains a compact `device` (`model`, `platform`). Both are additive and resolve best-effort, so older clients and existing consumers are unaffected (the fields are simply `null` when unknown).
+
+
 
 The admin Sessions page now shows real device info with brand logos, plus each viewer's live playback state.
 

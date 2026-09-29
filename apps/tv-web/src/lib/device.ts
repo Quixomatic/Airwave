@@ -184,9 +184,30 @@ async function webosDeviceInfo(): Promise<Luna> {
 }
 
 /**
- * The full device report sent on sign-in: web-standards probe (codecs) + webOS
- * Luna facts (real model / 4K / firmware) merged in, so the DB record reflects
- * the actual panel, not the 1080p web canvas.
+ * Real model on a Samsung Tizen TV (null off-Tizen). Samsung injects a SYNCHRONOUS `webapis.productinfo`
+ * (unlike webOS's async Luna bridge); `getRealModel()` returns e.g. "QN55Q7F" and needs the productinfo
+ * privilege (declared in config.xml). Throws off-Tizen or without the privilege — swallowed to null.
+ */
+function tizenModelInfo(): { model: string | null; firmware: string | null } | null {
+  try {
+    const pi = (
+      window as unknown as {
+        webapis?: { productinfo?: { getRealModel?: () => string; getFirmware?: () => string } };
+      }
+    ).webapis?.productinfo;
+    if (!pi || typeof pi.getRealModel !== "function") return null;
+    const model = pi.getRealModel();
+    const firmware = typeof pi.getFirmware === "function" ? pi.getFirmware() : null;
+    return { model: model || null, firmware: firmware || null };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The full device report sent on sign-in: web-standards probe (codecs) + real panel facts merged in
+ * (webOS Luna model / 4K / firmware, or the Samsung Tizen product model), so the DB record reflects the
+ * actual panel, not the 1080p web canvas.
  */
 export async function gatherDeviceReport() {
   const base = collectDeviceInfo();
@@ -203,14 +224,24 @@ export async function gatherDeviceReport() {
     (base.raw as Record<string, unknown>).webosSystemInfo = sys;
     (base.raw as Record<string, unknown>).panelUhd = uhd;
   }
+  // Samsung Tizen: fill in the real model (the UA has no model, so without this a Samsung TV has model=null).
+  const tizen = tizenModelInfo();
+  if (tizen?.model) {
+    base.model = tizen.model;
+    (base.raw as Record<string, unknown>).tizenProductInfo = tizen;
+  }
   return base;
 }
 
 export function collectDeviceInfo() {
   const video = document.createElement("video");
   const ua = navigator.userAgent;
-  const platform = /web[o0]s/i.test(ua) ? "webos" : "browser";
-  const osVersion = ua.match(/[Ww]eb[O0]S[.\s]?(?:TV[-/]?)?([\d.]+)/)?.[1] ?? null;
+  // Samsung Tizen TVs are a browser-family client too, but they're not webOS (LG) — give them their own
+  // bucket so the admin/session views brand them as Samsung instead of a generic browser. Their UA reads
+  // "SMART-TV; LINUX; Tizen 9.0".
+  const platform = /web[o0]s/i.test(ua) ? "webos" : /tizen|smart-?tv/i.test(ua) ? "tizen" : "browser";
+  const osVersion =
+    ua.match(/[Ww]eb[O0]S[.\s]?(?:TV[-/]?)?([\d.]+)/)?.[1] ?? ua.match(/Tizen[\s/]?([\d.]+)/i)?.[1] ?? null;
   const hdr = mq("(dynamic-range: high)");
   const colorGamut = mq("(color-gamut: rec2020)") ? "rec2020" : mq("(color-gamut: p3)") ? "p3" : "srgb";
 

@@ -36,7 +36,16 @@ const SessionDTO = z
       .object({ positionSeconds: z.number(), durationSeconds: z.number() })
       .nullable(),
     startedAt: z.string(),
-    device: z.object({ model: z.string().nullable(), platform: z.string().nullable() }).nullable(),
+    device: z
+      .object({
+        id: z.string().nullable(),
+        platform: z.string().nullable().describe('"webos" | "tizen" | "roku" | "ios" | "android" | "windows" | "browser".'),
+        model: z.string().nullable(),
+        osVersion: z.string().nullable(),
+        hdr: z.boolean().nullable().describe("Whether the device's display reports HDR."),
+      })
+      .nullable()
+      .describe("The device this session is on, when it's registered. Fields resolve best-effort (null when unknown)."),
   })
   .openapi("Session", {
     example: {
@@ -54,7 +63,7 @@ const SessionDTO = z
       artworkUrl: "/api/public/v1/channels/clx9k2p0a0001abcd/artwork/45210?kind=poster",
       progress: { positionSeconds: 540, durationSeconds: 1320 },
       startedAt: "2026-09-27T18:10:00.000Z",
-      device: { model: "Apple TV 4K", platform: "tvOS" },
+      device: { id: "living-room-tv", platform: "roku", model: "Streaming Stick 4K", osVersion: "15.3.4", hdr: true },
     },
   });
 
@@ -79,7 +88,15 @@ function toSession(s: any): z.infer<typeof SessionDTO> {
       ? { positionSeconds: s.progress.positionSeconds, durationSeconds: s.progress.durationSeconds }
       : null,
     startedAt: (s.startedAt instanceof Date ? s.startedAt : new Date(s.startedAt)).toISOString(),
-    device: s.device ? { model: s.device.model ?? null, platform: s.device.platform ?? null } : null,
+    device: s.device
+      ? {
+          id: s.device.id ?? null,
+          platform: s.device.platform ?? null,
+          model: s.device.model ?? null,
+          osVersion: s.device.osVersion ?? null,
+          hdr: s.device.hdr ?? null,
+        }
+      : null,
   };
 }
 
@@ -161,6 +178,9 @@ sessionRoutes.openapi(
                   progress: z
                     .object({ positionSeconds: z.number(), durationSeconds: z.number() })
                     .nullable(),
+                  device: z
+                    .object({ model: z.string().nullable(), platform: z.string().nullable() })
+                    .nullable(),
                 }),
               ),
             }),
@@ -184,6 +204,7 @@ sessionRoutes.openapi(
           progress: s.progress
             ? { positionSeconds: s.progress.positionSeconds, durationSeconds: s.progress.durationSeconds }
             : null,
+          device: s.device ? { model: s.device.model ?? null, platform: s.device.platform ?? null } : null,
         })),
       },
       200,

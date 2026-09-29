@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Airwave Public API",
-    "version": "0.15.8",
+    "version": "0.15.10",
     "description": "Read your self-hosted Airwave server's live data (guide, channels, now-watching) and subscribe to webhooks. Authenticate with an API key from Settings → API Keys, sent as either `X-API-Key` or `Authorization: Bearer`."
   },
   "servers": [
@@ -915,7 +915,7 @@
               "null"
             ],
             "properties": {
-              "model": {
+              "id": {
                 "type": [
                   "string",
                   "null"
@@ -925,13 +925,37 @@
                 "type": [
                   "string",
                   "null"
+                ],
+                "description": "\"webos\" | \"tizen\" | \"roku\" | \"ios\" | \"android\" | \"windows\" | \"browser\"."
+              },
+              "model": {
+                "type": [
+                  "string",
+                  "null"
                 ]
+              },
+              "osVersion": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "hdr": {
+                "type": [
+                  "boolean",
+                  "null"
+                ],
+                "description": "Whether the device's display reports HDR."
               }
             },
             "required": [
+              "id",
+              "platform",
               "model",
-              "platform"
-            ]
+              "osVersion",
+              "hdr"
+            ],
+            "description": "The device this session is on, when it's registered. Fields resolve best-effort (null when unknown)."
           }
         },
         "required": [
@@ -974,8 +998,11 @@
           },
           "startedAt": "2026-09-27T18:10:00.000Z",
           "device": {
-            "model": "Apple TV 4K",
-            "platform": "tvOS"
+            "id": "living-room-tv",
+            "platform": "roku",
+            "model": "Streaming Stick 4K",
+            "osVersion": "15.3.4",
+            "hdr": true
           }
         }
       },
@@ -2013,6 +2040,30 @@
                               "positionSeconds",
                               "durationSeconds"
                             ]
+                          },
+                          "device": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "model": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "platform": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "model",
+                              "platform"
+                            ]
                           }
                         },
                         "required": [
@@ -2022,7 +2073,8 @@
                           "title",
                           "showTitle",
                           "artworkUrl",
-                          "progress"
+                          "progress",
+                          "device"
                         ]
                       }
                     }
