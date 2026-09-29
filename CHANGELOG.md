@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.8] - 2026-09-29
+
+Documents the now-live playback events, per-device sessions, and the enriched event payload.
+
+### Docs
+- **Webhooks + Live events (SSE) guides updated.** The `playback.started` / `playback.stopped` / `playback.paused` / `playback.resumed` events are documented as live (no longer "coming soon"), with `channel.tuned` and how a channel change surfaces per client. The payload section now shows the full enriched `data` (deviceId, channel with callsign, program with show/season/episode/year, playbackState, delaySeconds, progress) that session and playback events carry, and a new "Per-device sessions" section explains the per-(user, device) keying and the `"legacy"` fallback. The SSE guide points at the same payload reference. Regenerated the committed OpenAPI spec.
+
 ## [0.15.7] - 2026-09-29
 
 The Roku client now reports live playback state, completing the rollout across all four clients.

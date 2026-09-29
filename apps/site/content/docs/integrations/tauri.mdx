@@ -41,19 +41,23 @@ curl -N -H "X-API-Key: airwave_your_key" \
 ## The stream
 
 Each message is an SSE frame whose `event:` is the event type and whose `data:` is the JSON envelope
-(`{ id, type, timestamp, data }`, the same shape as a webhook). On connect you get a `hello` frame, and a
-`keepalive` frame arrives periodically so idle proxies don't drop the connection:
+(`{ id, type, timestamp, data }`, the same shape and the same [rich `data`](/docs/integrations/webhooks#the-payload)
+a webhook carries: `deviceId`, channel, program, `playbackState`, `delaySeconds`, and `progress`). On connect you
+get a `hello` frame, and a `keepalive` frame arrives periodically so idle proxies don't drop the connection:
 
 ```
 event: hello
 data: {"product":"airwave","filter":"all"}
 
 event: session.started
-data: {"id":"evt_2a9f…","type":"session.started","timestamp":"2026-09-28T18:04:11.000Z","data":{"user":"James","channel":{"number":101,"name":"90s Sitcoms"},"program":{"title":"Friends"}}}
+data: {"id":"evt_2a9f…","type":"session.started","timestamp":"2026-09-28T18:04:11.000Z","data":{"userId":"clx9user01","deviceId":"tauri-88ac21","user":"James","channel":{"id":"clx9ch01","number":101,"name":"90s Sitcoms","callsign":"SITCOM"},"program":{"ratingKey":"45210","title":"The One with the Blackout","showTitle":"Friends","season":1,"episode":7,"year":1994},"playbackState":"playing","delaySeconds":0,"progress":{"positionSeconds":0,"durationSeconds":1380}}}
 
 event: keepalive
 data: {"t":1790000666000}
 ```
+
+The same [event catalog](/docs/integrations/webhooks#events) applies: `playback.*` events stream for clients
+that report play/pause state, and `channel.tuned` streams for clients that keep a session across channel changes.
 
 A browser `EventSource` reconnects on its own if the connection drops. For a fetch-based client, reconnect on
 error with a short backoff.

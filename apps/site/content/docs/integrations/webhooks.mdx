@@ -24,34 +24,73 @@ key, which is how an integration like n8n registers its own endpoint.
 | Event | When |
 | --- | --- |
 | `session.started` | A viewer starts watching a channel |
-| `session.ended` | A viewer stops watching |
+| `session.ended` | A viewer stops watching (also fires when a session goes stale, e.g. the client crashed or dropped off the network) |
+| `channel.tuned` | A viewer changes channel without leaving the player |
+| `playback.started` | Playback begins, the first play of a session (or content resuming from an idle/loading state) |
+| `playback.paused` | The viewer pauses |
+| `playback.resumed` | The viewer resumes after a pause |
+| `playback.stopped` | Playback ends together with the session |
 | `ping` | A test event you trigger from the webhook's **Send test** button |
 
-A channel change is a real stop then start, so it arrives as a `session.ended` followed by a `session.started`.
+The `playback.*` events fire only for clients that report their real play/pause state (the Airwave TV apps do).
+An older or third-party client that only heartbeats a channel still produces `session.started` / `session.ended`,
+just without the `playback.*` detail, so nothing breaks if a client doesn't send it.
 
-The `playback.started` / `playback.stopped` / `playback.paused` / `playback.resumed` events are defined but not
-emitted yet (they need the player to report actual play/pause state); they're marked "coming soon" in the UI.
+How a channel change surfaces depends on the client. The apps that keep the player open across channels (the
+desktop, mobile, and Roku clients) emit a single `channel.tuned`. The browser/TV-web client tears the player
+down and rebuilds it per channel, so there it arrives as a `session.ended` followed by a `session.started`.
 
 ## The payload
 
-Every delivery is a POST with a JSON envelope:
+Every delivery is a POST with a JSON envelope. Session and playback events carry the same rich `data` the
+"Now Watching" view has, so you can react straight off the payload without a follow-up call:
 
 ```json
 {
   "id": "evt_2a9f…",
-  "type": "session.started",
+  "type": "playback.paused",
   "timestamp": "2026-09-28T18:04:11.000Z",
   "data": {
     "userId": "clx9user01",
+    "deviceId": "roku-3f9c1a2b7d40",
     "user": "James",
-    "channel": { "id": "clx9ch01", "number": 101, "name": "90s Sitcoms" },
-    "program": { "ratingKey": "45210", "title": "Friends" }
+    "channel": { "id": "clx9ch01", "number": 101, "name": "90s Sitcoms", "callsign": "SITCOM" },
+    "program": {
+      "ratingKey": "45210",
+      "title": "The One with the Blackout",
+      "showTitle": "Friends",
+      "season": 1,
+      "episode": 7,
+      "year": 1994
+    },
+    "playbackState": "paused",
+    "delaySeconds": 42,
+    "progress": { "positionSeconds": 610, "durationSeconds": 1380 }
   }
 }
 ```
 
 `id` is unique per event (also sent as the `webhook-id` header) so you can dedupe. `type` is the dotted event
-name. `data` carries the viewer, channel, and program.
+name. In `data`:
+
+- `deviceId` — the specific device this session is on (see [Per-device sessions](#per-device-sessions)).
+- `channel` — id, number, name, and callsign.
+- `program` — the current program, with `showTitle` / `season` / `episode` for episodic content (movies leave
+  those `null`). `null` if nothing is scheduled.
+- `playbackState` — `playing`, `paused`, `buffering`, or `idle`. `null` from a client that doesn't report it.
+- `delaySeconds` — how far behind the live edge the viewer is (0 at the live edge, higher when paused or
+  rewound).
+- `progress` — `positionSeconds` into a program of `durationSeconds`. `null` when there's no resolvable program.
+
+Fields resolve on a best-effort basis: anything Airwave can't determine comes through as `null` rather than
+being omitted, so your parser can rely on the shape.
+
+## Per-device sessions
+
+Sessions are keyed per **(user, device)**, so the same account watching two different things on two TVs is two
+sessions, each with its own `deviceId` and its own events. The `deviceId` is the stable id the client already
+uses (the same one the capability system keys on). A client that doesn't send a `deviceId` collapses to a single
+`"legacy"` session for that user, unchanged from older behavior.
 
 ## Verify the signature
 
