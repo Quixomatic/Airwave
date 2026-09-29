@@ -641,13 +641,15 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   }, [now, goTo, currentEffective, buildScrubber, recordLog]);
 
   // The heartbeat body lives in a ref so the interval can mount once and togglePause can fire an immediate beat.
-  // playbackState from mpv: buffering, else paused (pausedRef), else playing. (delaySeconds/positionAt keep the
-  // admin Now-Watching accurate; without them every native session read as "Live" at 0:00.)
+  // playbackState from mpv. paused is checked BEFORE buffering: the engine can report buffering while paused, so
+  // buffering-first would send "buffering" on a steady-state beat while paused and the server would read that as
+  // active → a phantom playback.resumed. Paused-first keeps a paused player paused. (delaySeconds/positionAt keep
+  // the admin Now-Watching accurate; without them every native session read as "Live" at 0:00.)
   beatRef.current = () => {
     const cur = currentRef.current;
     if (!channelId || !cur) return;
     const eff = currentEffective();
-    const playbackState = bufferingRef.current ? "buffering" : pausedRef.current ? "paused" : "playing";
+    const playbackState = pausedRef.current ? "paused" : bufferingRef.current ? "buffering" : "playing";
     void api
       .heartbeat({
         channelId,

@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.6] - 2026-09-29
+
+Fixes a phantom `playback.resumed` on the mpv clients when a paused channel was left paused.
+
+### Fixed
+- **tv-tauri / tv-native no longer report a false resume while paused.** Both derived `playbackState` as buffering-first, but mpv reports `core-idle` (the buffering signal) as true while paused, so a steady-state heartbeat sent `buffering` a few seconds after pausing. The server counts buffering as active, so it emitted `playback.resumed` even though nothing resumed. `playbackState` now checks paused before buffering, so a paused player stays `paused`.
+
 ## [0.15.5] - 2026-09-29
 
 The tv-native (iOS / Android / Apple TV) client now reports live playback state.
