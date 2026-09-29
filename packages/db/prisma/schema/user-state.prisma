@@ -42,17 +42,24 @@ model ChannelWatchState {
 /// A live "who's watching what" session (our in-house version of Plex's Now Playing —
 /// we deliberately don't report sessions/watch-state to Plex). Kept fresh by client
 /// heartbeats; a session is "active" while its `lastHeartbeatAt` is recent. One per
-/// user (a user watches one channel at a time); switching channels updates it.
+/// (user, device) — the same account can watch different things on two TVs, so each
+/// device gets its own session; switching channels updates the device's session.
 model WatchSession {
   id     String @id @default(cuid())
-  userId String @unique
+  userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The client's stable device id (same id the capability system uses). "legacy" for clients that don't yet
+  /// send one — collapses to one session per user, matching the pre-per-device behavior.
+  deviceId String @default("legacy")
 
   channelId String?
   channel   Channel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
 
-  // "program" | "bumper" | "off"
+  // "program" | "bumper" | "off" — the SCHEDULE slot (not play/pause; see playbackState).
   state          String  @default("off")
+  // The player's actual state: "playing" | "paused" | "buffering" | "idle". Null when the client doesn't
+  // report it (older clients) — drives the playback.* webhook/SSE events only when present.
+  playbackState  String?
   ratingKey      String? // the media currently playing (null for bumpers)
   title          String? // denormalized snapshot for the admin view
   delaySeconds   Int     @default(0) // how far behind live
@@ -65,6 +72,7 @@ model WatchSession {
   startedAt       DateTime @default(now())
   lastHeartbeatAt DateTime @default(now())
 
+  @@unique([userId, deviceId])
   @@index([channelId])
   @@index([lastHeartbeatAt])
   @@map("watch_session")

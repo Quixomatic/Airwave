@@ -11,6 +11,7 @@ export const SESSION_ACTIVE_MS = 30_000;
 async function sessionEventData(
   prisma: PrismaClient,
   userId: string,
+  deviceId: string,
   channelId: string | null,
   ratingKey: string | null | undefined,
   title: string | null | undefined,
@@ -21,6 +22,7 @@ async function sessionEventData(
   ]);
   return {
     userId,
+    deviceId,
     user: user?.name ?? user?.email ?? null,
     channel: channelId ? { id: channelId, number: channel?.number ?? null, name: channel?.name ?? null } : null,
     program: ratingKey || title ? { ratingKey: ratingKey ?? null, title: title ?? null } : null,
@@ -30,12 +32,19 @@ async function sessionEventData(
 export type HeartbeatInput = {
   channelId: string;
   state: "program" | "bumper" | "off";
+  /** Stable client device id — one session per (user, device). Falls back to "legacy" when absent. */
+  deviceId?: string | null;
+  /** The player's actual state (play/pause/buffer). Absent from older clients; drives playback.* events. */
+  playbackState?: "playing" | "paused" | "buffering" | "idle" | null;
   ratingKey?: string | null;
   title?: string | null;
   delaySeconds?: number;
   positionAt?: string | null;
   transcodeSession?: string | null;
 };
+
+/** Resolve the per-device session key; clients that don't send a device id collapse to one "legacy" session. */
+const sessionDeviceId = (deviceId?: string | null) => deviceId?.trim() || "legacy";
 
 /**
  * In-house watch-session tracking (we deliberately don't report to Plex — see
@@ -51,6 +60,7 @@ export async function heartbeatSession(
   const data = {
     channelId: input.channelId,
     state: input.state,
+    playbackState: input.playbackState ?? null,
     ratingKey: input.ratingKey ?? null,
     title: input.title ?? null,
     delaySeconds: input.delaySeconds ?? 0,
@@ -58,9 +68,10 @@ export async function heartbeatSession(
     transcodeSession: input.transcodeSession ?? null,
     lastHeartbeatAt: now,
   };
+  const deviceId = sessionDeviceId(input.deviceId);
   const row = await prisma.watchSession.upsert({
-    where: { userId },
-    create: { userId, startedAt: now, ...data },
+    where: { userId_deviceId: { userId, deviceId } },
+    create: { userId, deviceId, startedAt: now, ...data },
     update: data,
   });
 
@@ -69,7 +80,7 @@ export async function heartbeatSession(
   // race, no dupes. A channel change is a real stop+start in our model (the client ends + recreates), so it
   // surfaces as session.ended + session.started, which is correct. Fire-and-forget; gated to zero cost when idle.
   if (row.startedAt.getTime() === now.getTime() && hasEventSubscribers("session.started")) {
-    void sessionEventData(prisma, userId, input.channelId, input.ratingKey, input.title)
+    void sessionEventData(prisma, userId, deviceId, input.channelId, input.ratingKey, input.title)
       .then((d) => emitEvent("session.started", d))
       .catch(() => {});
   }
@@ -126,10 +137,11 @@ async function keepTranscodeAlive(prisma: PrismaClient, channelId: string, sessi
   }
 }
 
-/** End the user's session (+ best-effort stop its Plex transcode). */
-export async function endWatchSession(prisma: PrismaClient, userId: string) {
+/** End a device's session (+ best-effort stop its Plex transcode). Keyed per (user, device). */
+export async function endWatchSession(prisma: PrismaClient, userId: string, deviceId?: string | null) {
+  const dev = sessionDeviceId(deviceId);
   const existing = await prisma.watchSession.findUnique({
-    where: { userId },
+    where: { userId_deviceId: { userId, deviceId: dev } },
     include: { channel: { include: { mediaSource: true } } },
   });
   if (!existing) return { ok: true as const };
@@ -142,10 +154,10 @@ export async function endWatchSession(prisma: PrismaClient, userId: string) {
       existing.transcodeSession,
     );
   }
-  await prisma.watchSession.delete({ where: { userId } });
+  await prisma.watchSession.delete({ where: { userId_deviceId: { userId, deviceId: dev } } });
   // session.ended webhook: the session row is gone. Fire-and-forget; gated to zero cost when idle.
   if (hasEventSubscribers("session.ended")) {
-    void sessionEventData(prisma, userId, existing.channelId, existing.ratingKey, existing.title)
+    void sessionEventData(prisma, userId, dev, existing.channelId, existing.ratingKey, existing.title)
       .then((d) => emitEvent("session.ended", d))
       .catch(() => {});
   }
@@ -222,6 +234,7 @@ export async function listActiveSessions(prisma: PrismaClient) {
       return {
         id: r.id,
         user: r.user.name || r.user.email,
+        deviceId: r.deviceId,
         channelId: r.channelId,
         channel: r.channel
           ? { number: r.channel.number, name: r.channel.name, callsign: r.channel.callsign }

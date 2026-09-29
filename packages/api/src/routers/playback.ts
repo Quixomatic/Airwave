@@ -88,6 +88,8 @@ export const playbackRouter = router({
       z.object({
         channelId: z.string(),
         state: z.enum(["program", "bumper", "off"]),
+        deviceId: z.string().nullish(),
+        playbackState: z.enum(["playing", "paused", "buffering", "idle"]).nullish(),
         ratingKey: z.string().nullish(),
         title: z.string().nullish(),
         delaySeconds: z.number().int().min(0).default(0),
@@ -97,10 +99,10 @@ export const playbackRouter = router({
     )
     .mutation(({ ctx, input }) => heartbeatSession(ctx.prisma, ctx.session.user.id, input)),
 
-  /** End the current user's session (+ best-effort stop its transcode). */
-  endSession: adminProcedure.mutation(({ ctx }) =>
-    endWatchSession(ctx.prisma, ctx.session.user.id),
-  ),
+  /** End the current user's session for a device (+ best-effort stop its transcode). */
+  endSession: adminProcedure
+    .input(z.object({ deviceId: z.string().nullish() }).optional())
+    .mutation(({ ctx, input }) => endWatchSession(ctx.prisma, ctx.session.user.id, input?.deviceId)),
 
   /** Active watch sessions — the admin "Now Watching" view. */
   sessions: adminProcedure.query(({ ctx }) => listActiveSessions(ctx.prisma)),

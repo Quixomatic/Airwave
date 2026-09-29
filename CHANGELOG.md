@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.1] - 2026-09-29
+
+Live watch sessions are now per-device, so the same account watching different things on two TVs shows as two sessions.
+
+### Changed
+- **`WatchSession` is keyed per (user, device)** instead of per user. The heartbeat accepts an optional `deviceId` (the stable id the capability system already uses) and upserts/ends the session for that device; clients that don't send one collapse to a single `"legacy"` session per user (unchanged behavior). This also fixes a latent bug where two devices on one account clobbered each other's transcode-reap tracking. The webhook `session.started` / `session.ended` events and the "Now Watching" view are now per-device and carry the `deviceId`.
+- The heartbeat also accepts an optional `playbackState` (`playing` / `paused` / `buffering` / `idle`), stored on the session; the `playback.*` events it will drive land next.
+
+### Migration
+- `watch_session_per_device` adds `deviceId` (default `"legacy"`) and `playbackState`, and a `@@unique([userId, deviceId])`. Applied automatically on the server's pre-deploy `prisma migrate deploy`.
+
 ## [0.15.0] - 2026-09-28
 
 Opens the 0.15 line on the **public integration API**: a stable, documented, key-authenticated way to read your self-hosted Airwave's live data and receive events, for Home Assistant, Tidbyt, Tauri, n8n, and anything that speaks HTTP. This graduates the work shipped incrementally across 0.14.63–0.14.76 (the read API, the getairwave.tv reference + mock playground, program artwork, webhooks, and the SSE event stream) into a minor release. No functional changes since 0.14.76.

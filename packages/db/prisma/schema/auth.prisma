@@ -25,7 +25,7 @@ model User {
   channelsCreated Channel[]           @relation("ChannelCreatedBy")
   favorites       Favorite[]
   watchStates     ChannelWatchState[]
-  watchSession    WatchSession?
+  watchSessions   WatchSession[]
   tvDevices       TvDevice[]
   playbackLogs    PlaybackLog[]
   aiConversations AiConversation[]

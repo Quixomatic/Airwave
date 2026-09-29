@@ -317,6 +317,8 @@ api.post("/sessions/heartbeat", async (c) => {
   const body = (await c.req.json().catch(() => null)) as {
     channelId?: string;
     state?: "program" | "bumper" | "off";
+    deviceId?: string | null;
+    playbackState?: "playing" | "paused" | "buffering" | "idle" | null;
     ratingKey?: string | null;
     title?: string | null;
     delaySeconds?: number;
@@ -333,6 +335,8 @@ api.post("/sessions/heartbeat", async (c) => {
     await heartbeatSession(prisma, c.get("session").user.id, {
       channelId: body.channelId,
       state: body.state,
+      deviceId: body.deviceId,
+      playbackState: body.playbackState,
       ratingKey: body.ratingKey,
       title: body.title,
       delaySeconds: body.delaySeconds,
@@ -342,10 +346,11 @@ api.post("/sessions/heartbeat", async (c) => {
   );
 });
 
-/** End the current user's session (+ best-effort stop its transcode). */
-api.post("/sessions/end", async (c) =>
-  c.json(await endWatchSession(prisma, c.get("session").user.id)),
-);
+/** End the current user's session for a device (+ best-effort stop its transcode). */
+api.post("/sessions/end", async (c) => {
+  const body = (await c.req.json().catch(() => null)) as { deviceId?: string | null } | null;
+  return c.json(await endWatchSession(prisma, c.get("session").user.id, body?.deviceId));
+});
 
 /** Active watch sessions — the "Now Watching" view (admin only). */
 api.get("/sessions", async (c) => {
