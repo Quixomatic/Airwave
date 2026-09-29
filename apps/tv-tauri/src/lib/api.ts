@@ -339,6 +339,8 @@ export const api = {
   heartbeat: (body: {
     channelId: string;
     state: "program" | "bumper" | "off";
+    deviceId?: string;
+    playbackState?: "playing" | "paused" | "buffering" | "idle";
     ratingKey?: string | null;
     title?: string | null;
     delaySeconds?: number;
@@ -346,7 +348,8 @@ export const api = {
     transcodeSession?: string | null;
   }) => request<unknown>("/api/v1/sessions/heartbeat", { method: "POST", body: JSON.stringify(body) }),
 
-  endSession: () => request<unknown>("/api/v1/sessions/end", { method: "POST", body: "{}" }),
+  endSession: (deviceId?: string) =>
+    request<unknown>("/api/v1/sessions/end", { method: "POST", body: JSON.stringify({ deviceId }) }),
 
   logPlayback: (data: Record<string, unknown>) =>
     request<{ ok: true; id: string }>("/api/v1/playback/log", {

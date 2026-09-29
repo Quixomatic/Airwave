@@ -106,6 +106,8 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   const lastPosSampleRef = useRef(0);
   const baselineArmedRef = useRef(false);
   const bufferingRef = useRef(false);
+  // Latest heartbeat closure — the once-mounted interval + togglePause both call it (see below).
+  const beatRef = useRef<() => void>(() => {});
   const loggedRef = useRef(false);
   const lastProgressAtRef = useRef(0);
   const resumeWatchRef = useRef(false);
@@ -444,27 +446,39 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
     return () => clearInterval(id);
   }, [now, goTo, currentEffective, buildScrubber]);
 
-  // Heartbeat the watch session (~10s) for Now Watching + orphan-transcode reap; end it on unmount.
+  // The heartbeat body lives in a ref so the interval can mount once and togglePause can fire an immediate beat.
+  // playbackState comes from mpv: idle when nothing's loaded, buffering from core-idle, paused from pausedRef,
+  // else playing.
+  beatRef.current = () => {
+    const cur = currentRef.current;
+    if (!channelId || !cur) return;
+    const eff = currentEffective();
+    const playbackState = bufferingRef.current ? "buffering" : pausedRef.current ? "paused" : "playing";
+    void api
+      .heartbeat({
+        channelId,
+        deviceId: deviceId(),
+        state: cur.kind === "BUMPER" ? "bumper" : "program",
+        playbackState,
+        ratingKey: cur.ratingKey,
+        title: titleOf(cur.guide),
+        delaySeconds: Math.max(0, Math.round(now() - eff)),
+        positionAt: new Date(eff * 1000).toISOString(),
+        transcodeSession: cur.session ?? null,
+      })
+      .catch(() => {});
+  };
+
+  // Heartbeat the watch session (~10s) for Now Watching + orphan-transcode reap; end it only on real teardown.
   useEffect(() => {
-    const id = setInterval(() => {
-      const cur = currentRef.current;
-      if (!channelId || !cur) return;
-      const eff = currentEffective();
-      void api
-        .heartbeat({
-          channelId,
-          state: cur.kind === "BUMPER" ? "bumper" : "program",
-          ratingKey: cur.ratingKey,
-          title: titleOf(cur.guide),
-          delaySeconds: Math.max(0, Math.round(now() - eff)),
-          positionAt: new Date(eff * 1000).toISOString(),
-          transcodeSession: cur.session ?? null,
-        })
-        .catch(() => {});
-    }, 10_000);
-    return () => clearInterval(id);
-  }, [channelId, now, currentEffective]);
-  useEffect(() => () => void api.endSession().catch(() => {}), []);
+    const id = setInterval(() => beatRef.current(), 10_000);
+    beatRef.current();
+    return () => {
+      clearInterval(id);
+      void api.endSession(deviceId()).catch(() => {});
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Channel change (incl. → null on Close): release the current media + reset the clock.
   const prevChannelRef = useRef(channelId);
@@ -479,6 +493,10 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
     resumeWatchRef.current = false;
     if (!channelId) {
       void mpv.stop();
+      // The mpv player is persistent (never unmounts), so closing = channelId→null is the real "stopped
+      // watching" signal — end the session now instead of waiting for the reaper. (A channel→channel change
+      // keeps the session, so this only fires on Close.)
+      void api.endSession(deviceId()).catch(() => {});
     }
     setStatus((s) => ({ ...s, loading: !!channelId, state: "idle", error: null, guide: null, scrubber: null, delivery: null, paused: false }));
   }, [channelId]);
@@ -520,6 +538,8 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
           pausedRef.current = !pausedRef.current;
         }
         setStatus((s) => ({ ...s, paused: pausedRef.current, error: pausedRef.current ? s.error : null }));
+        // Immediate heartbeat so playback.paused/resumed lands in ~ms (mpv toggles pause imperatively, no event).
+        beatRef.current();
       },
       jumpToLive: () => void goTo(now()),
       seekBy: (seconds: number) => void goTo(currentEffective() + seconds),

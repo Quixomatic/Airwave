@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.4] - 2026-09-29
+
+The tv-tauri desktop client now reports live playback state.
+
+### Added
+- **tv-tauri reports playback state.** The Tauri desktop client sends its `deviceId` + `playbackState` (playing/paused/buffering/idle, derived from mpv's pause state + `core-idle`) in the heartbeat and fires an immediate heartbeat on play/pause, so `playback.*` events land in about a second. Because it keeps one session across channel changes, tuning emits `channel.tuned` rather than a stop + start.
+- Closing the player (its persistent mpv view never unmounts) now ends the watch session immediately (`session.ended` + `playback.stopped`) instead of waiting for the reaper.
+
 ## [0.15.3] - 2026-09-29
 
 The tv-web client (LG/Samsung/browser) now reports live playback state, and reaped sessions emit a proper end.
