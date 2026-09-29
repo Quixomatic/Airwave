@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.7] - 2026-09-29
+
+The Roku client now reports live playback state, completing the rollout across all four clients.
+
+### Added
+- **tv-roku reports playback state.** The heartbeat now sends the Roku's `deviceId` and `playbackState` (paused-first from the app's pause flag, then `buffering` from the Video node, else `playing`), and a pause or resume fires an immediate beat so `playback.*` lands in about a second instead of on the next 10s tick. The session persists across channel changes (`channel.tuned`) and ends on exit (`endSession` now sends the `deviceId`). With this, tv-web, tv-tauri, tv-native, and tv-roku all report enriched heartbeats.
+
 ## [0.15.6] - 2026-09-29
 
 Fixes a phantom `playback.resumed` on the mpv clients when a paused channel was left paused.

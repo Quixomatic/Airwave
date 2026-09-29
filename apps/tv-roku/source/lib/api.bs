@@ -283,8 +283,8 @@ namespace Api
         return Api.post("/api/v1/sessions/heartbeat", Api.jsonBody(pairs))
     end function
 
-    function endSession() as object
-        return Api.post("/api/v1/sessions/end", "{}")
+    function endSession(deviceId as string) as object
+        return Api.post("/api/v1/sessions/end", Api.jsonBody([["deviceId", deviceId]]))
     end function
 
     function logPlayback(pairs as object) as object

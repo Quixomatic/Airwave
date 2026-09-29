@@ -655,9 +655,20 @@ sub onHeartbeat()
     if cur.kind = "BUMPER" then st = "bumper"
     delay# = t# - eff#
     if delay# < 0 then delay# = 0
+    ' playbackState: paused-first (m.paused is the app's single pause flag — it covers a bumper pause, where
+    ' the Video node isn't the thing playing). Only when NOT paused does a "buffering" video state count; that
+    ' ordering also avoids buffering masking a pause (the phantom-resume the mpv clients hit).
+    pbState = "playing"
+    if m.paused
+        pbState = "paused"
+    else if m.video.state = "buffering"
+        pbState = "buffering"
+    end if
     Api.heartbeat([
         ["channelId", m.top.channelId],
+        ["deviceId", Device.id()],
         ["state", st],
+        ["playbackState", pbState],
         ["ratingKey", cur.ratingKey],
         ["title", titleOf(cur.guide)],
         ["delaySeconds", Int(delay#)],
@@ -809,6 +820,7 @@ sub togglePause()
     else
         m.paused = not m.paused
     end if
+    onHeartbeat()   ' immediate beat so playback.paused/resumed lands in ~1s, not on the next 10s tick
 end sub
 
 sub seekBy(seconds as double)
@@ -835,7 +847,7 @@ sub teardown()
         saveResume(currentEffective(), clockSec())
         stopSession(m.current.session)
     end if
-    Api.endSession()
+    Api.endSession(Device.id())
     stopMedia()
 end sub
 
