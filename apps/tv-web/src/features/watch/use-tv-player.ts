@@ -228,6 +228,10 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
   const hlsRef = useRef<Hls | null>(null);
   const genRef = useRef(0);
   const pausedRef = useRef(false);
+  // Mirrors status.buffering so the heartbeat (an interval) can read it without re-subscribing.
+  const bufferingRef = useRef(false);
+  // The latest heartbeat closure — assigned each render so the once-mounted interval always runs current logic.
+  const beatRef = useRef<() => void>(() => {});
   const bumperEffRef = useRef(0);
   const lastTickRef = useRef(Date.now());
   const currentRef = useRef<Current | null>(null);
@@ -684,30 +688,46 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramsKey]);
 
-  // Heartbeat the session; end it on teardown.
+  // Keep bufferingRef in sync with status so the heartbeat can read the buffering state cheaply.
   useEffect(() => {
-    const beat = () => {
-      const cur = currentRef.current;
-      const eff = currentEffective();
-      void api
-        .heartbeat({
-          channelId,
-          state: cur ? (cur.kind === "BUMPER" ? "bumper" : "program") : "off",
-          ratingKey: cur?.ratingKey ?? null,
-          title: cur ? titleOf(cur.guide) : null,
-          delaySeconds: Math.max(0, Math.round(now() - eff)),
-          positionAt: new Date(eff * 1000).toISOString(),
-          transcodeSession: cur?.session ?? null,
-        })
-        .catch(() => {});
-    };
-    const id = window.setInterval(beat, HEARTBEAT_MS);
-    beat();
+    bufferingRef.current = status.buffering;
+  }, [status.buffering]);
+
+  // The heartbeat body lives in a ref so the interval can mount ONCE and survive channel changes — tuning
+  // updates the ref rather than tearing the effect (and the session) down. This matches the mpv clients
+  // (tv-tauri/tv-native): one session per device that spans channel changes, so the server emits channel.tuned
+  // on a switch instead of session.ended + session.started.
+  beatRef.current = () => {
+    const cur = currentRef.current;
+    const eff = currentEffective();
+    // The player's actual state (distinct from the schedule `state`): idle when nothing's loaded, buffering
+    // while rebuffering, paused when the user paused, else playing.
+    const playbackState = !cur ? "idle" : bufferingRef.current ? "buffering" : pausedRef.current ? "paused" : "playing";
+    void api
+      .heartbeat({
+        channelId,
+        deviceId: deviceId(),
+        state: cur ? (cur.kind === "BUMPER" ? "bumper" : "program") : "off",
+        playbackState,
+        ratingKey: cur?.ratingKey ?? null,
+        title: cur ? titleOf(cur.guide) : null,
+        delaySeconds: Math.max(0, Math.round(now() - eff)),
+        positionAt: new Date(eff * 1000).toISOString(),
+        transcodeSession: cur?.session ?? null,
+      })
+      .catch(() => {});
+  };
+
+  // Heartbeat the session (~10s); end it only on real teardown (leaving the player), NOT on channel change.
+  useEffect(() => {
+    const id = window.setInterval(() => beatRef.current(), HEARTBEAT_MS);
+    beatRef.current();
     return () => {
       window.clearInterval(id);
-      void api.endSession().catch(() => {});
+      void api.endSession(deviceId()).catch(() => {});
     };
-  }, [channelId, now, currentEffective]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Roll over on a program's natural end; native-first safety-catch on a decode error.
   useEffect(() => {
@@ -731,22 +751,36 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
       }
       if (!cur.retried) void goTo(currentEffective(), true); // all candidates failed → force hls.js
     };
-    // Buffering feedback: waiting/stalled → spinner on; playing/canplay → off.
+    // Buffering feedback + play/pause state, driven off the NATIVE video events so ANY pause source (remote,
+    // native controls, togglePause, programmatic) is caught. Each real transition fires an immediate heartbeat
+    // so playback.paused/resumed/started land in ~ms.
     const onWaiting = () => setStatus((s) => (s.buffering ? s : { ...s, buffering: true }));
-    const onResume = () => setStatus((s) => (s.buffering ? { ...s, buffering: false } : s));
+    const onCanplay = () => setStatus((s) => (s.buffering ? { ...s, buffering: false } : s));
+    const onPlaying = () => {
+      pausedRef.current = false;
+      setStatus((s) => (s.buffering || s.paused ? { ...s, buffering: false, paused: false } : s));
+      beatRef.current();
+    };
+    const onPause = () => {
+      pausedRef.current = true;
+      setStatus((s) => (s.paused ? s : { ...s, paused: true }));
+      beatRef.current();
+    };
     video.addEventListener("ended", onEnded);
     video.addEventListener("error", onError);
     video.addEventListener("waiting", onWaiting);
     video.addEventListener("stalled", onWaiting);
-    video.addEventListener("playing", onResume);
-    video.addEventListener("canplay", onResume);
+    video.addEventListener("canplay", onCanplay);
+    video.addEventListener("playing", onPlaying);
+    video.addEventListener("pause", onPause);
     return () => {
       video.removeEventListener("ended", onEnded);
       video.removeEventListener("error", onError);
       video.removeEventListener("waiting", onWaiting);
       video.removeEventListener("stalled", onWaiting);
-      video.removeEventListener("playing", onResume);
-      video.removeEventListener("canplay", onResume);
+      video.removeEventListener("canplay", onCanplay);
+      video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("pause", onPause);
     };
   }, [goTo, currentEffective, recordLog]);
 
@@ -757,13 +791,16 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
         if (cur?.kind === "PROGRAM") {
           const v = videoRef.current;
           if (!v) return;
+          // Just drive the video; the native "pause"/"playing" listeners own pausedRef + status + the immediate
+          // heartbeat, so any pause source (remote, native controls, here) is handled the same way.
           if (v.paused) tryPlay(v);
           else v.pause();
-          pausedRef.current = v.paused;
         } else {
+          // Bumper: no video element to emit events, so toggle + beat manually.
           pausedRef.current = !pausedRef.current;
+          setStatus((s) => ({ ...s, paused: pausedRef.current }));
+          beatRef.current();
         }
-        setStatus((s) => ({ ...s, paused: pausedRef.current }));
       },
       jumpToLive: () => void goTo(now()),
       seekBy: (seconds: number) => void goTo(currentEffective() + seconds),

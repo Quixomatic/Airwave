@@ -146,15 +146,24 @@ export async function heartbeatSession(
     // race, no dupes.
     const created = row.startedAt.getTime() === now.getTime();
     const events: WebhookEventType[] = [];
+    // "active" = content is or should be rolling (playing or buffering), as opposed to paused or idle.
+    const active = (s: string | null | undefined) => s === "playing" || s === "buffering";
     if (created) {
       events.push("session.started");
-      if (input.playbackState === "playing") events.push("playback.started");
+      if (active(input.playbackState)) events.push("playback.started");
     } else if (prior) {
       if (prior.channelId !== input.channelId) events.push("channel.tuned");
-      // Play/pause transitions — only when the client reports playbackState (older clients don't).
+      // Play/pause transitions — only when the client reports playbackState (older clients don't). Compare on
+      // paused-vs-not so the first pause after a tune (prior was buffering/idle, not yet "playing") still fires.
       if (input.playbackState) {
-        if (prior.playbackState === "paused" && input.playbackState === "playing") events.push("playback.resumed");
-        else if (prior.playbackState === "playing" && input.playbackState === "paused") events.push("playback.paused");
+        const wasPaused = prior.playbackState === "paused";
+        const isPaused = input.playbackState === "paused";
+        if (isPaused && !wasPaused) events.push("playback.paused");
+        else if (wasPaused && active(input.playbackState)) events.push("playback.resumed");
+        else if (!wasPaused && active(input.playbackState) && !active(prior.playbackState)) {
+          // idle → active mid-session (e.g. content finally loaded) reads as playback starting.
+          events.push("playback.started");
+        }
       }
     }
     if (events.length > 0) {
@@ -264,6 +273,57 @@ export async function endWatchSession(prisma: PrismaClient, userId: string, devi
       .catch(() => {});
   }
   return { ok: true as const };
+}
+
+/**
+ * Reap sessions that stopped heartbeating (closed tab, crash, network drop, or a server restart the client
+ * never returned from — a quick restart keeps the session because the client keeps heartbeating). Stops any
+ * leftover Plex transcode, emits session.ended (+ playback.stopped) so consumers get closure just like a clean
+ * end, and deletes the row. Called by the watch-session-reap job. Returns the count reaped.
+ */
+export async function reapStaleWatchSessions(
+  prisma: PrismaClient,
+  signal?: AbortSignal,
+  thresholdMs = 60_000,
+): Promise<number> {
+  const cutoff = new Date(Date.now() - thresholdMs);
+  const stale = await prisma.watchSession.findMany({
+    where: { lastHeartbeatAt: { lt: cutoff } },
+    include: { channel: { include: { mediaSource: true } } },
+  });
+  if (stale.length === 0) return 0;
+  const wantEnd = hasEventSubscribers("session.ended") || hasEventSubscribers("playback.stopped");
+  for (const s of stale) {
+    if (signal?.aborted) throw new Error("Job canceled");
+    const src = s.channel?.mediaSource;
+    if (s.transcodeSession && src?.baseUrl) {
+      await stopTranscode(
+        src.baseUrl,
+        decryptToken(src.token),
+        src.clientIdentifier ?? "channelguide-server",
+        s.transcodeSession,
+      ).catch(() => {});
+    }
+    if (wantEnd) {
+      const events: WebhookEventType[] = ["session.ended"];
+      if (s.playbackState) events.push("playback.stopped");
+      const ctx: SessionEventCtx = {
+        userId: s.userId,
+        deviceId: s.deviceId,
+        channelId: s.channelId,
+        playbackState: s.playbackState,
+        delaySeconds: s.delaySeconds,
+        positionAt: s.positionAt,
+        ratingKey: s.ratingKey,
+        title: s.title,
+      };
+      void sessionEventData(prisma, ctx)
+        .then((d) => events.forEach((t) => emitEvent(t, d)))
+        .catch(() => {});
+    }
+  }
+  await prisma.watchSession.deleteMany({ where: { id: { in: stale.map((s) => s.id) } } });
+  return stale.length;
 }
 
 type PlexDecision = {

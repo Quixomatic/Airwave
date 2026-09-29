@@ -13,9 +13,10 @@ import { syncConnector } from "../remote-access/connector";
 import { cloudServiceEnabled, refreshRemoteAccess } from "../remote-access/remote-access";
 import { getAppSettings } from "../settings";
 import { firstReadySource } from "../sources/readiness";
-import { getPlexUser, resolveConnectionUrls, stopTranscode } from "../plex/client";
+import { getPlexUser, resolveConnectionUrls } from "../plex/client";
+import { reapStaleWatchSessions } from "../playback/sessions";
 import { syncLibraries } from "../plex/sync-libraries";
-import { decryptToken, withDecryptedToken } from "../plex/token";
+import { withDecryptedToken } from "../plex/token";
 import {
   INITIAL_WINDOW_SECONDS,
   extendChannelSchedule,
@@ -408,27 +409,10 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
     interval: "minutes",
     defaultCron: "0 */2 * * * *",
     run: async (signal) => {
-      const cutoff = new Date(Date.now() - 60_000);
-      const stale = await prisma.watchSession.findMany({
-        where: { lastHeartbeatAt: { lt: cutoff } },
-        include: { channel: { include: { mediaSource: true } } },
-      });
-      for (const s of stale) {
-        throwIfAborted(signal);
-        const src = s.channel?.mediaSource;
-        if (s.transcodeSession && src?.baseUrl) {
-          await stopTranscode(
-            src.baseUrl,
-            decryptToken(src.token),
-            src.clientIdentifier ?? "channelguide-server",
-            s.transcodeSession,
-          );
-        }
-      }
-      if (stale.length > 0) {
-        await prisma.watchSession.deleteMany({ where: { id: { in: stale.map((s) => s.id) } } });
-        console.log(`[jobs] watch-session-reap cleared ${stale.length} stale session(s)`);
-      }
+      // reapStaleWatchSessions stops leftover transcodes AND emits session.ended (+ playback.stopped) so a
+      // crashed/disconnected session gets the same closure a clean end would.
+      const reaped = await reapStaleWatchSessions(prisma, signal);
+      if (reaped > 0) console.log(`[jobs] watch-session-reap cleared ${reaped} stale session(s)`);
     },
   },
   {

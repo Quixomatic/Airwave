@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.3] - 2026-09-29
+
+The tv-web client (LG/Samsung/browser) now reports live playback state, and reaped sessions emit a proper end.
+
+### Added
+- **tv-web reports playback state.** The web/TV client sends its `deviceId` + `playbackState` (playing/paused/buffering/idle) in the heartbeat and fires an immediate heartbeat on a play/pause transition, so `playback.started` / `playback.stopped` / `playback.paused` / `playback.resumed` land in about a second. Pause/play are read from the native video events, so any pause source (the remote, the on-screen control, native controls) is caught the same way. The heartbeat also mounts once and ends the session only on a real teardown.
+
+### Changed
+- **The watch-session reaper now emits `session.ended` (+ `playback.stopped`)** with the full enriched payload before clearing a stale session, so a crashed, closed, or disconnected session (or one a server restart left behind) gets the same closure a clean exit would, instead of leaving a consumer with a stuck session. A quick server restart while watching keeps the session alive, since the client keeps heartbeating.
+
 ## [0.15.2] - 2026-09-29
 
 Webhook + SSE events now report live playback state and rich detail, and the `playback.*` events are live.
