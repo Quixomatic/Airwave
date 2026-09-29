@@ -266,10 +266,10 @@ export const api = {
   stop: (channelId: string, session: string) =>
     request<{ ok: true }>(`/api/v1/channels/${channelId}/stop`, { method: "POST", body: JSON.stringify({ session }) }),
 
-  heartbeat: (body: { channelId: string; state: "program" | "bumper" | "off"; ratingKey?: string | null; title?: string | null; delaySeconds?: number; positionAt?: string | null; transcodeSession?: string | null }) =>
+  heartbeat: (body: { channelId: string; state: "program" | "bumper" | "off"; deviceId?: string; playbackState?: "playing" | "paused" | "buffering" | "idle"; ratingKey?: string | null; title?: string | null; delaySeconds?: number; positionAt?: string | null; transcodeSession?: string | null }) =>
     request<unknown>("/api/v1/sessions/heartbeat", { method: "POST", body: JSON.stringify(body) }),
 
-  endSession: () => request<unknown>("/api/v1/sessions/end", { method: "POST", body: "{}" }),
+  endSession: (deviceId?: string) => request<unknown>("/api/v1/sessions/end", { method: "POST", body: JSON.stringify({ deviceId }) }),
 
   /** One PlaybackLog row per program load: what the server decided (mode/codecs/connection) + the
    *  real on-device outcome (playing/not_decoding/error + decoded dims). Powers the play-log readout. */

@@ -161,6 +161,8 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
   const baselineArmedRef = useRef(false); // onLoad barrier: only anchor the baseline once the NEW source
   // has loaded, so a stale onProgress from the outgoing stream can't anchor the new program's baseline.
   const bufferingRef = useRef(false); // latest onBuffering state — for the watchdog's stuck-diagnosis
+  // Latest heartbeat closure — the once-mounted interval + togglePause both call it (see below).
+  const beatRef = useRef<() => void>(() => {});
   const loggedRef = useRef(false); // already logged this load (onLoad/onError)? the watchdog skips if so
   const frozeLoggedRef = useRef(false); // #31: already posted a freeze row for the CURRENT stall episode? (re-arms on progress)
   // Resume-stall watchdog state (see RESUME_STALL_MS): armed on unpause; the tick reloads if mpv's clock
@@ -638,30 +640,39 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
     return () => clearInterval(id);
   }, [now, goTo, currentEffective, buildScrubber, recordLog]);
 
-  // Heartbeat the watch session (~10s) for Now Watching + orphan-transcode reap; end it on unmount.
+  // The heartbeat body lives in a ref so the interval can mount once and togglePause can fire an immediate beat.
+  // playbackState from mpv: buffering, else paused (pausedRef), else playing. (delaySeconds/positionAt keep the
+  // admin Now-Watching accurate; without them every native session read as "Live" at 0:00.)
+  beatRef.current = () => {
+    const cur = currentRef.current;
+    if (!channelId || !cur) return;
+    const eff = currentEffective();
+    const playbackState = bufferingRef.current ? "buffering" : pausedRef.current ? "paused" : "playing";
+    void api
+      .heartbeat({
+        channelId,
+        deviceId: deviceId(),
+        state: cur.kind === "BUMPER" ? "bumper" : "program",
+        playbackState,
+        ratingKey: cur.ratingKey,
+        title: titleOf(cur.guide),
+        delaySeconds: Math.max(0, Math.round(now() - eff)),
+        positionAt: new Date(eff * 1000).toISOString(),
+        transcodeSession: cur.session ?? null,
+      })
+      .catch(() => {});
+  };
+
+  // Heartbeat the watch session (~10s) for Now Watching + orphan-transcode reap; end it only on real teardown.
   useEffect(() => {
-    const id = setInterval(() => {
-      const cur = currentRef.current;
-      if (!channelId || !cur) return;
-      // Report how far behind live + the exact timeline instant — parity with tv-web's use-channel-player.
-      // Without these the server defaulted delaySeconds to 0, so every native session read as "Live" at
-      // 0:00 in the admin Now-Watching / Sessions view (and cross-device resume had no position to seed).
-      const eff = currentEffective();
-      void api
-        .heartbeat({
-          channelId,
-          state: cur.kind === "BUMPER" ? "bumper" : "program",
-          ratingKey: cur.ratingKey,
-          title: titleOf(cur.guide),
-          delaySeconds: Math.max(0, Math.round(now() - eff)),
-          positionAt: new Date(eff * 1000).toISOString(),
-          transcodeSession: cur.session ?? null,
-        })
-        .catch(() => {});
-    }, 10_000);
-    return () => clearInterval(id);
-  }, [channelId, now, currentEffective]);
-  useEffect(() => () => void api.endSession().catch(() => {}), []);
+    const id = setInterval(() => beatRef.current(), 10_000);
+    beatRef.current();
+    return () => {
+      clearInterval(id);
+      void api.endSession(deviceId()).catch(() => {});
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Channel change (incl. → null on Close): release the current media + reset the clock. A non-null
   // change leaves the mounted <MpvPlayerView> and swaps its source (mpv loadfile replace) below; null
@@ -684,6 +695,9 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
       // the MpvPlayerView (deinit → mpv_terminate_destroy); pause() first halts audio so nothing leaks.
       void viewRef.current?.pause();
       setSource(null);
+      // The use-tv-player HOOK stays mounted (only the view unmounts), so end the session here on Close —
+      // its once-on-unmount endSession won't fire. A channel→channel change keeps the session (channel.tuned).
+      void api.endSession(deviceId()).catch(() => {});
     }
     // Channel change (channelId non-null): leave the old source playing in the mounted view — bootstrap
     // swaps in the new URL below. One player, one surface, no remount (no double-audio, no re-attach).
@@ -738,6 +752,8 @@ export function useTvPlayer(channelId: string | null, options: PlayerOptions = {
         }
         // On resume, clear a prior "Playback stopped" so pressing Play dismisses it immediately.
         setStatus((s) => ({ ...s, paused: pausedRef.current, error: pausedRef.current ? s.error : null }));
+        // Immediate heartbeat so playback.paused/resumed lands in ~ms (mpv toggles pause imperatively, no event).
+        beatRef.current();
       },
       jumpToLive: () => void goTo(now()),
       seekBy: (seconds: number) => void goTo(currentEffective() + seconds),

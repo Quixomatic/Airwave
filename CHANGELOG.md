@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.5] - 2026-09-29
+
+The tv-native (iOS / Android / Apple TV) client now reports live playback state.
+
+### Added
+- **tv-native reports playback state.** Same enrichment as the other clients: sends `deviceId` + `playbackState` (from mpv's pause + buffering) in the heartbeat, fires an immediate beat on play/pause, keeps one session across channel changes (`channel.tuned`), and ends the session on Close (the mpv view unmounts but the hook persists, so it ends explicitly). Mirrors the verified tv-tauri implementation; confirm on a real device build.
+
 ## [0.15.4] - 2026-09-29
 
 The tv-tauri desktop client now reports live playback state.
