@@ -339,6 +339,34 @@ type PlexDecision = {
  *  art), the delivery detail from the latest matching play-log (Direct Play vs Transcode per video/audio +
  *  connection), and the device it's on. A handful of sessions are ever active, so the per-row lookups are
  *  cheap. Additive to the guide chip's shape (id/user/channel/state/title/delaySeconds all still present). */
+/** The TvDevice fields the Sessions page needs to pick a brand logo + label. `raw` carries `isTV`. */
+const DEVICE_FACTS = {
+  deviceId: true,
+  platform: true,
+  model: true,
+  osVersion: true,
+  hdr: true,
+  userAgent: true,
+  raw: true,
+} as const;
+
+/**
+ * Resolve the TvDevice for a session. Prefer the session's OWN deviceId (reliable for every modern client
+ * since per-device sessions), and fall back to the latest play-log's device for a "legacy" session or one
+ * whose device never registered a report — the same path the page used before. Either route lands on the
+ * same TvDevice row.
+ */
+async function resolveSessionDevice(prisma: PrismaClient, sessionDeviceId: string, logDeviceId: string | null) {
+  if (sessionDeviceId && sessionDeviceId !== "legacy") {
+    const d = await prisma.tvDevice.findUnique({ where: { deviceId: sessionDeviceId }, select: DEVICE_FACTS });
+    if (d) return d;
+  }
+  if (logDeviceId) {
+    return prisma.tvDevice.findUnique({ where: { deviceId: logDeviceId }, select: DEVICE_FACTS });
+  }
+  return null;
+}
+
 export async function listActiveSessions(prisma: PrismaClient) {
   const since = new Date(Date.now() - SESSION_ACTIVE_MS);
   const rows = await prisma.watchSession.findMany({
@@ -382,12 +410,7 @@ export async function listActiveSessions(prisma: PrismaClient) {
               orderBy: { createdAt: "desc" },
             })
           : null;
-      const device = log?.deviceId
-        ? await prisma.tvDevice.findUnique({
-            where: { deviceId: log.deviceId },
-            select: { model: true, platform: true },
-          })
-        : null;
+      const deviceRow = await resolveSessionDevice(prisma, r.deviceId, log?.deviceId ?? null);
       const decision = (log?.decision as PlexDecision | null) ?? null;
       // Portrait POSTER of the show (for episodes, via grandparentRatingKey) or the movie itself — never
       // the landscape episode still. Same art the channel-edit preview uses.
@@ -420,7 +443,17 @@ export async function listActiveSessions(prisma: PrismaClient) {
         startedAt: r.startedAt,
         lastHeartbeatAt: r.lastHeartbeatAt,
         transcoding: !!r.transcodeSession,
-        device: log?.deviceId ? { id: log.deviceId, model: device?.model ?? null, platform: device?.platform ?? null } : null,
+        device: deviceRow
+          ? {
+              id: deviceRow.deviceId,
+              platform: deviceRow.platform,
+              model: deviceRow.model,
+              osVersion: deviceRow.osVersion,
+              hdr: deviceRow.hdr,
+              isTV: (deviceRow.raw as { isTV?: boolean } | null)?.isTV ?? null,
+              userAgent: deviceRow.userAgent,
+            }
+          : null,
         connection: log?.connection ?? null,
         mode: log?.mode ?? null,
         outcome: log?.outcome ?? null,

@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.12] - 2026-09-30
+
+Ships the server half of the device enrichment (it was written but never committed), plus a blog draft workflow and a themed 404.
+
+### Fixed
+- **The Sessions-page and public-API device enrichment now actually ships.** The server-side resolver (`resolveSessionDevice` and the richer device facts in `listActiveSessions`) added for v0.15.9 / v0.15.10 was left out of those commits (staged with `git add apps`, which skipped `packages/`), so the deployed server still returned the old `{ id, model, platform }` device shape. It's committed now, so the admin Sessions page and the public `/sessions` + `/now-playing` endpoints return the full device info (platform, model, osVersion, hdr, isTV) they were built for, including the Samsung Tizen recognition.
+
+### Site
+- **Blog draft workflow.** Posts can carry `draft: true`, hidden everywhere in production (list, direct URL, RSS, sitemap) but still visible in local dev for preview. Backed by a single `listBlogPosts()` helper.
+- **Themed 404 page.** Replaces Next's bare default with a page that follows the site's dark/light theme and chrome, with a large display "404". Uses a shared body across the root and `(home)` not-found boundaries so the header renders exactly once everywhere.
+
 ## [0.15.11] - 2026-09-30
 
 Adds the by-number now/schedule endpoints the Tidbyt docs example relied on.

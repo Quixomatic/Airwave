@@ -1,4 +1,4 @@
-import { blogSource } from "@/lib/source";
+import { listBlogPosts } from "@/lib/source";
 
 const SITE_URL = "https://getairwave.tv";
 
@@ -13,9 +13,7 @@ function escapeXml(s: string): string {
 }
 
 export function GET() {
-  const posts = [...blogSource.getPages()].sort(
-    (a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime(),
-  );
+  const posts = listBlogPosts();
 
   const items = posts
     .map((p) => {

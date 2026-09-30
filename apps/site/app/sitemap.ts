@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-import { blogSource, source } from "@/lib/source";
+import { listBlogPosts, source } from "@/lib/source";
 
 const SITE_URL = "https://getairwave.tv";
 
@@ -39,8 +39,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.6,
   }));
 
-  // Every blog post, dated by its frontmatter.
-  const blogRoutes = blogSource.getPages().map((page) => ({
+  // Every published blog post, dated by its frontmatter (drafts excluded in production).
+  const blogRoutes = listBlogPosts().map((page) => ({
     url: `${SITE_URL}${page.url}`,
     lastModified: page.data.date ? new Date(page.data.date) : now,
     changeFrequency: "yearly" as const,

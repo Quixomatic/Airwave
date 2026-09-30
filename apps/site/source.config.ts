@@ -23,6 +23,10 @@ export const blog = defineDocs({
       // featured `image` (the image still powers the social card + list thumbnail, which can't be a video),
       // and the page emits VideoObject structured data.
       video: z.string().optional(),
+      // Draft posts are hidden everywhere in production (list, direct URL, RSS, sitemap) but still visible in
+      // local `dev` so you can preview them. Set `draft: true` to hold a post; delete the line (or set false)
+      // to publish. See `listBlogPosts()` in lib/source.ts.
+      draft: z.boolean().optional(),
     }),
   },
 });

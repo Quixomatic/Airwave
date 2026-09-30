@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { blogSource } from "@/lib/source";
+import { blogSource, listBlogPosts, SHOW_DRAFTS } from "@/lib/source";
 import { readingTimeMinutes } from "@/lib/reading-time";
 import { getMDXComponents } from "@/components/mdx";
 import { PromoEmbed } from "@/components/promo-video";
@@ -23,15 +23,16 @@ export default async function BlogPost(props: Params) {
   const { slug } = await props.params;
   const page = blogSource.getPage([slug]);
   if (!page) notFound();
+  // A draft is reachable at its real URL in local dev (for preview) but 404s in production.
+  if (page.data.draft && !SHOW_DRAFTS) notFound();
 
   const Mdx = page.data.body;
   const mins = readingTimeMinutes(slug);
 
   // Prev/next neighbours from the date-sorted feed (newest-first): `newer` = published after this one,
   // `older` = before. fumadocs auto-wires this for docs (page tree) but not the flat blog collection.
-  const all = [...blogSource.getPages()].sort(
-    (a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime(),
-  );
+  // Uses the same draft-filtered feed so a draft never shows as a neighbour in production.
+  const all = listBlogPosts();
   const idx = all.findIndex((p) => p.slugs[0] === slug);
   const newer = idx > 0 ? all[idx - 1] : null;
   const older = idx >= 0 && idx < all.length - 1 ? all[idx + 1] : null;
@@ -173,7 +174,8 @@ export default async function BlogPost(props: Params) {
 }
 
 export function generateStaticParams() {
-  return blogSource.getPages().map((page) => ({ slug: page.slugs[0] }));
+  // Drafts are excluded from prebuilt params in production; they render on demand in dev only.
+  return listBlogPosts().map((page) => ({ slug: page.slugs[0] }));
 }
 
 export async function generateMetadata(props: Params): Promise<Metadata> {

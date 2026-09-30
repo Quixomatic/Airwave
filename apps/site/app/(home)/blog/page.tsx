@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { blogSource } from "@/lib/source";
+import { listBlogPosts } from "@/lib/source";
 import { readingTimeMinutes } from "@/lib/reading-time";
 import { Container, Eyebrow } from "@/components/marketing";
 
@@ -17,9 +17,7 @@ function formatDate(date: string) {
 }
 
 export default function BlogIndex() {
-  const posts = [...blogSource.getPages()].sort(
-    (a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime(),
-  );
+  const posts = listBlogPosts();
 
   return (
     <main className="flex-1">

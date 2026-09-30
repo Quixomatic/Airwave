@@ -42,3 +42,18 @@ export const blogSource = loader({
   baseUrl: "/blog",
   source: blog.toFumadocsSource(),
 });
+
+// Drafts (frontmatter `draft: true`) are hidden in production but shown in local `dev`, so you can preview an
+// unpublished post at its real URL before it goes live. Vercel builds (production AND preview) run with
+// NODE_ENV=production, so a draft only shows on `next dev`.
+export const SHOW_DRAFTS = process.env.NODE_ENV !== "production";
+
+/**
+ * The blog feed: every post, newest first, with drafts filtered out in production. Use this everywhere posts
+ * are enumerated (the list page, prev/next, RSS, static params) so a draft is hidden consistently.
+ */
+export function listBlogPosts() {
+  return [...blogSource.getPages()]
+    .filter((p) => SHOW_DRAFTS || !p.data.draft)
+    .sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime());
+}
