@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.11] - 2026-09-30
+
+Adds the by-number now/schedule endpoints the Tidbyt docs example relied on.
+
+### Fixed
+- **`GET /api/public/v1/channels/by-number/{number}/now` and `/schedule` now exist.** The Tidbyt integration example called `/channels/by-number/{number}/now`, but only the `/channels/{id}/...` variants were implemented, so that path 404'd for any channel (a reported issue, seen on a two-digit channel but not specific to digit count). Both by-number variants now resolve the number to the channel (honoring enabled + API-key access) and return the same now/next and schedule payloads as the by-id routes. Regenerated the OpenAPI spec, so the reference pages and the docs mock pick them up.
+
+### Changed
+- **`probe-public-api.ts`** now exercises the by-number now/schedule routes and prefers a multi-digit channel number for those checks, so this class of missing-route regression is caught.
+
 ## [0.15.10] - 2026-09-29
 
 Samsung TVs are recognized as their own platform, and the public API's session endpoints now carry device info.

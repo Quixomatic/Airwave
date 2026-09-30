@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Airwave Public API",
-    "version": "0.15.10",
+    "version": "0.15.11",
     "description": "Read your self-hosted Airwave server's live data (guide, channels, now-watching) and subscribe to webhooks. Authenticate with an API key from Settings → API Keys, sent as either `X-API-Key` or `Authorization: Bearer`."
   },
   "servers": [
@@ -1351,6 +1351,182 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Channel"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/channels/by-number/{number}/now": {
+      "get": {
+        "tags": [
+          "Channels"
+        ],
+        "summary": "What's on now & next (by channel number)",
+        "description": "The currently-airing slot (with its live offset) and the one after it, addressed by guide number.",
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "example": 101
+            },
+            "required": false,
+            "name": "number",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Now & next.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "current": {
+                      "$ref": "#/components/schemas/NowSlot"
+                    },
+                    "next": {
+                      "$ref": "#/components/schemas/NowSlot"
+                    },
+                    "endsAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When the materialized schedule runs out; ISO-8601 UTC."
+                    }
+                  },
+                  "required": [
+                    "current",
+                    "next",
+                    "endsAt"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/channels/by-number/{number}/schedule": {
+      "get": {
+        "tags": [
+          "Channels"
+        ],
+        "summary": "Upcoming schedule (by channel number)",
+        "description": "The channel's upcoming programs over the next N hours (default 3, max 24), addressed by guide number.",
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "example": 101
+            },
+            "required": false,
+            "name": "number",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 24,
+              "example": 6
+            },
+            "required": false,
+            "name": "hours",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Upcoming programs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "channelId": {
+                      "type": "string"
+                    },
+                    "serverTime": {
+                      "type": "string"
+                    },
+                    "programs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Program"
+                      }
+                    }
+                  },
+                  "required": [
+                    "channelId",
+                    "serverTime",
+                    "programs"
+                  ]
                 }
               }
             }

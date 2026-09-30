@@ -75,19 +75,26 @@ async function main() {
       console.log(`${ok} GET ${p} → ${res.status}  ${snippet(body)}`);
     }
 
-    // 2b. Sample parameterized channel routes against a real channel, if any exist.
+    // 2b. Sample parameterized channel routes against a real channel, if any exist. The by-number checks
+    // prefer a MULTI-DIGIT channel number — a reported bug was that /channels/by-number/{n}/now 404'd (the
+    // by-number now/schedule routes didn't exist), and a two-digit number surfaces the same 404 a single
+    // digit would, so we exercise a real multi-digit number when the lineup has one.
     const chRes = await publicApi.request("/channels", { headers: { "x-api-key": key } });
     if (chRes.ok) {
       const { channels } = (await chRes.json()) as { channels: Array<{ id: string; number: number }> };
       const ch = channels[0];
+      const byNum = channels.find((c) => c.number >= 10) ?? ch; // prefer multi-digit
       if (ch) {
         const sampled = [
           `/channels/${ch.id}`,
-          `/channels/by-number/${ch.number}`,
           `/channels/${ch.id}?include=definition`,
           `/channels/${ch.id}/now`,
           `/channels/${ch.id}/schedule?hours=3`,
+          `/channels/by-number/${byNum.number}`,
+          `/channels/by-number/${byNum.number}/now`,
+          `/channels/by-number/${byNum.number}/schedule?hours=3`,
         ];
+        console.log(`  (by-number checks use channel ${byNum.number}${byNum.number >= 10 ? " — multi-digit" : ""})`);
         for (const p of sampled) {
           const r = await publicApi.request(p, { headers: { "x-api-key": key } });
           const b = await r.text();

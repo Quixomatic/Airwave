@@ -17,6 +17,13 @@ import {
 } from "../dtos";
 import { toNowSlot, toProgram } from "../mappers";
 
+/** Resolve a channel's id from its guide number, honoring enabled + the key's access. Null when not visible. */
+async function allowedChannelIdByNumber(access: PublicVars["access"], number: number): Promise<string | null> {
+  const row = await prisma.channel.findUnique({ where: { number }, select: { id: true, enabled: true } });
+  if (!row || !row.enabled || !isChannelAllowed(access, row.id)) return null;
+  return row.id;
+}
+
 // ── DTO ───────────────────────────────────────────────────────────────────────────
 export const ChannelDTO = z
   .object({
@@ -230,6 +237,86 @@ channelRoutes.openapi(
       return c.json({ error: { code: "not_found", message: "Channel not found." } }, 404);
     }
     return c.json(toChannelDTO(row, withDef), 200);
+  },
+);
+
+channelRoutes.openapi(
+  createRoute({
+    method: "get",
+    path: "/channels/by-number/{number}/now",
+    tags: ["Channels"],
+    summary: "What's on now & next (by channel number)",
+    description: "The currently-airing slot (with its live offset) and the one after it, addressed by guide number.",
+    security: apiKeySecurity,
+    request: { params: z.object({ number: z.coerce.number().int().openapi({ example: 101 }) }) },
+    responses: {
+      200: {
+        description: "Now & next.",
+        content: {
+          "application/json": {
+            schema: z.object({
+              current: NowSlotDTO.nullable(),
+              next: NowSlotDTO.nullable(),
+              endsAt: z.string().nullable().describe("When the materialized schedule runs out; ISO-8601 UTC."),
+            }),
+          },
+        },
+      },
+      401: errorResponses[401],
+      404: errorResponses[404],
+    },
+  }),
+  async (c) => {
+    const id = await allowedChannelIdByNumber(c.get("access"), c.req.valid("param").number);
+    if (!id) return c.json({ error: { code: "not_found", message: "Channel not found." } }, 404);
+    const nn = await getNowNext(prisma, id);
+    return c.json(
+      {
+        current: nn.current ? toNowSlot(nn.current, id, nn.current.offsetSeconds) : null,
+        next: nn.next ? toNowSlot(nn.next, id) : null,
+        endsAt: nn.endsAt ? nn.endsAt.toISOString() : null,
+      },
+      200,
+    );
+  },
+);
+
+channelRoutes.openapi(
+  createRoute({
+    method: "get",
+    path: "/channels/by-number/{number}/schedule",
+    tags: ["Channels"],
+    summary: "Upcoming schedule (by channel number)",
+    description: "The channel's upcoming programs over the next N hours (default 3, max 24), addressed by guide number.",
+    security: apiKeySecurity,
+    request: {
+      params: z.object({ number: z.coerce.number().int().openapi({ example: 101 }) }),
+      query: z.object({ hours: z.coerce.number().int().min(1).max(24).optional().openapi({ example: 6 }) }),
+    },
+    responses: {
+      200: {
+        description: "Upcoming programs.",
+        content: {
+          "application/json": {
+            schema: z.object({
+              channelId: z.string(),
+              serverTime: z.string(),
+              programs: z.array(ProgramDTO),
+            }),
+          },
+        },
+      },
+      401: errorResponses[401],
+      404: errorResponses[404],
+    },
+  }),
+  async (c) => {
+    const id = await allowedChannelIdByNumber(c.get("access"), c.req.valid("param").number);
+    if (!id) return c.json({ error: { code: "not_found", message: "Channel not found." } }, 404);
+    const hours = c.req.valid("query").hours ?? 3;
+    const win = await getTimelineWindow(prisma, id, 0, hours * 60);
+    const programs = win.slots.filter((s) => s.kind === "PROGRAM").map((s) => toProgram(s, id));
+    return c.json({ channelId: id, serverTime: win.serverTime.toISOString(), programs }, 200);
   },
 );
 
