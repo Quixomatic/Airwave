@@ -169,6 +169,37 @@ These are the real snags from deploying on TrueNAS SCALE and plain-HTTP LANs:
 | First-admin seed | `packages/auth/src/lib/seed-admin.ts` |
 | Static SPA server (web / tvweb roles) | `docker/serve-web.ts` |
 
+## Portainer and Unraid
+
+The compose above is the whole app, so UI-based Docker managers work too. These are convenience helpers that
+reuse the same `docker-compose.yml`, not official catalog entries.
+
+### Portainer (App Template)
+
+In Portainer, go to **Settings → App Templates** and set the URL to:
+
+```
+https://raw.githubusercontent.com/Quixomatic/Airwave/main/tools/catalogs/portainer/templates.json
+```
+
+Save, open **App Templates**, pick **Airwave**, fill in the URLs, admin account, and secrets (the optional
+fields map to the same variables as `.env.example`), and deploy.
+
+### Unraid (Compose Manager)
+
+Airwave is three containers, so install it with the **Docker Compose Manager** plugin: add a new stack named
+`airwave`, paste the repo's `docker-compose.yml` into the compose editor, then paste the Unraid-tuned env below
+into the stack's `.env` editor and edit the `CHANGE_ME` values. Compose Up, then open `http://UNRAID_IP:36021`.
+
+```
+# compose
+https://raw.githubusercontent.com/Quixomatic/Airwave/main/docker-compose.yml
+# .env (Unraid-tuned: appdata paths, nobody:users, default ports)
+https://raw.githubusercontent.com/Quixomatic/Airwave/main/tools/catalogs/unraid/airwave.env
+```
+
+Data lives under `/mnt/user/appdata/airwave/`; containers run as Unraid's `nobody:users` (PUID 99 / PGID 100).
+
 ---
 
 See also: [Configuration](/docs/self-hosting/configuration) ·
