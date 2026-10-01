@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.13] - 2026-10-01
+
+Lets the Docker image run as an arbitrary non-root user, so Airwave can ship in the TrueNAS SCALE community catalog (and run under Podman, rootless Docker, or Kubernetes `runAsUser`). Purely additive: the default root path is unchanged, so existing Dockge / docker compose / one-line-installer setups behave exactly as before.
+
+### Added
+- **The image can start as a non-root user.** The entrypoint now branches on whether it was started as root. As root (the default) it behaves exactly as before: sets the timezone, remaps the `app` user to PUID/PGID, chowns, then drops privileges with gosu to run the role. Started as a non-root user (TrueNAS `set_user`, Podman, rootless Docker, Kubernetes `runAsUser`), it skips the root-only steps and runs the selected role directly as that user.
+
+### Fixed
+- **The web / tv-web build roles now succeed under an arbitrary uid.** Those roles build their SPA at container start, and the build writes across the app tree: a transient vite config bundle, the TanStack Router codegen into `src/`, and the `dist/` output. Those directories are now writable by any uid, so the startup build completes when the container runs as a non-root user (it already worked as root).
+
+### Notes
+- No change for existing or non-TrueNAS users: the root path, the published `docker-compose.yml`, the `.env`, and the installer are all untouched. This release only adds the ability to also run the same image as a non-root user.
+
 ## [0.15.12] - 2026-09-30
 
 Ships the server half of the device enrichment (it was written but never committed), plus a blog draft workflow and a themed 404.
