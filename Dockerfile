@@ -85,6 +85,19 @@ COPY docker/serve-web.ts /app/docker/serve-web.ts
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+# Allow running as an ARBITRARY non-root user (TrueNAS set_user, Podman, rootless Docker, k8s
+# runAsUser) in addition to the default root → gosu → PUID path. The entrypoint's non-root branch
+# runs the role directly as that user, so the paths written at runtime must be world-writable:
+#   • /home/app        — bun/pnpm/vite caches (HOME)
+#   • apps/web/dist, apps/tv-web/dist — the SPA build output (web/tvweb build their SPA at startup)
+#   • node_modules/.vite caches used by the vite build
+# This is purely additive: the default root path already writes these fine and is unaffected.
+RUN chmod 0777 /home/app \
+ && mkdir -p /app/apps/web/dist /app/apps/tv-web/dist \
+ && chmod -R 0777 /app/apps/web/dist /app/apps/tv-web/dist \
+ && mkdir -p /app/node_modules/.vite /app/apps/web/node_modules/.vite /app/apps/tv-web/node_modules/.vite \
+ && chmod -R 0777 /app/node_modules/.vite /app/apps/web/node_modules/.vite /app/apps/tv-web/node_modules/.vite
+
 # --- Capability-probe test media (~430MB, generated once, frozen) -------------------
 # Baked in so the TV capability diagnostic works out of the box — no ffmpeg, no runtime download.
 # The tarball is bind-mounted for this RUN only (never COPY'd into a layer), so the ~430MB archive
