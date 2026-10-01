@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="715" height="517" viewBox="0 0 715 517" color-interpolation="sRGB" role="img" aria-labelledby="title">
+  <title id="title">Airwave gradient logo</title>
+
+  <defs>
+    <path id="cloud" d="M331.52,3.55C374.57,-1.14 418.88,9.37 455.51,32.23C486.23,51.39 511.54,79.23 527.94,111.43C532.52,120.42 536.41,129.75 539.24,139.58C540.69,144.62 541.86,149.79 543.21,154.8C543.87,157.28 544.58,159.72 546.2,161.08C547.93,162.54 550.69,162.78 553.44,163.08C574.22,165.35 594.17,170.75 612.72,179.56C645.54,195.14 673.99,221.39 691.32,253.46C712.07,291.87 716.84,338.62 704.54,380.39C694.12,415.77 671.45,447.58 642.47,470.52C611.19,495.28 572.55,509.7 532.8,513.48C507.9,515.85 482.56,514.04 457.42,513.61C432.03,513.18 406.85,514.14 381.54,514.29C355.91,514.43 330.15,513.74 304.47,513.71C279.13,513.68 253.87,514.3 228.5,514.19C204.99,514.08 181.38,513.34 158.58,508.2C139.42,503.88 120.84,496.46 103.67,486.7C71.75,468.57 44.69,442.36 26.63,410.61C5.37,373.25 -3.44,328.2 4.71,286.08C11.87,249.06 32.13,214.3 61.6,190.49C76.38,178.55 93.47,169.36 111.42,163.42C116.31,161.8 121.26,160.42 126.43,159.59C131.81,158.73 137.42,158.47 142.81,157.94C148.71,157.37 154.34,156.49 157.7,152.92C160.54,149.9 161.75,144.94 163.17,140.08C173.76,103.67 195.92,72.09 224.6,48.29C254.79,23.25 292.2,6.82 331.59,3.56Z"></path>
+
+    <clipPath id="cloud-clip">
+      <use href="#cloud"></use>
+    </clipPath>
+
+    <clipPath id="body-clip">
+      <use href="#body"></use>
+    </clipPath>
+
+    <linearGradient id="body-gradient" gradientUnits="userSpaceOnUse" x1="140" y1="450" x2="490" y2="480">
+      <stop offset="0" stop-color="#0059B5"></stop>
+      <stop offset="0.52" stop-color="#0675CD"></stop>
+      <stop offset="1" stop-color="#179AEC"></stop>
+    </linearGradient>
+
+    <linearGradient id="curl-gradient" gradientUnits="userSpaceOnUse" x1="375" y1="354" x2="621" y2="497">
+      <stop offset="0" stop-color="#004A9D"></stop>
+      <stop offset="0.45" stop-color="#005FB9"></stop>
+      <stop offset="1" stop-color="#008EE8"></stop>
+    </linearGradient>
+
+    <linearGradient id="front-gradient" gradientUnits="userSpaceOnUse" x1="60" y1="435" x2="520" y2="225">
+      <stop offset="0" stop-color="#008BE5"></stop>
+      <stop offset="0.38" stop-color="#1BA4ED"></stop>
+      <stop offset="0.72" stop-color="#43D0F0"></stop>
+      <stop offset="1" stop-color="#7EF2F3"></stop>
+    </linearGradient>
+
+    <linearGradient id="rim-gradient" gradientUnits="userSpaceOnUse" x1="70" y1="410" x2="430" y2="180">
+      <stop offset="0" stop-color="#BCE6FE"></stop>
+      <stop offset="0.5" stop-color="#ECF8FF"></stop>
+      <stop offset="0.85" stop-color="#FFFFFF"></stop>
+      <stop offset="1" stop-color="#FFFFFF"></stop>
+    </linearGradient>
+  </defs>
+
+  <g id="cloud-light" clip-path="url(#cloud-clip)">
+    <defs>
+      <linearGradient id="cloud-base" gradientUnits="userSpaceOnUse" x1="34.5786" y1="92.8359" x2="234.6456" y2="629.9716">
+        <stop offset="0" stop-color="#9bcefc"></stop>
+        <stop offset="0.25" stop-color="#add9fd"></stop>
+        <stop offset="0.5" stop-color="#fdfffe"></stop>
+        <stop offset="0.75" stop-color="#fffffd"></stop>
+        <stop offset="1" stop-color="#b2dbfc"></stop>
+      </linearGradient>
+
+      <radialGradient id="cloud-falloff" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="4.5">
+        <stop offset="0" stop-color="#fff" stop-opacity="1"></stop>
+        <stop offset="0.0156" stop-color="#fff" stop-opacity="0.9975"></stop>
+        <stop offset="0.0312" stop-color="#fff" stop-opacity="0.9902"></stop>
+        <stop offset="0.0469" stop-color="#fff" stop-opacity="0.978"></stop>
+        <stop offset="0.0625" stop-color="#fff" stop-opacity="0.9612"></stop>
+        <stop offset="0.0781" stop-color="#fff" stop-opacity="0.9401"></stop>
+        <stop offset="0.0938" stop-color="#fff" stop-opacity="0.9149"></stop>
+        <stop offset="0.1094" stop-color="#fff" stop-opacity="0.8859"></stop>
+        <stop offset="0.125" stop-color="#fff" stop-opacity="0.8537"></stop>
+        <stop offset="0.1406" stop-color="#fff" stop-opacity="0.8185"></stop>
+        <stop offset="0.1562" stop-color="#fff" stop-opacity="0.781"></stop>
+        <stop offset="0.1875" stop-color="#fff" stop-opacity="0.7005"></stop>
+        <stop offset="0.25" stop-color="#fff" stop-opacity="0.5311"></stop>
+        <stop offset="0.2812" stop-color="#fff" stop-opacity="0.4489"></stop>
+        <stop offset="0.3125" stop-color="#fff" stop-opacity="0.372"></stop>
+        <stop offset="0.3281" stop-color="#fff" stop-opacity="0.3362"></stop>
+        <stop offset="0.3438" stop-color="#fff" stop-opacity="0.3023"></stop>
+        <stop offset="0.3594" stop-color="#fff" stop-opacity="0.2705"></stop>
+        <stop offset="0.375" stop-color="#fff" stop-opacity="0.2408"></stop>
+        <stop offset="0.3906" stop-color="#fff" stop-opacity="0.2133"></stop>
+        <stop offset="0.4062" stop-color="#fff" stop-opacity="0.1881"></stop>
+        <stop offset="0.4219" stop-color="#fff" stop-opacity="0.165"></stop>
+        <stop offset="0.4375" stop-color="#fff" stop-opacity="0.144"></stop>
+        <stop offset="0.4531" stop-color="#fff" stop-opacity="0.1251"></stop>
+        <stop offset="0.4688" stop-color="#fff" stop-opacity="0.1081"></stop>
+        <stop offset="0.4844" stop-color="#fff" stop-opacity="0.093"></stop>
+        <stop offset="0.5" stop-color="#fff" stop-opacity="0.0796"></stop>
+        <stop offset="0.5312" stop-color="#fff" stop-opacity="0.0574"></stop>
+        <stop offset="0.5625" stop-color="#fff" stop-opacity="0.0406"></stop>
+        <stop offset="0.5938" stop-color="#fff" stop-opacity="0.0282"></stop>
+        <stop offset="0.625" stop-color="#fff" stop-opacity="0.0192"></stop>
+        <stop offset="0.6562" stop-color="#fff" stop-opacity="0.0128"></stop>
+        <stop offset="0.6875" stop-color="#fff" stop-opacity="0.0083"></stop>
+        <stop offset="0.75" stop-color="#fff" stop-opacity="0.0034"></stop>
+        <stop offset="0.875" stop-color="#fff" stop-opacity="0.0004"></stop>
+        <stop offset="1" stop-color="#fff" stop-opacity="0"></stop>
+      </radialGradient>
+
+      <mask id="cloud-glow-mask" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="-4.5" y="-4.5" width="9" height="9">
+        <rect x="-4.5" y="-4.5" width="9" height="9" fill="url(#cloud-falloff)"></rect>
+      </mask>
+
+      <rect id="cloud-glow" x="-4.5" y="-4.5" width="9" height="9" mask="url(#cloud-glow-mask)"></rect>
+    </defs>
+
+    <rect width="715" height="517" fill="url(#cloud-base)"></rect>
+
+    <use href="#cloud-glow" fill="#0082f9" opacity="0.9325" transform="matrix(27.083 67.174 -300.688 121.229 28.113 376.026)"></use>
+    <use href="#cloud-glow" fill="#0086fa" opacity="0.9959" transform="matrix(56.407 54.816 -37.151 38.229 281.733 160.084)"></use>
+    <use href="#cloud-glow" fill="#91cafe" opacity="0.9997" transform="matrix(-64.271 -26.64 669.388 -1614.939 675.468 573.1)"></use>
+    <use href="#cloud-glow" fill="#fefffd" opacity="0.9997" transform="matrix(159.416 -12.969 8.205 100.85 329.64 104.25)"></use>
+    <use href="#cloud-glow" fill="#0087f9" opacity="1" transform="matrix(42.369 19.964 -5.968 12.665 167.456 155.941)"></use>
+    <use href="#cloud-glow" fill="#a4d4fc" opacity="0.6408" transform="matrix(26.525 -36.398 246.136 179.371 661.641 385.665)"></use>
+    <use href="#cloud-glow" fill="#fffffe" opacity="1" transform="matrix(138.052 -3.297 1.408 58.953 492.622 344.402)"></use>
+    <use href="#cloud-glow" fill="#ecf6fe" opacity="0.5549" transform="matrix(187.899 -170.815 48.197 53.018 134.487 271.651)"></use>
+    <use href="#cloud-glow" fill="#badefd" opacity="0.6655" transform="matrix(27.119 25.157 -14.493 15.623 171.147 108.864)"></use>
+    <use href="#cloud-glow" fill="#e2f2ff" opacity="0.9999" transform="matrix(-2.303 13.95 -48.006 -7.925 172.252 174.817)"></use>
+    <use href="#cloud-glow" fill="#fcfffe" opacity="0.4586" transform="matrix(75.666 -45.645 58.84 97.54 128.65 313.554)"></use>
+    <use href="#cloud-glow" fill="#ebf5fd" opacity="0.7803" transform="matrix(63.58 -11.674 5.94 32.352 159.652 205.308)"></use>
+    <use href="#cloud-glow" fill="#ebf7fd" opacity="0.3118" transform="matrix(40.761 3.854 -4.879 51.608 189.077 263.055)"></use>
+  </g>
+
+  <g clip-path="url(#cloud-clip)">
+    <path id="body" fill="url(#body-gradient)" d="M1.71,318C1.73,345 18.95,383.87 49.04,403.7C77.91,422.73 114.77,425.32 147.5,415.89C179.49,406.67 207.54,385.96 231.36,361.94C255.67,337.42 275.6,309.46 299.78,285.02C323.79,260.77 352,239.99 383.19,226.53C414.88,212.86 449.64,206.74 483.81,212.03C518.64,217.43 552.86,234.69 570.78,265.2C579.76,280.48 584.64,299.09 582.19,316.37C580.4,329 570.7,349.65 556,357C556,326 531,303 499,303C465,303 439.56,331 439.56,366.08C439.56,385.68 446.89,404.73 458.3,420.86C481.4,453.53 519.63,474.2 558.83,478.53C602,483.29 643.49,476.14 671.49,442L740,390L800,600L-50,600L-50,318Z"></path>
+
+    <g clip-path="url(#body-clip)">
+      <path id="curl" fill="url(#curl-gradient)" d="M556,357C556,328.02 535.01,303.67 509.14,294.8C488.45,287.7 466,288 441,299C400,317.04 373,354 373,400C373,463 427,512.66 482,514.28L800,560L800,357Z"></path>
+    </g>
+
+    <path id="rim" fill="url(#rim-gradient)" d="M1.71,318C1.72,337 6.19,354.66 15.24,370.75C24.07,386.46 40.07,397.45 57.8,401.99C75.19,406.45 94.26,404.69 111.35,399.06C129.07,393.22 144.66,383.21 158.81,371.57C214.01,326.17 247.37,256.1 304.07,212.37C361.59,168 443.15,150.74 509.83,180.88C543.55,196.12 573.47,223.5 584.19,259.44C594.37,293.57 584,343 556,357C570.7,349.65 580.4,329 582.19,316.37C584.64,299.09 579.76,280.48 570.78,265.2C552.86,234.69 518.64,217.43 483.81,212.03C449.64,206.74 414.88,212.86 383.19,226.53C352,239.99 323.79,260.77 299.78,285.02C275.6,309.46 255.67,337.42 231.36,361.94C207.54,385.96 179.49,406.67 147.5,415.89C114.77,425.32 77.91,422.73 49.04,403.7C18.95,383.87 1.73,345 1.71,318Z"></path>
+
+    <!-- Paint the blue front last to cover the left rim overlap. -->
+    <path id="front" fill="url(#front-gradient)" d="M1.71,318C1.73,345 18.95,383.87 49.04,403.7C77.91,422.73 114.77,425.32 147.5,415.89C179.49,406.67 207.54,385.96 231.36,361.94C255.67,337.42 275.6,309.46 299.78,285.02C323.79,260.77 352,239.99 383.19,226.53C414.88,212.86 449.64,206.74 483.81,212.03C518.64,217.43 552.86,234.69 570.78,265.2C579.76,280.48 584.64,299.09 582.19,316.37C580.4,329 570.7,349.65 556,357C556,329.36 537.68,304.12 515.9,289.33C494.05,274.49 465.76,270.18 439.11,274.65C412.5,279.12 387.51,292.35 367.87,310.64C348.75,328.45 334.69,351.05 321.63,374.11C308.23,397.79 295.89,421.95 277.93,442.1C260.24,461.94 237.1,477.9 212.25,486.36C175,499.04 116,495.31 92,479.57L-50,420L-50,318Z"></path>
+  </g>
+</svg>
