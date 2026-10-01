@@ -1,0 +1,49 @@
+{
+  "version": "2",
+  "templates": [
+    {
+      "type": 3,
+      "title": "Airwave",
+      "name": "airwave",
+      "description": "Turn your Plex library into custom, always-on live TV channels, watchable on native apps for every screen. Deploys the Airwave server, admin web, and a Postgres database.",
+      "note": "Set the Server URL and Admin Web URL to this host's IP (or domain) plus the published ports, e.g. http://192.168.1.10:36020 and http://192.168.1.10:36021 (not localhost). Optional fields map to the same variables as .env.example; leave them blank to use the compose defaults. After it starts, open the Admin web, sign in, and connect your Plex server. Docs: https://www.getairwave.tv/docs/self-hosting/docker",
+      "categories": ["Media", "Video"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/Quixomatic/Airwave/main/apps/site/public/logo.png",
+      "repository": {
+        "url": "https://github.com/Quixomatic/Airwave",
+        "stackfile": "docker-compose.yml"
+      },
+      "env": [
+        { "name": "SERVER_PUBLIC_URL", "label": "Server URL (http://HOST-IP:36020)" },
+        { "name": "WEB_PUBLIC_URL", "label": "Admin Web URL (http://HOST-IP:36021)" },
+        { "name": "POSTGRES_USER", "label": "Postgres user", "default": "airwave" },
+        { "name": "POSTGRES_PASSWORD", "label": "Postgres password" },
+        { "name": "POSTGRES_DB", "label": "Postgres database", "default": "airwave" },
+        { "name": "BETTER_AUTH_SECRET", "label": "Auth secret (run: openssl rand -base64 48)" },
+        { "name": "ADMIN_EMAIL", "label": "Initial admin email", "default": "admin@example.com" },
+        { "name": "ADMIN_PASSWORD", "label": "Initial admin password" },
+        { "name": "SERVER_PORT", "label": "Server host port", "default": "36020" },
+        { "name": "WEB_PORT", "label": "Admin web host port", "default": "36021" },
+        { "name": "PUID", "label": "PUID (run-as user)", "default": "1000" },
+        { "name": "PGID", "label": "PGID (run-as group)", "default": "1000" },
+        { "name": "TZ", "label": "Timezone", "default": "UTC" },
+        { "name": "CG_IMAGE", "label": "Image (pin a version or use latest)", "default": "ghcr.io/quixomatic/airwave:latest" },
+        { "name": "BUMPER_MUSIC_VOLUME", "label": "(optional) Bumper-music host path (blank = named volume)" },
+        { "name": "POSTGRES_DATA_VOLUME", "label": "(optional) Postgres data host path (blank = named volume)" },
+        { "name": "EXTRA_CORS_ORIGINS", "label": "(optional) Extra admin origins, comma-separated" },
+        { "name": "PLEX_CLIENT_IDENTIFIER", "label": "(optional) Stable Plex client identifier" },
+        { "name": "WORKFLOW_ENABLED", "label": "(optional) AI lineup workflow engine: set to 1 to enable" },
+        { "name": "GOOGLE_CLIENT_ID", "label": "(optional) Google OAuth client id" },
+        { "name": "GOOGLE_CLIENT_SECRET", "label": "(optional) Google OAuth client secret" },
+        { "name": "GITHUB_CLIENT_ID", "label": "(optional) GitHub OAuth client id" },
+        { "name": "GITHUB_CLIENT_SECRET", "label": "(optional) GitHub OAuth client secret" },
+        { "name": "COMPOSE_PROFILES", "label": "(optional) TV web player: set to tvweb to enable" },
+        { "name": "TV_WEB_PUBLIC_URL", "label": "(optional) TV web player URL (http://HOST-IP:36022)" },
+        { "name": "TV_WEB_PORT", "label": "(optional) TV web player host port", "default": "36022" },
+        { "name": "TV_SERVER_URL", "label": "(optional) Override the TV player's server URL" },
+        { "name": "AIRWAVE_CLOUD_SERVICE_ENABLED", "label": "(optional) Airwave Cloud remote access: set to 1 to show it" }
+      ]
+    }
+  ]
+}
