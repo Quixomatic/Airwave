@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.15] - 2026-10-02
+
+Reverts the 0.15.14 `disableMde` change — it was a no-op.
+
+### Reverted
+- **The `disableMde` / `hasMDE` playback change (0.15.14) is removed.** It was meant to stop mpv clients (tv-tauri/tv-native) from crawling a deep-offset HLS transcode, but per the Plex API, `hasMDE` only affects the direct-play decision when `directPlay=1`; our transcode request sends `directPlay=0`, so dropping `hasMDE` changed nothing. All five touched files (`client.ts`, `broker.ts`, `rest.ts`, and the tv-tauri/tv-native `api.ts`) are restored. The HLS deep-offset seek delay (libmpv walks the full-timeline playlist from segment 0) remains unsolved and is tracked for a real fix.
+
 ## [0.15.14] - 2026-10-02
 
 Fixes the long black wait when an mpv client (tv-tauri / tv-native) tunes into a program well past its start with subtitles on.

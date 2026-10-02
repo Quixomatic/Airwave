@@ -57,10 +57,6 @@ export type ResolveMediaOptions = {
    * the returned URL, for a TV that's away from home. A remote/relay with no stored URL falls
    * back to local. Default "local". See [[remote-playback]]. */
   connection?: "local" | "remote" | "relay";
-  /** Opt OUT of Plex's MDE seekable-HLS session (drop `hasMDE`). For clients whose player can't
-   * jump the full-movie MDE playlist (libmpv). Plex then serves an anchored session (segment 0 =
-   * offset). Default (unset) keeps `hasMDE`, so hls.js clients are unchanged. */
-  disableMde?: boolean;
 };
 
 /** Resolve a playable URL for one item at one offset (client-driven). */
@@ -99,7 +95,6 @@ export async function resolveMedia(
       forceHls: opts.forceHls,
       hlsContainer: opts.hlsContainer,
       clientBaseUrl,
-      disableMde: opts.disableMde,
     },
   );
   if (!info) throw notFound("No playable media part.");
