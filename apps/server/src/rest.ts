@@ -212,6 +212,9 @@ api.get("/channels/:id/media", async (c) => {
         forceHls: c.req.query("forceHls") === "1",
         hlsContainer,
         connection: network === "remote" || network === "relay" ? network : undefined,
+        // A client whose player can't jump Plex's MDE seekable-HLS playlist (libmpv walks it) sends
+        // disableMde=1 → Plex serves an anchored session (segment 0 = offset). Default keeps hasMDE.
+        disableMde: c.req.query("disableMde") === "1",
       }),
     );
   } catch (err) {

@@ -325,6 +325,10 @@ export const api = {
     }
     const net = getNetwork();
     if (net === "remote" || net === "relay") p.set("network", net);
+    // This is a libmpv client: it can't jump Plex's MDE seekable-HLS playlist (ffmpeg ignores
+    // #EXT-X-START on a VOD playlist and walks from segment 0 → minutes of black at a deep tune-in).
+    // Opt out of MDE so Plex serves an anchored session (segment 0 = offset) that mpv plays instantly.
+    p.set("disableMde", "1");
     return request<MediaInfo>(`/api/v1/channels/${channelId}/media?${p.toString()}`);
   },
 

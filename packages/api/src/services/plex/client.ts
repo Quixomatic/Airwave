@@ -777,6 +777,11 @@ export type PlaybackOptions = {
    * the base the CLIENT hits — set to the source's remote/relay URL for an off-network TV.
    * Defaults to `baseUrl`. See broker.resolveMedia + [[remote-playback]]. */
   clientBaseUrl?: string;
+  /** Opt OUT of Plex's MDE seekable-HLS session (drop `hasMDE`). Set by a client whose player
+   * can't jump the full-movie MDE playlist (libmpv ignores #EXT-X-START on a VOD playlist and
+   * walks from segment 0). Plex then serves an anchored session (segment 0 = offset). Default
+   * (unset) keeps `hasMDE` so hls.js clients are unchanged. */
+  disableMde?: boolean;
 };
 
 // Formats a browser can play from the original file (so we can direct-play + client-seek).
@@ -998,7 +1003,6 @@ export async function getPlaybackInfo(
     directPlay: "0",
     directStream: "1",
     subtitles: "none",
-    hasMDE: "1",
     // `session` is what the (undocumented) universal/stop endpoint keys on;
     // `X-Plex-Session-Identifier` is the spec's canonical field. Real clients send both.
     session,
@@ -1008,6 +1012,14 @@ export async function getPlaybackInfo(
     "X-Plex-Product": PRODUCT,
     "X-Plex-Platform": "Web",
   });
+  // hasMDE=1 asks Plex for the Media Decision Engine HLS session: a full-movie, 1s-segment, seekable
+  // VOD playlist (#EXT-X-START + #EXT-X-ENDLIST). hls.js jumps to #EXT-X-START and is happy; libmpv
+  // (tv-tauri/tv-native) ignores #EXT-X-START on a finished/VOD playlist and plays from segment 0,
+  // walking ~1 segment/sec to a deep offset (minutes of black). Clients whose player can't jump that
+  // playlist opt out via `disableMde` — Plex then serves an anchored session (segment 0 = offset)
+  // that mpv plays instantly. Default (no flag) keeps the MDE session, so nothing changes for the
+  // browser/webOS clients that already work. See [[project-tv-playback-protocol]].
+  if (!opts.disableMde) params.set("hasMDE", "1");
   // Quality cap (the Plex "Quality" ladder). Only applied when a preset is chosen, so
   // the uncapped transcode path is unchanged.
   if (quality) {

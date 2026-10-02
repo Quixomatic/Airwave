@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.14] - 2026-10-02
+
+Fixes the long black wait when an mpv client (tv-tauri / tv-native) tunes into a program well past its start with subtitles on.
+
+### Fixed
+- **mpv clients no longer crawl a deep-offset subtitle transcode.** Burning in a subtitle forces a Plex HLS transcode. With Plex's Media Decision Engine session (`hasMDE=1`), Plex publishes the whole program as a one-second-segment seekable playlist marked with `#EXT-X-START`. hls.js (tv-web / webOS) jumps straight to that start offset, but libmpv/ffmpeg ignores `#EXT-X-START` on a finished playlist and plays from segment 0, walking one segment per second up to the offset: tuning in near the end of a movie meant minutes of black screen. mpv clients now opt out of the MDE session (`disableMde`), so Plex serves a transcode anchored at the offset (segment 0 is the requested position) that mpv plays immediately.
+
+### How it works
+- New optional `disableMde` flag on `GET /api/v1/channels/{id}/media`: when set, the server drops `hasMDE` from the Plex transcode request. tv-tauri and tv-native send it; tv-web and webOS do not, so their playback is unchanged. The flag is additive and ignored by older servers, so new clients stay compatible with old servers.
+
 ## [0.15.13] - 2026-10-01
 
 Lets the Docker image run as an arbitrary non-root user, so Airwave can ship in the TrueNAS SCALE community catalog (and run under Podman, rootless Docker, or Kubernetes `runAsUser`). Purely additive: the default root path is unchanged, so existing Dockge / docker compose / one-line-installer setups behave exactly as before.
