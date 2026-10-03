@@ -33,7 +33,7 @@ model ScheduleItem {
 
   createdAt DateTime @default(now())
 
-  @@index([channelId, startsAt])
+  @@unique([channelId, startsAt])
   @@index([channelId, kind])
   @@index([mediaItemId])
   @@map("schedule_item")
