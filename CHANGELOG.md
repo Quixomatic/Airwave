@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.17] - 2026-10-03
+
+Makes the tv-tauri desktop player ride out a slow subtitle transcode instead of silently failing (part of #56).
+
+### Fixed
+- **tv-tauri waits out a slow Plex transcode start.** Enabling a subtitle forces a Plex HLS burn-in transcode, and Plex returns 503 on the stream for 30 seconds or more (minutes on weak hardware) while it spins the transcode up. By default ffmpeg treated that 503 as a dead stream and ended the file, so the desktop player could sit on a black screen and never recover. mpv now reconnects and retries the 503 (via libavformat's `reconnect` / `reconnect_on_http_error` options) until Plex is ready, the desktop equivalent of the longer hls.js retry budget added for the browser in 0.15.16. This is the delivery half of the fix; the on-screen "it's loading" feedback follows separately.
+
+### Notes
+- Additive: a healthy stream never returns 503, so the reconnect path stays dormant on normal playback. tv-web, tv-native, and tv-roku are unchanged. The mpv deep-offset seek delay (a separate issue) is still tracked on its own.
+
 ## [0.15.16] - 2026-10-03
 
 Fixes the browser player erroring out (`manifestLoadError`) when subtitles force a slow Plex transcode, especially on weak hardware.

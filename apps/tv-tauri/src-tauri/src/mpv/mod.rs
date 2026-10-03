@@ -60,6 +60,17 @@ impl Mpv {
             ("target-colorspace-hint", "yes"),
             ("hdr-compute-peak", "auto"),
             ("audio-fallback-to-null", "yes"),
+            // Ride out a slow transcode start (issue #56). Enabling a subtitle forces a Plex HLS
+            // burn-in transcode, and Plex answers 503 on the manifest/segments for 30s+ (minutes on
+            // weak hardware) while it spins the transcode up. By default ffmpeg treats that 503 as a
+            // dead stream and ends the file. These libavformat http options make it reconnect and
+            // retry the 503 instead of giving up, so the stream comes through once Plex is ready —
+            // the mpv-side equivalent of tv-web's longer hls.js retry budget. Additive: a healthy
+            // stream never 503s, so the reconnect path is dormant on normal playback (matches plezy).
+            (
+                "stream-lavf-o",
+                "reconnect=1,reconnect_on_network_error=1,reconnect_on_http_error=503,reconnect_streamed=1,reconnect_delay_max=60",
+            ),
             // Never auto-select an embedded/forced subtitle track. Airwave delivers subtitles by
             // SERVER-SIDE burn-in (the picker re-resolves `/media` to a transcode that bakes them into
             // the video), so mpv must never render a text sub itself — otherwise a media's default/
