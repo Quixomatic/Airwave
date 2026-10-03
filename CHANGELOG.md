@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.18] - 2026-10-03
+
+Gives the tv-tauri player an on-screen buffering indicator, so a slow transcode start no longer looks like a frozen screen (part of #56).
+
+### Added
+- **tv-tauri shows a buffering spinner while a stream loads or rebuffers.** The desktop player tracked a loading/buffering state but drew nothing for it, so warming up a transcode (or any buffer) looked like a dead screen. It now shows a spinner with a short label, and when the delivery is an HLS transcode the label reflects that ("Starting subtitles…" when a subtitle is on, otherwise "Starting stream…"). Paired with the reconnect fix in 0.15.17, a slow subtitle transcode now reads as "it's working" and then plays.
+
+### Notes
+- The indicator is a transparent overlay: it floats over whatever mpv is currently showing (the live frame, the last paused frame, or black while nothing has decoded), with only a small blurred chip behind the spinner for legibility. It never paints a full-screen fill, so a rebuffer doesn't flash the screen black, and it's hidden while paused. tv-web, tv-native, and tv-roku are unchanged.
+
 ## [0.15.17] - 2026-10-03
 
 Makes the tv-tauri desktop player ride out a slow subtitle transcode instead of silently failing (part of #56).

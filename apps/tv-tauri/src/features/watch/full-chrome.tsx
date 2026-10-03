@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Tv } from "lucide-react";
+import { ArrowLeft, Loader2, Tv } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { BumperCard } from "./bumper-card";
@@ -121,6 +121,12 @@ export function FullChrome({
   }, [panelOpen]);
 
   const isBumper = status.state === "bumper";
+  // Buffering/warmup spinner. Shown while loading the stream or rebuffering, but NOT while paused
+  // (mpv reports core-idle when paused too) or during a bumper. Transcode-aware message when we know
+  // the delivery is an HLS transcode (the slow-start case from #56).
+  const showLoading = (status.loading || status.buffering) && !status.paused && !isBumper && !status.error;
+  const transcoding = status.delivery?.mode === "hls";
+  const loadingMsg = transcoding ? (subtitleStreamId ? "Starting subtitles…" : "Starting stream…") : "Loading…";
 
   return (
     <>
@@ -143,6 +149,40 @@ export function FullChrome({
           always comes with mouse movement, which already reveals the chrome, and toggling shouldn't disturb
           an open surf/panel. */}
       <div onClick={() => controls.togglePause()} style={{ position: "absolute", inset: 0 }} />
+
+      {/* Buffering/warmup spinner — a TRANSPARENT overlay so it floats over whatever mpv is showing
+          (live frame, the last paused frame, or black while nothing has decoded yet). No full-screen
+          fill, so a rebuffer never flashes the screen black; only a small blurred chip sits behind the
+          spinner + label for legibility over any frame. pointer-events:none so it never eats input. */}
+      <AnimatePresence>
+        {showLoading && (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 50 }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 14,
+                padding: "20px 28px",
+                borderRadius: 18,
+                background: "rgba(6,10,20,0.45)",
+                backdropFilter: "blur(6px)",
+                WebkitBackdropFilter: "blur(6px)",
+              }}
+            >
+              <Loader2 className="animate-spin" color={accent} strokeWidth={2} style={{ width: 52, height: 52 }} />
+              <span style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.92)" }}>{loadingMsg}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {status.error && !panelOpen && (
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 rounded-lg bg-red-950/90 px-4 py-2 text-red-200">
