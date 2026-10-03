@@ -438,6 +438,50 @@ export function useTvPlayer(channelId: string, options: PlayerOptions = {}) {
             maxBufferLength: 60,
             backBufferLength: 10,
             maxBufferHole: 0.5,
+            // Ride out a slow transcode start. Burning in a subtitle forces a Plex HLS transcode,
+            // and Plex 503s `start.m3u8` for 30s+ while it spins up (worse on weak hardware like a
+            // Pi — issue #56). hls.js already retries a 503 (it's 5xx, not in the no-retry 4xx/0 set),
+            // but the shipped manifest policy only allows ONE error retry before it throws a fatal
+            // `manifestLoadError` — so it quits before the transcode is ready. We keep every shipped
+            // default (spread) and only widen the manifest + playlist error budget: more retries with
+            // exponential backoff, ~50s total, so a slow start rides through to playback instead of
+            // erroring. Purely additive: the happy path (manifest loads first try) is unchanged, a
+            // genuinely dead stream still goes fatal once the budget is spent, and `fragLoadPolicy`
+            // (mid-stream segments) is left on its already-tolerant defaults.
+            manifestLoadPolicy: {
+              default: {
+                ...Hls.DefaultConfig.manifestLoadPolicy.default,
+                maxLoadTimeMs: 30_000,
+                timeoutRetry: {
+                  ...Hls.DefaultConfig.manifestLoadPolicy.default.timeoutRetry!,
+                  maxNumRetry: 4,
+                },
+                errorRetry: {
+                  ...Hls.DefaultConfig.manifestLoadPolicy.default.errorRetry!,
+                  maxNumRetry: 8,
+                  retryDelayMs: 1_000,
+                  maxRetryDelayMs: 8_000,
+                  backoff: "exponential",
+                },
+              },
+            },
+            playlistLoadPolicy: {
+              default: {
+                ...Hls.DefaultConfig.playlistLoadPolicy.default,
+                maxLoadTimeMs: 30_000,
+                timeoutRetry: {
+                  ...Hls.DefaultConfig.playlistLoadPolicy.default.timeoutRetry!,
+                  maxNumRetry: 4,
+                },
+                errorRetry: {
+                  ...Hls.DefaultConfig.playlistLoadPolicy.default.errorRetry!,
+                  maxNumRetry: 8,
+                  retryDelayMs: 1_000,
+                  maxRetryDelayMs: 8_000,
+                  backoff: "exponential",
+                },
+              },
+            },
           });
           hlsRef.current = hls;
           hls.on(Hls.Events.ERROR, (_e, data) => {

@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.16] - 2026-10-03
+
+Fixes the browser player erroring out (`manifestLoadError`) when subtitles force a slow Plex transcode, especially on weak hardware.
+
+### Fixed
+- **The web/TV player now waits out a slow transcode start instead of erroring.** Burning in a subtitle forces a Plex HLS transcode, and Plex returns 503 for the stream's manifest (`start.m3u8`) for 30 seconds or more while it spins the transcode up, longer on limited hardware like a Raspberry Pi. hls.js only retried the manifest once before giving up with a fatal `Stream error (manifestLoadError)`, so it quit before the transcode was ready (reported in #56). The manifest and playlist load policies now allow more retries with exponential backoff (about 50 seconds of patience total), so a slow start rides through to playback the way buffering already does.
+
+### How it works
+- Built on hls.js's existing retry mechanism (it already treats a 503 as retryable), spreading the shipped defaults and only widening the `manifestLoadPolicy` / `playlistLoadPolicy` error budget (retries 1 to 8, exponential backoff, plus a longer load timeout). The happy path is unchanged, segment loading is untouched, and a genuinely dead stream still surfaces an error once the budget is spent. The mpv clients (tv-tauri / tv-native) have a separate slow-start path that is handled on its own.
+
 ## [0.15.15] - 2026-10-02
 
 Reverts the 0.15.14 `disableMde` change — it was a no-op.
