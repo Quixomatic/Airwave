@@ -9,6 +9,7 @@ import {
   upsertPoolItems,
 } from "../media/media-item";
 import { resolveChannel } from "../plex/resolve";
+import { withChannelScheduleLock } from "./lock";
 import {
   type BuildResult,
   type OrderingStrategy,
@@ -158,6 +159,16 @@ export async function generateChannelSchedule(
   channelId: string,
   opts: { from?: Date; minDurationSeconds?: number; windowSeconds?: number } = {},
 ): Promise<ScheduleSummary> {
+  return withChannelScheduleLock(channelId, () =>
+    generateChannelScheduleUnlocked(prisma, channelId, opts),
+  );
+}
+
+async function generateChannelScheduleUnlocked(
+  prisma: PrismaClient,
+  channelId: string,
+  opts: { from?: Date; minDurationSeconds?: number; windowSeconds?: number },
+): Promise<ScheduleSummary> {
   const channel = await prisma.channel.findUnique({ where: { id: channelId } });
   if (!channel) throw new Error("Channel not found");
 
@@ -214,6 +225,21 @@ export async function extendChannelSchedule(
     /** Cap this append too (mid-pass), continuing the stored cursor. */
     windowSeconds?: number;
   } = {},
+): Promise<ExtendResult> {
+  return withChannelScheduleLock(channelId, () =>
+    extendChannelScheduleUnlocked(prisma, channelId, opts),
+  );
+}
+
+async function extendChannelScheduleUnlocked(
+  prisma: PrismaClient,
+  channelId: string,
+  opts: {
+    minDurationSeconds?: number;
+    thresholdSeconds?: number;
+    force?: boolean;
+    windowSeconds?: number;
+  },
 ): Promise<ExtendResult> {
   const channel = await prisma.channel.findUnique({ where: { id: channelId } });
   if (!channel) throw new Error("Channel not found");
@@ -294,6 +320,16 @@ export async function repairChannelSchedule(
   prisma: PrismaClient,
   channelId: string,
   opts: { now?: Date; minDurationSeconds?: number; windowSeconds?: number } = {},
+): Promise<RepairResult> {
+  return withChannelScheduleLock(channelId, () =>
+    repairChannelScheduleUnlocked(prisma, channelId, opts),
+  );
+}
+
+async function repairChannelScheduleUnlocked(
+  prisma: PrismaClient,
+  channelId: string,
+  opts: { now?: Date; minDurationSeconds?: number; windowSeconds?: number },
 ): Promise<RepairResult> {
   const channel = await prisma.channel.findUnique({ where: { id: channelId } });
   if (!channel) throw new Error("Channel not found");
