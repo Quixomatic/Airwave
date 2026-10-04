@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.19] - 2026-10-04
+
+Keeps the iPad status bar from overlapping the guide in the tv-native app.
+
+### Fixed
+- **tv-native guide no longer sits under the iPad status bar.** The status bar is hidden during full-screen playback but shows on the guide, where it floated over the top of the interface. The guide now insets its content below the status bar and backs that strip with a subtly darker band so the bar reads as its own chrome. iPad-only (`Platform.isPad`): Apple TV, Android, and iPhone compute a zero inset, so their full-bleed layout is unchanged.
+
 ## [0.15.18] - 2026-10-03
 
 Gives the tv-tauri player an on-screen buffering indicator, so a slow transcode start no longer looks like a frozen screen (part of #56).
