@@ -1,12 +1,12 @@
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
-import { ActivityIndicator, Platform, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ActivityIndicator, View } from "react-native";
 
 import { AuroraGrid } from "@/features/guide/aurora-grid";
 import { usePlayer } from "@/features/watch/player-context";
 import { useFavorites, useGuide, useSetFavorite } from "@/hooks/queries";
 import { capsDoneForCurrentServer } from "@/lib/device";
+import { StatusBarBand } from "@/lib/ipad-status-bar";
 import { C } from "@/lib/theme";
 
 /**
@@ -16,12 +16,6 @@ import { C } from "@/lib/theme";
 export default function GuideRoute() {
   const router = useRouter();
   const player = usePlayer();
-  // iPad shows a status bar on the guide (it's hidden only in the full player), so it would otherwise
-  // float over the top of the interface. Inset the guide below it and back it with a subtly darker band.
-  // iPad-only: Apple TV / Android / iPhone have no iPad status bar here, so topInset is 0 and nothing
-  // changes for them (keeps the deliberate full-bleed on those platforms untouched).
-  const insets = useSafeAreaInsets();
-  const topInset = Platform.OS === "ios" && Platform.isPad ? insets.top : 0;
   const { data, error, isLoading } = useGuide(180);
   const { data: favData } = useFavorites();
   const setFavorite = useSetFavorite();
@@ -50,14 +44,10 @@ export default function GuideRoute() {
   // this reason — we extend it to the error case too). `serverTime` falls back to the client clock when
   // the fetch failed and none is available.
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: topInset }}>
-      {/* Subtle darker band behind the iPad status bar strip (no-op elsewhere — topInset is 0). */}
-      {topInset > 0 && (
-        <View
-          pointerEvents="none"
-          style={{ position: "absolute", top: 0, left: 0, right: 0, height: topInset, backgroundColor: "rgba(0,0,0,0.3)", zIndex: 1 }}
-        />
-      )}
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      {/* iPad status-bar strip (no-op on Apple TV / Android / iPhone). A flex block, so AuroraGrid flows
+          below it and clears the status bar. */}
+      <StatusBarBand />
       <AuroraGrid
         channels={data?.channels ?? []}
         serverTime={data?.serverTime ?? new Date().toISOString()}

@@ -9,6 +9,7 @@ import { SettingsSidebar } from "@/features/settings/settings-sidebar";
 import { SettingsCtx } from "@/features/settings/settings-ui";
 import { cs, scaled, SIDEBAR_SLIVER_W } from "@/features/guide/layout";
 import { LAYER, useKeyLayer } from "@/lib/input";
+import { StatusBarBand } from "@/lib/ipad-status-bar";
 import { C } from "@/lib/theme";
 
 /**
@@ -133,6 +134,10 @@ export default function SettingsShell() {
     // Android-TV overscan inset is applied ONCE at the app root (app/_layout.tsx), so every screen uses this
     // Apple TV layout unchanged — no per-screen overscan.
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+      {/* iPad status-bar strip (no-op on Apple TV / Android / iPhone). The rail + content sit in the
+          flex:1 view below it — including the absolute sidebar, so it starts beneath the status bar. */}
+      <StatusBarBand />
+      <View style={{ flex: 1 }}>
       <View style={{ flex: 1, flexDirection: "row" }}>
         <View style={{ width: cs(SIDEBAR_SLIVER_W), flexShrink: 0 }} />
         <ScrollView
@@ -165,6 +170,7 @@ export default function SettingsShell() {
         onActivate={activate}
         onExpand={() => setZone("rail")}
       />
+      </View>
     </View>
   );
 }

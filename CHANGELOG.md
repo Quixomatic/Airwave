@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.20] - 2026-10-04
+
+Refines the iPad status-bar handling in tv-native: no more snap when leaving full screen, and settings is covered too.
+
+### Fixed
+- **The iPad status-bar band no longer snaps in when leaving full-screen playback.** The full player hides the status bar, which collapses the live safe-area inset to 0; the guide was keyed to that live value, so returning from playback reflowed the inset in. The reserved space now comes from the launch-time inset (`initialWindowMetrics`), so it's always held and exiting full screen just reveals it.
+- **The band is now a flex block instead of a padding + absolute overlay**, which also fixes the settings sidebar (absolutely positioned) so it starts below the status bar rather than under it.
+
+### Changed
+- **The settings pages get the same iPad status-bar inset as the guide.** Factored the logic into one shared helper (`lib/ipad-status-bar`), used by both the guide and the settings shell. Still iPad-only (`Platform.isPad`): Apple TV, Android, and iPhone render nothing and are unchanged.
+
 ## [0.15.19] - 2026-10-04
 
 Keeps the iPad status bar from overlapping the guide in the tv-native app.
