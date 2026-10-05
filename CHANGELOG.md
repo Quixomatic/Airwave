@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.21] - 2026-10-05
+
+### Changed
+- **The iPad status-bar band now uses the sidebar background color** (`#0b1120`) instead of a translucent dark overlay, so the strip behind the status bar reads as solid chrome matching the sidebar. tv-native only, iPad only; other platforms unchanged.
+
 ## [0.15.20] - 2026-10-04
 
 Refines the iPad status-bar handling in tv-native: no more snap when leaving full screen, and settings is covered too.
