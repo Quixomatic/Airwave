@@ -1,0 +1,133 @@
+---
+title: "TrueNAS SCALE"
+description: "Install Airwave from the TrueNAS SCALE community catalog, and what to put in each of the install questions — the secrets, the URLs, and how to turn on the TV web player."
+---
+
+Airwave is in the **TrueNAS SCALE community catalog**. In the TrueNAS UI go to **Apps → Discover Apps**,
+search for **Airwave**, and click **Install**. TrueNAS then shows an install form with a lot of fields,
+several of which are blank with no default (the secrets and URLs have none on purpose). This page walks
+every question and tells you what to put in it.
+
+<Alert type="info" title="This page is only about the install form">
+The catalog handles the containers, Postgres, and networking for you. You just answer the questions. If
+you're deploying with plain Docker instead, see the [Docker quick start](/docs/self-hosting/docker); for
+the full environment-variable reference, see [Configuration](/docs/self-hosting/configuration).
+</Alert>
+
+## Before you start
+
+Have these ready — two of the fields have no default and the form won't save without them:
+
+- **The address your devices will use to reach this server.** The host's LAN IP (e.g. `192.168.1.10`) or
+  a domain, and whether you'll serve plain **http** on the LAN or **https** through a reverse proxy. You'll
+  paste this into three different URL fields, so decide it once.
+- **A 32+ character auth secret.** Generate one now and keep it somewhere safe. On any machine with
+  OpenSSL:
+
+  ```bash
+  openssl rand -base64 48
+  ```
+
+- **A database password.** Any strong string. You'll never type it again (it's only used between Airwave
+  and its bundled Postgres), but the field is required.
+
+## Airwave Configuration
+
+| Question | What to enter |
+| --- | --- |
+| **Timezone** | Your timezone (defaults to `Etc/UTC`). Affects schedule/log timestamps. |
+| **Postgres Image** | Leave on **Postgres 18**. Only change it to move *forward* a major version, and back up the data dataset first — it triggers a one-way upgrade. |
+| **Database Password** | Any strong password. Internal only (Airwave ↔ its Postgres); you won't enter it again. Required, no default. |
+| **Auth Secret** | The 32+ character random string from above. Required, and TrueNAS enforces a 32-character minimum. It signs login sessions, so **changing it later logs everyone out.** |
+| **Initial Admin Email** | The email for the first admin account, created on first boot. Set once here. |
+| **Initial Admin Password** | The password for that first admin account. |
+| **Server URL** | Where browsers and TV apps reach the Airwave **server** — see [URLs](#the-urls-get-these-right) below. e.g. `http://192.168.1.10:30515`. |
+| **Admin Web URL** | Where the **admin panel** is served. e.g. `http://192.168.1.10:30516`. |
+| **TV Web Player URL** | Only needed if you turn on the TV web player (see [Network](#network-ports-and-the-tv-web-player)). e.g. `http://192.168.1.10:30517`. |
+| **TV Player Server URL** | Optional override of the server URL the TV player's browser uses. Leave blank to reuse the Server URL. |
+| **Enable AI Lineup Workflow Engine** | On by default. Turn off only if you don't use the AI lineup builder. |
+| **Additional Environment Variables** | Optional name/value extras — `PLEX_CLIENT_IDENTIFIER` (a stable UUID from `uuidgen`), `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`, `EXTRA_CORS_ORIGINS`, and anything else from the [Configuration reference](/docs/self-hosting/configuration). |
+
+<Alert type="warn" title="The Admin Email and Password are set once">
+Both are applied only on first boot to seed the first account, and can't be changed by editing the app
+afterward. Change them later from inside Airwave (or, if you must reset them, from the server container).
+Get them right the first time.
+</Alert>
+
+### The URLs — get these right
+
+The three URL fields are the number-one cause of "it installed but I can't log in." Each one must point at
+**exactly where that service is actually reachable**, with the right scheme (`http` vs `https`) and port:
+
+- **Plain HTTP on the LAN:** use `http://<host-ip>:<port>` with the host's real IP, not `localhost` (the TV
+  apps and your browser aren't on the server). Example: `http://192.168.1.10:30515`.
+- **Behind a reverse proxy / HTTPS:** use the external `https://<domain>` you proxy to each service.
+
+The port in each URL must match that service's **published** port in the Network section below. A scheme or
+port mismatch is what shows up later as a failed login or an expired-code error.
+
+| URL field | Points at | Default port |
+| --- | --- | --- |
+| Server URL | the server (API the apps talk to) | `30515` |
+| Admin Web URL | the admin panel you log into | `30516` |
+| TV Web Player URL | the browser TV player (if enabled) | `30517` |
+
+## User and Group Configuration
+
+Leave **User ID** and **Group ID** at **568** (the built-in TrueNAS `apps` user) unless you have a specific
+reason. These own the Postgres data and the bumper-music library on disk; 568 is what TrueNAS expects, and
+the image is built to run as any non-root UID.
+
+## Network — ports and the TV web player
+
+Three services, three ports. The defaults sit in the TrueNAS node-port range:
+
+- **Server Port** — default `30515`, bind mode **Publish**. This is what your **Server URL** points at.
+- **Admin Web Port** — default `30516`, bind mode **Publish**. This is what your **Admin Web URL** points at.
+- **TV Web Player Port** — default `30517`, bind mode **None**.
+
+<Alert type="warn" title="The TV web player is OFF by default">
+Its port **Bind Mode** defaults to **None**, which means the TV web player container isn't reachable — there
+is no separate on/off switch. To turn it on, set its Bind Mode to **Publish port on host for external
+access**, then fill in the **TV Web Player URL** above to match the port. Leave it on **None** if you only
+use the native apps (Apple TV, Android TV, etc.).
+</Alert>
+
+<Steps>
+<Step>
+**Enabling the TV web player:** set **TV Web Player Port → Bind Mode** to *Publish port on host for external access*.
+</Step>
+<Step>
+Keep the default port (`30517`) or pick your own.
+</Step>
+<Step>
+Set **TV Web Player URL** (in Airwave Configuration) to `http(s)://<host>:<that port>` so the server
+allow-lists it for the TV login flow.
+</Step>
+</Steps>
+
+If you change any port, update the matching URL field to the same number.
+
+## Storage Configuration
+
+| Storage | What it is |
+| --- | --- |
+| **Postgres Data** | Your database — channels, schedules, accounts, everything. Defaults to an **ixVolume** (a dataset TrueNAS creates and manages). Back it up; losing it loses your setup. Choose **Host Path** instead to point at an existing dataset. |
+| **Bumper Music** | Holds the ambient bumper-music library you upload in the admin panel. ixVolume by default. |
+| **Additional Storage** | Usually leave empty. Airwave streams from your Plex server over the network, so you do **not** mount your media library here. |
+
+## Resources Configuration
+
+Defaults are **2 CPUs** and **4096 MB** of memory. Transcoding is done by your Plex server, not by Airwave,
+so modest resources are fine. Raise the memory if you run large AI-lineup builds.
+
+## First boot
+
+Deploy the app. The first start initializes the database and creates your admin account, which takes a
+moment. Then open your **Admin Web URL**, sign in with the admin email and password you set, and connect
+your Plex server. From there, [getting started](/docs) walks you through building your first channel.
+
+<Alert type="info" title="Updating">
+New versions roll out through the catalog — update Airwave from the TrueNAS Apps page like any other app.
+See [Updating](/docs/self-hosting/updating) for what a release contains.
+</Alert>
