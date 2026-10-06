@@ -23,6 +23,7 @@ import {
   generateChannelSchedule,
   repairChannelSchedule,
 } from "../schedule/generate";
+import { ScheduleBusyError } from "../schedule/lock";
 
 /**
  * How many channels the admin "Build Lineup with AI" button actually constructs.
@@ -182,7 +183,14 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
       });
       for (const channel of channels) {
         throwIfAborted(signal);
-        await extendChannelSchedule(prisma, channel.id);
+        try {
+          await extendChannelSchedule(prisma, channel.id, { signal });
+        } catch (err) {
+          // Another build (admin action / workflow) holds this channel's lock — skip it; the next
+          // refresh tick picks it up. Any real error still aborts the run as before.
+          if (err instanceof ScheduleBusyError) continue;
+          throw err;
+        }
       }
     },
   },
@@ -214,8 +222,10 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
         try {
           await generateChannelSchedule(prisma, channels[i]!.id, {
             windowSeconds: INITIAL_WINDOW_SECONDS,
+            signal,
           });
         } catch (err) {
+          if (err instanceof ScheduleBusyError) continue; // being built elsewhere — skip quietly
           console.warn(`[jobs] schedule-backfill failed for "${channels[i]!.name}":`, err);
         }
       }
@@ -267,8 +277,9 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
         throwIfAborted(signal);
         ctx.progress({ current: i, total: stale.length, label: stale[i]!.name });
         try {
-          await generateChannelSchedule(prisma, stale[i]!.id);
+          await generateChannelSchedule(prisma, stale[i]!.id, { signal });
         } catch (err) {
+          if (err instanceof ScheduleBusyError) continue; // being built elsewhere — skip quietly
           console.warn(`[jobs] schedule-bumper-sync failed for "${stale[i]!.name}":`, err);
         }
       }
@@ -392,9 +403,10 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
         throwIfAborted(signal);
         ctx.progress({ current: i, total: channels.length, label: channels[i]!.name });
         try {
-          const r = await repairChannelSchedule(prisma, channels[i]!.id);
+          const r = await repairChannelSchedule(prisma, channels[i]!.id, { signal });
           if (r.repaired) repaired++;
         } catch (err) {
+          if (err instanceof ScheduleBusyError) continue; // being built elsewhere — skip quietly
           console.warn(`[jobs] missing-media-repair failed for "${channels[i]!.name}":`, err);
         }
       }

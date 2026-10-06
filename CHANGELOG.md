@@ -2,6 +2,45 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.27] - 2026-10-06
+
+### Tests
+- **Direct unit coverage for the schedule lock.** Added `lock.test.ts`: the lock acquires/runs/releases, releases even when the build throws, throws `ScheduleBusyError` when the channel is already held, reclaims a stale (dead-build) lock, doesn't contend across different channels, and `clearAllScheduleLocks` sweeps set locks. Full `packages/api` suite is green (54 tests).
+
+## [0.15.26] - 2026-10-06
+
+Wires the schedule-build callsites to the per-channel lock so contention is handled gracefully.
+
+### Changed
+- **Background schedule jobs skip a busy channel instead of failing.** `schedule-refresh`, `schedule-backfill`, `schedule-bumper-sync`, and `schedule-missing-media-repair` now skip a channel whose build is already in progress (and pass their cancel signal through to the lock, so a cancelled job stops waiting). A real error still surfaces as before.
+- **The admin Generate / Extend buttons fail fast and clearly when a build is already running.** Both use a short lock-wait budget and return a `409 Conflict` ("a schedule build is already running for this channel, try again in a moment") instead of hanging or erroring opaquely. The AI lineup workflow, preset generator, importer, and channel-create path are unchanged — they build channels sequentially, so they never contend and simply acquire the lock immediately.
+
+## [0.15.25] - 2026-10-06
+
+### Fixed
+- **Stale schedule locks are cleared at startup.** The server now clears any `Channel.scheduleLockedAt` left set by a previous process (a crash, kill, or redeploy mid-build) during boot, before the job scheduler starts. Single-instance deployment means nothing is building at boot, so a set lock is always stale. This gives instant recovery on top of the automatic 5-minute stale-lock reclaim, so a channel can never be left permanently unable to rebuild its schedule.
+
+## [0.15.24] - 2026-10-06
+
+Serializes channel schedule builds per channel, so concurrent builds can't overlap.
+
+### Changed
+- **`generate`/`extend`/`repair` now serialize per channel via a database lock.** Replaces the PR's in-memory mutex (which was lost on a restart and didn't span processes) with one backed by `Channel.scheduleLockedAt`: an atomic acquire, a bounded backoff-wait on contention (then a `ScheduleBusyError`), and a release that only clears the lock if it's still held by this build. A stale lock (older than 5 minutes, i.e. a crashed or hung build) is automatically reclaimed, so a wedged build can't deadlock a channel. Different channels still build fully in parallel. The concurrency test suite was updated to the new mechanism.
+
+## [0.15.23] - 2026-10-06
+
+More schedule-serialization groundwork: the per-channel lock field.
+
+### Added
+- **`Channel.scheduleLockedAt` column** (migration `20261006181323_add_channel_schedule_lock`): a nullable timestamp used as a per-channel schedule-build mutex. Set while a `generate`/`extend`/`repair` build runs, NULL otherwise. Additive and nullable, a no-op for existing data. The schedule table keeps its plain `@@index([channelId, startsAt])` (no unique constraint) — the lock prevents duplicate rows at the source, so no destructive dedupe is needed.
+
+## [0.15.22] - 2026-10-06
+
+Groundwork for serializing channel schedule builds (preventing concurrent `generate`/`extend`/`repair` on the same channel from appending overlapping timeline rows).
+
+### Added
+- **A reusable `retry()` backoff utility** (`packages/api/src/lib/retry.ts`): runs an async op, retrying with exponential backoff + jitter while it throws a retryable error, abort-aware (bails mid-backoff on an `AbortSignal`), and rethrows the last error once attempts are exhausted. It will back the schedule-build lock's acquire; also usable for other flaky/contended operations.
+
 ## [0.15.21] - 2026-10-05
 
 ### Changed

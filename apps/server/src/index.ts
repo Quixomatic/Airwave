@@ -6,6 +6,7 @@ import { contentTypeFor } from "@airwave/api/services/bumper-music/store";
 import { resumePresetJobRuns } from "@airwave/api/services/generator/generate";
 import { syncConnector } from "@airwave/api/services/remote-access/connector";
 import { startJobs } from "@airwave/api/services/jobs/scheduler";
+import { clearAllScheduleLocks } from "@airwave/api/services/schedule/lock";
 import { refreshWebhookSubscriptions, startWebhookDispatcher } from "@airwave/api/services/webhooks";
 import { getInstanceId, getServerName } from "@airwave/api/services/settings/index";
 import { resolveChannelSource, resolveMediaSource } from "@airwave/api/services/playback/broker";
@@ -367,6 +368,16 @@ try {
   await encryptExistingSourceTokens(prisma);
 } catch (err) {
   console.error("Plex token encryption backfill failed:", err);
+}
+
+// Clear any schedule-build locks left set by a previous process (crash / kill / redeploy). Single-
+// instance: nothing is building at boot, so a set `Channel.scheduleLockedAt` is stale. Runs BEFORE the
+// job scheduler so a job doesn't skip a dead-locked channel on its first tick. Best-effort.
+try {
+  const cleared = await clearAllScheduleLocks(prisma);
+  if (cleared > 0) console.log(`Cleared ${cleared} stale schedule lock(s) at startup.`);
+} catch (err) {
+  console.error("Schedule lock sweep failed:", err);
 }
 
 // Register background jobs (metadata sync, library scan, schedule refresh).

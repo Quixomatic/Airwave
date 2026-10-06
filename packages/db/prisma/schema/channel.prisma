@@ -106,6 +106,13 @@ model Channel {
   // the in-progress pass's constraint, so it holds across a windowed build seam. null unless a constraint is set.
   scheduleRecent    Json?
 
+  // Per-channel schedule-build mutex. Set to `now()` while a generate/extend/repair build runs for this
+  // channel, NULL otherwise, so two concurrent builds can't append overlapping timeline rows (services/
+  // schedule/lock.ts). Also a lease: a value older than the stale interval is treated as dead and
+  // reclaimable, so an in-process hang can't deadlock the channel. Cleared on completion + swept at
+  // startup. Does NOT lock the row for other edits — only the schedule-build functions read it.
+  scheduleLockedAt  DateTime?
+
   // Thin per-channel bumper override; the global BumperConfig owns the content.
   bumperMode BumperMode @default(INHERIT)
   // The BumperConfig.rev this channel's schedule was last built under; Bumper Sync

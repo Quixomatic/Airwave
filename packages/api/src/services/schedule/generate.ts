@@ -9,6 +9,7 @@ import {
   upsertPoolItems,
 } from "../media/media-item";
 import { resolveChannel } from "../plex/resolve";
+import { withChannelScheduleLock } from "./lock";
 import {
   type BuildResult,
   type OrderingStrategy,
@@ -156,7 +157,28 @@ function cursorOf(channel: {
 export async function generateChannelSchedule(
   prisma: PrismaClient,
   channelId: string,
-  opts: { from?: Date; minDurationSeconds?: number; windowSeconds?: number } = {},
+  opts: {
+    from?: Date;
+    minDurationSeconds?: number;
+    windowSeconds?: number;
+    /** Abort the lock's backoff-wait (a cancelled job passes its run signal). */
+    signal?: AbortSignal;
+    /** Lock-acquire retry budget; the admin UI passes a small value to fail fast. Default in lock.ts. */
+    lockAttempts?: number;
+  } = {},
+): Promise<ScheduleSummary> {
+  return withChannelScheduleLock(
+    prisma,
+    channelId,
+    () => generateChannelScheduleUnlocked(prisma, channelId, opts),
+    { signal: opts.signal, attempts: opts.lockAttempts },
+  );
+}
+
+async function generateChannelScheduleUnlocked(
+  prisma: PrismaClient,
+  channelId: string,
+  opts: { from?: Date; minDurationSeconds?: number; windowSeconds?: number },
 ): Promise<ScheduleSummary> {
   const channel = await prisma.channel.findUnique({ where: { id: channelId } });
   if (!channel) throw new Error("Channel not found");
@@ -213,7 +235,29 @@ export async function extendChannelSchedule(
     force?: boolean;
     /** Cap this append too (mid-pass), continuing the stored cursor. */
     windowSeconds?: number;
+    /** Abort the lock's backoff-wait (a cancelled job passes its run signal). */
+    signal?: AbortSignal;
+    /** Lock-acquire retry budget; the admin UI passes a small value to fail fast. Default in lock.ts. */
+    lockAttempts?: number;
   } = {},
+): Promise<ExtendResult> {
+  return withChannelScheduleLock(
+    prisma,
+    channelId,
+    () => extendChannelScheduleUnlocked(prisma, channelId, opts),
+    { signal: opts.signal, attempts: opts.lockAttempts },
+  );
+}
+
+async function extendChannelScheduleUnlocked(
+  prisma: PrismaClient,
+  channelId: string,
+  opts: {
+    minDurationSeconds?: number;
+    thresholdSeconds?: number;
+    force?: boolean;
+    windowSeconds?: number;
+  },
 ): Promise<ExtendResult> {
   const channel = await prisma.channel.findUnique({ where: { id: channelId } });
   if (!channel) throw new Error("Channel not found");
@@ -293,7 +337,28 @@ export type RepairResult = {
 export async function repairChannelSchedule(
   prisma: PrismaClient,
   channelId: string,
-  opts: { now?: Date; minDurationSeconds?: number; windowSeconds?: number } = {},
+  opts: {
+    now?: Date;
+    minDurationSeconds?: number;
+    windowSeconds?: number;
+    /** Abort the lock's backoff-wait (a cancelled job passes its run signal). */
+    signal?: AbortSignal;
+    /** Lock-acquire retry budget; the admin UI passes a small value to fail fast. Default in lock.ts. */
+    lockAttempts?: number;
+  } = {},
+): Promise<RepairResult> {
+  return withChannelScheduleLock(
+    prisma,
+    channelId,
+    () => repairChannelScheduleUnlocked(prisma, channelId, opts),
+    { signal: opts.signal, attempts: opts.lockAttempts },
+  );
+}
+
+async function repairChannelScheduleUnlocked(
+  prisma: PrismaClient,
+  channelId: string,
+  opts: { now?: Date; minDurationSeconds?: number; windowSeconds?: number },
 ): Promise<RepairResult> {
   const channel = await prisma.channel.findUnique({ where: { id: channelId } });
   if (!channel) throw new Error("Channel not found");
