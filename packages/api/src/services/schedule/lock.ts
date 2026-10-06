@@ -75,3 +75,18 @@ export async function withChannelScheduleLock<T>(
     });
   }
 }
+
+/**
+ * Clear every channel's schedule lock. Run ONCE at server startup: this is a single-instance
+ * deployment, so at boot nothing is building and any set lock is stale (left by a crash / kill /
+ * redeploy). This gives instant recovery on boot, on top of the per-acquire stale-timeout. Returns
+ * how many locks were cleared. Must run before the job scheduler so a job doesn't skip a dead-locked
+ * channel on the first tick.
+ */
+export async function clearAllScheduleLocks(prisma: PrismaClient): Promise<number> {
+  const { count } = await prisma.channel.updateMany({
+    where: { scheduleLockedAt: { not: null } },
+    data: { scheduleLockedAt: null },
+  });
+  return count;
+}

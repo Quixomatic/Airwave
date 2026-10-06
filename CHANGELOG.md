@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.25] - 2026-10-06
+
+### Fixed
+- **Stale schedule locks are cleared at startup.** The server now clears any `Channel.scheduleLockedAt` left set by a previous process (a crash, kill, or redeploy mid-build) during boot, before the job scheduler starts. Single-instance deployment means nothing is building at boot, so a set lock is always stale. This gives instant recovery on top of the automatic 5-minute stale-lock reclaim, so a channel can never be left permanently unable to rebuild its schedule.
+
 ## [0.15.24] - 2026-10-06
 
 Serializes channel schedule builds per channel, so concurrent builds can't overlap.
