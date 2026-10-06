@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.24] - 2026-10-06
+
+Serializes channel schedule builds per channel, so concurrent builds can't overlap.
+
+### Changed
+- **`generate`/`extend`/`repair` now serialize per channel via a database lock.** Replaces the PR's in-memory mutex (which was lost on a restart and didn't span processes) with one backed by `Channel.scheduleLockedAt`: an atomic acquire, a bounded backoff-wait on contention (then a `ScheduleBusyError`), and a release that only clears the lock if it's still held by this build. A stale lock (older than 5 minutes, i.e. a crashed or hung build) is automatically reclaimed, so a wedged build can't deadlock a channel. Different channels still build fully in parallel. The concurrency test suite was updated to the new mechanism.
+
 ## [0.15.23] - 2026-10-06
 
 More schedule-serialization groundwork: the per-channel lock field.
