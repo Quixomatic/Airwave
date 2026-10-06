@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.27] - 2026-10-06
+
+### Tests
+- **Direct unit coverage for the schedule lock.** Added `lock.test.ts`: the lock acquires/runs/releases, releases even when the build throws, throws `ScheduleBusyError` when the channel is already held, reclaims a stale (dead-build) lock, doesn't contend across different channels, and `clearAllScheduleLocks` sweeps set locks. Full `packages/api` suite is green (54 tests).
+
 ## [0.15.26] - 2026-10-06
 
 Wires the schedule-build callsites to the per-channel lock so contention is handled gracefully.
