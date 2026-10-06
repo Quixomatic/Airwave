@@ -29,6 +29,7 @@ import {
   getChannelTimeline,
   getNowNext,
 } from "../services/schedule/generate";
+import { ScheduleBusyError } from "../services/schedule/lock";
 
 const orderingEnum = z.enum(["SHUFFLE", "IN_ORDER", "BY_AIR_DATE"]);
 const mediaTypeEnum = z.enum(["movie", "show"]);
@@ -628,16 +629,39 @@ export const channelsRouter = router({
   generateSchedule: adminProcedure
     .input(z.object({ id: z.string(), minHorizonHours: z.number().int().min(1).max(1440).optional() }))
     .mutation(async ({ ctx, input }) => {
-      return generateChannelSchedule(ctx.prisma, input.id, {
-        minDurationSeconds: input.minHorizonHours ? input.minHorizonHours * 3600 : undefined,
-      });
+      try {
+        // Short lock budget (3 tries): if a build is already running for this channel, fail fast to a
+        // "try again" toast rather than hanging the request.
+        return await generateChannelSchedule(ctx.prisma, input.id, {
+          minDurationSeconds: input.minHorizonHours ? input.minHorizonHours * 3600 : undefined,
+          lockAttempts: 3,
+        });
+      } catch (err) {
+        if (err instanceof ScheduleBusyError) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "A schedule build is already running for this channel. Try again in a moment.",
+          });
+        }
+        throw err;
+      }
     }),
 
   /** Append a fresh block at the tail when the schedule is running low (non-disruptive). */
   extendSchedule: adminProcedure
     .input(z.object({ id: z.string(), force: z.boolean().optional() }))
     .mutation(async ({ ctx, input }) => {
-      return extendChannelSchedule(ctx.prisma, input.id, { force: input.force });
+      try {
+        return await extendChannelSchedule(ctx.prisma, input.id, { force: input.force, lockAttempts: 3 });
+      } catch (err) {
+        if (err instanceof ScheduleBusyError) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "A schedule build is already running for this channel. Try again in a moment.",
+          });
+        }
+        throw err;
+      }
     }),
 
   /** The materialized timeline over a window (default: next 24h) for the guide grid. */

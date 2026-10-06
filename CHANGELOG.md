@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.26] - 2026-10-06
+
+Wires the schedule-build callsites to the per-channel lock so contention is handled gracefully.
+
+### Changed
+- **Background schedule jobs skip a busy channel instead of failing.** `schedule-refresh`, `schedule-backfill`, `schedule-bumper-sync`, and `schedule-missing-media-repair` now skip a channel whose build is already in progress (and pass their cancel signal through to the lock, so a cancelled job stops waiting). A real error still surfaces as before.
+- **The admin Generate / Extend buttons fail fast and clearly when a build is already running.** Both use a short lock-wait budget and return a `409 Conflict` ("a schedule build is already running for this channel, try again in a moment") instead of hanging or erroring opaquely. The AI lineup workflow, preset generator, importer, and channel-create path are unchanged — they build channels sequentially, so they never contend and simply acquire the lock immediately.
+
 ## [0.15.25] - 2026-10-06
 
 ### Fixed
