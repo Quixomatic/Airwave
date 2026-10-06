@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.23] - 2026-10-06
+
+More schedule-serialization groundwork: the per-channel lock field.
+
+### Added
+- **`Channel.scheduleLockedAt` column** (migration `20261006181323_add_channel_schedule_lock`): a nullable timestamp used as a per-channel schedule-build mutex. Set while a `generate`/`extend`/`repair` build runs, NULL otherwise. Additive and nullable, a no-op for existing data. The schedule table keeps its plain `@@index([channelId, startsAt])` (no unique constraint) — the lock prevents duplicate rows at the source, so no destructive dedupe is needed.
+
 ## [0.15.22] - 2026-10-06
 
 Groundwork for serializing channel schedule builds (preventing concurrent `generate`/`extend`/`repair` on the same channel from appending overlapping timeline rows).
