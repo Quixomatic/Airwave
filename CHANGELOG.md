@@ -2,6 +2,29 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.21] - 2026-10-05
+
+### Changed
+- **The iPad status-bar band now uses the sidebar background color** (`#0b1120`) instead of a translucent dark overlay, so the strip behind the status bar reads as solid chrome matching the sidebar. tv-native only, iPad only; other platforms unchanged.
+
+## [0.15.20] - 2026-10-04
+
+Refines the iPad status-bar handling in tv-native: no more snap when leaving full screen, and settings is covered too.
+
+### Fixed
+- **The iPad status-bar band no longer snaps in when leaving full-screen playback.** The full player hides the status bar, which collapses the live safe-area inset to 0; the guide was keyed to that live value, so returning from playback reflowed the inset in. The reserved space now comes from the launch-time inset (`initialWindowMetrics`), so it's always held and exiting full screen just reveals it.
+- **The band is now a flex block instead of a padding + absolute overlay**, which also fixes the settings sidebar (absolutely positioned) so it starts below the status bar rather than under it.
+
+### Changed
+- **The settings pages get the same iPad status-bar inset as the guide.** Factored the logic into one shared helper (`lib/ipad-status-bar`), used by both the guide and the settings shell. Still iPad-only (`Platform.isPad`): Apple TV, Android, and iPhone render nothing and are unchanged.
+
+## [0.15.19] - 2026-10-04
+
+Keeps the iPad status bar from overlapping the guide in the tv-native app.
+
+### Fixed
+- **tv-native guide no longer sits under the iPad status bar.** The status bar is hidden during full-screen playback but shows on the guide, where it floated over the top of the interface. The guide now insets its content below the status bar and backs that strip with a subtly darker band so the bar reads as its own chrome. iPad-only (`Platform.isPad`): Apple TV, Android, and iPhone compute a zero inset, so their full-bleed layout is unchanged.
+
 ## [0.15.18] - 2026-10-03
 
 Gives the tv-tauri player an on-screen buffering indicator, so a slow transcode start no longer looks like a frozen screen (part of #56).

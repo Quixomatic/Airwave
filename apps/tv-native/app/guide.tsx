@@ -6,6 +6,7 @@ import { AuroraGrid } from "@/features/guide/aurora-grid";
 import { usePlayer } from "@/features/watch/player-context";
 import { useFavorites, useGuide, useSetFavorite } from "@/hooks/queries";
 import { capsDoneForCurrentServer } from "@/lib/device";
+import { StatusBarBand } from "@/lib/ipad-status-bar";
 import { C } from "@/lib/theme";
 
 /**
@@ -44,6 +45,9 @@ export default function GuideRoute() {
   // the fetch failed and none is available.
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+      {/* iPad status-bar strip (no-op on Apple TV / Android / iPhone). A flex block, so AuroraGrid flows
+          below it and clears the status bar. */}
+      <StatusBarBand />
       <AuroraGrid
         channels={data?.channels ?? []}
         serverTime={data?.serverTime ?? new Date().toISOString()}
