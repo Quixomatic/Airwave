@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.22] - 2026-10-06
+
+Groundwork for serializing channel schedule builds (preventing concurrent `generate`/`extend`/`repair` on the same channel from appending overlapping timeline rows).
+
+### Added
+- **A reusable `retry()` backoff utility** (`packages/api/src/lib/retry.ts`): runs an async op, retrying with exponential backoff + jitter while it throws a retryable error, abort-aware (bails mid-backoff on an `AbortSignal`), and rethrows the last error once attempts are exhausted. It will back the schedule-build lock's acquire; also usable for other flaky/contended operations.
+
 ## [0.15.21] - 2026-10-05
 
 ### Changed
