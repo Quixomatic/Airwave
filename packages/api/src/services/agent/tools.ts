@@ -274,31 +274,152 @@ export type ManualSearchType = "movie" | "show" | "episode";
  * shows (expandable in the UI) + episodes whose OWN title matches (direct hits, carrying show/season/episode
  * context in their guide). Each bucket is capped. Scope is by content TYPE (MediaItem has no library key).
  */
+/**
+ * Smart-search facets, matched against the cached `MediaItem.guide` (jsonb) and `year` column — parity
+ * with the filter-mode fields we can serve WITHOUT Plex. OR within a facet, AND across facets. These
+ * gate movies + shows only; episodes (whose tags live on their parent show) are matched by title alone,
+ * and only when a title query is present.
+ */
+export type SearchFacets = {
+  genres?: string[];
+  actors?: string[];
+  directors?: string[];
+  studios?: string[];
+  ratings?: string[]; // contentRating (PG-13, TV-MA, …)
+  resolutions?: string[]; // 4k / 1080 / 720 / sd …
+  decades?: number[]; // 2010 → [2010, 2020)
+  years?: number[];
+  audienceMin?: number; // audienceRating >= N (0–10)
+  hdr?: boolean;
+  dovi?: boolean;
+};
+
+/** Build the AND-list of facet conditions (each facet an OR of its values). Empty = no facets. */
+function buildFacetAnds(f: SearchFacets): Prisma.MediaItemWhereInput[] {
+  const ands: Prisma.MediaItemWhereInput[] = [];
+  const arrayFacet = (key: string, vals?: string[]) => {
+    if (vals?.length) ands.push({ OR: vals.map((v) => ({ guide: { path: [key], array_contains: v } })) });
+  };
+  const scalarFacet = (key: string, vals?: string[]) => {
+    if (vals?.length) ands.push({ OR: vals.map((v) => ({ guide: { path: [key], equals: v } })) });
+  };
+  arrayFacet("genres", f.genres);
+  arrayFacet("cast", f.actors);
+  arrayFacet("directors", f.directors);
+  scalarFacet("studio", f.studios);
+  scalarFacet("contentRating", f.ratings);
+  scalarFacet("resolution", f.resolutions);
+  if (f.decades?.length) ands.push({ OR: f.decades.map((d) => ({ year: { gte: d, lt: d + 10 } })) });
+  if (f.years?.length) ands.push({ OR: f.years.map((y) => ({ year: y })) });
+  if (f.audienceMin != null) ands.push({ guide: { path: ["audienceRating"], gte: f.audienceMin } });
+  if (f.hdr) ands.push({ guide: { path: ["hdr"], not: Prisma.AnyNull } });
+  if (f.dovi) ands.push({ guide: { path: ["dovi"], not: Prisma.AnyNull } });
+  return ands;
+}
+
 export async function searchMedia(
   prisma: PrismaClient,
-  args: { mediaSourceId: string; query: string; types: ManualSearchType[] },
+  args: { mediaSourceId: string; query: string; types: ManualSearchType[]; facets?: SearchFacets },
 ): Promise<{ movies: PlexItem[]; shows: PlexItem[]; episodes: PlexItem[] }> {
   const q = args.query.trim();
-  if (!q || args.types.length === 0) return { movies: [], shows: [], episodes: [] };
-  const PER_BUCKET = 25;
-  const rows = await prisma.mediaItem.findMany({
-    where: {
-      mediaSourceId: args.mediaSourceId,
-      available: true,
-      type: { in: args.types },
-      title: { contains: q, mode: "insensitive" },
-    },
-    orderBy: { title: "asc" },
-    take: PER_BUCKET * args.types.length,
-    select: { ratingKey: true, title: true, durationMs: true, year: true, airDate: true, guide: true, type: true },
-  });
+  if (args.types.length === 0) return { movies: [], shows: [], episodes: [] };
+  const facetAnds = buildFacetAnds(args.facets ?? {});
+  // A bare search with neither a title nor any facet would return the whole library — skip it.
+  if (!q && facetAnds.length === 0) return { movies: [], shows: [], episodes: [] };
 
-  const out = { movies: [] as PlexItem[], shows: [] as PlexItem[], episodes: [] as PlexItem[] };
-  for (const r of rows) {
-    const bucket = r.type === "movie" ? out.movies : r.type === "show" ? out.shows : out.episodes;
-    if (bucket.length < PER_BUCKET) bucket.push(mediaItemToPlexItem(r));
+  const PER_BUCKET = 25;
+  const titleWhere = q ? { title: { contains: q, mode: "insensitive" as const } } : {};
+  const facetWhere = facetAnds.length ? { AND: facetAnds } : {};
+  const select = {
+    ratingKey: true,
+    title: true,
+    durationMs: true,
+    year: true,
+    airDate: true,
+    guide: true,
+    type: true,
+  } as const;
+
+  // ONE query per bucket, each with its own cap, so a high-volume bucket (episodes — matched by title
+  // only, NOT facet-filtered) can't starve the facet-filtered movie/show buckets in a shared window.
+  const run = (where: Prisma.MediaItemWhereInput) =>
+    prisma.mediaItem.findMany({
+      where: { mediaSourceId: args.mediaSourceId, available: true, ...where },
+      orderBy: { title: "asc" },
+      take: PER_BUCKET,
+      select,
+    });
+
+  const wantMovies = args.types.includes("movie");
+  const wantShows = args.types.includes("show");
+  const wantEpisodes = args.types.includes("episode") && q.length > 0; // episodes: title match only
+
+  const [movies, shows, episodes] = await Promise.all([
+    wantMovies ? run({ type: "movie", ...titleWhere, ...facetWhere }) : Promise.resolve([]),
+    wantShows ? run({ type: "show", ...titleWhere, ...facetWhere }) : Promise.resolve([]),
+    wantEpisodes ? run({ type: "episode", ...titleWhere }) : Promise.resolve([]),
+  ]);
+
+  return {
+    movies: movies.map(mediaItemToPlexItem),
+    shows: shows.map(mediaItemToPlexItem),
+    episodes: episodes.map(mediaItemToPlexItem),
+  };
+}
+
+export type MediaFacet = "genre" | "actor" | "director" | "studio" | "rating" | "resolution" | "decade";
+
+const ARRAY_FACET_KEY: Partial<Record<MediaFacet, string>> = { genre: "genres", actor: "cast", director: "directors" };
+const SCALAR_FACET_KEY: Partial<Record<MediaFacet, string>> = {
+  studio: "studio",
+  rating: "contentRating",
+  resolution: "resolution",
+};
+
+/**
+ * Distinct values for a smart-search facet, matching `query`, straight from the MediaItem cache (no Plex).
+ * Array facets (genre/actor/director) expand the jsonb array; scalar facets (studio/rating/resolution) read
+ * the string; `decade` derives from the `year` column. Feeds the chip autocomplete; empty query = all.
+ */
+export async function mediaFacetValues(
+  prisma: PrismaClient,
+  args: { mediaSourceId: string; facet: MediaFacet; query: string; limit?: number },
+): Promise<string[]> {
+  const sid = args.mediaSourceId;
+  const like = `%${args.query.trim()}%`;
+  const limit = Math.min(Math.max(args.limit ?? 25, 1), 50);
+
+  if (args.facet === "decade") {
+    const rows = await prisma.$queryRaw<{ d: number }[]>`
+      SELECT DISTINCT (year / 10 * 10) AS d FROM media_item
+      WHERE "mediaSourceId" = ${sid} AND available AND year IS NOT NULL
+      ORDER BY d DESC LIMIT ${limit}`;
+    return rows.map((r) => String(r.d));
   }
-  return out;
+
+  const arrayKey = ARRAY_FACET_KEY[args.facet];
+  if (arrayKey) {
+    const rows = await prisma.$queryRaw<{ v: string }[]>`
+      SELECT DISTINCT v FROM media_item m
+      CROSS JOIN LATERAL jsonb_array_elements_text(
+        CASE WHEN jsonb_typeof(m.guide -> ${arrayKey}) = 'array' THEN m.guide -> ${arrayKey} ELSE '[]'::jsonb END
+      ) AS v
+      WHERE m."mediaSourceId" = ${sid} AND m.available AND v ILIKE ${like}
+      ORDER BY v LIMIT ${limit}`;
+    return rows.map((r) => r.v);
+  }
+
+  const scalarKey = SCALAR_FACET_KEY[args.facet];
+  if (scalarKey) {
+    const rows = await prisma.$queryRaw<{ v: string }[]>`
+      SELECT DISTINCT m.guide ->> ${scalarKey} AS v FROM media_item m
+      WHERE m."mediaSourceId" = ${sid} AND m.available
+        AND m.guide ->> ${scalarKey} IS NOT NULL AND m.guide ->> ${scalarKey} ILIKE ${like}
+      ORDER BY v LIMIT ${limit}`;
+    return rows.map((r) => r.v);
+  }
+
+  return [];
 }
 
 /**

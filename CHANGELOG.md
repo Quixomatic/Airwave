@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.28] - 2026-10-07
+
+Server groundwork for Manual-mode smart search: facet filters + value autocomplete, from the cache.
+
+### Added
+- **`channels.mediaFacetValues`** — distinct values for a manual-search facet (genre, actor, director, studio, rating, resolution, decade), matched against the `MediaItem` cache (no Plex round-trip). Array facets expand the jsonb guide (`genres`/`cast`/`directors`), scalar facets read the string, decade derives from `year`. Feeds the chip autocomplete (empty query = all values).
+- **`channels.searchMedia` now takes optional facet filters** (`genres`, `actors`, `directors`, `studios`, `ratings`, `resolutions`, `decades`, `years`, `audienceMin`, `hdr`, `dovi`). OR within a facet, AND across facets; filters apply to movies + shows (episodes still match by their own title only, when a title is typed). Native Prisma JSON filtering, one query per result bucket so episodes can't starve the facet-filtered movie/show results. Backward-compatible: no facets behaves exactly as before.
+
+### Dev
+- `scripts/probe-media-facets.ts` — read-only probe that validates the facet queries against a live library.
+
 ## [0.15.27] - 2026-10-06
 
 ### Tests

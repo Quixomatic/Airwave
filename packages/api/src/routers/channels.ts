@@ -13,6 +13,8 @@ import { decryptToken } from "../services/plex/token";
 import { getSourceReadiness, notReadyReason } from "../services/sources/readiness";
 import {
   itemLabels as itemLabelsService,
+  type MediaFacet,
+  mediaFacetValues as mediaFacetValuesService,
   previewItems,
   previewFilter as resolvePreviewFilter,
   previewManual as resolvePreviewManual,
@@ -576,13 +578,30 @@ export const channelsRouter = router({
       }),
     ),
 
-  /** Manual-mode search over the MediaItem cache — movies / shows / episodes matching a title query. */
+  /** Manual-mode smart search over the MediaItem cache — title + facet chips (genre/actor/decade/…). */
   searchMedia: adminProcedure
     .input(
       z.object({
         mediaSourceId: z.string(),
         query: z.string(),
         types: z.array(z.enum(["movie", "show", "episode"])).min(1),
+        // Optional smart-search facets (parity with filter mode, served from the cache). OR within a
+        // facet, AND across facets; applied to movies + shows only (episodes match title alone).
+        facets: z
+          .object({
+            genres: z.array(z.string()).optional(),
+            actors: z.array(z.string()).optional(),
+            directors: z.array(z.string()).optional(),
+            studios: z.array(z.string()).optional(),
+            ratings: z.array(z.string()).optional(),
+            resolutions: z.array(z.string()).optional(),
+            decades: z.array(z.number().int()).optional(),
+            years: z.array(z.number().int()).optional(),
+            audienceMin: z.number().optional(),
+            hdr: z.boolean().optional(),
+            dovi: z.boolean().optional(),
+          })
+          .optional(),
       }),
     )
     .query(({ ctx, input }) =>
@@ -590,6 +609,26 @@ export const channelsRouter = router({
         mediaSourceId: input.mediaSourceId,
         query: input.query,
         types: input.types,
+        facets: input.facets,
+      }),
+    ),
+
+  /** Distinct values for a smart-search facet (chip autocomplete), from the MediaItem cache. */
+  mediaFacetValues: adminProcedure
+    .input(
+      z.object({
+        mediaSourceId: z.string(),
+        facet: z.enum(["genre", "actor", "director", "studio", "rating", "resolution", "decade"]),
+        query: z.string().default(""),
+        limit: z.number().int().min(1).max(50).optional(),
+      }),
+    )
+    .query(({ ctx, input }) =>
+      mediaFacetValuesService(ctx.prisma, {
+        mediaSourceId: input.mediaSourceId,
+        facet: input.facet as MediaFacet,
+        query: input.query,
+        limit: input.limit,
       }),
     ),
 
