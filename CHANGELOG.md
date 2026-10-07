@@ -2,7 +2,7 @@
 
 All notable changes to Airwave are documented here.
 
-## [0.16.0] - 2026-10-07
+## [0.15.36] - 2026-10-07
 
 Convert a Filter-mode channel's current results into a hand-picked Manual pool, in one click.
 
