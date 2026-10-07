@@ -758,6 +758,7 @@ export function ManualBuilder({
         </p>
         {value.length === 0 ? (
           <EmptyState
+            variant="compact"
             icon={ListChecks}
             title="Nothing added yet"
             description="Search above and add movies, shows, or episodes to build this channel."

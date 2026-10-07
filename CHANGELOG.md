@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.33] - 2026-10-07
+
+### Changed
+- **The "In this channel" empty state in the Manual builder is now compact.** The `EmptyState` component gained a `variant="compact"`: a horizontal layout (smaller icon disc in a left gutter, text left-aligned beside it, the group still centered) with trimmed vertical padding. The empty pool below the search results uses it, so it no longer takes up as much height as the full-size search-results empty state. The default variant is unchanged everywhere else.
+
 ## [0.15.32] - 2026-10-07
 
 ### Changed
