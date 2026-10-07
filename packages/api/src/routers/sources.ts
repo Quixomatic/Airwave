@@ -83,9 +83,11 @@ export const sourcesRouter = router({
   setLibraryEnabled: adminProcedure
     .input(z.object({ libraryId: z.string(), enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+      // A manual toggle (either direction) claims ownership of the library: clear the library-health state
+      // so it stays as the user set it and isn't re-managed (re-enabled or re-disabled) by the health job.
       await ctx.prisma.mediaLibrary.update({
         where: { id: input.libraryId },
-        data: { enabled: input.enabled },
+        data: { enabled: input.enabled, autoDisabled: false, missingPolls: 0 },
       });
       return { ok: true };
     }),

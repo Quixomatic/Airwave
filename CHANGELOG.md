@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.38] - 2026-10-07
+
+Auto-disable a Plex library that was deleted, and turn it back on if it returns (issue #36).
+
+### Added
+- **New "Library Health" job.** Every 15 minutes it does a cheap check that each source's libraries still exist on the server. A library that has disappeared (for example, deleted in Plex) is auto-disabled after three consecutive failed checks, so the heavier jobs (metadata sync, library scan, schedule builds) stop erroring on a section that no longer exists. If the library reappears in a later check, it is turned back on automatically. This prevents the all-jobs-failing situation in #36, where a deleted library left the sync and schedule jobs failing with Plex 404s.
+
+### Changed
+- **A library you disable by hand now stays disabled.** The Library Health job only manages libraries it disabled itself; a manual on/off in Sources claims ownership of that library (it clears the auto-disable state), so the job never re-enables or re-disables a choice you made.
+
 ## [0.15.37] - 2026-10-07
 
 Groundwork for auto-disabling a deleted Plex library (issue #36).

@@ -15,7 +15,7 @@ import { getAppSettings } from "../settings";
 import { firstReadySource } from "../sources/readiness";
 import { getPlexUser, resolveConnectionUrls } from "../plex/client";
 import { reapStaleWatchSessions } from "../playback/sessions";
-import { syncLibraries } from "../plex/sync-libraries";
+import { reconcileLibraryHealth, syncLibraries } from "../plex/sync-libraries";
 import { withDecryptedToken } from "../plex/token";
 import {
   INITIAL_WINDOW_SECONDS,
@@ -165,6 +165,21 @@ export const JOB_DEFINITIONS: JobDefinition[] = [
       for (const source of await enabledSources()) {
         throwIfAborted(signal);
         await syncLibraries(prisma, source);
+      }
+    },
+  },
+  {
+    id: "library-health",
+    name: "Library Health",
+    description:
+      "Frequent, lightweight check that each source's libraries still exist on the server. A library that disappears (e.g. deleted in Plex) is auto-disabled after a few failed checks so the heavier jobs don't error on it, and it's turned back on automatically if it reappears. Libraries you disabled by hand are left alone.",
+    interval: "minutes",
+    // every 15 minutes — a single cheap library-list call per source; grace is 3 consecutive misses
+    defaultCron: "0 */15 * * * *",
+    run: async (signal) => {
+      for (const source of await enabledSources()) {
+        throwIfAborted(signal);
+        await reconcileLibraryHealth(prisma, source);
       }
     },
   },
