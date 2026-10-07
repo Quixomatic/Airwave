@@ -30,7 +30,7 @@ const MISSING_POLL_THRESHOLD = 3;
 
 /** Per-library presence badge driven by the library-health job: Healthy / Missing n/3 / Not found. */
 function LibraryHealthBadge({ autoDisabled, missingPolls }: { autoDisabled: boolean; missingPolls: number }) {
-  if (autoDisabled)
+  if (autoDisabled || missingPolls >= MISSING_POLL_THRESHOLD)
     return (
       <Badge variant="outline" className="border-red-500/30 text-red-600">
         Not found

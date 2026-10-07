@@ -69,7 +69,10 @@ export async function reconcileLibraryHealth(prisma: PrismaClient, source: Conne
         });
       }
     } else {
-      // Missing this poll: count it, and auto-disable once it's been missing enough times (and is still on).
+      // Missing this poll. Once it's already auto-disabled or has reached the threshold there's nothing
+      // left to do — stop counting (keeps `missingPolls` capped at the threshold and avoids a pointless
+      // write every poll while a library stays gone).
+      if (lib.autoDisabled || lib.missingPolls >= MISSING_POLL_THRESHOLD) continue;
       const next = lib.missingPolls + 1;
       const disableNow = next >= MISSING_POLL_THRESHOLD && lib.enabled;
       await prisma.mediaLibrary.update({

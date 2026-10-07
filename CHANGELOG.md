@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.40] - 2026-10-07
+
+### Changed
+- **Library Health stops counting once a library is confirmed gone.** `missingPolls` is now capped at the threshold instead of growing forever while a library stays missing, which also removes a pointless database write on every poll for an already-gone library. The Sources badge shows "Not found" once a library is auto-disabled or has reached the threshold, so a hand-disabled library that was later deleted reads "Not found" rather than an ever-climbing "Missing n/3".
+
 ## [0.15.39] - 2026-10-07
 
 ### Added
