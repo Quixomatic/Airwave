@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.37] - 2026-10-07
+
+Groundwork for auto-disabling a deleted Plex library (issue #36).
+
+### Added
+- **`MediaLibrary.autoDisabled` and `MediaLibrary.missingPolls` columns** (migration `20261007200035_add_library_health_fields`): fields for the upcoming library-health check. `autoDisabled` marks a library that the system turned off because it vanished from the Plex server (as opposed to a manual toggle), and `missingPolls` counts consecutive failed presence polls. Additive and nullable-safe (defaults `false` / `0`), a no-op for existing data.
+
 ## [0.15.36] - 2026-10-07
 
 Convert a Filter-mode channel's current results into a hand-picked Manual pool, in one click.

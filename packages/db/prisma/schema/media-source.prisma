@@ -105,6 +105,11 @@ model MediaLibrary {
   title         String
   type          String // "movie" | "show" | …
   enabled       Boolean     @default(true)
+  // Library-health auto-disable (issue #36): a vanished Plex library is auto-disabled after a few failed
+  // presence polls, then re-enabled if it returns. `autoDisabled` marks that library-health (NOT a manual
+  // toggle) turned it off, so a manual disable stays off; `missingPolls` counts consecutive failed polls.
+  autoDisabled  Boolean     @default(false)
+  missingPolls  Int         @default(0)
   lastScanAt    DateTime?
 
   createdAt DateTime @default(now())
