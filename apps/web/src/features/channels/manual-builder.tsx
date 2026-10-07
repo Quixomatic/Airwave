@@ -4,7 +4,7 @@ import { Skeleton } from "@airwave/ui/components/skeleton";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronDown, ChevronRight, Clapperboard, Filter, ListChecks, ListTree, Plus, Search, SearchX, Tv, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { BottomBlur } from "@/components/bottom-blur";
 import { EmptyState } from "@/components/empty-state";
@@ -215,6 +215,10 @@ const FACET_LABEL: Record<FacetKind, string> = {
   resolution: "Resolution", decade: "Decade", year: "Year", audience: "Audience", hdr: "HDR", dovi: "Dolby Vision",
 };
 const PREFIX_HINT = Object.keys(FACET_PREFIX).map((p) => `${p}:`).join("  ");
+/** The facet palette shown in the always-visible footer, in display order (prefix === the kind name). */
+const FOOTER_FACETS: FacetKind[] = [
+  "genre", "actor", "director", "studio", "rating", "resolution", "decade", "year", "audience", "hdr", "dovi",
+];
 
 /** Parse a leading `prefix:` of a known facet off the raw input. Returns the facet + the text after it. */
 function parseFacetInput(q: string): { kind: FacetKind | null; value: string } {
@@ -360,6 +364,21 @@ export function ManualBuilder({
   };
   const removeChip = (i: number) => setChips((prev) => prev.filter((_, j) => j !== i));
 
+  // ── Facet palette footer ──
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Picking a palette facet is the same as typing its prefix: a boolean flag commits straight away;
+  // a value/numeric facet drops `prefix:` into the input (opening the value dropdown) and refocuses.
+  const pickFacet = (kind: FacetKind) => {
+    if (BOOL_FACETS.has(kind)) commitChip(kind, "");
+    else setQuery(`${kind}:`);
+    inputRef.current?.focus();
+  };
+  // Filter the palette by the current typed text (only when no prefix is active yet) — "gen" → Genre.
+  const paletteQuery = query.includes(":") ? "" : query.trim().toLowerCase();
+  const visibleFacets = paletteQuery
+    ? FOOTER_FACETS.filter((k) => k.includes(paletteQuery) || FACET_LABEL[k].toLowerCase().includes(paletteQuery))
+    : FOOTER_FACETS;
+
   const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Backspace" && query === "" && chips.length) {
       e.preventDefault();
@@ -429,6 +448,7 @@ export function ManualBuilder({
               </span>
             ))}
             <input
+              ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onSearchKeyDown}
@@ -461,6 +481,26 @@ export function ManualBuilder({
           >
             Clear all
           </button>
+        </div>
+
+        {/* Facet palette footer — a borderless strip inset below the bar (frame/muted bg). Click a facet
+            to start it (same as typing its prefix); typing filters the palette ("gen" → Genre). */}
+        <div className="bg-muted/72 mx-2 flex flex-wrap items-center gap-1.5 rounded-b-md px-3 py-2 text-xs">
+          <span className="text-muted-foreground mr-0.5">Filter by</span>
+          {visibleFacets.length === 0 ? (
+            <span className="text-muted-foreground/70">no matching filter — keep typing to search titles</span>
+          ) : (
+            visibleFacets.map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => pickFacet(k)}
+                className="bg-background/60 text-foreground hover:bg-background rounded px-1.5 py-0.5 font-medium transition-colors"
+              >
+                {FACET_LABEL[k]}
+              </button>
+            ))
+          )}
         </div>
 
         {/* Facet-value dropdown — opens while a `prefix:` is active. Input keeps focus (onMouseDown

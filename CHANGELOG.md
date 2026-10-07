@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.30] - 2026-10-07
+
+### Added
+- **Facet palette under the Manual-mode search bar.** An always-visible, borderless strip (inset below the search bar) lists the available filters — Genre, Actor, Director, Studio, Rating, Resolution, Decade, Year, Audience, HDR, Dolby Vision. Clicking one starts that filter (the same as typing its prefix), and typing narrows the palette ("gen" → Genre), so you can discover and pick facets without memorizing the prefixes.
+
 ## [0.15.29] - 2026-10-07
 
 Manual-mode channels get a smart, chip-based search (the admin builder).
