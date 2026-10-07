@@ -633,12 +633,14 @@ export function ManualBuilder({
           <div className={cn("max-h-[32rem] space-y-3 overflow-y-auto p-1", showingResults && "pb-28")}>
           {types.length === 0 ? (
             <EmptyState
+              variant="compact"
               icon={Filter}
               title="Select at least one search category"
               description="Turn on Movies, TV Shows, or Episodes to search."
             />
           ) : debouncedTitle.length < 2 && !hasChips ? (
             <EmptyState
+              variant="compact"
               icon={Search}
               title="Search your library"
               description="Type at least two characters, or add a filter like genre: / actor: / decade: to find things to add."
@@ -647,6 +649,7 @@ export function ManualBuilder({
             <PreviewSkeleton count={ONE_ROW} />
           ) : !hasResults ? (
             <EmptyState
+              variant="compact"
               icon={SearchX}
               title="No results found"
               description="Try a different search, or adjust the Movies / TV Shows / Episodes scope."

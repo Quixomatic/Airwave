@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.34] - 2026-10-07
+
+### Changed
+- **The Manual builder's search-results empty states are now compact too.** The three idle/empty states in the results area (select a category, search your library, no results found) use the compact `EmptyState` variant, matching the "In this channel" pool below, so none of them claim a full panel's height.
+
 ## [0.15.33] - 2026-10-07
 
 ### Changed
