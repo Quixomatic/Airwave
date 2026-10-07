@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.41] - 2026-10-07
+
+Custom request headers for OpenAI-compatible AI connections (issue #58).
+
+### Added
+- **Extra request headers on local / OpenAI-compatible AI connections.** Settings → AI Assistant → a `compatible` connection → Advanced now has an "Extra request headers" editor (add/remove key/value rows). The headers are merged into every request to that endpoint, including the connection Test, so endpoints that require a header can finally be used. The motivating case is OpenCode Go, which rejects any request missing `x-opencode-session`; a custom `User-Agent` is another use. Headers are stored encrypted at rest (same as the API key), since one can carry a secret. Reserved transport and auth headers (Authorization, Content-Type, Host, Content-Length, Connection, Transfer-Encoding, Accept-Encoding) can't be overridden, on save and at request time; use the API key field for auth. Migration `20261007205951_add_ai_connection_extra_headers` adds the nullable `AiConnection.extraHeadersEnc` column (a no-op for existing data).
+
 ## [0.15.40] - 2026-10-07
 
 ### Changed

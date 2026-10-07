@@ -28,9 +28,56 @@ export type ResolvedConnection = {
   disableThinking?: boolean;
   /** LOCAL only: extra JSON merged into every request body (engine-specific escape hatch). */
   extraBody?: unknown;
+  /** LOCAL only: extra request headers merged into every request (decrypted; reserved headers stripped). */
+  extraHeaders?: Record<string, string>;
   /** Z.ai (GLM) only: `reasoning_effort` level ("low" | "high" | "max"); null = provider default. */
   reasoningEffort?: string | null;
 };
+
+/**
+ * Request headers an admin's extra-headers map may NEVER set — transport/content headers the fetch layer
+ * owns and the auth header the API-key field owns. Lowercase; matched case-insensitively. Enforced BOTH on
+ * save (stripped before encrypting) and at merge time (skipped), so a stale/tampered blob still can't inject
+ * one.
+ */
+const PROTECTED_HEADERS = new Set([
+  "host",
+  "content-length",
+  "content-type",
+  "connection",
+  "transfer-encoding",
+  "accept-encoding",
+  "authorization",
+]);
+
+/** Drop reserved + blank-keyed entries and stringify values. The one gate both save and read run through. */
+function sanitizeHeaders(h: Record<string, unknown> | null | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (h && typeof h === "object" && !Array.isArray(h)) {
+    for (const [k, v] of Object.entries(h)) {
+      const key = k.trim();
+      if (!key || PROTECTED_HEADERS.has(key.toLowerCase()) || v == null) continue;
+      out[key] = String(v);
+    }
+  }
+  return out;
+}
+
+/** Encrypt a header map for storage (same crypto as the API key), or null when nothing is left to store. */
+function encryptHeaders(h: Record<string, unknown> | null | undefined): string | null {
+  const clean = sanitizeHeaders(h);
+  return Object.keys(clean).length ? encryptSecret(JSON.stringify(clean)) : null;
+}
+
+/** Decrypt a stored header map; re-sanitized on read (defense in depth), undefined when absent/garbled. */
+function decryptHeaders(enc: string | null): Record<string, string> | undefined {
+  if (!enc) return undefined;
+  try {
+    return sanitizeHeaders(JSON.parse(decryptSecret(enc)) as Record<string, unknown>);
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * A `fetch` wrapper that merges extra fields into an OpenAI-compatible request body — how we disable a local
@@ -100,8 +147,17 @@ function localFetch(cfg: ResolvedConnection): typeof fetch {
         /* non-JSON body — leave it untouched */
       }
     }
+    // Merge per-connection extra request headers (reserved headers are stripped on save and skipped here).
+    const finalInit: Record<string, unknown> = { ...(nextInit ?? {}), timeout: false };
+    if (cfg.extraHeaders && Object.keys(cfg.extraHeaders).length) {
+      const h = new Headers(nextInit?.headers as ConstructorParameters<typeof Headers>[0]);
+      for (const [k, v] of Object.entries(cfg.extraHeaders)) {
+        if (!PROTECTED_HEADERS.has(k.toLowerCase())) h.set(k, v);
+      }
+      finalInit.headers = h;
+    }
     // `timeout` is a Bun-specific RequestInit field (not in the DOM types) — cast past the type.
-    return fetch(input, { ...(nextInit ?? {}), timeout: false } as unknown as RequestInit);
+    return fetch(input, finalInit as unknown as RequestInit);
   };
   // Cast past the `preconnect` member the lib's `typeof fetch` declares but the SDK never calls.
   return wrapped as typeof fetch;
@@ -165,6 +221,7 @@ type PublicConnection = {
   isWorker: boolean;
   disableThinking: boolean;
   extraBody: unknown;
+  extraHeaders?: Record<string, string>;
   reasoningEffort: string | null;
 };
 
@@ -183,6 +240,7 @@ export async function listConnections(prisma: PrismaClient): Promise<PublicConne
     isWorker: c.isWorker,
     disableThinking: c.disableThinking,
     extraBody: c.extraBody,
+    extraHeaders: decryptHeaders(c.extraHeadersEnc),
     reasoningEffort: c.reasoningEffort,
   }));
 }
@@ -198,6 +256,7 @@ export async function getActiveConnection(prisma: PrismaClient): Promise<Resolve
     apiKey: c.apiKeyEnc ? decryptSecret(c.apiKeyEnc) : null,
     disableThinking: c.disableThinking,
     extraBody: c.extraBody,
+    extraHeaders: decryptHeaders(c.extraHeadersEnc),
     reasoningEffort: c.reasoningEffort,
   };
 }
@@ -242,6 +301,7 @@ export async function getConnectionForRole(
     apiKey: c.apiKeyEnc ? decryptSecret(c.apiKeyEnc) : null,
     disableThinking: c.disableThinking,
     extraBody: c.extraBody,
+    extraHeaders: decryptHeaders(c.extraHeadersEnc),
     reasoningEffort: c.reasoningEffort,
   };
 }
@@ -279,6 +339,8 @@ type ConnectionInput = {
   disableThinking?: boolean;
   /** LOCAL only — extra JSON merged into every request body. `null` clears it. */
   extraBody?: unknown;
+  /** LOCAL only — extra request headers (reserved headers stripped, stored encrypted). `null` clears it. */
+  extraHeaders?: Record<string, string> | null;
   /** Z.ai (GLM) only — `reasoning_effort` level; `null` clears it (back to provider default). */
   reasoningEffort?: string | null;
 };
@@ -299,6 +361,7 @@ export async function createConnection(prisma: PrismaClient, input: ConnectionIn
       apiKeyEnc: input.apiKey ? encryptSecret(input.apiKey) : null,
       disableThinking: input.disableThinking ?? false,
       ...(input.extraBody != null ? { extraBody: input.extraBody as Prisma.InputJsonValue } : {}),
+      ...(input.extraHeaders != null ? { extraHeadersEnc: encryptHeaders(input.extraHeaders) } : {}),
       reasoningEffort: input.reasoningEffort ?? null,
       isActive: first,
       isPlanner: first,
@@ -316,6 +379,9 @@ export async function updateConnection(prisma: PrismaClient, id: string, input: 
     input.extraBody === undefined
       ? {}
       : { extraBody: input.extraBody === null ? Prisma.DbNull : (input.extraBody as Prisma.InputJsonValue) };
+  // Encrypted-string field: undefined = leave unchanged; null or an empty/all-reserved map = clear; a map = set.
+  const extraHeadersPatch =
+    input.extraHeaders === undefined ? {} : { extraHeadersEnc: encryptHeaders(input.extraHeaders) };
   await prisma.aiConnection.update({
     where: { id },
     data: {
@@ -327,6 +393,7 @@ export async function updateConnection(prisma: PrismaClient, id: string, input: 
       reasoningEffort: input.reasoningEffort ?? null,
       ...keyPatch,
       ...extraBodyPatch,
+      ...extraHeadersPatch,
     },
   });
   return listConnections(prisma);
@@ -363,6 +430,7 @@ export async function testConnection(prisma: PrismaClient, id: string): Promise<
     apiKey: c.apiKeyEnc ? decryptSecret(c.apiKeyEnc) : null,
     disableThinking: c.disableThinking,
     extraBody: c.extraBody,
+    extraHeaders: decryptHeaders(c.extraHeadersEnc),
     reasoningEffort: c.reasoningEffort,
   };
   try {

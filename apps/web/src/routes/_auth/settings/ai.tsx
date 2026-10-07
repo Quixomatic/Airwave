@@ -8,7 +8,7 @@ import { Switch } from "@airwave/ui/components/switch";
 import { Textarea } from "@airwave/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, Loader2, Pencil, Plug, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Pencil, Plug, Plus, Trash2, XCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -55,8 +55,21 @@ type Conn = {
   isWorker: boolean;
   disableThinking: boolean;
   extraBody: unknown;
+  extraHeaders?: Record<string, string>;
   reasoningEffort: string | null;
 };
+
+// Request headers an admin's extra-headers rows may not set (mirrors the server's PROTECTED_HEADERS; the
+// server is authoritative and strips these too). Lowercase, compared case-insensitively.
+const RESERVED_HEADERS = new Set([
+  "host",
+  "content-length",
+  "content-type",
+  "connection",
+  "transfer-encoding",
+  "accept-encoding",
+  "authorization",
+]);
 
 const REASONING_EFFORTS = ["low", "high", "max"] as const;
 const EFFORT_DEFAULT = "__default__";
@@ -108,6 +121,8 @@ function SettingsAi() {
   // LOCAL (`compatible`) only — disable the model's thinking + an advanced extra-body JSON escape hatch.
   const [disableThinking, setDisableThinking] = useState(false);
   const [extraBodyText, setExtraBodyText] = useState("");
+  // Extra request headers, edited as key/value rows (compatible only). Stored encrypted on the server.
+  const [headerRows, setHeaderRows] = useState<{ key: string; value: string }[]>([]);
   // Z.ai (GLM) only — reasoning-effort level. EFFORT_DEFAULT = leave to the provider default (max).
   const [reasoningEffort, setReasoningEffort] = useState<string>(EFFORT_DEFAULT);
   const [busy, setBusy] = useState(false);
@@ -127,6 +142,7 @@ function SettingsAi() {
     setApiKey("");
     setDisableThinking(false);
     setExtraBodyText("");
+    setHeaderRows([{ key: "", value: "" }]); // always start with one ready-to-fill row
     setReasoningEffort(EFFORT_DEFAULT);
   };
 
@@ -140,6 +156,11 @@ function SettingsAi() {
     setApiKey("");
     setDisableThinking(c.disableThinking);
     setExtraBodyText(c.extraBody ? JSON.stringify(c.extraBody, null, 2) : "");
+    setHeaderRows(
+      c.extraHeaders && Object.keys(c.extraHeaders).length
+        ? Object.entries(c.extraHeaders).map(([key, value]) => ({ key, value }))
+        : [{ key: "", value: "" }], // no saved headers → one ready-to-fill row
+    );
     setReasoningEffort(c.reasoningEffort ?? EFFORT_DEFAULT);
   };
 
@@ -167,6 +188,21 @@ function SettingsAi() {
         }
       }
     }
+    // Build the extra-headers map from the key/value rows (compatible only). Empty → clear (null).
+    let extraHeaders: Record<string, string> | null | undefined;
+    if (isCompat) {
+      const obj: Record<string, string> = {};
+      for (const row of headerRows) {
+        const key = row.key.trim();
+        if (!key) continue; // skip blank rows
+        if (RESERVED_HEADERS.has(key.toLowerCase())) {
+          toast.error(`"${key}" is a reserved header and can't be set here.`);
+          return;
+        }
+        obj[key] = row.value;
+      }
+      extraHeaders = Object.keys(obj).length ? obj : null;
+    }
     setBusy(true);
     try {
       const payload = {
@@ -176,7 +212,7 @@ function SettingsAi() {
         baseUrl: isCompat ? baseUrl.trim() || null : null,
         apiKey: apiKey ? apiKey : undefined,
         disableThinking: isCompat ? disableThinking : false,
-        ...(isCompat ? { extraBody } : {}),
+        ...(isCompat ? { extraBody, extraHeaders } : {}),
         // Z.ai (GLM) reasoning-effort knob; null (or "__default__") = provider default. Cleared for others.
         reasoningEffort:
           provider === "zai" && reasoningEffort !== EFFORT_DEFAULT
@@ -476,6 +512,54 @@ function SettingsAi() {
                 <p className="text-muted-foreground text-xs">
                   Optional. Merged into every request body — an escape hatch for engine-specific params the
                   toggle above doesn't cover. Leave blank unless you know you need it.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Extra request headers — advanced</Label>
+                <div className="space-y-2">
+                  {headerRows.map((row, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Input
+                        value={row.key}
+                        onChange={(e) =>
+                          setHeaderRows((rows) => rows.map((r, j) => (j === i ? { ...r, key: e.target.value } : r)))
+                        }
+                        placeholder="Header name"
+                        className="font-mono text-xs"
+                      />
+                      <Input
+                        value={row.value}
+                        onChange={(e) =>
+                          setHeaderRows((rows) => rows.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)))
+                        }
+                        placeholder="Value"
+                        className="font-mono text-xs"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setHeaderRows((rows) => rows.filter((_, j) => j !== i))}
+                        aria-label="Remove header"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setHeaderRows((rows) => [...rows, { key: "", value: "" }])}
+                  >
+                    <Plus className="mr-1 h-3.5 w-3.5" /> Add header
+                  </Button>
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  Optional. Sent with every request (for example a required <code>x-opencode-session</code> or a
+                  custom <code>User-Agent</code>). Stored encrypted. Transport and auth headers (Authorization,
+                  Content-Type, Host, …) are reserved and can't be set here — use the API key field for auth.
                 </p>
               </div>
             </>

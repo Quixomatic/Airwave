@@ -25,6 +25,12 @@ model AiConnection {
   /// params not covered by the toggle (e.g. a synonym like `do_reasoning`, or a new engine's flag).
   extraBody Json?
 
+  /// LOCAL (`compatible`) only: optional extra request HEADERS, merged into every request (e.g. a required
+  /// `x-opencode-session`, or a custom `User-Agent`). Stored ENCRYPTED (a header can carry a secret) as a
+  /// JSON object string via crypto.encryptSecret, exactly like `apiKeyEnc`. Reserved transport/auth headers
+  /// are never overridable (see PROTECTED_HEADERS). Null = none.
+  extraHeadersEnc String?
+
   /// Z.ai (GLM) only: reasoning-effort level sent as `reasoning_effort` ("low" | "high" | "max"). GLM-5.3 has
   /// ALWAYS-ON thinking (can't be disabled) and defaults to `max`, which is slow and burns the output-token
   /// budget — so this is the knob to dial it down. Null = provider default (max). Ignored by other providers.

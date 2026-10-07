@@ -28,6 +28,9 @@ const connectionInput = z.object({
   // LOCAL (`compatible`) only — disable the model's thinking, and an optional extra body escape hatch.
   disableThinking: z.boolean().optional(),
   extraBody: z.record(z.string(), z.unknown()).nullable().optional(), // undefined = unchanged; null = clear; object = set
+  // LOCAL only — extra request headers (string→string). Reserved headers are stripped server-side. Stored
+  // encrypted. undefined = unchanged; null (or empty) = clear; object = set.
+  extraHeaders: z.record(z.string(), z.string()).nullable().optional(),
   // Z.ai (GLM) only — reasoning-effort level. undefined = unchanged; null = clear (provider default).
   reasoningEffort: z.enum(["low", "high", "max"]).nullable().optional(),
 });
