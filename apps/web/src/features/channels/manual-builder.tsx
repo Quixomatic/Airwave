@@ -251,6 +251,15 @@ function chipsToFacets(chips: Chip[]) {
   return f;
 }
 
+/** Placeholder shown in the input once a facet pill is active (prompting for its value). */
+function facetInputPlaceholder(kind: FacetKind): string {
+  if (kind === "hdr" || kind === "dovi") return "press Enter to add";
+  if (kind === "year") return "e.g. 2015";
+  if (kind === "audience") return "minimum rating, e.g. 8";
+  if (kind === "decade") return "e.g. 2010";
+  return `type a ${FACET_LABEL[kind].toLowerCase()}…`;
+}
+
 /** The short label shown inside a committed chip. */
 function chipLabel(c: Chip): string {
   if (BOOL_FACETS.has(c.kind)) return FACET_LABEL[c.kind];
@@ -278,10 +287,10 @@ export function ManualBuilder({
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [expandedShow, setExpandedShow] = useState<string | null>(null);
   const [hi, setHi] = useState(0); // highlighted index in the facet dropdown
+  const [activeFacet, setActiveFacet] = useState<FacetKind | null>(null); // the live facet pill, if any
 
-  // A leading `prefix:` of a known facet switches the input into facet mode; otherwise the bare text is
-  // the title filter. The facet value is what the user types after the colon.
-  const { kind: activeFacet, value: pendingValue } = parseFacetInput(query);
+  // When a facet pill is active the input holds just its VALUE (the pill carries the prefix); otherwise
+  // the bare input text is the title filter. Typing a known `prefix:` (onInputChange) flips the pill on.
   const titleText = activeFacet ? "" : query.trim();
   const facetOpen = !!activeFacet && DROPDOWN_FACETS.has(activeFacet);
 
@@ -290,9 +299,9 @@ export function ManualBuilder({
     return () => clearTimeout(t);
   }, [titleText]);
   useEffect(() => {
-    const t = setTimeout(() => setFacetQ(pendingValue.trim()), 200);
+    const t = setTimeout(() => setFacetQ(activeFacet ? query.trim() : ""), 200);
     return () => clearTimeout(t);
-  }, [pendingValue]);
+  }, [query, activeFacet]);
   useEffect(() => setHi(0), [facetQ, activeFacet]);
 
   const types = [
@@ -361,34 +370,66 @@ export function ManualBuilder({
     const chip: Chip = { kind, value: BOOL_FACETS.has(kind) ? "" : v };
     setChips((prev) => (prev.some((c) => c.kind === chip.kind && c.value === chip.value) ? prev : [...prev, chip]));
     setQuery("");
+    setActiveFacet(null);
   };
   const removeChip = (i: number) => setChips((prev) => prev.filter((_, j) => j !== i));
 
-  // ── Facet palette footer ──
+  // ── Facet pill + palette footer ──
   const inputRef = useRef<HTMLInputElement>(null);
-  // Picking a palette facet is the same as typing its prefix: a boolean flag commits straight away;
-  // a value/numeric facet drops `prefix:` into the input (opening the value dropdown) and refocuses.
-  const pickFacet = (kind: FacetKind) => {
-    if (BOOL_FACETS.has(kind)) commitChip(kind, "");
-    else setQuery(`${kind}:`);
+  // Flip the input into facet mode the moment the user completes a known `prefix:` (case-insensitive).
+  // A non-facet `foo:` stays literal text (a plain title keyword). Once a pill is live we stop re-parsing,
+  // so the value the user types after it (even with a colon) is left alone.
+  const onInputChange = (raw: string) => {
+    if (!activeFacet) {
+      const parsed = parseFacetInput(raw);
+      if (parsed.kind) {
+        setActiveFacet(parsed.kind);
+        setQuery(parsed.value);
+        return;
+      }
+    }
+    setQuery(raw);
+  };
+  // Pop the active facet pill off and return the input to plain/empty.
+  const cancelFacet = () => {
+    setActiveFacet(null);
+    setQuery("");
     inputRef.current?.focus();
   };
-  // Filter the palette by the current typed text (only when no prefix is active yet) — "gen" → Genre.
-  const paletteQuery = query.includes(":") ? "" : query.trim().toLowerCase();
+  // Picking a palette facet is the same as completing its prefix: a boolean flag commits straight away;
+  // a value/numeric facet raises the pill (opening the value dropdown) and refocuses.
+  const pickFacet = (kind: FacetKind) => {
+    if (BOOL_FACETS.has(kind)) commitChip(kind, "");
+    else {
+      setActiveFacet(kind);
+      setQuery("");
+    }
+    inputRef.current?.focus();
+  };
+  // Filter the palette by the current typed text (only when no pill/prefix is active yet) — "gen" → Genre.
+  const paletteQuery = activeFacet || query.includes(":") ? "" : query.trim().toLowerCase();
   const visibleFacets = paletteQuery
     ? FOOTER_FACETS.filter((k) => k.includes(paletteQuery) || FACET_LABEL[k].toLowerCase().includes(paletteQuery))
     : FOOTER_FACETS;
 
   const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && query === "" && chips.length) {
-      e.preventDefault();
-      setChips((prev) => prev.slice(0, -1));
-      return;
+    if (e.key === "Backspace" && query === "") {
+      if (activeFacet) {
+        // Backspace into an empty pill pops it off (Discord-style), before touching committed chips.
+        e.preventDefault();
+        setActiveFacet(null);
+        return;
+      }
+      if (chips.length) {
+        e.preventDefault();
+        setChips((prev) => prev.slice(0, -1));
+        return;
+      }
     }
     if (!activeFacet) return;
     if (e.key === "Escape") {
       e.preventDefault();
-      setQuery("");
+      cancelFacet();
       return;
     }
     if (facetOpen && facetOptions.length) {
@@ -411,7 +452,7 @@ export function ManualBuilder({
     if (e.key === "Enter") {
       // numeric (year/audience) → the typed number; boolean (hdr/dovi) → the flag
       e.preventDefault();
-      commitChip(activeFacet, BOOL_FACETS.has(activeFacet) ? "" : pendingValue);
+      commitChip(activeFacet, BOOL_FACETS.has(activeFacet) ? "" : query);
     }
   };
 
@@ -447,14 +488,39 @@ export function ManualBuilder({
                 </button>
               </span>
             ))}
-            <input
-              ref={inputRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={onSearchKeyDown}
-              placeholder={chips.length ? "Add more…" : "Search titles, or type genre:  actor:  decade: …"}
-              className="placeholder:text-muted-foreground text-foreground min-w-[8rem] flex-1 bg-transparent text-base outline-none md:text-sm"
-            />
+            {/* When a facet is active the input lives INSIDE a pseudo-chip: a grouped label segment (the
+                left cap, e.g. "Year") and the value field on the right of the same pill. The wrapper span
+                is always present — only its styling and the label toggle — so the input never remounts and
+                keeps focus/cursor through the plain↔facet transition. Escape / Backspace pop the chip. */}
+            <span
+              className={cn(
+                "flex min-w-[8rem] flex-1 items-stretch",
+                activeFacet && "text-primary bg-primary/10 min-w-[10rem] overflow-hidden rounded",
+              )}
+            >
+              {activeFacet && (
+                <span className="bg-primary/20 flex items-center px-1.5 text-xs font-medium">
+                  {FACET_LABEL[activeFacet]}
+                </span>
+              )}
+              <input
+                ref={inputRef}
+                value={query}
+                onChange={(e) => onInputChange(e.target.value)}
+                onKeyDown={onSearchKeyDown}
+                placeholder={
+                  activeFacet
+                    ? facetInputPlaceholder(activeFacet)
+                    : chips.length
+                      ? "Add more…"
+                      : "Search titles, or type genre:  actor:  decade: …"
+                }
+                className={cn(
+                  "placeholder:text-muted-foreground text-foreground min-w-0 flex-1 bg-transparent text-base outline-none md:text-sm",
+                  activeFacet && "px-1.5",
+                )}
+              />
+            </span>
           </div>
           <div className="border-input bg-muted/72 flex items-center gap-4 border-l px-3 text-sm">
             <label className="flex items-center gap-1.5">
@@ -550,7 +616,7 @@ export function ManualBuilder({
                 ) : (
                   <>
                     Type a {FACET_LABEL[activeFacet].toLowerCase()} and press Enter — e.g.{" "}
-                    <span className="text-foreground font-medium">{activeFacet === "year" ? "year:2015" : "audience:8"}</span>.
+                    <span className="text-foreground font-medium">{activeFacet === "year" ? "2015" : "8"}</span>.
                   </>
                 )}
               </div>

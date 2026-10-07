@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.32] - 2026-10-07
+
+### Changed
+- **The active facet in Manual-mode search is now an inline pseudo-chip.** Completing a known prefix (typing `year:`, or clicking a facet in the palette) collapses the raw `prefix:` text into a single chip: a grouped label cap on the left (e.g. "Year") with the value field inside the same pill, so you type the value within the chip rather than next to loose `genre:` text. Escape or Backspace on an empty value pops the chip off; a non-facet prefix like `comedy:` never becomes a chip and stays a plain title keyword. Prefix matching is case-insensitive (`Year:` = `year:`).
+
 ## [0.15.31] - 2026-10-07
 
 ### Changed
