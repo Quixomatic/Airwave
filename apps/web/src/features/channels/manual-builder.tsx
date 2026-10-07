@@ -499,7 +499,20 @@ export function ManualBuilder({
               )}
             >
               {activeFacet && (
-                <span className="bg-primary/20 flex items-center px-1.5 text-xs font-medium">
+                <span className="bg-primary/20 flex items-center gap-1 px-1.5 text-xs font-medium">
+                  <button
+                    type="button"
+                    // Cancel facet-input mode without needing Escape. onMouseDown + preventDefault keeps
+                    // the input from blurring first, so focus lands cleanly back in the bar.
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      cancelFacet();
+                    }}
+                    aria-label={`Cancel ${FACET_LABEL[activeFacet]} filter`}
+                    className="hover:text-primary/60"
+                  >
+                    <X className="size-3" />
+                  </button>
                   {FACET_LABEL[activeFacet]}
                 </span>
               )}

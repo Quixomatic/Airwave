@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.35] - 2026-10-07
+
+### Changed
+- **The Manual-mode search facet pseudo-chip now has a cancel button.** When a facet is active (the inline `[✕ Genre]` pill), a small ✕ sits as the pill's left cap — clicking it cancels facet-input mode and returns the input to plain title search, the same as pressing Escape or backspacing into the empty pill.
+
 ## [0.15.34] - 2026-10-07
 
 ### Changed
