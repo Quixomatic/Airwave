@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.31] - 2026-10-07
+
+### Changed
+- **The Manual-mode facet palette is now a flush, bordered strip under the search bar.** Dropped the left/right inset so it spans the full width of the bar, and gave it a border on the left, bottom, and right (the bar's bottom corners are squared off), so the search bar and the palette read as one connected bordered element instead of a floating inset chip.
+
 ## [0.15.30] - 2026-10-07
 
 ### Added

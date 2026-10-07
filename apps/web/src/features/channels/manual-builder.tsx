@@ -433,7 +433,7 @@ export function ManualBuilder({
           facet, bare text = title), the Movies/TV/Episodes scope, and Clear. The `relative` wrapper
           anchors the facet-value dropdown directly below. */}
       <div className="relative">
-        <div className="border-input focus-within:border-ring focus-within:ring-ring/50 flex min-h-11 items-stretch overflow-hidden rounded-lg border bg-transparent transition-colors focus-within:ring-3 dark:bg-input/30">
+        <div className="border-input focus-within:border-ring focus-within:ring-ring/50 flex min-h-11 items-stretch overflow-hidden rounded-t-lg border bg-transparent transition-colors focus-within:ring-3 dark:bg-input/30">
           <div className="flex flex-1 flex-wrap items-center gap-1.5 px-3 py-1.5">
             <Search className="text-muted-foreground size-4 shrink-0" />
             {chips.map((c, i) => (
@@ -483,9 +483,10 @@ export function ManualBuilder({
           </button>
         </div>
 
-        {/* Facet palette footer — a borderless strip inset below the bar (frame/muted bg). Click a facet
-            to start it (same as typing its prefix); typing filters the palette ("gen" → Genre). */}
-        <div className="bg-muted/72 mx-2 flex flex-wrap items-center gap-1.5 rounded-b-md px-3 py-2 text-xs">
+        {/* Facet palette footer — a bordered strip flush below the bar (frame/muted bg), sharing the
+            bar's left/right edge with a border on left/bottom/right (no top, it butts the bar). Click a
+            facet to start it (same as typing its prefix); typing filters the palette ("gen" → Genre). */}
+        <div className="border-input bg-muted/72 flex flex-wrap items-center gap-1.5 rounded-b-lg border border-t-0 px-3 py-2 text-xs">
           <span className="text-muted-foreground mr-0.5">Filter by</span>
           {visibleFacets.length === 0 ? (
             <span className="text-muted-foreground/70">no matching filter — keep typing to search titles</span>
