@@ -1,6 +1,6 @@
 {
   "name": "tv-tauri",
-  "version": "0.15.28",
+  "version": "0.15.29",
   "private": true,
   "type": "module",
   "scripts": {

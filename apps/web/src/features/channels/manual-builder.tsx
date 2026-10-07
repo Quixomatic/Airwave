@@ -1,5 +1,6 @@
 import { Button } from "@airwave/ui/components/button";
 import { Checkbox } from "@airwave/ui/components/checkbox";
+import { Skeleton } from "@airwave/ui/components/skeleton";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronDown, ChevronRight, Clapperboard, Filter, ListChecks, ListTree, Plus, Search, SearchX, Tv, X } from "lucide-react";
@@ -194,6 +195,66 @@ function ShowDrill({
   );
 }
 
+// ── Smart-search facets ──────────────────────────────────────────────────────────────────────────
+// A chip-based search: type a `prefix:` of a known facet (genre/actor/decade/…) and a dropdown of
+// matching values opens below the SAME input; picking one commits a chip. Bare text = title filter.
+type FacetKind =
+  | "genre" | "actor" | "director" | "studio" | "rating" | "resolution" | "decade" | "year" | "audience" | "hdr" | "dovi";
+type Chip = { kind: FacetKind; value: string };
+
+const FACET_PREFIX: Record<string, FacetKind> = {
+  genre: "genre", actor: "actor", director: "director", studio: "studio", rating: "rating",
+  resolution: "resolution", decade: "decade", year: "year", audience: "audience", hdr: "hdr", dovi: "dovi",
+};
+/** Facets with a value-autocomplete dropdown (they hit channels.mediaFacetValues). */
+const DROPDOWN_FACETS = new Set<FacetKind>(["genre", "actor", "director", "studio", "rating", "resolution", "decade"]);
+const BOOL_FACETS = new Set<FacetKind>(["hdr", "dovi"]);
+const NUMERIC_FACETS = new Set<FacetKind>(["year", "audience"]);
+const FACET_LABEL: Record<FacetKind, string> = {
+  genre: "Genre", actor: "Actor", director: "Director", studio: "Studio", rating: "Rating",
+  resolution: "Resolution", decade: "Decade", year: "Year", audience: "Audience", hdr: "HDR", dovi: "Dolby Vision",
+};
+const PREFIX_HINT = Object.keys(FACET_PREFIX).map((p) => `${p}:`).join("  ");
+
+/** Parse a leading `prefix:` of a known facet off the raw input. Returns the facet + the text after it. */
+function parseFacetInput(q: string): { kind: FacetKind | null; value: string } {
+  const m = /^([a-zA-Z]+):(.*)$/.exec(q);
+  if (!m) return { kind: null, value: "" };
+  const kind = FACET_PREFIX[m[1]!.toLowerCase()];
+  return kind ? { kind, value: m[2]! } : { kind: null, value: "" };
+}
+
+/** Collapse committed chips into the searchMedia `facets` shape (OR within a facet, AND across). */
+function chipsToFacets(chips: Chip[]) {
+  const f: {
+    genres?: string[]; actors?: string[]; directors?: string[]; studios?: string[];
+    ratings?: string[]; resolutions?: string[]; decades?: number[]; years?: number[];
+    audienceMin?: number; hdr?: boolean; dovi?: boolean;
+  } = {};
+  for (const c of chips) {
+    if (c.kind === "genre") (f.genres ??= []).push(c.value);
+    else if (c.kind === "actor") (f.actors ??= []).push(c.value);
+    else if (c.kind === "director") (f.directors ??= []).push(c.value);
+    else if (c.kind === "studio") (f.studios ??= []).push(c.value);
+    else if (c.kind === "rating") (f.ratings ??= []).push(c.value);
+    else if (c.kind === "resolution") (f.resolutions ??= []).push(c.value);
+    else if (c.kind === "decade") (f.decades ??= []).push(Number(c.value));
+    else if (c.kind === "year") (f.years ??= []).push(Number(c.value));
+    else if (c.kind === "audience") f.audienceMin = Math.max(f.audienceMin ?? 0, Number(c.value));
+    else if (c.kind === "hdr") f.hdr = true;
+    else if (c.kind === "dovi") f.dovi = true;
+  }
+  return f;
+}
+
+/** The short label shown inside a committed chip. */
+function chipLabel(c: Chip): string {
+  if (BOOL_FACETS.has(c.kind)) return FACET_LABEL[c.kind];
+  if (c.kind === "decade") return `${c.value}s`;
+  if (c.kind === "audience") return `Audience ≥ ${c.value}`;
+  return `${FACET_LABEL[c.kind]}: ${c.value}`;
+}
+
 export function ManualBuilder({
   value,
   onChange,
@@ -203,41 +264,73 @@ export function ManualBuilder({
   onChange: (keys: string[]) => void;
   mediaSourceId: string;
 }) {
-  const [query, setQuery] = useState("");
-  const [debounced, setDebounced] = useState("");
+  const [query, setQuery] = useState(""); // raw input: a facet-in-progress (`genre:…`) OR title text
+  const [chips, setChips] = useState<Chip[]>([]);
+  const [debouncedTitle, setDebouncedTitle] = useState("");
+  const [facetQ, setFacetQ] = useState(""); // debounced value typed after a `prefix:`
   const [movies, setMovies] = useState(true);
   const [tv, setTv] = useState(true);
   const [episodes, setEpisodes] = useState(false); // off by default so search doesn't always match episode titles
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [expandedShow, setExpandedShow] = useState<string | null>(null);
+  const [hi, setHi] = useState(0); // highlighted index in the facet dropdown
+
+  // A leading `prefix:` of a known facet switches the input into facet mode; otherwise the bare text is
+  // the title filter. The facet value is what the user types after the colon.
+  const { kind: activeFacet, value: pendingValue } = parseFacetInput(query);
+  const titleText = activeFacet ? "" : query.trim();
+  const facetOpen = !!activeFacet && DROPDOWN_FACETS.has(activeFacet);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(query.trim()), 300);
+    const t = setTimeout(() => setDebouncedTitle(titleText), 300);
     return () => clearTimeout(t);
-  }, [query]);
-
-  // Changing the search (query or scope) clears any pending selection, so the action bar never lingers on
-  // items from a previous result set.
+  }, [titleText]);
   useEffect(() => {
-    setChecked(new Set());
-    setExpandedShow(null);
-  }, [debounced, movies, tv, episodes]);
+    const t = setTimeout(() => setFacetQ(pendingValue.trim()), 200);
+    return () => clearTimeout(t);
+  }, [pendingValue]);
+  useEffect(() => setHi(0), [facetQ, activeFacet]);
 
   const types = [
     ...(movies ? (["movie"] as const) : []),
     ...(tv ? (["show"] as const) : []),
     ...(episodes ? (["episode"] as const) : []),
   ];
-  const canSearch = !!mediaSourceId && debounced.length >= 2 && types.length > 0;
+  const facets = chipsToFacets(chips);
+  const hasChips = chips.length > 0;
+
+  // Facet-value autocomplete (dropdown facets only). The `facet` arg falls back to "genre" while disabled
+  // to keep the hook order stable; `enabled` gates the real fetch.
+  const facetValuesQ = useQuery(
+    trpc.channels.mediaFacetValues.queryOptions(
+      {
+        mediaSourceId,
+        facet: (facetOpen ? activeFacet : "genre") as
+          | "genre" | "actor" | "director" | "studio" | "rating" | "resolution" | "decade",
+        query: facetQ,
+      },
+      { enabled: !!mediaSourceId && facetOpen, placeholderData: keepPreviousData },
+    ),
+  );
+  const facetOptions = facetOpen ? (facetValuesQ.data ?? []) : [];
+
+  const canSearch = !!mediaSourceId && types.length > 0 && (debouncedTitle.length >= 2 || hasChips);
   const results = useQuery(
     trpc.channels.searchMedia.queryOptions(
-      { mediaSourceId, query: debounced, types: [...types] },
+      { mediaSourceId, query: debouncedTitle, types: [...types], facets },
       { enabled: canSearch, placeholderData: keepPreviousData },
     ),
   );
   const pool = useQuery(
     trpc.channels.itemsByKeys.queryOptions({ mediaSourceId, keys: value }, { enabled: !!mediaSourceId && value.length > 0 }),
   );
+
+  // Changing the result set clears any pending selection, so the action bar never lingers on stale items.
+  const facetsKey = JSON.stringify(facets);
+  useEffect(() => {
+    setChecked(new Set());
+    setExpandedShow(null);
+  }, [debouncedTitle, facetsKey, movies, tv, episodes]);
 
   const toggle = (keys: string | string[]) => {
     const arr = Array.isArray(keys) ? keys : [keys];
@@ -256,12 +349,58 @@ export function ManualBuilder({
   };
   const removeKey = (k: string) => onChange(value.filter((x) => x !== k));
 
+  // ── Facet chips ──
+  const commitChip = (kind: FacetKind, raw: string) => {
+    const v = raw.trim();
+    if (!BOOL_FACETS.has(kind) && !v) return;
+    if (NUMERIC_FACETS.has(kind) && !Number.isFinite(Number(v))) return;
+    const chip: Chip = { kind, value: BOOL_FACETS.has(kind) ? "" : v };
+    setChips((prev) => (prev.some((c) => c.kind === chip.kind && c.value === chip.value) ? prev : [...prev, chip]));
+    setQuery("");
+  };
+  const removeChip = (i: number) => setChips((prev) => prev.filter((_, j) => j !== i));
+
+  const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && query === "" && chips.length) {
+      e.preventDefault();
+      setChips((prev) => prev.slice(0, -1));
+      return;
+    }
+    if (!activeFacet) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setQuery("");
+      return;
+    }
+    if (facetOpen && facetOptions.length) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setHi((h) => Math.min(h + 1, facetOptions.length - 1));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setHi((h) => Math.max(h - 1, 0));
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commitChip(activeFacet, facetOptions[hi] ?? "");
+        return;
+      }
+    }
+    if (e.key === "Enter") {
+      // numeric (year/audience) → the typed number; boolean (hdr/dovi) → the flag
+      e.preventDefault();
+      commitChip(activeFacet, BOOL_FACETS.has(activeFacet) ? "" : pendingValue);
+    }
+  };
+
   const data = results.data;
   const hasResults = data && (data.movies.length > 0 || data.shows.length > 0 || data.episodes.length > 0);
   const searching = canSearch && results.isFetching && !hasResults;
-  // Only true when result tiles are actually on screen (not the idle/empty states, and not stale
-  // keepPreviousData after the query was cleared) — gates the action bar + frosted edge.
-  const showingResults = Boolean(hasResults) && debounced.length >= 2 && types.length > 0;
+  // Only true when result tiles are actually on screen (gates the action bar + frosted edge).
+  const showingResults = Boolean(hasResults) && canSearch;
 
   // The top-level result items (movies + whole shows + direct episodes), for "Select all".
   const resultKeys = data ? [...data.movies, ...data.shows, ...data.episodes].map((i) => i.ratingKey) : [];
@@ -271,40 +410,112 @@ export function ManualBuilder({
 
   return (
     <div className="space-y-3 rounded-md border p-3">
-      {/* Search bar as an input group: a standard-styled text input on the left, then a lighter (frame-base
-          bg) segment with the scope checkboxes, then a Clear all — divided by left borders. */}
-      <div className="border-input focus-within:border-ring focus-within:ring-ring/50 flex h-11 items-stretch overflow-hidden rounded-lg border bg-transparent transition-colors focus-within:ring-3 dark:bg-input/30">
-        <div className="flex flex-1 items-center gap-2 px-3">
-          <Search className="text-muted-foreground size-4 shrink-0" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search movies, shows, episodes…"
-            className="placeholder:text-muted-foreground text-foreground h-full w-full bg-transparent text-base outline-none md:text-sm"
-          />
+      {/* Smart search bar: committed facet chips + the input (type `genre:`/`actor:`/`decade:`… for a
+          facet, bare text = title), the Movies/TV/Episodes scope, and Clear. The `relative` wrapper
+          anchors the facet-value dropdown directly below. */}
+      <div className="relative">
+        <div className="border-input focus-within:border-ring focus-within:ring-ring/50 flex min-h-11 items-stretch overflow-hidden rounded-lg border bg-transparent transition-colors focus-within:ring-3 dark:bg-input/30">
+          <div className="flex flex-1 flex-wrap items-center gap-1.5 px-3 py-1.5">
+            <Search className="text-muted-foreground size-4 shrink-0" />
+            {chips.map((c, i) => (
+              <span
+                key={`${c.kind}:${c.value}:${i}`}
+                className="bg-primary/10 text-primary flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium"
+              >
+                {chipLabel(c)}
+                <button type="button" onClick={() => removeChip(i)} aria-label={`Remove ${chipLabel(c)}`} className="hover:text-primary/60">
+                  <X className="size-3" />
+                </button>
+              </span>
+            ))}
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={onSearchKeyDown}
+              placeholder={chips.length ? "Add more…" : "Search titles, or type genre:  actor:  decade: …"}
+              className="placeholder:text-muted-foreground text-foreground min-w-[8rem] flex-1 bg-transparent text-base outline-none md:text-sm"
+            />
+          </div>
+          <div className="border-input bg-muted/72 flex items-center gap-4 border-l px-3 text-sm">
+            <label className="flex items-center gap-1.5">
+              <Checkbox checked={movies} onCheckedChange={(v) => setMovies(v === true)} />
+              Movies
+            </label>
+            <label className="flex items-center gap-1.5">
+              <Checkbox checked={tv} onCheckedChange={(v) => setTv(v === true)} />
+              TV Shows
+            </label>
+            <label className="flex items-center gap-1.5">
+              <Checkbox checked={episodes} onCheckedChange={(v) => setEpisodes(v === true)} />
+              Episodes
+            </label>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              setChips([]);
+            }}
+            disabled={!query && chips.length === 0}
+            className="border-input bg-muted/72 text-muted-foreground hover:text-foreground border-l px-3 text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            Clear all
+          </button>
         </div>
-        <div className="border-input bg-muted/72 flex items-center gap-4 border-l px-3 text-sm">
-          <label className="flex items-center gap-1.5">
-            <Checkbox checked={movies} onCheckedChange={(v) => setMovies(v === true)} />
-            Movies
-          </label>
-          <label className="flex items-center gap-1.5">
-            <Checkbox checked={tv} onCheckedChange={(v) => setTv(v === true)} />
-            TV Shows
-          </label>
-          <label className="flex items-center gap-1.5">
-            <Checkbox checked={episodes} onCheckedChange={(v) => setEpisodes(v === true)} />
-            Episodes
-          </label>
-        </div>
-        <button
-          type="button"
-          onClick={() => setQuery("")}
-          disabled={!query}
-          className="border-input bg-muted/72 text-muted-foreground hover:text-foreground border-l px-3 text-sm font-medium transition-colors disabled:opacity-50"
-        >
-          Clear all
-        </button>
+
+        {/* Facet-value dropdown — opens while a `prefix:` is active. Input keeps focus (onMouseDown
+            prevents the blur that would close it before the click lands). */}
+        {activeFacet && (
+          <div className="bg-popover absolute inset-x-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-md border p-1 shadow-lg">
+            {facetOpen ? (
+              facetValuesQ.isFetching && facetOptions.length === 0 ? (
+                <div className="space-y-1 p-1">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-7 w-full" />
+                  ))}
+                </div>
+              ) : facetOptions.length === 0 ? (
+                <EmptyState
+                  icon={SearchX}
+                  title={`No ${FACET_LABEL[activeFacet].toLowerCase()} matches`}
+                  description="Keep typing or try a different value."
+                />
+              ) : (
+                facetOptions.map((v, i) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      commitChip(activeFacet, v);
+                    }}
+                    onMouseEnter={() => setHi(i)}
+                    className={cn(
+                      "flex w-full items-center rounded px-2 py-1.5 text-left text-sm",
+                      i === hi ? "bg-accent" : "hover:bg-accent/50",
+                    )}
+                  >
+                    {activeFacet === "decade" ? `${v}s` : v}
+                  </button>
+                ))
+              )
+            ) : (
+              // Numeric (year/audience) or boolean (hdr/dovi): no value list — just the commit affordance.
+              <div className="text-muted-foreground p-2 text-sm">
+                {BOOL_FACETS.has(activeFacet) ? (
+                  <>
+                    Press Enter to add the <span className="text-foreground font-medium">{FACET_LABEL[activeFacet]}</span> filter.
+                  </>
+                ) : (
+                  <>
+                    Type a {FACET_LABEL[activeFacet].toLowerCase()} and press Enter — e.g.{" "}
+                    <span className="text-foreground font-medium">{activeFacet === "year" ? "year:2015" : "audience:8"}</span>.
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Results — poster tiles matching the preview grid. The scroll box uses p-1 so a selected tile's
@@ -319,11 +530,11 @@ export function ManualBuilder({
               title="Select at least one search category"
               description="Turn on Movies, TV Shows, or Episodes to search."
             />
-          ) : debounced.length < 2 ? (
+          ) : debouncedTitle.length < 2 && !hasChips ? (
             <EmptyState
               icon={Search}
               title="Search your library"
-              description="Type at least two characters to find movies, shows, or episodes to add."
+              description="Type at least two characters, or add a filter like genre: / actor: / decade: to find things to add."
             />
           ) : searching ? (
             <PreviewSkeleton count={ONE_ROW} />

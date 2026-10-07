@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.29] - 2026-10-07
+
+Manual-mode channels get a smart, chip-based search (the admin builder).
+
+### Added
+- **Facet chips in the Manual-mode search bar.** Alongside plain title search, type a prefix to filter by a Plex-style tag: `genre:`, `actor:`, `director:`, `studio:`, `rating:` (content rating), `resolution:`, `decade:`, `year:`, `audience:` (minimum rating), plus `hdr:` / `dovi:` flags. Typing a prefix opens a dropdown of matching values from your library (autocomplete, narrowing as you type); picking one commits a chip. Multiple chips of the same kind are OR'd, different kinds are AND'd, and bare text filters by title on top — e.g. `decade:2010` + `actor:Tom Hanks` + `the`. Everything is served from the synced `MediaItem` cache (no extra Plex calls). Facets apply to movies and shows; episodes still match by their own title.
+
 ## [0.15.28] - 2026-10-07
 
 Server groundwork for Manual-mode smart search: facet filters + value autocomplete, from the cache.
