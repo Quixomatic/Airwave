@@ -118,6 +118,24 @@ async function main() {
   console.log(`  ${ok(prismaNumericWorks)} Prisma JSON gte audienceRating>=7 → ${prismaNumericWorks ? prismaCount + " items" : "NOT SUPPORTED, use raw"}`);
   console.log(`  ${ok(rawCount >= 0)} raw cast audienceRating>=7 → ${rawCount} items`);
 
+  // 5. Per-type coverage of the media-file facets (resolution / hdr / dovi). These come from Media[0]
+  //    in toGuideMeta, which shows don't have (a show is not a single file), so they're expected to be
+  //    populated on movies + episodes but NULL on show rows — which is why those facets return no shows.
+  console.log("\n── Per-type coverage of media-file facets (resolution / hdr / dovi) ──");
+  const cov = await prisma.$queryRaw<{ type: string; total: bigint; res: bigint; hdr: bigint; dovi: bigint }[]>`
+    SELECT type,
+      count(*) AS total,
+      count(*) FILTER (WHERE guide ->> 'resolution' IS NOT NULL) AS res,
+      count(*) FILTER (WHERE guide ->> 'hdr' IS NOT NULL) AS hdr,
+      count(*) FILTER (WHERE guide -> 'dovi' IS NOT NULL AND jsonb_typeof(guide -> 'dovi') <> 'null') AS dovi
+    FROM media_item
+    WHERE "mediaSourceId" = ${sid} AND available
+    GROUP BY type ORDER BY type`;
+  for (const r of cov) {
+    const n = (b: bigint) => String(Number(b)).padStart(6);
+    console.log(`  ${r.type.padEnd(8)} total=${n(r.total)}  resolution=${n(r.res)}  hdr=${n(r.hdr)}  dovi=${n(r.dovi)}`);
+  }
+
   console.log(`\nVerdict: ${total > 0 ? "cache has data; " : "NO data — sync a library first; "}pick the query styles that passed above.`);
   await prisma.$disconnect();
 }
