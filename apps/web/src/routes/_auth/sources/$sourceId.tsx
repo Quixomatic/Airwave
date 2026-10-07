@@ -25,10 +25,35 @@ export const Route = createFileRoute("/_auth/sources/$sourceId")({
   component: SourceDetail,
 });
 
+// Mirrors the library-health job's threshold (packages/api .../sync-libraries.ts). UI-only copy.
+const MISSING_POLL_THRESHOLD = 3;
+
+/** Per-library presence badge driven by the library-health job: Healthy / Missing n/3 / Not found. */
+function LibraryHealthBadge({ autoDisabled, missingPolls }: { autoDisabled: boolean; missingPolls: number }) {
+  if (autoDisabled)
+    return (
+      <Badge variant="outline" className="border-red-500/30 text-red-600">
+        Not found
+      </Badge>
+    );
+  if (missingPolls > 0)
+    return (
+      <Badge variant="outline" className="border-amber-500/30 text-amber-600">
+        Missing {missingPolls}/{MISSING_POLL_THRESHOLD}
+      </Badge>
+    );
+  return (
+    <Badge variant="outline" className="border-emerald-500/30 text-emerald-600">
+      Healthy
+    </Badge>
+  );
+}
+
 function SourceDetail() {
   const { sourceId } = Route.useParams();
   const navigate = useNavigate();
-  const source = useQuery(trpc.sources.get.queryOptions({ id: sourceId }));
+  // Light polling so the per-library health badge reflects the library-health job as it runs.
+  const source = useQuery({ ...trpc.sources.get.queryOptions({ id: sourceId }), refetchInterval: 30000 });
   useBreadcrumb(source.data?.name);
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [name, setName] = useState("");
@@ -205,18 +230,21 @@ function SourceDetail() {
         <FramePanel className="p-0">
           <ul className="divide-y">
             {source.data.libraries.map((lib) => (
-              <li key={lib.id} className="flex items-center justify-between px-4 py-3">
-                <div>
+              <li key={lib.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <div className="min-w-0">
                   <p className="text-sm font-medium">{lib.title}</p>
                   <p className="text-muted-foreground text-xs capitalize">{lib.type}</p>
                 </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <Switch
-                    checked={lib.enabled}
-                    onCheckedChange={(v) => toggleLibrary(lib.id, v === true)}
-                  />
-                  Enabled
-                </label>
+                <div className="flex shrink-0 items-center gap-3">
+                  <LibraryHealthBadge autoDisabled={lib.autoDisabled} missingPolls={lib.missingPolls} />
+                  <label className="flex items-center gap-2 text-sm">
+                    <Switch
+                      checked={lib.enabled}
+                      onCheckedChange={(v) => toggleLibrary(lib.id, v === true)}
+                    />
+                    Enabled
+                  </label>
+                </div>
               </li>
             ))}
             {source.data.libraries.length === 0 && (

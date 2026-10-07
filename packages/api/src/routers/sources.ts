@@ -55,6 +55,8 @@ export const sourcesRouter = router({
             type: true,
             enabled: true,
             lastScanAt: true,
+            autoDisabled: true,
+            missingPolls: true,
           },
         },
       },

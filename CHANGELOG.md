@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.39] - 2026-10-07
+
+### Added
+- **Per-library health badge on the Sources page.** Each library now shows a small status badge driven by the Library Health job: "Healthy" when it was last seen on the server, "Missing n/3" while it's failing presence checks (counting toward auto-disable), and "Not found" once it's been auto-disabled for having vanished. The page refreshes on a light interval so the badge updates as the job runs.
+
 ## [0.15.38] - 2026-10-07
 
 Auto-disable a Plex library that was deleted, and turn it back on if it returns (issue #36).
