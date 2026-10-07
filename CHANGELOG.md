@@ -13,6 +13,7 @@ Convert a Filter-mode channel's current results into a hand-picked Manual pool, 
 ### Server
 - **`channels.convertFilterToManual`** — a read-only endpoint that resolves a filter to its raw leaf items and applies the whole-show-vs-episode rule, returning the Manual item keys. It never mutates the channel.
 
+## [0.15.35] - 2026-10-07
 
 ### Changed
 - **The Manual-mode search facet pseudo-chip now has a cancel button.** When a facet is active (the inline `[✕ Genre]` pill), a small ✕ sits as the pill's left cap — clicking it cancels facet-input mode and returns the input to plain title search, the same as pressing Escape or backspacing into the empty pill.
