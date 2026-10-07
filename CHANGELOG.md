@@ -2,7 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
-## [0.15.35] - 2026-10-07
+## [0.16.0] - 2026-10-07
+
+Convert a Filter-mode channel's current results into a hand-picked Manual pool, in one click.
+
+### Added
+- **"Convert to Manual" button in the channel editor's Filter mode** (next to Copy / Paste). It resolves whatever the current filter matches right now and snapshots the result into a Manual pool, then flips the editor into Manual mode with those items pre-filled, exactly as if you had hand-picked them. It is a client-side, non-destructive action: nothing is saved until you Save the channel normally, and the filter stays in local state so you can switch back to Filter mode before saving.
+- The conversion honors Manual mode's granularity: a show whose entire set of cached episodes matched collapses to the **show** (a live whole-show pick, so future episodes follow), a show only partly matched contributes its **matched episodes** (a point-in-time snapshot), and movies are added as themselves.
+
+### Server
+- **`channels.convertFilterToManual`** — a read-only endpoint that resolves a filter to its raw leaf items and applies the whole-show-vs-episode rule, returning the Manual item keys. It never mutates the channel.
+
 
 ### Changed
 - **The Manual-mode search facet pseudo-chip now has a cancel button.** When a facet is active (the inline `[✕ Genre]` pill), a small ✕ sits as the pill's left cap — clicking it cancels facet-input mode and returns the input to plain title search, the same as pressing Escape or backspacing into the empty pill.

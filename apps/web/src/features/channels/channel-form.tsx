@@ -17,7 +17,7 @@ import { Label } from "@airwave/ui/components/label";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@airwave/ui/components/select";
 import { Switch } from "@airwave/ui/components/switch";
 import { Textarea } from "@airwave/ui/components/textarea";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
   Check,
@@ -29,8 +29,10 @@ import {
   ListChecks,
   ListFilter,
   ListMusic,
+  Loader2,
   SlidersHorizontal,
   Tv,
+  Wand2,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
@@ -252,6 +254,32 @@ export function ChannelForm({
     setTv(types.includes("show"));
     setFilter(normalizeFilter(f));
     toast.success("Filter applied.");
+  };
+
+  // Convert the current (unsaved) filter into a Manual pool: resolve it server-side, snapshot the result
+  // into manual item keys (whole-matched shows → the live show, partial → episodes, movies → movies), then
+  // flip the form into Manual mode with those items seeded. Nothing is persisted until the normal Save; the
+  // filter stays in local state, so switching back to Filter mode restores it.
+  const convertToManual = useMutation(
+    trpc.channels.convertFilterToManual.mutationOptions({
+      onSuccess: (keys: string[]) => {
+        if (keys.length === 0) {
+          toast.error("That filter matched nothing to convert.");
+          return;
+        }
+        setManualItemKeys(keys);
+        setMode("manual");
+        toast.success(`Converted to Manual — ${keys.length} item${keys.length === 1 ? "" : "s"} added. Save to apply.`);
+      },
+      onError: (e) => toast.error(e.message || "Couldn't convert this filter to a manual pool."),
+    }),
+  );
+  const handleConvertToManual = () => {
+    if (mediaTypes.length === 0) {
+      toast.error("Turn on Movies or TV Shows first.");
+      return;
+    }
+    convertToManual.mutate({ mediaSourceId: sourceId, mediaTypes, filter, sortField, sortDir });
   };
 
   // Report the live filter/source/sort upward so a preview panel can resolve the UNSAVED filter (#12). Fires
@@ -558,8 +586,28 @@ export function ChannelForm({
                   </label>
                 </div>
               </div>
-              {/* Copy the content types + filter to the clipboard, or paste one in (with a review dialog). */}
+              {/* Convert-to-Manual (snapshot the filter into a hand-picked pool), then copy/paste the filter. */}
               <div className="flex shrink-0 gap-2">
+                {/* Snapshot whatever this filter currently resolves to into a Manual pool (one-time; takes
+                    effect on Save). Whole-matched shows stay live, partial shows become their episodes. */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleConvertToManual}
+                  disabled={convertToManual.isPending || mediaTypes.length === 0}
+                  title="Resolve this filter now and convert the results into a hand-picked Manual pool"
+                >
+                  {convertToManual.isPending ? (
+                    <>
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> Converting…
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="mr-1 h-3.5 w-3.5" /> Convert to Manual
+                    </>
+                  )}
+                </Button>
                 <Button
                   type="button"
                   variant="outline"

@@ -12,6 +12,7 @@ import { resolveChannel } from "../services/plex/resolve";
 import { decryptToken } from "../services/plex/token";
 import { getSourceReadiness, notReadyReason } from "../services/sources/readiness";
 import {
+  filterToManualKeys as filterToManualKeysService,
   itemLabels as itemLabelsService,
   type MediaFacet,
   mediaFacetValues as mediaFacetValuesService,
@@ -524,6 +525,33 @@ export const channelsRouter = router({
         // per-file Stream tree and return the lean `tiles` projection — same as the preset preview.
         detail: input.detail ?? "tiles",
         includeStreams: false,
+      }),
+    ),
+
+  /**
+   * Convert an UNSAVED filter into a Manual-mode key list — the "Convert to Manual" button. Read-only: it
+   * resolves the current filter and snapshots the result into manual-item keys (whole-matched shows collapse
+   * to the live show key, partially-matched shows contribute their matched episode keys, movies are their
+   * own keys). It does NOT touch the channel — the client seeds the builder with these and the normal Save
+   * persists the mode change.
+   */
+  convertFilterToManual: adminProcedure
+    .input(
+      z.object({
+        mediaSourceId: z.string(),
+        mediaTypes: z.array(mediaTypeEnum).min(1),
+        filter: nodeSchema.optional(),
+        sortField: z.string().optional(),
+        sortDir: z.enum(["asc", "desc"]).optional(),
+      }),
+    )
+    .mutation(({ ctx, input }) =>
+      filterToManualKeysService(ctx.prisma, {
+        mediaSourceId: input.mediaSourceId,
+        mediaTypes: input.mediaTypes,
+        filter: input.filter,
+        sortField: input.sortField,
+        sortDir: input.sortDir,
       }),
     ),
 

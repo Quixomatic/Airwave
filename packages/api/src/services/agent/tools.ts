@@ -248,6 +248,69 @@ export async function previewFilter(
   return previewItems(prisma, args.mediaSourceId, items, args.detail);
 }
 
+/**
+ * Convert a FILTER definition into a MANUAL_ITEMS key list — a one-time, read-only snapshot behind the
+ * "Convert to Manual" button. The server only resolves + converts; it never mutates the channel (the client
+ * seeds the form and the normal Save persists it). Resolves the filter to its raw leaf items (episodes for
+ * TV, movies), then applies the manual-mode granularity rule: a show whose EVERY cached episode matched
+ * collapses to the SHOW key (a live whole-show pick), a partially-matched show contributes its matched
+ * EPISODE keys (a snapshot), and movies (or any show-level leaf) are their own keys.
+ */
+export async function filterToManualKeys(
+  prisma: PrismaClient,
+  args: {
+    mediaSourceId: string;
+    mediaTypes: MediaType[];
+    filter?: FilterNode;
+    sortField?: string;
+    sortDir?: "asc" | "desc";
+  },
+): Promise<string[]> {
+  const source = await requireSource(prisma, args.mediaSourceId);
+  const sort = channelSortParam("SHUFFLE", args.sortField ?? "title", args.sortDir ?? "asc");
+  const items = await resolveFilter(prisma, source, args.mediaTypes, asFilterNode(args.filter), sort, {
+    includeStreams: false,
+  });
+
+  // Atomic leaves (movies, or any show-level record returned directly) are their own keys; episodes are
+  // grouped by their parent show so we can decide whole-show vs partial.
+  const atomicKeys: string[] = [];
+  const matchedByShow = new Map<string, string[]>();
+  for (const it of items) {
+    const showKey = it.guide.showRatingKey;
+    if (showKey) {
+      let arr = matchedByShow.get(showKey);
+      if (!arr) matchedByShow.set(showKey, (arr = []));
+      arr.push(it.ratingKey);
+    } else {
+      atomicKeys.push(it.ratingKey);
+    }
+  }
+
+  // Total cached episodes per matched show (one grouped query) → whole vs partial.
+  const showKeys = [...matchedByShow.keys()];
+  const totals = new Map<string, number>();
+  if (showKeys.length) {
+    const rows = await prisma.$queryRaw<{ show: string | null; total: bigint }[]>`
+      SELECT guide ->> 'showRatingKey' AS show, count(*) AS total
+      FROM media_item
+      WHERE "mediaSourceId" = ${args.mediaSourceId} AND available AND type = 'episode'
+        AND guide ->> 'showRatingKey' IN (${Prisma.join(showKeys)})
+      GROUP BY 1`;
+    for (const r of rows) if (r.show) totals.set(r.show, Number(r.total));
+  }
+
+  const keys: string[] = [...atomicKeys];
+  for (const [showKey, epKeys] of matchedByShow) {
+    const total = totals.get(showKey) ?? 0;
+    // Whole show (every cached episode matched) → the live show pick; otherwise snapshot the episodes.
+    // If the cache has no episode count for the show, fall back to the safe snapshot of what matched.
+    if (total > 0 && epKeys.length >= total) keys.push(showKey);
+    else keys.push(...epKeys);
+  }
+  return keys;
+}
+
 export async function previewMembership(
   prisma: PrismaClient,
   args: { mediaSourceId: string; sources: MembershipSource[]; detail?: PreviewDetail },
