@@ -70,8 +70,13 @@ function detectWide(title: string | null | undefined): number | null {
 type Ep = { ratingKey: string; title: string; season: number | null; episode: number | null; showKey: string; showTitle: string };
 type Run = { showTitle: string; parts: { ep: Ep; num: number }[] };
 
-/** Walk each show in season/episode order and collect runs (length >= 2) of consecutive part numbers,
- *  using the supplied part-number detector. */
+/** A kept-together run MUST begin at part 1 (so a show's episode/production numbers like "(4091)" that
+ *  happen to run consecutively are NOT mistaken for a story), and is capped at this many parts (a longer
+ *  run is left split — a whole-season-length block is too much). */
+const MAX_RUN_PARTS = 5;
+
+/** Walk each show in season/episode order and collect runs of consecutive part numbers, applying the
+ *  start-at-1 rule and the length cap. */
 function collectRuns(byShow: Map<string, Ep[]>, detectNum: (t: string) => number | null): Run[] {
   const runs: Run[] = [];
   for (const eps of byShow.values()) {
@@ -79,21 +84,24 @@ function collectRuns(byShow: Map<string, Ep[]>, detectNum: (t: string) => number
     let current: { ep: Ep; num: number }[] = [];
     let lastNum = 0;
     const flush = () => {
-      if (current.length >= 2) runs.push({ showTitle: current[0]!.ep.showTitle, parts: current });
+      // Keep only a run that starts at 1 (guaranteed by the start rule below) and is 2..MAX_RUN_PARTS long.
+      if (current.length >= 2 && current.length <= MAX_RUN_PARTS) {
+        runs.push({ showTitle: current[0]!.ep.showTitle, parts: current });
+      }
       current = [];
       lastNum = 0;
     };
     for (const ep of eps) {
       const n = detectNum(ep.title);
       if (n != null && current.length > 0 && n === lastNum + 1) {
-        current.push({ ep, num: n });
+        current.push({ ep, num: n }); // extends the current run
         lastNum = n;
-      } else if (n != null) {
+      } else if (n === 1) {
         flush();
-        current = [{ ep, num: n }];
-        lastNum = n;
+        current = [{ ep, num: 1 }]; // a run can only BEGIN at part 1
+        lastNum = 1;
       } else {
-        flush();
+        flush(); // a non-part, or a part number that isn't 1 and isn't the next in sequence → no run
       }
     }
     flush();
@@ -148,7 +156,7 @@ async function main() {
   // Runs of length >= 2 under the CURRENT (end-anchored) detection — the ones that would be kept together.
   const runs = collectRuns(byShow, partNumber);
   runs.sort((a, b) => b.parts.length - a.parts.length || a.showTitle.localeCompare(b.showTitle));
-  console.log(`── Multi-part runs detected (length ≥ 2): ${runs.length} ──`);
+  console.log(`── Multi-part runs detected (start at part 1, length 2–${MAX_RUN_PARTS}): ${runs.length} ──`);
   const byLen = new Map<number, number>();
   for (const run of runs) byLen.set(run.parts.length, (byLen.get(run.parts.length) ?? 0) + 1);
   console.log(`   by length: ${[...byLen.entries()].sort((a, b) => a[0] - b[0]).map(([l, c]) => `${l}-part×${c}`).join(", ") || "(none)"}\n`);
