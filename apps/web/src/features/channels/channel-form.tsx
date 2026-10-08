@@ -143,34 +143,46 @@ const BUMPER_MODE_OPTIONS: { value: BumperMode; label: string }[] = [
  * title, then the chevron right after it — sitting on the muted Frame; the section's CONTENT is
  * a raised FramePanel that animates open/closed. Independent open state, several open at once.
  */
+/** The channel-editor sections, in order — shared by the form (section ids) and the page's section TOC. */
+export const CHANNEL_SECTIONS = [
+  { id: "ch-details", label: "Details" },
+  { id: "ch-options", label: "Options" },
+  { id: "ch-content", label: "Content & filter" },
+  { id: "ch-advanced", label: "Advanced" },
+] as const;
+
 function Section({
+  id,
   title,
   icon: Icon,
   defaultOpen = true,
   children,
 }: {
+  id?: string;
   title: string;
   icon: LucideIcon;
   defaultOpen?: boolean;
   children: ReactNode;
 }) {
   return (
-    <Collapsible defaultOpen={defaultOpen}>
-      {/* `ms-2.5` insets the trigger so its icon lines up with the px-5 content of the header
-          above and the FramePanel below. `aria-expanded:bg-transparent` cancels the ghost
-          variant's `aria-expanded:bg-muted` — otherwise an OPEN section keeps a faint bg. */}
-      <CollapsibleTrigger
-        className="ms-2.5 gap-2 font-semibold aria-expanded:bg-transparent data-panel-open:[&>svg:last-child]:rotate-180"
-        render={<Button variant="ghost" size="sm" type="button" />}
-      >
-        <Icon className="size-4 shrink-0" />
-        {title}
-        <ChevronDown className="text-muted-foreground size-4 shrink-0 transition-transform" />
-      </CollapsibleTrigger>
-      <CollapsiblePanel>
-        <FramePanel className="mt-2 space-y-4">{children}</FramePanel>
-      </CollapsiblePanel>
-    </Collapsible>
+    <div id={id} className="scroll-mt-24">
+      <Collapsible defaultOpen={defaultOpen}>
+        {/* `ms-2.5` insets the trigger so its icon lines up with the px-5 content of the header
+            above and the FramePanel below. `aria-expanded:bg-transparent` cancels the ghost
+            variant's `aria-expanded:bg-muted` — otherwise an OPEN section keeps a faint bg. */}
+        <CollapsibleTrigger
+          className="ms-2.5 gap-2 font-semibold aria-expanded:bg-transparent data-panel-open:[&>svg:last-child]:rotate-180"
+          render={<Button variant="ghost" size="sm" type="button" />}
+        >
+          <Icon className="size-4 shrink-0" />
+          {title}
+          <ChevronDown className="text-muted-foreground size-4 shrink-0 transition-transform" />
+        </CollapsibleTrigger>
+        <CollapsiblePanel>
+          <FramePanel className="mt-2 space-y-4">{children}</FramePanel>
+        </CollapsiblePanel>
+      </Collapsible>
+    </div>
   );
 }
 
@@ -393,12 +405,12 @@ export function ChannelForm({
           triggers breathing room from each other and their panels. */}
       <Frame className="gap-3 p-2">
         {(title || subtitle) && (
-          <FrameHeader>
+          <FrameHeader id="ch-top" className="scroll-mt-24">
             {title && <FrameTitle>{title}</FrameTitle>}
             {subtitle && <FrameDescription>{subtitle}</FrameDescription>}
           </FrameHeader>
         )}
-        <Section title="Details" icon={Info}>
+        <Section id="ch-details" title="Details" icon={Info}>
         {/* Fixed side-column widths (not `auto`) + items-end so the three input boxes line up
             on one baseline regardless of label width. */}
         <div className="grid grid-cols-[1fr_7rem_7rem] items-end gap-3">
@@ -446,7 +458,7 @@ export function ChannelForm({
       </Section>
 
       {/* Package + ordering + bumpers + appearance grouped as one "Options" section. */}
-      <Section title="Options" icon={SlidersHorizontal}>
+      <Section id="ch-options" title="Options" icon={SlidersHorizontal}>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label htmlFor="cpkg">Package</Label>
@@ -566,7 +578,7 @@ export function ChannelForm({
       {/* Content types + filter together, LAST — they jointly define what plays, and the
           resolved preview tiles render right below the form. The mode tiles pick HOW the pool is
           defined: a metadata filter, or specific Plex playlists/collections. */}
-      <Section title="Content & filter" icon={ListFilter}>
+      <Section id="ch-content" title="Content & filter" icon={ListFilter}>
         <div className="space-y-2">
           <Label>Mode</Label>
           <ModeTiles value={mode} onChange={setMode} />
@@ -656,7 +668,7 @@ export function ChannelForm({
       {/* Advanced grouping/rotation strategy — collapsed by default so a basic channel stays simple, but
           auto-expanded when this channel ALREADY has a strategy (so it's not hidden). Optional; off = plays in
           the order set above (byte-for-byte today's behavior). */}
-      <Section title="Advanced — grouping & rotation" icon={Layers} defaultOpen={strategy != null || keepMultiPartTogether || excludeSpecials}>
+      <Section id="ch-advanced" title="Advanced — grouping & rotation" icon={Layers} defaultOpen={strategy != null || keepMultiPartTogether || excludeSpecials}>
         <StrategyEditor
           value={strategy}
           onChange={setStrategy}

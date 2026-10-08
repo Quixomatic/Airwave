@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.49] - 2026-10-08
+
+### Added
+- **A floating "On this page" section nav on the channel editor.** On wide screens (≥1800px) a table-of-contents floats at the top-right: the channel (the form frame) as a parent, its sections (Details, Options, Content & filter, Advanced) nested beneath, then Preview and Schedule. It highlights every section currently in view with a moving rail, and clicking an entry scrolls to it. It overlays without affecting the form's width, and is hidden when there isn't room. Built as a reusable `toc` component (ported from the docs-site TOC, restyled to our tokens) whose observed anchors are configurable.
+
 ## [0.15.48] - 2026-10-08
 
 ### Changed

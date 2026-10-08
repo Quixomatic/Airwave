@@ -20,6 +20,7 @@ import { useBreadcrumb } from "@/context/breadcrumb-provider";
 import { HeaderLeft, HeaderRight, TopHeaderRight } from "@/context/header-provider";
 import { resolveTile } from "@/features/icons/app-icon";
 import {
+  CHANNEL_SECTIONS,
   ChannelForm,
   type BumperMode,
   type ChannelPreviewInput,
@@ -29,6 +30,7 @@ import {
 import { ChannelPreviewPanel } from "@/features/channels/channel-preview-panel";
 import type { FilterGroup } from "@/features/channels/filter-builder";
 import type { ChannelStrategy } from "@/features/channels/strategy-editor";
+import { SectionToc } from "@/components/toc/toc";
 import { trpc, trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/channels/$channelId")({
@@ -122,6 +124,19 @@ function ChannelDetail() {
   return (
     <div className="space-y-6 pb-32">
       {confirmDialog}
+      {/* Floating section TOC, top-right of the pane — overlays (no layout impact), only when there's room
+          (≥2xl). Nested: the channel (the form's Frame) is the H2, its sections are the H3s beneath it. */}
+      <aside className="fixed right-8 top-32 z-20 hidden w-44 min-[1800px]:block">
+        <p className="text-muted-foreground mb-3 pl-5 text-xs font-medium">On this page</p>
+        <SectionToc
+          items={[
+            { title: channel.data.name, url: "#ch-top", depth: 2 },
+            ...CHANNEL_SECTIONS.map((s) => ({ title: s.label, url: `#${s.id}`, depth: 3 })),
+            { title: "Preview", url: "#ch-preview", depth: 2 },
+            { title: "Schedule", url: "#ch-schedule", depth: 2 },
+          ]}
+        />
+      </aside>
       {/* Channel identity in the sub-header left: tinted icon tile · callsign · CH NN,
           each piece the same size, dot-separated. */}
       <HeaderLeft>
@@ -236,15 +251,16 @@ function ChannelDetail() {
 
       {/* Preview — the resolved OUTPUT of the filter, its own Frame. Shows the SAVED filter on load
           (preview.data), then live-resolves the UNSAVED filter as you edit (debounced) + on demand (#12). */}
-      <ChannelPreviewPanel
-        input={previewInput}
-        channelId={channelId}
-        initialData={preview.data}
-        initialLoading={preview.isLoading}
-      />
+      <div id="ch-preview" className="scroll-mt-24">
+        <ChannelPreviewPanel
+          input={previewInput}
+          channelId={channelId}
+          initialData={preview.data}
+          initialLoading={preview.isLoading}
+        />
+      </div>
 
-
-      <Frame>
+      <Frame id="ch-schedule" className="scroll-mt-24">
         <FrameHeader className="flex-row items-center justify-between">
           <div>
             <FrameTitle>Schedule</FrameTitle>
