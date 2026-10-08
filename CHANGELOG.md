@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.45] - 2026-10-08
+
+### Fixed
+- **The "Keep multi-part episodes together" toggle now actually saves and loads.** The channel create/edit/clone pages built the form's initial values and the save payload by cherry-picking fields, and the new toggle wasn't in either list, so it always showed off and a change to it was dropped on save (the channel kept whatever it had). Both the edit page and the new/clone page now carry `keepMultiPartTogether` in and out, so the toggle reflects the saved value and persists when you change it.
+
 ## [0.15.44] - 2026-10-08
 
 ### Added
