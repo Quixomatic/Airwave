@@ -31,10 +31,14 @@ import { ChannelPreviewPanel } from "@/features/channels/channel-preview-panel";
 import type { FilterGroup } from "@/features/channels/filter-builder";
 import type { ChannelStrategy } from "@/features/channels/strategy-editor";
 import { SectionToc } from "@/components/toc/toc";
+import { useDetailsPanel } from "@/context/details-panel-provider";
+import { channelImg } from "@/lib/img";
 import { trpc, trpcClient } from "@/utils/trpc";
 
 export const Route = createFileRoute("/_auth/channels/$channelId")({
-  staticData: { breadcrumb: "Channel" },
+  // `mainClassName: relative` makes the <main> card the containing block for the floating section TOC below,
+  // so it positions in main's right gutter (above the scroll container) instead of the viewport.
+  staticData: { breadcrumb: "Channel", mainClassName: "relative" },
   component: ChannelDetail,
 });
 
@@ -43,6 +47,8 @@ const FORM_ID = "edit-channel-form";
 function ChannelDetail() {
   const { channelId } = Route.useParams();
   const { confirm, dialog: confirmDialog } = useConfirm();
+  // The section TOC is fixed-position, so a side panel (AI assistant) would slide over it — hide it then.
+  const { isOpen: panelOpen } = useDetailsPanel();
   const navigate = useNavigate();
   const channel = useQuery(trpc.channels.get.queryOptions({ id: channelId }));
   useBreadcrumb(channel.data?.name);
@@ -125,8 +131,10 @@ function ChannelDetail() {
     <div className="space-y-6 pb-32">
       {confirmDialog}
       {/* Floating section TOC, top-right of the pane — overlays (no layout impact), only when there's room
-          (≥2xl). Nested: the channel (the form's Frame) is the H2, its sections are the H3s beneath it. */}
-      <aside className="fixed right-8 top-32 z-20 hidden w-44 min-[1800px]:block">
+          (≥1800px) and no side panel is open (the AI assistant would otherwise slide over this fixed TOC).
+          Nested: the channel (the form's Frame) is the H2, its sections are the H3s beneath it. */}
+      {!panelOpen && (
+      <aside className="absolute right-6 top-20 z-20 hidden w-44 min-[1800px]:block">
         <p className="text-muted-foreground mb-3 pl-5 text-xs font-medium">On this page</p>
         <SectionToc
           items={[
@@ -137,6 +145,7 @@ function ChannelDetail() {
           ]}
         />
       </aside>
+      )}
       {/* Channel identity in the sub-header left: tinted icon tile · callsign · CH NN,
           each piece the same size, dot-separated. */}
       <HeaderLeft>
@@ -279,34 +288,40 @@ function ChannelDetail() {
         </FrameHeader>
         <FramePanel className="space-y-4">
           {nowNext.data?.current ? (
-            <div className="space-y-1.5">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                  On now
-                </span>
-                <span className="text-muted-foreground text-xs">
-                  +{formatDuration(nowNext.data.current.offsetSeconds)} in
-                </span>
+            <div className="flex gap-3">
+              {(() => {
+                // The SHOW's portrait poster for episodes (showThumb), the movie's poster otherwise (thumb).
+                const art = channelImg(channelId, nowNext.data.current.guide.showThumb ?? nowNext.data.current.guide.thumb, 240);
+                return art ? (
+                  <img src={art} alt="" className="aspect-[2/3] w-16 shrink-0 self-start rounded-md border object-cover" />
+                ) : null;
+              })()}
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">On now</span>
+                  <span className="text-muted-foreground shrink-0 text-xs">
+                    +{formatDuration(nowNext.data.current.offsetSeconds)} in
+                  </span>
+                </div>
+                <p className="text-sm font-medium">{guideTitle(nowNext.data.current.guide)}</p>
+                <GuideMetaLine guide={nowNext.data.current.guide} />
+                {nowNext.data.current.guide.summary && (
+                  <p className="text-muted-foreground line-clamp-2 text-xs">
+                    {nowNext.data.current.guide.summary}
+                  </p>
+                )}
+                {nowNext.data.next && (
+                  <p className="text-muted-foreground pt-1 text-xs">
+                    Up next · {formatTime(nowNext.data.next.startsAt)} — {guideTitle(nowNext.data.next.guide)}
+                  </p>
+                )}
+                {nowNext.data.endsAt && (
+                  <p className="text-muted-foreground text-xs">
+                    Lineup runs until {formatWhen(nowNext.data.endsAt)} ·{" "}
+                    {formatDuration(runwaySeconds(nowNext.data.endsAt))} ahead
+                  </p>
+                )}
               </div>
-              <p className="text-sm font-medium">{guideTitle(nowNext.data.current.guide)}</p>
-              <GuideMetaLine guide={nowNext.data.current.guide} />
-              {nowNext.data.current.guide.summary && (
-                <p className="text-muted-foreground line-clamp-2 text-xs">
-                  {nowNext.data.current.guide.summary}
-                </p>
-              )}
-              {nowNext.data.next && (
-                <p className="text-muted-foreground pt-1 text-xs">
-                  Up next · {formatTime(nowNext.data.next.startsAt)} —{" "}
-                  {guideTitle(nowNext.data.next.guide)}
-                </p>
-              )}
-              {nowNext.data.endsAt && (
-                <p className="text-muted-foreground text-xs">
-                  Lineup runs until {formatWhen(nowNext.data.endsAt)} ·{" "}
-                  {formatDuration(runwaySeconds(nowNext.data.endsAt))} ahead
-                </p>
-              )}
             </div>
           ) : (
             <p className="text-muted-foreground text-sm">
@@ -320,29 +335,35 @@ function ChannelDetail() {
                 s.kind === "BUMPER" ? (
                   <li
                     key={s.id}
-                    className="text-muted-foreground flex items-center gap-3 py-1.5 text-xs italic"
+                    className="text-muted-foreground flex items-center gap-3 py-1 text-xs italic"
                   >
                     <span className="w-24 shrink-0 not-italic tabular-nums">
                       {formatWhen(s.startsAt)}
                     </span>
-                    <span className="truncate">▸ Break — Up Next: {guideTitle(s.guide)}</span>
-                    <span className="ml-auto shrink-0 not-italic">
-                      {formatDuration(s.durationSeconds)}
-                    </span>
+                    {/* Inset so breaks read as minor interstitials between the programs. */}
+                    <span className="truncate pl-6">▸ Break — Up Next: {guideTitle(s.guide)}</span>
+                    <span className="ml-auto shrink-0 not-italic tabular-nums">{s.durationSeconds}s</span>
                   </li>
                 ) : (
                   <li key={s.id} className="flex items-center gap-3 py-1.5">
                     <span className="text-muted-foreground w-24 shrink-0 tabular-nums text-xs">
                       {formatWhen(s.startsAt)}
                     </span>
-                    <span className="truncate">
-                      {guideTitle(s.guide)}
-                      {s.guide.contentRating && (
-                        <span className="text-muted-foreground ml-2 text-xs">
-                          {s.guide.contentRating}
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="truncate">{guideTitle(s.guide)}</span>
+                      {rowBadges(s.guide).length > 0 && (
+                        <span className="flex shrink-0 items-center gap-1">
+                          {rowBadges(s.guide).map((b) => (
+                            <span
+                              key={b}
+                              className="border-border text-muted-foreground rounded border px-1 text-[10px] uppercase leading-4"
+                            >
+                              {b}
+                            </span>
+                          ))}
                         </span>
                       )}
-                    </span>
+                    </div>
                     <span className="text-muted-foreground ml-auto shrink-0 text-xs">
                       {formatDuration(s.durationSeconds)}
                     </span>
@@ -370,6 +391,8 @@ type GuideMeta = {
   resolution?: string;
   audioChannels?: number;
   summary?: string;
+  thumb?: string;
+  showThumb?: string;
 };
 
 function guideTitle(g: GuideMeta): string {
@@ -393,6 +416,18 @@ function audioLabel(ch?: number): string | null {
   if (ch >= 6) return "5.1";
   if (ch >= 2) return "2.0";
   return "1.0";
+}
+
+/** Compact badge labels for a schedule list row: season/episode, content rating, resolution, audio. */
+function rowBadges(g: GuideMeta): string[] {
+  const out: string[] = [];
+  const se = seasonEp(g);
+  if (se) out.push(se);
+  if (g.contentRating) out.push(g.contentRating);
+  if (g.resolution) out.push(resLabel(g.resolution));
+  const audio = audioLabel(g.audioChannels);
+  if (audio) out.push(audio);
+  return out;
 }
 
 function GuideMetaLine({ guide }: { guide: GuideMeta }) {

@@ -30,6 +30,9 @@ declare module "@tanstack/react-router" {
   interface StaticDataRouteOption {
     hideSubHeader?: boolean;
     fullBleed?: boolean;
+    /** Extra classes for the <main> card — e.g. `relative` so a route can absolutely-position an overlay
+     *  (like the channel editor's floating section TOC) within main, above its scroll container. */
+    mainClassName?: string;
   }
 }
 
@@ -46,6 +49,11 @@ declare module "@tanstack/react-router" {
  *           PageContent (Outlet, scrollable)
  */
 export function AppLayout() {
+  const matches = useMatches();
+  const mainClassName = matches
+    .map((m) => m.staticData?.mainClassName)
+    .filter(Boolean)
+    .join(" ");
   return (
     <SidebarProvider defaultOpen>
       <DetailsPanelProvider>
@@ -56,7 +64,12 @@ export function AppLayout() {
               <BreadcrumbProvider>
                 <TopHeader />
                 <div className="flex min-h-0 flex-1 pr-1 pb-1">
-                  <main className="bg-background m-2 mt-0 ml-0 flex flex-1 flex-col overflow-hidden rounded-md border shadow-sm">
+                  <main
+                    className={cn(
+                      "bg-background m-2 mt-0 ml-0 flex flex-1 flex-col overflow-hidden rounded-md border shadow-sm",
+                      mainClassName,
+                    )}
+                  >
                     <SubHeader />
                     <PageContent />
                   </main>

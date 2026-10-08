@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.50] - 2026-10-08
+
+### Changed
+- **The channel editor's Schedule panel surfaces more.** The "on now" block now leads with the show/movie's portrait poster in a left gutter (the show poster for episodes, via a new `showThumb` guide field; the movie poster otherwise). Upcoming programs show season/episode plus resolution, audio, and content-rating as badges. Interstitial breaks are inset and show their exact length in seconds (e.g. "15s") instead of rounding to "0m"/"1m".
+- **The floating section TOC now positions against the main content card, not the viewport.** It's absolutely positioned within `<main>` (via a new per-route `mainClassName` layout option set to `relative`), so it sits in the card's right gutter above the scroll area and moves with the layout. It also hides whenever a side panel (the AI assistant) is open, since that panel would otherwise slide over it.
+
+### Note
+- The show poster for episodes needs a metadata re-sync to populate `showThumb`; until then the "on now" art falls back to the episode image. Movies are unaffected.
+
 ## [0.15.49] - 2026-10-08
 
 ### Added
