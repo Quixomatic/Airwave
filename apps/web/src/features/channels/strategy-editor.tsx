@@ -2,9 +2,10 @@ import { Button } from "@airwave/ui/components/button";
 import { Input } from "@airwave/ui/components/input";
 import { Label } from "@airwave/ui/components/label";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@airwave/ui/components/select";
-import { Switch } from "@airwave/ui/components/switch";
 import { Filter, Plus, X } from "lucide-react";
 import { useState } from "react";
+
+import { SwitchField } from "@/components/switch-field";
 
 import { FilterBuilder, type FilterGroup, emptyGroup, normalizeFilter } from "./filter-builder";
 
@@ -103,33 +104,26 @@ export function StrategyEditor({
 
   return (
     <div className="space-y-4">
-      <label className="flex items-center gap-2 text-sm">
-        <Switch checked={excludeSpecials} onCheckedChange={(v) => onExcludeSpecialsChange(v === true)} />
-        Exclude specials
-      </label>
-      <p className="text-muted-foreground text-xs">
-        Drops TV specials (Season 0 episodes) from this channel&rsquo;s pool, so they never land in the
-        schedule. Movies and normal seasons are unaffected.
-      </p>
+      <SwitchField
+        checked={excludeSpecials}
+        onCheckedChange={onExcludeSpecialsChange}
+        label="Exclude specials"
+        description="Drops TV specials (Season 0 episodes) from this channel’s pool, so they never land in the schedule. Movies and normal seasons are unaffected."
+      />
 
-      <label className="flex items-center gap-2 text-sm">
-        <Switch checked={keepMultiPart} onCheckedChange={(v) => onKeepMultiPartChange(v === true)} />
-        Keep multi-part episodes together
-      </label>
-      <p className="text-muted-foreground text-xs">
-        Consecutive &ldquo;Part 1 / Part 2&hellip;&rdquo; episodes that tell one story air back to back
-        wherever they land, regardless of the ordering or grouping below (detected from episode titles; a run
-        must start at part 1 and is capped at 5 parts).
-      </p>
+      <SwitchField
+        checked={keepMultiPart}
+        onCheckedChange={onKeepMultiPartChange}
+        label="Keep multi-part episodes together"
+        description="Episodes that form one split story (“Part 1 / Part 2…”) always air back to back, whatever the ordering or grouping."
+      />
 
-      <label className="flex items-center gap-2 text-sm">
-        <Switch checked={!!value} onCheckedChange={(v) => onChange(v === true ? defaultStrategy() : null)} />
-        Group &amp; rotate this channel&rsquo;s content
-      </label>
-      <p className="text-muted-foreground text-xs">
-        Off plays in the order set above. On clusters or rotates content by show, movies, or a filter — the
-        ordering above still decides episode order within each block.
-      </p>
+      <SwitchField
+        checked={!!value}
+        onCheckedChange={(v) => onChange(v ? defaultStrategy() : null)}
+        label="Group & rotate this channel’s content"
+        description="Off plays in the order set above. On clusters or rotates content by show, movies, or a filter — the ordering above still decides episode order within each block."
+      />
 
       {value && (
         <>

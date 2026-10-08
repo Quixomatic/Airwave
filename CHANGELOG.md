@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.48] - 2026-10-08
+
+### Changed
+- **The channel scheduling toggles read better.** The switches in Advanced grouping & rotation (Exclude specials, Keep multi-part together, Group & rotate) now put the switch in a left gutter with the label and a width-limited description aligned beside it, instead of a full-width blurb under each. Extracted the pattern into a reusable `SwitchField` component, and trimmed the multi-part description.
+
 ## [0.15.47] - 2026-10-08
 
 ### Added
