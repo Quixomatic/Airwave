@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.47] - 2026-10-08
+
+### Added
+- **"Exclude specials" toggle in the channel editor** (issue #7), at the top of the Advanced grouping & rotation section, above "Keep multi-part episodes together." On, it drops TV specials (Season 0 episodes) from the channel's pool so they never appear in the schedule — all modes, movies and normal seasons unaffected. The channel create/update/read API carries it, and the AI assistant can see it when describing a channel.
+
 ## [0.15.46] - 2026-10-08
 
 Groundwork for excluding TV specials from a channel (issue #7).

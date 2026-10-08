@@ -69,6 +69,7 @@ export type ChannelFormValues = {
   manualItemKeys: string[];
   ordering: Ordering;
   strategy: ChannelStrategy | null;
+  excludeSpecials: boolean;
   keepMultiPartTogether: boolean;
   sortField: string;
   sortDir: "asc" | "desc";
@@ -214,6 +215,7 @@ export function ChannelForm({
   const [tv, setTv] = useState(initialTypes.includes("show"));
   const [ordering, setOrdering] = useState<Ordering>(initial?.ordering ?? "SHUFFLE");
   const [strategy, setStrategy] = useState<ChannelStrategy | null>(initial?.strategy ?? null);
+  const [excludeSpecials, setExcludeSpecials] = useState(initial?.excludeSpecials ?? false);
   const [keepMultiPartTogether, setKeepMultiPartTogether] = useState(initial?.keepMultiPartTogether ?? false);
   const [sortField, setSortField] = useState(initial?.sortField ?? "title");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(initial?.sortDir ?? "asc");
@@ -357,6 +359,7 @@ export function ChannelForm({
       manualItemKeys: mode === "manual" ? manualItemKeys : [],
       ordering,
       strategy,
+      excludeSpecials,
       keepMultiPartTogether,
       sortField,
       sortDir,
@@ -653,10 +656,12 @@ export function ChannelForm({
       {/* Advanced grouping/rotation strategy — collapsed by default so a basic channel stays simple, but
           auto-expanded when this channel ALREADY has a strategy (so it's not hidden). Optional; off = plays in
           the order set above (byte-for-byte today's behavior). */}
-      <Section title="Advanced — grouping & rotation" icon={Layers} defaultOpen={strategy != null || keepMultiPartTogether}>
+      <Section title="Advanced — grouping & rotation" icon={Layers} defaultOpen={strategy != null || keepMultiPartTogether || excludeSpecials}>
         <StrategyEditor
           value={strategy}
           onChange={setStrategy}
+          excludeSpecials={excludeSpecials}
+          onExcludeSpecialsChange={setExcludeSpecials}
           keepMultiPart={keepMultiPartTogether}
           onKeepMultiPartChange={setKeepMultiPartTogether}
           mediaSourceId={sourceId}

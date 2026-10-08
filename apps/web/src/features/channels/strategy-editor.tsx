@@ -74,6 +74,8 @@ function describeRule(rule: StrategyRule, rotation: ChannelStrategy["rotation"])
 export function StrategyEditor({
   value,
   onChange,
+  excludeSpecials,
+  onExcludeSpecialsChange,
   keepMultiPart,
   onKeepMultiPartChange,
   mediaSourceId,
@@ -81,6 +83,8 @@ export function StrategyEditor({
 }: {
   value: ChannelStrategy | null;
   onChange: (s: ChannelStrategy | null) => void;
+  excludeSpecials: boolean;
+  onExcludeSpecialsChange: (v: boolean) => void;
   keepMultiPart: boolean;
   onKeepMultiPartChange: (v: boolean) => void;
   mediaSourceId: string;
@@ -99,6 +103,15 @@ export function StrategyEditor({
 
   return (
     <div className="space-y-4">
+      <label className="flex items-center gap-2 text-sm">
+        <Switch checked={excludeSpecials} onCheckedChange={(v) => onExcludeSpecialsChange(v === true)} />
+        Exclude specials
+      </label>
+      <p className="text-muted-foreground text-xs">
+        Drops TV specials (Season 0 episodes) from this channel&rsquo;s pool, so they never land in the
+        schedule. Movies and normal seasons are unaffected.
+      </p>
+
       <label className="flex items-center gap-2 text-sm">
         <Switch checked={keepMultiPart} onCheckedChange={(v) => onKeepMultiPartChange(v === true)} />
         Keep multi-part episodes together

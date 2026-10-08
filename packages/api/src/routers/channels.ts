@@ -205,6 +205,7 @@ export const channelsRouter = router({
       callsign: channel.callsign,
       ordering: channel.ordering,
       keepMultiPartTogether: channel.keepMultiPartTogether,
+      excludeSpecials: channel.excludeSpecials,
       sortField: channel.sortField,
       sortDir: channel.sortDir,
       enabled: channel.enabled,
@@ -299,6 +300,7 @@ export const channelsRouter = router({
         ordering: orderingEnum.default("SHUFFLE"),
         strategy: strategySchema.optional(),
         keepMultiPartTogether: z.boolean().optional(),
+        excludeSpecials: z.boolean().optional(),
         sortField: z.string().optional(),
         sortDir: z.enum(["asc", "desc"]).optional(),
         packageId: z.string().nullish(),
@@ -348,6 +350,7 @@ export const channelsRouter = router({
             ? (JSON.parse(JSON.stringify(input.strategy)) as Prisma.InputJsonValue)
             : Prisma.DbNull,
           keepMultiPartTogether: input.keepMultiPartTogether ?? false,
+          excludeSpecials: input.excludeSpecials ?? false,
           sortField: input.sortField ?? "title",
           sortDir: input.sortDir ?? "asc",
           packageId: input.packageId ?? null,
@@ -397,6 +400,7 @@ export const channelsRouter = router({
         ordering: orderingEnum,
         strategy: strategySchema.optional(),
         keepMultiPartTogether: z.boolean().optional(),
+        excludeSpecials: z.boolean().optional(),
         sortField: z.string().optional(),
         sortDir: z.enum(["asc", "desc"]).optional(),
         packageId: z.string().nullish(),
@@ -432,6 +436,7 @@ export const channelsRouter = router({
           ...(input.keepMultiPartTogether === undefined
             ? {}
             : { keepMultiPartTogether: input.keepMultiPartTogether }),
+          ...(input.excludeSpecials === undefined ? {} : { excludeSpecials: input.excludeSpecials }),
           sortField: input.sortField ?? "title",
           sortDir: input.sortDir ?? "asc",
           packageId: input.packageId ?? null,

@@ -609,6 +609,7 @@ export async function getChannel(prisma: PrismaClient, id: string) {
     enabled: c.enabled,
     ordering: c.ordering,
     keepMultiPartTogether: c.keepMultiPartTogether,
+    excludeSpecials: c.excludeSpecials,
     sortField: c.sortField,
     sortDir: c.sortDir,
     icon: c.icon,
