@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.53] - 2026-10-08
+
+### Fixed
+- **The channel editor's "on now" show poster works without a re-sync.** The portrait poster for an episode is now read from its parent show's existing cached metadata at request time, instead of a per-episode field that 0.15.50 wrote only on a fresh sync. The poster appears immediately on existing libraries, with no metadata re-sync required.
+
+### Internal
+- `guideFromNode` derives `showThumb` from the parent show row's own `thumb` during the episode-over-show guide merge. Removed the sync-time `showThumb` capture (and the now-unused `grandparentThumb` plumbing) added in 0.15.50, so the metadata sync tracks no extra field. The change is additive to the guide payload (only `showThumb` is added, no existing field changes), and only the admin on-now panel reads it, so the TV clients and guide grid are unaffected.
+
 ## [0.15.52] - 2026-10-08
 
 ### Changed

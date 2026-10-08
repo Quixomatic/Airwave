@@ -47,7 +47,13 @@ function guideFromNode(mi: MediaNode): GuideMeta {
   if (!mi) return { title: "Unavailable" };
   const own = (mi.guide as GuideMeta | null) ?? { title: "Unavailable" };
   const parent = (mi.parent?.guide as GuideMeta | null | undefined) ?? undefined;
-  return parent ? mergeGuide(parent, own) : own;
+  if (!parent) return own;
+  const merged = mergeGuide(parent, own);
+  // `own.thumb` (the episode still) overwrote the show poster in the merge. Expose the parent
+  // SHOW's own poster as `showThumb` so UIs can prefer the portrait art — derived from the
+  // already-cached parent row, so no re-sync is needed to populate it.
+  if (parent.thumb) merged.showThumb = parent.thumb;
+  return merged;
 }
 
 /**

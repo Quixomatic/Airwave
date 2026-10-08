@@ -1,0 +1,18 @@
+{
+  "// note": "ChannelGuide is TS/Bun. The only Gradle in-tree is two tiny Expo native modules (packages/key-input, packages/mpv-player), built by Expo/EAS, never from VS Code. The Red Hat Java extension (redhat.java) is Java-ONLY — it does not provide Kotlin or Swift support — so disabling its Gradle/Maven importer costs nothing here and stops it from spinning up a Gradle daemon per project. The 7GB daemon storm came from it importing the reference apps in .refs/. After changing these, run 'Java: Clean Java Language Server Workspace' and reload the window, or the cached state keeps importing.",
+  "java.import.gradle.enabled": false,
+  "java.import.gradle.wrapper.enabled": false,
+  "java.import.maven.enabled": false,
+  "java.import.exclusions": [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/.refs/**"
+  ],
+  "gradle.nestedProjects": false,
+  "files.watcherExclude": {
+    "**/.refs/**": true
+  },
+  "search.exclude": {
+    "**/.refs/**": true
+  }
+}

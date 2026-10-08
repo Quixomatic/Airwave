@@ -276,7 +276,7 @@ export type GuideMeta = {
   // episode context
   showTitle?: string; // grandparentTitle
   showRatingKey?: string; // grandparentRatingKey — links an episode to its parent show
-  showThumb?: string; // grandparentThumb — the SHOW's portrait poster (for episodes; movies use `thumb`)
+  showThumb?: string; // the SHOW's portrait poster, filled at read time from the parent show row (for episodes; movies use `thumb`) — see guideFromNode
   season?: number;
   episode?: number;
 };
@@ -309,7 +309,6 @@ type PlexMetadata = {
   art?: string;
   grandparentTitle?: string;
   grandparentRatingKey?: string | number;
-  grandparentThumb?: string;
   parentIndex?: number;
   index?: number;
   Director?: PlexTagRef[];
@@ -414,7 +413,6 @@ function toGuideMeta(m: PlexMetadata): GuideMeta {
     videoCodec: media?.videoCodec,
     showTitle: m.grandparentTitle,
     showRatingKey: m.grandparentRatingKey != null ? String(m.grandparentRatingKey) : undefined,
-    showThumb: m.grandparentThumb,
     season: m.parentIndex,
     episode: m.index,
   };
