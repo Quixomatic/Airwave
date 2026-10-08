@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.51] - 2026-10-08
+
+Refines the channel editor's Schedule panel and extracts its pieces into reusable components.
+
+### Changed
+- **The "on now" panel now reads like an active session.** It mirrors the Settings → Sessions card: a larger portrait poster in a left gutter, the title and metadata beside it, and a progress band (a thin bar with elapsed / total time and a Live marker). The "Up next" and "Lineup runs until" lines move into a recessed footer strip (the Frame's own background, with a full-width border above and below) that also serves as the divider down to the schedule.
+- **The upcoming lineup is now a proper vertical timeline.** Built on a new shared `Timeline` component, each row is `timestamp → rail + dot → program`: the timestamp sits in a left gutter, an outline dot and continuous rail run down the middle, and the title, badges, and duration sit to the right. The program that's on now is the timeline's active step, so its dot stands out. Interstitial breaks pass through the rail without a dot and read as minor interstitials.
+
+### Added
+- **Reusable `Timeline` component** (`@airwave/ui/components/timeline`): `Timeline`, `TimelineItem`, `TimelineHeader`, `TimelineSeparator`, `TimelineDate`, `TimelineIndicator`, `TimelineTitle`, and `TimelineContent`, with an active-step model, available to the whole admin UI.
+
+### Internal
+- Split the Schedule panel into focused components: `ChannelNowPlaying`, `ChannelScheduleTimeline`, and a shared `guide-meta` helper module (title, badges, and time formatting), trimming the channel editor route.
+
 ## [0.15.50] - 2026-10-08
 
 ### Changed
