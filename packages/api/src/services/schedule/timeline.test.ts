@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { PlexItem } from "../plex/client";
-import { type ChannelStrategy, buildSchedule } from "./timeline";
+import { type ChannelStrategy, type TimelineBumperPlan, buildSchedule, groupMultiPartRuns, partNumber } from "./timeline";
 
 // ── fixtures ────────────────────────────────────────────────────────────────
 
@@ -300,5 +300,131 @@ describe("channel strategies", () => {
     expect([...keys].sort()).toEqual([...pool.map((p) => p.ratingKey)].sort());
     const blocks = showBlocks(keys);
     for (let i = 1; i < blocks.length; i++) expect(blocks[i]).not.toBe(blocks[i - 1]!);
+  });
+});
+
+// ── keep multi-part episodes together (issue #37) ─────────────────────────────
+
+/** A multi-part-ish episode with explicit season/episode so the run walk has a deterministic order. */
+function mpEp(show: string, season: number, episode: number, title: string, mins = 30): PlexItem {
+  return {
+    ratingKey: `${show}-s${season}e${episode}`,
+    title,
+    durationMs: mins * 60_000,
+    guide: { title, type: "episode", showRatingKey: show, season, episode },
+  };
+}
+
+describe("partNumber detection", () => {
+  test("matches the four end-anchored forms", () => {
+    expect(partNumber("The Saga (1)")).toBe(1);
+    expect(partNumber("The Saga (2) - The Reckoning")).toBe(2);
+    expect(partNumber("The Saga Part 3")).toBe(3);
+    expect(partNumber("The Saga (Part 4)")).toBe(4);
+    expect(partNumber("The Saga (II)")).toBe(2);
+    expect(partNumber("The Saga Part Two")).toBe(2);
+  });
+  test("ignores non-parts and mid-title 'Part N'", () => {
+    expect(partNumber("A Normal Episode")).toBeNull();
+    expect(partNumber("Green with Evil Part 1: Out of Control")).toBeNull(); // mid-title, not end-anchored
+    expect(partNumber("The Fleshy Part of the Thigh")).toBeNull();
+    expect(partNumber(null)).toBeNull();
+  });
+});
+
+describe("groupMultiPartRuns", () => {
+  const run = (show: string, nums: number[]) => nums.map((n) => mpEp(show, 1, n, `The Saga (${n})`));
+
+  test("groups a 1..3 run: lead carries parts 2-3, continuations leave the ordering pool", () => {
+    const { leads, continuations } = groupMultiPartRuns(run("P", [1, 2, 3]));
+    expect(leads.map((l) => l.ratingKey)).toEqual(["P-s1e1"]);
+    expect(continuations.get("P-s1e1")!.map((p) => p.ratingKey)).toEqual(["P-s1e2", "P-s1e3"]);
+  });
+
+  test("does NOT group a run that doesn't start at part 1 (episode numbers like (4091))", () => {
+    const pool = [
+      mpEp("S", 36, 9, "Snuffy Learns To Dance (4091)"),
+      mpEp("S", 36, 10, "Big Bird Hikes (4092)"),
+      mpEp("S", 36, 11, "Baby Bear's First Day (4093)"),
+    ];
+    const { leads, continuations } = groupMultiPartRuns(pool);
+    expect(leads.length).toBe(3);
+    expect(continuations.size).toBe(0);
+  });
+
+  test("does NOT group a run longer than the cap (6 parts), but groups one exactly at the cap (5)", () => {
+    expect(groupMultiPartRuns(run("P", [1, 2, 3, 4, 5, 6])).continuations.size).toBe(0);
+    const atCap = groupMultiPartRuns(run("P", [1, 2, 3, 4, 5]));
+    expect(atCap.leads.map((l) => l.ratingKey)).toEqual(["P-s1e1"]);
+    expect(atCap.continuations.get("P-s1e1")!.length).toBe(4);
+  });
+
+  test("groups two separate two-parters in the same show", () => {
+    const pool = [
+      mpEp("P", 3, 19, "Story A (1)"),
+      mpEp("P", 3, 20, "Story A (2)"),
+      mpEp("P", 5, 50, "Story B (1)"),
+      mpEp("P", 5, 51, "Story B (2)"),
+    ];
+    const { leads, continuations } = groupMultiPartRuns(pool);
+    expect(leads.map((l) => l.ratingKey).sort()).toEqual(["P-s3e19", "P-s5e50"]);
+    expect(continuations.get("P-s3e19")!.map((p) => p.ratingKey)).toEqual(["P-s3e20"]);
+    expect(continuations.get("P-s5e50")!.map((p) => p.ratingKey)).toEqual(["P-s5e51"]);
+  });
+
+  test("leaves movies / non-episodes untouched", () => {
+    const { leads, continuations } = groupMultiPartRuns([movie("x"), movie("y")]);
+    expect(leads.length).toBe(2);
+    expect(continuations.size).toBe(0);
+  });
+});
+
+describe("buildSchedule keepMultiPart", () => {
+  const pool = (): PlexItem[] => [
+    mpEp("P", 1, 1, "The Saga (1)"),
+    mpEp("P", 1, 2, "The Saga (2)"),
+    mpEp("P", 1, 3, "The Saga (3)"),
+    mpEp("P", 2, 1, "Standalone P"),
+    mpEp("Q", 1, 1, "Q episode 1"),
+    mpEp("Q", 1, 2, "Q episode 2"),
+    mpEp("Q", 1, 3, "Q episode 3"),
+    movie("film"),
+  ];
+  const at = new Date("2026-01-01T00:00:00Z");
+  const programKeys = (keepMultiPart: boolean) =>
+    buildSchedule(pool(), "SHUFFLE", 999, at, 1, null, { keepMultiPart })
+      .entries.filter((e) => e.kind === "PROGRAM")
+      .map((e) => e.ratingKey!);
+
+  test("off (default) is byte-for-byte the no-opt build", () => {
+    const base = buildSchedule(pool(), "SHUFFLE", 999, at, 1, null, {});
+    const off = buildSchedule(pool(), "SHUFFLE", 999, at, 1, null, { keepMultiPart: false });
+    expect(off.entries).toEqual(base.entries);
+  });
+
+  test("on: the run's parts are contiguous and in order under SHUFFLE, every item still aired once", () => {
+    const keys = programKeys(true);
+    expect([...keys].sort()).toEqual([...pool().map((p) => p.ratingKey)].sort());
+    const i1 = keys.indexOf("P-s1e1");
+    expect(keys[i1 + 1]).toBe("P-s1e2");
+    expect(keys[i1 + 2]).toBe("P-s1e3");
+  });
+
+  test("on: bumpers are still woven between the parts", () => {
+    const bumper: TimelineBumperPlan = {
+      defaultSeconds: 15,
+      afterMovieSeconds: 30,
+      afterEpisodeSeconds: 15,
+      quickSeconds: 10,
+      shortEpisodeMinutes: 10,
+      rev: 1,
+    };
+    const entries = buildSchedule(pool(), "IN_ORDER", 999, at, 1, bumper, { keepMultiPart: true }).entries;
+    const i1 = entries.findIndex((e) => e.ratingKey === "P-s1e1");
+    expect(entries[i1]!.ratingKey).toBe("P-s1e1");
+    expect(entries[i1 + 1]!.kind).toBe("BUMPER");
+    expect(entries[i1 + 2]!.ratingKey).toBe("P-s1e2");
+    expect(entries[i1 + 3]!.kind).toBe("BUMPER");
+    expect(entries[i1 + 4]!.ratingKey).toBe("P-s1e3");
   });
 });

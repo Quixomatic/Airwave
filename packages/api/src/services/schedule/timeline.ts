@@ -446,6 +446,90 @@ function tailRecent(
   return res;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Keep multi-part episodes together (issue #37). Title-based detection (the only signal Plex exposes — there
+// is no episode-to-episode story metadata). We reshape the pool BEFORE any ordering/strategy runs: a run of
+// consecutive "part N" episodes within a show becomes a LEAD (its first part, a normal pool item) plus
+// CONTINUATIONS (the rest, removed from the ordering pool and emitted right after the lead, in order). So the
+// parts stay atomic no matter the ordering, strategy, rotation, or constraint. Bumpers are UNCHANGED — each
+// part still goes through the normal emit path, so the channel/package/global break plan is woven between
+// parts exactly as configured; "together" only means no OTHER program interleaves the run.
+
+const ROMAN: Record<string, number> = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, iix: 8, ix: 9, x: 10 };
+const ENGLISH: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+/** Title patterns that mark a part number, end-anchored. */
+const PART_PATTERNS: Array<[RegExp, (m: string) => number | null]> = [
+  [/^.*\((\d+)\)( - .*)?$/, (m) => (/^\d+$/.test(m) ? Number(m) : null)], // "The Story (2)" / "(2) - subtitle"
+  [/^.*\(?Part (\d+)\)?$/i, (m) => (/^\d+$/.test(m) ? Number(m) : null)], // "The Story Part 2" / "(Part 2)"
+  [/^.*\(([MDCLXVI]+)\)( - .*)?$/i, (m) => ROMAN[m.toLowerCase()] ?? null], // "The Story (II)"
+  [/^.*\(?Part (\w+)\)?$/i, (m) => ENGLISH[m.toLowerCase()] ?? null], // "The Story Part Two"
+];
+/** The part number encoded in an episode title, or null if it doesn't look like a multi-part episode. */
+export function partNumber(title: string | undefined | null): number | null {
+  if (!title) return null;
+  for (const [re, conv] of PART_PATTERNS) {
+    const m = re.exec(title);
+    if (m?.[1] != null) {
+      const n = conv(m[1]);
+      if (n != null) return n;
+    }
+  }
+  return null;
+}
+
+/** A kept-together run must begin at part 1 (so a show's episode/production numbers like "(4091)" that run
+ *  consecutively aren't mistaken for a story) and is capped at this many parts (a longer run is left split
+ *  entirely — a whole-season-length block is too much; its parts schedule normally). */
+export const MAX_RUN_PARTS = 5;
+
+/**
+ * Split the pool into the ORDERING pool (leads + every non-run item, original order preserved) and a map of
+ * each lead's continuation parts (in part order). A run is a maximal sequence of consecutive part numbers
+ * within one show, in season/episode order, that STARTS at part 1 and is 2..MAX_RUN_PARTS long; anything
+ * else (over-long, not starting at 1) leaves its episodes as ordinary individual items.
+ */
+export function groupMultiPartRuns(pool: PlexItem[]): { leads: PlexItem[]; continuations: Map<string, PlexItem[]> } {
+  const continuations = new Map<string, PlexItem[]>();
+  const continuationKeys = new Set<string>();
+  const byShow = new Map<string, PlexItem[]>();
+  for (const it of pool) {
+    const show = it.guide.showRatingKey;
+    if (show) (byShow.get(show) ?? byShow.set(show, []).get(show)!).push(it);
+  }
+  for (const eps of byShow.values()) {
+    eps.sort(
+      (a, b) => (a.guide.season ?? 0) - (b.guide.season ?? 0) || (a.guide.episode ?? 0) - (b.guide.episode ?? 0),
+    );
+    let run: PlexItem[] = [];
+    let lastNum = 0;
+    const commit = () => {
+      if (run.length >= 2 && run.length <= MAX_RUN_PARTS) {
+        const [lead, ...rest] = run;
+        continuations.set(lead!.ratingKey, rest);
+        for (const r of rest) continuationKeys.add(r.ratingKey);
+      }
+      run = [];
+      lastNum = 0;
+    };
+    for (const ep of eps) {
+      const n = partNumber(ep.guide.title);
+      if (n != null && run.length > 0 && n === lastNum + 1) {
+        run.push(ep); // extends the current run
+        lastNum = n;
+      } else if (n === 1) {
+        commit();
+        run = [ep]; // a run can only BEGIN at part 1
+        lastNum = 1;
+      } else {
+        commit(); // a non-part, or a part number that isn't 1 and isn't next in sequence → no run
+      }
+    }
+    commit();
+  }
+  const leads = pool.filter((i) => !continuationKeys.has(i.ratingKey));
+  return { leads, continuations };
+}
+
 /**
  * Lay out a channel's lineup back-to-back from `startAt`.
  *
@@ -481,9 +565,16 @@ export function buildSchedule(
     resumeFrom?: ScheduleCursor | null;
     /** OPTIONAL bolt-on grouping/rotation (§7.6 Arc 3). null/undefined = base ordering only. */
     strategy?: ChannelStrategy | null;
+    /** Keep multi-part episodes contiguous (issue #37). Off = the ordering pool is the full pool (unchanged). */
+    keepMultiPart?: boolean;
   } = {},
 ): BuildResult {
   const usable = pool.filter((i) => i.durationMs > 0);
+  // Keep-multi-part: reshape the ordering pool so a run's lead carries its continuation parts, which are
+  // removed here and re-attached right after the lead at emit time. Off = `leads` is the full pool.
+  const { leads, continuations } = opts.keepMultiPart
+    ? groupMultiPartRuns(usable)
+    : { leads: usable, continuations: new Map<string, PlexItem[]>() };
   const resume = opts.resumeFrom ?? null;
   // Fold the block's start time into the seed so an appended block (or a rebuild at a
   // different time) reshuffles differently, while staying deterministic. A resumed build
@@ -529,10 +620,45 @@ export function buildSchedule(
   // Tier-2 incoming cross-pass history for the CURRENT pass — pinned per pass (like passSeed), recomputed from
   // the prior pass's tail at rollover, so a `noRepeatWithin` constraint holds across a windowed build seam.
   let recent: RecentItem[] = constraint && resume?.recent ? resume.recent : [];
+
+  // Emit one program with its leading interstitial break (never before the very first slot) and advance the
+  // clock. A multi-part lead calls this for itself then each continuation part, so the parts are contiguous
+  // AND each still gets the normal break before it — bumper behavior is unchanged by keep-multi-part.
+  const emitProgram = (item: PlexItem) => {
+    if (bumper && prevItem) {
+      const bumperSeconds = Math.max(1, Math.round(breakSeconds(prevItem, item, bumper)));
+      entries.push({
+        kind: "BUMPER",
+        ratingKey: null,
+        bumperKind: "interstitial",
+        targetRatingKey: item.ratingKey,
+        startsAt: new Date(cursorSec * 1000),
+        durationSeconds: bumperSeconds,
+        startOffsetSeconds: 0,
+      });
+      cursorSec += bumperSeconds;
+      coveredSeconds += bumperSeconds;
+      bumperCount++;
+    }
+    const dur = itemSeconds(item);
+    entries.push({
+      kind: "PROGRAM",
+      ratingKey: item.ratingKey,
+      bumperKind: null,
+      targetRatingKey: null,
+      startsAt: new Date(cursorSec * 1000),
+      durationSeconds: dur,
+      startOffsetSeconds: 0,
+    });
+    cursorSec += dur;
+    coveredSeconds += dur;
+    prevItem = item;
+  };
+
   while (!stopped && coveredSeconds < target && entries.length < MAX_ENTRIES) {
     const order = strategy
-      ? strategyPassOrder(usable, ordering, strategy, baseSeed, passIndex, recent)
-      : passOrder(usable, ordering, baseSeed, passIndex);
+      ? strategyPassOrder(leads, ordering, strategy, baseSeed, passIndex, recent)
+      : passOrder(leads, ordering, baseSeed, passIndex);
     // Stale/over-end cursor (pool shrank, or this pass came out shorter) — roll to a fresh pass.
     if (pos >= order.length) {
       passIndex++;
@@ -550,39 +676,12 @@ export function buildSchedule(
         stopped = true;
         break;
       }
+      // Emit the slot's lead, then (keep-multi-part) its continuation parts right after it, contiguous.
+      // The whole run commits once started, so it may overshoot a window cap by a part or two — intended.
       const item = order[i]!;
-
-      // Interstitial break introducing this program (never before the very first slot).
-      // Length is contextual — a function of the outgoing (prevItem) → incoming (item) pair.
-      if (bumper && prevItem) {
-        const bumperSeconds = Math.max(1, Math.round(breakSeconds(prevItem, item, bumper)));
-        entries.push({
-          kind: "BUMPER",
-          ratingKey: null,
-          bumperKind: "interstitial",
-          targetRatingKey: item.ratingKey,
-          startsAt: new Date(cursorSec * 1000),
-          durationSeconds: bumperSeconds,
-          startOffsetSeconds: 0,
-        });
-        cursorSec += bumperSeconds;
-        coveredSeconds += bumperSeconds;
-        bumperCount++;
-      }
-
-      const dur = itemSeconds(item);
-      entries.push({
-        kind: "PROGRAM",
-        ratingKey: item.ratingKey,
-        bumperKind: null,
-        targetRatingKey: null,
-        startsAt: new Date(cursorSec * 1000),
-        durationSeconds: dur,
-        startOffsetSeconds: 0,
-      });
-      cursorSec += dur;
-      coveredSeconds += dur;
-      prevItem = item;
+      emitProgram(item);
+      const parts = continuations.get(item.ratingKey);
+      if (parts) for (const part of parts) emitProgram(part);
       i++;
     }
 

@@ -2,7 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
-## [0.15.42] - 2026-10-08
+## [0.15.43] - 2026-10-08
+
+The scheduler can now keep multi-part episodes together (issue #37); off by default, no behavior change until enabled.
+
+### Added
+- **Multi-part episode keep-together in the schedule builder.** When a channel has `keepMultiPartTogether` on, consecutive episodes that form one split story (titles like "… (1)/(2)", "… Part 2", "… (II)") are scheduled contiguously and in order wherever they land, no matter the ordering or grouping strategy. Detection is title-based (the only signal the media server exposes): a run must start at part 1 and is capped at 5 parts (a longer run is left as normal individual episodes). Interstitial bumpers are still woven between the parts per the channel/package/global plan. Off by default, and when off the build is byte-for-byte unchanged.
+
+### Internal
+- `timeline.ts` gains `partNumber` / `groupMultiPartRuns` and a `keepMultiPart` build option: the run's lead carries its continuation parts out of the ordering pool and they're re-emitted right after it, so ordering/strategy/rotation/constraints can't split them. Wired through `generate`/`extend`/`repair`. Covered by `timeline.test.ts`.
+
+### Dev
+- `scripts/probe-multipart-episodes.ts` now runs the real detection and reports the runs it would keep together.
 
 Groundwork for keeping multi-part episodes together (issue #37).
 

@@ -195,6 +195,7 @@ async function generateChannelScheduleUnlocked(
   const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, from, min, plan, {
     maxDurationSeconds: opts.windowSeconds,
     strategy: parseStrategy(channel.strategy),
+    keepMultiPart: channel.keepMultiPartTogether,
   });
 
   await prisma.$transaction([
@@ -293,6 +294,7 @@ async function extendChannelScheduleUnlocked(
     maxDurationSeconds: opts.windowSeconds,
     resumeFrom: cursorOf(channel),
     strategy: parseStrategy(channel.strategy),
+    keepMultiPart: channel.keepMultiPartTogether,
   });
 
   const pruneBefore = new Date(now.getTime() - HISTORY_KEEP_SECONDS * 1000);
@@ -403,6 +405,7 @@ async function repairChannelScheduleUnlocked(
   const build = buildSchedule(pool, channel.ordering as OrderingStrategy, seed, from, min, plan, {
     maxDurationSeconds: opts.windowSeconds,
     strategy: parseStrategy(channel.strategy),
+    keepMultiPart: channel.keepMultiPartTogether,
   });
 
   await prisma.$transaction([
