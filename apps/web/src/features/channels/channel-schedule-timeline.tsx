@@ -65,14 +65,17 @@ export function ChannelScheduleTimeline({ items }: { items: ScheduleItem[] }) {
               <TimelineSeparator />
               <TimelineDate className={DATE_GUTTER}>{formatWhen(s.startsAt)}</TimelineDate>
               <div className="flex items-center justify-between gap-3 sm:-mt-0.5">
-                <TimelineTitle className="truncate font-normal">{guideTitle(s.guide)}</TimelineTitle>
+                <TimelineTitle className="truncate font-normal group-data-completed/timeline-item:font-semibold">
+                  {guideTitle(s.guide)}
+                </TimelineTitle>
                 <span className="text-muted-foreground shrink-0 text-xs">
                   {formatDuration(s.durationSeconds)}
                 </span>
               </div>
-              {/* Uniform visible outline; the primitive fills the active step (defaultValue) to
-                  full `border-primary` via its own data-completed styling. */}
-              <TimelineIndicator className="border-primary/40" />
+              {/* Visible outline for upcoming programs; the active step (on now, via defaultValue)
+                  gets the same live red as the "on now" Live marker, through the primitive's own
+                  data-completed styling. */}
+              <TimelineIndicator className="border-primary/40 group-data-completed/timeline-item:border-red-500" />
             </TimelineHeader>
             {rowBadges(s.guide).length > 0 && (
               <TimelineContent className="mt-1 flex flex-wrap items-center gap-1.5">

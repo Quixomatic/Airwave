@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.52] - 2026-10-08
+
+### Changed
+- **The on-now program stands out more in the Schedule timeline.** The active step's dot now uses the same live red as the "on now" Live marker, and only the on-now program's title is bold (the rest stay normal weight).
+
 ## [0.15.51] - 2026-10-08
 
 Refines the channel editor's Schedule panel and extracts its pieces into reusable components.
