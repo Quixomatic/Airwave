@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.42] - 2026-10-08
+
+Groundwork for keeping multi-part episodes together (issue #37).
+
+### Added
+- **`Channel.keepMultiPartTogether` column** (migration `20261008013312_add_channel_keep_multipart`): a per-channel flag for the upcoming "keep multi-part episodes together" scheduling option. Additive and defaulted off, a no-op for existing channels.
+
 ## [0.15.41] - 2026-10-07
 
 Custom request headers for OpenAI-compatible AI connections (issue #58).

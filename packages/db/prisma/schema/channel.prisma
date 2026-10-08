@@ -73,6 +73,11 @@ model Channel {
   //   grouping: [{ scope: "show"|"movie"|"collection", run: n|[min,max]|"all"|{minutes:[min,max]}, filter? }],
   //   constraints?: { noRepeatWithin?: {...} } }. Base order still governs within-group order + group sort.
   strategy    Json?
+  // When ON, consecutive multi-part episodes (title "… (1)", "… Part 2", …) that form ONE story are kept
+  // contiguous and in order wherever the scheduler places them — independent of ordering/strategy (issue
+  // #37). A run must start at part 1 and is capped at 5 parts (longer = left split). Off (default) = today's
+  // behavior byte-for-byte. See services/schedule/timeline.ts `fuseMultiPart`.
+  keepMultiPartTogether Boolean @default(false)
   // When ordering != SHUFFLE, Plex sorts the pool by this field/direction and the
   // scheduler preserves that order. `sortField` is a SORT_FIELDS key.
   sortField   String           @default("title")
