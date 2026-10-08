@@ -204,6 +204,7 @@ export const channelsRouter = router({
       name: channel.name,
       callsign: channel.callsign,
       ordering: channel.ordering,
+      keepMultiPartTogether: channel.keepMultiPartTogether,
       sortField: channel.sortField,
       sortDir: channel.sortDir,
       enabled: channel.enabled,
@@ -297,6 +298,7 @@ export const channelsRouter = router({
         manualItemKeys: manualItemKeysSchema,
         ordering: orderingEnum.default("SHUFFLE"),
         strategy: strategySchema.optional(),
+        keepMultiPartTogether: z.boolean().optional(),
         sortField: z.string().optional(),
         sortDir: z.enum(["asc", "desc"]).optional(),
         packageId: z.string().nullish(),
@@ -345,6 +347,7 @@ export const channelsRouter = router({
           strategy: input.strategy
             ? (JSON.parse(JSON.stringify(input.strategy)) as Prisma.InputJsonValue)
             : Prisma.DbNull,
+          keepMultiPartTogether: input.keepMultiPartTogether ?? false,
           sortField: input.sortField ?? "title",
           sortDir: input.sortDir ?? "asc",
           packageId: input.packageId ?? null,
@@ -393,6 +396,7 @@ export const channelsRouter = router({
         manualItemKeys: manualItemKeysSchema, // non-empty → MANUAL_ITEMS (takes priority)
         ordering: orderingEnum,
         strategy: strategySchema.optional(),
+        keepMultiPartTogether: z.boolean().optional(),
         sortField: z.string().optional(),
         sortDir: z.enum(["asc", "desc"]).optional(),
         packageId: z.string().nullish(),
@@ -425,6 +429,9 @@ export const channelsRouter = router({
                   ? (JSON.parse(JSON.stringify(input.strategy)) as Prisma.InputJsonValue)
                   : Prisma.DbNull,
               }),
+          ...(input.keepMultiPartTogether === undefined
+            ? {}
+            : { keepMultiPartTogether: input.keepMultiPartTogether }),
           sortField: input.sortField ?? "title",
           sortDir: input.sortDir ?? "asc",
           packageId: input.packageId ?? null,

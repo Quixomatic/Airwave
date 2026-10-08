@@ -74,11 +74,15 @@ function describeRule(rule: StrategyRule, rotation: ChannelStrategy["rotation"])
 export function StrategyEditor({
   value,
   onChange,
+  keepMultiPart,
+  onKeepMultiPartChange,
   mediaSourceId,
   mediaTypes,
 }: {
   value: ChannelStrategy | null;
   onChange: (s: ChannelStrategy | null) => void;
+  keepMultiPart: boolean;
+  onKeepMultiPartChange: (v: boolean) => void;
   mediaSourceId: string;
   mediaTypes: ("movie" | "show")[];
 }) {
@@ -95,6 +99,16 @@ export function StrategyEditor({
 
   return (
     <div className="space-y-4">
+      <label className="flex items-center gap-2 text-sm">
+        <Switch checked={keepMultiPart} onCheckedChange={(v) => onKeepMultiPartChange(v === true)} />
+        Keep multi-part episodes together
+      </label>
+      <p className="text-muted-foreground text-xs">
+        Consecutive &ldquo;Part 1 / Part 2&hellip;&rdquo; episodes that tell one story air back to back
+        wherever they land, regardless of the ordering or grouping below (detected from episode titles; a run
+        must start at part 1 and is capped at 5 parts).
+      </p>
+
       <label className="flex items-center gap-2 text-sm">
         <Switch checked={!!value} onCheckedChange={(v) => onChange(v === true ? defaultStrategy() : null)} />
         Group &amp; rotate this channel&rsquo;s content

@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.44] - 2026-10-08
+
+### Added
+- **"Keep multi-part episodes together" toggle in the channel editor.** A new switch in a channel's Options turns on the multi-part grouping from 0.15.43: consecutive "Part 1 / Part 2…" episodes of one story air back to back wherever they land. The channel create/update/read API carries the setting, and the AI assistant can now see it when describing a channel (it doesn't set it).
+
 ## [0.15.43] - 2026-10-08
 
 The scheduler can now keep multi-part episodes together (issue #37); off by default, no behavior change until enabled.

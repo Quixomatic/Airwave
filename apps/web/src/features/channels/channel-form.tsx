@@ -69,6 +69,7 @@ export type ChannelFormValues = {
   manualItemKeys: string[];
   ordering: Ordering;
   strategy: ChannelStrategy | null;
+  keepMultiPartTogether: boolean;
   sortField: string;
   sortDir: "asc" | "desc";
   packageId: string | null;
@@ -213,6 +214,7 @@ export function ChannelForm({
   const [tv, setTv] = useState(initialTypes.includes("show"));
   const [ordering, setOrdering] = useState<Ordering>(initial?.ordering ?? "SHUFFLE");
   const [strategy, setStrategy] = useState<ChannelStrategy | null>(initial?.strategy ?? null);
+  const [keepMultiPartTogether, setKeepMultiPartTogether] = useState(initial?.keepMultiPartTogether ?? false);
   const [sortField, setSortField] = useState(initial?.sortField ?? "title");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(initial?.sortDir ?? "asc");
   const [packageId, setPackageId] = useState<string>(initial?.packageId ?? "");
@@ -355,6 +357,7 @@ export function ChannelForm({
       manualItemKeys: mode === "manual" ? manualItemKeys : [],
       ordering,
       strategy,
+      keepMultiPartTogether,
       sortField,
       sortDir,
       packageId: packageId || null,
@@ -650,10 +653,12 @@ export function ChannelForm({
       {/* Advanced grouping/rotation strategy — collapsed by default so a basic channel stays simple, but
           auto-expanded when this channel ALREADY has a strategy (so it's not hidden). Optional; off = plays in
           the order set above (byte-for-byte today's behavior). */}
-      <Section title="Advanced — grouping & rotation" icon={Layers} defaultOpen={strategy != null}>
+      <Section title="Advanced — grouping & rotation" icon={Layers} defaultOpen={strategy != null || keepMultiPartTogether}>
         <StrategyEditor
           value={strategy}
           onChange={setStrategy}
+          keepMultiPart={keepMultiPartTogether}
+          onKeepMultiPartChange={setKeepMultiPartTogether}
           mediaSourceId={sourceId}
           mediaTypes={mediaTypes}
         />
