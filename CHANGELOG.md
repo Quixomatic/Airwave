@@ -2,6 +2,13 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.46] - 2026-10-08
+
+Groundwork for excluding TV specials from a channel (issue #7).
+
+### Added
+- **`Channel.excludeSpecials` + pool filtering** (migration `20261008140254_add_channel_exclude_specials`): when a channel opts in, TV specials (Season 0 episodes) are dropped from its pool in `resolveChannel`, so they never reach the schedule, across all modes (filter, membership, manual). Movies and normal seasons are untouched. Off by default. The UI toggle follows in the next patch.
+
 ## [0.15.45] - 2026-10-08
 
 ### Fixed

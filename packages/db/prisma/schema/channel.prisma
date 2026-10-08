@@ -73,6 +73,10 @@ model Channel {
   //   grouping: [{ scope: "show"|"movie"|"collection", run: n|[min,max]|"all"|{minutes:[min,max]}, filter? }],
   //   constraints?: { noRepeatWithin?: {...} } }. Base order still governs within-group order + group sort.
   strategy    Json?
+  // When ON, TV specials (Season 0 episodes) are dropped from the channel's pool before a schedule is built,
+  // across all modes (filter/membership/manual). Movies and normal seasons are untouched. Off (default) =
+  // today's behavior. Applied in services/plex/resolve.ts `resolveChannel`. Issue #7.
+  excludeSpecials Boolean @default(false)
   // When ON, consecutive multi-part episodes (title "… (1)", "… Part 2", …) that form ONE story are kept
   // contiguous and in order wherever the scheduler places them — independent of ordering/strategy (issue
   // #37). A run must start at part 1 and is capped at 5 parts (longer = left split). Off (default) = today's

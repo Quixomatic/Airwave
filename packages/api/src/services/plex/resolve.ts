@@ -316,17 +316,20 @@ export async function resolveChannel(
   if (!channel || !source?.baseUrl || !def) return [];
   const src = { id: source.id, baseUrl: source.baseUrl, token: decryptToken(source.token) };
 
+  let items: PlexItem[];
   if (def.kind === "MEMBERSHIP") {
     const sources = (def.sources as unknown as MembershipSource[] | null) ?? [];
-    return applyResolvedOrdering(await resolveMembership(prisma, src, sources), channel.ordering);
+    items = applyResolvedOrdering(await resolveMembership(prisma, src, sources), channel.ordering);
+  } else if (def.kind === "MANUAL_ITEMS") {
+    items = applyResolvedOrdering(await resolveManual(prisma, src, def.manualItemKeys), channel.ordering);
+  } else {
+    const filter = (def.plexFilter as unknown as ChannelFilter | null) ?? {};
+    const mediaTypes = filter.mediaTypes?.length ? filter.mediaTypes : ["movie", "show"];
+    const sort = channelSortParam(channel.ordering, channel.sortField, channel.sortDir);
+    items = await resolveFilter(prisma, src, mediaTypes, filter.filter, sort, { includeStreams: opts.includeStreams });
   }
 
-  if (def.kind === "MANUAL_ITEMS") {
-    return applyResolvedOrdering(await resolveManual(prisma, src, def.manualItemKeys), channel.ordering);
-  }
-
-  const filter = (def.plexFilter as unknown as ChannelFilter | null) ?? {};
-  const mediaTypes = filter.mediaTypes?.length ? filter.mediaTypes : ["movie", "show"];
-  const sort = channelSortParam(channel.ordering, channel.sortField, channel.sortDir);
-  return resolveFilter(prisma, src, mediaTypes, filter.filter, sort, { includeStreams: opts.includeStreams });
+  // Exclude TV specials (Season 0) from the pool when the channel opts in — all modes, issue #7. Movies and
+  // normal seasons (season !== 0, or undefined) are untouched.
+  return channel.excludeSpecials ? items.filter((i) => i.guide.season !== 0) : items;
 }
