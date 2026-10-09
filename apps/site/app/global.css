@@ -117,6 +117,20 @@
   .animate-badge-shimmer { animation: none; }
 }
 
+/* Subtle "breathing" pulse for the gradient blob background (components/blob-background.tsx). A near-
+   imperceptible 1px blur oscillation that keeps the blob feeling alive. Tuned for the ellipse variant's
+   100px blur; other variants use a static blur instead. */
+@keyframes blob-pulse {
+  0% { filter: blur(100px); }
+  100% { filter: blur(101px); }
+}
+.animate-blob-pulse {
+  animation: blob-pulse 1000ms ease-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-blob-pulse { animation: none; }
+}
+
 /* ────────────────────────────────────────────────────────────────────────────
    Blog reading typography — only heading sizes and the light/dark font colors are
    tuned to match selfh.st; body size and column width stay at the site defaults.

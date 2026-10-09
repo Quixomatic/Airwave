@@ -1,8 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { blogSource, listBlogPosts, SHOW_DRAFTS } from "@/lib/source";
+import { FeatureImage } from "@/components/feature-image";
+import { BlobBackground } from "@/components/blob-background";
 import { readingTimeMinutes } from "@/lib/reading-time";
 import { getMDXComponents } from "@/components/mdx";
 import { PromoEmbed } from "@/components/promo-video";
@@ -79,17 +80,10 @@ export default async function BlogPost(props: Params) {
         // eslint-disable-next-line react/no-danger -- JSON.stringify output is safe structured data
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      {/* Centered header — meta, title, subtitle, with a soft radial glow that fades into the page
-          background (selfh.st style: no back button, no border line) */}
+      {/* Centered header — meta, title, subtitle, over an animated gradient blob (selfh.st style: no back
+          button, no border line) */}
       <div className="relative">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 -top-16 -z-10 mx-auto h-64 max-w-3xl opacity-40 blur-3xl"
-          style={{
-            background:
-              "radial-gradient(closest-side, color-mix(in oklab, var(--color-fd-primary) 35%, transparent), transparent)",
-          }}
-        />
+        <BlobBackground variant="ellipse" offsetY={-150} overflow="visible" />
         <div className="mx-auto w-full max-w-3xl px-6 pt-14 text-center">
           <div className="flex flex-wrap items-center justify-center gap-2 text-sm font-medium text-fd-muted-foreground">
             <time dateTime={page.data.date}>{formatDate(page.data.date)}</time>
@@ -114,11 +108,11 @@ export default async function BlogPost(props: Params) {
           <PromoEmbed id={page.data.video} title={page.data.title} />
         ) : (
           <div className="relative aspect-video overflow-hidden rounded-xl border border-fd-border bg-fd-muted">
-            <Image
-              src={page.data.image}
+            <FeatureImage
+              image={page.data.image}
               alt={page.data.title}
-              fill
-              className="object-cover"
+              feature={page.data.feature}
+              view="article"
               sizes="(max-width: 1024px) 100vw, 1024px"
               priority
             />

@@ -19,6 +19,20 @@ export const blog = defineDocs({
       // cards + as the social/OG card + the JSON-LD image. Generate a branded default with
       // scripts/gen-blog-image.py, or drop a real one. For a video post, use a still from the video.
       image: z.string(),
+      // Optional CSS feature-image treatment. `image` above stays the static social/OG card + fallback;
+      // when `feature` is set, the on-site list card and post hero render `feature.image` (or `image`) as
+      // the REAL screenshot and add the blurred, branded logomark+title overlay in CSS, controlled per view.
+      // `blur` is a boolean (both views) or `{ list?, article? }`. See components/feature-image.tsx.
+      feature: z
+        .object({
+          image: z.string().optional(),
+          title: z.string().optional(),
+          subtitle: z.string().optional(),
+          blur: z
+            .union([z.boolean(), z.object({ list: z.boolean().optional(), article: z.boolean().optional() })])
+            .optional(),
+        })
+        .optional(),
       // Optional YouTube video id. When set, the post header plays the glass-framed embed IN PLACE OF the
       // featured `image` (the image still powers the social card + list thumbnail, which can't be a video),
       // and the page emits VideoObject structured data.

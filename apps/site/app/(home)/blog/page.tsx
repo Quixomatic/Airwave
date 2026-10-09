@@ -1,8 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
 import { listBlogPosts } from "@/lib/source";
 import { readingTimeMinutes } from "@/lib/reading-time";
 import { Container, Eyebrow } from "@/components/marketing";
+import { FeatureImage } from "@/components/feature-image";
+import { BlobBackground } from "@/components/blob-background";
 
 export const metadata = {
   title: "Blog",
@@ -22,13 +23,16 @@ export default function BlogIndex() {
   return (
     <main className="flex-1">
       <Container className="py-16 sm:py-20">
-        {/* Hero */}
-        <div className="mx-auto max-w-2xl text-center">
-          <Eyebrow>Blog</Eyebrow>
-          <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl">The Airwave blog</h1>
-          <p className="mt-4 text-lg text-fd-muted-foreground">
-            News, notes, and the occasional dev-log from the project.
-          </p>
+        {/* Hero, over an animated gradient blob */}
+        <div className="relative">
+          <BlobBackground variant="ellipse" offsetY={-150} overflow="visible" />
+          <div className="relative z-10 mx-auto max-w-2xl text-center">
+            <Eyebrow>Blog</Eyebrow>
+            <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl">The Airwave blog</h1>
+            <p className="mt-4 text-lg text-fd-muted-foreground">
+              News, notes, and the occasional dev-log from the project.
+            </p>
+          </div>
         </div>
 
         {/* Feed + sidebar */}
@@ -39,7 +43,7 @@ export default function BlogIndex() {
               Latest posts
             </h2>
             <div className="flex flex-col divide-y divide-fd-border overflow-hidden border-y border-fd-border sm:rounded-xl sm:border sm:bg-fd-card/30">
-              {posts.map((post) => {
+              {posts.map((post, i) => {
                 const mins = readingTimeMinutes(post.slugs[0]);
                 return (
                   <Link
@@ -48,12 +52,13 @@ export default function BlogIndex() {
                     className="group relative flex items-center gap-5 p-4 transition-colors hover:bg-fd-accent/40 sm:gap-6 sm:p-6"
                   >
                     <div className="relative aspect-square w-24 shrink-0 overflow-hidden rounded-lg bg-fd-muted sm:aspect-video sm:w-auto sm:flex-1">
-                      <Image
-                        src={post.data.image}
+                      <FeatureImage
+                        image={post.data.image}
                         alt={post.data.title}
-                        fill
-                        className="object-cover"
+                        feature={post.data.feature}
+                        view="list"
                         sizes="(max-width: 639px) 96px, 360px"
+                        priority={i === 0}
                       />
                     </div>
                     <div className="flex flex-[2] flex-col gap-2">

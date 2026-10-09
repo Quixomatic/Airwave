@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.54] - 2026-10-09
+
+Marketing site (getairwave.tv): a metadata-driven blog feature-image treatment, a reusable gradient-blob background, and this week's post.
+
+### Site
+- **Metadata-driven blog feature images.** A post can carry a `feature` block (a raw screenshot plus title/subtitle and a per-view `blur`) that renders the real image with a CSS blur, a navy scrim, and the Airwave logomark + title overlaid, controllable separately for the list card and the article hero. With no `feature` block the static `image` renders as before, so the generated-image fallback still works. Adds a reusable `AirwaveLogo` SVG component, a responsive overlay (stacked on phones, horizontal on wider screens), and serves the real image unoptimized so it stays lossless.
+- **Reusable gradient-blob background** (`BlobBackground`): an animated blob behind a section, with three shape variants (organic, ellipse, spotlight), a mount fade/scale/slide-in, an optional pulse, and a scroll-linked parallax that drifts and scales the blob as the section moves through the viewport. Wired behind the blog list and article headers. Respects reduced-motion.
+- **New post: "Airwave Weekly (9 October 2026)"**, covering keep multi-part episodes together, exclude specials, Library Health, custom AI request headers, and the channel-editor refresh.
+
 ## [0.15.53] - 2026-10-08
 
 ### Fixed
