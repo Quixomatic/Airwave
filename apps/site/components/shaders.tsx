@@ -3,6 +3,8 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
+import { BlobBackground } from "@/components/blob-background";
+import { GridPattern } from "@/components/grid-pattern";
 
 // The animated backgrounds are the one third-party piece — @paper-design/shaders-react (WebGL). Loaded
 // client-only via next/dynamic (ssr:false) exactly like fumadocs.dev does, so they never run on the server.
@@ -140,12 +142,16 @@ export function ShaderCta({
   title,
   subtitle,
   children,
+  variant = "shader",
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
   children: ReactNode;
+  /** "shader" (default) = the animated GrainGradient wash + dithered logo. "blob" = the GuideEngine
+   *  integrations treatment: an organic pink-to-orange gradient blob glow on a dark panel. */
+  variant?: "shader" | "blob";
 }) {
-  // Pinned dark: the CTA sits on a dark shader panel, so it stays dark-themed even in site light mode.
+  // Pinned dark: the CTA sits on a dark panel, so it stays dark-themed even in site light mode.
   const dark = true;
   const ref = useRef<HTMLDivElement | null>(null);
   const visible = useIsVisible(ref);
@@ -154,8 +160,25 @@ export function ShaderCta({
   return (
     <div
       ref={ref}
-      className="dark relative isolate flex min-h-[240px] flex-col justify-center overflow-hidden rounded-2xl border bg-fd-background px-8 py-12 text-landing-foreground md:px-12"
+      className={cn(
+        "relative isolate flex min-h-[240px] flex-col justify-center overflow-hidden rounded-2xl border bg-fd-background px-8 py-12 md:px-12",
+        // The shader variant pins itself dark (it's a dark shader panel); the blob variant follows the theme.
+        variant === "blob" ? "text-fd-foreground" : "dark text-landing-foreground",
+      )}
     >
+      {variant === "blob" ? (
+        <>
+          <GridPattern cellSize={20} opacity={0.3} fade="radial" fadeStop="75%" />
+          <BlobBackground
+            variant="organic"
+            colors={["#2142E7", "#4a9fe0"]}
+            opacity={0.24}
+            offsetY={-90}
+            width={2000}
+            animate
+          />
+        </>
+      ) : (
       <div className="absolute inset-0 -z-1 overflow-hidden">
         {show && (
           <GrainGradient
@@ -192,6 +215,7 @@ export function ShaderCta({
           />
         )}
       </div>
+      )}
 
       <div className="z-2 max-w-xl">
         <h2

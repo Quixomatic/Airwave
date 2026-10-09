@@ -117,15 +117,21 @@
   .animate-badge-shimmer { animation: none; }
 }
 
-/* Subtle "breathing" pulse for the gradient blob background (components/blob-background.tsx). A near-
-   imperceptible 1px blur oscillation that keeps the blob feeling alive. Tuned for the ellipse variant's
-   100px blur; other variants use a static blur instead. */
+/* A slow, organic drift for the gradient blob background (components/blob-background.tsx): the blob wanders
+   in scale, rotation, and opacity on a long, uneven loop so it reads as randomized rather than a repeating
+   beat. Applied to a dedicated wrapper that carries no other transform, so it composes with the mount
+   animation and the scroll parallax, and works on every variant/blur. */
 @keyframes blob-pulse {
-  0% { filter: blur(100px); }
-  100% { filter: blur(101px); }
+  0%   { transform: scale(1)    rotate(0deg);   opacity: 1; }
+  17%  { transform: scale(1.06) rotate(3deg);   opacity: 0.88; }
+  34%  { transform: scale(0.96) rotate(-4deg);  opacity: 0.8; }
+  51%  { transform: scale(1.09) rotate(2deg);   opacity: 0.96; }
+  69%  { transform: scale(0.99) rotate(5deg);   opacity: 0.78; }
+  85%  { transform: scale(1.04) rotate(-2deg);  opacity: 0.92; }
+  100% { transform: scale(1)    rotate(0deg);   opacity: 1; }
 }
 .animate-blob-pulse {
-  animation: blob-pulse 1000ms ease-out infinite alternate;
+  animation: blob-pulse 24s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .animate-blob-pulse { animation: none; }

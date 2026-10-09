@@ -149,17 +149,20 @@ export function BlobBackground({
       )}
     >
       <motion.div style={{ y, scale }} className="absolute inset-0 origin-center">
-        <BlobShape
-          config={v}
-          colors={colors}
-          opacity={opacity}
-          offsetY={finalOffsetY}
-          width={finalWidth}
-          blur={finalBlur}
-          pulse={pulse}
-          animateIn={animateIn && !reduce}
-          isSpotlight={variant === "spotlight"}
-        />
+        {/* Dedicated pulse wrapper: carries no other transform, so its scale/opacity breathing composes
+            cleanly with the parallax (parent) and the mount animation (child). */}
+        <div className={cn("absolute inset-0 origin-center", pulse && "animate-blob-pulse")}>
+          <BlobShape
+            config={v}
+            colors={colors}
+            opacity={opacity}
+            offsetY={finalOffsetY}
+            width={finalWidth}
+            blur={finalBlur}
+            animateIn={animateIn && !reduce}
+            isSpotlight={variant === "spotlight"}
+          />
+        </div>
       </motion.div>
     </div>
   );
@@ -172,7 +175,6 @@ function BlobShape({
   offsetY,
   width,
   blur,
-  pulse,
   animateIn,
   isSpotlight,
 }: {
@@ -182,7 +184,6 @@ function BlobShape({
   offsetY: number;
   width: number | string;
   blur: number;
-  pulse: boolean;
   animateIn: boolean;
   isSpotlight: boolean;
 }) {
@@ -225,7 +226,6 @@ function BlobShape({
     </svg>
   );
 
-  // When pulsing, the blur comes from the `blob-pulse` keyframe; otherwise it's a static inline filter.
   const baseStyle: React.CSSProperties = {
     position: "absolute",
     width: widthValue,
@@ -233,7 +233,8 @@ function BlobShape({
     bottom: 0,
     left: "50%",
     zIndex: 1,
-    ...(!pulse && { filter: `blur(${blur}px)`, WebkitFilter: `blur(${blur}px)` }),
+    filter: `blur(${blur}px)`,
+    WebkitFilter: `blur(${blur}px)`,
     backfaceVisibility: "hidden",
     WebkitBackfaceVisibility: "hidden",
   };
@@ -243,7 +244,7 @@ function BlobShape({
     const fromY = isSpotlight ? offsetY + 100 : offsetY - 100;
     return (
       <motion.div
-        className={cn("pointer-events-none", pulse && "animate-blob-pulse")}
+        className="pointer-events-none"
         style={baseStyle}
         initial={{ opacity: 0, scale: 0.5, x: "-50%", y: fromY }}
         animate={{ opacity: 1, scale: 1, x: "-50%", y: offsetY }}
@@ -256,7 +257,7 @@ function BlobShape({
 
   return (
     <div
-      className={cn("pointer-events-none", pulse && "animate-blob-pulse")}
+      className="pointer-events-none"
       style={{ ...baseStyle, transform: `translate(-50%, ${offsetY}px)` }}
     >
       {svg}
