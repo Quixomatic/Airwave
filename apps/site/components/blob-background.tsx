@@ -143,8 +143,11 @@ export function BlobBackground({
       ref={ref}
       aria-hidden
       className={cn(
-        "pointer-events-none absolute inset-0 -z-10",
-        overflow === "hidden" ? "overflow-hidden" : "overflow-visible",
+        // Always clip the X axis so a scaled/rotated/parallaxed blob can never cause horizontal PAGE
+        // overflow, wherever this is dropped. `overflow-x: clip` still permits `overflow-y: visible`, so
+        // the vertical bleed the `overflow` prop asks for is preserved.
+        "pointer-events-none absolute inset-0 -z-10 overflow-x-clip",
+        overflow === "hidden" ? "overflow-y-clip" : "overflow-y-visible",
         className,
       )}
     >
