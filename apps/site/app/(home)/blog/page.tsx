@@ -22,21 +22,23 @@ export default function BlogIndex() {
 
   return (
     <main className="flex-1">
-      <Container className="py-16 sm:py-20">
-        {/* Hero, over an animated gradient blob */}
-        <div className="relative">
-          <BlobBackground variant="ellipse" offsetY={-150} overflow="visible" />
-          <div className="relative z-10 mx-auto max-w-2xl text-center">
+      {/* Full-width hero so the gradient blob spans the viewport (clipped only at the screen edge) */}
+      <div className="relative">
+        <BlobBackground variant="ellipse" offsetY={-150} overflow="visible" />
+        <Container className="relative z-10 pt-16 sm:pt-20">
+          <div className="mx-auto max-w-2xl text-center">
             <Eyebrow>Blog</Eyebrow>
             <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl">The Airwave blog</h1>
             <p className="mt-4 text-lg text-fd-muted-foreground">
               News, notes, and the occasional dev-log from the project.
             </p>
           </div>
-        </div>
+        </Container>
+      </div>
 
+      <Container className="pb-16 pt-14 sm:pb-20">
         {/* Feed + sidebar */}
-        <div className="mt-14 flex flex-col gap-10 lg:flex-row lg:gap-8">
+        <div className="flex flex-col gap-10 lg:flex-row lg:gap-8">
           {/* Post feed */}
           <div className="flex-1">
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-fd-muted-foreground">

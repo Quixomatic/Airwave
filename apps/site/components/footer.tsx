@@ -32,6 +32,7 @@ const COLUMNS: { heading: string; links: FooterLink[] }[] = [
     links: [
       { label: "About", href: "/about" },
       { label: "Roadmap", href: "/roadmap" },
+      { label: "Community", href: "/community" },
       { label: "Blog", href: "/blog" },
       { label: "FAQ", href: "/faq" },
       { label: "GitHub", href: "https://github.com/Quixomatic/Airwave", external: true },
