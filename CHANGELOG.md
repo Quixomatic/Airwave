@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.55] - 2026-10-10
+
+Groundwork for portable, cross-server channel sharing: capture each item's external metadata ids during Plex sync.
+
+### Added
+- **External metadata ids (TMDB / TVDB / IMDb) on synced media.** Plex library sync now requests each item's `Guid` tags (`includeGuids=1`) and parses them into `tmdbId` / `tvdbId` / `imdbId` on the item's guide bundle (handling the modern Plex-agent `Guid[]` array, legacy single-`guid` agents, and the HAMA anime agent, mirroring the approach the *arr/seerr ecosystem uses). These are the portable identity for a title (a Plex `ratingKey` is server-local and can't be shared), the foundation for resolving a shared channel's items against whatever Plex server you're connected to.
+
+### Note
+- The ids ride along in the existing `MediaItem.guide` JSON, so there's no database migration — but a metadata re-sync is needed to populate them on already-synced libraries. Nothing reads them yet; this is purely capture.
+
 ## [0.15.54] - 2026-10-09
 
 Marketing site (getairwave.tv): a metadata-driven blog feature-image treatment, a reusable gradient-blob background, and this week's post.

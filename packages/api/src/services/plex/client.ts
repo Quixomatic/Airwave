@@ -279,6 +279,11 @@ export type GuideMeta = {
   showThumb?: string; // the SHOW's portrait poster, filled at read time from the parent show row (for episodes; movies use `thumb`) — see guideFromNode
   season?: number;
   episode?: number;
+  // External metadata ids from Plex's `Guid[]` tags — the portable identity for cross-server resolution
+  // (tmdb is the canonical key, the seerr / *arr standard). See .plans/export-import-schema-versioning.md.
+  tmdbId?: string;
+  tvdbId?: string;
+  imdbId?: string;
 };
 
 export type PlexItem = {
@@ -311,6 +316,10 @@ type PlexMetadata = {
   grandparentRatingKey?: string | number;
   parentIndex?: number;
   index?: number;
+  // Primary guid (plex://… for the modern agent, or com.plexapp.agents.*://… for legacy agents) + the
+  // external-id tag array ({ id: "tmdb://603" } / "imdb://tt…" / "tvdb://…"), present with includeGuids=1.
+  guid?: string;
+  Guid?: Array<{ id?: string }>;
   Director?: PlexTagRef[];
   Genre?: PlexTagRef[];
   Role?: PlexTagRef[];
@@ -386,6 +395,36 @@ const tags = (arr: PlexTagRef[] | undefined, max: number): string[] | undefined 
   return out.length ? out : undefined;
 };
 
+// External-id patterns, mirroring seerr's plex scanner (.refs/seerr/server/lib/scanners/plex/index.ts):
+// modern Plex-agent items carry external ids in the `Guid[]` array; legacy-agent items carry a single
+// external-id `guid` (e.g. `com.plexapp.agents.themoviedb://603`); HAMA (anime) maps via tvdb.
+const EXT_ID = {
+  imdb: /imdb:\/\/(tt\d+)/,
+  tmdb: /tmdb:\/\/(\d+)/,
+  tmdbLegacy: /themoviedb:\/\/(\d+)/,
+  tvdb: /tvdb:\/\/(\d+)/,
+  tvdbLegacy: /thetvdb:\/\/(\d+)/,
+  hamaTvdb: /hama:\/\/tvdb\d?-(\d+)/,
+};
+
+/** Portable external ids (tmdb/tvdb/imdb) from an item's `Guid[]` tags + its primary `guid`. */
+function parseExternalIds(m: PlexMetadata): Pick<GuideMeta, "tmdbId" | "tvdbId" | "imdbId"> {
+  const sources = [
+    ...(m.Guid?.map((g) => g.id).filter((s): s is string => !!s) ?? []),
+    ...(m.guid ? [m.guid] : []),
+  ];
+  const out: Pick<GuideMeta, "tmdbId" | "tvdbId" | "imdbId"> = {};
+  for (const s of sources) {
+    const tmdb = s.match(EXT_ID.tmdb) ?? s.match(EXT_ID.tmdbLegacy);
+    if (tmdb && !out.tmdbId) out.tmdbId = tmdb[1];
+    const tvdb = s.match(EXT_ID.tvdb) ?? s.match(EXT_ID.tvdbLegacy) ?? s.match(EXT_ID.hamaTvdb);
+    if (tvdb && !out.tvdbId) out.tvdbId = tvdb[1];
+    const imdb = s.match(EXT_ID.imdb);
+    if (imdb && !out.imdbId) out.imdbId = imdb[1];
+  }
+  return out;
+}
+
 function toGuideMeta(m: PlexMetadata): GuideMeta {
   const media = m.Media?.[0];
   return {
@@ -415,6 +454,7 @@ function toGuideMeta(m: PlexMetadata): GuideMeta {
     showRatingKey: m.grandparentRatingKey != null ? String(m.grandparentRatingKey) : undefined,
     season: m.parentIndex,
     episode: m.index,
+    ...parseExternalIds(m),
   };
 }
 
@@ -488,6 +528,8 @@ export async function getSectionItemsRaw(
     // for lean reads (e.g. the preset preview) that only need counts + artwork, which drops the heaviest
     // part of the response and speeds the query up materially.
     ...(type === 2 || !includeStreams ? [] : ["includeElements=Stream"]),
+    // External metadata ids (tmdb/tvdb/imdb) on each item, for portable cross-server identity.
+    "includeGuids=1",
     ...filterParams,
   ].join("&");
   const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/all?${qs}`, {
@@ -653,6 +695,8 @@ export async function getAllSectionItems(
       // per-file streams inline (HDR / object-audio) — bulk, no per-item calls; NOT for shows
       // (type 2): they're containers with no streams and Plex 500s on includeElements=Stream.
       ...(type === 2 ? [] : ["includeElements=Stream"]),
+      // External metadata ids (tmdb/tvdb/imdb) on each item, for portable cross-server identity.
+      "includeGuids=1",
     ].join("&");
     const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/all?${qs}`, {
       headers: pmsHeaders(token),
