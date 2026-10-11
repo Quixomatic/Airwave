@@ -27,3 +27,21 @@ Each value is restricted to 32 KiB and keys are allowlisted, keeping these six
 values below tvOS's 512 KiB UserDefaults warning threshold. The pod bundles the
 required UserDefaults privacy declaration. A new native binary is required;
 an OTA JavaScript update alone cannot supply this module.
+
+From the repository root:
+
+```sh
+bun test apps/tv-native/src/lib/session.test.ts
+pnpm --filter tv-native check-types
+swiftc apps/tv-native/modules/session-store/ios/PersistentSessionStore.swift \
+  apps/tv-native/modules/session-store/tests/PersistentSessionStoreTests.swift \
+  -o /tmp/airwave-session-tests
+/tmp/airwave-session-tests
+```
+
+The Bun suite restarts actual session/startup/routing/API modules in separate
+processes, substituting only native storage and network boundaries. The Swift
+checks exercise the production UserDefaults implementation with a temporary
+test suite. These checks do not replace tvOS release-build validation: verify
+force-quit/relaunch, device restart, upgrade migration, expired sessions,
+offline launch, logout, Change Server, and remote-driven Retry on Apple TV.
