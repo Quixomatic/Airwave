@@ -1,4 +1,6 @@
-import { getServerUrl, getToken } from "./auth";
+import { router } from "expo-router";
+
+import { getServerUrl, getToken, invalidateToken } from "./auth";
 import { getNetwork } from "./plex-connection";
 
 /**
@@ -21,7 +23,8 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
-  const res = await fetch(`${getServerUrl()}${path}`, {
+  const server = getServerUrl();
+  const res = await fetch(`${server}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -30,6 +33,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     },
   });
   if (!res.ok) {
+    // Only reject the current credential on 401; retain it on network/5xx/permissions failures.
+    // A late response from a previous login or server must not invalidate the new session.
+    if (res.status === 401 && token && token === getToken() && server === getServerUrl()) {
+      const invalidated = await invalidateToken(token, server);
+      if (invalidated && server === getServerUrl() && !getToken()) router.replace("/login");
+    }
     const body = (await res.json().catch(() => null)) as { error?: string } | null;
     throw new ApiError(res.status, body?.error ?? `Request failed (${res.status})`);
   }

@@ -22,9 +22,12 @@ const NETWORK_LABEL: Record<Network, string> = {
 export default function ServerSettings() {
   const router = useRouter();
   const [armChange, setArmChange] = useState(false);
+  const [storageError, setStorageError] = useState(false);
   const changeServer = () => {
     // Sign out + drop the stored server, then bounce through the entry gate → onboarding.
-    void Promise.all([setToken(null), clearServerUrl()]).then(() => router.replace("/"));
+    setStorageError(false);
+    void setToken(null).then(clearServerUrl).then(() => router.replace("/"))
+      .catch(() => setStorageError(true));
   };
 
   const [network, setNetwork] = useState<Network | null>(getNetwork());
@@ -65,6 +68,7 @@ export default function ServerSettings() {
   return (
     <View>
       <PageHeader title="Server" subtitle="The Airwave server this device is signed in to." />
+      {storageError && <Text style={{ color: "#f87171" }}>Couldn't change server. Please try again.</Text>}
 
       <View style={scaled({ flexDirection: "row", flexWrap: "wrap", gap: 28, padding: 22, borderRadius: 14, backgroundColor: "rgba(148,163,184,0.06)", marginBottom: 8 })}>
         <Info label="Address" value={getServerUrl() || "Not connected"} />

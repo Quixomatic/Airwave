@@ -4,17 +4,18 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Component, type ReactNode, useEffect, useState } from "react";
-import { Dimensions, Platform, View } from "react-native";
+import { Dimensions, Platform, Pressable, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { BootSplash } from "@/components/boot-splash";
 import { PlayerProvider } from "@/features/watch/player-context";
-import { getToken, hasServerUrl, loadSession } from "@/lib/auth";
+import { getToken, hasServerUrl } from "@/lib/auth";
 import { loadDevice } from "@/lib/device";
 import { hydrateAudioMode } from "@/lib/audio-pref";
-import { notifyInputActivity, useAndroidBack, useHardwareKeyInput, useTVInput } from "@/lib/input";
+import { LAYER, useKeyLayer, notifyInputActivity, useAndroidBack, useHardwareKeyInput, useTVInput } from "@/lib/input";
 import { hydrateNetwork, probeConnection } from "@/lib/plex-connection";
+import { initializeApp } from "@/lib/startup";
 import { C } from "@/lib/theme";
 
 // Startup diagnostic — isTV drives UI_SCALE + the focusable/native-focus gating; the window dp size +
@@ -60,6 +61,8 @@ class SplashBoundary extends Component<{ children: ReactNode }, { failed: boolea
  */
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
+  const [storageError, setStorageError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [bootDone, setBootDone] = useState(false);
 
   // Input sources → the one dispatcher (tv-web's model). `useTVInput` = the TV remote D-pad (TV builds
@@ -68,21 +71,52 @@ export default function RootLayout() {
   useTVInput();
   useHardwareKeyInput();
   useAndroidBack();
+  const retry = () => {
+    setStorageError(false);
+    setAttempt((value) => value + 1);
+  };
+  useKeyLayer({
+    id: "startup-retry",
+    priority: LAYER.BASE,
+    active: storageError,
+    onKey(event) {
+      if (event.key !== "ok") return false;
+      retry();
+      return true;
+    },
+  });
 
   useEffect(() => {
-    void Promise.all([loadSession(), loadDevice(), hydrateNetwork(), hydrateAudioMode()]).finally(() => {
+    let active = true;
+    void initializeApp([loadDevice, hydrateNetwork, hydrateAudioMode]).then(() => {
+      if (!active) return;
       setReady(true);
       // Refresh which Plex connection this device can actually reach (local → remote → relay) so
       // off-network playback streams from the right URL. Non-blocking; the first media request uses
       // the hydrated last-known value until this resolves. Only when we have a session to probe with.
       if (hasServerUrl() && getToken()) void probeConnection();
+    }).catch(() => {
+      if (active) setStorageError(true);
     });
-  }, []);
+    return () => {
+      active = false;
+    };
+  }, [attempt]);
 
   // Hydrate session/device BEFORE mounting the app (route guards read the session synchronously). While
   // loading, a plain dark screen — it matches the splash background, so the hand-off is seamless. This is the
   // original, known-good boot; the splash is a pure overlay ON TOP of the mounted app.
-  if (!ready) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
+  if (!ready) return (
+    <View style={{ flex: 1, backgroundColor: C.bg, alignItems: "center", justifyContent: "center" }}>
+      {storageError && <>
+        <Text style={{ color: C.fg, fontSize: 24 }}>Could not read saved settings.</Text>
+        <Text style={{ color: C.mutedFg, marginTop: 12 }}>Retry to load your server and session.</Text>
+        <Pressable onPress={retry} focusable={!Platform.isTV} style={{ padding: 20, marginTop: 20 }}>
+          <Text style={{ color: C.accent, fontSize: 24 }}>Retry</Text>
+        </Pressable>
+      </>}
+    </View>
+  );
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: C.bg }} onTouchStart={() => notifyInputActivity()}>

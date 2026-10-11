@@ -1,6 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
-import { CredStore, hydrateSyncCreds } from "./cred-store";
+import { CredStore, clearSyncCreds, hydrateSyncCreds } from "./cred-store";
+import { SessionStorage } from "./session-storage";
 
 /**
  * Native equivalent of tv-web's `auth-client` + `server-url`, minus better-auth's React client:
@@ -8,8 +7,8 @@ import { CredStore, hydrateSyncCreds } from "./cred-store";
  * (a) where the server is and (b) the token.
  *
  *  - The **bearer token** is a credential → `CredStore` (Keychain/Keystore via SecureStore, except on the
- *    Apple TV where it falls back to AsyncStorage — see `cred-store.ts` for the tvOS release-crash reason).
- *  - The **server URL** and other prefs are not secret → `AsyncStorage`.
+ *    Apple TV where it uses UserDefaults — see `cred-store.ts` for the tvOS release-crash reason).
+ *  - The **server URL** is not secret → `SessionStorage` (UserDefaults on tvOS, AsyncStorage elsewhere).
  *
  * These are read once at startup into module-level values (mirroring tv-web, where `SERVER_URL` is
  * evaluated at module load and the app re-initialises after onboarding). `loadSession()` hydrates
@@ -25,16 +24,22 @@ const BAKED = (process.env.EXPO_PUBLIC_SERVER_URL ?? "").replace(/\/+$/, "");
 
 let serverUrl = BAKED;
 let token: string | null = null;
+let tokenWrites: Promise<unknown> = Promise.resolve();
 
 /** Hydrate the in-memory session from storage. Call once before rendering the app. */
 export async function loadSession(): Promise<void> {
-  const [storedUrl, storedToken] = await Promise.all([
-    AsyncStorage.getItem(SERVER_KEY),
+  const [urlResult, tokenResult, expoResult] = await Promise.allSettled([
+    SessionStorage.getItem(SERVER_KEY),
     CredStore.getItemAsync(TOKEN_KEY),
-    // Warm the Apple-TV sync credential cache (for better-auth's expoClient) before any auth screen renders.
+    // Migrate Apple-TV Expo credentials before any auth screen renders.
     hydrateSyncCreds(),
   ]);
-  if (storedUrl) serverUrl = storedUrl.replace(/\/+$/, "");
+  if (urlResult.status !== "fulfilled" || tokenResult.status !== "fulfilled" || expoResult.status !== "fulfilled") {
+    throw new Error("Could not read saved session");
+  }
+  const storedUrl = urlResult.value;
+  const storedToken = tokenResult.value;
+  serverUrl = storedUrl ? storedUrl.replace(/\/+$/, "") : BAKED;
   token = storedToken ?? null;
 }
 
@@ -45,21 +50,40 @@ export function hasServerUrl(): boolean {
   return serverUrl !== "";
 }
 export async function setServerUrl(raw: string): Promise<void> {
-  serverUrl = normalizeServerUrl(raw);
-  await AsyncStorage.setItem(SERVER_KEY, serverUrl);
+  const next = normalizeServerUrl(raw);
+  await SessionStorage.setItem(SERVER_KEY, next);
+  serverUrl = next;
 }
 export async function clearServerUrl(): Promise<void> {
+  await SessionStorage.removeItem(SERVER_KEY);
   serverUrl = BAKED;
-  await AsyncStorage.removeItem(SERVER_KEY);
 }
 
 export function getToken(): string | null {
   return token;
 }
+function writeToken(next: string | null, rejected?: { token: string; server: string }): Promise<boolean> {
+  const write = tokenWrites.then(async () => {
+    if (rejected && (token !== rejected.token || serverUrl !== rejected.server)) return false;
+    if (next) await CredStore.setItemAsync(TOKEN_KEY, next);
+    else {
+      await clearSyncCreds();
+      await CredStore.deleteItemAsync(TOKEN_KEY);
+    }
+    token = next;
+    return true;
+  });
+  // Serialize deletion with a concurrent login; failed writes must not block a later retry.
+  tokenWrites = write.catch(() => {});
+  return write;
+}
+
 export async function setToken(next: string | null): Promise<void> {
-  token = next;
-  if (next) await CredStore.setItemAsync(TOKEN_KEY, next);
-  else await CredStore.deleteItemAsync(TOKEN_KEY);
+  await writeToken(next);
+}
+
+export function invalidateToken(rejectedToken: string, rejectedServer: string): Promise<boolean> {
+  return writeToken(null, { token: rejectedToken, server: rejectedServer });
 }
 
 /** Coerce user input into a base URL (add a scheme if missing, drop a trailing slash) — tv-web parity. */

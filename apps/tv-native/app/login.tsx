@@ -54,7 +54,12 @@ export default function Login() {
           const res = await plexLink.poll(started.pinId);
           if (res.status === "ok") {
             stopPolling();
-            await setToken(res.token);
+            try {
+              await setToken(res.token);
+            } catch {
+              reset("Couldn't save your session. Please try again.");
+              return;
+            }
             void probeConnection(); // pick the reachable Plex connection for this network
             router.replace("/guide");
           } else if (res.status === "expired") {
@@ -94,7 +99,12 @@ export default function Login() {
       });
       if (tok?.access_token) {
         stopPolling();
-        await setToken(tok.access_token);
+        try {
+          await setToken(tok.access_token);
+        } catch {
+          reset("Couldn't save your session. Please try again.");
+          return;
+        }
         void probeConnection(); // pick the reachable Plex connection for this network
         router.replace("/guide");
         return;
@@ -105,10 +115,10 @@ export default function Login() {
     }, (data.interval ?? 5) * 1000);
   }, [router]);
 
-  // "Change server" — drop the onboarded URL and bounce through the entry gate → onboarding. No token
-  // exists yet at login (mirrors settings/server.tsx's changeServer, minus the setToken(null)).
+  // Change server also clears any surviving bearer/Expo credentials before onboarding.
   const changeServer = useCallback(() => {
-    void clearServerUrl().then(() => router.replace("/"));
+    void setToken(null).then(clearServerUrl).then(() => router.replace("/"))
+      .catch(() => setError("Couldn't change server. Please try again."));
   }, [router]);
 
   // D-pad zone machine. On Android TV our native key module consumes the D-pad and routes it here

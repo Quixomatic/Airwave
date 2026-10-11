@@ -1,6 +1,6 @@
 import { Redirect } from "expo-router";
 
-import { getToken, hasServerUrl } from "@/lib/auth";
+import { sessionRoute } from "@/lib/session-route";
 
 /**
  * Entry gate — the native analogue of tv-web's `main.tsx` routing + the `_auth` guard:
@@ -9,7 +9,5 @@ import { getToken, hasServerUrl } from "@/lib/auth";
  *  - signed in      → the guide (home)
  */
 export default function Index() {
-  if (!hasServerUrl()) return <Redirect href="/setup" />;
-  if (!getToken()) return <Redirect href="/login" />;
-  return <Redirect href="/guide" />;
+  return <Redirect href={sessionRoute()} />;
 }

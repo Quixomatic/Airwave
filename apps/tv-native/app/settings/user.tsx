@@ -21,8 +21,11 @@ export default function UserSettings() {
   const user = session?.user as { name?: string | null; email?: string; image?: string | null; role?: string | null } | undefined;
 
   const [armOut, setArmOut] = useState(false);
+  const [storageError, setStorageError] = useState(false);
   const signOut = () => {
-    void setToken(null).then(() => router.replace("/login"));
+    setStorageError(false);
+    void setToken(null).then(() => router.replace("/login"))
+      .catch(() => setStorageError(true));
   };
   const { sel } = useSettingsPage(1, () => {
     if (armOut) signOut();
@@ -35,6 +38,7 @@ export default function UserSettings() {
   return (
     <View>
       <PageHeader title="User" subtitle="Your account on this TV." />
+      {storageError && <Text style={{ color: "#f87171" }}>Couldn't sign out. Please try again.</Text>}
 
       <View style={scaled({ flexDirection: "row", alignItems: "center", gap: 24, padding: 26, borderRadius: 18, backgroundColor: "rgba(148,163,184,0.06)", marginBottom: 8 })}>
         <Avatar image={user?.image} initials={initialsOf(user?.name, user?.email)} />
