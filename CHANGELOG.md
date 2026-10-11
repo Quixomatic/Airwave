@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.56] - 2026-10-11
+
+Closes a gap in the external-id capture from 0.15.55: the frequent incremental scan was erasing the ids the full sync had just written.
+
+### Fixed
+- **The recently-added scan no longer wipes external ids off the newest items.** The full metadata sync captures each item's tmdb/tvdb/imdb ids (0.15.55), but the lightweight recently-added scan — which re-upserts the 50 most-recently-added items per library every few minutes — was fetching them *without* `includeGuids=1`, so it overwrote those items' cached metadata with an id-less copy, stripping the ids the full sync had set. The incremental scan now requests the ids too, so they survive. The single-item metadata fetch (used to backfill a missing parent show) carries them as well.
+
+### Note
+- Existing already-clobbered rows (the 50 newest per library) repopulate on the next recently-added scan once the server is on this build; no re-sync needed.
+
+### Dev
+- `apps/server/scripts/probe-external-ids.ts`: verifies external-id capture after a sync — reports per-type cache coverage (and, for episodes, parent-show coverage, since an episode's portable identity rides on its show), then does a live round-trip against Plex (re-grab with `includeGuids=1`, re-parse, compare) to prove grab + parse works end to end. Distinguishes a benign "cache-behind" row from a real live-vs-cache conflict.
+
 ## [0.15.55] - 2026-10-10
 
 Groundwork for portable, cross-server channel sharing: capture each item's external metadata ids during Plex sync.

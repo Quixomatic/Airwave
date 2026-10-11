@@ -728,6 +728,10 @@ export async function getRecentlyAdded(
     `X-Plex-Container-Size=${limit}`,
     // per-file streams inline (HDR / object-audio); not for shows (type 2 → Plex 500s, no streams)
     ...(type === 2 ? [] : ["includeElements=Stream"]),
+    // External metadata ids (tmdb/tvdb/imdb) on each item, for portable cross-server identity. The
+    // incremental scan must capture them too, else a newly-added title lands id-less until the next
+    // full sync — matching getAllSectionItems / getSectionItemsRaw.
+    "includeGuids=1",
   ].join("&");
   const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/all?${qs}`, {
     headers: pmsHeaders(token),
@@ -743,7 +747,8 @@ export async function getMetadata(
   token: string,
   ratingKey: string,
 ): Promise<PlexItem | null> {
-  const res = await fetch(`${baseUrl}/library/metadata/${ratingKey}`, {
+  // includeGuids=1 so a backfilled parent show (or any single-item fetch) carries the external ids too.
+  const res = await fetch(`${baseUrl}/library/metadata/${ratingKey}?includeGuids=1`, {
     headers: pmsHeaders(token),
   });
   if (!res.ok) return null;
