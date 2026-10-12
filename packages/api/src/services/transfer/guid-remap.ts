@@ -84,6 +84,26 @@ export function resolveFromIndex(ref: GuidRef, idx: CacheIndex): string | null {
 
 const hasAnyId = (r: GuidRef) => !!(r.tmdbId || r.tvdbId || r.imdbId);
 
+/** One bulk query of the id columns for every id the refs carry, indexed for O(1) resolution. Reused by the
+ *  resolver (tier 1) and the import preview's cache-only match estimate. */
+export async function buildCacheIndex(prisma: PrismaClient, sourceId: string, refs: GuidRef[]): Promise<CacheIndex> {
+  const uniq = (xs: Array<string | undefined>) => [...new Set(xs.filter((s): s is string => !!s))];
+  const or: Array<{ tmdbId: { in: string[] } } | { tvdbId: { in: string[] } } | { imdbId: { in: string[] } }> = [];
+  const tmdb = uniq(refs.map((r) => r.tmdbId));
+  const tvdb = uniq(refs.map((r) => r.tvdbId));
+  const imdb = uniq(refs.map((r) => r.imdbId));
+  if (tmdb.length) or.push({ tmdbId: { in: tmdb } });
+  if (tvdb.length) or.push({ tvdbId: { in: tvdb } });
+  if (imdb.length) or.push({ imdbId: { in: imdb } });
+  const rows = or.length
+    ? await prisma.mediaItem.findMany({
+        where: { mediaSourceId: sourceId, available: true, OR: or },
+        select: { ratingKey: true, type: true, tmdbId: true, tvdbId: true, imdbId: true },
+      })
+    : [];
+  return indexCacheRows(rows);
+}
+
 /* ---------------- Live fallback + persistence ------------------------------------------------------ */
 
 /** Resolve one ref against the live server via `/library/matches`. Tries tmdb → imdb → tvdb. */
@@ -125,28 +145,18 @@ async function persistLiveIds(prisma: PrismaClient, sourceId: string, hits: Arra
 
 /* ---------------- The resolver ---------------------------------------------------------------------- */
 
-export async function remapGuids(prisma: PrismaClient, source: ResolveSource, refs: GuidRef[]): Promise<GuidRemapResult> {
+export async function remapGuids(
+  prisma: PrismaClient,
+  source: ResolveSource,
+  refs: GuidRef[],
+  opts: { persist?: boolean } = {},
+): Promise<GuidRemapResult> {
   const hits: GuidRemapHit[] = [];
   const unmatched: GuidRef[] = [];
   if (refs.length === 0) return { hits, unmatched, counts: { total: 0, cache: 0, live: 0, unmatched: 0 } };
 
-  // 1. Bulk indexed cache lookup over the id columns (only refs that actually carry an id).
-  const withIds = refs.filter(hasAnyId);
-  const uniq = (xs: Array<string | undefined>) => [...new Set(xs.filter((s): s is string => !!s))];
-  const or: Array<{ tmdbId: { in: string[] } } | { tvdbId: { in: string[] } } | { imdbId: { in: string[] } }> = [];
-  const tmdb = uniq(withIds.map((r) => r.tmdbId));
-  const tvdb = uniq(withIds.map((r) => r.tvdbId));
-  const imdb = uniq(withIds.map((r) => r.imdbId));
-  if (tmdb.length) or.push({ tmdbId: { in: tmdb } });
-  if (tvdb.length) or.push({ tvdbId: { in: tvdb } });
-  if (imdb.length) or.push({ imdbId: { in: imdb } });
-  const rows = or.length
-    ? await prisma.mediaItem.findMany({
-        where: { mediaSourceId: source.id, available: true, OR: or },
-        select: { ratingKey: true, type: true, tmdbId: true, tvdbId: true, imdbId: true },
-      })
-    : [];
-  const idx = indexCacheRows(rows);
+  // 1. Bulk indexed cache lookup over the id columns.
+  const idx = await buildCacheIndex(prisma, source.id, refs.filter(hasAnyId));
 
   const misses: GuidRef[] = [];
   for (const ref of refs) {
@@ -168,8 +178,8 @@ export async function remapGuids(prisma: PrismaClient, source: ResolveSource, re
     }
   }
 
-  // 3. Persist live hits' ids (best-effort self-heal).
-  await persistLiveIds(prisma, source.id, liveHits);
+  // 3. Persist live hits' ids (best-effort self-heal) — skipped in dry-run.
+  if (opts.persist !== false) await persistLiveIds(prisma, source.id, liveHits);
 
   return {
     hits,

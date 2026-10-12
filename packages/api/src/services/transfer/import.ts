@@ -7,7 +7,8 @@ import { channelSortParam } from "../plex/sort-fields";
 import { decryptToken } from "../plex/token";
 import { INITIAL_WINDOW_SECONDS, generateChannelSchedule } from "../schedule/generate";
 import { sourceReadiness } from "../sources/readiness";
-import { type LineupEnvelope, migrateToCurrent } from "./schema";
+import { type GuidRef, buildCacheIndex, remapGuids, resolveFromIndex } from "./guid-remap";
+import { type ExportItem, type LineupEnvelope, migrateToCurrent } from "./schema";
 
 /**
  * The shape of an uploaded lineup file (produced by `exportLineup`). Kept structural + tolerant — an
@@ -20,6 +21,10 @@ export type ImportedDefinition = {
   sortIndex?: number;
   plexFilter?: unknown;
   plexLibraryTitle?: string | null;
+  // MEMBERSHIP/MANUAL: original per-server refs (valid on a same-server re-import) + the portable GUID items.
+  sources?: unknown;
+  manualItemKeys?: string[];
+  items?: ExportItem[];
 };
 export type ImportedChannel = {
   number: number;
@@ -39,6 +44,8 @@ export type ImportedChannel = {
   excludeSpecials?: boolean;
   keepMultiPartTogether?: boolean;
   shuffleSeed?: number | null;
+  /** The Plex server (machineIdentifier) this channel was exported from (schema 1.2). */
+  sourceServerId?: string | null;
   packageKey?: string | null;
   definitions?: ImportedDefinition[];
 };
@@ -64,6 +71,34 @@ export type ImportedLineup = {
 const DEFAULT_ORDERING = "SHUFFLE";
 const DEFAULT_SORT_FIELD = "title";
 const DEFAULT_SORT_DIR = "asc";
+
+/** An exported item → a GuidRef for the remap resolver. `ref` echoes the source ratingKey. */
+function itemToGuidRef(it: ExportItem, i: number): GuidRef {
+  const type = it.type === "show" || it.type === "episode" ? it.type : "movie"; // season/other → movie-ish leaf
+  return {
+    ref: it.ratingKey ?? String(i),
+    type,
+    tmdbId: it.tmdbId,
+    tvdbId: it.tvdbId,
+    imdbId: it.imdbId,
+    title: it.title,
+    year: it.year ?? undefined,
+    showTitle: it.showTitle,
+    season: it.season ?? undefined,
+    episode: it.episode ?? undefined,
+    airDate: it.airDate ?? undefined,
+  };
+}
+
+/** The MANUAL/MEMBERSHIP defs' items of a channel, flattened to GuidRefs (for remap / match estimate). */
+function channelRemapRefs(c: ImportedChannel): GuidRef[] {
+  const refs: GuidRef[] = [];
+  for (const d of c.definitions ?? []) {
+    if (d.kind === "PREDICATE") continue;
+    (d.items ?? []).forEach((it, i) => refs.push(itemToGuidRef(it, i)));
+  }
+  return refs;
+}
 
 /* ---------------- Content signature (dedupe) ----------------------------- */
 
@@ -93,8 +128,8 @@ function canonicalJson(value: unknown): string {
  * A channel's content signature — what makes two channels "the same" for dedupe, independent of
  * instance. Deliberately EXCLUDES the number (a re-import preserves numbers, but identical content is
  * the same channel even if the number differs) and appearance-only fields. It's the name, its package,
- * its ordering, and the canonicalized PREDICATE filter(s) — the substance that decides what plays.
- * Non-predicate defs are ignored (they're dropped on import anyway).
+ * its ordering, the canonicalized PREDICATE filter(s), and (for MANUAL/MEMBERSHIP) the portable item GUIDs
+ * — the substance that decides what plays.
  */
 function signatureParts(args: {
   name: string;
@@ -103,6 +138,7 @@ function signatureParts(args: {
   sortField: string;
   sortDir: string;
   predicateFilters: unknown[];
+  itemGuids?: string[];
 }): string {
   // Sort the canonicalized filters so def order doesn't change the signature.
   const filters = args.predicateFilters.map(canonicalJson).sort();
@@ -113,7 +149,32 @@ function signatureParts(args: {
     args.sortField,
     args.sortDir,
     filters,
+    args.itemGuids ?? [],
   ]);
+}
+
+/** Portable item identity of a channel's MANUAL/MEMBERSHIP defs (sorted), so distinct hand-picked channels
+ *  don't collide on an empty filter set. Imported-only: existing channels contribute [] here, so an imported
+ *  manual/membership channel never matches an existing signature and always imports as new (re-imports may
+ *  duplicate — GUID-accurate dedupe of these is a later refinement). */
+function channelItemGuids(c: ImportedChannel): string[] {
+  const out: string[] = [];
+  for (const d of c.definitions ?? []) {
+    if (d.kind === "PREDICATE") continue;
+    for (const it of d.items ?? []) {
+      const id = it.tmdbId
+        ? `tmdb:${it.tmdbId}`
+        : it.imdbId
+          ? `imdb:${it.imdbId}`
+          : it.tvdbId
+            ? `tvdb:${it.tvdbId}`
+            : it.ratingKey
+              ? `rk:${it.ratingKey}`
+              : null;
+      if (id) out.push(id);
+    }
+  }
+  return out.sort();
 }
 
 /** Signature of an imported channel (from the uploaded file). */
@@ -128,6 +189,7 @@ function importedChannelSignature(c: ImportedChannel): string {
     sortField: c.sortField ?? DEFAULT_SORT_FIELD,
     sortDir: c.sortDir ?? DEFAULT_SORT_DIR,
     predicateFilters,
+    itemGuids: channelItemGuids(c),
   });
 }
 
@@ -177,9 +239,10 @@ export type ChannelPreview = {
   number: number;
   name: string;
   callsign: string | null;
-  /** Definition kinds that will be dropped (collections/playlists/manual — per-server, not portable). */
+  /** Definition kinds that will be dropped. Empty now that all three kinds are portable — kept for forward
+   *  compatibility (a future kind an older reader can't handle). */
   droppedKinds: string[];
-  /** No PREDICATE definition survives → the channel would have an empty pool, so it imports DISABLED. */
+  /** The channel has no usable definition → it would have an empty pool, so it imports DISABLED. */
   willBeDisabled: boolean;
   /** The channel's number is already taken on this instance → it'll be reassigned to the next free one. */
   numberInUse: boolean;
@@ -187,6 +250,10 @@ export type ChannelPreview = {
   libraryUnmatched: boolean;
   /** An identical channel already exists here (same content signature) → it'll be skipped on import. */
   duplicate: boolean;
+  /** MANUAL/MEMBERSHIP item portability. null for pure PREDICATE channels. `mode`: "same-server" keeps the
+   *  original containers/picks as-is; "remap" matches the items' GUIDs to this library (matched is a
+   *  cache-only estimate — the real import also tries a live Plex match for the rest). */
+  portable: { mode: "same-server" | "remap"; total: number; matched: number } | null;
 };
 
 export type PackagePreview = {
@@ -231,7 +298,7 @@ export async function previewImport(
 
   const source = await prisma.mediaSource.findUnique({
     where: { id: targetSourceId },
-    select: { id: true, name: true, enabled: true, baseUrl: true, syncStatus: true, _count: { select: { mediaItems: true } } },
+    select: { id: true, name: true, enabled: true, baseUrl: true, syncStatus: true, machineIdentifier: true, _count: { select: { mediaItems: true } } },
   });
   const [existingNumbers, existingKeys, libraries, existingSignatures] = await Promise.all([
     prisma.channel.findMany({ select: { number: true } }),
@@ -242,26 +309,46 @@ export async function previewImport(
   const numberSet = new Set(existingNumbers.map((c) => c.number));
   const keySet = new Set(existingKeys.map((p) => p.key));
   const libTitles = new Set(libraries.map((l) => l.title.toLowerCase()));
+  const targetServerId = source?.machineIdentifier ?? null;
+  const isSameServer = (c: ImportedChannel) => !!c.sourceServerId && !!targetServerId && c.sourceServerId === targetServerId;
+
+  // One cache lookup over every channel's remap items → a cross-server "N of M in your library" estimate.
+  const allRefs = data.channels.flatMap(channelRemapRefs);
+  const cacheIdx = source ? await buildCacheIndex(prisma, targetSourceId, allRefs) : null;
 
   let duplicates = 0;
   const annotate = (c: ImportedChannel): ChannelPreview => {
     const defs = c.definitions ?? [];
+    const nonPredicate = defs.filter((d) => d.kind !== "PREDICATE");
     const predicate = defs.filter((d) => d.kind === "PREDICATE");
-    const droppedKinds = defs.filter((d) => d.kind !== "PREDICATE").map((d) => d.kind);
     const libraryUnmatched = predicate.some(
       (d) => d.plexLibraryTitle != null && !libTitles.has(d.plexLibraryTitle.toLowerCase()),
     );
     const duplicate = existingSignatures.has(importedChannelSignature(c));
     if (duplicate) duplicates++;
+
+    // Portability annotation for MANUAL/MEMBERSHIP channels.
+    let portable: ChannelPreview["portable"] = null;
+    if (nonPredicate.length > 0) {
+      const refs = channelRemapRefs(c);
+      if (isSameServer(c)) {
+        portable = { mode: "same-server", total: refs.length, matched: refs.length };
+      } else {
+        const matched = cacheIdx ? refs.filter((r) => resolveFromIndex(r, cacheIdx) !== null).length : 0;
+        portable = { mode: "remap", total: refs.length, matched };
+      }
+    }
+
     return {
       number: c.number,
       name: c.name,
       callsign: c.callsign ?? null,
-      droppedKinds,
-      willBeDisabled: predicate.length === 0,
+      droppedKinds: [], // all kinds portable now
+      willBeDisabled: defs.length === 0,
       numberInUse: numberSet.has(c.number),
       libraryUnmatched,
       duplicate,
+      portable,
     };
   };
 
@@ -294,13 +381,23 @@ export async function previewImport(
 
 /* ---------------- Import plan (deterministic, read-only) ----------------- */
 
-/** A PREDICATE definition resolved against the target: library remapped by title, ready to persist. */
+/** A definition resolved against the target, ready to persist. PREDICATE carries its filter (library remapped
+ *  by title); MEMBERSHIP (same server) its original container refs; MANUAL_ITEMS either its original keys
+ *  (same server) or portable `remapItems` to resolve to local ratingKeys at execute time (cross server). */
 export type ResolvedDefinition = {
+  kind: "PREDICATE" | "MEMBERSHIP" | "MANUAL_ITEMS";
   mode: string;
   sortIndex: number;
-  plexFilter: unknown;
+  // PREDICATE
+  plexFilter?: unknown;
   /** Remapped from the file's library title to this source's key; null = search all libraries. */
-  plexLibraryKey: string | null;
+  plexLibraryKey?: string | null;
+  // MEMBERSHIP (same server) — original container refs, valid as-is.
+  sources?: unknown;
+  // MANUAL_ITEMS (same server) — original hand-picked ratingKeys, valid as-is.
+  manualItemKeys?: string[];
+  // MANUAL_ITEMS (cross server) — portable items to remap to local ratingKeys at execute time.
+  remapItems?: ExportItem[];
 };
 
 export type ChannelPlan = {
@@ -359,41 +456,52 @@ export async function planImport(
   const dryRun = opts.dryRun ?? false;
   const selected = opts.selectedNumbers ? new Set(opts.selectedNumbers) : null;
 
-  const [existingNumbers, existingKeys, libraries, existingSignatures] = await Promise.all([
+  const [existingNumbers, existingKeys, libraries, existingSignatures, targetSource] = await Promise.all([
     prisma.channel.findMany({ select: { number: true } }),
     prisma.channelPackage.findMany({ select: { key: true } }),
     prisma.mediaLibrary.findMany({ where: { mediaSourceId: opts.targetSourceId }, select: { key: true, title: true } }),
     loadExistingSignatures(prisma),
+    prisma.mediaSource.findUnique({ where: { id: opts.targetSourceId }, select: { machineIdentifier: true } }),
   ]);
   const keySet = new Set(existingKeys.map((p) => p.key));
   // Title (lowercased) → this source's library key, so a def's library travels by name.
   const libByTitle = new Map(libraries.map((l) => [l.title.toLowerCase(), l.key]));
   // Numbers reserved as we assign — starts from what's already on the instance.
   const reserved = new Set(existingNumbers.map((c) => c.number));
+  const targetServerId = targetSource?.machineIdentifier ?? null;
 
   const chosen = data.channels.filter((c) => !selected || selected.has(c.number));
 
   // First classify each channel (dedupe + resolve defs + disabled), THEN assign numbers in two passes
   // so channels whose original number is free keep it before collisions probe.
   type Draft = ChannelPlan & { keepsOriginal: boolean };
+  const sameServer = (c: ImportedChannel) => !!c.sourceServerId && !!targetServerId && c.sourceServerId === targetServerId;
+
   const drafts: Draft[] = chosen.map((c) => {
     const defs = c.definitions ?? [];
-    const predicate = defs.filter((d) => d.kind === "PREDICATE");
-    const droppedKinds = [...new Set(defs.filter((d) => d.kind !== "PREDICATE").map((d) => d.kind))];
+    const onSameServer = sameServer(c);
     let libraryUnmatched = false;
-    const definitions: ResolvedDefinition[] = predicate.map((d, i) => {
+    const definitions: ResolvedDefinition[] = defs.map((d, i) => {
+      const mode = d.mode ?? "INCLUDE";
+      const sortIndex = d.sortIndex ?? i;
+      if (d.kind === "MEMBERSHIP") {
+        // Same server → the collection/playlist keys are still valid, keep it a live MEMBERSHIP channel.
+        if (onSameServer && d.sources) return { kind: "MEMBERSHIP", mode, sortIndex, sources: d.sources };
+        // Different server → snapshot: remap the exported member GUIDs to local ratingKeys (→ MANUAL_ITEMS).
+        return { kind: "MANUAL_ITEMS", mode, sortIndex, remapItems: d.items ?? [] };
+      }
+      if (d.kind === "MANUAL_ITEMS") {
+        if (onSameServer && d.manualItemKeys?.length) return { kind: "MANUAL_ITEMS", mode, sortIndex, manualItemKeys: d.manualItemKeys };
+        return { kind: "MANUAL_ITEMS", mode, sortIndex, remapItems: d.items ?? [] };
+      }
+      // PREDICATE — remap the library by title.
       let plexLibraryKey: string | null = null;
       if (d.plexLibraryTitle != null) {
         const key = libByTitle.get(d.plexLibraryTitle.toLowerCase());
         if (key) plexLibraryKey = key;
         else libraryUnmatched = true; // scoped to a library we don't have → all libraries
       }
-      return {
-        mode: d.mode ?? "INCLUDE",
-        sortIndex: d.sortIndex ?? i,
-        plexFilter: d.plexFilter ?? null,
-        plexLibraryKey,
-      };
+      return { kind: "PREDICATE", mode, sortIndex, plexFilter: d.plexFilter ?? null, plexLibraryKey };
     });
     const signature = importedChannelSignature(c);
     const isDuplicate = existingSignatures.has(signature);
@@ -405,8 +513,8 @@ export async function planImport(
       name: c.name,
       packageKey: c.packageKey ?? null,
       action: isDuplicate ? "skip-duplicate" : "create",
-      disabled: predicate.length === 0,
-      droppedKinds,
+      disabled: definitions.length === 0, // no usable definition → nothing to schedule
+      droppedKinds: [], // all kinds portable now
       libraryUnmatched,
       definitions,
       source: c,
@@ -511,6 +619,9 @@ export type ChannelImportResult = {
   poolSize?: number;
   scheduleSlots?: number;
   numberReassigned?: boolean;
+  /** For a cross-server MANUAL/MEMBERSHIP import: how many of its items remapped to this library. */
+  itemsTotal?: number;
+  itemsMatched?: number;
 };
 
 /**
@@ -563,11 +674,52 @@ export async function executeChannelPlan(
     return { ...base, status: "skipped", reason: "identical channel already exists" };
   }
 
-  // Resolve a real pool size when we can reach Plex (always in dry-run; also nice for the real report).
+  // Resolve each definition to its persisted shape. PREDICATE/same-server defs are already resolved;
+  // cross-server MANUAL/MEMBERSHIP defs remap their exported GUIDs to local ratingKeys now (the remap needs
+  // the live source for its fallback; it persists found ids unless this is a dry-run).
+  type DefCreate = {
+    kind: "PREDICATE" | "MEMBERSHIP" | "MANUAL_ITEMS";
+    mode: "INCLUDE" | "EXCLUDE";
+    sortIndex: number;
+    plexFilter?: Prisma.InputJsonValue;
+    plexLibraryKey?: string | null;
+    sources?: Prisma.InputJsonValue;
+    manualItemKeys?: string[];
+  };
+  const defData: DefCreate[] = [];
+  let itemsTotal = 0;
+  let itemsMatched = 0;
+  for (const d of plan.definitions) {
+    const mode = (d.mode === "EXCLUDE" ? "EXCLUDE" : "INCLUDE") as "INCLUDE" | "EXCLUDE";
+    if (d.kind === "PREDICATE") {
+      defData.push({ kind: "PREDICATE", mode, sortIndex: d.sortIndex, plexFilter: (d.plexFilter ?? Prisma.JsonNull) as Prisma.InputJsonValue, plexLibraryKey: d.plexLibraryKey ?? null });
+    } else if (d.kind === "MEMBERSHIP") {
+      defData.push({ kind: "MEMBERSHIP", mode, sortIndex: d.sortIndex, sources: (d.sources ?? Prisma.JsonNull) as Prisma.InputJsonValue });
+    } else {
+      // MANUAL_ITEMS: same-server keeps original keys; cross-server remaps the exported items by GUID.
+      let keys = d.manualItemKeys ?? [];
+      if (d.remapItems) {
+        const refs = d.remapItems.map((it, i) => itemToGuidRef(it, i));
+        itemsTotal += refs.length;
+        if (opts.source) {
+          const r = await remapGuids(prisma, opts.source, refs, { persist: !opts.dryRun });
+          keys = r.hits.map((h) => h.ratingKey);
+          itemsMatched += r.hits.length;
+        } else {
+          keys = []; // can't reach Plex to remap → empty (reported as 0 of N)
+        }
+      }
+      defData.push({ kind: "MANUAL_ITEMS", mode, sortIndex: d.sortIndex, manualItemKeys: keys });
+    }
+  }
+  const itemReport = itemsTotal > 0 ? { itemsTotal, itemsMatched } : {};
+
+  // Real pool size for PREDICATE defs when we can reach Plex (dry-run report / nice-to-have).
   let poolSize: number | undefined;
-  if (opts.source && plan.definitions.length > 0) {
+  const predicateDefs = plan.definitions.filter((d) => d.kind === "PREDICATE");
+  if (opts.source && predicateDefs.length > 0) {
     try {
-      poolSize = await resolveDryRunPool(prisma, opts.source, plan.definitions);
+      poolSize = await resolveDryRunPool(prisma, opts.source, predicateDefs);
     } catch (err) {
       // Non-fatal: a filter that can't resolve just leaves the pool size unknown in the report.
       console.warn(`[import] ${plan.name}: pool resolve failed:`, err);
@@ -579,7 +731,12 @@ export async function executeChannelPlan(
       ...base,
       status: "created", // "would create"
       poolSize,
-      reason: plan.disabled ? "no portable filter — would import disabled" : undefined,
+      ...itemReport,
+      reason: plan.disabled
+        ? "no portable definition — would import disabled"
+        : itemsTotal > 0
+          ? `would match ${itemsMatched} of ${itemsTotal} items`
+          : undefined,
     };
   }
 
@@ -618,15 +775,7 @@ export async function executeChannelPlan(
         mediaSourceId: opts.targetSourceId,
         packageId: opts.packageId,
         createdById: opts.userId,
-        definitions: {
-          create: plan.definitions.map((d) => ({
-            kind: "PREDICATE" as const,
-            mode: (d.mode as never) ?? "INCLUDE",
-            sortIndex: d.sortIndex,
-            plexFilter: (d.plexFilter ?? Prisma.JsonNull) as Prisma.InputJsonValue,
-            plexLibraryKey: d.plexLibraryKey,
-          })),
-        },
+        definitions: { create: defData },
       },
     });
 
@@ -645,7 +794,7 @@ export async function executeChannelPlan(
       }
     }
 
-    return { ...base, status: "created", channelId: c.id, poolSize, scheduleSlots };
+    return { ...base, status: "created", channelId: c.id, poolSize, scheduleSlots, ...itemReport };
   } catch (err) {
     // Retry-safety: WDK re-runs a step whose result wasn't checkpointed (a crash after the write, or two
     // workers racing the same queued step in dev). The plan's assigned number is deterministic, so a

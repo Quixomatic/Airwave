@@ -187,9 +187,14 @@ function ChannelRow({ c, checked, onToggle }: { c: Ch; checked: boolean; onToggl
   const issues: string[] = [];
   if (c.duplicate)
     issues.push("An identical channel already exists here — it'll be skipped even if selected (idempotent re-import).");
-  if (c.willBeDisabled) issues.push("No portable filter — it'll import disabled (nothing to schedule).");
+  if (c.willBeDisabled) issues.push("No usable definition — it'll import disabled (nothing to schedule).");
   if (c.droppedKinds.length)
-    issues.push(`Drops ${[...new Set(c.droppedKinds)].join(", ").toLowerCase()} from the filter (per-server, not portable).`);
+    issues.push(`Drops ${[...new Set(c.droppedKinds)].join(", ").toLowerCase()} (not portable).`);
+  // Manual/membership portability: same-server keeps the collections/picks; a different server remaps by GUID.
+  if (c.portable && c.portable.mode === "remap" && c.portable.matched < c.portable.total)
+    issues.push(
+      `Hand-picked / collection channel from a different server — ${c.portable.matched} of ${c.portable.total} titles match your library by metadata id (the rest are skipped; the importer also tries a live lookup).`,
+    );
   if (c.numberInUse)
     issues.push(`Channel number ${c.number} is already in use here — it'll be reassigned to the next free number.`);
   if (c.libraryUnmatched)

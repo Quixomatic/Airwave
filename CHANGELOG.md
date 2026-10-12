@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.62] - 2026-10-12
+
+Importing a lineup now recreates hand-picked and collection/playlist channels instead of dropping them.
+
+### Added
+- **Manual and membership channels import for real.** Previously only filter channels survived an import; hand-picked (manual) and collection/playlist (membership) channels were dropped. Now:
+  - **Same Plex server** (re-importing onto the box the lineup came from): the channel imports exactly as-is — a membership channel stays a live collection/playlist, a manual channel keeps its picks. No data lost.
+  - **Different server**: the channel's items are matched to your library by their metadata ids (tmdb/tvdb/imdb) — a fast indexed lookup, with a live Plex fallback for anything not yet synced — and rebuilt as a hand-picked snapshot. The import reports "matched X of Y titles"; unmatched titles are skipped, never a hard failure.
+- **Staging preview shows portability.** A manual/membership channel from another server now shows how many of its titles match your library before you import.
+
+### Internal
+- Carries the source Plex server id in the export (schema 1.2) to detect the same-server case; the import plan resolves each definition (predicate / same-server membership+manual / cross-server remap) and `executeChannelPlan` performs the GUID remap. The content signature now includes manual/membership item identity so distinct hand-picked channels don't collide. Verified with a dry-run round-trip probe.
+
 ## [0.15.61] - 2026-10-12
 
 Exports now carry portable identity for hand-picked and collection/playlist channels (schema 1.2).

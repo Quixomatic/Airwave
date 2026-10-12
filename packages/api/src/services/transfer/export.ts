@@ -31,17 +31,20 @@ export async function exportLineup(prisma: PrismaClient) {
       include: { definitions: { orderBy: { sortIndex: "asc" } }, package: { select: { key: true } } },
     }),
     prisma.mediaLibrary.findMany({ select: { mediaSourceId: true, key: true, title: true } }),
-    prisma.mediaSource.findMany({ select: { id: true, baseUrl: true, token: true } }),
+    prisma.mediaSource.findMany({ select: { id: true, baseUrl: true, token: true, machineIdentifier: true } }),
   ]);
 
   // (sourceId, libraryKey) → title, so a definition's library can travel by name.
   const libTitle = new Map<string, string>();
   for (const l of libraries) libTitle.set(`${l.mediaSourceId}:${l.key}`, l.title);
 
-  // sourceId → connection creds (for the export-time GUID backfill + membership member fetch).
+  // sourceId → connection creds (for the export-time GUID backfill + membership member fetch) + the Plex
+  // server id (so import can tell a same-server re-import, where MEMBERSHIP/MANUAL keys are still valid).
   const srcById = new Map<string, ResolveSource>();
+  const serverIdById = new Map<string, string | null>();
   for (const s of sources) {
     if (s.baseUrl) srcById.set(s.id, { id: s.id, baseUrl: s.baseUrl, token: decryptToken(s.token) });
+    serverIdById.set(s.id, s.machineIdentifier ?? null);
   }
 
   // Resolve the portable items[] for a MANUAL / MEMBERSHIP def (PREDICATE returns undefined).
@@ -101,6 +104,8 @@ export async function exportLineup(prisma: PrismaClient) {
         excludeSpecials: c.excludeSpecials,
         keepMultiPartTogether: c.keepMultiPartTogether,
         shuffleSeed: c.shuffleSeed,
+        // The Plex server this channel's media lives on — lets a same-server import keep MEMBERSHIP/MANUAL as-is.
+        sourceServerId: serverIdById.get(c.mediaSourceId) ?? null,
         packageKey: c.package?.key ?? null,
         definitions: await Promise.all(
           c.definitions.map(async (d) => ({

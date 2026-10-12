@@ -76,6 +76,10 @@ export const channelSchema = z
     excludeSpecials: z.boolean().optional(),
     keepMultiPartTogether: z.boolean().optional(),
     shuffleSeed: z.number().nullish(),
+    // schema 1.2 — the Plex server (machineIdentifier) this channel was exported from. On import, a matching
+    // target server lets MEMBERSHIP/MANUAL defs import AS-IS (their container keys / ratingKeys are still
+    // valid); a different server falls back to the portable GUID `items`.
+    sourceServerId: z.string().nullish(),
     packageKey: z.string().nullish(),
     definitions: z.array(definitionSchema).optional(),
   })
