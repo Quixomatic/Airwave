@@ -78,4 +78,34 @@ describe("migrateToCurrent", () => {
       expect((r.doc.channels[0] as Record<string, unknown>).futureField).toBe(42); // unknowns survive
     }
   });
+
+  test("1.0 → 1.1 defaults the new scheduling fields on a channel that lacks them", () => {
+    const r = migrateToCurrent(base({ version: 1, channels: [{ number: 1, name: "Old" } as never] }));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.doc.schemaVersion).toBe("1.1");
+      const c = r.doc.channels[0] as Record<string, unknown>;
+      expect(c.strategy).toBeNull();
+      expect(c.excludeSpecials).toBe(false);
+      expect(c.keepMultiPartTogether).toBe(false);
+      expect(c.shuffleSeed).toBeNull();
+    }
+  });
+
+  test("1.0 → 1.1 preserves any values a channel already had", () => {
+    const r = migrateToCurrent(
+      base({
+        version: 1,
+        channels: [{ number: 1, name: "Set", excludeSpecials: true, shuffleSeed: 7, strategy: { rotation: "clustered" } } as never],
+      }),
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const c = r.doc.channels[0] as Record<string, unknown>;
+      expect(c.excludeSpecials).toBe(true);
+      expect(c.shuffleSeed).toBe(7);
+      expect(c.strategy).toEqual({ rotation: "clustered" });
+      expect(c.keepMultiPartTogether).toBe(false); // the one it didn't set still defaults
+    }
+  });
 });

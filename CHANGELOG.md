@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.58] - 2026-10-12
+
+Lineup export/import stops dropping four channel settings (schema 1.1).
+
+### Fixed
+- **Exporting a channel now carries its scheduling config.** The export predated several `Channel` columns and silently dropped them, so an imported channel lost its grouping/rotation **strategy**, its **Exclude specials** and **Keep multi-part together** toggles, and its **shuffle seed** (so it re-shuffled differently). All four now travel with the channel and are applied on import, so a round-tripped channel matches the original. Correctly-omitted instance-specific fields (provenance, schedule cursor, media binding) stay omitted.
+
+### Internal
+- Bumps the exchange format to schema **1.1** (additive/minor) with a 1.0→1.1 migration that defaults the new fields, so older `1.0` exports still import cleanly. Covered by `schema.test.ts`.
+
 ## [0.15.57] - 2026-10-12
 
 Groundwork for portable channel sharing: a proper versioned lineup export/import envelope.

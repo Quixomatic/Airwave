@@ -17,7 +17,7 @@ import { z } from "zod";
  * Legacy: the pre-semver exports carried an integer `version: 1`. That maps to `"1.0"` (see
  * {@link readSchemaVersion}), so every lineup ever exported still imports.
  */
-export const CURRENT_SCHEMA_VERSION = "1.0" as const;
+export const CURRENT_SCHEMA_VERSION = "1.1" as const;
 
 /* ---------------- Envelope zod (tolerant: nested contents stay loose, extras pass through) ---------- */
 
@@ -45,6 +45,11 @@ export const channelSchema = z
     sortField: z.string().optional(),
     sortDir: z.string().optional(),
     bumperMode: z.string().optional(),
+    // schema 1.1 — portable scheduling config (see export.ts).
+    strategy: z.unknown().optional(),
+    excludeSpecials: z.boolean().optional(),
+    keepMultiPartTogether: z.boolean().optional(),
+    shuffleSeed: z.number().nullish(),
     packageKey: z.string().nullish(),
     definitions: z.array(definitionSchema).optional(),
   })
@@ -119,7 +124,23 @@ export type Migration = { to: string; up: (doc: LineupEnvelope) => LineupEnvelop
  * version is below its `to` (and `to` ≤ CURRENT). A 1.0→1.1 step (defaulting the fields added in 1.1) lands
  * with the gap-fill work; today the chain is empty because CURRENT is still "1.0".
  */
-export const MIGRATIONS: Migration[] = [];
+export const MIGRATIONS: Migration[] = [
+  {
+    // 1.0 → 1.1: the scheduling-config fields were absent in 1.0; default them so a 1.0 channel reads as a
+    // valid 1.1 channel (today's behavior: strategy off, toggles off, no fixed seed). Existing values win.
+    to: "1.1",
+    up: (doc) => ({
+      ...doc,
+      channels: doc.channels.map((c) => ({
+        strategy: null,
+        excludeSpecials: false,
+        keepMultiPartTogether: false,
+        shuffleSeed: null,
+        ...c,
+      })),
+    }),
+  },
+];
 
 export type MigrateResult =
   | { ok: true; doc: LineupEnvelope; fromVersion: string; relation: VersionRelation }

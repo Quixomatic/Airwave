@@ -34,6 +34,11 @@ export type ImportedChannel = {
   sortField?: string;
   sortDir?: string;
   bumperMode?: string;
+  // schema 1.1 — portable scheduling config.
+  strategy?: unknown;
+  excludeSpecials?: boolean;
+  keepMultiPartTogether?: boolean;
+  shuffleSeed?: number | null;
   packageKey?: string | null;
   definitions?: ImportedDefinition[];
 };
@@ -604,6 +609,12 @@ export async function executeChannelPlan(
         sortField: plan.source.sortField ?? DEFAULT_SORT_FIELD,
         sortDir: plan.source.sortDir ?? DEFAULT_SORT_DIR,
         bumperMode: (plan.source.bumperMode as never) ?? undefined,
+        // Portable scheduling config (schema 1.1). Defaults match createChannel so an imported channel's
+        // signature matches an equivalent locally-created one. strategy is nullable Json (JsonNull = no strategy).
+        strategy: (plan.source.strategy ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+        excludeSpecials: plan.source.excludeSpecials ?? false,
+        keepMultiPartTogether: plan.source.keepMultiPartTogether ?? false,
+        shuffleSeed: plan.source.shuffleSeed ?? undefined,
         mediaSourceId: opts.targetSourceId,
         packageId: opts.packageId,
         createdById: opts.userId,

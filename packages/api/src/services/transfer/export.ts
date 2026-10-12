@@ -55,6 +55,13 @@ export async function exportLineup(prisma: PrismaClient) {
       sortField: c.sortField,
       sortDir: c.sortDir,
       bumperMode: c.bumperMode,
+      // Portable scheduling config added in schema 1.1 (predates the original exporter, so it used to be
+      // dropped): the grouping/rotation strategy, the specials/multi-part toggles, and the shuffle seed so an
+      // imported channel shuffles identically.
+      strategy: c.strategy,
+      excludeSpecials: c.excludeSpecials,
+      keepMultiPartTogether: c.keepMultiPartTogether,
+      shuffleSeed: c.shuffleSeed,
       packageKey: c.package?.key ?? null,
       definitions: c.definitions.map((d) => ({
         kind: d.kind,
