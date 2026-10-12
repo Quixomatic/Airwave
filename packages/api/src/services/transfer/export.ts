@@ -1,5 +1,7 @@
 import type { PrismaClient } from "@airwave/db";
 
+import { CURRENT_SCHEMA_VERSION } from "./schema";
+
 /**
  * Export the full lineup — every package + channel + their definitions — as a portable JSON blob that can
  * be imported into another Airwave instance. Deliberately OMITS everything instance-specific: the media
@@ -9,10 +11,10 @@ import type { PrismaClient } from "@airwave/db";
  *
  * The `plexFilter` on a PREDICATE definition is field+value based (matched by title against the target's
  * Plex), so it's portable. COLLECTION / PLAYLIST / MANUAL definitions reference per-server ids — they're
- * exported for completeness but the importer drops them.
+ * exported for completeness but the importer drops them (portability lands with the GUID remap, P3).
+ *
+ * The envelope carries a semver `schemaVersion` (see `schema.ts`); the legacy integer `version` is gone.
  */
-export const LINEUP_EXPORT_VERSION = 1 as const;
-
 export type LineupExport = Awaited<ReturnType<typeof exportLineup>>;
 
 export async function exportLineup(prisma: PrismaClient) {
@@ -30,7 +32,7 @@ export async function exportLineup(prisma: PrismaClient) {
   for (const l of libraries) libTitle.set(`${l.mediaSourceId}:${l.key}`, l.title);
 
   return {
-    version: LINEUP_EXPORT_VERSION,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
     packages: packages.map((p) => ({
       key: p.key,

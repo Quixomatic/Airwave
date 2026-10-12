@@ -7,7 +7,7 @@ import { channelSortParam } from "../plex/sort-fields";
 import { decryptToken } from "../plex/token";
 import { INITIAL_WINDOW_SECONDS, generateChannelSchedule } from "../schedule/generate";
 import { sourceReadiness } from "../sources/readiness";
-import { LINEUP_EXPORT_VERSION } from "./export";
+import { type LineupEnvelope, migrateToCurrent } from "./schema";
 
 /**
  * The shape of an uploaded lineup file (produced by `exportLineup`). Kept structural + tolerant — an
@@ -46,7 +46,9 @@ export type ImportedPackage = {
   sortIndex?: number;
 };
 export type ImportedLineup = {
-  version: number;
+  /** Semver "MAJOR.MINOR" (see schema.ts). Optional on input — a legacy integer `version` is normalized. */
+  schemaVersion?: string;
+  version?: number; // legacy pre-semver field, tolerated on input
   exportedAt?: string;
   packages: ImportedPackage[];
   channels: ImportedChannel[];
@@ -193,8 +195,8 @@ export type PackagePreview = {
 };
 
 export type ImportPreview = {
-  version: number;
-  supported: boolean; // version we understand
+  schemaVersion: string; // the uploaded file's version ("MAJOR.MINOR")
+  supported: boolean; // false only for a newer-MAJOR file we can't safely read
   source: { id: string; name: string; ready: boolean } | null;
   packages: PackagePreview[];
   /** Channels with no package in the file — grouped for selection under "Ungrouped". */
@@ -212,9 +214,16 @@ const UNGROUPED = "__ungrouped__";
  */
 export async function previewImport(
   prisma: PrismaClient,
-  data: ImportedLineup,
+  rawData: ImportedLineup,
   targetSourceId: string,
 ): Promise<ImportPreview> {
+  // Normalize the envelope to CURRENT (migrate an older file; detect a newer-major one we can't read).
+  const migrated = migrateToCurrent(rawData as LineupEnvelope);
+  const schemaVersion = migrated.fromVersion;
+  const supported = migrated.ok;
+  // Annotate against the migrated doc when we could read it, else the raw (best-effort, banner warns).
+  const data = (migrated.ok ? migrated.doc : rawData) as unknown as ImportedLineup;
+
   const source = await prisma.mediaSource.findUnique({
     where: { id: targetSourceId },
     select: { id: true, name: true, enabled: true, baseUrl: true, syncStatus: true, _count: { select: { mediaItems: true } } },
@@ -269,8 +278,8 @@ export async function previewImport(
   const ungrouped = (byPkg.get(UNGROUPED) ?? []).map(annotate);
 
   return {
-    version: data.version,
-    supported: data.version === LINEUP_EXPORT_VERSION,
+    schemaVersion,
+    supported,
     source: source ? { id: source.id, name: source.name, ready: sourceReadiness(source).ready } : null,
     packages,
     ungrouped,
@@ -335,9 +344,13 @@ export type ImportPlan = {
  */
 export async function planImport(
   prisma: PrismaClient,
-  data: ImportedLineup,
+  rawData: ImportedLineup,
   opts: { targetSourceId: string; selectedNumbers?: number[]; dryRun?: boolean },
 ): Promise<ImportPlan> {
+  // Normalize to CURRENT first (migrate older, read newer-minor leniently). A newer-major file can't be
+  // read safely; fall back to the raw doc best-effort (preview already flagged it unsupported).
+  const migrated = migrateToCurrent(rawData as LineupEnvelope);
+  const data = (migrated.ok ? migrated.doc : rawData) as unknown as ImportedLineup;
   const dryRun = opts.dryRun ?? false;
   const selected = opts.selectedNumbers ? new Set(opts.selectedNumbers) : null;
 

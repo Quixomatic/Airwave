@@ -5,54 +5,14 @@ import { exportLineup } from "../services/transfer/export";
 import { type ImportedLineup, previewImport } from "../services/transfer/import";
 import { isImportRunnerAvailable, requireImportRunner } from "../services/transfer/import-runner";
 import { getAppSettings } from "../services/settings";
+import { lineupEnvelopeSchema } from "../services/transfer/schema";
 import { listImportRuns, listImportRunSteps } from "../services/transfer/import-runs";
 import { listImportRunTraces } from "../services/transfer/import-trace";
 
-// Tolerant envelope for an uploaded lineup file — known fields typed, extras passed through (an
-// older/other instance may include more). Deep filter/definition contents stay loose.
-const importedDefinition = z
-  .object({
-    kind: z.string(),
-    mode: z.string().optional(),
-    sortIndex: z.number().optional(),
-    plexFilter: z.unknown().optional(),
-    plexLibraryTitle: z.string().nullish(),
-  })
-  .passthrough();
-const importedChannel = z
-  .object({
-    number: z.number(),
-    name: z.string(),
-    callsign: z.string().nullish(),
-    description: z.string().nullish(),
-    icon: z.string().nullish(),
-    tint: z.string().nullish(),
-    enabled: z.boolean().optional(),
-    sortIndex: z.number().optional(),
-    ordering: z.string().optional(),
-    sortField: z.string().optional(),
-    sortDir: z.string().optional(),
-    bumperMode: z.string().optional(),
-    packageKey: z.string().nullish(),
-    definitions: z.array(importedDefinition).optional(),
-  })
-  .passthrough();
-const importedPackage = z
-  .object({
-    key: z.string(),
-    name: z.string(),
-    description: z.string().nullish(),
-    icon: z.string().nullish(),
-    tint: z.string().nullish(),
-    sortIndex: z.number().optional(),
-  })
-  .passthrough();
-const importedLineup = z.object({
-  version: z.number(),
-  exportedAt: z.string().optional(),
-  packages: z.array(importedPackage),
-  channels: z.array(importedChannel),
-});
+// The tolerant versioned envelope lives in services/transfer/schema.ts (shared with the migration chain):
+// known fields typed, nested contents loose, extras passed through, and the version field optional so a
+// legacy integer `version` or a newer-minor file still parses. The service normalizes it via migrateToCurrent.
+const importedLineup = lineupEnvelopeSchema;
 
 /**
  * Lineup transfer between Airwave instances — export the full lineup (packages + channels) as a portable

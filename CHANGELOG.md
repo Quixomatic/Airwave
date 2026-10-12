@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.57] - 2026-10-12
+
+Groundwork for portable channel sharing: a proper versioned lineup export/import envelope.
+
+### Changed
+- **Lineup export/import now carries a semver `schemaVersion`** (e.g. `"1.0"`) instead of a bare integer `version`, with a real forward/back-compatibility policy: an older file is migrated up to the current format before import; a same-major newer-minor file is accepted with unknown fields ignored; only a newer-*major* file is rejected as "needs a newer Airwave." Legacy exports (integer `version: 1`) map to `"1.0"`, so every file ever exported still imports. No change to what a channel export contains yet — this is the versioning foundation.
+
+### Internal
+- New `services/transfer/schema.ts`: the single source of truth for the exchange envelope — the tolerant zod schema, `CURRENT_SCHEMA_VERSION`, version parsing/comparison, and an ordered migration chain (`migrateToCurrent`). The router and both `export`/`import` services consume it; `previewImport` and `planImport` normalize an uploaded file through it on entry. Covered by `schema.test.ts`.
+
 ## [0.15.56] - 2026-10-11
 
 Closes a gap in the external-id capture from 0.15.55: the frequent incremental scan was erasing the ids the full sync had just written.

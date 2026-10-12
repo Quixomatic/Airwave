@@ -134,8 +134,8 @@ function ImportPreviewPage() {
 
       {!preview.supported && (
         <Banner>
-          This file was exported by a newer version of Airwave (format v{preview.version}); some fields may not
-          import cleanly.
+          This file was exported by a newer version of Airwave (format v{preview.schemaVersion}); some fields
+          may not import cleanly. Update Airwave for a clean import.
         </Banner>
       )}
       {!sourceReady && (
