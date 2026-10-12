@@ -2,6 +2,17 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.60] - 2026-10-12
+
+The engine that resolves a shared channel's items to your own library (for cross-server import).
+
+### Added
+- **GUID → ratingKey remap resolver** (`services/transfer/guid-remap.ts`): given a shared item's external ids (tmdb/tvdb/imdb), find the matching item in this server's library. Tiered for speed and completeness: a single indexed lookup over the new `MediaItem` id columns resolves everything that's synced; anything missing (added since the last sync, or in an unsynced library) falls back to a live `GET /library/matches` call to Plex, and the ids it finds are written back to the cache so the next import is a pure indexed hit. Reports matched vs. unmatched; an unmatched item is skipped with a note, never a failure. Not wired into import yet — that's next.
+- **`matchByGuid` Plex client helper** wrapping `/library/matches` (external guid → local ratingKey, score-gated for movies/shows), and `includeGuids=1` on the batched metadata fetch.
+
+### Dev
+- `probe-guid-remap.ts` exercises the resolver end to end against the real library.
+
 ## [0.15.59] - 2026-10-12
 
 Makes the external metadata ids first-class, indexed columns on cached media (for cross-server channel import).

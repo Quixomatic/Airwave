@@ -678,7 +678,7 @@ export async function getMetadataByKeys(
   const out: PlexItem[] = [];
   for (let i = 0; i < ratingKeys.length; i += 50) {
     const chunk = ratingKeys.slice(i, i + 50);
-    const res = await fetch(`${baseUrl}/library/metadata/${chunk.join(",")}?includeElements=Stream`, {
+    const res = await fetch(`${baseUrl}/library/metadata/${chunk.join(",")}?includeElements=Stream&includeGuids=1`, {
       headers: pmsHeaders(token),
     });
     if (!res.ok) throw new Error(`Plex metadata failed (${res.status})`);
@@ -766,6 +766,52 @@ export async function getMetadata(
   const data = (await res.json()) as { MediaContainer?: { Metadata?: Array<PlexMetadata> } };
   const m = data.MediaContainer?.Metadata?.[0];
   return m ? toPlexItem(m) : null;
+}
+
+/** Hints passed alongside the external guid to `/library/matches`. Movies/shows need title+year; episodes
+ *  need the show title + season/episode (or air date) in addition to the (episode-level) guid. */
+export type MatchHints = {
+  title?: string;
+  year?: number;
+  grandparentTitle?: string; // show title (episodes)
+  parentIndex?: number; // season (episodes)
+  index?: number; // episode number (episodes)
+  originallyAvailableAt?: string; // air date YYYY-MM-DD (episodes)
+};
+
+/** One LOCAL match from `/library/matches`: a real item in THIS server's library (numeric ratingKey). */
+export type GuidMatch = { ratingKey: string; score?: number; type?: string; title?: string };
+
+/**
+ * Reverse-lookup an external GUID (`tmdb://`, `tvdb://`, `imdb://`) to this server's matching items via
+ * `GET /library/matches` — the live-fallback tier of the import remap (validated by probe-guid-match.ts:
+ * exact local ratingKey, score 100 on movies/shows, clean on a bogus guid). `type` is the Plex metadata
+ * type (1=movie, 2=show, 4=episode). Returns ONLY local-library matches (a numeric ratingKey under
+ * `/library/metadata/`), skipping provider candidates, sorted by score desc. Never throws — a failure → [].
+ */
+export async function matchByGuid(
+  baseUrl: string,
+  token: string,
+  type: 1 | 2 | 4,
+  guid: string,
+  hints: MatchHints = {},
+): Promise<GuidMatch[]> {
+  const params = new URLSearchParams({ type: String(type), guid });
+  for (const [k, v] of Object.entries(hints)) if (v != null && v !== "") params.set(k, String(v));
+  try {
+    const res = await fetch(`${baseUrl}/library/matches?${params.toString()}`, { headers: pmsHeaders(token) });
+    if (!res.ok) return [];
+    const data = (await res.json().catch(() => null)) as {
+      MediaContainer?: { Metadata?: Array<{ score?: number; ratingKey?: string | number; key?: string; type?: string; title?: string }> };
+    } | null;
+    const md = data?.MediaContainer?.Metadata ?? [];
+    return md
+      .filter((m) => m.ratingKey != null && /^\d+$/.test(String(m.ratingKey)) && (m.key ?? "").startsWith("/library/metadata/"))
+      .map((m) => ({ ratingKey: String(m.ratingKey), score: m.score, type: m.type, title: m.title }))
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  } catch {
+    return [];
+  }
 }
 
 /**
