@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.64] - 2026-10-12
+
+### Fixed
+- **Re-importing a lineup now detects hand-picked and collection/playlist channels as "already imported."** Filter channels were correctly flagged as duplicates (and skipped) on a re-import, but manual and membership channels weren't — they showed up ready to import again even though they already existed. The duplicate check now includes a manual channel's picked items and a membership channel's collections/playlists in its content signature, so re-importing the same lineup onto the same server flags all of them as already imported and leaves them unchecked by default.
+
 ## [0.15.63] - 2026-10-12
 
 ### Added

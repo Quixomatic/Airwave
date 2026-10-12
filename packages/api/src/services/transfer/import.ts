@@ -128,8 +128,8 @@ function canonicalJson(value: unknown): string {
  * A channel's content signature — what makes two channels "the same" for dedupe, independent of
  * instance. Deliberately EXCLUDES the number (a re-import preserves numbers, but identical content is
  * the same channel even if the number differs) and appearance-only fields. It's the name, its package,
- * its ordering, the canonicalized PREDICATE filter(s), and (for MANUAL/MEMBERSHIP) the portable item GUIDs
- * — the substance that decides what plays.
+ * its ordering, the canonicalized PREDICATE filter(s), and (for MANUAL/MEMBERSHIP) the definition's raw
+ * server refs — the substance that decides what plays.
  */
 function signatureParts(args: {
   name: string;
@@ -138,7 +138,7 @@ function signatureParts(args: {
   sortField: string;
   sortDir: string;
   predicateFilters: unknown[];
-  itemGuids?: string[];
+  nonPredicateRefs?: string[];
 }): string {
   // Sort the canonicalized filters so def order doesn't change the signature.
   const filters = args.predicateFilters.map(canonicalJson).sort();
@@ -149,29 +149,25 @@ function signatureParts(args: {
     args.sortField,
     args.sortDir,
     filters,
-    args.itemGuids ?? [],
+    args.nonPredicateRefs ?? [],
   ]);
 }
 
-/** Portable item identity of a channel's MANUAL/MEMBERSHIP defs (sorted), so distinct hand-picked channels
- *  don't collide on an empty filter set. Imported-only: existing channels contribute [] here, so an imported
- *  manual/membership channel never matches an existing signature and always imports as new (re-imports may
- *  duplicate — GUID-accurate dedupe of these is a later refinement). */
-function channelItemGuids(c: ImportedChannel): string[] {
+/**
+ * The MANUAL/MEMBERSHIP definitions' raw server refs (sorted) — a MANUAL def's picked ratingKeys and a
+ * MEMBERSHIP def's collection/playlist keys. Computed the SAME way on both sides so a SAME-SERVER re-import
+ * (where those keys are identical) dedupes exactly, and so distinct hand-picked channels don't collide on an
+ * empty filter set. (A cross-server import can't match raw keys and imports as new — GUID-level dedupe across
+ * servers is a later refinement.)
+ */
+function nonPredicateRefs(defs: Array<{ kind: string; manualItemKeys?: string[] | null; sources?: unknown }>): string[] {
   const out: string[] = [];
-  for (const d of c.definitions ?? []) {
-    if (d.kind === "PREDICATE") continue;
-    for (const it of d.items ?? []) {
-      const id = it.tmdbId
-        ? `tmdb:${it.tmdbId}`
-        : it.imdbId
-          ? `imdb:${it.imdbId}`
-          : it.tvdbId
-            ? `tvdb:${it.tvdbId}`
-            : it.ratingKey
-              ? `rk:${it.ratingKey}`
-              : null;
-      if (id) out.push(id);
+  for (const d of defs) {
+    if (d.kind === "MANUAL_ITEMS") {
+      for (const k of d.manualItemKeys ?? []) out.push(`m:${k}`);
+    } else if (d.kind === "MEMBERSHIP") {
+      const srcs = Array.isArray(d.sources) ? (d.sources as Array<{ type?: string; key?: string }>) : [];
+      for (const s of srcs) if (s?.key) out.push(`s:${s.type ?? ""}:${s.key}`);
     }
   }
   return out.sort();
@@ -189,7 +185,7 @@ function importedChannelSignature(c: ImportedChannel): string {
     sortField: c.sortField ?? DEFAULT_SORT_FIELD,
     sortDir: c.sortDir ?? DEFAULT_SORT_DIR,
     predicateFilters,
-    itemGuids: channelItemGuids(c),
+    nonPredicateRefs: nonPredicateRefs(c.definitions ?? []),
   });
 }
 
@@ -199,7 +195,7 @@ type ExistingChannelForSig = {
   sortField: string;
   sortDir: string;
   package: { key: string } | null;
-  definitions: { kind: string; plexFilter: Prisma.JsonValue }[];
+  definitions: { kind: string; plexFilter: Prisma.JsonValue; manualItemKeys: string[]; sources: Prisma.JsonValue }[];
 };
 
 /** Signature of a channel already on this instance. */
@@ -214,6 +210,7 @@ function existingChannelSignature(c: ExistingChannelForSig): string {
     sortField: c.sortField,
     sortDir: c.sortDir,
     predicateFilters,
+    nonPredicateRefs: nonPredicateRefs(c.definitions),
   });
 }
 
@@ -226,7 +223,7 @@ async function loadExistingSignatures(prisma: PrismaClient): Promise<Set<string>
       sortField: true,
       sortDir: true,
       package: { select: { key: true } },
-      definitions: { select: { kind: true, plexFilter: true } },
+      definitions: { select: { kind: true, plexFilter: true, manualItemKeys: true, sources: true } },
     },
   });
   return new Set(rows.map(existingChannelSignature));
