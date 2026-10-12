@@ -279,8 +279,15 @@ export type GuideMeta = {
   showThumb?: string; // the SHOW's portrait poster, filled at read time from the parent show row (for episodes; movies use `thumb`) — see guideFromNode
   season?: number;
   episode?: number;
-  // External metadata ids from Plex's `Guid[]` tags — the portable identity for cross-server resolution
-  // (tmdb is the canonical key, the seerr / *arr standard). See .plans/export-import-schema-versioning.md.
+};
+
+/**
+ * Portable external identity parsed from Plex's `Guid[]` tags — the de-facto *arr/seerr standard for
+ * matching a title across servers (a `ratingKey` is server-local). These are IDENTITY, not display guide
+ * data, so they live on PlexItem (top level) → the indexed `MediaItem.tmdbId/tvdbId/imdbId` columns, NOT in
+ * the guide JSON. See .plans/export-import-schema-versioning.md.
+ */
+export type ExternalIds = {
   tmdbId?: string;
   tvdbId?: string;
   imdbId?: string;
@@ -292,7 +299,11 @@ export type PlexItem = {
   durationMs: number;
   year?: number;
   originallyAvailableAt?: string;
-  /** Full denormalized metadata for the guide. */
+  /** Portable external ids (tmdb/tvdb/imdb) for cross-server resolution — persisted to indexed columns. */
+  tmdbId?: string;
+  tvdbId?: string;
+  imdbId?: string;
+  /** Full denormalized metadata for the guide (display). */
   guide: GuideMeta;
 };
 
@@ -408,12 +419,12 @@ const EXT_ID = {
 };
 
 /** Portable external ids (tmdb/tvdb/imdb) from an item's `Guid[]` tags + its primary `guid`. */
-function parseExternalIds(m: PlexMetadata): Pick<GuideMeta, "tmdbId" | "tvdbId" | "imdbId"> {
+function parseExternalIds(m: PlexMetadata): ExternalIds {
   const sources = [
     ...(m.Guid?.map((g) => g.id).filter((s): s is string => !!s) ?? []),
     ...(m.guid ? [m.guid] : []),
   ];
-  const out: Pick<GuideMeta, "tmdbId" | "tvdbId" | "imdbId"> = {};
+  const out: ExternalIds = {};
   for (const s of sources) {
     const tmdb = s.match(EXT_ID.tmdb) ?? s.match(EXT_ID.tmdbLegacy);
     if (tmdb && !out.tmdbId) out.tmdbId = tmdb[1];
@@ -454,7 +465,6 @@ function toGuideMeta(m: PlexMetadata): GuideMeta {
     showRatingKey: m.grandparentRatingKey != null ? String(m.grandparentRatingKey) : undefined,
     season: m.parentIndex,
     episode: m.index,
-    ...parseExternalIds(m),
   };
 }
 
@@ -465,6 +475,7 @@ function toPlexItem(m: PlexMetadata): PlexItem {
     durationMs: m.duration ?? 0,
     year: m.year,
     originallyAvailableAt: m.originallyAvailableAt,
+    ...parseExternalIds(m), // top-level identity, not guide
     guide: toGuideMeta(m),
   };
 }

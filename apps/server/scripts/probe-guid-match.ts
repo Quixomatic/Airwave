@@ -14,8 +14,11 @@
  */
 import prisma from "@airwave/db";
 
-import type { GuideMeta } from "../../../packages/api/src/services/plex/client";
+import type { ExternalIds, GuideMeta } from "../../../packages/api/src/services/plex/client";
 import { decryptToken } from "../../../packages/api/src/services/plex/token";
+
+/** A sampled ground-truth row: the id columns + guide (for episode hints). */
+type SampleRow = { ratingKey: string; title: string; type: string; guide: GuideMeta } & ExternalIds;
 
 const srcArg = process.argv[2];
 
@@ -42,8 +45,8 @@ async function matchByGuid(
   return { status: res.status, matches: data?.MediaContainer?.Metadata ?? [] };
 }
 
-/** The id schemes to try for an item, as [label, guidValue] built from the cached ids. */
-function schemesFor(g: GuideMeta): Array<[string, string]> {
+/** The id schemes to try for an item, as [label, guidValue] built from the stored id columns. */
+function schemesFor(g: ExternalIds): Array<[string, string]> {
   const out: Array<[string, string]> = [];
   if (g.tmdbId) out.push(["tmdb", `tmdb://${g.tmdbId}`]);
   if (g.tvdbId) out.push(["tvdb", `tvdb://${g.tvdbId}`]);
@@ -55,12 +58,12 @@ function schemesFor(g: GuideMeta): Array<[string, string]> {
 const looksLocal = (m: Match) =>
   m.ratingKey != null && /^\d+$/.test(String(m.ratingKey)) && (m.key ?? "").startsWith("/library/metadata/");
 
-async function sample(sid: string, type: string, take: number) {
-  // Rows that carry at least one external id AND a ratingKey — our ground truth.
-  return prisma.$queryRawUnsafe<{ ratingKey: string; title: string; type: string; guide: GuideMeta }[]>(
-    `SELECT "ratingKey", title, type, guide FROM media_item
+async function sample(sid: string, type: string, take: number): Promise<SampleRow[]> {
+  // Rows that carry at least one external id (columns) AND a ratingKey — our ground truth.
+  return prisma.$queryRawUnsafe<SampleRow[]>(
+    `SELECT "ratingKey", title, type, guide, "tmdbId", "tvdbId", "imdbId" FROM media_item
      WHERE "mediaSourceId" = $1 AND available AND type = $2
-       AND (guide ->> 'tmdbId' IS NOT NULL OR guide ->> 'tvdbId' IS NOT NULL OR guide ->> 'imdbId' IS NOT NULL)
+       AND ("tmdbId" IS NOT NULL OR "tvdbId" IS NOT NULL OR "imdbId" IS NOT NULL)
      ORDER BY random() LIMIT $3`,
     sid,
     type,
@@ -104,7 +107,7 @@ async function main() {
         : { title: g.title ?? row.title, year: g.year };
 
     console.log(`\x1b[1m${row.type}\x1b[0m  rk=${row.ratingKey}  "${g.title ?? row.title}"`);
-    for (const [label, guid] of schemesFor(g)) {
+    for (const [label, guid] of schemesFor(row)) {
       const t = bump(label);
       t.tried++;
       const { status, matches } = await matchByGuid(baseUrl, token, ptype, guid, extra);

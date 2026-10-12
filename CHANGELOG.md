@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.59] - 2026-10-12
+
+Makes the external metadata ids first-class, indexed columns on cached media (for cross-server channel import).
+
+### Added
+- **`MediaItem.tmdbId` / `tvdbId` / `imdbId` columns** (migration `add_mediaitem_external_ids`), each indexed per source, so a shared channel's items can be resolved to this server's `ratingKey` by a fast indexed lookup. The ids move out of the `guide` JSON blob (where 0.15.55 first stashed them) onto the item itself, since they're identity, not display metadata. Populated by the metadata sync.
+
+### Note
+- The columns start empty and fill in on the next metadata sync (no backfill — a re-sync self-repairs). Nothing reads them yet; the import resolver that uses them is next.
+
+### Dev
+- `probe-external-ids.ts` now reports column coverage; `probe-guid-match.ts` samples ground truth from the columns.
+
 ## [0.15.58] - 2026-10-12
 
 Lineup export/import stops dropping four channel settings (schema 1.1).
