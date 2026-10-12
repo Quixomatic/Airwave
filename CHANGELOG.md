@@ -2,6 +2,11 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.65] - 2026-10-12
+
+### Fixed
+- **Cloning a membership or manual channel now loads its preview automatically.** Cloning pre-fills the create page with the source channel's setup (all three modes already worked). But the Preview only auto-resolved for filter clones; a playlist/collection or hand-picked clone sat on "Nothing to preview yet" until you nudged it. The preview's "load when the pool goes from empty to populated" detection now fires on the create/clone page for every mode, so a clone's pre-filled pool previews on load. (The edit page is unchanged — it still shows the saved preview without a redundant re-resolve.)
+
 ## [0.15.64] - 2026-10-12
 
 ### Fixed
