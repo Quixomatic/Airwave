@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.61] - 2026-10-12
+
+Exports now carry portable identity for hand-picked and collection/playlist channels (schema 1.2).
+
+### Added
+- **Manual and membership channels export their items by external GUID.** A hand-picked (MANUAL) channel exports each pick's tmdb/tvdb/imdb id (a whole-show pick stays a show, so it keeps expanding live after import); a collection/playlist (MEMBERSHIP) channel exports its container's direct members by GUID (shows stay shows, not exploded into episodes). This is what lets these channels rebuild against a different server's library on import. Bumps the exchange format to schema **1.2** (additive).
+- **Export-time GUID backfill.** If a referenced item's id isn't cached yet (e.g. exported before a metadata re-sync), the exporter fetches it live from Plex on the fly and persists it, so an export is always complete regardless of sync state. Bounded to only the referenced items missing an id.
+
 ## [0.15.60] - 2026-10-12
 
 The engine that resolves a shared channel's items to your own library (for cross-server import).

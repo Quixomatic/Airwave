@@ -1,6 +1,10 @@
 import type { PrismaClient } from "@airwave/db";
 
-import { CURRENT_SCHEMA_VERSION } from "./schema";
+import { getMembershipMemberKeys } from "../plex/client";
+import type { ResolveSource } from "../plex/resolve";
+import { decryptToken } from "../plex/token";
+import { resolveExportItems } from "./export-items";
+import { CURRENT_SCHEMA_VERSION, type ExportItem } from "./schema";
 
 /**
  * Export the full lineup — every package + channel + their definitions — as a portable JSON blob that can
@@ -9,27 +13,62 @@ import { CURRENT_SCHEMA_VERSION } from "./schema";
  * the target). Channel→package links travel by the package's stable `key`; a definition's Plex library
  * travels by its human **title** (library keys differ per server) so the importer can remap it.
  *
- * The `plexFilter` on a PREDICATE definition is field+value based (matched by title against the target's
- * Plex), so it's portable. COLLECTION / PLAYLIST / MANUAL definitions reference per-server ids — they're
- * exported for completeness but the importer drops them (portability lands with the GUID remap, P3).
+ * PREDICATE defs travel by their field+value `plexFilter` (portable). MANUAL / MEMBERSHIP defs reference
+ * per-server ids, so they also carry a resolved `items[]` of portable external GUIDs (schema 1.2) — a MANUAL
+ * def's hand-picked keys, or a MEMBERSHIP container's DIRECT members (shows stay shows, so "whole show"
+ * survives). The importer remaps those GUIDs to the target server's ratingKeys. Missing ids are backfilled
+ * live from Plex at export time (see resolveExportItems), so an export is complete even without a re-sync.
  *
  * The envelope carries a semver `schemaVersion` (see `schema.ts`); the legacy integer `version` is gone.
  */
 export type LineupExport = Awaited<ReturnType<typeof exportLineup>>;
 
 export async function exportLineup(prisma: PrismaClient) {
-  const [packages, channels, libraries] = await Promise.all([
+  const [packages, channels, libraries, sources] = await Promise.all([
     prisma.channelPackage.findMany({ orderBy: { sortIndex: "asc" } }),
     prisma.channel.findMany({
       orderBy: { number: "asc" },
       include: { definitions: { orderBy: { sortIndex: "asc" } }, package: { select: { key: true } } },
     }),
     prisma.mediaLibrary.findMany({ select: { mediaSourceId: true, key: true, title: true } }),
+    prisma.mediaSource.findMany({ select: { id: true, baseUrl: true, token: true } }),
   ]);
 
   // (sourceId, libraryKey) → title, so a definition's library can travel by name.
   const libTitle = new Map<string, string>();
   for (const l of libraries) libTitle.set(`${l.mediaSourceId}:${l.key}`, l.title);
+
+  // sourceId → connection creds (for the export-time GUID backfill + membership member fetch).
+  const srcById = new Map<string, ResolveSource>();
+  for (const s of sources) {
+    if (s.baseUrl) srcById.set(s.id, { id: s.id, baseUrl: s.baseUrl, token: decryptToken(s.token) });
+  }
+
+  // Resolve the portable items[] for a MANUAL / MEMBERSHIP def (PREDICATE returns undefined).
+  async function resolveItems(d: (typeof channels)[number]["definitions"][number], channelSourceId: string): Promise<ExportItem[] | undefined> {
+    const src = srcById.get(channelSourceId);
+    if (d.kind === "MANUAL_ITEMS") {
+      // Even without live creds we can still emit cached ids; resolveExportItems skips the live backfill.
+      return resolveExportItems(prisma, src ?? { id: channelSourceId, baseUrl: "", token: "" }, d.manualItemKeys);
+    }
+    if (d.kind === "MEMBERSHIP") {
+      const membershipSources = (d.sources as Array<{ type: "playlist" | "collection"; key: string }> | null) ?? [];
+      if (!src || membershipSources.length === 0) return [];
+      // Each container's DIRECT members (unexpanded), in order, deduped across sources.
+      const seen = new Set<string>();
+      const memberKeys: string[] = [];
+      for (const ms of membershipSources) {
+        for (const m of await getMembershipMemberKeys(src.baseUrl, src.token, ms)) {
+          if (!seen.has(m.ratingKey)) {
+            seen.add(m.ratingKey);
+            memberKeys.push(m.ratingKey);
+          }
+        }
+      }
+      return resolveExportItems(prisma, src, memberKeys);
+    }
+    return undefined; // PREDICATE
+  }
 
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -42,38 +81,42 @@ export async function exportLineup(prisma: PrismaClient) {
       tint: p.tint,
       sortIndex: p.sortIndex,
     })),
-    channels: channels.map((c) => ({
-      number: c.number,
-      name: c.name,
-      callsign: c.callsign,
-      description: c.description,
-      icon: c.icon,
-      tint: c.tint,
-      enabled: c.enabled,
-      sortIndex: c.sortIndex,
-      ordering: c.ordering,
-      sortField: c.sortField,
-      sortDir: c.sortDir,
-      bumperMode: c.bumperMode,
-      // Portable scheduling config added in schema 1.1 (predates the original exporter, so it used to be
-      // dropped): the grouping/rotation strategy, the specials/multi-part toggles, and the shuffle seed so an
-      // imported channel shuffles identically.
-      strategy: c.strategy,
-      excludeSpecials: c.excludeSpecials,
-      keepMultiPartTogether: c.keepMultiPartTogether,
-      shuffleSeed: c.shuffleSeed,
-      packageKey: c.package?.key ?? null,
-      definitions: c.definitions.map((d) => ({
-        kind: d.kind,
-        mode: d.mode,
-        sortIndex: d.sortIndex,
-        plexFilter: d.plexFilter,
-        // Portable library reference — the importer resolves this back to a key on the target source.
-        plexLibraryTitle: d.plexLibraryKey ? (libTitle.get(`${c.mediaSourceId}:${d.plexLibraryKey}`) ?? null) : null,
-        // MEMBERSHIP playlist/collection sources (server-specific keys; importer drops non-PREDICATE defs).
-        sources: d.sources,
-        manualItemKeys: d.manualItemKeys,
+    channels: await Promise.all(
+      channels.map(async (c) => ({
+        number: c.number,
+        name: c.name,
+        callsign: c.callsign,
+        description: c.description,
+        icon: c.icon,
+        tint: c.tint,
+        enabled: c.enabled,
+        sortIndex: c.sortIndex,
+        ordering: c.ordering,
+        sortField: c.sortField,
+        sortDir: c.sortDir,
+        bumperMode: c.bumperMode,
+        // Portable scheduling config added in schema 1.1 (predates the original exporter, so it used to be
+        // dropped): the grouping/rotation strategy, the specials/multi-part toggles, and the shuffle seed.
+        strategy: c.strategy,
+        excludeSpecials: c.excludeSpecials,
+        keepMultiPartTogether: c.keepMultiPartTogether,
+        shuffleSeed: c.shuffleSeed,
+        packageKey: c.package?.key ?? null,
+        definitions: await Promise.all(
+          c.definitions.map(async (d) => ({
+            kind: d.kind,
+            mode: d.mode,
+            sortIndex: d.sortIndex,
+            plexFilter: d.plexFilter,
+            // Portable library reference — the importer resolves this back to a key on the target source.
+            plexLibraryTitle: d.plexLibraryKey ? (libTitle.get(`${c.mediaSourceId}:${d.plexLibraryKey}`) ?? null) : null,
+            // Original per-server refs kept for reference/name-match; portability rides on `items` (schema 1.2).
+            sources: d.sources,
+            manualItemKeys: d.manualItemKeys,
+            items: await resolveItems(d, c.mediaSourceId),
+          })),
+        ),
       })),
-    })),
+    ),
   };
 }

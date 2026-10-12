@@ -83,7 +83,7 @@ describe("migrateToCurrent", () => {
     const r = migrateToCurrent(base({ version: 1, channels: [{ number: 1, name: "Old" } as never] }));
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.doc.schemaVersion).toBe("1.1");
+      expect(r.doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION); // migrated up through the chain
       const c = r.doc.channels[0] as Record<string, unknown>;
       expect(c.strategy).toBeNull();
       expect(c.excludeSpecials).toBe(false);

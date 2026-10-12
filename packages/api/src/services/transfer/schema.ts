@@ -17,9 +17,30 @@ import { z } from "zod";
  * Legacy: the pre-semver exports carried an integer `version: 1`. That maps to `"1.0"` (see
  * {@link readSchemaVersion}), so every lineup ever exported still imports.
  */
-export const CURRENT_SCHEMA_VERSION = "1.1" as const;
+export const CURRENT_SCHEMA_VERSION = "1.2" as const;
 
 /* ---------------- Envelope zod (tolerant: nested contents stay loose, extras pass through) ---------- */
+
+/**
+ * A portable reference to one media item in a MANUAL / MEMBERSHIP definition (schema 1.2). Carries external
+ * GUIDs (the portable identity) + display/disambiguation hints; the source server's `ratingKey` is included
+ * only for reference. On import these remap to the target server's ratingKeys (see guid-remap.ts).
+ */
+export const exportItemSchema = z
+  .object({
+    ratingKey: z.string().optional(), // source-server key, reference only
+    type: z.string(), // movie | show | episode | season
+    tmdbId: z.string().optional(),
+    tvdbId: z.string().optional(),
+    imdbId: z.string().optional(),
+    title: z.string().optional(),
+    year: z.number().nullish(),
+    showTitle: z.string().optional(),
+    season: z.number().nullish(),
+    episode: z.number().nullish(),
+    airDate: z.string().nullish(),
+  })
+  .passthrough();
 
 export const definitionSchema = z
   .object({
@@ -28,6 +49,11 @@ export const definitionSchema = z
     sortIndex: z.number().optional(),
     plexFilter: z.unknown().optional(),
     plexLibraryTitle: z.string().nullish(),
+    // Legacy per-server refs (kept for reference/name-match); portability rides on `items`.
+    sources: z.unknown().optional(),
+    manualItemKeys: z.array(z.string()).optional(),
+    // schema 1.2 — resolved portable items for MANUAL / MEMBERSHIP defs (GUIDs → target ratingKeys on import).
+    items: z.array(exportItemSchema).optional(),
   })
   .passthrough();
 
@@ -82,6 +108,7 @@ export const lineupEnvelopeSchema = z
   .passthrough();
 
 export type LineupEnvelope = z.infer<typeof lineupEnvelopeSchema>;
+export type ExportItem = z.infer<typeof exportItemSchema>;
 
 /* ---------------- Version parsing + comparison ----------------------------------------------------- */
 

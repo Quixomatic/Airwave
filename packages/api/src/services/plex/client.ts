@@ -667,6 +667,22 @@ export async function getCollectionItems(
 }
 
 /**
+ * A membership container's DIRECT members (not expanded to episodes) — just `ratingKey` + `type`, in
+ * container order. Used by the exporter to capture the membership at the container's own granularity (a
+ * collection of shows exports the SHOW refs, not every episode), so "whole show stays live" survives a
+ * round-trip. A missing/deleted container resolves to [] rather than throwing.
+ */
+export async function getMembershipMemberKeys(
+  baseUrl: string,
+  token: string,
+  member: { type: "playlist" | "collection"; key: string },
+): Promise<Array<{ ratingKey: string; type: string }>> {
+  const path = member.type === "playlist" ? `/playlists/${member.key}/items` : `/library/collections/${member.key}/items`;
+  const md = await fetchMetadata(baseUrl, token, path).catch(() => [] as PlexMetadata[]);
+  return md.map((m) => ({ ratingKey: String(m.ratingKey), type: m.type ?? "movie" }));
+}
+
+/**
  * Batch metadata for specific ratingKeys WITH per-file streams — the Plex-side hydration fallback for
  * membership items not (yet) in the MediaItem cache. Chunked to keep the URL length sane.
  */
