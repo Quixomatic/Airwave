@@ -2,6 +2,14 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.63] - 2026-10-12
+
+### Added
+- **Export a single channel or package, not just the whole lineup.** `exportLineup` takes an optional selection (channel numbers or package keys) and produces the same versioned document with just those entries (a single-channel export brings its package along), via a new `transfer.exportSelection` endpoint. Groundwork for sharing one channel/package.
+
+### Internal
+- Documented that the channel-editor filter Copy/Paste envelope (`airwave/filter`, client-only, filter-only) stays deliberately separate from the server-side lineup-exchange format — different payload, transport, and scope, so they aren't unified.
+
 ## [0.15.62] - 2026-10-12
 
 Importing a lineup now recreates hand-picked and collection/playlist channels instead of dropping them.

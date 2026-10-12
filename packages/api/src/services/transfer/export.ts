@@ -20,19 +20,39 @@ import { CURRENT_SCHEMA_VERSION, type ExportItem } from "./schema";
  * live from Plex at export time (see resolveExportItems), so an export is complete even without a re-sync.
  *
  * The envelope carries a semver `schemaVersion` (see `schema.ts`); the legacy integer `version` is gone.
+ *
+ * `selection` narrows the export to a SUBSET — one channel, one package (its channels), or a hand-picked set
+ * — producing the SAME versioned document with fewer entries (what the single-channel / package share on the
+ * marketplace needs). Omit it for the whole lineup.
  */
 export type LineupExport = Awaited<ReturnType<typeof exportLineup>>;
 
-export async function exportLineup(prisma: PrismaClient) {
-  const [packages, channels, libraries, sources] = await Promise.all([
+export type ExportSelection = { channelNumbers?: number[]; packageKeys?: string[] };
+
+export async function exportLineup(prisma: PrismaClient, selection: ExportSelection = {}) {
+  const selecting = !!(selection.channelNumbers || selection.packageKeys);
+  const channelWhere = selection.channelNumbers
+    ? { number: { in: selection.channelNumbers } }
+    : selection.packageKeys
+      ? { package: { key: { in: selection.packageKeys } } }
+      : {};
+
+  const [allPackages, channels, libraries, sources] = await Promise.all([
     prisma.channelPackage.findMany({ orderBy: { sortIndex: "asc" } }),
     prisma.channel.findMany({
+      where: channelWhere,
       orderBy: { number: "asc" },
       include: { definitions: { orderBy: { sortIndex: "asc" } }, package: { select: { key: true } } },
     }),
     prisma.mediaLibrary.findMany({ select: { mediaSourceId: true, key: true, title: true } }),
     prisma.mediaSource.findMany({ select: { id: true, baseUrl: true, token: true, machineIdentifier: true } }),
   ]);
+
+  // Only emit packages referenced by the exported channels (plus any explicitly requested), so a subset
+  // export stays self-contained without dragging in unrelated packages. Whole-lineup export emits all.
+  const neededPkgKeys = new Set<string>(selection.packageKeys ?? []);
+  for (const c of channels) if (c.package?.key) neededPkgKeys.add(c.package.key);
+  const packages = selecting ? allPackages.filter((p) => neededPkgKeys.has(p.key)) : allPackages;
 
   // (sourceId, libraryKey) → title, so a definition's library can travel by name.
   const libTitle = new Map<string, string>();

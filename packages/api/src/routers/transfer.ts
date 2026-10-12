@@ -23,6 +23,17 @@ export const transferRouter = router({
   /** The full lineup as a portable JSON object; the client serializes it to a download. */
   export: adminProcedure.query(({ ctx }) => exportLineup(ctx.prisma)),
 
+  /** The same versioned document, narrowed to a selection — one channel, one package, or a hand-picked set
+   *  (what sharing a single channel/package to the marketplace needs). Omit both for the whole lineup. */
+  exportSelection: adminProcedure
+    .input(
+      z.object({
+        channelNumbers: z.array(z.number().int()).optional(),
+        packageKeys: z.array(z.string()).optional(),
+      }),
+    )
+    .query(({ ctx, input }) => exportLineup(ctx.prisma, input)),
+
   /** Read-only: annotate an uploaded lineup against this instance for the staging screen. A mutation (not a
    *  query) so the uploaded JSON rides the POST body, not a length-limited URL. */
   importPreview: adminProcedure

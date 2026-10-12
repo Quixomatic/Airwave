@@ -4,6 +4,11 @@ import { normalizeFilter, type FilterGroup } from "./filter-builder";
 // A copied filter is wrapped in a small versioned envelope so a paste can recognize it (and reject random
 // clipboard text), and so the content types (libraries) travel with the filter tree. Bump the version if the
 // shape ever changes incompatibly.
+//
+// DELIBERATELY SEPARATE from the lineup-exchange format (`packages/api/.../transfer/schema.ts`, semver
+// `schemaVersion`). That one carries whole channels/packages between SERVERS over a file/the marketplace;
+// this is a client-only, clipboard-scoped convenience carrying just a filter tree. Unifying would couple the
+// web app to server internals for no payload overlap, so they stay independent tiny formats on purpose.
 const ENVELOPE_TYPE = "airwave/filter";
 const ENVELOPE_VERSION = 1;
 
