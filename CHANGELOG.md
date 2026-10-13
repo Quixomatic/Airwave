@@ -2,6 +2,112 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.65] - 2026-10-12
+
+### Fixed
+- **Cloning a membership or manual channel now loads its preview automatically.** Cloning pre-fills the create page with the source channel's setup (all three modes already worked). But the Preview only auto-resolved for filter clones; a playlist/collection or hand-picked clone sat on "Nothing to preview yet" until you nudged it. The preview's "load when the pool goes from empty to populated" detection now fires on the create/clone page for every mode, so a clone's pre-filled pool previews on load. (The edit page is unchanged — it still shows the saved preview without a redundant re-resolve.)
+
+## [0.15.64] - 2026-10-12
+
+### Fixed
+- **Re-importing a lineup now detects hand-picked and collection/playlist channels as "already imported."** Filter channels were correctly flagged as duplicates (and skipped) on a re-import, but manual and membership channels weren't — they showed up ready to import again even though they already existed. The duplicate check now includes a manual channel's picked items and a membership channel's collections/playlists in its content signature, so re-importing the same lineup onto the same server flags all of them as already imported and leaves them unchecked by default.
+
+## [0.15.63] - 2026-10-12
+
+### Added
+- **Export a single channel or package, not just the whole lineup.** `exportLineup` takes an optional selection (channel numbers or package keys) and produces the same versioned document with just those entries (a single-channel export brings its package along), via a new `transfer.exportSelection` endpoint. Groundwork for sharing one channel/package.
+
+### Internal
+- Documented that the channel-editor filter Copy/Paste envelope (`airwave/filter`, client-only, filter-only) stays deliberately separate from the server-side lineup-exchange format — different payload, transport, and scope, so they aren't unified.
+
+## [0.15.62] - 2026-10-12
+
+Importing a lineup now recreates hand-picked and collection/playlist channels instead of dropping them.
+
+### Added
+- **Manual and membership channels import for real.** Previously only filter channels survived an import; hand-picked (manual) and collection/playlist (membership) channels were dropped. Now:
+  - **Same Plex server** (re-importing onto the box the lineup came from): the channel imports exactly as-is — a membership channel stays a live collection/playlist, a manual channel keeps its picks. No data lost.
+  - **Different server**: the channel's items are matched to your library by their metadata ids (tmdb/tvdb/imdb) — a fast indexed lookup, with a live Plex fallback for anything not yet synced — and rebuilt as a hand-picked snapshot. The import reports "matched X of Y titles"; unmatched titles are skipped, never a hard failure.
+- **Staging preview shows portability.** A manual/membership channel from another server now shows how many of its titles match your library before you import.
+
+### Internal
+- Carries the source Plex server id in the export (schema 1.2) to detect the same-server case; the import plan resolves each definition (predicate / same-server membership+manual / cross-server remap) and `executeChannelPlan` performs the GUID remap. The content signature now includes manual/membership item identity so distinct hand-picked channels don't collide. Verified with a dry-run round-trip probe.
+
+## [0.15.61] - 2026-10-12
+
+Exports now carry portable identity for hand-picked and collection/playlist channels (schema 1.2).
+
+### Added
+- **Manual and membership channels export their items by external GUID.** A hand-picked (MANUAL) channel exports each pick's tmdb/tvdb/imdb id (a whole-show pick stays a show, so it keeps expanding live after import); a collection/playlist (MEMBERSHIP) channel exports its container's direct members by GUID (shows stay shows, not exploded into episodes). This is what lets these channels rebuild against a different server's library on import. Bumps the exchange format to schema **1.2** (additive).
+- **Export-time GUID backfill.** If a referenced item's id isn't cached yet (e.g. exported before a metadata re-sync), the exporter fetches it live from Plex on the fly and persists it, so an export is always complete regardless of sync state. Bounded to only the referenced items missing an id.
+
+## [0.15.60] - 2026-10-12
+
+The engine that resolves a shared channel's items to your own library (for cross-server import).
+
+### Added
+- **GUID → ratingKey remap resolver** (`services/transfer/guid-remap.ts`): given a shared item's external ids (tmdb/tvdb/imdb), find the matching item in this server's library. Tiered for speed and completeness: a single indexed lookup over the new `MediaItem` id columns resolves everything that's synced; anything missing (added since the last sync, or in an unsynced library) falls back to a live `GET /library/matches` call to Plex, and the ids it finds are written back to the cache so the next import is a pure indexed hit. Reports matched vs. unmatched; an unmatched item is skipped with a note, never a failure. Not wired into import yet — that's next.
+- **`matchByGuid` Plex client helper** wrapping `/library/matches` (external guid → local ratingKey, score-gated for movies/shows), and `includeGuids=1` on the batched metadata fetch.
+
+### Dev
+- `probe-guid-remap.ts` exercises the resolver end to end against the real library.
+
+## [0.15.59] - 2026-10-12
+
+Makes the external metadata ids first-class, indexed columns on cached media (for cross-server channel import).
+
+### Added
+- **`MediaItem.tmdbId` / `tvdbId` / `imdbId` columns** (migration `add_mediaitem_external_ids`), each indexed per source, so a shared channel's items can be resolved to this server's `ratingKey` by a fast indexed lookup. The ids move out of the `guide` JSON blob (where 0.15.55 first stashed them) onto the item itself, since they're identity, not display metadata. Populated by the metadata sync.
+
+### Note
+- The columns start empty and fill in on the next metadata sync (no backfill — a re-sync self-repairs). Nothing reads them yet; the import resolver that uses them is next.
+
+### Dev
+- `probe-external-ids.ts` now reports column coverage; `probe-guid-match.ts` samples ground truth from the columns.
+
+## [0.15.58] - 2026-10-12
+
+Lineup export/import stops dropping four channel settings (schema 1.1).
+
+### Fixed
+- **Exporting a channel now carries its scheduling config.** The export predated several `Channel` columns and silently dropped them, so an imported channel lost its grouping/rotation **strategy**, its **Exclude specials** and **Keep multi-part together** toggles, and its **shuffle seed** (so it re-shuffled differently). All four now travel with the channel and are applied on import, so a round-tripped channel matches the original. Correctly-omitted instance-specific fields (provenance, schedule cursor, media binding) stay omitted.
+
+### Internal
+- Bumps the exchange format to schema **1.1** (additive/minor) with a 1.0→1.1 migration that defaults the new fields, so older `1.0` exports still import cleanly. Covered by `schema.test.ts`.
+
+## [0.15.57] - 2026-10-12
+
+Groundwork for portable channel sharing: a proper versioned lineup export/import envelope.
+
+### Changed
+- **Lineup export/import now carries a semver `schemaVersion`** (e.g. `"1.0"`) instead of a bare integer `version`, with a real forward/back-compatibility policy: an older file is migrated up to the current format before import; a same-major newer-minor file is accepted with unknown fields ignored; only a newer-*major* file is rejected as "needs a newer Airwave." Legacy exports (integer `version: 1`) map to `"1.0"`, so every file ever exported still imports. No change to what a channel export contains yet — this is the versioning foundation.
+
+### Internal
+- New `services/transfer/schema.ts`: the single source of truth for the exchange envelope — the tolerant zod schema, `CURRENT_SCHEMA_VERSION`, version parsing/comparison, and an ordered migration chain (`migrateToCurrent`). The router and both `export`/`import` services consume it; `previewImport` and `planImport` normalize an uploaded file through it on entry. Covered by `schema.test.ts`.
+
+## [0.15.56] - 2026-10-11
+
+Closes a gap in the external-id capture from 0.15.55: the frequent incremental scan was erasing the ids the full sync had just written.
+
+### Fixed
+- **The recently-added scan no longer wipes external ids off the newest items.** The full metadata sync captures each item's tmdb/tvdb/imdb ids (0.15.55), but the lightweight recently-added scan — which re-upserts the 50 most-recently-added items per library every few minutes — was fetching them *without* `includeGuids=1`, so it overwrote those items' cached metadata with an id-less copy, stripping the ids the full sync had set. The incremental scan now requests the ids too, so they survive. The single-item metadata fetch (used to backfill a missing parent show) carries them as well.
+
+### Note
+- Existing already-clobbered rows (the 50 newest per library) repopulate on the next recently-added scan once the server is on this build; no re-sync needed.
+
+### Dev
+- `apps/server/scripts/probe-external-ids.ts`: verifies external-id capture after a sync — reports per-type cache coverage (and, for episodes, parent-show coverage, since an episode's portable identity rides on its show), then does a live round-trip against Plex (re-grab with `includeGuids=1`, re-parse, compare) to prove grab + parse works end to end. Distinguishes a benign "cache-behind" row from a real live-vs-cache conflict.
+
+## [0.15.55] - 2026-10-10
+
+Groundwork for portable, cross-server channel sharing: capture each item's external metadata ids during Plex sync.
+
+### Added
+- **External metadata ids (TMDB / TVDB / IMDb) on synced media.** Plex library sync now requests each item's `Guid` tags (`includeGuids=1`) and parses them into `tmdbId` / `tvdbId` / `imdbId` on the item's guide bundle (handling the modern Plex-agent `Guid[]` array, legacy single-`guid` agents, and the HAMA anime agent, mirroring the approach the *arr/seerr ecosystem uses). These are the portable identity for a title (a Plex `ratingKey` is server-local and can't be shared), the foundation for resolving a shared channel's items against whatever Plex server you're connected to.
+
+### Note
+- The ids ride along in the existing `MediaItem.guide` JSON, so there's no database migration — but a metadata re-sync is needed to populate them on already-synced libraries. Nothing reads them yet; this is purely capture.
+
 ## [0.15.54] - 2026-10-09
 
 Marketing site (getairwave.tv): a metadata-driven blog feature-image treatment, a reusable gradient-blob background, and this week's post.

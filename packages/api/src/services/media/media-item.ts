@@ -21,6 +21,10 @@ export function toMediaItemData(
     airDate: item.originallyAvailableAt ?? null,
     parentId,
     guide: item.guide as object,
+    // Portable identity → indexed columns (for cross-server import remap). Null when Plex has no such id.
+    tmdbId: item.tmdbId ?? null,
+    tvdbId: item.tvdbId ?? null,
+    imdbId: item.imdbId ?? null,
   };
 }
 

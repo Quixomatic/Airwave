@@ -281,13 +281,29 @@ export type GuideMeta = {
   episode?: number;
 };
 
+/**
+ * Portable external identity parsed from Plex's `Guid[]` tags — the de-facto *arr/seerr standard for
+ * matching a title across servers (a `ratingKey` is server-local). These are IDENTITY, not display guide
+ * data, so they live on PlexItem (top level) → the indexed `MediaItem.tmdbId/tvdbId/imdbId` columns, NOT in
+ * the guide JSON. See .plans/export-import-schema-versioning.md.
+ */
+export type ExternalIds = {
+  tmdbId?: string;
+  tvdbId?: string;
+  imdbId?: string;
+};
+
 export type PlexItem = {
   ratingKey: string;
   title: string;
   durationMs: number;
   year?: number;
   originallyAvailableAt?: string;
-  /** Full denormalized metadata for the guide. */
+  /** Portable external ids (tmdb/tvdb/imdb) for cross-server resolution — persisted to indexed columns. */
+  tmdbId?: string;
+  tvdbId?: string;
+  imdbId?: string;
+  /** Full denormalized metadata for the guide (display). */
   guide: GuideMeta;
 };
 
@@ -311,6 +327,10 @@ type PlexMetadata = {
   grandparentRatingKey?: string | number;
   parentIndex?: number;
   index?: number;
+  // Primary guid (plex://… for the modern agent, or com.plexapp.agents.*://… for legacy agents) + the
+  // external-id tag array ({ id: "tmdb://603" } / "imdb://tt…" / "tvdb://…"), present with includeGuids=1.
+  guid?: string;
+  Guid?: Array<{ id?: string }>;
   Director?: PlexTagRef[];
   Genre?: PlexTagRef[];
   Role?: PlexTagRef[];
@@ -386,6 +406,36 @@ const tags = (arr: PlexTagRef[] | undefined, max: number): string[] | undefined 
   return out.length ? out : undefined;
 };
 
+// External-id patterns, mirroring seerr's plex scanner (.refs/seerr/server/lib/scanners/plex/index.ts):
+// modern Plex-agent items carry external ids in the `Guid[]` array; legacy-agent items carry a single
+// external-id `guid` (e.g. `com.plexapp.agents.themoviedb://603`); HAMA (anime) maps via tvdb.
+const EXT_ID = {
+  imdb: /imdb:\/\/(tt\d+)/,
+  tmdb: /tmdb:\/\/(\d+)/,
+  tmdbLegacy: /themoviedb:\/\/(\d+)/,
+  tvdb: /tvdb:\/\/(\d+)/,
+  tvdbLegacy: /thetvdb:\/\/(\d+)/,
+  hamaTvdb: /hama:\/\/tvdb\d?-(\d+)/,
+};
+
+/** Portable external ids (tmdb/tvdb/imdb) from an item's `Guid[]` tags + its primary `guid`. */
+function parseExternalIds(m: PlexMetadata): ExternalIds {
+  const sources = [
+    ...(m.Guid?.map((g) => g.id).filter((s): s is string => !!s) ?? []),
+    ...(m.guid ? [m.guid] : []),
+  ];
+  const out: ExternalIds = {};
+  for (const s of sources) {
+    const tmdb = s.match(EXT_ID.tmdb) ?? s.match(EXT_ID.tmdbLegacy);
+    if (tmdb && !out.tmdbId) out.tmdbId = tmdb[1];
+    const tvdb = s.match(EXT_ID.tvdb) ?? s.match(EXT_ID.tvdbLegacy) ?? s.match(EXT_ID.hamaTvdb);
+    if (tvdb && !out.tvdbId) out.tvdbId = tvdb[1];
+    const imdb = s.match(EXT_ID.imdb);
+    if (imdb && !out.imdbId) out.imdbId = imdb[1];
+  }
+  return out;
+}
+
 function toGuideMeta(m: PlexMetadata): GuideMeta {
   const media = m.Media?.[0];
   return {
@@ -425,6 +475,7 @@ function toPlexItem(m: PlexMetadata): PlexItem {
     durationMs: m.duration ?? 0,
     year: m.year,
     originallyAvailableAt: m.originallyAvailableAt,
+    ...parseExternalIds(m), // top-level identity, not guide
     guide: toGuideMeta(m),
   };
 }
@@ -488,6 +539,8 @@ export async function getSectionItemsRaw(
     // for lean reads (e.g. the preset preview) that only need counts + artwork, which drops the heaviest
     // part of the response and speeds the query up materially.
     ...(type === 2 || !includeStreams ? [] : ["includeElements=Stream"]),
+    // External metadata ids (tmdb/tvdb/imdb) on each item, for portable cross-server identity.
+    "includeGuids=1",
     ...filterParams,
   ].join("&");
   const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/all?${qs}`, {
@@ -614,6 +667,22 @@ export async function getCollectionItems(
 }
 
 /**
+ * A membership container's DIRECT members (not expanded to episodes) — just `ratingKey` + `type`, in
+ * container order. Used by the exporter to capture the membership at the container's own granularity (a
+ * collection of shows exports the SHOW refs, not every episode), so "whole show stays live" survives a
+ * round-trip. A missing/deleted container resolves to [] rather than throwing.
+ */
+export async function getMembershipMemberKeys(
+  baseUrl: string,
+  token: string,
+  member: { type: "playlist" | "collection"; key: string },
+): Promise<Array<{ ratingKey: string; type: string }>> {
+  const path = member.type === "playlist" ? `/playlists/${member.key}/items` : `/library/collections/${member.key}/items`;
+  const md = await fetchMetadata(baseUrl, token, path).catch(() => [] as PlexMetadata[]);
+  return md.map((m) => ({ ratingKey: String(m.ratingKey), type: m.type ?? "movie" }));
+}
+
+/**
  * Batch metadata for specific ratingKeys WITH per-file streams — the Plex-side hydration fallback for
  * membership items not (yet) in the MediaItem cache. Chunked to keep the URL length sane.
  */
@@ -625,7 +694,7 @@ export async function getMetadataByKeys(
   const out: PlexItem[] = [];
   for (let i = 0; i < ratingKeys.length; i += 50) {
     const chunk = ratingKeys.slice(i, i + 50);
-    const res = await fetch(`${baseUrl}/library/metadata/${chunk.join(",")}?includeElements=Stream`, {
+    const res = await fetch(`${baseUrl}/library/metadata/${chunk.join(",")}?includeElements=Stream&includeGuids=1`, {
       headers: pmsHeaders(token),
     });
     if (!res.ok) throw new Error(`Plex metadata failed (${res.status})`);
@@ -653,6 +722,8 @@ export async function getAllSectionItems(
       // per-file streams inline (HDR / object-audio) — bulk, no per-item calls; NOT for shows
       // (type 2): they're containers with no streams and Plex 500s on includeElements=Stream.
       ...(type === 2 ? [] : ["includeElements=Stream"]),
+      // External metadata ids (tmdb/tvdb/imdb) on each item, for portable cross-server identity.
+      "includeGuids=1",
     ].join("&");
     const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/all?${qs}`, {
       headers: pmsHeaders(token),
@@ -684,6 +755,10 @@ export async function getRecentlyAdded(
     `X-Plex-Container-Size=${limit}`,
     // per-file streams inline (HDR / object-audio); not for shows (type 2 → Plex 500s, no streams)
     ...(type === 2 ? [] : ["includeElements=Stream"]),
+    // External metadata ids (tmdb/tvdb/imdb) on each item, for portable cross-server identity. The
+    // incremental scan must capture them too, else a newly-added title lands id-less until the next
+    // full sync — matching getAllSectionItems / getSectionItemsRaw.
+    "includeGuids=1",
   ].join("&");
   const res = await fetch(`${baseUrl}/library/sections/${sectionKey}/all?${qs}`, {
     headers: pmsHeaders(token),
@@ -699,13 +774,60 @@ export async function getMetadata(
   token: string,
   ratingKey: string,
 ): Promise<PlexItem | null> {
-  const res = await fetch(`${baseUrl}/library/metadata/${ratingKey}`, {
+  // includeGuids=1 so a backfilled parent show (or any single-item fetch) carries the external ids too.
+  const res = await fetch(`${baseUrl}/library/metadata/${ratingKey}?includeGuids=1`, {
     headers: pmsHeaders(token),
   });
   if (!res.ok) return null;
   const data = (await res.json()) as { MediaContainer?: { Metadata?: Array<PlexMetadata> } };
   const m = data.MediaContainer?.Metadata?.[0];
   return m ? toPlexItem(m) : null;
+}
+
+/** Hints passed alongside the external guid to `/library/matches`. Movies/shows need title+year; episodes
+ *  need the show title + season/episode (or air date) in addition to the (episode-level) guid. */
+export type MatchHints = {
+  title?: string;
+  year?: number;
+  grandparentTitle?: string; // show title (episodes)
+  parentIndex?: number; // season (episodes)
+  index?: number; // episode number (episodes)
+  originallyAvailableAt?: string; // air date YYYY-MM-DD (episodes)
+};
+
+/** One LOCAL match from `/library/matches`: a real item in THIS server's library (numeric ratingKey). */
+export type GuidMatch = { ratingKey: string; score?: number; type?: string; title?: string };
+
+/**
+ * Reverse-lookup an external GUID (`tmdb://`, `tvdb://`, `imdb://`) to this server's matching items via
+ * `GET /library/matches` — the live-fallback tier of the import remap (validated by probe-guid-match.ts:
+ * exact local ratingKey, score 100 on movies/shows, clean on a bogus guid). `type` is the Plex metadata
+ * type (1=movie, 2=show, 4=episode). Returns ONLY local-library matches (a numeric ratingKey under
+ * `/library/metadata/`), skipping provider candidates, sorted by score desc. Never throws — a failure → [].
+ */
+export async function matchByGuid(
+  baseUrl: string,
+  token: string,
+  type: 1 | 2 | 4,
+  guid: string,
+  hints: MatchHints = {},
+): Promise<GuidMatch[]> {
+  const params = new URLSearchParams({ type: String(type), guid });
+  for (const [k, v] of Object.entries(hints)) if (v != null && v !== "") params.set(k, String(v));
+  try {
+    const res = await fetch(`${baseUrl}/library/matches?${params.toString()}`, { headers: pmsHeaders(token) });
+    if (!res.ok) return [];
+    const data = (await res.json().catch(() => null)) as {
+      MediaContainer?: { Metadata?: Array<{ score?: number; ratingKey?: string | number; key?: string; type?: string; title?: string }> };
+    } | null;
+    const md = data?.MediaContainer?.Metadata ?? [];
+    return md
+      .filter((m) => m.ratingKey != null && /^\d+$/.test(String(m.ratingKey)) && (m.key ?? "").startsWith("/library/metadata/"))
+      .map((m) => ({ ratingKey: String(m.ratingKey), score: m.score, type: m.type, title: m.title }))
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  } catch {
+    return [];
+  }
 }
 
 /**

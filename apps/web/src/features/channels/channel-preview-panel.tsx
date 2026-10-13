@@ -82,8 +82,12 @@ export function ChannelPreviewPanel({
 
   const key = inputKey(input);
 
-  // Capture the initial key ONCE the source is known, so we don't auto-resolve the saved/empty starting state.
-  if (!initialCaptured.current && input?.mediaSourceId) {
+  // Capture the initial key ONCE the source is known, so we don't auto-resolve the starting state — but ONLY
+  // on the EDIT page (channelId present), where `initialData` already shows the saved preview. On create/clone
+  // there's no saved preview to protect, so we let the first resolvable input resolve on its own: a plain
+  // create starts with an empty filter (not resolvable → nothing happens), while a CLONE starts fully
+  // populated (filter/membership/manual) and should auto-resolve so its preview loads without a manual click.
+  if (!initialCaptured.current && input?.mediaSourceId && channelId) {
     initialCaptured.current = true;
     lastKey.current = key;
   }

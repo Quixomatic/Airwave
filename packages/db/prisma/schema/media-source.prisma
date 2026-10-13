@@ -78,6 +78,14 @@ model MediaItem {
   /// its episodes via `parent`).
   guide Json
 
+  /// Portable external identity (parsed from Plex's `Guid[]` tags during sync) — first-class + indexed so
+  /// cross-server channel import can resolve a shared item to THIS server's `ratingKey` by id. A server-local
+  /// `ratingKey` can't be shared; TMDB is the de-facto *arr/seerr standard, with tvdb/imdb alternates. Null
+  /// until a sync populates them. See .plans/export-import-schema-versioning.md.
+  tmdbId String?
+  tvdbId String?
+  imdbId String?
+
   /// Whether the item is still present on the media server (for the missing-media
   /// edge case — sync flips this instead of hard-deleting so built schedules render).
   available    Boolean  @default(true)
@@ -92,6 +100,10 @@ model MediaItem {
   @@unique([mediaSourceId, ratingKey])
   @@index([mediaSourceId, type])
   @@index([parentId])
+  // GUID → ratingKey reverse lookup for cross-server channel import (scoped per source, like the type index).
+  @@index([mediaSourceId, tmdbId])
+  @@index([mediaSourceId, tvdbId])
+  @@index([mediaSourceId, imdbId])
   @@map("media_item")
 }
 
