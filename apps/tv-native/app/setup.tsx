@@ -32,13 +32,8 @@ export default function Setup() {
   const inputRef = useRef<TextInput>(null);
 
   const save = async (target: string) => {
-    try {
-      await setServerUrl(target);
-      router.replace("/login");
-    } catch {
-      setChecking(false);
-      setError("Couldn't save your server address. Please try again.");
-    }
+    await setServerUrl(target);
+    router.replace("/login");
   };
 
   const connect = async () => {

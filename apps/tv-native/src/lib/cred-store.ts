@@ -17,27 +17,26 @@ export const CredStore = isAppleTV
       deleteItemAsync: (key: string) => SecureStore.deleteItemAsync(key),
     };
 
-// @better-auth/expo 1.6 uses these two keys with storagePrefix: "cg". Migrate only
-// those values, rather than copying all device preferences into credential storage.
+// @better-auth/expo 1.6 stores its session under these two keys (storagePrefix "cg"). We migrate only
+// those, rather than copying every device preference into credential storage.
 const SYNC_KEYS = ["cg_cookie", "cg_session_data"];
 
+/** Trigger the one-time AsyncStorage→UserDefaults migration of the better-auth session at startup, so the
+ *  synchronous reads below see it. Best-effort: UserDefaults reads don't fail, and a missing value just
+ *  means "signed out". No-op off Apple TV. */
 export async function hydrateSyncCreds(): Promise<void> {
   if (!isAppleTV) return;
-  const results = await Promise.allSettled(SYNC_KEYS.map((key) => SessionStorage.getItem(key)));
-  if (results.some((result) => result.status === "rejected")) {
-    throw new Error("Could not read saved credentials");
-  }
+  await Promise.allSettled(SYNC_KEYS.map((key) => SessionStorage.getItem(key)));
 }
 
+/** Clear the better-auth session (cookie + session data) on sign-out. No-op off Apple TV. */
 export async function clearSyncCreds(): Promise<void> {
-  const results = await Promise.allSettled(SYNC_KEYS.map((key) => CredStore.deleteItemAsync(key)));
-  if (results.some((result) => result.status === "rejected")) {
-    throw new Error("Could not clear saved credentials");
-  }
+  if (!isAppleTV) return;
+  await Promise.allSettled(SYNC_KEYS.map((key) => CredStore.deleteItemAsync(key)));
 }
 
-/** The Expo auth client needs synchronous reads. Both credential interfaces now use
- * the same persistent tvOS store, without a stale cache or fire-and-forget writes. */
+/** The Expo auth client reads its session SYNCHRONOUSLY. On Apple TV both credential interfaces share the
+ *  same durable UserDefaults store (no stale in-memory cache); elsewhere it's SecureStore's sync accessors. */
 export const SyncCredStore = isAppleTV
   ? TVSessionStorage
   : {
