@@ -3,7 +3,7 @@
 dist/
 web-build/
 android/
-/ios/
+ios/
 *.orig.*
 
 # Expo Router / TypeScript generated

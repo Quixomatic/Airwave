@@ -1,6 +1,6 @@
 {
   "name": "tv-native",
-  "version": "0.15.65",
+  "version": "0.15.66",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -10,8 +10,7 @@
     "dev:ios": "expo start --dev-client --ios",
     "start": "expo start --dev-client",
     "prebuild": "expo prebuild",
-    "check-types": "tsc --noEmit",
-    "test": "bun test src/lib/session.test.ts"
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@airwave/key-input": "workspace:*",
@@ -53,10 +52,5 @@
   "devDependencies": {
     "@react-native-tvos/config-tv": "^0.1.6",
     "tailwindcss": "^3.4.19"
-  },
-  "expo": {
-    "autolinking": {
-      "nativeModulesDir": "./modules"
-    }
   }
 }
