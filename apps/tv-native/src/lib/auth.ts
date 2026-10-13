@@ -1,6 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
-import { CredStore, hydrateSyncCreds } from "./cred-store";
+import { CredStore, clearSyncCreds, hydrateSyncCreds } from "./cred-store";
+import { SessionStorage } from "./session-storage";
 
 /**
  * Native equivalent of tv-web's `auth-client` + `server-url`, minus better-auth's React client:
@@ -8,8 +7,8 @@ import { CredStore, hydrateSyncCreds } from "./cred-store";
  * (a) where the server is and (b) the token.
  *
  *  - The **bearer token** is a credential → `CredStore` (Keychain/Keystore via SecureStore, except on the
- *    Apple TV where it falls back to AsyncStorage — see `cred-store.ts` for the tvOS release-crash reason).
- *  - The **server URL** and other prefs are not secret → `AsyncStorage`.
+ *    Apple TV where it uses UserDefaults — see `cred-store.ts` for the tvOS release-crash reason).
+ *  - The **server URL** is not secret → `SessionStorage` (UserDefaults on tvOS, AsyncStorage elsewhere).
  *
  * These are read once at startup into module-level values (mirroring tv-web, where `SERVER_URL` is
  * evaluated at module load and the app re-initialises after onboarding). `loadSession()` hydrates
@@ -29,9 +28,9 @@ let token: string | null = null;
 /** Hydrate the in-memory session from storage. Call once before rendering the app. */
 export async function loadSession(): Promise<void> {
   const [storedUrl, storedToken] = await Promise.all([
-    AsyncStorage.getItem(SERVER_KEY),
+    SessionStorage.getItem(SERVER_KEY),
     CredStore.getItemAsync(TOKEN_KEY),
-    // Warm the Apple-TV sync credential cache (for better-auth's expoClient) before any auth screen renders.
+    // Migrate the Apple-TV better-auth credentials into the durable store before any auth screen reads them.
     hydrateSyncCreds(),
   ]);
   if (storedUrl) serverUrl = storedUrl.replace(/\/+$/, "");
@@ -45,21 +44,27 @@ export function hasServerUrl(): boolean {
   return serverUrl !== "";
 }
 export async function setServerUrl(raw: string): Promise<void> {
-  serverUrl = normalizeServerUrl(raw);
-  await AsyncStorage.setItem(SERVER_KEY, serverUrl);
+  const next = normalizeServerUrl(raw);
+  await SessionStorage.setItem(SERVER_KEY, next);
+  serverUrl = next;
 }
 export async function clearServerUrl(): Promise<void> {
+  await SessionStorage.removeItem(SERVER_KEY);
   serverUrl = BAKED;
-  await AsyncStorage.removeItem(SERVER_KEY);
 }
 
 export function getToken(): string | null {
   return token;
 }
 export async function setToken(next: string | null): Promise<void> {
+  if (next) {
+    await CredStore.setItemAsync(TOKEN_KEY, next);
+  } else {
+    // Sign-out: clear better-auth's cookie/session alongside the bearer token so no stale session lingers.
+    await clearSyncCreds();
+    await CredStore.deleteItemAsync(TOKEN_KEY);
+  }
   token = next;
-  if (next) await CredStore.setItemAsync(TOKEN_KEY, next);
-  else await CredStore.deleteItemAsync(TOKEN_KEY);
 }
 
 /** Coerce user input into a base URL (add a scheme if missing, drop a trailing slash) — tv-web parity. */

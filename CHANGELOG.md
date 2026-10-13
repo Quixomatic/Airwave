@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.15.66] - 2026-10-13
+
+Fixes the Apple TV dropping back to server setup after a restart (issue #64).
+
+### Fixed
+- **Apple TV now keeps its server and session across a reboot.** On tvOS, the server URL, token, and session were stored in AsyncStorage, which the OS keeps in a purgeable cache and clears when storage runs low — so after a restart the Apple TV had forgotten its server and returned to onboarding. Those small values now live in UserDefaults (via React Native's built-in `Settings`), the one tvOS store with a durability guarantee, so they survive a reboot. No new native module or dependency; iPad, iPhone, and Android are unchanged (they keep the Keychain/Keystore and AsyncStorage). A one-time migration carries over any values that haven't been purged yet; an Apple TV whose cache was already cleared re-onboards once.
+
+### Internal
+- `session-storage.ts` backs the Apple-TV durable store with core RN `Settings` (NSUserDefaults), gated on `Platform.OS === "ios" && Platform.isTV`, using an empty-string tombstone for deletes (UserDefaults has no remove).
+
 ## [0.15.65] - 2026-10-12
 
 ### Fixed
