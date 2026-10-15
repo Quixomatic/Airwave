@@ -205,7 +205,10 @@ export async function startWorkflowEngine(): Promise<void> {
   const world = createWorld();
   // Register the world globally so steps can read run/step data via `getWorld()` (the seed loader for the
   // build-from-dry-run / rebuild flows) without opening a second pg pool per run.
-  setWorld(world);
+  // `createWorld` (@workflow/world-postgres) and `setWorld` (workflow/runtime) ship separate copies of the
+  // `World` type that have drifted (the queue-name brand), so the structurally-identical value needs a cast —
+  // same skew the `world as unknown as WorldStorage` cast below works around.
+  setWorld(world as unknown as Parameters<typeof setWorld>[0]);
 
   // #29 — cancel any config-drifted non-terminal lineup run BEFORE the poller can pick it up and
   // resume-and-wipe with stale args. Reads frozen args via the observability API; best-effort. Cancel goes

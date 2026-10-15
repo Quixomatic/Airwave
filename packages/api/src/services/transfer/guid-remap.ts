@@ -77,7 +77,8 @@ export function resolveFromIndex(ref: GuidRef, idx: CacheIndex): string | null {
     if (!id) continue;
     const rows = map.get(id);
     if (!rows?.length) continue;
-    return (rows.find((r) => r.type === ref.type) ?? rows[0]).ratingKey;
+    const match = rows.find((r) => r.type === ref.type) ?? rows[0];
+    if (match) return match.ratingKey;
   }
   return null;
 }
@@ -117,12 +118,12 @@ async function liveMatch(source: ResolveSource, ref: GuidRef): Promise<string | 
     ref.tmdbId && (`tmdb://${ref.tmdbId}` as const),
     ref.imdbId && (`imdb://${ref.imdbId}` as const),
     ref.tvdbId && (`tvdb://${ref.tvdbId}` as const),
-  ].filter((s): s is string => !!s);
+  ].filter((s): s is `tmdb://${string}` | `imdb://${string}` | `tvdb://${string}` => !!s);
 
   for (const guid of schemes) {
     const matches = await matchByGuid(source.baseUrl, source.token, ptype, guid, hints);
-    if (!matches.length) continue;
     const best = matches[0]; // sorted by score desc
+    if (!best) continue;
     // Episodes carry no score (a single exact match is trustworthy); movies/shows must clear Plex's bar.
     if (ref.type === "episode" || (best.score ?? 0) >= LIVE_SCORE_MIN) return best.ratingKey;
   }

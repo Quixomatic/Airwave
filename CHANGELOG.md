@@ -2,6 +2,29 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.16.0] - 2026-10-15
+
+Type-correctness pass: fixes the real latent type errors in shipped code and holds the
+server's diagnostic scripts to the project's strict typing. No behavior change.
+
+### Fixed
+- **GUID remap resolver (`guid-remap.ts`) is now type-proven.** Its array indexing relied on
+  length/empty guards that were already runtime-correct; the code now satisfies
+  `noUncheckedIndexedAccess` too (guarded the resolved row and the live-match candidate, and
+  narrowed the guid-scheme filter to its real union). Behavior is unchanged.
+- **Remote-access relay buffers type as `Uint8Array<ArrayBuffer>`.** `encodeBody`/`send` now
+  carry the ArrayBuffer-backed buffer type the browser `WebSocket.send` requires.
+- **AI-lineup replay view: removed a dead `onScrub` prop** from the gantt scrubber (its slider
+  is currently disabled and the prop was never passed).
+- **Workflow engine: cast the `World` value** across the `@workflow/world-postgres` ↔
+  `workflow/runtime` type skew (the queue-name brand), matching the existing workaround in the
+  same file.
+
+### Internal
+- **Server diagnostic scripts (`apps/server/scripts/*`) held to strict typing** (removed unused
+  bindings, guarded possibly-undefined indexing, loosened a probe helper to accept `null` ids),
+  since the server tsconfig includes `scripts/`.
+
 ## [0.15.66] - 2026-10-13
 
 Fixes the Apple TV dropping back to server setup after a restart (issue #64).

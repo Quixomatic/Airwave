@@ -144,7 +144,7 @@ async function main() {
   const neg = await matchByGuid(baseUrl, token, 1, "imdb://tt0000001", { title: "Nonexistent Probe Film", year: 1901 });
   console.log(
     `   bogus imdb://tt0000001 → HTTP ${neg.status}, ${neg.matches.length} match(es)` +
-      (neg.matches.length ? ` (top score ${neg.matches[0]?.score}, local=${looksLocal(neg.matches[0])})` : ""),
+      (neg.matches.length ? ` (top score ${neg.matches[0]?.score}, local=${looksLocal(neg.matches[0]!)})` : ""),
   );
   const negClean = neg.matches.every((m) => !looksLocal(m) || (m.score ?? 0) < 85);
   console.log(`   ${ok(negClean)} no false LOCAL positive at score ≥ 85`);

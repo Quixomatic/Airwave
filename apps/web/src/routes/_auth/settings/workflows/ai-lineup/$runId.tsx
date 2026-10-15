@@ -856,7 +856,6 @@ function RunScrubber({
   tMax,
   scrubbing,
   live,
-  onScrub,
 }: {
   traces: ScrubRow[];
   // CONTROLLED by the page's shared scrub time, so the gantt playhead follows the global scrubber. It still

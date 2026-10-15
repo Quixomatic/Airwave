@@ -83,8 +83,8 @@ async function main() {
     if (chRes.ok) {
       const { channels } = (await chRes.json()) as { channels: Array<{ id: string; number: number }> };
       const ch = channels[0];
-      const byNum = channels.find((c) => c.number >= 10) ?? ch; // prefer multi-digit
       if (ch) {
+        const byNum = channels.find((c) => c.number >= 10) ?? ch; // prefer multi-digit (ch is defined here)
         const sampled = [
           `/channels/${ch.id}`,
           `/channels/${ch.id}?include=definition`,

@@ -48,18 +48,18 @@ async function main() {
   console.log(`Library ${movie.title} (key ${movie.key}) — Action=${A} Comedy=${C}\n`);
 
   console.log("=== singles ===");
-  const cA = await count("genre=Action", `genre=${A}`);
-  const cC = await count("genre=Comedy", `genre=${C}`);
+  await count("genre=Action", `genre=${A}`);
+  await count("genre=Comedy", `genre=${C}`);
 
   console.log("\n=== same-field two params: AND or OR? ===");
   const cTwoParams = await count("genre=A&genre=C (two params)", `genre=${A}&genre=${C}`);
   console.log(`  (if ~intersection → AND; if > max(cA,cC) → OR)`);
 
   console.log("\n=== OR forms (should match each other, and be >= max single) ===");
-  const cComma = await count("genre=A,C (comma OR)", `genre=${A},${C}`);
-  const cOr = await count("genre=A or=1 genre=C", `genre=${A}&or=1&genre=${C}`);
-  const cOrAdv = await count("advancedFilters=1 genre=A or=1 genre=C", `advancedFilters=1&genre=${A}&or=1&genre=${C}`);
-  const cOrPush = await count("push genre=A or=1 genre=C pop (adv)", `advancedFilters=1&push=1&genre=${A}&or=1&genre=${C}&pop=1`);
+  await count("genre=A,C (comma OR)", `genre=${A},${C}`);
+  await count("genre=A or=1 genre=C", `genre=${A}&or=1&genre=${C}`);
+  await count("advancedFilters=1 genre=A or=1 genre=C", `advancedFilters=1&genre=${A}&or=1&genre=${C}`);
+  await count("push genre=A or=1 genre=C pop (adv)", `advancedFilters=1&push=1&genre=${A}&or=1&genre=${C}&pop=1`);
 
   console.log("\n=== (A OR C) AND decade — implicit AND after pop ===");
   await count("push A or C pop & decade (implicit AND)", `advancedFilters=1&push=1&genre=${A}&or=1&genre=${C}&pop=1&decade=${decade}`);

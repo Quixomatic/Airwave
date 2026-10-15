@@ -21,7 +21,6 @@ const genre = (g: string) => cond("genre", "is", g);
 const notGenre = (g: string) => cond("genre", "isNot", g);
 const network = (n: string) => cond("network", "is", n);
 const studio = (s: string) => cond("studio", "is", s);
-const rating = (v: string) => cond("contentRating", "is", v);
 const aud = (v: string) => cond("audienceRating", "gte", v);
 const crit = (v: string) => cond("criticRating", "gte", v);
 const durLte = (v: string) => cond("duration", "lte", v);

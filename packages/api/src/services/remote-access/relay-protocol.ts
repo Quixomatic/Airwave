@@ -74,7 +74,7 @@ export function decodeControl(text: string): ControlFrame {
 export const BODY_REQ = 0x01; // relay → connector: a chunk of the request body
 export const BODY_RES = 0x02; // connector → relay: a chunk of the response body
 
-export function encodeBody(type: number, id: number, payload: Uint8Array): Uint8Array {
+export function encodeBody(type: number, id: number, payload: Uint8Array): Uint8Array<ArrayBuffer> {
   const out = new Uint8Array(5 + payload.byteLength);
   out[0] = type;
   new DataView(out.buffer).setUint32(1, id >>> 0, false);

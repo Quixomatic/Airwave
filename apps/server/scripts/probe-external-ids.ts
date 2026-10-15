@@ -13,14 +13,13 @@
  */
 import prisma from "@airwave/db";
 
-import type { ExternalIds } from "../../../packages/api/src/services/plex/client";
 import { getMetadata } from "../../../packages/api/src/services/plex/client";
 import { decryptToken } from "../../../packages/api/src/services/plex/token";
 
 const srcArg = process.argv[2];
 
 const ok = (b: boolean) => (b ? "\x1b[32m✓\x1b[0m" : "\x1b[31m✗\x1b[0m");
-const ids = (g: ExternalIds) =>
+const ids = (g: { tmdbId?: string | null; tvdbId?: string | null; imdbId?: string | null }) =>
   [g.tmdbId && `tmdb:${g.tmdbId}`, g.tvdbId && `tvdb:${g.tvdbId}`, g.imdbId && `imdb:${g.imdbId}`]
     .filter(Boolean)
     .join(" ") || "(none)";

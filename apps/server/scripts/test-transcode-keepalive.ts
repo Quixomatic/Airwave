@@ -107,6 +107,7 @@ async function main() {
   if (!ratingKey) {
     const libs = await getLibraries(base, token);
     const lib = libs.find((l: { type: string }) => l.type === "movie") ?? libs[0];
+    if (!lib) return console.log("No library to transcode from.");
     const res = await fetch(`${base}/library/sections/${lib.key}/all?type=1&X-Plex-Container-Size=1`, { headers: H(token) });
     const j = (await res.json()) as { MediaContainer?: { Metadata?: Array<{ ratingKey: string; title: string }> } };
     const item = j?.MediaContainer?.Metadata?.[0];

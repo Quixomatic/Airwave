@@ -158,7 +158,7 @@ export class RelayConnector {
     this.pingTimer = setInterval(() => this.send(encodeControl({ t: "ping" })), PING_INTERVAL_MS);
   }
 
-  private send(data: string | Uint8Array): void {
+  private send(data: string | Uint8Array<ArrayBuffer>): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(data);
   }
 
