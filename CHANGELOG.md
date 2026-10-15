@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.16.3] - 2026-10-15
+
+Resolves `apps/desktop`'s electrobun type errors, so `pnpm check-fast` is green across the whole repo.
+
+### Internal
+- **`apps/desktop` resolves `electrobun` / `electrobun/bun` to the Hutch devkit for types.** electrobun
+  v2 ships its SDK through the Hutch devkit (`.hutch/`, gitignored, projected by `electrobun dev`), not
+  npm — the `electrobun` npm package is a stub that throws on import, so TypeScript fell back to it and
+  reported `TS7016` (no declarations) and a knock-on `TS7006` (implicit-any callback param). A `paths`
+  mapping in `apps/desktop/tsconfig.json` points the two imported specifiers at the devkit's real types.
+  It's inline rather than `extends .hutch/devkit/tsconfig.json`, so the config stays valid when the
+  devkit is absent (fresh checkout, or the 1.18.1 macOS-Intel build job that uses the classic CLI, no
+  Hutch). No build impact — electrobun resolves its SDK through Hutch, not this tsconfig.
+
 ## [0.16.2] - 2026-10-15
 
 Removes vestigial TypeScript declaration-emit config so the server and internal packages

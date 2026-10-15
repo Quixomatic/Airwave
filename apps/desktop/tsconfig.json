@@ -9,7 +9,16 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    // electrobun v2 ships its SDK through the Hutch devkit (.hutch/, gitignored, projected by
+    // `electrobun dev`), NOT npm — the `electrobun` npm package is a stub that throws on import.
+    // Point the type resolver at the devkit so `electrobun` / `electrobun/bun` get real types
+    // locally. Inline (not `extends` .hutch/devkit/tsconfig.json) so the config stays valid when
+    // the devkit is absent (fresh checkout, or the 1.18.1 macOS-Intel CI job that has no Hutch).
+    "paths": {
+      "electrobun": ["./.hutch/devkit/api/sdks/main/index.ts"],
+      "electrobun/bun": ["./.hutch/devkit/api/sdks/main/index.ts"]
+    }
   },
   "include": ["src/**/*.ts", "electrobun.config.ts"]
 }
