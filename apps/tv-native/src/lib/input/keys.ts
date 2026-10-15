@@ -30,18 +30,20 @@ export type SemanticKey =
 export type KeyEvent = { key: SemanticKey; digit?: number };
 
 /** react-native-tvos `useTVEventHandler` eventType → SemanticKey.
- *  We map ONLY the reliable inputs: the discrete clickpad-edge presses (`up/down/left/right`), select,
- *  menu, and the dedicated `playPause` media button (a real physical key on the Siri remote — routed
- *  through the same dispatcher so a key layer, e.g. the player, can claim it). We deliberately DO NOT map
- *  the Siri remote's touch `swipeUp/swipeDown/swipeLeft/swipeRight`
- *  — the touchpad is imprecise, so a stray thumb-brush fires a spurious direction, and since every
- *  direction here is a real transition (open panel / channel-surf / mini / sidebar), that read as the
- *  UI "randomly" jumping. The clickpad edges are the true d-pad (physical, reliable — unlike an LG
- *  wheel's detents, a swipe has none). If we want swipe-to-scroll back, the correct way is
- *  `TVEventControl.enableTVPanGesture()` + a pan-distance THRESHOLD (so micro/stray swipes are ignored),
- *  not raw swipe events — a separate, deliberate follow-up. */
-export function tvEventToKey(eventType: string): SemanticKey {
+ * Apple TV's existing RN swipe recognizers emit discrete `swipe*` events, separately from arrow
+ * presses. Our zone-driven controls are not native-focusable, so dropping swipes makes touchpad-only
+ * remotes inert. Feed recognized swipes into the same navigation stack as clicks on tvOS only.
+ * Native-focus screens keep UIKit navigation; no pan listener or second gesture bridge is needed. */
+export function tvEventToKey(eventType: string, isAppleTV = false): SemanticKey {
   switch (eventType) {
+    case "swipeUp":
+      return isAppleTV ? "up" : "unknown";
+    case "swipeDown":
+      return isAppleTV ? "down" : "unknown";
+    case "swipeLeft":
+      return isAppleTV ? "left" : "unknown";
+    case "swipeRight":
+      return isAppleTV ? "right" : "unknown";
     case "up":
       return "up";
     case "down":
