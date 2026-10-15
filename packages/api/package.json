@@ -9,7 +9,9 @@
       "default": "./src/*.ts"
     }
   },
-  "scripts": {},
+  "scripts": {
+    "check-fast": "bun check"
+  },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.16",
     "@ai-sdk/google": "^4.0.18",

@@ -10,6 +10,7 @@
     "platforms": ["ios", "tvos", "android"]
   },
   "scripts": {
+    "check-fast": "bun check",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {

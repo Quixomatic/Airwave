@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "check-fast": "bun check",
     "dev": "tauri dev",
     "dev:vite": "vite dev",
     "build": "tauri build",

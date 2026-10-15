@@ -9,7 +9,9 @@
       "default": "./src/*.ts"
     }
   },
-  "scripts": {},
+  "scripts": {
+    "check-fast": "bun check"
+  },
   "dependencies": {
     "@airwave/db": "workspace:*",
     "@airwave/env": "workspace:*",

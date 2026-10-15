@@ -4,6 +4,7 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
+    "check-fast": "bun check",
     "eas-build-pre-install": "if command -v brew >/dev/null 2>&1; then brew install cmake ninja; fi",
     "dev": "expo start --dev-client",
     "dev:android": "expo start --dev-client --android",

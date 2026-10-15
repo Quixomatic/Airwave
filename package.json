@@ -12,6 +12,7 @@
     "dev:setup": "bun scripts/dev-setup.ts",
     "version:bump": "bun scripts/bump-version.ts",
     "build": "turbo run build --filter=!tv-tauri",
+    "check-fast": "turbo run check-fast",
     "check-types": "turbo run check-types",
     "dev:web": "turbo run dev -F web",
     "dev:server": "turbo run dev -F server",

@@ -19,6 +19,12 @@
     "check-types": {
       "dependsOn": ["^check-types"]
     },
+    // `check-fast` = `bun check` (the TS7 type checker) per workspace. Named `check-fast`, not `check`,
+    // because `bun check` runs a `check` script if one exists, which would recurse. `^check-fast` so a
+    // dependency's errors invalidate its dependents' cached results (no masking).
+    "check-fast": {
+      "dependsOn": ["^check-fast"]
+    },
     "dev": {
       "cache": false,
       "persistent": true

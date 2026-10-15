@@ -8,6 +8,7 @@
     "airwave-mcp": "./dist/index.js"
   },
   "scripts": {
+    "check-fast": "bun check",
     "build": "bun build ./src/index.ts --outfile dist/index.js --target bun",
     "start": "bun run dist/index.js",
     "dev": "bun run src/index.ts",

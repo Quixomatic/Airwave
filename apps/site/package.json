@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "check-fast": "bun check",
     "dev": "next dev -p 3004",
     "build": "next build",
     "start": "next start -p 3004",
