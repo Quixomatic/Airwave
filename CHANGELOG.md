@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.16.1] - 2026-10-15
+
+Adds `check-fast`, a fast `bun check` typecheck across the monorepo.
+
+### Internal
+- **`pnpm check-fast`** runs Bun's TypeScript type checker (`bun check`, TS7, roughly 6x faster than
+  tsc) across every workspace, and **`pnpm -F <pkg> check-fast`** checks a single package. Each
+  workspace gains a `check-fast` script; web/tv-web run `vite build` first to generate their
+  (gitignored) route tree. Named `check-fast` rather than `check` because `bun check` runs a
+  same-named script if one exists, which would recurse. The existing tsc `check-types` is unchanged;
+  this is purely additive.
+
 ## [0.16.0] - 2026-10-15
 
 Type-correctness pass: fixes the real latent type errors in shipped code and holds the
