@@ -2,6 +2,21 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.16.2] - 2026-10-15
+
+Removes vestigial TypeScript declaration-emit config so the server and internal packages
+type-check cleanly. No behavior change.
+
+### Internal
+- **`apps/server` and `packages/{api,auth,db}` no longer set `composite` / `declaration` / `outDir`.**
+  These packages are consumed as source (their `exports` point at `./src`, and the server is bundled
+  by tsdown, not `tsc`), so the project-reference and declaration-emit options were dead config — yet
+  they switched on tsc's declaration-portability (`TS2883`) and rootDir (`TS6059` / `TS6307`) checks,
+  leaving ~133 phantom errors that `bun check` (and a forced `tsc`) surfaced. The internal packages
+  now use the `{ "noEmit": true }` baseline; the server keeps its `paths` / `jsx` and its `check-types`
+  moves from `tsc -b` to `tsc --noEmit`. `pnpm check-fast` is now green across the repo except
+  `apps/desktop` (tracked separately). The Docker build uses tsdown and is unaffected.
+
 ## [0.16.1] - 2026-10-15
 
 Adds `check-fast`, a fast `bun check` typecheck across the monorepo.
