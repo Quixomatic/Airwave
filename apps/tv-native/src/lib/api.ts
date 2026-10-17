@@ -1,4 +1,6 @@
-import { getServerUrl, getToken } from "./auth";
+import { router } from "expo-router";
+
+import { getServerUrl, getToken, invalidateToken } from "./auth";
 import { getNetwork } from "./plex-connection";
 
 /**
@@ -21,7 +23,8 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
-  const res = await fetch(`${getServerUrl()}${path}`, {
+  const server = getServerUrl();
+  const res = await fetch(`${server}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -30,6 +33,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     },
   });
   if (!res.ok) {
+    // A 401 means the server has no session for this bearer (expired / revoked) — clear it and go sign in
+    // again, keeping the server (tv-web / tv-tauri do the same from the guide). Network / 5xx / 403 failures
+    // never touch it. A late 401 from before a newer login, or from a previous server, is ignored.
+    if (res.status === 401 && token && token === getToken() && server === getServerUrl()) {
+      const invalidated = await invalidateToken(token, server);
+      if (invalidated && server === getServerUrl() && !getToken()) router.replace("/login");
+    }
     const body = (await res.json().catch(() => null)) as { error?: string } | null;
     throw new ApiError(res.status, body?.error ?? `Request failed (${res.status})`);
   }
