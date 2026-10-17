@@ -24,6 +24,7 @@ const BAKED = (process.env.EXPO_PUBLIC_SERVER_URL ?? "").replace(/\/+$/, "");
 
 let serverUrl = BAKED;
 let token: string | null = null;
+let tokenWrites: Promise<unknown> = Promise.resolve();
 
 /** Hydrate the in-memory session from storage. Call once before rendering the app. */
 export async function loadSession(): Promise<void> {
@@ -56,15 +57,38 @@ export async function clearServerUrl(): Promise<void> {
 export function getToken(): string | null {
   return token;
 }
+
+/**
+ * Every token write goes through one queue. A 401 invalidation re-checks, INSIDE the queue, that the token it
+ * was rejecting is still the current one: without that, a late 401 from a request sent before a fresh login
+ * could pass its check, then delete the new token once the login's write landed. A failed write doesn't
+ * block the next one.
+ */
+function writeToken(next: string | null, rejected?: { token: string; server: string }): Promise<boolean> {
+  const write = tokenWrites.then(async () => {
+    if (rejected && (token !== rejected.token || serverUrl !== rejected.server)) return false;
+    if (next) {
+      await CredStore.setItemAsync(TOKEN_KEY, next);
+    } else {
+      // Sign-out: clear better-auth's cookie/session alongside the bearer token so no stale session lingers.
+      await clearSyncCreds();
+      await CredStore.deleteItemAsync(TOKEN_KEY);
+    }
+    token = next;
+    return true;
+  });
+  tokenWrites = write.catch(() => {});
+  return write;
+}
+
 export async function setToken(next: string | null): Promise<void> {
-  if (next) {
-    await CredStore.setItemAsync(TOKEN_KEY, next);
-  } else {
-    // Sign-out: clear better-auth's cookie/session alongside the bearer token so no stale session lingers.
-    await clearSyncCreds();
-    await CredStore.deleteItemAsync(TOKEN_KEY);
-  }
-  token = next;
+  await writeToken(next);
+}
+
+/** The server rejected `rejectedToken` (401) — clear it, unless it has already been replaced or the server
+ *  changed since the request went out. Resolves true only if this call cleared it. The server URL is kept. */
+export function invalidateToken(rejectedToken: string, rejectedServer: string): Promise<boolean> {
+  return writeToken(null, { token: rejectedToken, server: rejectedServer });
 }
 
 /** Coerce user input into a base URL (add a scheme if missing, drop a trailing slash) — tv-web parity. */

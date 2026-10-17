@@ -11,7 +11,8 @@
     "dev:ios": "expo start --dev-client --ios",
     "start": "expo start --dev-client",
     "prebuild": "expo prebuild",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "bun test src/lib/session.test.ts"
   },
   "dependencies": {
     "@airwave/key-input": "workspace:*",
