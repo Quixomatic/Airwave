@@ -117,6 +117,36 @@ namespace Api
         return FormatJson(b)
     end function
 
+    ' ---- error classification -------------------------------------------------
+
+    ' Classify a rejected request's status so callers react to the KIND of failure, not a raw code. Every
+    ' rejection carries this as `kind`:
+    '   "network"   — no HTTP response at all (status <= 0: unreachable, DNS, TLS, timeout)
+    '   "auth"      — 401: the server has no valid session for our bearer (expired / revoked / malformed)
+    '   "forbidden" — 403: signed in, but not allowed (the /api/v1 per-channel gate) — creds stay valid
+    '   "server"    — 5xx
+    '   "client"    — any other 4xx
+    function errorKind(status as integer) as string
+        if status <= 0 then return "network"
+        if status = 401 then return "auth"
+        if status = 403 then return "forbidden"
+        if status >= 500 then return "server"
+        return "client"
+    end function
+
+    ' Is this 401 a DEFINITIVE invalid-session verdict? Only for a bearer-carrying /api/v1 request: the
+    ' server's `*` middleware (apps/server/src/rest.ts) 401s exactly when getSession() finds no session. The
+    ' sign-in endpoints (/api/tv/auth/*, /api/auth/device/*) also 401 for a wrong password / pending code,
+    ' which is NOT a dead session — so they're excluded. And only when the rejected bearer is the CURRENT
+    ' token: a straggler still carrying a token we've already replaced must not sign out the new one.
+    function isSessionRejection(status as integer, req as object, currentToken as string) as boolean
+        if status <> 401 or req = invalid or req.url = invalid or currentToken = "" then return false
+        if Instr(1, req.url, "/api/v1/") = 0 then return false
+        h = req.headers
+        if h = invalid or h["Authorization"] = invalid then return false
+        return h["Authorization"] = "Bearer " + currentToken
+    end function
+
     ' ---- promise core -----------------------------------------------------------
 
     ' Fire an HTTP request against an ABSOLUTE url and return a Promise that resolves with the parsed
@@ -340,14 +370,20 @@ sub Api_onResponse(event as object)
     if p = invalid then return
 
     if resp = invalid
-        reject({ status: 0, message: "No response", body: invalid }, p)
+        reject({ status: 0, kind: "network", message: "No response", body: invalid }, p)
         return
     end if
     if resp.ok = true
         resolve(resp.body, p)
     else
+        ' A dead session is app-wide state, not a per-screen error: signal it ONCE here (MainScene observes
+        ' authRejected → clears the token, keeps the server, routes to Login) so no screen can strand the
+        ' user on it. The screen's own catch still runs (kind "auth") but must not try to recover on its own.
+        if Api.isSessionRejection(resp.status, task.request, Auth.token()) and m.global <> invalid and m.global.hasField("authRejected")
+            m.global.authRejected = m.global.authRejected + 1
+        end if
         msg = "Request failed (" + Str(resp.status).Trim() + ")"
         if resp.body <> invalid and type(resp.body) = "roAssociativeArray" and resp.body.error <> invalid then msg = resp.body.error
-        reject({ status: resp.status, message: msg, body: resp.body }, p)
+        reject({ status: resp.status, kind: Api.errorKind(resp.status), message: msg, body: resp.body }, p)
     end if
 end sub

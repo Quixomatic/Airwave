@@ -49,6 +49,10 @@ sub init()
     m.top.setFocus(true)
 end sub
 
+sub onNotice()
+    if m.top.notice <> "" then m.subtitle.text = m.top.notice
+end sub
+
 ' ---- view state ---------------------------------------------------------------
 
 sub showForm()

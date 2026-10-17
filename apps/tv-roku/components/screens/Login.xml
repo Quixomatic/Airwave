@@ -9,6 +9,9 @@
     <interface>
         <field id="done" type="boolean" alwaysNotify="true" />
         <field id="changeServer" type="boolean" alwaysNotify="true" />
+        <!-- Why we're here, when it isn't a first sign-in (MainScene sets it after the server rejects the
+             stored session). Replaces the subtitle. -->
+        <field id="notice" type="string" onChange="onNotice" />
     </interface>
 
     <children>

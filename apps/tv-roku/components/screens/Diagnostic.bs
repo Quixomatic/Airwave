@@ -57,6 +57,9 @@ end sub
 
 sub onManifestErr(err as object, _ctx as object)
     Log.warn("[caps] manifest error: " + Log.trunc(err))
+    ' A rejected session isn't "the matrix can't load" — MainScene is already routing to Login, and marking
+    ' done here would skip the diagnostic for this server after the user signs back in.
+    if err <> invalid and err.kind = "auth" then return
     ' Don't nag on every login if the matrix can't load — mark done + route on.
     Device.markCapsDone()
     m.top.done = true
