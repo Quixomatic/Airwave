@@ -1,0 +1,34 @@
+name: Native TV remote regression checks
+
+on:
+  pull_request:
+    paths:
+      - "apps/tv-native/**"
+      - "packages/key-input/**"
+      - "packages/mpv-player/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/tv-native-remote.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  remote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: pnpm install --frozen-lockfile --ignore-scripts --filter tv-native...
+      - run: pnpm --filter tv-native test
+      - run: pnpm --filter tv-native check-types
