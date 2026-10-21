@@ -2,6 +2,18 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.16.6] - 2026-10-21
+
+Security: stops the public API key (and other secrets) from being written to logs (GHSA-fjx9-jwmr-2r58).
+
+### Fixed
+- **Secrets passed in a URL are now redacted from the request log.** The SSE endpoint accepts the key as
+  `?api_key=` (a browser `EventSource` can't set headers), and Hono's request logger writes the full path
+  including the query string — so the key was landing in stdout / `docker logs` in plaintext. The logger now
+  masks `api_key` / `token` / `X-Plex-Token` / `code` / `state` / `ticket` query values before printing.
+  `?api_key=` still works unchanged; only the log output is affected. (A short-lived connection ticket for
+  SSE, so the key need not ride in the URL at all, follows next.) Reported by @cashcon57.
+
 ## [0.16.5] - 2026-10-21
 
 Security: closes an open redirect in the Plex sign-in flow (GHSA-6p5v-m89f-x7hg).

@@ -33,7 +33,12 @@ import { startWorkflowEngine } from "./workflow-engine";
 
 const app = new Hono();
 
-app.use(logger());
+// Hono's logger writes the full request path INCLUDING the query string, so a key passed as `?api_key=`
+// (an EventSource can't set headers) would otherwise be logged in plaintext (GHSA-fjx9-jwmr-2r58). Mask
+// secret-bearing query values before anything reaches stdout — also covers token/code/state/ticket/X-Plex-Token.
+const SECRET_QS = /([?&](?:api_key|apikey|token|x-plex-token|code|state|ticket)=)[^&\s]*/gi;
+const redactSecrets = (s: string) => s.replace(SECRET_QS, "$1<redacted>");
+app.use(logger((message, ...rest) => console.log(redactSecrets(message), ...rest)));
 const corsMethods = ["GET", "POST", "OPTIONS"];
 const corsHeaders = ["Content-Type", "Authorization"];
 
