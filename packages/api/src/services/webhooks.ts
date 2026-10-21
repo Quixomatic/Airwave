@@ -12,7 +12,16 @@
 export { emitEvent, hasEventSubscribers } from "./webhooks/emit";
 export { startWebhookDispatcher, stopWebhookDispatcher, wakeDispatcher } from "./webhooks/dispatcher";
 export { refreshWebhookSubscriptions, hasWebhookSubscribers } from "./webhooks/subscriptions";
-export { addSseClient, removeSseClient, hasSseClients, sseClientCount, sseAtCapacity, type SseClient } from "./webhooks/sse";
+export {
+  addSseClient,
+  removeSseClient,
+  hasSseClients,
+  sseClientCount,
+  sseAtCapacity,
+  mintSseTicket,
+  consumeSseTicket,
+  type SseClient,
+} from "./webhooks/sse";
 export {
   listWebhooks,
   getWebhook,
