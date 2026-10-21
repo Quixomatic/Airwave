@@ -2,6 +2,23 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.16.8] - 2026-10-21
+
+Security: the SSE endpoint no longer accepts the API key in the URL at all (completes GHSA-fjx9-jwmr-2r58).
+
+### Changed
+- **`GET /api/public/v1/events` no longer accepts `?api_key=`.** The key is accepted only via the
+  `X-API-Key` / `Authorization: Bearer` header (fetch-based clients) or exchanged for a single-use `?ticket=`
+  (browser `EventSource`, via `POST /events/ticket`, added in 0.16.7). This removes the last path that put a
+  long-lived credential in a URL — and thus in proxy/CDN access logs and browser history.
+
+### Breaking / Migration
+- A browser `EventSource` that connected with `?api_key=<key>` must switch to the ticket flow: `POST
+  /api/public/v1/events/ticket` with the key in the `X-API-Key` header, then open
+  `GET /api/public/v1/events?ticket=<ticket>`. Because a ticket is single-use, reconnect by minting a fresh
+  one. Fetch-based clients (Tauri, dashboards, Home Assistant) are unaffected — they already use the header.
+  Docs updated at `/docs/integrations/tauri`.
+
 ## [0.16.7] - 2026-10-21
 
 Security follow-up to 0.16.6: a single-use connection ticket for the SSE stream, so the API key need not ride in the URL at all (GHSA-fjx9-jwmr-2r58).

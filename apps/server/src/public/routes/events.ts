@@ -15,8 +15,8 @@ import type { PublicVars } from "../context";
  *
  * Auth on the stream is custom (this GET is exempt from the shared key middleware): a browser `EventSource`
  * can't set headers, so it authenticates with a single-use `?ticket=` (minted via the header-authed
- * `POST /events/ticket`, so the long-lived key never rides in a URL) or, for compatibility, the key as
- * `?api_key=`; header auth (X-API-Key / Bearer) also works for fetch-based clients. `?types=a,b` filters.
+ * `POST /events/ticket`); a fetch-based client uses the `X-API-Key` / `Authorization: Bearer` header. The
+ * API key is NEVER accepted in the URL (no `?api_key=`). `?types=a,b` filters to specific event types.
  */
 export const eventRoutes = new OpenAPIHono<{ Variables: PublicVars }>();
 
@@ -30,19 +30,25 @@ eventRoutes.post("/events/ticket", (c) => {
 });
 
 eventRoutes.get("/events", async (c) => {
-  // Auth, in order of preference: a single-use `?ticket=` (minted above — keeps the key out of the URL),
-  // else the API key via `X-API-Key`/`Authorization` header or `?api_key=` (kept for header-less EventSource).
+  // Auth: a single-use `?ticket=` (minted via POST /events/ticket — the only option for a browser
+  // EventSource, which can't set headers), or the API key via the `X-API-Key` / `Authorization` header for
+  // a fetch-based client. The key is never accepted in the URL.
   const ticket = c.req.query("ticket");
   if (ticket) {
     if (!consumeSseTicket(ticket)) {
       return c.json({ error: { code: "unauthorized", message: "Invalid or expired ticket." } }, 401);
     }
   } else {
-    const raw = c.req.header("x-api-key") ?? c.req.header("authorization") ?? c.req.query("api_key") ?? "";
+    const raw = c.req.header("x-api-key") ?? c.req.header("authorization") ?? "";
     const key = raw.replace(/^Bearer\s+/i, "").trim();
     if (!key) {
       return c.json(
-        { error: { code: "unauthorized", message: "Auth required (?ticket, X-API-Key header, or ?api_key)." } },
+        {
+          error: {
+            code: "unauthorized",
+            message: "Auth required: a `?ticket=` (from POST /events/ticket) or an X-API-Key / Authorization header.",
+          },
+        },
         401,
       );
     }
