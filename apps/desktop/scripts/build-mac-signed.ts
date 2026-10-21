@@ -250,7 +250,25 @@ if (status !== "Accepted") {
   }
   process.exit(1);
 }
-run("xcrun", ["stapler", "staple", dmg]);
+// `notarytool --wait` returns "Accepted" before Apple reliably publishes the ticket to its CloudKit
+// ticket-delivery service, so an immediate `stapler staple` can fail to fetch it (NSURLErrorDomain -1005
+// "network connection was lost" / Error 68), especially on CI. The notarization itself already succeeded;
+// only the ticket download flaked. Retry with backoff — the ticket usually lands within a minute or two.
+let stapled = false;
+for (let attempt = 1; attempt <= 6 && !stapled; attempt++) {
+  try {
+    run("xcrun", ["stapler", "staple", dmg]);
+    stapled = true;
+  } catch (err) {
+    if (attempt === 6) {
+      console.error("[mac-sign] stapler still failing after 6 attempts; the DMG is notarized but could not be stapled.");
+      throw err;
+    }
+    const waitSec = 20 * attempt; // 20s, 40s, 60s, 80s, 100s (up to ~5 min total)
+    console.warn(`[mac-sign] staple attempt ${attempt} failed (Apple's ticket is likely not published yet); retrying in ${waitSec}s…`);
+    Bun.sleepSync(waitSec * 1000);
+  }
+}
 run("xcrun", ["stapler", "validate", dmg]);
 console.log("[mac-sign] notarized + stapled.");
 

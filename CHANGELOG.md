@@ -2,6 +2,16 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.16.9] - 2026-10-21
+
+### Internal
+- **macOS release build retries `stapler staple`.** Apple's `notarytool --wait` returns "Accepted" before the
+  notarization ticket is reliably published to its CloudKit ticket-delivery service, so an immediate
+  `xcrun stapler staple` can fail to fetch it (`NSURLErrorDomain` -1005, Error 68) and fail the desktop
+  release job even though notarization itself succeeded (seen on the macOS Intel runner during the v0.16.8
+  release). The signing script now retries the staple with backoff (up to ~5 minutes), so a transient
+  ticket-delivery flake no longer breaks the build. CI-only; no change to the shipped app.
+
 ## [0.16.8] - 2026-10-21
 
 Security: the SSE endpoint no longer accepts the API key in the URL at all (completes GHSA-fjx9-jwmr-2r58).
