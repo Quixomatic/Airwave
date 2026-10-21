@@ -2,6 +2,20 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.16.4] - 2026-10-21
+
+Security: closes an unauthenticated path-traversal in the `/img` artwork proxy (GHSA-vc4j-53mw-85mx).
+
+### Fixed
+- **The `/img` artwork proxy can no longer be tricked into reaching arbitrary Plex endpoints.** It took a
+  caller-supplied path and checked only that it *started* with `/library` or `/photo`, but `..` / `%2e%2e`
+  segments are resolved by `fetch` AFTER that check — so a crafted `?path=` could reach any admin-token Plex
+  endpoint (sessions, preferences, library/account data) and the `/photo` transcoder's `url=` (SSRF),
+  unauthenticated and reachable over Remote Access. Artwork paths are now resolved first and must stay on the
+  same Plex server under `/library/`, with no traversal, host change, or query string; `w`/`h` are clamped to
+  a sane range; the public artwork route additionally constrains the rating key to digits. No change to
+  legitimate artwork (every real art path is `/library/metadata/...`). Reported by @cashcon57.
+
 ## [0.16.3] - 2026-10-15
 
 Resolves `apps/desktop`'s electrobun type errors, so `pnpm check-fast` is green across the whole repo.

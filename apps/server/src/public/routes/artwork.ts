@@ -37,7 +37,9 @@ artworkRoutes.openapi(
     request: {
       params: z.object({
         channelId: z.string().openapi({ example: "clx9k2p0a0001abcd" }),
-        ratingKey: z.string().openapi({ example: "45210" }),
+        // A Plex ratingKey is always numeric; constrain it so the key can't smuggle path segments into the
+        // `/library/metadata/{ratingKey}/...` path below (defense-in-depth on top of streamPlexArt's guard).
+        ratingKey: z.string().regex(/^\d{1,12}$/).openapi({ example: "45210" }),
       }),
       query: z.object({
         kind: ArtKind.optional().openapi({ param: { name: "kind", in: "query" }, example: "poster" }),
