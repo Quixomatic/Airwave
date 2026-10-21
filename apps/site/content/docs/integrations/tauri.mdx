@@ -14,22 +14,43 @@ deliver, the moment they happen.
 GET /api/public/v1/events
 ```
 
-Authenticate with an API key from **Settings → API Keys**, as either the `X-API-Key` header (for a fetch-based
-client) or, since a browser `EventSource` can't set headers, the `?api_key=` query parameter. Add
-`?types=session.started,session.ended` to receive only certain events.
+Authenticate with an API key from **Settings → API Keys**, one of two ways depending on your client. The key
+is **never** accepted in the URL.
+
+- **`X-API-Key` header** — for a fetch-based client (a Tauri app, or anything reading the stream with `fetch`
+  + a `ReadableStream`). Simplest, and it reconnects by just re-fetching.
+- **A single-use ticket** — for a browser `EventSource`, which can't set a header. First `POST
+  /api/public/v1/events/ticket` with your `X-API-Key` header to get a short-lived, single-use ticket, then
+  open the stream with `?ticket=`. Your long-lived key stays in a header and never touches the URL.
+
+Add `?types=session.started,session.ended` to receive only certain events.
 
 ```js
-// browser / webview
-const es = new EventSource(
-  "http://192.168.1.10:36020/api/public/v1/events?api_key=airwave_your_key",
-);
-es.addEventListener("session.started", (e) => {
-  const { data } = JSON.parse(e.data);
-  console.log(`${data.user} started watching ${data.channel.name}`);
-});
-es.addEventListener("session.ended", (e) => {
-  /* … */
-});
+// browser / webview — mint a ticket (key stays in a header), then stream with ?ticket=
+const base = "http://192.168.1.10:36020/api/public/v1/events";
+
+async function connect() {
+  const { ticket } = await fetch(`${base}/ticket`, {
+    method: "POST",
+    headers: { "X-API-Key": "airwave_your_key" },
+  }).then((r) => r.json());
+
+  const es = new EventSource(`${base}?ticket=${ticket}`);
+  es.addEventListener("session.started", (e) => {
+    const { data } = JSON.parse(e.data);
+    console.log(`${data.user} started watching ${data.channel.name}`);
+  });
+  es.addEventListener("session.ended", (e) => {
+    /* … */
+  });
+  // A ticket is single-use, so EventSource's built-in reconnect can't reuse it — on a drop, mint a fresh
+  // ticket and open a new EventSource.
+  es.onerror = () => {
+    es.close();
+    setTimeout(connect, 2000);
+  };
+}
+connect();
 ```
 
 ```bash
@@ -59,8 +80,9 @@ data: {"t":1790000666000}
 The same [event catalog](/docs/integrations/webhooks#events) applies: `playback.*` events stream for clients
 that report play/pause state, and `channel.tuned` streams for clients that keep a session across channel changes.
 
-A browser `EventSource` reconnects on its own if the connection drops. For a fetch-based client, reconnect on
-error with a short backoff.
+Because a ticket is single-use, a browser `EventSource` can't rely on its built-in auto-reconnect (the ticket
+is already spent). Handle `onerror` by closing the stream, minting a fresh ticket, and opening a new
+`EventSource`, as shown above. A fetch-based client reconnects by re-fetching with its header and a short backoff.
 
 ## SSE or webhooks?
 
