@@ -2,6 +2,19 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.16.5] - 2026-10-21
+
+Security: closes an open redirect in the Plex sign-in flow (GHSA-6p5v-m89f-x7hg).
+
+### Fixed
+- **Plex web sign-in now validates the `redirect_uri`.** `/api/plex/authorize` built Plex's `forwardUrl` from
+  an unvalidated `redirect_uri`, so a crafted sign-in link could bounce the Plex pin to an attacker's URL
+  after the victim approved on plex.tv. The proxy now accepts a `redirect_uri` only when its path is the
+  better-auth Plex callback AND its origin is trusted — the configured `BETTER_AUTH_URL` / `CORS_ORIGIN` /
+  `EXTRA_CORS_ORIGINS`, or the forwarded host when the request arrived over the Airwave Cloud tunnel — so the
+  pin can only ever return to your own callback. Every real sign-in path (localhost, reverse proxy, LAN,
+  tunnel) is unaffected. Reported by @cashcon57.
+
 ## [0.16.4] - 2026-10-21
 
 Security: closes an unauthenticated path-traversal in the `/img` artwork proxy (GHSA-vc4j-53mw-85mx).

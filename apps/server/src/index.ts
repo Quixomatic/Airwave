@@ -179,6 +179,39 @@ app.post("/api/admin/bumper-music", async (c) => {
   }
 });
 
+// Accept redirect_uri only if it targets OUR Plex OAuth callback on a trusted origin — otherwise an
+// attacker's sign-in link could bounce the Plex pin to their own URL (GHSA-6p5v-m89f-x7hg). Trusted origins:
+// BETTER_AUTH_URL / CORS_ORIGIN / EXTRA_CORS_ORIGINS (LAN), plus the forwarded host when the request arrived
+// over the Airwave Cloud tunnel (the same origin the authorize-URL rewrite above targets). This keeps every
+// real sign-in path (localhost, reverse proxy, LAN, tunnel) working while closing the open redirect.
+function isAllowedPlexRedirect(c: Context, redirectUri: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(redirectUri);
+  } catch {
+    return false;
+  }
+  if (!u.pathname.endsWith("/oauth2/callback/plex")) return false;
+  const allowed = new Set<string>();
+  const add = (s: string | undefined) => {
+    if (!s) return;
+    try {
+      allowed.add(new URL(s).origin);
+    } catch {
+      /* ignore an unparseable configured origin */
+    }
+  };
+  add(env.BETTER_AUTH_URL);
+  add(env.CORS_ORIGIN);
+  for (const o of (env.EXTRA_CORS_ORIGINS ?? "").split(",")) add(o.trim());
+  const fwdHost = c.req.header("x-forwarded-host")?.split(",")[0]?.trim();
+  if (fwdHost) {
+    const fwdProto = c.req.header("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+    allowed.add(`${fwdProto}://${fwdHost}`);
+  }
+  return allowed.has(u.origin);
+}
+
 // Plex login authorize-proxy. better-auth's genericOAuth "plex" provider points
 // its authorizationUrl here (with better-auth's redirect_uri + state). We create a
 // pin, then bounce to Plex, setting forwardUrl back to better-auth's callback with
@@ -188,6 +221,9 @@ app.get("/api/plex/authorize", async (c) => {
   const state = c.req.query("state");
   if (!redirectUri || !state) {
     return c.text("Missing redirect_uri or state", 400);
+  }
+  if (!isAllowedPlexRedirect(c, redirectUri)) {
+    return c.text("Invalid redirect_uri", 400);
   }
   const { id: pinId, code } = await createPin(PLEX_CLIENT_ID);
   const forwardUrl = `${redirectUri}?code=${pinId}&state=${encodeURIComponent(state)}`;
