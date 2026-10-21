@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import type { EventEnvelope } from "./types";
 
 /**
@@ -54,4 +56,34 @@ export async function publishToSse(envelope: EventEnvelope): Promise<void> {
       .filter((c) => !c.types || c.types.has(envelope.type))
       .map((c) => c.write(payload).catch(() => {})),
   );
+}
+
+/* ── Connection tickets ──────────────────────────────────────────────────────────────────────────────
+ * A browser `EventSource` can't send an auth header, so the SSE GET also accepts the API key as `?api_key=`
+ * — which ends up in proxy/CDN logs and browser history. A ticket avoids that: the client first POSTs
+ * (header-authed) to mint a single-use, ~60s token, then opens the stream with `?ticket=`. The ticket only
+ * has to survive the mint→connect gap — the stream then stays open on its own — so a leaked ticket is dead
+ * on arrival. In-memory + single-instance like the rest of the SSE hub (a restart just means clients
+ * re-mint); no DB row per connect, no background timer. */
+type SseTicket = { userId: string; expiresAt: number };
+const sseTickets = new Map<string, SseTicket>();
+const TICKET_TTL_MS = 60_000;
+
+/** Mint a single-use, ~60s connection ticket for an already-key-authed caller. Opportunistically prunes
+ *  expired/abandoned tickets (mints are infrequent and the map stays tiny). */
+export function mintSseTicket(userId: string): { ticket: string; expiresInSeconds: number } {
+  const now = Date.now();
+  for (const [k, v] of sseTickets) if (v.expiresAt <= now) sseTickets.delete(k);
+  const ticket = randomUUID();
+  sseTickets.set(ticket, { userId, expiresAt: now + TICKET_TTL_MS });
+  return { ticket, expiresInSeconds: TICKET_TTL_MS / 1000 };
+}
+
+/** Consume a ticket at connect time. Deletes it unconditionally (single-use), then returns its owner only
+ *  if it was still valid. Unknown / expired / already-used → null. */
+export function consumeSseTicket(ticket: string): { userId: string } | null {
+  const t = sseTickets.get(ticket);
+  if (!t) return null;
+  sseTickets.delete(ticket);
+  return t.expiresAt > Date.now() ? { userId: t.userId } : null;
 }

@@ -1,6 +1,6 @@
 {
   "name": "@airwave/mcp",
-  "version": "0.16.6",
+  "version": "0.16.7",
   "private": true,
   "type": "module",
   "description": "MCP server exposing a running Airwave server's tools to any MCP-capable agent.",

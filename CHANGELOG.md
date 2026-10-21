@@ -2,6 +2,22 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.16.7] - 2026-10-21
+
+Security follow-up to 0.16.6: a single-use connection ticket for the SSE stream, so the API key need not ride in the URL at all (GHSA-fjx9-jwmr-2r58).
+
+### Added
+- **`POST /api/public/v1/events/ticket`** mints a single-use, ~60-second connection ticket (header-authed).
+  A browser `EventSource` can't send an auth header, so it now exchanges its key for a ticket and opens the
+  stream with `?ticket=` — the long-lived key never travels in a URL, so it can't leak via proxy/CDN access
+  logs or browser history. The stream (`GET /api/public/v1/events`) accepts `?ticket=` alongside the existing
+  header and `?api_key=` auth (both kept for compatibility). Tickets are in-memory, single-use, and expire in
+  ~60s, so a leaked ticket is dead on arrival.
+
+### Dev
+- `scripts/sse-listen-ticket.ts` — an SSE listener that exercises the ticket path (mint → `?ticket=`), the
+  browser-style counterpart to `sse-listen.ts` (which tests the header/key path).
+
 ## [0.16.6] - 2026-10-21
 
 Security: stops the public API key (and other secrets) from being written to logs (GHSA-fjx9-jwmr-2r58).

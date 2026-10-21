@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { streamSSE } from "hono/streaming";
 
-import { addSseClient, removeSseClient, sseAtCapacity } from "@airwave/api/services/webhooks";
+import { addSseClient, consumeSseTicket, mintSseTicket, removeSseClient, sseAtCapacity } from "@airwave/api/services/webhooks";
 import { auth } from "@airwave/auth";
 
 import type { PublicVars } from "../context";
@@ -13,24 +13,43 @@ import type { PublicVars } from "../context";
  * wall dashboard). One long-lived `GET /api/public/v1/events` connection receives the same envelopes webhooks
  * deliver, `{ id, type, timestamp, data }`, as SSE `event:`/`data:` frames.
  *
- * Auth is custom (this route is exempt from the shared key middleware) so a browser `EventSource`, which can't
- * set headers, can pass the key as `?api_key=`; header auth (X-API-Key / Bearer) also works for fetch-based
- * clients. `?types=a,b` filters to specific event types.
+ * Auth on the stream is custom (this GET is exempt from the shared key middleware): a browser `EventSource`
+ * can't set headers, so it authenticates with a single-use `?ticket=` (minted via the header-authed
+ * `POST /events/ticket`, so the long-lived key never rides in a URL) or, for compatibility, the key as
+ * `?api_key=`; header auth (X-API-Key / Bearer) also works for fetch-based clients. `?types=a,b` filters.
  */
 export const eventRoutes = new OpenAPIHono<{ Variables: PublicVars }>();
 
+// Mint a single-use, ~60s connection ticket so a browser EventSource can open the stream with `?ticket=`
+// instead of putting the long-lived API key in the URL (GHSA-fjx9-jwmr-2r58). This path does NOT hit the
+// `/events` SSE exemption, so the shared key middleware header-auths it — by here the caller is a valid key
+// owner (c.get("userId") is set) and the key never travelled in a URL.
+eventRoutes.post("/events/ticket", (c) => {
+  const { ticket, expiresInSeconds } = mintSseTicket(c.get("userId"));
+  return c.json({ ticket, expiresInSeconds });
+});
+
 eventRoutes.get("/events", async (c) => {
-  const raw = c.req.header("x-api-key") ?? c.req.header("authorization") ?? c.req.query("api_key") ?? "";
-  const key = raw.replace(/^Bearer\s+/i, "").trim();
-  if (!key) {
-    return c.json(
-      { error: { code: "unauthorized", message: "API key required (X-API-Key header or ?api_key)." } },
-      401,
-    );
-  }
-  const res = await auth.api.verifyApiKey({ body: { key } });
-  if (!res.valid) {
-    return c.json({ error: { code: "unauthorized", message: "Invalid or revoked API key." } }, 401);
+  // Auth, in order of preference: a single-use `?ticket=` (minted above — keeps the key out of the URL),
+  // else the API key via `X-API-Key`/`Authorization` header or `?api_key=` (kept for header-less EventSource).
+  const ticket = c.req.query("ticket");
+  if (ticket) {
+    if (!consumeSseTicket(ticket)) {
+      return c.json({ error: { code: "unauthorized", message: "Invalid or expired ticket." } }, 401);
+    }
+  } else {
+    const raw = c.req.header("x-api-key") ?? c.req.header("authorization") ?? c.req.query("api_key") ?? "";
+    const key = raw.replace(/^Bearer\s+/i, "").trim();
+    if (!key) {
+      return c.json(
+        { error: { code: "unauthorized", message: "Auth required (?ticket, X-API-Key header, or ?api_key)." } },
+        401,
+      );
+    }
+    const res = await auth.api.verifyApiKey({ body: { key } });
+    if (!res.valid) {
+      return c.json({ error: { code: "unauthorized", message: "Invalid or revoked API key." } }, 401);
+    }
   }
   if (sseAtCapacity()) {
     return c.json({ error: { code: "unavailable", message: "Too many event streams are open. Try again later." } }, 503);
