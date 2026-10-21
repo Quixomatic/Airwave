@@ -273,16 +273,16 @@ app.use(
 
 // Plex artwork proxy — PUBLIC (a CSS/<img> background can't send a bearer token), so
 // the TV can use program cover art (blurred bumper backgrounds, guide thumbnails). Only
-// proxies Plex image paths (/library, /photo) through the channel's own media source,
-// injecting the admin token. `w`/`h` optionally resize via Plex's photo transcoder. The
-// streaming helper is shared with the public artwork endpoint (see ./lib/plex-art).
+// proxies validated `/library` art paths through the channel's own media source, injecting
+// the admin token (the shared helper resolves + allow-lists the path — see ./lib/plex-art).
+// `w`/`h` optionally resize via Plex's photo transcoder. Shared with the public artwork endpoint.
 
 // Source-keyed variant — registered FIRST (more specific: 3 segments) so it's never shadowed by the
 // channel route. Lets the admin's channel CREATE page preview artwork before a channel exists (no channelId
 // to key on yet); it resolves the token straight from the media source. See channels.previewFilter.
 app.get("/img/source/:sourceId", async (c) => {
   const path = c.req.query("path");
-  if (!path || !/^\/(library|photo)\//.test(path)) return c.text("bad path", 400);
+  if (!path) return c.text("bad path", 400);
   try {
     const { source } = await resolveMediaSource(prisma, c.req.param("sourceId"));
     return await streamPlexArt(c, source, path);
@@ -293,7 +293,7 @@ app.get("/img/source/:sourceId", async (c) => {
 
 app.get("/img/:channelId", async (c) => {
   const path = c.req.query("path");
-  if (!path || !/^\/(library|photo)\//.test(path)) return c.text("bad path", 400);
+  if (!path) return c.text("bad path", 400);
   try {
     const { source } = await resolveChannelSource(prisma, c.req.param("channelId"));
     return await streamPlexArt(c, source, path);
