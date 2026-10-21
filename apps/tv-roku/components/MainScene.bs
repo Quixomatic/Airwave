@@ -26,6 +26,11 @@ sub init()
     ' onBootDone right after the splash (see there) so it fires on EVERY launch — an unauthenticated launch
     ' never reaches the guide, and Roku's automated CBA can't complete our device-code sign-in.
     m.global.addFields({ appLoaded: false })
+    ' Session rejection: Api_onResponse bumps authRejected on a definitive 401 from /api/v1 (the stored token
+    ' is expired / revoked / malformed). Handled HERE, once, for every screen — see onAuthRejected.
+    m.global.addFields({ authRejected: 0 })
+    m.global.observeField("authRejected", "onAuthRejected")
+    m.sessionExpired = false
     m.pendingDeepLink = ""
     m.top.observeField("deepLink", "onDeepLink")
     ' Deep link / voice / low-memory events run in a Task (off the render thread, and where Roku's cert
@@ -275,6 +280,25 @@ sub onSettingsExit()
     route()
 end sub
 
+' The server rejected our bearer (tv-web parity: guide-screen.tsx forces sign-out on a 401). Drop ONLY the
+' token — the server URL is still good — tear down the player, and route to Login with an explanation.
+' Idempotent: the token is cleared on the first signal, so the other in-flight /api/v1 401s (favorites,
+' packages, heartbeat…) land here as no-ops instead of re-routing again. A network failure never reaches
+' here (no HTTP status), so a flaky connection can't cost the user their sign-in.
+sub onAuthRejected()
+    if not Auth.hasToken() then return
+    Log.warn("[auth] session rejected by server (401) -> sign in again")
+    Auth.setToken("")
+    m.sessionExpired = true
+    if m.player <> invalid
+        m.player.layout = "off"
+        m.top.removeChild(m.player)
+        m.player = invalid
+    end if
+    m.probeStarted = false
+    route()
+end sub
+
 sub onSettingsReprobe()
     startConnectionProbe()
 end sub
@@ -431,6 +455,10 @@ sub showLogin()
     m.top.appendChild(s)
     s.observeField("done", "onLoginDone")
     s.observeField("changeServer", "onLoginChangeServer")
+    if m.sessionExpired
+        s.notice = "Your session expired. Sign in again to continue."
+        m.sessionExpired = false
+    end if
     s.setFocus(true)
     m.screen = s
 end sub

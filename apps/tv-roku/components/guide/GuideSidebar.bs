@@ -48,7 +48,11 @@ sub init()
     m.filterClip.clippingRect = [0, 0, SB_EXPANDED, m.vpH + 2 * SB_RING_ROOM]
     m.filters.translation = [SB_RING_ROOM, SB_RING_ROOM]
 
-    refresh()
+    ' Build the item list NOW, not on the first packages/lens change: `lens` starts at "all" (setting it to
+    ' "all" again doesn't fire onLens) and `packages` only arrives if /api/v1/packages succeeds. Without this,
+    ' a failed packages fetch (401 / offline) left m.items empty → onActivate dropped every OK, so Settings
+    ' and Account were dead exactly when the user needed them to recover.
+    rebuild()
 end sub
 
 ' Packages or lens changed → rebuild the filter list (Show All appears only when a filter is applied).

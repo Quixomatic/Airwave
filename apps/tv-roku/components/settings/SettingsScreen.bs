@@ -413,13 +413,29 @@ sub pageUser()
     m.y = m.y + 148 + 8
     mkSectionLabel("Account", false)
     mkRow({ label: "Sign out", sublabel: "Sign this TV out of your account", cmd: "signOut" })
-    onThen(Api.session(), onSession, m)
+    p = Api.session()
+    onThen(p, onSession, m)
+    onCatch(p, onSessionErr, m)
+end sub
+
+' The identity card can't load (offline / server down) — say so instead of a forever "…"; Sign out (local)
+' still works. (get-session isn't /api/v1, so a dead token resolves with no user rather than rejecting.)
+sub onSessionErr(_err as object, _m as object)
+    if m.userCard = invalid then return
+    m.userCard.name.text = "Couldn't load your account"
+    m.userCard.email.text = "You can still sign out below."
 end sub
 
 sub onSession(data as object, _m as object)
-    if data = invalid or m.userCard = invalid then return
-    u = data.user
-    if u = invalid then return
+    if m.userCard = invalid then return
+    u = invalid
+    if data <> invalid then u = data.user
+    if u = invalid
+        ' get-session answers 200 + null for a token the server no longer honours.
+        m.userCard.name.text = "Session expired"
+        m.userCard.email.text = "Sign out below, then sign in again."
+        return
+    end if
     nm = u.name
     if nm = invalid or nm = "" then nm = "Signed in"
     m.userCard.name.text = nm

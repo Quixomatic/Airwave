@@ -16,6 +16,7 @@ sub init()
     ' (m.<id> for every XML node is auto-injected by bsc-plugin-auto-findnode.)
     m.soundSeq = 0
     m.refreshStarted = false
+    m.loadFailed = false
     m.refreshTimer.observeField("fire", "onRefreshTick")
 
     Theme.setFont(m.dayLabel, Theme.FONT_SEMI, GuideLayout.vw(32))
@@ -187,6 +188,10 @@ end sub
 ' Skipped while the sidebar is open (the grid is covered).
 sub onRefreshTick()
     if m.zone = "sidebar" then return
+    if m.loadFailed
+        retryLoad()
+        return
+    end if
     p = Api.guide(180)
     onThen(p, onGuideRefresh, m)
 end sub
@@ -268,11 +273,38 @@ function lensEmptySub() as string
     return "Once channels are set up on your server, they'll appear here."
 end function
 
+' First-load failure. The sidebar stays usable in every state (left → Settings / Account). An "auth" failure is
+' owned app-wide (Api_onResponse → MainScene → Login), so here it only gets an interim message; every other
+' kind keeps the credentials, says what actually failed, and retries — OK now, or the 60s timer.
 sub onGuideErr(err as object, _ctx as object)
+    kind = ""
+    if err <> invalid and err.kind <> invalid then kind = err.kind
+    m.loadFailed = (kind <> "auth")
     m.ghost.message = "Couldn't load the guide"
-    m.ghost.sub = "Check your connection and try again."
+    if kind = "auth"
+        m.ghost.sub = "Your session has expired. Taking you to sign in…"
+    else if kind = "forbidden"
+        m.ghost.sub = "Your account isn't allowed to view this guide. Ask your server's admin, or open Account to switch users."
+    else if kind = "server"
+        m.ghost.sub = "Your Airwave server had a problem. Press OK to try again."
+    else if kind = "network"
+        m.ghost.sub = "Can't reach your Airwave server. Check your connection, then press OK to try again."
+    else
+        m.ghost.sub = "Press OK to try again, or open Settings from the sidebar."
+    end if
     showEmpty(true)
-    Log.warn("[guide] load error: " + Log.trunc(err))
+    ' Keep retrying in the background (the same 60s cadence as the refresh) until the first load lands.
+    if m.loadFailed and not m.refreshStarted
+        m.refreshStarted = true
+        m.refreshTimer.control = "start"
+    end if
+    Log.warn("[guide] load error (" + kind + "): " + Log.trunc(err))
+end sub
+
+' Re-run the FIRST load (guide + favorites + packages) after a failure.
+sub retryLoad()
+    m.loadFailed = false
+    load()
 end sub
 
 ' T0 = now − 30min, snapped back to the nearest :31 / :01 half-hour boundary (matches tv-web/native).
@@ -379,11 +411,14 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
 
     ' From here on the keys act on channels. If the current lens filtered to nothing, only left (→ sidebar,
-    ' to change the filter) does anything.
+    ' to change the filter) does anything — plus OK to retry when the first load FAILED.
     if m.channels = invalid or m.channels.count() = 0
         if key = Keys.LEFT
             enterSidebar()
             playNav()
+        else if key = Keys.OK and m.loadFailed
+            playSelect()
+            retryLoad()
         end if
         return true
     end if
