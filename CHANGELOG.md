@@ -2,6 +2,15 @@
 
 All notable changes to Airwave are documented here.
 
+## [0.16.10] - 2026-10-23
+
+### Internal
+- **Node baseline moved from 22 to 24** (current active LTS): the Docker base image
+  (`node:24-bookworm-slim`) and the `desktop` / `tv-tauri` CI workflows. The server runs on Bun and is
+  unaffected; this is build tooling only, with no change to the shipped runtime. Verified locally on Node
+  24.22.1: clean install, `check-fast` across all 16 workspaces, the web/tv-web vite builds, the server
+  build, and the Expo CLI all pass.
+
 ## [0.16.9] - 2026-10-21
 
 ### Internal

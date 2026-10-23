@@ -17,7 +17,7 @@
 # Run the same image multiple times from docker-compose (server + web [+ tvweb]), different env.
 
 # --- base: shared runtime + package tooling -----------------------------------------
-FROM node:22-bookworm-slim AS base
+FROM node:24-bookworm-slim AS base
 
 # System deps:
 #   gosu           — drop from root to PUID/PGID at runtime (TrueNAS datasets)
@@ -72,7 +72,7 @@ RUN pnpm --filter @airwave/db db:generate \
 # --- final: runtime image -----------------------------------------------------------
 FROM base AS final
 
-# Runtime user (remapped to PUID/PGID by the entrypoint). node:22 already ships uid/gid 1000
+# Runtime user (remapped to PUID/PGID by the entrypoint). node:24 already ships uid/gid 1000
 # (`node`), so don't force 1000 here — let the system pick; the entrypoint remaps at runtime.
 RUN groupadd app && useradd -g app -d /home/app -m -s /bin/bash app
 
