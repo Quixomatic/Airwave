@@ -109,8 +109,8 @@ class AuroraLayoutTest {
   @Test fun theNameEndsAtTheRailsBottomPadding() {
     assertEquals(114, layout.nameWidth)
     assertEquals(15, layout.nameLeft)
-    assertEquals(71, layout.nameTop(42)) // 2 + round(126 - 2 - 13.5 - 42 = 68.5)
-    assertEquals(113, layout.nameTop(42) + 42) // 13 px above the row's bottom: the 13.5 px bottom padding
+    assertEquals(70, layout.nameTop(42)) // 2 + floor(126 - 2 - 13.5 - 42 = 68.5): a text node's top rounds down
+    assertEquals(112, layout.nameTop(42) + 42) // 14 px above the row's bottom: the 13.5 px bottom padding
   }
 
   @Test fun anUnselectedCellIsPlacedInsideTheLane() {
@@ -189,7 +189,7 @@ class AuroraLayoutTest {
 
   @Test fun aThemesOuterRingGrowsTheSelectedCellsBoxByItsWidthOnEverySide() {
     val ringGeo = GuideGeo(
-      """{"rowH": 63, "railW": 72, "laneW": 800, "ppm": 4, "originMs": 0, "nowMs": 0, "windowMin": 180, "gap": 3,
+      """{"rowH": 63, "railW": 72, "laneW": 800, "ppm": 4, "originMs": 0, "windowMin": 180, "gap": 3,
           "borderTop": 1, "padV": 6.75, "padH": 7.5, "barW": 1.5,
           "circle": 18, "circleBorder": 0.5, "circleRing": 1, "glyph": 9.5, "badge": 8, "badgeOff": 1.5,
           "numberSize": 12.75, "nameSize": 8.6, "nameLine": 10.3,
@@ -218,7 +218,7 @@ class AuroraLayoutTest {
   }
 
   private fun logoGeo(logoPad: Double) = GuideGeo(
-    """{"rowH": 63, "railW": 72, "laneW": 800, "ppm": 4, "originMs": 0, "nowMs": 0, "windowMin": 180, "gap": 3,
+    """{"rowH": 63, "railW": 72, "laneW": 800, "ppm": 4, "originMs": 0, "windowMin": 180, "gap": 3,
         "borderTop": 1, "padV": 6.75, "padH": 7.5, "barW": 1.5,
         "circle": 18, "circleBorder": 0.5, "circleRing": 1, "glyph": 9.5, "badge": 8, "badgeOff": 1.5,
         "logoGap": 3, "logoPad": $logoPad, "logoRadius": 3,

@@ -56,6 +56,8 @@ class GuideTokens private constructor(
   val accentFixed: Int?,
   /** The plate painted behind a channel's logo so a white or light logo stays visible; transparent for none. */
   val logoPlate: Int,
+  /** The "now" color: the tick that marks now on a dimension-line progress bar (the time header's marker, in JS, is the same color). */
+  val now: Int,
   /** Over a program's art, left to right: the two ends of the scrim (translucent colors of one hue). */
   val artScrimStart: Int,
   val artScrimEnd: Int,
@@ -81,7 +83,7 @@ class GuideTokens private constructor(
     val KEYS = listOf(
       "railGround", "rowBorder", "cellBg", "liveCellBg", "cellBorder", "ring", "ringOuter", "liveFill",
       "title", "titleWeight", "sub", "railFocusAlpha", "circle", "heartOff", "fav",
-      "number", "numberFocused", "numberWeight", "name", "accentShade", "accentFixed", "logoPlate",
+      "number", "numberFocused", "numberWeight", "name", "accentShade", "accentFixed", "logoPlate", "now",
       "artScrim", "artTitle", "artSub",
     ) + GuideLook.KEYS
 
@@ -114,6 +116,7 @@ class GuideTokens private constructor(
       accentShade = 0.0,
       accentFixed = null,
       logoPlate = GuideColor.TRANSPARENT,
+      now = GuideColor.parse("#ef4444"),
       artScrimStart = GuideColor.parse("rgba(6,10,20,0.88)"),
       artScrimEnd = GuideColor.parse("rgba(6,10,20,0.8)"),
       artTitle = GuideColor.parse("#f1f5f9"),
@@ -157,6 +160,7 @@ class GuideTokens private constructor(
         accentShade = alpha(o, "accentShade", a.accentShade),
         accentFixed = optionalColor(o, "accentFixed"),
         logoPlate = color(o, "logoPlate", a.logoPlate),
+        now = color(o, "now", a.now),
         artScrimStart = (scrim?.opt(0) as? String)?.let { GuideColor.parse(it) } ?: a.artScrimStart,
         artScrimEnd = (scrim?.opt(1) as? String)?.let { GuideColor.parse(it) } ?: a.artScrimEnd,
         artTitle = color(o, "artTitle", a.artTitle),

@@ -29,6 +29,7 @@ data class GuideLook(
   val rowBorderW: Double?,
   val railBg: Int,
   val railFocus: RailFocus?,
+  /** The focused rail's edge bar: its corner radius and color are read from here; its width the layout takes from `geo` (`barW`, the same width in dp). */
   val railBar: RailBar,
   val railDivider: Rule?,
   val railLayout: RailLayout,
@@ -58,7 +59,8 @@ data class GuideLook(
   /** The gap between the selected cell's ring and its outer ring, and the outer ring's dashes; design px. */
   val ringOuterGap: Double,
   val ringOuterDash: Dash?,
-  /** The on-now bar: where it starts from the padding edge and the gap above and below it (design px), and a fixed color or null. */
+  /** The on-now bar: where it starts from the padding edge and the gap above and below it (design px), and a fixed color or null. The
+   *  layout takes its place from `geo` (`liveBarX`, `liveBarInset`: JS sends these same two converted to dp), so only the color is read from here. */
   val liveBarX: Double,
   val liveBarInset: Double,
   val liveBarColor: Int?,
@@ -484,6 +486,9 @@ data class GuideLook(
         placeholder = gradient(o.optJSONObject("placeholder"), a.placeholder),
       )
     }
+
+    /** The `patterns` token object (`{ "bg": ..., "overlay": ... }`) as [Patterns]. */
+    internal fun parsePatterns(o: JSONObject?): Patterns = patterns(o)
 
     private fun patterns(o: JSONObject?): Patterns {
       val bg = o?.optJSONObject("bg")

@@ -39,7 +39,9 @@
     "padX": 7.5,
     "titleSize": 12.75,
     "subSize": 9.75,
-    "subGap": 4.5
+    "subGap": 4.5,
+    "kickerSize": 7.5,
+    "plateSize": 8.25
   },
   "tokens": {
     "railGround": "#060a14",
@@ -71,6 +73,7 @@
     "accentShade": 0,
     "accentFixed": null,
     "logoPlate": "transparent",
+    "now": "#ef4444",
     "artScrim": [
       "rgba(6,10,20,0.88)",
       "rgba(6,10,20,0.8)"

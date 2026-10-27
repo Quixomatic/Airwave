@@ -45,6 +45,27 @@ class GuideColorTest {
     assertEquals(c, GuideColor.alpha(c, 2.0))
   }
 
+  @Test fun scaleAlphaMultipliesTheColorsOwnAlphaWhateverFormItIsWrittenIn() {
+    // The colors and alphas tv-native's color.test.ts checks `hexA` on ("a shadow's or a halo's alpha is the color's own times the step's"):
+    // there they come out 0.34, 1, 0.251, 0.1, 0.2 and 0.4, here as the same shares of 255.
+    fun alphaOf(color: String, a: Double) = GuideColor.scaleAlpha(GuideColor.parse(color), a) ushr 24
+    assertEquals(87, alphaOf("#000000", 0.34))
+    assertEquals(255, alphaOf("#000", 1.0))
+    assertEquals(64, alphaOf("#00000080", 0.5))
+    assertEquals(26, alphaOf("rgba(0, 0, 0, 0.5)", 0.2))
+    assertEquals(51, alphaOf("rgb(0, 0, 0)", 0.2))
+    assertEquals(102, alphaOf("#000000ff", 0.4))
+  }
+
+  @Test fun scaleAlphaKeepsTheChannelsAndClampsTheAlphaItIsAsked() {
+    val c = GuideColor.parse("#3b82f6")
+    assertEquals(GuideColor.alpha(c, 0.32), GuideColor.scaleAlpha(c, 0.32)) // an opaque color: the same as setting it
+    assertEquals(0x3b82f6, GuideColor.scaleAlpha(c, 2.0) and 0xffffff)
+    assertEquals(c, GuideColor.scaleAlpha(c, 2.0))
+    assertEquals(0, GuideColor.scaleAlpha(c, -1.0) ushr 24)
+    assertEquals(GuideColor.TRANSPARENT, GuideColor.scaleAlpha(GuideColor.TRANSPARENT, 0.5))
+  }
+
   @Test fun mixMovesEachChannelTowardTheOtherColorAndRoundsHalvesUp() {
     val a = GuideColor.parse("#5b8fd6")
     val b = GuideColor.parse("#1d2430")
@@ -62,5 +83,14 @@ class GuideColorTest {
     assertEquals(GuideColor.argb(255, 109, 0, 0), GuideColor.mix(GuideColor.argb(255, 100, 0, 0), GuideColor.argb(255, 117, 0, 0), 0.5))
     // Moving down: 100 + (83 - 100) * 0.5 = 91.5 -> 92.
     assertEquals(GuideColor.argb(255, 92, 0, 0), GuideColor.mix(GuideColor.argb(255, 100, 0, 0), GuideColor.argb(255, 83, 0, 0), 0.5))
+  }
+
+  @Test fun autoInkIsDecidedOverTheGroundItIsGiven() {
+    // A faint white tint is as light as what it sits on: black ink on a light ground, white ink on a dark one. The ground is the opaque color
+    // the rail is over (JS: `toHex(over(railBg, bg))`), not the rail's translucent color laid over black.
+    val faint = GuideColor.parse("rgba(255,255,255,0.1)")
+    assertEquals(GuideColor.BLACK, GuideColor.autoInk(faint, GuideColor.parse("#e8e8e8")))
+    assertEquals(GuideColor.WHITE, GuideColor.autoInk(faint, GuideColor.BLACK))
+    assertEquals(GuideColor.WHITE, GuideColor.autoInk(faint, GuideColor.parse("#060a14")))
   }
 }

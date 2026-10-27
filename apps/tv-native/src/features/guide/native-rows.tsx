@@ -9,10 +9,11 @@ import { channelTint } from "@/lib/tint";
 
 import { useGuideTokens } from "./use-guide-tokens";
 import { logoSource } from "./channel-logo";
+import { rowAccent, type GuideTokens } from "./guide-tokens";
 import { isVisible, type Lane, programArtPath } from "./geometry";
 import { accentOf, cs, FEATURE_SCALE, line, subLine } from "./layout";
 import { GLYPH_FALLBACK, GLYPH_HEART, iconNodeOf, resolveIconId, type IconNode } from "./lucide-nodes";
-import { auroraGeo, ROW_BORDER_TOP, rowTokens } from "./native-rows-geo";
+import { auroraGeo, rowBorderTop, rowTokens } from "./native-rows-geo";
 import { clampScroll, followScroll, GlyphSync, Handover, hitRow, type LineupApplied, type LineupResolvers, type NativeScroll } from "./native-rows-logic";
 
 /**
@@ -41,17 +42,20 @@ const glyphs = new GlyphSync();
 /** A new instance's hand-over state (see `Handover`: it makes no native store until the instance has committed). */
 const newHandover = (): Handover => new Handover(`${SESSION}-${++instances}`, SESSION);
 
-const resolvers: LineupResolvers = {
-  icon: (ch) => resolveIconId(ch.icon ?? ch.package?.icon),
+const iconOf: LineupResolvers["icon"] = (ch) => resolveIconId(ch.icon ?? ch.package?.icon);
+
+/** What every row is packed with. A row's accent comes from the theme (`rowAccent`: the channel's own tint, one fixed color or the theme's cycle), so it follows the theme. */
+const resolversFor = (tk: GuideTokens): LineupResolvers => ({
+  icon: iconOf,
   sub: subLine,
-  accent: (ch, index) => channelTint(ch) ?? accentOf(index),
-};
+  accent: (ch, index) => rowAccent(tk, channelTint(ch) ?? accentOf(index), index),
+});
 
 /** Gives the native store the icons the lineup (and the favorite heart) draw, once each. Throws if the store refuses them. */
 function sendGlyphs(channels: readonly GuideGridChannel[]): void {
   const ng = nativeGuide;
   if (!ng) return;
-  const missing = glyphs.missing([GLYPH_FALLBACK, GLYPH_HEART, ...channels.map(resolvers.icon)]);
+  const missing = glyphs.missing([GLYPH_FALLBACK, GLYPH_HEART, ...channels.map(iconOf)]);
   if (missing.length === 0) return;
   const table: Record<string, IconNode> = {};
   for (const id of missing) {
@@ -136,13 +140,14 @@ export const NativeRows = memo(function NativeRows({
   const serverUrl = getServerUrl();
   // What the lineup is packed with: program art and channel logos are only packed (so only fetched) when they are chosen.
   const lineupResolvers = useMemo<LineupResolvers>(() => {
+    const resolvers = resolversFor(tk);
     if (art !== "on" && marks !== "logos") return resolvers;
     return {
       ...resolvers,
       ...(art === "on" ? { ...artResolvers, artKey: serverUrl } : {}),
       ...(marks === "logos" ? { logo: (ch: GuideGridChannel) => logoSource(ch.logo, serverUrl) } : {}),
     };
-  }, [art, marks, serverUrl]);
+  }, [tk, art, marks, serverUrl]);
   // Bumped when the instance commits (and again if it is remounted), to send the lineup: see `Handover`.
   const [generation, setGeneration] = useState(0);
   // Synchronous on purpose, once the instance has committed: the native store must hold this lineup before the view's next frame, so the view
@@ -167,7 +172,8 @@ export const NativeRows = memo(function NativeRows({
     () => JSON.stringify(auroraGeo({ rowPx, railPx, laneW, ppm, originMs, gap, featureScale: FEATURE_SCALE }, { vw, cs, line }, tk)),
     [rowPx, railPx, laneW, ppm, originMs, gap, vw, tk],
   );
-  const tokensJson = useMemo(() => JSON.stringify(rowTokens(tk)), [tk]);
+  // The guide's own layers draw a theme's background pattern and grain across the whole screen (AuroraGrid), so the view does not.
+  const tokensJson = useMemo(() => JSON.stringify(rowTokens(tk, { textures: false })), [tk]);
 
   const [viewH, setViewH] = useState(0);
   const onLayout = useCallback((e: LayoutChangeEvent) => setViewH(e.nativeEvent.layout.height), []);
@@ -192,7 +198,7 @@ export const NativeRows = memo(function NativeRows({
         scrollY: scrollRef.current,
         rowPx,
         railPx,
-        top: ROW_BORDER_TOP,
+        top: rowBorderTop(tk, vw),
         inset: vw(6),
         lane,
         programsAt: (row) => channels[row]?.programs.filter((p) => isVisible(p, lane)),
@@ -201,7 +207,7 @@ export const NativeRows = memo(function NativeRows({
       if (hit.part === "rail") onRailTap(hit.row);
       else onProgramTap(hit.row, hit.index);
     },
-    [channels, rowPx, railPx, vw, lane, onRailTap, onProgramTap],
+    [channels, rowPx, railPx, tk, vw, lane, onRailTap, onProgramTap],
   );
 
   if (!NativeGuideView) return null;

@@ -24,6 +24,10 @@ class GuideFrame(
   val uptimeMs: Long,
   /** The current time (epoch ms), which a live cell's progress is drawn from. It is not part of [geo]: it moves every minute, the geometry does not. */
   val nowMs: Double,
+  /** Where the view's top-left corner is on the screen (px): the origin a repeating texture is laid from, so it lines up with the
+   *  screen's other layers whatever the view's place. */
+  val screenX: Float = 0f,
+  val screenY: Float = 0f,
 ) {
   /** A painter sets this when something it drew keeps changing (an image fading in): the view redraws on the next
    *  vsync. It stays false for a still frame, so the view stops redrawing. */
@@ -109,6 +113,12 @@ interface GuidePainter {
 
   /** A frame is about to draw. */
   fun beginFrame(frame: GuideFrame) = Unit
+
+  /** Draws what sits behind the rows: a theme's background texture (the canvas is the view's, untranslated). */
+  fun drawBackdrop(canvas: Canvas, frame: GuideFrame) = Unit
+
+  /** Draws what sits over the rows: a theme's grain, over everything (the canvas is the view's, untranslated). */
+  fun drawOverlay(canvas: Canvas, frame: GuideFrame) = Unit
 
   /** Draws one row. The canvas is translated so the row's top-left corner is (0, 0); the row is [GuideFrame.widthPx]
    *  wide and [GuideFrame.rowHeightPx] tall. */

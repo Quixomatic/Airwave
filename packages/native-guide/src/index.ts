@@ -104,6 +104,66 @@ function loadView(): ComponentType<NativeGuideViewProps> | null {
 
 export const NativeGuideView: ComponentType<NativeGuideViewProps> | null = loadView();
 
+export type NativeGuidePatternViewProps = ViewProps & {
+  /** JSON: the guide's textures as its tokens carry them (`{ bg, overlay }`). Only graph paper (`bg.kind` "grid") is drawn. */
+  pattern: string;
+  /** dp per design px: what `vw(1)` is. */
+  unit: number;
+};
+
+function loadPatternView(): ComponentType<NativeGuidePatternViewProps> | null {
+  if (!nativeGuide) return null;
+  try {
+    return requireNativeView<NativeGuidePatternViewProps>("NativeGuide", "NativeGuidePatternView");
+  } catch {
+    return null;
+  }
+}
+
+export type NativeGuideGlyphViewProps = ViewProps & {
+  /** The icon-set id (`lucide:Radio`), registered with `setGlyphs`; an unregistered one draws `lucide:Radio`'s. */
+  icon: string;
+  /** The stroke's color (a CSS color). */
+  color: string;
+  /** What each shape is filled with before it is stroked (a CSS color), or "" for none. */
+  fill?: string;
+  /** The stroke width in lucide's 24 unit box (default 2). */
+  strokeWidth?: number;
+};
+
+function loadGlyphView(): ComponentType<NativeGuideGlyphViewProps> | null {
+  if (!nativeGuide) return null;
+  try {
+    return requireNativeView<NativeGuideGlyphViewProps>("NativeGuide", "NativeGuideGlyphView");
+  } catch {
+    return null;
+  }
+}
+
+/** One lucide icon drawn by the native module, where this binary has it; else null, and the guide draws the `lucide-react-native` icon. */
+export const NativeGuideGlyphView: ComponentType<NativeGuideGlyphViewProps> | null = loadGlyphView();
+
+export type NativeGuideDimensionViewProps = ViewProps & {
+  /** JSON: `{ pct, durationMin, every, majorEvery, height, minorH, majorH, w, capH, color, nowColor, unit }` (`height` in dp, the other heights and `w` in design px, `unit` dp per
+   *  design px, `every` and `majorEvery` in minutes, `pct` 0..1). The line is as wide as the view. */
+  spec: string;
+};
+
+function loadDimensionView(): ComponentType<NativeGuideDimensionViewProps> | null {
+  if (!nativeGuide) return null;
+  try {
+    return requireNativeView<NativeGuideDimensionViewProps>("NativeGuide", "NativeGuideDimensionView");
+  } catch {
+    return null;
+  }
+}
+
+/** A programme's dimension line (a progress bar drawn as a ruler) drawn by the native module, where this binary has it; else null. */
+export const NativeGuideDimensionView: ComponentType<NativeGuideDimensionViewProps> | null = loadDimensionView();
+
+/** The theme's graph paper drawn as lines by the native module, where this binary has it; else null, and the guide draws its SVG pattern. */
+export const NativeGuidePatternView: ComponentType<NativeGuidePatternViewProps> | null = loadPatternView();
+
 /** True when this binary can draw the guide natively. */
 export function nativeGuideAvailable(): boolean {
   return nativeGuide != null && NativeGuideView != null;

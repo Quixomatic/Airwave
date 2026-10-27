@@ -283,6 +283,40 @@ class GuideTokensTest {
     assertEquals(0.0, t.accentShade, 0.0)
   }
 
+  @Test fun theNowColorIsAurorasUnlessTheThemeSetsOne() {
+    // It marks "now" on a dimension line's progress; Aurora's is the red of the time header's marker.
+    assertEquals(argb("#ef4444"), a.now)
+    assertEquals(argb("#ffe27a"), GuideTokens.parse("""{"now": "#ffe27a"}""").now)
+    assertEquals(a.now, GuideTokens.parse("""{"now": 7}""").now)
+    assertEquals(a.now, GuideTokens.parse("""{"now": null}""").now)
+  }
+
+  @Test fun theLooksDefaultsStandInForEveryFieldAThemeLeavesOut() {
+    // A theme that sets only its colors still has a text style, an unscaled round circle, no status label and no textures.
+    val t = GuideTokens.parse("""{"cellBg": "#101010", "railLayout": "numeral"}""")
+    assertEquals(GuideLook.RailLayout.NUMERAL, t.look.railLayout)
+    assertEquals(GuideLook.AURORA.type, t.look.type)
+    assertEquals(GuideLook.AURORA.circle, t.look.circle)
+    assertEquals(GuideLook.StatusLabel.None, t.look.statusLabel)
+    assertEquals(GuideLook.Patterns(null, null, null), t.look.patterns)
+    assertEquals(GuideLook.AURORA.progress, t.look.progress)
+    // A status label that names its mode but little else reads with a transparent plate and white text, not an unreadable one.
+    val plate = GuideTokens.parse("""{"statusLabel": {"mode": "plate", "text": "NOW"}}""").look.statusLabel as GuideLook.StatusLabel.Plate
+    assertEquals("NOW", plate.text)
+    assertEquals(GuideColor.TRANSPARENT, plate.bg)
+    assertEquals(GuideColor.WHITE, plate.fg)
+    assertEquals(0.0, plate.minCell, 0.0)
+    // A kicker names its word and color; a burst its size.
+    val kicker = GuideTokens.parse("""{"statusLabel": {"mode": "kicker", "live": "ON NOW", "color": "#b50d27"}}""").look.statusLabel as GuideLook.StatusLabel.Kicker
+    assertEquals("ON NOW", kicker.live)
+    assertEquals(argb("#b50d27"), kicker.color)
+    val burst = GuideTokens.parse("""{"statusLabel": {"mode": "burst", "text": "NOW!", "size": 78, "minCell": 560}}""").look.statusLabel as GuideLook.StatusLabel.Burst
+    assertEquals(78.0, burst.size, 0.0)
+    assertEquals(560.0, burst.minCell, 0.0)
+    // A mode it does not know is no label.
+    assertEquals(GuideLook.StatusLabel.None, GuideTokens.parse("""{"statusLabel": {"mode": "ticker"}}""").look.statusLabel)
+  }
+
   @Test fun weightsReadAsCssStringsOrNumbers() {
     assertEquals(500, GuideTokens.parse("""{"titleWeight": "500"}""").titleWeight)
     assertEquals(800, GuideTokens.parse("""{"titleWeight": 800}""").titleWeight)

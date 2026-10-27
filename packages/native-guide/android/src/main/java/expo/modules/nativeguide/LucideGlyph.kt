@@ -162,11 +162,12 @@ class GlyphDrawer {
 
   /**
    * Draws `glyph` into the `size` x `size` px square whose top-left corner is (`left`, `top`). `fillColor` fills each shape
-   * before it is stroked (0 = no fill, since a transparent fill draws nothing anyway).
+   * before it is stroked (0 = no fill, since a transparent fill draws nothing anyway). `strokeWidth` is in the 24 unit box (lucide's own is 2).
    */
-  fun draw(canvas: Canvas, glyph: Glyph, left: Float, top: Float, size: Float, strokeColor: Int, fillColor: Int = 0) {
+  fun draw(canvas: Canvas, glyph: Glyph, left: Float, top: Float, size: Float, strokeColor: Int, fillColor: Int = 0, strokeWidth: Float = STROKE_WIDTH) {
     if (size <= 0f) return
     stroke.color = strokeColor
+    stroke.strokeWidth = strokeWidth
     fill.color = fillColor
     canvas.save()
     canvas.translate(left, top)

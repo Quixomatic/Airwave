@@ -52,6 +52,7 @@ class NativeGuideView(context: Context, appContext: AppContext) : ExpoView(conte
   private var backdrop = 0
 
   private val density = resources.displayMetrics.density.toDouble()
+  private val onScreen = IntArray(2)
   private val text = GuideText(context)
   private val images = GuideImages { invalidate() }
   private val painter = GuidePainters.create(PainterKit(density, text, images))
@@ -214,11 +215,13 @@ class NativeGuideView(context: Context, appContext: AppContext) : ExpoView(conte
     val visible = GuideGeometry.visibleRows(scrollY, rowHpx, height.toDouble(), rows.size)
     if (visible.isEmpty()) return
 
-    val frame = GuideFrame(g, width.toFloat(), height.toFloat(), rowHpx.toFloat(), SystemClock.uptimeMillis(), nowMs)
+    getLocationOnScreen(onScreen)
+    val frame = GuideFrame(g, width.toFloat(), height.toFloat(), rowHpx.toFloat(), SystemClock.uptimeMillis(), nowMs, onScreen[0].toFloat(), onScreen[1].toFloat())
     images.beginFrame()
     painter.beginFrame(frame)
     canvas.save()
     canvas.clipRect(0f, 0f, width.toFloat(), height.toFloat())
+    painter.drawBackdrop(canvas, frame)
     val nodes = rowNodes
     if (nodes != null && canvas.isHardwareAccelerated) {
       drawFromRecordings(nodes, canvas, rows, visible, scrollY, rowHpx, frame)
@@ -231,6 +234,7 @@ class NativeGuideView(context: Context, appContext: AppContext) : ExpoView(conte
         canvas.restore()
       }
     }
+    painter.drawOverlay(canvas, frame)
     canvas.restore()
     painter.endFrame()
     images.endFrame()

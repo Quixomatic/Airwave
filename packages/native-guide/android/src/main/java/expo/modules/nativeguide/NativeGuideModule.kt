@@ -45,5 +45,25 @@ class NativeGuideModule : Module() {
       Prop("backdrop") { view: NativeGuideView, v: String -> view.setBackdrop(v) }
       OnViewDidUpdateProps { view: NativeGuideView -> view.propsUpdated() }
     }
+
+    // A theme's graph paper behind the guide, drawn as lines. Defined after the rows' view: the first view a module defines is the one
+    // `requireNativeView("NativeGuide")` gets without naming it.
+    View(NativeGuidePatternView::class) {
+      Prop("pattern") { view: NativeGuidePatternView, s: String -> view.setPattern(s) }
+      Prop("unit") { view: NativeGuidePatternView, v: Double -> view.setUnit(v) }
+    }
+
+    // One lucide icon: the featured panel's channel tile and its rating star.
+    View(NativeGuideGlyphView::class) {
+      Prop("icon") { view: NativeGuideGlyphView, s: String -> view.setIcon(s) }
+      Prop("color") { view: NativeGuideGlyphView, s: String -> view.setColor(s) }
+      Prop("fill") { view: NativeGuideGlyphView, s: String -> view.setFill(s) }
+      Prop("strokeWidth") { view: NativeGuideGlyphView, v: Double -> view.setStrokeWidth(v) }
+    }
+
+    // The featured panel's progress bar when a theme draws it as a ruler.
+    View(NativeGuideDimensionView::class) {
+      Prop("spec") { view: NativeGuideDimensionView, s: String -> view.setSpec(s) }
+    }
   }
 }

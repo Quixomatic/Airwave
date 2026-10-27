@@ -1,6 +1,6 @@
 import { hasLogoPlate } from "./channel-logo";
 import { WINDOW_MIN } from "./geometry";
-import { type GuideTokens, railGround } from "./guide-tokens";
+import { type GuidePatterns, type GuideTokens, railGround } from "./guide-tokens";
 
 /**
  * What the native rows are told about the Aurora row: its dimensions (`auroraGeo`, dp) and its colors (`rowTokens`).
@@ -40,6 +40,12 @@ export type AuroraGeoInput = {
 export const ROW_BORDER_TOP = 1;
 
 /**
+ * The row's top rule in dp as the React Native row lays it out: a theme's `rowBorderW` (design px, so it takes the guide's `vw`), else the 1 dp
+ * hairline (`ROW_BORDER_TOP`). A tap's hit test needs it, as the lane and its cells start that far below the row's top.
+ */
+export const rowBorderTop = (tk: Pick<GuideTokens, "rowBorderW">, vw: (px: number) => number): number => (tk.rowBorderW === null ? ROW_BORDER_TOP : vw(tk.rowBorderW));
+
+/**
  * The JSON object the native view's `geo` prop carries. Sizes are dp.
  *
  * A theme can set a width or radius to 0 (a borderless cell, a square bar, no outer ring): 0 stays 0 rather than snapping up
@@ -66,7 +72,7 @@ export function auroraGeo(i: AuroraGeoInput, s: Scalers, tk: GuideTokens) {
     borderTop: ROW_BORDER_TOP,
     padV: vw(18),
     padH: vw(20),
-    barW: vw(4), // the focused rail's accent bar
+    barW: vw(tk.railBar.w), // the focused rail's edge bar (0 for none)
     circle: vw(64 * i.featureScale),
     circleBorder: line(1),
     circleRing: line(tk.ringW),
@@ -89,8 +95,8 @@ export function auroraGeo(i: AuroraGeoInput, s: Scalers, tk: GuideTokens) {
     cellBorder: ln(tk.cellBorderW),
     cellRing: line(tk.ringW),
     ringOuterW: tk.ringOuter ? ln(tk.ringOuter.w) : 0, // the selected cell's second ring, drawn outside its box
-    liveBarX: vw(3),
-    liveBarInset: vw(10),
+    liveBarX: vw(tk.liveBar.x),
+    liveBarInset: vw(tk.liveBar.inset),
     liveBarW: ln(tk.liveBar.w),
     liveBarR: ln(tk.liveBar.r),
     padTop: vw(20),
@@ -98,10 +104,24 @@ export function auroraGeo(i: AuroraGeoInput, s: Scalers, tk: GuideTokens) {
     titleSize: vw(34) * fs,
     subSize: vw(26) * fs,
     subGap: vw(12),
+    // A status label's text: the kicker line above a title and the tag in the sub-line (the burst scales with its own `size` token).
+    kickerSize: vw(20) * fs,
+    plateSize: vw(22) * fs,
   };
 }
 
 export type AuroraGeo = ReturnType<typeof auroraGeo>;
+
+const NO_TEXTURES: GuidePatterns = { bg: null, overlay: null };
+
+/**
+ * The one color the native rows are drawn over, for the view's `backdrop` prop: the guide's ground, which every row sits on (the plates the rows paint
+ * go over it). "" when a texture is drawn on the ground (graph paper, dots: then it is not one color), so the view keeps a theme that multiplies its
+ * second ink with what is beneath the rows as a plain list on the window; any other theme's rows do not read what is beneath them and ignore it.
+ */
+export function rowBackdrop(tk: Pick<GuideTokens, "bg" | "patterns">): string {
+  return tk.patterns.bg ? "" : tk.bg;
+}
 
 /**
  * The JSON object the native view's `tokens` prop carries: the colors, accent alphas and weights the rows draw with, and what a
@@ -115,8 +135,12 @@ export type AuroraGeo = ReturnType<typeof auroraGeo>;
  * px, which the painter turns into dp with `geo.unit`. Every field is sent whether or not the painter draws it, so the two sides
  * read one token set; the colors and sizes of the featured panel, sidebar and time header's own fields (featured, badge, sidebar,
  * glass, ghost, headerDay, headerTick) stay in JS.
+ *
+ * `textures: false` sends no background pattern and no grain. The native view can draw both over its own rectangle, but the guide's
+ * own layers already draw them under and over the whole screen (rows, featured panel and header alike), so the guide asks the view
+ * not to and every texture is drawn exactly once, from one origin.
  */
-export function rowTokens(tk: GuideTokens) {
+export function rowTokens(tk: GuideTokens, o: { textures?: boolean } = {}) {
   return {
     // What the rail sits on, opaque: the rail's own color over the guide's ground. An `auto` glyph's ink is decided against it, as `circleColors` does here.
     railGround: railGround(tk),
@@ -141,6 +165,8 @@ export function rowTokens(tk: GuideTokens) {
     accentShade: tk.accentShade,
     accentFixed: tk.accentFixed,
     logoPlate: tk.logoPlate,
+    // The "now" color: the time-header marker, and the tick that marks now on a dimension-line progress bar.
+    now: tk.now,
     // Program art, when the cells show it: the scrim over it (left to right) and the text colors on it.
     artScrim: [tk.artScrim[0], tk.artScrim[1]],
     artTitle: tk.artTitle,
@@ -169,7 +195,7 @@ export function rowTokens(tk: GuideTokens) {
     progress: tk.progress,
     statusLabel: tk.statusLabel,
     art: tk.art,
-    patterns: tk.patterns,
+    patterns: o.textures === false ? NO_TEXTURES : tk.patterns,
     misregister: tk.misregister,
     headerStyle: tk.headerStyle,
     featuredName: tk.featuredName,

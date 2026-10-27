@@ -175,7 +175,7 @@ export type GuideStatusLabel =
   | { mode: "plate"; text: string; bg: string; fg: string; minCell: number }
   /** A star-shaped burst. `size` is vw(). */
   | { mode: "burst"; text: string; bg: string; fg: string; outline: string; size: number; minCell: number }
-  /** A caps line above the title: `live` ("ON NOW") on the live cell, the start time on the others. */
+  /** A caps line above the title: `live` ("ON NOW") on the live cell, the start time on the others. A cell too narrow to hold the line whole drops it. */
   | { mode: "kicker"; live: string; color: string };
 
 /** Where program art goes: under a scrim across the whole cell, or in a framed strip beside the text. */

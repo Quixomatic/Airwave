@@ -8,7 +8,8 @@ import { over, toHex } from "./color";
 import { WINDOW_MIN } from "./geometry";
 import { GUIDE_THEMES, resolveGuideTokens } from "./guide-themes";
 import { AURORA, accentFg, type GuideTokens } from "./guide-tokens";
-import { auroraGeo, ROW_BORDER_TOP, rowTokens, type AuroraGeoInput, type Scalers } from "./native-rows-geo";
+import { auroraGeo, ROW_BORDER_TOP, rowBackdrop, rowBorderTop, rowTokens, type AuroraGeoInput, type Scalers } from "./native-rows-geo";
+import { hitRow } from "./native-rows-logic";
 
 // Scalers with round numbers, so each expected value below is easy to follow: 1000 dp wide (a spec px is 0.390625 dp),
 // chrome halved, hairlines snapped to half a dp.
@@ -115,10 +116,24 @@ describe("auroraGeo", () => {
     expect(big.numberSize).toBe(scalers.vw(34) * fs);
     expect(big.nameSize).toBe(scalers.vw(23) * fs);
     expect(big.nameLine).toBe(scalers.vw(23) * fs * 1.2);
+    expect(big.kickerSize).toBe(scalers.vw(20) * fs);
+    expect(big.plateSize).toBe(scalers.vw(22) * fs);
     // Every position and box stays where Aurora has it.
-    for (const k of ["rowH", "railW", "padV", "padH", "circle", "glyph", "cellTop", "cellInset", "padTop", "padX", "subGap", "liveBarX", "liveBarInset"] as const) {
+    for (const k of ["rowH", "railW", "padV", "padH", "circle", "glyph", "cellTop", "cellInset", "padTop", "padX", "subGap"] as const) {
       expect(big[k]).toBe(plain[k]);
     }
+  });
+
+  test("the rail's edge bar and the on-now bar sit where the tokens put them, and Aurora's are what they were", () => {
+    const plain = auroraGeo(input, scalers, AURORA);
+    expect(plain.barW).toBe(scalers.vw(4));
+    expect(plain.liveBarX).toBe(scalers.vw(3));
+    expect(plain.liveBarInset).toBe(scalers.vw(10));
+    // High Contrast has no rail bar and a full-height spine on the cell's edge.
+    const hc = auroraGeo(input, scalers, HIGH_CONTRAST);
+    expect(hc.barW).toBe(0);
+    expect(hc.liveBarX).toBe(0);
+    expect(hc.liveBarInset).toBe(0);
   });
 
   test("every variant's geo is plain, finite numbers the native side can read", () => {
@@ -206,6 +221,21 @@ describe("rowTokens", () => {
     expect(rowTokens(SWISS)).toMatchObject({ cellBorder: "transparent" });
   });
 
+  test("`textures: false` sends no background pattern and no grain, and changes nothing else", () => {
+    const POP = resolveGuideTokens("pop-art", "punch");
+    const RISO = resolveGuideTokens("risograph", "cherry");
+    expect(POP.patterns.bg).not.toBeNull();
+    expect(RISO.patterns.overlay).not.toBeNull();
+    for (const tk of [POP, RISO]) {
+      const { patterns, ...rest } = rowTokens(tk);
+      const off = rowTokens(tk, { textures: false });
+      expect(off.patterns).toEqual({ bg: null, overlay: null });
+      const { patterns: _patterns, ...offRest } = off;
+      expect(offRest).toEqual(rest);
+      expect(patterns).toEqual(tk.patterns);
+    }
+  });
+
   test("every variant's tokens are JSON the native side can parse back unchanged", () => {
     for (const tk of ALL) {
       const t = rowTokens(tk);
@@ -227,7 +257,7 @@ describe("rowTokens", () => {
 
   test("none of the featured panel's, sidebar's or time header's own colors: those stay in JS", () => {
     const keys = Object.keys(rowTokens(AURORA));
-    for (const other of ["bg", "scrim", "now", "featured", "badge", "sidebar", "glass", "ghost", "headerDay", "headerTick", "fontScale"]) expect(keys).not.toContain(other);
+    for (const other of ["bg", "scrim", "featured", "badge", "sidebar", "glass", "ghost", "headerDay", "headerTick", "fontScale"]) expect(keys).not.toContain(other);
   });
 });
 
@@ -270,5 +300,58 @@ describe("aurora-fixture.json", () => {
     const { about, ...rest } = fixture;
     expect(about.length).toBeGreaterThan(0);
     expect(JSON.parse(JSON.stringify(buildAuroraFixture()))).toEqual(rest);
+  });
+});
+
+describe("rowBackdrop", () => {
+  test("is the guide's ground where nothing is drawn on it", () => {
+    expect(rowBackdrop(AURORA)).toBe(AURORA.bg);
+    const riso = resolveGuideTokens("risograph", "flamingo");
+    expect(riso.patterns.bg).toBeNull();
+    expect(rowBackdrop(riso)).toBe(riso.bg);
+  });
+
+  test("is empty where a texture is drawn on the ground, so the rows are not taken to sit on one color", () => {
+    for (const theme of GUIDE_THEMES) {
+      for (const v of theme.variants) {
+        const tk = resolveGuideTokens(theme.id, v.id);
+        expect(rowBackdrop(tk), `${theme.id}/${v.id}`).toBe(tk.patterns.bg ? "" : tk.bg);
+      }
+    }
+    expect(rowBackdrop(resolveGuideTokens("blueprint", "cyanotype"))).toBe("");
+    expect(rowBackdrop(resolveGuideTokens("pop-art", "sunny"))).toBe("");
+  });
+
+  test("is an opaque color for every theme that multiplies its second ink with what is beneath the rows and has no texture behind them", () => {
+    for (const theme of GUIDE_THEMES) {
+      for (const v of theme.variants) {
+        const tk = resolveGuideTokens(theme.id, v.id);
+        if (!tk.misregister || tk.patterns.bg) continue;
+        // The native side keeps such a row in a layer only over an opaque color; "#rrggbb" is one.
+        expect(rowBackdrop(tk), `${theme.id}/${v.id}`).toMatch(/^#[0-9a-fA-F]{6}$/);
+      }
+    }
+  });
+});
+
+describe("rowBorderTop: the rule a tap's hit test measures below", () => {
+  const vw = scalers.vw;
+
+  test("Aurora's rule is the 1 dp hairline and a theme's is its own width, as the classic row lays it", () => {
+    expect(rowBorderTop(AURORA, vw)).toBe(1);
+    expect(rowBorderTop(SWISS, vw)).toBe(vw(4));
+    for (const tk of ALL) expect(rowBorderTop(tk, vw), String(tk.rowBorderW)).toBe(tk.rowBorderW === null ? ROW_BORDER_TOP : vw(tk.rowBorderW));
+  });
+
+  test("under a thick rule a cell starts lower and ends lower, and a tap on the edge it left lands on the margin", () => {
+    const lane = { T0: new Date(1_000), ppm: 4, laneW: 800, gap: 3 };
+    const programs = [{ startsAt: new Date(1_000).toISOString(), durationSeconds: 3600 }];
+    const tap = (tk: GuideTokens, y: number) =>
+      hitRow(74 + 50, y, { scrollY: 0, rowPx: 65.625, railPx: 74, top: rowBorderTop(tk, vw), inset: vw(6), lane, programsAt: () => programs });
+    // Swiss Poster's rule is 4 design px (1.5625 dp here), Aurora's 1 dp, so its cell spans 0.5625 dp further down: 3.906 to 64.84, not 3.34 to 64.28.
+    expect(tap(AURORA, 3.5)).toMatchObject({ part: "program" });
+    expect(tap(SWISS, 3.5)).toBeNull();
+    expect(tap(AURORA, 64.5)).toBeNull();
+    expect(tap(SWISS, 64.5)).toMatchObject({ part: "program" });
   });
 });
