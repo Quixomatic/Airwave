@@ -5,6 +5,8 @@ import type { TextStyle } from "react-native";
 
 import type { GuideGridProgram } from "@/lib/api";
 
+import { lucideIconFrom } from "./icon-id";
+
 /**
  * The Aurora grid's layout constants + helpers, ported verbatim from tv-web's `aurora-grid.tsx`.
  * The design is authored at 2560px wide and used as a PROPORTION guide: `vw(px)` converts a spec
@@ -123,12 +125,16 @@ export const audioBadge = (ch?: number) =>
 type IconCmp = ComponentType<{ size?: number; color?: string; fill?: string }>;
 const LUCIDE = LucideIcons as unknown as Record<string, IconCmp>;
 
-/** Resolve a channel's stored icon id (`lucide:Radio`) to its lucide component. */
+/**
+ * Resolve a channel's stored icon id (`lucide:Radio`) to its lucide component: the icon the id points at (`lucideIconFrom`: the name, and that it
+ * is an icon at all, which is the rule the native rows read an id with too, so both draw the same ids), else Radio. It looks the component up and
+ * nothing more: the native rows' extraction of lucide's drawing instructions is not on this path, so a library release that breaks it cannot change
+ * these rows.
+ */
 export function channelIcon(id?: string | null): IconCmp {
-  if (id && id.startsWith("lucide:")) return LUCIDE[id.slice(7)] ?? LucideIcons.Radio;
-  return LucideIcons.Radio;
+  return lucideIconFrom<IconCmp>(LUCIDE, id) ?? LucideIcons.Radio;
 }
+/** A package's icon, by the same rule as a channel's (`channelIcon`), else a folder. */
 export function pkgIconCmp(id?: string | null): IconCmp {
-  if (id && id.startsWith("lucide:")) return LUCIDE[id.slice(7)] ?? LucideIcons.Folder;
-  return LucideIcons.Folder;
+  return lucideIconFrom<IconCmp>(LUCIDE, id) ?? LucideIcons.Folder;
 }

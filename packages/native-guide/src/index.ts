@@ -51,6 +51,9 @@ type NativeGuideModule = {
   setLineup(lineupId: string, json: string): number;
   /** Drops the lineup store `lineupId` (those native rows unmounted); other stores are untouched. */
   clearLineup(lineupId: string): void;
+  /** Writes one line to logcat under the tag AirwaveGuide (the app's choice of renderer and why). Missing on a binary built
+   *  before it was added, so check for it. */
+  logRenderer?(line: string): void;
   /** Registers icons the rows can draw: a JSON object of lucide icon nodes (`[tag, attributes][]`, as `lucide-react-native`
    *  holds them) by icon-set id (`{ "lucide:Radio": [["path", { "d": "..." }], ...] }`). Idempotent; returns how many icons
    *  it read. A channel whose icon was never registered draws `lucide:Radio`'s, and the favorite heart is `lucide:Heart`: register

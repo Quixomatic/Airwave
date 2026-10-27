@@ -15,6 +15,7 @@ import { usePackages } from "@/hooks/queries";
 
 import { cellBox, isVisible, liveFill, timelineOrigin, type Lane } from "./geometry";
 import { GuideGhost } from "./guide-ghost";
+import { reportNativeGuideError } from "./guide-renderer";
 import { useGuideTokens } from "./guide-tokens";
 import { GuideSidebar, buildSidebarItems, lensEquals, type Lens } from "./guide-sidebar";
 import {
@@ -37,6 +38,9 @@ import {
   vwOf,
   WINDOW_MIN,
 } from "./layout";
+import { NativeRows } from "./native-rows";
+import { classicFollow, classicHandOver, type NativeScroll } from "./native-rows-logic";
+import { useGuideRenderer } from "./use-guide-renderer";
 
 const is4K = (res?: string) => res === "4k";
 const isHD = (res?: string) => !!res && res !== "sd" && res !== "480";
@@ -90,9 +94,12 @@ export function AuroraGrid({
   const [sidebarSel, setSidebarSel] = useState(0);
   const sidebarExpanded = zone === "sidebar";
   const player = usePlayer();
+  // The native rows (the default on Android TV) or the FlashList of React Native rows (everywhere else, and the fallback): see `useGuideRenderer`.
+  const nativeRows = useGuideRenderer().renderer === "native";
 
-  // Recents/favorites lenses filter the channel list (favorites via the passed set).
-  const channels = useMemo(() => {
+  // Recents/favorites lenses filter the channel list (favorites via the passed set). These are the raw channel objects
+  // from `useGuide`, which the native rows key their lineup on.
+  const lensChannels = useMemo(() => {
     const inLens = (c: GuideGridChannel): boolean =>
       lens.type === "all"
         ? true
@@ -101,13 +108,17 @@ export function AuroraGrid({
           : lens.type === "favorites"
             ? favoriteIds.has(c.id)
             : true; // recents handled server-side elsewhere; kept simple here
-    // Cull each channel's programs to what's actually on the visible grid — within the window AND wide
-    // enough to render (not a rail-edge sliver) — at the SOURCE, matching tv-web (§7.1). This is what
-    // makes the rows cheap: otherwise every row maps the whole day's back-buffer on EVERY keypress (the
-    // guide lag), and `fp` could land on a hidden program. `isVisible` is this filter's own arithmetic, unchanged (its gap is
-    // SOURCE_CULL_GAP, not the Row's `cs(6)`).
-    return rawChannels.filter(inLens).map((c): GuideGridChannel => ({ ...c, programs: c.programs.filter((p) => isVisible(p, lane)) }));
-  }, [rawChannels, lens, favoriteIds, lane]);
+    return rawChannels.filter(inLens);
+  }, [rawChannels, lens, favoriteIds]);
+  // Cull each channel's programs to what's actually on the visible grid — within the window AND wide
+  // enough to render (not a rail-edge sliver) — at the SOURCE, matching tv-web (§7.1). This is what
+  // makes the rows cheap: otherwise every row maps the whole day's back-buffer on EVERY keypress (the
+  // guide lag), and `fp` could land on a hidden program. `isVisible` is this filter's own arithmetic, unchanged (its gap is
+  // SOURCE_CULL_GAP, not the Row's `cs(6)`).
+  const channels = useMemo(
+    () => lensChannels.map((c): GuideGridChannel => ({ ...c, programs: c.programs.filter((p) => isVisible(p, lane)) })),
+    [lensChannels, lane],
+  );
 
   const [fc, setFc] = useState(0);
   const [fp, setFp] = useState(0);
@@ -277,6 +288,30 @@ export function AuroraGrid({
   const listRef = useRef<FlashListRef<GuideGridChannel>>(null);
   const scrollYRef = useRef(0);
   const listHRef = useRef(0);
+  // The rows fell back from the native view to the FlashList (it failed, or the setting changed): the list opens where the native rows
+  // were scrolled to (`NativeRows` writes that into `nativeScrollRef` as it renders), with the focused row still on screen, instead of back
+  // at the first channel or with the focused row thrown to the top. The offset the list is taken to be at is held inside the list.
+  const nativeScrollRef = useRef<NativeScroll>({ y: 0, h: 0 });
+  const wasNativeRef = useRef(nativeRows);
+  const listStartRef = useRef<number | undefined>(undefined);
+  if (wasNativeRef.current !== nativeRows) {
+    wasNativeRef.current = nativeRows;
+    if (nativeRows) {
+      listStartRef.current = undefined;
+      scrollYRef.current = 0;
+    } else {
+      const start = classicHandOver(nativeScrollRef.current, fc, rowPx, channels.length);
+      listStartRef.current = start.index;
+      scrollYRef.current = start.offset;
+      // The list measures itself (`onLayout`) only after its first frame, and a key press can come before that. Until it has, it is the native view's
+      // height, so the follow rule below keeps the focused row where it is instead of putting it at the top (a list of no height) and the effect
+      // has nothing to do on the render that hands over (the list opens with the focused row on screen).
+      listHRef.current = start.listH;
+    }
+  }
+  // Only the list that opens right after the switch starts at `fc`. Once the rows run out (a lens with no channels) the list
+  // unmounts, and the next one starts at the top, where the focus is again.
+  if (channels.length === 0) listStartRef.current = undefined;
   // Scroll the list only when the focused channel would be OFF-SCREEN (tv-web parity) — otherwise leave
   // it PUT, so moving up/down feels like you're travelling through the visible rows and the list only
   // scrolls once you hit the top/bottom edge (not the old "always re-center", which never felt like
@@ -284,27 +319,17 @@ export function AuroraGrid({
   // We predict the new offset after a programmatic scroll so rapid presses stay consistent. TV only —
   // iPad keeps native touch-scroll (this is a no-op there).
   useEffect(() => {
-    if (!Platform.isTV || !channels.length) return;
+    if (!Platform.isTV || !channels.length || nativeRows) return; // the native rows follow focus themselves
     if (zone !== "grid" && zone !== "rail") return;
-    const h = listHRef.current;
-    const top = fc * rowPx;
-    const bottom = top + rowPx;
-    const off = scrollYRef.current;
+    const move = classicFollow(scrollYRef.current, fc, rowPx, listHRef.current);
+    if (!move) return; // already fully visible → don't scroll.
     try {
-      if (h <= 0) {
-        listRef.current?.scrollToIndex({ index: fc, animated: false, viewPosition: 0 }); // not measured yet
-      } else if (top < off) {
-        listRef.current?.scrollToIndex({ index: fc, animated: false, viewPosition: 0 }); // above → to top
-        scrollYRef.current = top;
-      } else if (bottom > off + h) {
-        listRef.current?.scrollToIndex({ index: fc, animated: false, viewPosition: 1 }); // below → to bottom
-        scrollYRef.current = Math.max(0, bottom - h);
-      }
-      // else: already fully visible → don't scroll.
+      listRef.current?.scrollToIndex({ index: fc, animated: false, viewPosition: move.viewPosition });
+      if (move.offset !== undefined) scrollYRef.current = move.offset;
     } catch {
       // index not measured yet / out of range — the next fc change re-tries.
     }
-  }, [fc, zone, channels.length, rowPx]);
+  }, [fc, zone, channels.length, rowPx, nativeRows]);
 
   return (
     <View style={{ flex: 1, flexDirection: "row", backgroundColor: tk.bg }}>
@@ -330,10 +355,30 @@ export function AuroraGrid({
               message={lens.type === "favorites" ? "No favorites yet" : lens.type === "packages" ? "No channels in this filter" : "No channels yet"}
               sub={lens.type === "favorites" ? "Highlight a channel and add it to your favorites." : lens.type === "packages" ? "Try another filter, or open the sidebar to clear it." : "Once channels are set up on your server, they'll appear here."}
             />
+          ) : nativeRows ? (
+            <NativeRows
+              channels={lensChannels}
+              favoriteIds={favoriteIds}
+              fc={fc}
+              focusProgramId={focusedProgram?.id}
+              zone={zone}
+              miniFocused={player.miniFocused}
+              rowPx={rowPx}
+              railPx={railPx}
+              laneW={laneW}
+              ppm={ppm}
+              originMs={T0.getTime()}
+              nowMs={now.getTime()}
+              gap={lane.gap}
+              vw={vw}
+              scrollOut={nativeScrollRef}
+              onError={reportNativeGuideError}
+            />
           ) : (
             <FlashList
               ref={listRef}
               data={channels}
+              initialScrollIndex={listStartRef.current}
               keyExtractor={(c) => c.id}
               extraData={{ fc, fp, zone, mf: player.miniFocused }}
               // TV: kill the list's own scroll so the remote's swipe surfaces as a discrete swipeUp/Down

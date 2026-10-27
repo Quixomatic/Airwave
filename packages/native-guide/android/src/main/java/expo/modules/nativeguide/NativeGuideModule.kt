@@ -1,5 +1,6 @@
 package expo.modules.nativeguide
 
+import android.util.Log
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
@@ -10,12 +11,20 @@ import expo.modules.kotlin.modules.ModuleDefinition
  * gives both its `setLineup` calls and its view, so a guide mounted twice keeps two lineups.
  */
 class NativeGuideModule : Module() {
+  private companion object {
+    const val LOG_TAG = "AirwaveGuide"
+  }
+
   override fun definition() = ModuleDefinition {
     Name("NativeGuide")
 
     Function("setLineup") { lineupId: String, json: String -> LineupStores.apply(lineupId, json) }
 
     Function("clearLineup") { lineupId: String -> LineupStores.clear(lineupId) }
+
+    // One line to logcat (tag AirwaveGuide) saying which renderer draws the guide and why. JS sends it when the choice is made
+    // and again whenever it changes, so a bug report can say what the app chose.
+    Function("logRenderer") { line: String -> Log.i(LOG_TAG, line.take(300)) }
 
     // The icons the rail's circle can draw, as lucide icon nodes keyed by icon-set id. JS sends each one once; adding is
     // idempotent. Returns how many it read.
