@@ -1,4 +1,4 @@
-import { nativeGuide, NativeGuideView, type NativeGuideErrorEvent } from "@airwave/native-guide";
+import { nativeGuide, NativeGuidePatternView, NativeGuideView, type NativeGuideErrorEvent } from "@airwave/native-guide";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Pressable, StyleSheet, type GestureResponderEvent, type LayoutChangeEvent } from "react-native";
 
@@ -9,11 +9,12 @@ import { channelTint } from "@/lib/tint";
 
 import { useGuideTokens } from "./use-guide-tokens";
 import { logoSource } from "./channel-logo";
-import { rowAccent, type GuideTokens } from "./guide-tokens";
+import { PatternFill } from "./guide-parts";
+import { rowAccent, type GuidePatterns, type GuideTokens } from "./guide-tokens";
 import { isVisible, type Lane, programArtPath } from "./geometry";
 import { accentOf, cs, FEATURE_SCALE, line, subLine } from "./layout";
-import { GLYPH_FALLBACK, GLYPH_HEART, iconNodeOf, resolveIconId, type IconNode } from "./lucide-nodes";
-import { auroraGeo, rowBorderTop, rowTokens } from "./native-rows-geo";
+import { GLYPH_FALLBACK, GLYPH_HEART, GLYPH_STAR, iconNodeOf, resolveIconId, type IconNode } from "./lucide-nodes";
+import { auroraGeo, rowBackdrop, rowBorderTop, rowTokens } from "./native-rows-geo";
 import { clampScroll, followScroll, GlyphSync, Handover, hitRow, type LineupApplied, type LineupResolvers, type NativeScroll } from "./native-rows-logic";
 
 /**
@@ -55,7 +56,7 @@ const resolversFor = (tk: GuideTokens): LineupResolvers => ({
 function sendGlyphs(channels: readonly GuideGridChannel[]): void {
   const ng = nativeGuide;
   if (!ng) return;
-  const missing = glyphs.missing([GLYPH_FALLBACK, GLYPH_HEART, ...channels.map(iconOf)]);
+  const missing = glyphs.missing([GLYPH_FALLBACK, GLYPH_HEART, GLYPH_STAR, ...channels.map(iconOf)]);
   if (missing.length === 0) return;
   const table: Record<string, IconNode> = {};
   for (const id of missing) {
@@ -226,10 +227,24 @@ export const NativeRows = memo(function NativeRows({
         zone={zone}
         miniFocused={miniFocused}
         scrollY={scrollY}
+        // What is behind the rows: the guide's ground, unless a texture is drawn on it (then it is not one color).
+        backdrop={rowBackdrop(tk)}
         onRenderError={handleError}
       />
     </Pressable>
   );
 });
+
+/**
+ * A theme's repeating background (graph paper, halftone dots) behind everything. Graph paper is drawn as the lines it is by the native
+ * module where this binary has it, which costs the GPU a few percent of the pixels the React Native version's SVG pattern does (that is
+ * drawn as one full-screen bitmap, blended onto the ground, on every frame). Anything else, and a binary without the view, draws
+ * the SVG pattern. Both put the same pixels on the screen.
+ */
+export function GuideBackdrop({ pattern, u }: { pattern: NonNullable<GuidePatterns["bg"]>; u: number }) {
+  const json = useMemo(() => JSON.stringify({ bg: pattern }), [pattern]);
+  if (pattern.kind === "grid" && NativeGuidePatternView) return <NativeGuidePatternView style={StyleSheet.absoluteFill} pointerEvents="none" pattern={json} unit={u} />;
+  return <PatternFill pattern={pattern} u={u} />;
+}
 
 const styles = StyleSheet.create({ fill: { flex: 1, overflow: "hidden" } });

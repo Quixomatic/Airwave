@@ -20,6 +20,8 @@ export type IconNode = [tag: string, attrs: Record<string, string | number>][];
 
 export const GLYPH_FALLBACK = "lucide:Radio";
 export const GLYPH_HEART = "lucide:Heart";
+/** The rating star in the featured panel. */
+export const GLYPH_STAR = "lucide:Star";
 
 type ForwardRefIcon = { displayName?: unknown; render?: (props: object, ref: unknown) => { props?: { iconNode?: unknown } } | null };
 

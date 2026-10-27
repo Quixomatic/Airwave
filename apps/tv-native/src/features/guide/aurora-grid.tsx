@@ -59,7 +59,9 @@ import {
   vwOf,
   WINDOW_MIN,
 } from "./layout";
-import { NativeRows } from "./native-rows";
+import { NativeGuideDimensionView, NativeGuideGlyphView } from "@airwave/native-guide";
+import { GLYPH_STAR, resolveIconId } from "./lucide-nodes";
+import { GuideBackdrop, NativeRows } from "./native-rows";
 import { classicFollow, classicHandOver, type NativeScroll } from "./native-rows-logic";
 import { useGuideRenderer } from "./use-guide-renderer";
 import { useGuideTokens } from "./use-guide-tokens";
@@ -367,7 +369,7 @@ export function AuroraGrid({
       {/* A theme's repeating background (halftone dots, graph paper) sits behind everything; every plate that carries text covers it. */}
       {tk.patterns.bg && (
         <View pointerEvents="none" style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }}>
-          <PatternFill pattern={tk.patterns.bg} u={vw(1)} />
+          {nativeRows ? <GuideBackdrop pattern={tk.patterns.bg} u={vw(1)} /> : <PatternFill pattern={tk.patterns.bg} u={vw(1)} />}
         </View>
       )}
       {/* The guide column — the layout reserves only the sliver width; the sidebar overlays it. Must use
@@ -375,7 +377,7 @@ export function AuroraGrid({
       <View style={{ width: cs(SIDEBAR_SLIVER_W), flexShrink: 0 }} />
       <View style={{ flex: 1, position: "relative", overflow: "hidden" }}>
         {channels.length > 0 && focusedChannel && focusedProgram ? (
-          <FeaturedPanel channel={focusedChannel} program={focusedProgram} now={now} accent={rowAccent(tk, channelTint(focusedChannel) ?? accentOf(fc), fc)} vw={vw} onTune={() => onTune(focusedChannel.id)} />
+          <FeaturedPanel channel={focusedChannel} program={focusedProgram} now={now} accent={rowAccent(tk, channelTint(focusedChannel) ?? accentOf(fc), fc)} vw={vw} native={nativeRows} onTune={() => onTune(focusedChannel.id)} />
         ) : (
           <View style={{ height: vw(600) }} />
         )}
@@ -1033,7 +1035,7 @@ function Badge({ label, colors, textColor, fv, tk }: { label: string; colors: re
  * the progress as a bar in its own style or a dimension line. `FeaturedPanel` adds the tap target and the mini-feed slot around it, and the
  * settings preview shows this part alone.
  */
-export function FeaturedBody({ channel, program, now, accent, vw }: { channel: GuideGridChannel; program: GuideGridProgram; now: Date; accent: string; vw: (px: number) => number }) {
+export function FeaturedBody({ channel, program, now, accent, vw, native = false }: { channel: GuideGridChannel; program: GuideGridProgram; now: Date; accent: string; vw: (px: number) => number; native?: boolean }) {
   const g: GuideMeta = program.guide;
   const start = new Date(program.startsAt);
   const end = new Date(start.getTime() + program.durationSeconds * 1000);
@@ -1082,7 +1084,12 @@ export function FeaturedBody({ channel, program, now, accent, vw }: { channel: G
     <>
       <View style={{ flexDirection: "row", alignItems: "center", gap: fv(22) }}>
         <View style={{ width: tile, height: tile, borderRadius: tileRadius, alignItems: "center", justifyContent: "center", backgroundColor: cc.fill, borderWidth: misCircle ? 0 : rimW, borderColor: cc.border }}>
-          <Icon size={fv(34)} color={cc.glyph} {...stroke} />
+          {native && NativeGuideGlyphView ? (
+            // The same icon as one native view whose icon changes, not the SVG views the `lucide-react-native` icon builds again for each channel.
+            <NativeGuideGlyphView style={{ width: fv(34), height: fv(34) }} icon={resolveIconId(channel.icon ?? channel.package?.icon)} color={cc.glyph} strokeWidth={tk.glyphStroke} />
+          ) : (
+            <Icon size={fv(34)} color={cc.glyph} {...stroke} />
+          )}
           {misCircle && rimW > 0 && (
             <View pointerEvents="none" style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0, borderRadius: tileRadius, borderWidth: rimW, borderColor: cc.border, ...misShapeStyle(misCircle, vw, "rim") }} />
           )}
@@ -1127,7 +1134,11 @@ export function FeaturedBody({ channel, program, now, accent, vw }: { channel: G
         {g.criticRating != null && (
           <>
             <Text style={{ ...text(fv(34)), color: f.sep }}>·</Text>
-            <Star size={fv(34)} color={f.star} fill={f.star} />
+            {native && NativeGuideGlyphView ? (
+              <NativeGuideGlyphView style={{ width: fv(34), height: fv(34) }} icon={GLYPH_STAR} color={f.star} fill={f.star} />
+            ) : (
+              <Star size={fv(34)} color={f.star} fill={f.star} />
+            )}
             <Text style={{ ...text(fv(34)), color: f.meta }}>{g.criticRating.toFixed(1)}</Text>
           </>
         )}
@@ -1141,7 +1152,26 @@ export function FeaturedBody({ channel, program, now, accent, vw }: { channel: G
         <Text style={{ ...text(fv(34)), color: f.meta }}>{fmtTime(start)} - {fmtTime(end)}</Text>
         <Text style={{ ...text(fv(34)), color: f.status }}>{status}</Text>
       </View>
-      {prog.kind === "ticks" ? (
+      {prog.kind === "ticks" && native && NativeGuideDimensionView ? (
+        // The same strokes as `DimensionLine`, drawn by one native view that measures itself (no SVG views to build on every move of the focus).
+        <NativeGuideDimensionView
+          style={{ marginTop: fv(14), height: vw(prog.h) }}
+          spec={JSON.stringify({
+            pct: Math.max(0, Math.min(1, pct / 100)),
+            durationMin: program.durationSeconds / 60,
+            every: prog.ticks.every,
+            majorEvery: prog.ticks.majorEvery,
+            height: vw(prog.h),
+            minorH: prog.ticks.minorH,
+            majorH: prog.ticks.majorH,
+            w: prog.ticks.w,
+            capH: prog.ticks.capH,
+            color: prog.ticks.color,
+            nowColor: tk.now,
+            unit: vw(1),
+          })}
+        />
+      ) : prog.kind === "ticks" ? (
         <View onLayout={(e) => setBarW(e.nativeEvent.layout.width)} style={{ marginTop: fv(14), height: vw(prog.h) }}>
           {barW > 0 && (
             <DimensionLine
@@ -1184,7 +1214,7 @@ export function FeaturedBody({ channel, program, now, accent, vw }: { channel: G
   );
 }
 
-function FeaturedPanel({ channel, program, now, accent, vw, onTune }: { channel: GuideGridChannel; program: GuideGridProgram; now: Date; accent: string; vw: (px: number) => number; onTune: () => void }) {
+function FeaturedPanel({ channel, program, now, accent, vw, native, onTune }: { channel: GuideGridChannel; program: GuideGridProgram; now: Date; accent: string; vw: (px: number) => number; native: boolean; onTune: () => void }) {
   const fv = (px: number) => vw(px * FEATURE_SCALE);
 
   // The mini feed docks into a slot on the right of the featured panel (like tv-web). Reserve the
@@ -1219,7 +1249,7 @@ function FeaturedPanel({ channel, program, now, accent, vw, onTune }: { channel:
 
   return (
     <Pressable onPress={onTune} focusable={!Platform.isTV} style={{ flexDirection: "row", alignItems: "flex-start", paddingTop: fv(40), paddingHorizontal: fv(64) }}>
-      <FeaturedBody channel={channel} program={program} now={now} accent={accent} vw={vw} />
+      <FeaturedBody channel={channel} program={program} now={now} accent={accent} vw={vw} native={native} />
 
       {/* The mini-feed dock. Outer stretches to the featured panel's full height and BOTTOM-aligns its
           child, so the video's bottom lines up with the progress bar on the left. Inner is a TRUE 16:9
