@@ -87,6 +87,11 @@ export function findGuideVariant(theme: GuideTheme, id: unknown): GuideVariant {
   return theme.variants.find((v) => v.id === id) ?? theme.variants.find((v) => v.id === theme.defaultVariant) ?? theme.variants[0]!;
 }
 
+/** Where the color `id` names (the theme's default for an id that names none) stands in the theme's list of colors, as Settings lists them. */
+export function variantIndex(theme: GuideTheme, id: unknown): number {
+  return Math.max(0, theme.variants.indexOf(findGuideVariant(theme, id)));
+}
+
 const isPlain = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /**

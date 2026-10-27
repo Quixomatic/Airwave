@@ -24,13 +24,19 @@ export type SettingsCtxValue = {
 };
 export const SettingsCtx = createContext<SettingsCtxValue>({ active: false, returnToRail: () => {}, ensureVisible: () => {}, scrollToTop: () => {} });
 
-export function useSettingsPage(count: number, onActivate: (i: number) => void) {
+/**
+ * `opts.onBack` sees the selected index when Left or Back is pressed and returns true to handle it itself (a page with a
+ * sub-list steps back to the list above it); false leaves the key to return to the rail as usual. `setSel` moves the selection.
+ */
+export function useSettingsPage(count: number, onActivate: (i: number) => void, opts?: { onBack?: (sel: number) => boolean }) {
   const { active, returnToRail, scrollToTop } = useContext(SettingsCtx);
   const [sel, setSel] = useState(0);
   const selRef = useRef(0);
   selRef.current = sel;
   const cbRef = useRef(onActivate);
   cbRef.current = onActivate;
+  const backRef = useRef(opts?.onBack);
+  backRef.current = opts?.onBack;
 
   useEffect(() => {
     if (active) setSel((s) => Math.min(s, Math.max(0, count - 1)));
@@ -61,14 +67,14 @@ export function useSettingsPage(count: number, onActivate: (i: number) => void) 
           return true;
         case "left":
         case "back":
-          returnToRail();
+          if (!backRef.current?.(selRef.current)) returnToRail();
           return true;
       }
       return false;
     },
   });
 
-  return { sel: active ? sel : -1 };
+  return { sel: active ? sel : -1, setSel };
 }
 
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {

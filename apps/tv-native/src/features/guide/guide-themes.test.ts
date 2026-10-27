@@ -14,6 +14,7 @@ import {
   isGuideThemeId,
   isGuideVariantId,
   resolveGuideTokens,
+  variantIndex,
 } from "./guide-themes";
 import { AURORA, type GuideTokens } from "./guide-tokens";
 import { analyze, chromeFailures, failures } from "./theme-contrast";
@@ -113,6 +114,15 @@ describe("the registry", () => {
     expect(isGuideVariantId("modern", "signal")).toBe(false); // another theme's
     expect(isGuideVariantId("neon", "default")).toBe(false);
     expect(isGuideVariantId("aurora", DEFAULT_GUIDE_VARIANT)).toBe(true);
+  });
+
+  test("variantIndex is the color's place in the theme's list, the default's for an id that names none", () => {
+    for (const t of GUIDE_THEMES) {
+      t.variants.forEach((v, i) => expect(variantIndex(t, v.id), `${t.id}/${v.id}`).toBe(i));
+      expect(variantIndex(t, "nope")).toBe(t.variants.findIndex((v) => v.id === t.defaultVariant));
+      expect(variantIndex(t, undefined)).toBe(t.variants.findIndex((v) => v.id === t.defaultVariant));
+    }
+    expect(variantIndex(findGuideTheme("aurora"), "anything")).toBe(0);
   });
 });
 
