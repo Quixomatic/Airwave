@@ -1,6 +1,6 @@
 // Regenerates the fixtures the Kotlin JVM tests read from the guide's TypeScript:
 //   bun packages/native-guide/scripts/gen-geometry-fixture.ts
-//  - android/src/test/resources/geometry-fixture.json: the cell, live-fill and artwork-box geometry. The Kotlin geometry's
+//  - android/src/test/resources/geometry-fixture.json: the cell, live-fill, artwork-box and artwork-URL geometry. The Kotlin geometry's
 //    tests must reproduce every `out` and `kept`, and apps/tv-native's geometry.test.ts checks the TypeScript still does, so the two
 //    renderers can't drift.
 //  - android/src/test/resources/aurora-fixture.json: the `geo` and `tokens` JSON the Aurora rows send the native view, built
@@ -10,7 +10,7 @@
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { artBox, cellBox, isVisible, liveFill, MIN, WINDOW_MIN } from "../../../apps/tv-native/src/features/guide/geometry";
+import { artBox, artUrl, cellBox, isVisible, liveFill, MIN, WINDOW_MIN } from "../../../apps/tv-native/src/features/guide/geometry";
 import { AURORA } from "../../../apps/tv-native/src/features/guide/guide-tokens";
 import { auroraGeo, rowTokens, type Scalers } from "../../../apps/tv-native/src/features/guide/native-rows-geo";
 
@@ -62,11 +62,22 @@ export function buildFixture() {
   }
 
   const artBoxes = [];
-  for (const [w, h, ratio, step] of [[100, 40, 2, 64], [32, 32, 2, 64], [128, 55, 2, 64], [200.5, 44, 2, 64], [123.456, 39.9, 1.5, 64], [100.1, 33.3, 2.625, 64], [4000, 4000, 2, 64], [0.2, 0.2, 2, 64], [0, 0, 1, 64], [40, 53, 2, 32], [86, 106, 1, 32]] as const) {
+  for (const [w, h, ratio, step] of [[100, 40, 2, 64], [32, 32, 2, 64], [128, 55, 2, 64], [200.5, 44, 2, 64], [123.456, 39.9, 1.5, 64], [100.1, 33.3, 2.625, 64], [4000, 4000, 2, 64], [512, 60, 2, 64], [600, 60, 2, 64], [900, 63, 2, 64], [0.2, 0.2, 2, 64], [0, 0, 1, 64], [40, 53, 2, 32], [86, 106, 1, 32]] as const) {
     artBoxes.push({ in: { w, h, ratio, step }, out: artBox(w, h, ratio, step) });
   }
 
-  return { cells, liveFills, artBoxes };
+  // The request a cell's image is fetched with: the image route and path, then the bucketed pixel box. The route and path
+  // are the shape `imageUrl` builds; one has no query yet, as a bare route would.
+  const artUrls = [];
+  for (const base of [
+    "https://guide.example.com/img/ch-1?path=%2Flibrary%2Fmetadata%2F42%2Fart%2F1700000000",
+    "http://tv.example:3000/img/ch-2?path=%2Flibrary%2Fmetadata%2F7%2Fthumb%2F5",
+    "https://guide.example.com/img/ch-3",
+  ]) {
+    for (const [w, h] of [[256, 128], [64, 64], [1920, 1920], [384, 192]] as const) artUrls.push({ in: { base, w, h }, out: artUrl(base, { w, h }) });
+  }
+
+  return { cells, liveFills, artBoxes, artUrls };
 }
 
 /**
@@ -106,7 +117,7 @@ if (import.meta.main) {
     .map(([k, arr]) => `  ${JSON.stringify(k)}: [\n${arr.map((x) => `    ${JSON.stringify(x)}`).join(",\n")}\n  ]`)
     .join(",\n");
   writeFileSync(OUT, `{\n  "about": ${JSON.stringify(about)},\n${body}\n}\n`);
-  console.log(`geometry-fixture.json: ${sections.cells.length} cells (${sections.cells.filter((c) => !c.out).length} culled), ${sections.liveFills.length} fills, ${sections.artBoxes.length} art boxes`);
+  console.log(`geometry-fixture.json: ${sections.cells.length} cells (${sections.cells.filter((c) => !c.out).length} culled), ${sections.liveFills.length} fills, ${sections.artBoxes.length} art boxes, ${sections.artUrls.length} art URLs`);
   writeFileSync(AURORA_OUT, `${JSON.stringify({ about: auroraAbout, ...buildAuroraFixture() }, null, 2)}\n`);
   console.log("aurora-fixture.json written");
 }

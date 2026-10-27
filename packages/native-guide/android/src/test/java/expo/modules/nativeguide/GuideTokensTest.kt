@@ -1,16 +1,26 @@
 package expo.modules.nativeguide
 
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import java.lang.reflect.Modifier
 
 /** The `tokens` prop: what the painter reads from the token JSON, and what it does with an incomplete or odd one. */
 class GuideTokensTest {
   private val a = GuideTokens.AURORA
 
   private fun argb(hex: String) = GuideColor.parse(hex)
+
+  /** Every value the parsed tokens hold, by field name (reflection, so a field added later is covered without editing this). */
+  private fun snapshot(t: GuideTokens): Map<String, Any?> =
+    GuideTokens::class.java.declaredFields.filter { !Modifier.isStatic(it.modifiers) }.associate {
+      it.isAccessible = true
+      it.name to it.get(t)
+    }
 
   @Test fun auroraHoldsTheStandardGuidesLiterals() {
     assertEquals(argb("rgba(148,163,184,0.12)"), a.rowBorder)
@@ -32,6 +42,10 @@ class GuideTokensTest {
     assertEquals(argb("#e6eaf1"), a.numberFocused)
     assertEquals(700, a.numberWeight)
     assertEquals(argb("#94a3b8"), a.name)
+    assertEquals(argb("rgba(6,10,20,0.88)"), a.artScrimStart)
+    assertEquals(argb("rgba(6,10,20,0.8)"), a.artScrimEnd)
+    assertEquals(argb("#f1f5f9"), a.artTitle)
+    assertEquals(argb("#e6ebf2"), a.artSub)
   }
 
   /** The tokens JS sends for Aurora (aurora-fixture.json, built by `rowTokens(AURORA)`): reading them gives Aurora back. */
@@ -58,37 +72,41 @@ class GuideTokensTest {
     assertEquals(a.numberFocused, t.numberFocused)
     assertEquals(a.numberWeight, t.numberWeight)
     assertEquals(a.name, t.name)
+    assertEquals(snapshot(a), snapshot(t))
   }
 
-  /** Every key JS sends is one the painter reads: a key that parse() ignores would be a token that does nothing. */
+  /**
+   * Every value JS sends changes what the painter reads: change each key (and each field inside an object, each element of an
+   * array) to a value Aurora doesn't use and the parsed tokens must differ. A token the parser ignored would be a token that
+   * does nothing.
+   */
   @Test fun everyTokenJsSendsChangesWhatTheParserReads() {
     val sent = JSONObject(requireNotNull(javaClass.classLoader?.getResource("aurora-fixture.json")).readText()).getJSONObject("tokens")
-    val base = GuideTokens.parse("{}")
-    fun differs(o: JSONObject) = GuideTokens.parse(o.toString())
-    // Flip each top-level scalar to a value Aurora doesn't use and see the parsed tokens change.
-    val keys = sent.keys().asSequence().toList()
-    for (key in keys) {
+    val base = snapshot(GuideTokens.parse(sent.toString()))
+    for (key in sent.keys().asSequence().toList()) {
       val v = sent.get(key)
-      val changed = JSONObject(sent.toString())
-      when (v) {
-        is Number -> changed.put(key, 0.5)
-        is String -> changed.put(key, if (key.endsWith("Weight")) "300" else "#010203")
-        is JSONObject -> v.keys().asSequence().forEach { sub ->
-          val inner = changed.getJSONObject(key)
-          inner.put(sub, 0.5)
+      val probes: List<Pair<String, (JSONObject) -> Unit>> = when (v) {
+        is JSONObject -> v.keys().asSequence().map { inner ->
+          "$key.$inner" to { o: JSONObject -> o.getJSONObject(key).put(inner, otherThan(inner, o.getJSONObject(key).opt(inner))); Unit }
+        }.toList()
+        is JSONArray -> (0 until v.length()).map { i ->
+          "$key[$i]" to { o: JSONObject -> o.getJSONArray(key).put(i, otherThan(key, o.getJSONArray(key).opt(i))); Unit }
         }
-        else -> error("unexpected token shape for $key")
+        else -> listOf(key to { o: JSONObject -> o.put(key, otherThan(key, o.opt(key))); Unit })
       }
-      val got = differs(changed)
-      val same = listOf(
-        got.rowBorder == base.rowBorder, got.cellBg == base.cellBg, got.liveCellBg == base.liveCellBg, got.cellBorder == base.cellBorder,
-        got.ring == base.ring, got.liveElapsedA == base.liveElapsedA, got.liveRemainA == base.liveRemainA, got.title == base.title,
-        got.titleWeight == base.titleWeight, got.sub == base.sub, got.railFocusA == base.railFocusA, got.circleFillA == base.circleFillA,
-        got.circleBorderA == base.circleBorderA, got.heartOff == base.heartOff, got.fav == base.fav, got.number == base.number,
-        got.numberFocused == base.numberFocused, got.numberWeight == base.numberWeight, got.name == base.name,
-      ).all { it }
-      assertEquals("changing `$key` changes nothing the painter reads", false, same)
+      for ((name, change) in probes) {
+        val changed = JSONObject(sent.toString())
+        change(changed)
+        assertNotEquals("changing `$name` changes nothing the painter reads", base, snapshot(GuideTokens.parse(changed.toString())))
+      }
     }
+  }
+
+  /** A value for `key` that differs from `old` and is of a kind the parser accepts there. */
+  private fun otherThan(key: String, old: Any?): Any = when {
+    key.endsWith("Weight") -> if (old == "300") "400" else "300"
+    old is Number -> if (old.toDouble() == 0.5) 0.25 else 0.5
+    else -> if (old == "#010203") "#040506" else "#010203"
   }
 
   @Test fun aPartialObjectKeepsAurorasValuesForTheRest() {

@@ -149,10 +149,27 @@
     {"in":{"w":200.5,"h":44,"ratio":2,"step":64},"out":{"w":448,"h":128}},
     {"in":{"w":123.456,"h":39.9,"ratio":1.5,"step":64},"out":{"w":192,"h":64}},
     {"in":{"w":100.1,"h":33.3,"ratio":2.625,"step":64},"out":{"w":320,"h":128}},
-    {"in":{"w":4000,"h":4000,"ratio":2,"step":64},"out":{"w":1920,"h":1920}},
+    {"in":{"w":4000,"h":4000,"ratio":2,"step":64},"out":{"w":1024,"h":1024}},
+    {"in":{"w":512,"h":60,"ratio":2,"step":64},"out":{"w":1024,"h":128}},
+    {"in":{"w":600,"h":60,"ratio":2,"step":64},"out":{"w":1024,"h":128}},
+    {"in":{"w":900,"h":63,"ratio":2,"step":64},"out":{"w":1024,"h":128}},
     {"in":{"w":0.2,"h":0.2,"ratio":2,"step":64},"out":{"w":64,"h":64}},
     {"in":{"w":0,"h":0,"ratio":1,"step":64},"out":{"w":64,"h":64}},
     {"in":{"w":40,"h":53,"ratio":2,"step":32},"out":{"w":96,"h":128}},
     {"in":{"w":86,"h":106,"ratio":1,"step":32},"out":{"w":96,"h":128}}
+  ],
+  "artUrls": [
+    {"in":{"base":"https://guide.example.com/img/ch-1?path=%2Flibrary%2Fmetadata%2F42%2Fart%2F1700000000","w":256,"h":128},"out":"https://guide.example.com/img/ch-1?path=%2Flibrary%2Fmetadata%2F42%2Fart%2F1700000000&w=256&h=128"},
+    {"in":{"base":"https://guide.example.com/img/ch-1?path=%2Flibrary%2Fmetadata%2F42%2Fart%2F1700000000","w":64,"h":64},"out":"https://guide.example.com/img/ch-1?path=%2Flibrary%2Fmetadata%2F42%2Fart%2F1700000000&w=64&h=64"},
+    {"in":{"base":"https://guide.example.com/img/ch-1?path=%2Flibrary%2Fmetadata%2F42%2Fart%2F1700000000","w":1920,"h":1920},"out":"https://guide.example.com/img/ch-1?path=%2Flibrary%2Fmetadata%2F42%2Fart%2F1700000000&w=1920&h=1920"},
+    {"in":{"base":"https://guide.example.com/img/ch-1?path=%2Flibrary%2Fmetadata%2F42%2Fart%2F1700000000","w":384,"h":192},"out":"https://guide.example.com/img/ch-1?path=%2Flibrary%2Fmetadata%2F42%2Fart%2F1700000000&w=384&h=192"},
+    {"in":{"base":"http://tv.example:3000/img/ch-2?path=%2Flibrary%2Fmetadata%2F7%2Fthumb%2F5","w":256,"h":128},"out":"http://tv.example:3000/img/ch-2?path=%2Flibrary%2Fmetadata%2F7%2Fthumb%2F5&w=256&h=128"},
+    {"in":{"base":"http://tv.example:3000/img/ch-2?path=%2Flibrary%2Fmetadata%2F7%2Fthumb%2F5","w":64,"h":64},"out":"http://tv.example:3000/img/ch-2?path=%2Flibrary%2Fmetadata%2F7%2Fthumb%2F5&w=64&h=64"},
+    {"in":{"base":"http://tv.example:3000/img/ch-2?path=%2Flibrary%2Fmetadata%2F7%2Fthumb%2F5","w":1920,"h":1920},"out":"http://tv.example:3000/img/ch-2?path=%2Flibrary%2Fmetadata%2F7%2Fthumb%2F5&w=1920&h=1920"},
+    {"in":{"base":"http://tv.example:3000/img/ch-2?path=%2Flibrary%2Fmetadata%2F7%2Fthumb%2F5","w":384,"h":192},"out":"http://tv.example:3000/img/ch-2?path=%2Flibrary%2Fmetadata%2F7%2Fthumb%2F5&w=384&h=192"},
+    {"in":{"base":"https://guide.example.com/img/ch-3","w":256,"h":128},"out":"https://guide.example.com/img/ch-3?w=256&h=128"},
+    {"in":{"base":"https://guide.example.com/img/ch-3","w":64,"h":64},"out":"https://guide.example.com/img/ch-3?w=64&h=64"},
+    {"in":{"base":"https://guide.example.com/img/ch-3","w":1920,"h":1920},"out":"https://guide.example.com/img/ch-3?w=1920&h=1920"},
+    {"in":{"base":"https://guide.example.com/img/ch-3","w":384,"h":192},"out":"https://guide.example.com/img/ch-3?w=384&h=192"}
   ]
 }

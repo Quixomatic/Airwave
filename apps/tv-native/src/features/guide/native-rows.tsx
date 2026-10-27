@@ -2,10 +2,12 @@ import { nativeGuide, NativeGuideView, type NativeGuideErrorEvent } from "@airwa
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Pressable, StyleSheet, type GestureResponderEvent, type LayoutChangeEvent } from "react-native";
 
-import type { GuideGridChannel } from "@/lib/api";
+import { type GuideGridChannel, imageUrl } from "@/lib/api";
+import { getServerUrl } from "@/lib/auth";
+import { useGuidePrefs } from "@/lib/guide-prefs";
 import { channelTint } from "@/lib/tint";
 
-import { isVisible, type Lane } from "./geometry";
+import { isVisible, type Lane, programArtPath } from "./geometry";
 import { useGuideTokens } from "./guide-tokens";
 import { accentOf, cs, FEATURE_SCALE, line, subLine } from "./layout";
 import { GLYPH_FALLBACK, GLYPH_HEART, iconNodeOf, resolveIconId, type IconNode } from "./lucide-nodes";
@@ -59,8 +61,12 @@ function sendGlyphs(channels: readonly GuideGridChannel[]): void {
   glyphs.markSent(missing);
 }
 
+/** With program art on, each program also carries the artwork URL the classic rows request (up to its query: the native view
+ *  adds the pixel box), so a cell's image is fetched and cached once whichever renderer draws it. */
+const artResolvers: Pick<LineupResolvers, "art"> = { art: (ch, p) => imageUrl(ch.id, programArtPath(p.guide)) };
+
 /** Never throws (`applyLineupUpdate`): a failure comes back as `error`, reported after render. */
-function applyLineup(h: Handover, channels: readonly GuideGridChannel[], favoriteIds: Set<string>, fromMs: number): LineupApplied {
+function applyLineup(h: Handover, channels: readonly GuideGridChannel[], favoriteIds: Set<string>, fromMs: number, r: LineupResolvers): LineupApplied {
   const ng = nativeGuide;
   if (!ng) return { version: 0, error: null };
   return h.apply(
@@ -70,7 +76,7 @@ function applyLineup(h: Handover, channels: readonly GuideGridChannel[], favorit
     },
     channels,
     favoriteIds,
-    resolvers,
+    r,
     fromMs,
   );
 }
@@ -125,13 +131,16 @@ export const NativeRows = memo(function NativeRows({
   const tk = useGuideTokens();
   // This instance's own native lineup store and hand-over state: see the header.
   const [handover] = useState(newHandover);
+  const artOn = useGuidePrefs().art === "on";
+  const serverUrl = getServerUrl();
+  const lineupResolvers = useMemo<LineupResolvers>(() => (artOn ? { ...resolvers, ...artResolvers, artKey: serverUrl } : resolvers), [artOn, serverUrl]);
   // Bumped when the instance commits (and again if it is remounted), to send the lineup: see `Handover`.
   const [generation, setGeneration] = useState(0);
   // Synchronous on purpose, once the instance has committed: the native store must hold this lineup before the view's next frame, so the view
   // never draws a lineup that is not the one its focus and scroll props are for. (The first commit has none; the layout effect below sends it
   // before anything is painted.)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const applied = useMemo(() => applyLineup(handover, channels, favoriteIds, originMs), [handover, channels, favoriteIds, originMs, generation]);
+  const applied = useMemo(() => applyLineup(handover, channels, favoriteIds, originMs, lineupResolvers), [handover, channels, favoriteIds, originMs, lineupResolvers, generation]);
   // A lineup the native store couldn't take is reported after render (it switches the guide to the React Native rows,
   // which re-renders other components: not allowed mid-render).
   useLayoutEffect(() => {

@@ -91,6 +91,19 @@ describe("packChannel", () => {
     expect(packChannel(c, "lucide:Radio", FROM, resolvers.sub)[5].map((p) => p[0])).toEqual(["live", "next"]);
   });
 
+  test("packs a program's art URL when program art is on, and null for a program without one", () => {
+    const c = channel("c1", [prog("a", 0, 30, { art: "/library/metadata/1/art/9" }), prog("b", 30, 30)]);
+    const art = (ch: GuideGridChannel, p: GuideGridProgram) => (p.guide.art ? `https://s.example/img/${ch.id}?path=${encodeURIComponent(p.guide.art)}` : null);
+    const packed = packChannel(c, "lucide:Radio", FROM, resolvers.sub, art)[5];
+    expect(packed.map((p) => p[4])).toEqual(["https://s.example/img/c1?path=%2Flibrary%2Fmetadata%2F1%2Fart%2F9", null]);
+  });
+
+  test("packs no art when program art is off, whatever the programs carry", () => {
+    const c = channel("c1", [prog("a", 0, 30, { art: "/library/metadata/1/art/9", thumb: "/library/metadata/1/thumb/9" })]);
+    expect(packChannel(c, "lucide:Radio", FROM, resolvers.sub)[5].map((p) => p[4])).toEqual([null]);
+    expect(packChannel(c, "lucide:Radio", FROM, resolvers.sub, () => "")[5].map((p) => p[4])).toEqual([null]); // an empty URL is none
+  });
+
   test("a missing program list, name or number packs as empty", () => {
     const c = { ...channel("c1"), programs: undefined, name: undefined, number: undefined } as unknown as GuideGridChannel;
     expect(packChannel(c, "lucide:Radio", FROM, resolvers.sub)).toEqual(["c1", "", "", "lucide:Radio", null, []]);
@@ -168,6 +181,23 @@ describe("LineupSync", () => {
     sync.accepted(1);
     const u = parse(sync.update([a], NONE, { ...resolvers, icon: () => "lucide:Tv" }, FROM));
     expect(u.add.map(([, ch]) => ch[3])).toEqual(["lucide:Tv"]);
+  });
+
+  test("turning program art on, or pointing it at another server, repacks the channels; turning it off does too", () => {
+    const withArt = (artKey: string): LineupResolvers => ({ ...resolvers, art: (ch) => `https://${artKey}/img/${ch.id}`, artKey });
+    const art = channel("c1", [prog("p", 0, 30, { art: "/library/metadata/1/art/9" })]);
+    const sync = new LineupSync("s1");
+    sync.update([art], NONE, resolvers, FROM);
+    sync.accepted(1);
+    const on = parse(sync.update([art], NONE, withArt("one.example"), FROM));
+    expect(on.add.map(([, ch]) => ch[5].map((p) => p[4]))).toEqual([["https://one.example/img/c1"]]);
+    sync.accepted(2);
+    expect(sync.update([art], NONE, withArt("one.example"), FROM)).toBeNull(); // the same setting sends nothing
+    const moved = parse(sync.update([art], NONE, withArt("two.example"), FROM));
+    expect(moved.add.map(([, ch]) => ch[5].map((p) => p[4]))).toEqual([["https://two.example/img/c1"]]);
+    sync.accepted(3);
+    const off = parse(sync.update([art], NONE, resolvers, FROM));
+    expect(off.add.map(([, ch]) => ch[5].map((p) => p[4]))).toEqual([[null]]);
   });
 
   test("a timeline that now starts earlier than what a channel was packed from repacks it", () => {

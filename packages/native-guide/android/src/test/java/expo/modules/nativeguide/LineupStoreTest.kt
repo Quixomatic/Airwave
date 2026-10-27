@@ -210,4 +210,28 @@ class LineupStoreTest {
     val v = store.apply(update(session = "b", order = listOf("1"), add = mapOf("1" to channel("c1")), accent = listOf("#ff0000"), fav = listOf(0)))
     assertNotSame(a, store.rows(v)[0])
   }
+
+  @Test fun aProgramsArtIsItsUrlUpToTheQueryAndItsRequestAddsTheBox() {
+    val v = store.apply(
+      update(
+        order = listOf("1"),
+        add = mapOf("1" to channel("c1", listOf(program("a", art = "https://s.example/img/c1?path=%2Flibrary%2Fx"), program("b")))),
+      ),
+    )
+    val (withArt, without) = store.rows(v)[0].channel.programs
+    assertEquals("https://s.example/img/c1?path=%2Flibrary%2Fx", withArt.art)
+    assertEquals("https://s.example/img/c1?path=%2Flibrary%2Fx&w=448&h=128", withArt.artUrl(448, 128))
+    assertNull(without.art)
+    assertNull(without.artUrl(448, 128))
+  }
+
+  @Test fun theArtUrlIsBuiltOncePerBoxAndRebuiltWhenTheBoxChanges() {
+    val v = store.apply(update(order = listOf("1"), add = mapOf("1" to channel("c1", listOf(program("a", art = "http://s/img/c1?path=%2Fa"))))))
+    val p = store.rows(v)[0].channel.programs[0]
+    val first = p.artUrl(448, 128)
+    assertEquals("http://s/img/c1?path=%2Fa&w=448&h=128", first)
+    assertTrue("the same box gives the same string instance", first === p.artUrl(448, 128))
+    assertEquals("http://s/img/c1?path=%2Fa&w=512&h=128", p.artUrl(512, 128))
+    assertEquals("http://s/img/c1?path=%2Fa&w=448&h=128", p.artUrl(448, 128))
+  }
 }

@@ -85,8 +85,13 @@ export function liveProgramIndex(programs: Timed[], nowMs: number): number {
 
 /** Artwork sizes are rounded up to this many px, so near-identical cells share one image URL (and cache entry). */
 export const ART_STEP = 64;
-/** The image route clamps `w` and `h` to 2000 px; this is the largest bucket under that. */
-export const ART_MAX = 1920;
+/**
+ * The largest side artwork is requested at, in px. The image route scales a picture to COVER the box it is asked for, so a cell as wide
+ * as the lane gets a picture as wide as the lane and as tall as the artwork's shape makes it (a 16:9 poster 1920 wide is 1080 tall,
+ * 8 MB decoded, for a cell 128 px tall). The cap bounds that: past it a wide cell's art is scaled up a little under its scrim instead.
+ * The image route itself clamps a side to 2000.
+ */
+export const ART_MAX = 1024;
 
 /**
  * The pixel size to request artwork at for a cell drawn `widthDp` x `heightDp`: the drawn size, rounded up to a
@@ -96,3 +101,13 @@ export function artBox(widthDp: number, heightDp: number, pixelRatio: number, st
   const up = (dp: number) => Math.min(ART_MAX, Math.ceil(Math.max(1, Math.ceil(dp * pixelRatio)) / step) * step);
   return { w: up(widthDp), h: up(heightDp) };
 }
+
+/** The Plex artwork path a program's cell shows when program art is on: its landscape `art`, else its `thumb`. Null for neither. */
+export const programArtPath = (g: { art?: string | null; thumb?: string | null }): string | null => g.art || g.thumb || null;
+
+/**
+ * `base` (an artwork URL up to its query: the image route and the path, from `imageUrl`) with the pixel box asked for appended.
+ * Both renderers build the request this way from the same bucketed box, so a cell's image is fetched and cached once whichever
+ * of them draws it.
+ */
+export const artUrl = (base: string, box: { w: number; h: number }): string => `${base}${base.includes("?") ? "&" : "?"}w=${box.w}&h=${box.h}`;

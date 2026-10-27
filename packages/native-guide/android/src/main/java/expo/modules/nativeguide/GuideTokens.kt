@@ -39,6 +39,12 @@ class GuideTokens private constructor(
   val numberFocused: Int,
   val numberWeight: Int,
   val name: Int,
+  /** Over a program's art, left to right: the two ends of the scrim (translucent colors of one hue). */
+  val artScrimStart: Int,
+  val artScrimEnd: Int,
+  /** A program's title and sub-line over its art. */
+  val artTitle: Int,
+  val artSub: Int,
 ) {
   companion object {
     /** The standard guide: the values the React Native rows used before they read tokens. */
@@ -62,6 +68,10 @@ class GuideTokens private constructor(
       numberFocused = GuideColor.parse("#e6eaf1"),
       numberWeight = 700,
       name = GuideColor.parse("#94a3b8"),
+      artScrimStart = GuideColor.parse("rgba(6,10,20,0.88)"),
+      artScrimEnd = GuideColor.parse("rgba(6,10,20,0.8)"),
+      artTitle = GuideColor.parse("#f1f5f9"),
+      artSub = GuideColor.parse("#e6ebf2"),
     )
 
     /** Reads the `tokens` prop. Anything that isn't valid JSON throws (the view reports it and the guide falls back). */
@@ -70,6 +80,7 @@ class GuideTokens private constructor(
       val a = AURORA
       val liveFill = o.optJSONObject("liveFill")
       val circle = o.optJSONObject("circle")
+      val scrim = o.optJSONArray("artScrim")
       return GuideTokens(
         rowBorder = color(o, "rowBorder", a.rowBorder),
         cellBg = color(o, "cellBg", a.cellBg),
@@ -90,6 +101,10 @@ class GuideTokens private constructor(
         numberFocused = color(o, "numberFocused", a.numberFocused),
         numberWeight = weight(o, "numberWeight", a.numberWeight),
         name = color(o, "name", a.name),
+        artScrimStart = (scrim?.opt(0) as? String)?.let { GuideColor.parse(it) } ?: a.artScrimStart,
+        artScrimEnd = (scrim?.opt(1) as? String)?.let { GuideColor.parse(it) } ?: a.artScrimEnd,
+        artTitle = color(o, "artTitle", a.artTitle),
+        artSub = color(o, "artSub", a.artSub),
       )
     }
 

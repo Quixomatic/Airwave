@@ -86,7 +86,11 @@ export function auroraGeo(i: AuroraGeoInput, s: Scalers, tk: GuideTokens) {
 
 export type AuroraGeo = ReturnType<typeof auroraGeo>;
 
-/** The JSON object the native view's `tokens` prop carries: the colors, accent alphas and weights the rows draw with. */
+/**
+ * The JSON object the native view's `tokens` prop carries: the colors, accent alphas and weights the rows draw with. A
+ * program's art is a URL in the lineup, not a token: the painter draws it when there is one, with `artScrim` over it and
+ * `artTitle` / `artSub` for the text.
+ */
 export function rowTokens(tk: GuideTokens) {
   return {
     rowBorder: tk.rowBorder,
@@ -106,5 +110,9 @@ export function rowTokens(tk: GuideTokens) {
     numberFocused: tk.numberFocused,
     numberWeight: tk.numberWeight,
     name: tk.name,
+    // Program art, when the cells show it: the scrim over it (left to right) and the text colors on it.
+    artScrim: [tk.artScrim[0], tk.artScrim[1]],
+    artTitle: tk.artTitle,
+    artSub: tk.artSub,
   };
 }

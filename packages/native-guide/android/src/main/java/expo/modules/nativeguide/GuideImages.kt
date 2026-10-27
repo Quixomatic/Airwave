@@ -5,15 +5,19 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import com.facebook.cache.common.CacheKey
+import com.facebook.cache.common.SimpleCacheKey
 import com.facebook.common.executors.UiThreadImmediateExecutorService
 import com.facebook.common.references.CloseableReference
 import com.facebook.datasource.BaseDataSubscriber
 import com.facebook.datasource.DataSource
 import com.facebook.drawee.backends.pipeline.Fresco
+import com.facebook.imagepipeline.bitmaps.PlatformBitmapFactory
 import com.facebook.imagepipeline.common.ImageDecodeOptions
 import com.facebook.imagepipeline.common.ResizeOptions
 import com.facebook.imagepipeline.image.CloseableBitmap
 import com.facebook.imagepipeline.image.CloseableImage
+import com.facebook.imagepipeline.request.BasePostprocessor
 import com.facebook.imagepipeline.request.ImageRequestBuilder
 
 /**
@@ -33,7 +37,7 @@ import com.facebook.imagepipeline.request.ImageRequestBuilder
  * happens underneath; a slow download that keeps moving is never abandoned. Main thread only.
  */
 class GuideImages(private val onChanged: () -> Unit) {
-  class Entry internal constructor(val key: String, val url: String, internal val resizeW: Int, internal val resizeH: Int) {
+  class Entry internal constructor(val key: String, val url: String, internal val resizeW: Int, internal val resizeH: Int, internal val cover: Boolean) {
     internal var ref: CloseableReference<CloseableImage>? = null
     var bitmap: Bitmap? = null
       internal set
@@ -59,6 +63,11 @@ class GuideImages(private val onChanged: () -> Unit) {
 
   companion object {
     const val FADE_MS = 300L
+
+    /** How opaque an image that arrived at `arrivedAt` (uptime ms; 0 = a memory-cache hit) is at `now`: a fresh fetch fades
+     *  in over [FADE_MS], a cache hit is drawn at once. */
+    fun fade(arrivedAt: Long, now: Long): Float = if (arrivedAt <= 0L) 1f else ((now - arrivedAt).toFloat() / FADE_MS).coerceIn(0f, 1f)
+
     private const val RETRY_LIMIT = 3
     private const val RETRY_BASE_MS = 1000L
     private const val FAILURE_TTL_MS = 5 * 60_000L
@@ -100,11 +109,16 @@ class GuideImages(private val onChanged: () -> Unit) {
     for (e in list) e.usedFrame = frame
   }
 
-  /** The image for `url`. `resizeW` and `resizeH` above 0 decode it down to that pixel box (like React Native's
-   *  `resizeMethod="resize"`); 0 decodes it as served (server-sized art). Starts or retries the fetch as needed. */
-  fun get(url: String, resizeW: Int = 0, resizeH: Int = 0): Entry {
-    val key = if (resizeW > 0) "$url#${resizeW}x$resizeH" else url
-    val e = entries[key] ?: Entry(key, url, resizeW, resizeH).also { entries[key] = it }
+  /**
+   * The image for `url`. `resizeW` and `resizeH` above 0 decode it down to that pixel box (like React Native's
+   * `resizeMethod="resize"`); 0 decodes it as served. `cover` also crops the decoded bitmap to the centre band that a `resizeW` x
+   * `resizeH` box shows of it (see [CoverCropPostprocessor]): the bitmap this class then holds for an image that is drawn centre-cropped
+   * into a box (a cell's art) is the box's pixels, not the whole picture's, which for a wide, short box is several times as many.
+   * (Fresco's own bitmap cache may also hold the uncropped decode: see [CoverCropPostprocessor].) Starts or retries the fetch as needed.
+   */
+  fun get(url: String, resizeW: Int = 0, resizeH: Int = 0, cover: Boolean = false): Entry {
+    val key = if (resizeW > 0) "$url#${resizeW}x$resizeH${if (cover) "c" else ""}" else url
+    val e = entries[key] ?: Entry(key, url, resizeW, resizeH, cover && resizeW > 0 && resizeH > 0).also { entries[key] = it }
     e.usedFrame = frame
     val now = SystemClock.uptimeMillis()
     if (e.failed && now - e.failedAt > FAILURE_TTL_MS) {
@@ -203,6 +217,7 @@ class GuideImages(private val onChanged: () -> Unit) {
     val b = ImageRequestBuilder.newBuilderWithSource(Uri.parse(e.url))
       .setImageDecodeOptions(ImageDecodeOptions.newBuilder().setForceStaticImage(true).build())
     if (e.resizeW > 0 && e.resizeH > 0) b.setResizeOptions(ResizeOptions(e.resizeW, e.resizeH))
+    if (e.cover) b.setPostprocessor(CoverCropPostprocessor(e.resizeW, e.resizeH))
     val request = b.build()
     val fromMemory = pipeline.isInBitmapMemoryCache(request)
     val ds = pipeline.fetchDecodedImage(request, CALLER)
@@ -258,6 +273,31 @@ class GuideImages(private val onChanged: () -> Unit) {
     e.failedAt = SystemClock.uptimeMillis()
     version += 1
     onChanged()
+  }
+}
+
+/**
+ * Crops a decoded picture to the centre band a `boxW` x `boxH` box shows of it when it is scaled to cover the box (what the painter draws,
+ * `GuideGeometry.coverCrop`), on Fresco's decode thread and before anything holds the bitmap. The image route's pictures are cover-scaled
+ * to the box they are asked for, so for a wide, short cell the picture is as wide as the cell and as tall as the artwork's shape makes
+ * it (a 16:9 picture as wide as the request is 576 px tall at the 1024 px cap, and 2.4 MB decoded); only the band is ever drawn.
+ *
+ * What this saves is what the view PINS: [GuideImages] holds a reference to the cropped band for as long as it is on screen, and that is
+ * not counted against the view's memory budget. It does not stop Fresco keeping the full decode: Fresco's bitmap memory cache holds the
+ * decode the crop was made from as well, as it does for any request, and there is no supported per-request switch that skips it while
+ * keeping the cropped result cached. That copy is an LRU Fresco bounds and trims under memory pressure, not a pinned one, and its
+ * size is bounded by the request's cap ([GuideGeometry.ART_MAX]).
+ * Fresco caches the cropped result under [getPostprocessorCacheKey], so a repeat of the box is a cache hit.
+ */
+internal class CoverCropPostprocessor(private val boxW: Int, private val boxH: Int) : BasePostprocessor() {
+  override fun getName(): String = "AirwaveCoverCrop"
+
+  override fun getPostprocessorCacheKey(): CacheKey = SimpleCacheKey("airwave-cover-crop-${boxW}x$boxH")
+
+  override fun process(source: Bitmap, bitmapFactory: PlatformBitmapFactory): CloseableReference<Bitmap> {
+    val c = IntArray(4)
+    GuideGeometry.coverCrop(source.width, source.height, boxW.toDouble(), boxH.toDouble(), c)
+    return bitmapFactory.createBitmap(source, c[0], c[1], c[2] - c[0], c[3] - c[1])
   }
 }
 

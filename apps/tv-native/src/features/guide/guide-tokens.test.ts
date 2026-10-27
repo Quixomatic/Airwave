@@ -3,9 +3,16 @@ import { describe, expect, test } from "bun:test";
 
 import { AURORA, type GuideTokens, useGuideTokens } from "./guide-tokens";
 
+// What program art (opt-in) draws with: new with art, so not among the literals the guide drew with before tokens.
+const ART_TOKENS = {
+  artScrim: ["rgba(6,10,20,0.88)", "rgba(6,10,20,0.8)"] as const,
+  artTitle: "#f1f5f9",
+  artSub: "#e6ebf2",
+};
+
 // The literals the guide components drew with before the look moved into tokens (aurora-grid,
 // guide-sidebar, glass-button, guide-ghost and the `C` palette entries they read).
-const BEFORE_TOKENS: GuideTokens = {
+const BEFORE_TOKENS: Omit<GuideTokens, keyof typeof ART_TOKENS> = {
   bg: "#060a14",
   scrim: "rgba(6,10,20,0.55)",
   now: "#ef4444",
@@ -65,8 +72,8 @@ const BEFORE_TOKENS: GuideTokens = {
 };
 
 describe("Aurora tokens", () => {
-  test("reproduce the literals the guide used before tokens", () => {
-    expect(AURORA).toEqual(BEFORE_TOKENS);
+  test("reproduce the literals the guide used before tokens, plus the program art colors", () => {
+    expect(AURORA).toEqual({ ...BEFORE_TOKENS, ...ART_TOKENS });
   });
 
   test("are what the guide reads", () => {

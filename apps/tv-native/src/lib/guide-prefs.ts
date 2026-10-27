@@ -6,23 +6,28 @@ import { useSyncExternalStore } from "react";
  * AsyncStorage and hydrated once at launch into a module variable so `getGuidePrefs()` is synchronous (the same pattern as
  * `audio-pref.ts`). A small external store notifies the guide and the settings page when it changes.
  *
+ *  - `art`: "off" (the default) draws plain program cells; "on" draws each program's artwork behind its title (served by
+ *    the server's image route, sized to the cell). It costs memory and network, which is why it is opt-in.
  *  - `rows`: "native" (the default) draws the guide's rows in one native view, on Android TV and only when the app build
  *    has the native module; the guide falls back to classic by itself when anything goes wrong (see
  *    `features/guide/guide-renderer.ts`). "classic" draws them as React Native views, which is what every other platform
  *    always does. Settings -> Guide -> Guide rendering shows them as Native and Classic.
  */
 export type GuideRows = "classic" | "native";
+export type GuideArt = "off" | "on";
 
 export type GuidePrefs = {
+  art: GuideArt;
   rows: GuideRows;
 };
 
-export const DEFAULT_GUIDE_PREFS: GuidePrefs = { rows: "native" };
+export const DEFAULT_GUIDE_PREFS: GuidePrefs = { art: "off", rows: "native" };
 
 const KEY = "cg-guide-prefs";
 
 /** One validator per field: a stored value it doesn't accept falls back to the field's default. */
 const VALID: { [K in keyof GuidePrefs]: (v: unknown) => v is GuidePrefs[K] } = {
+  art: (v): v is GuideArt => v === "off" || v === "on",
   rows: (v): v is GuideRows => v === "classic" || v === "native",
 };
 const FIELDS = Object.keys(VALID) as (keyof GuidePrefs)[];

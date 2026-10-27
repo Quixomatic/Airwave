@@ -5,11 +5,13 @@ import fixture from "../../../../../packages/native-guide/android/src/test/resou
 import {
   ART_MAX,
   artBox,
+  artUrl,
   cellBox,
   isVisible,
   liveFill,
   liveProgramIndex,
   MIN,
+  programArtPath,
   SOURCE_CULL_GAP,
   timelineOrigin,
   WINDOW_MIN,
@@ -167,13 +169,16 @@ describe("artBox", () => {
     expect(artBox(32, 32, 2)).toEqual({ w: 64, h: 64 });
   });
 
-  test("is never smaller than what is drawn, and nearby sizes share a request", () => {
-    for (let w = 20; w < 700; w += 7.3) expect(artBox(w, 40, 2.625).w).toBeGreaterThanOrEqual(Math.ceil(w * 2.625));
+  test("is never smaller than what is drawn (up to the cap), and nearby sizes share a request", () => {
+    for (let w = 20; w < 700; w += 7.3) expect(artBox(w, 40, 2.625).w).toBeGreaterThanOrEqual(Math.min(ART_MAX, Math.ceil(w * 2.625)));
     expect(artBox(100.2, 40, 2)).toEqual(artBox(100.9, 40, 2));
   });
 
   test("caps the request and keeps a minimum of one step", () => {
     expect(artBox(4000, 4000, 2)).toEqual({ w: ART_MAX, h: ART_MAX });
+    expect(ART_MAX).toBe(1024); // a wide cell's cover-scaled picture is as wide as the request: see ART_MAX
+    expect(artBox(512, 60, 2)).toEqual({ w: 1024, h: 128 }); // exactly the cap is not rounded past it
+    expect(artBox(900, 60, 2)).toEqual({ w: 1024, h: 128 }); // a lane-wide cell asks for the cap, not its full width
     expect(artBox(0, 0.1, 2)).toEqual({ w: 64, h: 64 });
     expect(artBox(40, 53, 2, 32)).toEqual({ w: 96, h: 128 });
   });
@@ -181,6 +186,34 @@ describe("artBox", () => {
 
 // packages/native-guide's Kotlin tests read this same file. When geometry.ts changes, regenerate it with
 // `bun packages/native-guide/scripts/gen-geometry-fixture.ts`.
+describe("programArtPath", () => {
+  test("prefers the landscape art, then the thumb", () => {
+    expect(programArtPath({ art: "/library/metadata/1/art/9", thumb: "/library/metadata/1/thumb/9" })).toBe("/library/metadata/1/art/9");
+    expect(programArtPath({ thumb: "/library/metadata/1/thumb/9" })).toBe("/library/metadata/1/thumb/9");
+    expect(programArtPath({ art: "", thumb: "/library/metadata/1/thumb/9" })).toBe("/library/metadata/1/thumb/9");
+  });
+
+  test("is null for neither", () => {
+    expect(programArtPath({})).toBeNull();
+    expect(programArtPath({ art: "", thumb: null })).toBeNull();
+  });
+});
+
+describe("artUrl", () => {
+  test("appends the pixel box to the query the image route already has", () => {
+    expect(artUrl("https://s.example/img/c1?path=%2Flibrary%2Fx", { w: 256, h: 128 })).toBe("https://s.example/img/c1?path=%2Flibrary%2Fx&w=256&h=128");
+  });
+
+  test("starts a query when there is none", () => {
+    expect(artUrl("https://s.example/img/c1", { w: 64, h: 64 })).toBe("https://s.example/img/c1?w=64&h=64");
+  });
+
+  test("two cells that bucket to one box request one URL", () => {
+    const base = "https://s.example/img/c1?path=%2Flibrary%2Fx";
+    expect(artUrl(base, artBox(100.2, 40, 2))).toBe(artUrl(base, artBox(100.9, 40, 2)));
+  });
+});
+
 describe("geometry fixture", () => {
   const lanes = (c: { originMs: number; ppm: number; laneW: number; gap: number }): Lane => ({
     T0: new Date(c.originMs),
@@ -206,6 +239,11 @@ describe("geometry fixture", () => {
 
   test("liveFill reproduces every case", () => {
     fixture.liveFills.forEach((c, i) => expect({ i, out: liveFill(c.in.nowX, c.in.left, c.in.width) }).toEqual({ i, out: c.out }));
+  });
+
+  test("artUrl reproduces every case", () => {
+    expect(fixture.artUrls.length).toBeGreaterThan(0);
+    fixture.artUrls.forEach((c, i) => expect({ i, out: artUrl(c.in.base, { w: c.in.w, h: c.in.h }) }).toEqual({ i, out: c.out }));
   });
 
   test("artBox reproduces every case", () => {

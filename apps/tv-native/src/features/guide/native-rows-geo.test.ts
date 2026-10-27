@@ -93,6 +93,9 @@ describe("rowTokens", () => {
       numberFocused: "#e6eaf1",
       numberWeight: "700",
       name: "#94a3b8",
+      artScrim: ["rgba(6,10,20,0.88)", "rgba(6,10,20,0.8)"],
+      artTitle: "#f1f5f9",
+      artSub: "#e6ebf2",
     });
   });
 

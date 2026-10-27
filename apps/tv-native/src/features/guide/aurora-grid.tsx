@@ -3,20 +3,21 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect } from "expo-router";
 import { Heart, Star } from "lucide-react-native";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Platform, Text, useWindowDimensions, View } from "react-native";
+import { Image, PixelRatio, Platform, Text, useWindowDimensions, View } from "react-native";
 
 import { TvPressable as Pressable } from "@/components/tv-pressable";
 
 import { usePlayer } from "@/features/watch/player-ctx";
-import type { GuideGridChannel, GuideGridProgram, GuideMeta } from "@/lib/api";
+import { type GuideGridChannel, type GuideGridProgram, type GuideMeta, imageUrl } from "@/lib/api";
+import { useGuidePrefs } from "@/lib/guide-prefs";
 import { LAYER, setBackExitsApp, useKeyLayer } from "@/lib/input";
 import { channelTint } from "@/lib/tint";
 import { usePackages } from "@/hooks/queries";
 
-import { cellBox, isVisible, liveFill, timelineOrigin, type Lane } from "./geometry";
+import { artBox, artUrl, cellBox, isVisible, liveFill, programArtPath, timelineOrigin, type Lane } from "./geometry";
 import { GuideGhost } from "./guide-ghost";
 import { reportNativeGuideError } from "./guide-renderer";
-import { useGuideTokens } from "./guide-tokens";
+import { type GuideTokens, useGuideTokens } from "./guide-tokens";
 import { GuideSidebar, buildSidebarItems, lensEquals, type Lens } from "./guide-sidebar";
 import {
   accentOf,
@@ -524,6 +525,7 @@ function Row({
   vw: (px: number) => number;
 }) {
   const tk = useGuideTokens();
+  const art = useGuidePrefs().art === "on";
   const Icon = channelIcon(channel.icon ?? channel.package?.icon);
   const circle = vw(64 * FEATURE_SCALE);
 
@@ -566,47 +568,113 @@ function Row({
           const fillA = hexA(accent, tk.liveFill.elapsed);
           const fillB = hexA(accent, tk.liveFill.remain);
           return (
-            <Pressable
+            <ProgramCell
               key={p.id}
-              onPress={() => onProgramTap(index, pi)}
-              focusable={!Platform.isTV}
-              style={{
-                position: "absolute",
-                top: vw(6),
-                left,
-                width: cw,
-                height: rowPx - vw(12),
-                borderRadius: cs(tk.cellRadius),
-                overflow: "hidden",
-                borderWidth: selected ? line(tk.ringW) : line(tk.cellBorderW),
-                borderColor: selected ? tk.ring : tk.cellBorder,
-                backgroundColor: live ? tk.liveCellBg : tk.cellBg,
-                zIndex: selected ? 4 : 1,
-              }}
-            >
-              {live && (
-                <LinearGradient
-                  colors={[fillA, fillA, fillB, fillB]}
-                  locations={[0, fillPct, fillPct, 1]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={{ position: "absolute", inset: 0 }}
-                />
-              )}
-              {live && <View style={{ position: "absolute", left: vw(3), top: vw(10), bottom: vw(10), width: line(tk.liveBar.w), borderRadius: line(tk.liveBar.r), backgroundColor: accent }} />}
-              <View style={{ paddingTop: vw(20), paddingHorizontal: vw(20) }}>
-                <Text numberOfLines={1} style={{ fontSize: vw(34), fontWeight: tk.titleWeight, color: tk.title }}>
-                  {p.guide.showTitle ?? p.guide.title}
-                </Text>
-                <Text numberOfLines={1} style={{ marginTop: vw(12), fontSize: vw(26), color: tk.sub }}>
-                  {subLine(p.guide)}
-                </Text>
-              </View>
-            </Pressable>
+              program={p}
+              programIndex={pi}
+              channelId={channel.id}
+              index={index}
+              left={left}
+              width={cw}
+              selected={selected}
+              live={live}
+              fillA={fillA}
+              fillB={fillB}
+              fillPct={fillPct}
+              accent={accent}
+              tk={tk}
+              art={art}
+              rowPx={rowPx}
+              vw={vw}
+              onProgramTap={onProgramTap}
+            />
           );
         })}
       </View>
     </View>
+  );
+}
+
+type ProgramCellProps = {
+  program: GuideGridProgram;
+  programIndex: number;
+  channelId: string;
+  /** The row's index in the lineup. */
+  index: number;
+  /** The cell's box in the lane (dp). */
+  left: number;
+  width: number;
+  selected: boolean;
+  live: boolean;
+  /** The on-now fill's colors, left and right of the now line, and where the line falls (0..1). */
+  fillA: string;
+  fillB: string;
+  fillPct: number;
+  /** The row's accent (the live bar). */
+  accent: string;
+  tk: GuideTokens;
+  /** Program art is on: the cell shows its artwork when it has one. */
+  art: boolean;
+  rowPx: number;
+  vw: (px: number) => number;
+  onProgramTap: (index: number, programIndex: number) => void;
+};
+
+/**
+ * One program's cell. With program art on, the program's artwork (its landscape `art`, else its `thumb`) fills the cell, centre
+ * cropped, under a scrim and the title and sub-line in the theme's art text colors. The request is the server's image route at
+ * the cell's size rounded up to a 64 px step, the same URL the native rows ask for. A cell with no artwork, or whose image
+ * failed to load, is a plain cell. With art off the cell is exactly what it was before art existed.
+ */
+function ProgramCell({ program: p, programIndex: pi, channelId, index, left, width: cw, selected, live, fillA, fillB, fillPct, accent, tk, art, rowPx, vw, onProgramTap }: ProgramCellProps) {
+  const base = art ? imageUrl(channelId, programArtPath(p.guide)) : null;
+  const src = base ? artUrl(base, artBox(cw, rowPx - vw(12), PixelRatio.get())) : null;
+  // The image that failed to load, so a changed URL (another size) gets a fresh try.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const showArt = src !== null && failedSrc !== src;
+  return (
+    <Pressable
+      onPress={() => onProgramTap(index, pi)}
+      focusable={!Platform.isTV}
+      style={{
+        position: "absolute",
+        top: vw(6),
+        left,
+        width: cw,
+        height: rowPx - vw(12),
+        borderRadius: cs(tk.cellRadius),
+        overflow: "hidden",
+        borderWidth: selected ? line(tk.ringW) : line(tk.cellBorderW),
+        borderColor: selected ? tk.ring : tk.cellBorder,
+        backgroundColor: live ? tk.liveCellBg : tk.cellBg,
+        zIndex: selected ? 4 : 1,
+      }}
+    >
+      {showArt && (
+        <>
+          <Image source={{ uri: src }} resizeMode="cover" resizeMethod="resize" onError={() => setFailedSrc(src)} style={{ position: "absolute", inset: 0 }} />
+          <LinearGradient colors={[tk.artScrim[0], tk.artScrim[1]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ position: "absolute", inset: 0 }} />
+        </>
+      )}
+      {live && (
+        <LinearGradient
+          colors={[fillA, fillA, fillB, fillB]}
+          locations={[0, fillPct, fillPct, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{ position: "absolute", inset: 0 }}
+        />
+      )}
+      {live && <View style={{ position: "absolute", left: vw(3), top: vw(10), bottom: vw(10), width: line(tk.liveBar.w), borderRadius: line(tk.liveBar.r), backgroundColor: accent }} />}
+      <View style={{ paddingTop: vw(20), paddingHorizontal: vw(20) }}>
+        <Text numberOfLines={1} style={{ fontSize: vw(34), fontWeight: tk.titleWeight, color: showArt ? tk.artTitle : tk.title }}>
+          {p.guide.showTitle ?? p.guide.title}
+        </Text>
+        <Text numberOfLines={1} style={{ marginTop: vw(12), fontSize: vw(26), color: showArt ? tk.artSub : tk.sub }}>
+          {subLine(p.guide)}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 

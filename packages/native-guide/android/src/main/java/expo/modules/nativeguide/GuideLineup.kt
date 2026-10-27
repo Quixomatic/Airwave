@@ -16,6 +16,23 @@ class GuideProgram(
   val sub: String,
 ) {
   val endMs: Long get() = startMs + durationSeconds * 1000L
+
+  // The URL last built for this program's art, so a frame doesn't build a string per cell. Main thread only.
+  private var urlW = 0
+  private var urlH = 0
+  private var urlText: String? = null
+
+  /** The request URL for this program's art at a `w` x `h` px box ([GuideGeometry.artUrl]), or null when it has no art. */
+  fun artUrl(w: Int, h: Int): String? {
+    val base = art ?: return null
+    val cached = urlText
+    if (cached != null && w == urlW && h == urlH) return cached
+    return GuideGeometry.artUrl(base, intArrayOf(w, h)).also {
+      urlText = it
+      urlW = w
+      urlH = h
+    }
+  }
 }
 
 /** One channel's data (see `PackedChannel` in src/index.ts). */

@@ -187,6 +187,16 @@ class AuroraLayoutTest {
     assertEquals(plain.right, ring.right)
   }
 
+  @Test fun artworkIsRequestedAtTheCellsSizeRoundedUpToTheStep() {
+    // Density 2: a 200 dp wide cell is 400 px -> 448; the cell is 63 - 4.5 = 58.5 dp tall, 117 px -> 128.
+    assertEquals(448, layout.artW(GuideGeometry.CellBox(100.0, 200.0)))
+    assertEquals(128, layout.artH)
+    assertEquals(64, layout.artW(GuideGeometry.CellBox(0.0, 20.0))) // 40 px: one step at least
+    assertEquals(1024, layout.artW(GuideGeometry.CellBox(0.0, 5000.0))) // capped at ART_MAX: a wide cell's picture is cover-scaled to its width
+    // Two cells a couple of dp apart in width share one request.
+    assertEquals(layout.artW(GuideGeometry.CellBox(0.0, 201.0)), layout.artW(GuideGeometry.CellBox(0.0, 203.0)))
+  }
+
   @Test fun aCellsEdgesFollowItsFractionalPositionOnThePixelGrid() {
     val c = CellRect()
     layout.placeCell(GuideGeometry.CellBox(10.3, 20.2), selected = false, out = c)

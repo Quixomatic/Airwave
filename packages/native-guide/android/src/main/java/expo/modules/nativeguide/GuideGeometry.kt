@@ -4,6 +4,7 @@ import org.json.JSONObject
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * The guide rows' pure geometry: where a program's cell sits in its row, which rows a scroll offset shows, and the
@@ -15,6 +16,14 @@ import kotlin.math.min
  */
 object GuideGeometry {
   const val MIN_MS = 60_000.0
+
+  /**
+   * The largest side artwork is requested at (`ART_MAX` in geometry.ts), in px. The image route scales a picture to COVER the box it is
+   * asked for, so a cell as wide as the lane gets a picture as wide as the lane and as tall as the artwork's shape makes it (a 16:9 poster
+   * 1920 wide is 1080 tall, 8 MB decoded, for a cell 128 px tall). A cap bounds that, for the picture Fresco decodes (and caches) as well as
+   * for the band the view keeps: past it a wide cell's art is scaled up a little under its scrim instead.
+   */
+  const val ART_MAX = 1024
 
   /** A cell narrower than this (dp) is not drawn. */
   const val MIN_CELL_W = 8.0
@@ -75,12 +84,37 @@ object GuideGeometry {
 
   /** A dp box -> the pixel box requested from the image proxy: rounded UP to `step` px so near-identical boxes share
    *  one URL (and one cache entry), never below the drawn size, capped at `maxW` x `maxH`. Returns [w, h]. */
-  fun artBox(widthDp: Double, heightDp: Double, pixelRatio: Double, maxW: Int, maxH: Int, step: Int = 64): IntArray {
-    fun up(dp: Double, cap: Int): Int {
-      val px = max(1.0, ceil(dp * pixelRatio))
-      return min(cap.toDouble(), ceil(px / step) * step).toInt()
+  fun artBox(widthDp: Double, heightDp: Double, pixelRatio: Double, maxW: Int, maxH: Int, step: Int = 64): IntArray =
+    intArrayOf(artSide(widthDp, pixelRatio, maxW, step), artSide(heightDp, pixelRatio, maxH, step))
+
+  /** One side of [artBox]: `dp` in px, rounded up to `step`, at least one step and at most `cap`. */
+  fun artSide(dp: Double, pixelRatio: Double, cap: Int, step: Int = 64): Int {
+    val px = max(1.0, ceil(dp * pixelRatio))
+    return min(cap.toDouble(), ceil(px / step) * step).toInt()
+  }
+
+  /**
+   * The part of a `srcW` x `srcH` image that fills a `dstW` x `dstH` box when it is scaled to cover the box and centered
+   * (a React Native image's `resizeMode="cover"`), as [left, top, right, bottom] in source pixels written to `out`. An
+   * image or box with no size crops nothing.
+   */
+  fun coverCrop(srcW: Int, srcH: Int, dstW: Double, dstH: Double, out: IntArray) {
+    if (srcW <= 0 || srcH <= 0 || dstW <= 0 || dstH <= 0) {
+      out[0] = 0
+      out[1] = 0
+      out[2] = max(0, srcW)
+      out[3] = max(0, srcH)
+      return
     }
-    return intArrayOf(up(widthDp, maxW), up(heightDp, maxH))
+    val scale = max(dstW / srcW, dstH / srcH)
+    val w = dstW / scale
+    val h = dstH / scale
+    val left = (srcW - w) / 2
+    val top = (srcH - h) / 2
+    out[0] = left.roundToInt().coerceIn(0, srcW)
+    out[1] = top.roundToInt().coerceIn(0, srcH)
+    out[2] = (left + w).roundToInt().coerceIn(out[0], srcW)
+    out[3] = (top + h).roundToInt().coerceIn(out[1], srcH)
   }
 
   /** `base` (the artwork URL up to its query) with the requested pixel box appended. */

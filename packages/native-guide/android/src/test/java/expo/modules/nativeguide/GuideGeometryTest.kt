@@ -15,7 +15,8 @@ import org.junit.Test
  *
  *   { "cells":     [{ "in": { startMs, durationSeconds, originMs, ppm, laneW, gap }, "out": { left, width } | null, "kept": boolean }],
  *     "liveFills": [{ "in": { nowX, left, width }, "out": number }],
- *     "artBoxes":  [{ "in": { w, h, ratio, step }, "out": { w, h } }] }
+ *     "artBoxes":  [{ "in": { w, h, ratio, step }, "out": { w, h } }],
+ *     "artUrls":   [{ "in": { base, w, h }, "out": string }] }
  *
  * The TypeScript fixes the window (WINDOW_MIN) and the artwork cap (ART_MAX), so the fixture doesn't carry them and
  * the parity tests below pass the same constants. A missing fixture fails these tests rather than skipping them.
@@ -130,6 +131,46 @@ class GuideGeometryTest {
     assertEquals(listOf(64, 64), GuideGeometry.artBox(0.0, 0.0, 2.0, 1152, 1080).toList())
   }
 
+  @Test fun artSideIsOneSideOfTheBox() {
+    assertEquals(512, GuideGeometry.artSide(225.0, 2.0, 1920)) // 450 px -> 512
+    assertEquals(64, GuideGeometry.artSide(0.0, 2.0, 1920)) // at least one step
+    assertEquals(1920, GuideGeometry.artSide(5000.0, 2.0, 1920))
+    assertEquals("the cap a cell is requested at", 1024, GuideGeometry.artSide(5000.0, 2.0, GuideGeometry.ART_MAX))
+    assertEquals(1024, GuideGeometry.artSide(512.0, 2.0, GuideGeometry.ART_MAX)) // exactly the cap
+    assertEquals(GuideGeometry.artBox(225.0, 55.0, 2.0, 1920, 1920).toList(), listOf(GuideGeometry.artSide(225.0, 2.0, 1920), GuideGeometry.artSide(55.0, 2.0, 1920)))
+  }
+
+  private fun crop(srcW: Int, srcH: Int, dstW: Double, dstH: Double): List<Int> = IntArray(4).also { GuideGeometry.coverCrop(srcW, srcH, dstW, dstH, it) }.toList()
+
+  @Test fun aWideImageInASquareBoxLosesItsSidesEvenly() {
+    assertEquals(listOf(250, 0, 750, 500), crop(1000, 500, 100.0, 100.0)) // the middle 500 x 500
+  }
+
+  @Test fun aTallImageInAWideBoxLosesItsTopAndBottomEvenly() {
+    assertEquals(listOf(0, 125, 500, 375), crop(500, 500, 200.0, 100.0)) // the middle 500 x 250
+  }
+
+  @Test fun anImageOfTheBoxsOwnShapeIsNotCropped() {
+    assertEquals(listOf(0, 0, 640, 360), crop(640, 360, 320.0, 180.0))
+    assertEquals(listOf(0, 0, 1920, 1080), crop(1920, 1080, 480.0, 270.0))
+  }
+
+  @Test fun aWideShortBoxKeepsOnlyItsBandOfACoverScaledPicture() {
+    // What CoverCropPostprocessor keeps of the picture the image route sends for a cell: its centre band, whatever the artwork's shape.
+    assertEquals(listOf(0, 224, 1024, 352), crop(1024, 576, 1024.0, 128.0)) // a 16:9 picture for a cell 1024 x 128: 128 of its 576 rows
+    val poster = crop(450, 675, 448.0, 128.0) // a 2:3 poster for a 448 x 128 cell
+    assertTrue("$poster", poster[3] - poster[1] in 128..130 && poster[2] - poster[0] == 450)
+  }
+
+  @Test fun theCropStaysInsideTheImageAndIsEmptyForNoSize() {
+    for ((sw, sh, dw, dh) in listOf(listOf(1000, 563, 448, 128), listOf(300, 450, 448, 128), listOf(3, 2, 7, 1), listOf(1, 1, 1000, 1)).map { it.map { n -> n.toDouble() } }) {
+      val c = crop(sw.toInt(), sh.toInt(), dw, dh)
+      assertTrue("$c", c[0] in 0..c[2] && c[2] <= sw.toInt() && c[1] in 0..c[3] && c[3] <= sh.toInt())
+    }
+    assertEquals(listOf(0, 0, 0, 0), crop(0, 0, 100.0, 100.0))
+    assertEquals(listOf(0, 0, 400, 300), crop(400, 300, 0.0, 50.0))
+  }
+
   @Test fun artUrlAppendsTheBoxToTheQuery() {
     val box = intArrayOf(512, 128)
     assertEquals("http://s/img/c1?path=%2Fa&w=512&h=128", GuideGeometry.artUrl("http://s/img/c1?path=%2Fa", box))
@@ -156,7 +197,7 @@ class GuideGeometryTest {
 
   // Parity with the TypeScript. WINDOW_MIN and ART_MAX are geometry.ts's constants.
   private val windowMin = 180.0
-  private val artMax = 1920
+  private val artMax = 1024
 
   private val fixture: JSONObject by lazy {
     val text = javaClass.classLoader?.getResource("geometry-fixture.json")?.readText()
@@ -192,6 +233,16 @@ class GuideGeometryTest {
       // The TypeScript takes now's lane position (nowX) directly; origin 0 and 1 dp per minute make this one's `nowMs` equal it.
       val got = GuideGeometry.liveFill(a.getDouble("nowX") * GuideGeometry.MIN_MS, 0.0, 1.0, a.getDouble("left"), a.getDouble("width"))
       near(cases.getJSONObject(i).getDouble("out"), got, "case $i")
+    }
+  }
+
+  @Test fun artUrlMatchesTypeScript() {
+    val cases = fixture.getJSONArray("artUrls")
+    assertTrue(cases.length() > 0)
+    for (i in 0 until cases.length()) {
+      val case = cases.getJSONObject(i)
+      val a = case.getJSONObject("in")
+      assertEquals("case $i", case.getString("out"), GuideGeometry.artUrl(a.getString("base"), intArrayOf(a.getInt("w"), a.getInt("h"))))
     }
   }
 

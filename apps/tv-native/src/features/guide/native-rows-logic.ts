@@ -23,6 +23,12 @@ export type LineupResolvers = {
   /** A row's accent. It depends on the row's position in the lineup being shown (an untinted channel takes a palette color
    *  by index, and a filter lens changes the index), so it is sent with the order, not with the channel. */
   accent: (ch: GuideGridChannel, index: number) => string;
+  /** A program's artwork request URL up to its query (the native side appends the pixel box it needs), or null for none.
+   *  Absent while program art is off: nothing is packed, so nothing is fetched. */
+  art?: (ch: GuideGridChannel, p: GuideGridProgram) => string | null;
+  /** What `art` yields (the server its URLs point at), so channels packed for another art setting or server are packed again.
+   *  "" or absent with art off. */
+  artKey?: string;
 };
 
 /** A value as a string for the packed arrays (the native reader takes strings where it expects strings). */
@@ -33,9 +39,9 @@ const str = (v: unknown): string => (v == null ? "" : String(v));
  * the server sends: a missing title packs as "", a non-integer duration is rounded, a negative or non-finite one
  * becomes 0, and a program whose start doesn't parse is dropped (it has no place on the time axis, and the React Native
  * rows can't place it either). Programs that ended before `fromMs` are left out: the timeline only moves forward, so
- * they are never drawn again.
+ * they are never drawn again. `art`, when program art is on, gives each program's artwork URL (null packs as no art).
  */
-export function packChannel(ch: GuideGridChannel, icon: string, fromMs: number, sub: LineupResolvers["sub"]): PackedChannel {
+export function packChannel(ch: GuideGridChannel, icon: string, fromMs: number, sub: LineupResolvers["sub"], art?: LineupResolvers["art"]): PackedChannel {
   const programs: PackedProgram[] = [];
   for (const p of ch.programs ?? []) {
     if (!p) continue;
@@ -44,7 +50,7 @@ export function packChannel(ch: GuideGridChannel, icon: string, fromMs: number, 
     const durationSeconds = Number.isFinite(p.durationSeconds) ? Math.max(0, Math.round(p.durationSeconds)) : 0;
     if (startMs + durationSeconds * 1000 <= fromMs) continue;
     const g = p.guide ?? ({} as GuideMeta);
-    programs.push([str(p.id), startMs, durationSeconds, str(g.showTitle ?? g.title), null, sub(g)]);
+    programs.push([str(p.id), startMs, durationSeconds, str(g.showTitle ?? g.title), art?.(ch, p) || null, sub(g)]);
   }
   return [str(ch.id), str(ch.number), str(ch.name), icon, null, programs];
 }
@@ -100,15 +106,17 @@ export class LineupSync {
     for (let i = 0; i < channels.length; i++) {
       const ch = channels[i]!;
       const icon = r.icon(ch);
+      const key = `${icon}|${r.artKey ?? ""}`;
       let h = this.tokens.get(ch);
-      // Repack when the resolved icon changed, or when the timeline now starts earlier than the programs this was packed from.
-      if (!h || h.key !== icon || fromMs < h.from) {
-        h = { tok: `${this.next++}`, key: icon, from: fromMs };
+      // Repack when what it was packed with changed (the resolved icon, the art setting), or when the timeline now starts
+      // earlier than the programs this was packed from.
+      if (!h || h.key !== key || fromMs < h.from) {
+        h = { tok: `${this.next++}`, key, from: fromMs };
         this.tokens.set(ch, h);
       }
       if (!this.held.has(h.tok) && !adding.has(h.tok)) {
         adding.add(h.tok);
-        add.push([h.tok, packChannel(ch, icon, h.from, r.sub)]);
+        add.push([h.tok, packChannel(ch, icon, h.from, r.sub, r.art)]);
       }
       order.push(h.tok);
       accent.push(r.accent(ch, i));

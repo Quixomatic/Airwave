@@ -1,9 +1,13 @@
 package expo.modules.nativeguide
 
 import android.graphics.Canvas
+import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.Rect
 import android.graphics.RectF
+import android.graphics.Shader
 import android.os.Build
 import android.os.Trace
 import android.text.Layout
@@ -26,7 +30,9 @@ import kotlin.math.roundToInt
  *    channel's lucide icon (the favorite heart while the rail itself has focus) with a heart badge on its corner for a
  *    favorite; the channel number at the top right and the name along the bottom (two lines at most);
  *  - the lane: a rounded, bordered cell per program (the selected one drawn last, with the focus ring), an on-now cell's
- *    two-tone progress fill and accent bar, then its title and sub-line.
+ *    two-tone progress fill and accent bar, then its title and sub-line. With program art on (a program carries an art URL),
+ *    the artwork fills the cell centre cropped, under a scrim, and the text takes the theme's art colors; a cell whose image
+ *    failed is a plain cell.
  *
  * Every dimension comes in `geo` (dp, from JS) and every color in the tokens, so the painter owns no design values. The
  * layout is [AuroraLayout], which rounds boxes to the pixel grid as React Native's layout engine does; text is measured
@@ -65,6 +71,15 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
   private val clip = Path()
   private val cell = CellRect()
 
+  // Program art: the image paint (alpha is the fade), the scrim's gradient (a unit one, placed per cell by a matrix) and scratch.
+  private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
+  private val scrimPaint = Paint().apply { style = Paint.Style.FILL }
+  private var scrimShader: LinearGradient? = null
+  private val scrimMatrix = Matrix()
+  private val artSrc = Rect()
+  private val artDst = RectF()
+  private val crop = IntArray(4)
+
   private data class NameKey(val text: String, val width: Int, val size: Float, val face: Int, val lineHeight: Int)
 
   private val names = object : LinkedHashMap<NameKey, StaticLayout>(32, 0.75f, true) {
@@ -74,6 +89,7 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
   override fun setTokens(json: String) {
     epoch += 1
     tk = GuideTokens.parse(json)
+    scrimShader = LinearGradient(0f, 0f, 1f, 0f, tk.artScrimStart, tk.artScrimEnd, Shader.TileMode.CLAMP)
     stylesDirty = true
   }
 
@@ -227,26 +243,26 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
     for (p in programs) {
       if (p.id == selectedId) continue
       val box = g.cellBox(p) ?: continue
-      drawCell(canvas, row, p, box, false, g, frame.nowMs, l)
+      drawCell(canvas, row, p, box, false, g, l, frame)
     }
     // The selected cell goes last so its ring sits over its neighbors.
     if (selectedId != null) {
       for (p in programs) {
         if (p.id != selectedId) continue
         val box = g.cellBox(p) ?: continue
-        drawCell(canvas, row, p, box, true, g, frame.nowMs, l)
+        drawCell(canvas, row, p, box, true, g, l, frame)
       }
     }
     canvas.restore()
   }
 
-  private fun drawCell(canvas: Canvas, row: GuideRow, p: GuideProgram, box: GuideGeometry.CellBox, selected: Boolean, g: GuideGeo, nowMs: Double, l: AuroraLayout) {
+  private fun drawCell(canvas: Canvas, row: GuideRow, p: GuideProgram, box: GuideGeometry.CellBox, selected: Boolean, g: GuideGeo, l: AuroraLayout, frame: GuideFrame) {
     val c = cell
     l.placeCell(box, selected, c)
     val w = (c.right - c.left).toFloat()
     val h = (c.bottom - c.top).toFloat()
     if (w <= 0f || h <= 0f) return
-    val live = GuideGeometry.isLive(p.startMs, p.durationSeconds, nowMs)
+    val live = GuideGeometry.isLive(p.startMs, p.durationSeconds, frame.nowMs)
     val radius = AuroraLayout.radius(l.cellRadius, w, h)
     val bw = c.border
 
@@ -266,16 +282,21 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
       canvas.drawRoundRect(inner, innerRadius, innerRadius, stroke)
     }
 
-    if (live) {
-      // The progress fill and the accent bar live in the padding box, clipped to its rounded corners.
+    // Program art, when the program has some and its image hasn't failed: asked for at the cell's box.
+    val art = artFor(p, box, l)?.takeIf { !it.failed }
+    if (live || art != null) {
+      // The art, the progress fill and the accent bar live in the padding box, clipped to its rounded corners.
       canvas.save()
       clip.rewind()
       rect.set(c.padLeft, c.padTop, c.padRight, c.padBottom)
       val padRadius = max(0f, radius - bw)
       clip.addRoundRect(rect, padRadius, padRadius, Path.Direction.CW)
       canvas.clipPath(clip)
+      if (art != null) drawArt(canvas, art, c, frame)
+    }
+    if (live) {
       // Two tones with a hard edge where "now" falls, like a gradient whose stops sit at the same position.
-      val pct = GuideGeometry.liveFill(nowMs, g.originMs, g.ppm, box.left, box.width)
+      val pct = GuideGeometry.liveFill(frame.nowMs, g.originMs, g.ppm, box.left, box.width)
       val edge = c.padLeft + (pct * (c.padRight - c.padLeft)).roundToInt()
       fill.color = GuideColor.alpha(row.accent, tk.liveElapsedA)
       canvas.drawRect(c.padLeft, c.padTop, edge, c.padBottom, fill)
@@ -286,23 +307,61 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
       val barRadius = AuroraLayout.radius(l.barRadius, rect.width(), rect.height())
       fill.color = row.accent
       canvas.drawRoundRect(rect, barRadius, barRadius, fill)
-      canvas.restore()
     }
+    if (live || art != null) canvas.restore()
 
-    drawTexts(canvas, p, c)
+    drawTexts(canvas, p, c, art != null)
   }
 
-  /** The title and the sub-line, each one line with an END ellipsis. */
-  private fun drawTexts(canvas: Canvas, p: GuideProgram, c: CellRect) {
+  /**
+   * The image for this program's art at the cell's box, or null when it has none. The request is the one the React Native
+   * rows make for the same cell: the art URL with the cell's size (dp, the box's width and the row's height less the cell
+   * inset) in pixels, rounded up to a 64 px step, so a repeat of a cell is a cache hit whichever renderer drew it first.
+   * It is decoded to that box and cropped to what the cell shows of it ([GuideImages.get] `cover`), so the bitmap the cell pins while it is on
+   * screen (which no memory budget limits) is the size of the cell, not of the picture. Fresco's own cache can still hold the uncropped decode,
+   * capped by [GuideGeometry.ART_MAX] and evictable (see [CoverCropPostprocessor]).
+   */
+  private fun artFor(p: GuideProgram, box: GuideGeometry.CellBox, l: AuroraLayout): GuideImages.Entry? {
+    if (p.art == null) return null
+    val w = l.artW(box)
+    val h = l.artH
+    val url = p.artUrl(w, h) ?: return null
+    return kit.images.get(url, w, h, cover = true)
+  }
+
+  /** The art centre cropped to the padding box, fading in over 300 ms when it just arrived, then the scrim over it. The scrim
+   *  is there from the start (while the image loads the cell is its plain fill under the scrim). */
+  private fun drawArt(canvas: Canvas, art: GuideImages.Entry, c: CellRect, frame: GuideFrame) {
+    artDst.set(c.padLeft, c.padTop, c.padRight, c.padBottom)
+    val bitmap = art.bitmap
+    if (bitmap != null) {
+      GuideGeometry.coverCrop(bitmap.width, bitmap.height, artDst.width().toDouble(), artDst.height().toDouble(), crop)
+      artSrc.set(crop[0], crop[1], crop[2], crop[3])
+      val fade = GuideImages.fade(art.arrivedAt, frame.uptimeMs)
+      bitmapPaint.alpha = (fade * 255).roundToInt()
+      canvas.drawBitmap(bitmap, artSrc, artDst, bitmapPaint)
+      if (fade < 1f) frame.animating = true
+    }
+    val shader = scrimShader ?: return
+    scrimMatrix.setScale(artDst.width(), 1f)
+    scrimMatrix.postTranslate(artDst.left, 0f)
+    shader.setLocalMatrix(scrimMatrix)
+    scrimPaint.shader = shader
+    canvas.drawRect(artDst, scrimPaint)
+    scrimPaint.shader = null
+  }
+
+  /** The title and the sub-line, each one line with an END ellipsis, in the art colors when the cell shows art. */
+  private fun drawTexts(canvas: Canvas, p: GuideProgram, c: CellRect, art: Boolean) {
     if (c.textWidth <= 0) return
     val left = c.textLeft.toFloat()
     val right = left + c.textWidth
     if (p.title.isNotEmpty()) {
-      titlePaint.color = tk.title
+      titlePaint.color = if (art) tk.artTitle else tk.title
       text.drawLineIn(canvas, text.ellipsize(p.title, titlePaint, c.textWidth.toFloat()), left, right, (c.titleTop + titleTopOffset).toFloat(), titlePaint)
     }
     if (p.sub.isNotEmpty()) {
-      subPaint.color = tk.sub
+      subPaint.color = if (art) tk.artSub else tk.sub
       text.drawLineIn(canvas, text.ellipsize(p.sub, subPaint, c.textWidth.toFloat()), left, right, (c.subTop + subTopOffset).toFloat(), subPaint)
     }
   }

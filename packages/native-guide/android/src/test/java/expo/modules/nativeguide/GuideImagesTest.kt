@@ -17,4 +17,13 @@ class GuideImagesTest {
     assertEquals(48 * mb, imageBudgetBytes(512))
     assertEquals(48 * mb, imageBudgetBytes(4096))
   }
+
+  @Test fun aFreshFetchFadesInOver300msAndACacheHitIsDrawnAtOnce() {
+    assertEquals(1f, GuideImages.fade(0, 5_000), 0f) // a memory-cache hit
+    assertEquals(0f, GuideImages.fade(1_000, 1_000), 0f)
+    assertEquals(0.5f, GuideImages.fade(1_000, 1_150), 1e-6f)
+    assertEquals(1f, GuideImages.fade(1_000, 1_300), 0f)
+    assertEquals("past the fade", 1f, GuideImages.fade(1_000, 9_000), 0f)
+    assertEquals("a clock that went backwards", 0f, GuideImages.fade(1_000, 900), 0f)
+  }
 }

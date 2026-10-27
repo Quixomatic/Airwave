@@ -179,6 +179,13 @@ class AuroraLayout(private val geo: GuideGeo, density: Double, val widthPx: Doub
   val cellRadius = px("cellRadius")
   val cellBorder = px("cellBorder")
   val cellRing = px("cellRing")
+
+  /** The pixel height artwork is requested at for every cell: the cell's height (dp) rounded up to the 64 px step, the same
+   *  box the React Native rows ask for. */
+  val artH = GuideGeometry.artSide(geo.rowH - geo.dp("cellInset"), d, GuideGeometry.ART_MAX)
+
+  /** The pixel width artwork is requested at for the cell `box` (see [artH]). */
+  fun artW(box: GuideGeometry.CellBox): Int = GuideGeometry.artSide(box.width, d, GuideGeometry.ART_MAX)
   private val barX = px("liveBarX")
   private val barInset = px("liveBarInset")
   private val barW = px("liveBarW")

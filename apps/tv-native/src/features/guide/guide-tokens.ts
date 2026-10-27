@@ -62,6 +62,13 @@ export type GuideTokens = {
   numberWeight: GuideFontWeight;
   name: string;
 
+  // Program art (when the cells show artwork)
+  /** Scrim over the art, left to right: the alpha fades between these two colors. */
+  artScrim: readonly [string, string];
+  /** Program title and sub-line over the art. */
+  artTitle: string;
+  artSub: string;
+
   // Time header
   headerDay: string;
   headerTick: string;
@@ -133,6 +140,10 @@ export const AURORA: GuideTokens = {
   numberFocused: "#e6eaf1",
   numberWeight: "700",
   name: C.mutedFg,
+
+  artScrim: ["rgba(6,10,20,0.88)", "rgba(6,10,20,0.8)"],
+  artTitle: "#f1f5f9",
+  artSub: "#e6ebf2",
 
   headerDay: "#e6eaf1",
   headerTick: "#c3c9d4",
