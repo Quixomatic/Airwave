@@ -1,7 +1,7 @@
 import * as LucideIcons from "lucide-react-native";
 import { History, LayoutGrid, ListFilter, Menu, Settings as SettingsIcon, Star, User } from "lucide-react-native";
 import type { ReactNode } from "react";
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import { ScrollView, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
@@ -76,7 +76,7 @@ export function lensEquals(a: Lens | undefined, b: Lens): boolean {
   return true;
 }
 
-export function GuideSidebar({
+export const GuideSidebar = memo(function GuideSidebar({
   items,
   expanded,
   focused,
@@ -228,4 +228,4 @@ export function GuideSidebar({
       <View style={{ flex: 1, overflow: "hidden", backgroundColor: tk.sidebar.bg, borderRightWidth: 1, borderRightColor: tk.sidebar.border }}>{content}</View>
     </Animated.View>
   );
-}
+});

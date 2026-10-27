@@ -1,20 +1,25 @@
 import { nativeGuide, NativeGuideView, type NativeGuideErrorEvent } from "@airwave/native-guide";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import { Pressable, StyleSheet, type GestureResponderEvent, type LayoutChangeEvent } from "react-native";
 
 import type { GuideGridChannel } from "@/lib/api";
 import { channelTint } from "@/lib/tint";
 
+import { isVisible, type Lane } from "./geometry";
 import { useGuideTokens } from "./guide-tokens";
 import { accentOf, cs, FEATURE_SCALE, line, subLine } from "./layout";
 import { GLYPH_FALLBACK, GLYPH_HEART, iconNodeOf, resolveIconId, type IconNode } from "./lucide-nodes";
-import { auroraGeo, rowTokens } from "./native-rows-geo";
-import { clampScroll, followScroll, GlyphSync, Handover, type LineupApplied, type LineupResolvers, type NativeScroll } from "./native-rows-logic";
+import { auroraGeo, ROW_BORDER_TOP, rowTokens } from "./native-rows-geo";
+import { clampScroll, followScroll, GlyphSync, Handover, hitRow, type LineupApplied, type LineupResolvers, type NativeScroll } from "./native-rows-logic";
 
 /**
  * The Aurora guide's channel rows drawn by ONE native view (packages/native-guide): the native rows. AuroraGrid mounts
  * this in place of its FlashList of React Native rows when `useGuideRenderer` says so; everything around the rows (the
  * featured panel, time header, now marker, sidebar, the key layer) is unchanged.
+ *
+ * The view only draws, so a tap (a touch screen, or the pointer of a mouse or an air remote) is placed on the rows here, with the
+ * same cell arithmetic the React Native rows' Pressables use (`hitRow`), and goes to the same handlers they call: tap to focus, tap
+ * the focused thing to activate.
  *
  * The lineup goes over once per lineup change, incrementally (`LineupSync`); a D-pad move only changes a few small props
  * (the focused row and program, the zone, the scroll offset). The scroll offset is decided HERE, by the same rule the
@@ -90,6 +95,9 @@ export type NativeRowsProps = {
   vw: (px: number) => number;
   /** Written with the scroll offset (and the view's height) the rows are drawn at, so a fallback to the React Native rows can open its list at the same place. */
   scrollOut?: RefObject<NativeScroll>;
+  /** A tap on a row's rail, and on a program's cell (its index among the programs the row draws). */
+  onRailTap: (index: number) => void;
+  onProgramTap: (index: number, programIndex: number) => void;
   /** The native rows failed: the guide switches back to the React Native rows. */
   onError: (message: string) => void;
 };
@@ -110,6 +118,8 @@ export const NativeRows = memo(function NativeRows({
   gap,
   vw,
   scrollOut,
+  onRailTap,
+  onProgramTap,
   onError,
 }: NativeRowsProps) {
   const tk = useGuideTokens();
@@ -156,9 +166,30 @@ export const NativeRows = memo(function NativeRows({
     scrollOut.current.h = viewH;
   }
 
+  const lane = useMemo<Lane>(() => ({ T0: new Date(originMs), ppm, laneW, gap }), [originMs, ppm, laneW, gap]);
+  const onPress = useCallback(
+    (e: GestureResponderEvent) => {
+      const { locationX, locationY } = e.nativeEvent;
+      const hit = hitRow(locationX, locationY, {
+        scrollY: scrollRef.current,
+        rowPx,
+        railPx,
+        top: ROW_BORDER_TOP,
+        inset: vw(6),
+        lane,
+        programsAt: (row) => channels[row]?.programs.filter((p) => isVisible(p, lane)),
+      });
+      if (!hit) return;
+      if (hit.part === "rail") onRailTap(hit.row);
+      else onProgramTap(hit.row, hit.index);
+    },
+    [channels, rowPx, railPx, vw, lane, onRailTap, onProgramTap],
+  );
+
   if (!NativeGuideView) return null;
   return (
-    <View style={styles.fill} onLayout={onLayout}>
+    // Not focusable and not an accessibility node of its own: the D-pad is the zone machine's, and the native view carries the guide's description.
+    <Pressable style={styles.fill} onLayout={onLayout} onPress={onPress} focusable={false} accessible={false}>
       <NativeGuideView
         style={StyleSheet.absoluteFill}
         lineupId={handover.id}
@@ -173,7 +204,7 @@ export const NativeRows = memo(function NativeRows({
         scrollY={scrollY}
         onRenderError={handleError}
       />
-    </View>
+    </Pressable>
   );
 });
 

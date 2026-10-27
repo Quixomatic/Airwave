@@ -144,6 +144,16 @@ export function AuroraGrid({
     }
   };
 
+  // The sidebar's two handlers never change identity, so a D-pad step in the grid leaves the sidebar alone (it is memoized): the first reads the
+  // latest `activateSidebar` through a ref, the second only sets state.
+  const activateSidebarRef = useRef(activateSidebar);
+  activateSidebarRef.current = activateSidebar;
+  const onSidebarActivate = useCallback((index: number) => activateSidebarRef.current(index), []);
+  const onSidebarExpand = useCallback(() => {
+    setZone("sidebar");
+    setSidebarSel(0);
+  }, []);
+
   // Refs mirroring the live zone/selection + the callbacks, so onRailTap/onProgramTap can be STABLE
   // (`useCallback([])`). That stability is what lets `memo(Row)` skip re-rendering the unchanged rows on
   // every keypress — otherwise these close over fc/fp/zone/channels and change every navigation, defeating
@@ -343,7 +353,7 @@ export function AuroraGrid({
           <View style={{ height: vw(600) }} />
         )}
 
-        {channels.length > 0 && <TimeHeader T0={T0} railPx={railPx} laneX={laneX} vw={vw} />}
+        {channels.length > 0 && <TimeHeaderMemo T0={T0} railPx={railPx} laneX={laneX} vw={vw} />}
 
         <View style={{ position: "relative", flex: 1 }}>
           {channels.length === 0 ? (
@@ -372,6 +382,8 @@ export function AuroraGrid({
               gap={lane.gap}
               vw={vw}
               scrollOut={nativeScrollRef}
+              onRailTap={onRailTap}
+              onProgramTap={onProgramTap}
               onError={reportNativeGuideError}
             />
           ) : (
@@ -444,8 +456,8 @@ export function AuroraGrid({
         focused={zone === "sidebar"}
         sel={sidebarSel}
         lens={lens}
-        onActivate={activateSidebar}
-        onExpand={() => { setZone("sidebar"); setSidebarSel(0); }}
+        onActivate={onSidebarActivate}
+        onExpand={onSidebarExpand}
       />
     </View>
   );
@@ -467,6 +479,12 @@ function TimeHeader({ T0, railPx, laneX, vw }: { T0: Date; railPx: number; laneX
     </View>
   );
 }
+
+/**
+ * The time header holds still while the focus moves (its props are memoized above: the origin, `laneX` and the scaler), so a D-pad
+ * step has no reason to run it again. Its own token read (`useGuideTokens`) still re-renders it when that changes.
+ */
+const TimeHeaderMemo = memo(TimeHeader);
 
 // Memoized: with stable props (the `now`/laneX/vw memos + the ref-backed onRailTap/onProgramTap), only the
 // rows whose focus/favorited actually changed re-render on navigation — not every visible row.

@@ -1,6 +1,8 @@
 import type { PackedChannel, PackedProgram } from "@airwave/native-guide";
 
-import type { GuideGridChannel, GuideMeta } from "@/lib/api";
+import type { GuideGridChannel, GuideGridProgram, GuideMeta } from "@/lib/api";
+
+import { cellBox, type Lane } from "./geometry";
 
 /**
  * The pure half of the native guide rows (native-rows.tsx): handing the lineup to the native store, and the scroll rule.
@@ -301,5 +303,38 @@ export function classicFollow(off: number, fc: number, rowH: number, listH: numb
   if (listH <= 0) return { viewPosition: 0 };
   if (top < off) return { viewPosition: 0, offset: top };
   if (bottom > off + listH) return { viewPosition: 1, offset: Math.max(0, bottom - listH) };
+  return null;
+}
+
+/** What a tap on the native rows landed on: a row's rail, or one of its programs (its index among the programs the row draws). */
+export type RowHit = { row: number; part: "rail" } | { row: number; part: "program"; index: number };
+
+/**
+ * What a tap at (`x`, `y`), in dp from the rows view's top left corner, lands on: the rail of the row under it, a program's cell, or
+ * nothing (the gap between cells, a row's margin above and below its cells, past the last row). The same places the React Native rows'
+ * Pressables take a tap, from the same arithmetic (`cellBox`), so a tap means the same in both renderers. `programsAt(row)` gives the
+ * programs that row draws, in the order the zone machine counts them (the list the per-channel filter keeps), or undefined past the
+ * last row; `top` is the row's top rule, which the lane (and so every cell) sits below, `inset` the margin above and below a cell, `scrollY` how far
+ * the list is scrolled.
+ */
+export function hitRow(
+  x: number,
+  y: number,
+  o: { scrollY: number; rowPx: number; railPx: number; top: number; inset: number; lane: Lane; programsAt: (row: number) => readonly Pick<GuideGridProgram, "startsAt" | "durationSeconds">[] | undefined },
+): RowHit | null {
+  if (!(o.rowPx > 0) || x < 0 || y < 0) return null;
+  const down = y + o.scrollY;
+  const row = Math.floor(down / o.rowPx);
+  const programs = o.programsAt(row);
+  if (!programs) return null;
+  if (x < o.railPx) return { row, part: "rail" };
+  const within = down - row * o.rowPx;
+  // The cell is placed `inset` below the lane's top, which is `top` below the row's: it spans `top + inset` to `rowPx - inset + top`.
+  if (within < o.top + o.inset || within > o.rowPx - o.inset + o.top) return null;
+  const lx = x - o.railPx;
+  for (let index = 0; index < programs.length; index++) {
+    const box = cellBox(programs[index]!, o.lane);
+    if (box && lx >= box.left && lx < box.left + box.width) return { row, part: "program", index };
+  }
   return null;
 }

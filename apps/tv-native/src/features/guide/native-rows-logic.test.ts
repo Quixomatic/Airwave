@@ -4,6 +4,8 @@ import { QueryClient, QueryObserver } from "@tanstack/react-query";
 
 import type { GuideGridChannel, GuideGridProgram, GuideMeta } from "@/lib/api";
 
+import type { Lane } from "./geometry";
+
 import {
   applyLineupUpdate,
   clampScroll,
@@ -13,6 +15,7 @@ import {
   followScroll,
   GlyphSync,
   Handover,
+  hitRow,
   LineupSync,
   packChannel,
   type LineupResolvers,
@@ -548,5 +551,57 @@ describe("classicListStart", () => {
     expect(at(0, 20)).toEqual({ index: 6, offset: 360 }); // the focus is past the end of a list that shrank
     expect(classicListStart({ y: 0, h: 240 }, 3, 60, 0)).toEqual({ index: 0, offset: 0 });
     expect(classicListStart({ y: 0, h: 240 }, 3, 0, 10)).toEqual({ index: 0, offset: 0 });
+  });
+});
+
+describe("hitRow", () => {
+  // Rows 60 dp tall under a 100 dp rail with a 1 dp top rule, a lane 600 dp wide at 3 dp a minute from T, cells 4 dp apart, a 6 dp margin above and below.
+  const lane: Lane = { T0: new Date(T), ppm: 3, laneW: 600, gap: 4 };
+  const rows = [[prog("a", 0, 30), prog("b", 30, 30), prog("c", 60, 60)], [prog("d", -20, 40)], []];
+  const hit = (x: number, y: number, scrollY = 0) =>
+    hitRow(x, y, { scrollY, rowPx: 60, railPx: 100, top: 1, inset: 6, lane, programsAt: (r) => rows[r] });
+
+  test("the rail is the first rail-wide strip of a row", () => {
+    expect(hit(0, 0)).toEqual({ row: 0, part: "rail" });
+    expect(hit(99, 59)).toEqual({ row: 0, part: "rail" });
+    expect(hit(50, 60)).toEqual({ row: 1, part: "rail" });
+    expect(hit(50, 130)).toEqual({ row: 2, part: "rail" }); // a row with no programs still has its rail
+  });
+
+  test("a program is the cell under the tap, counted from the lane's left edge", () => {
+    expect(hit(100, 30)).toEqual({ row: 0, part: "program", index: 0 }); // the first cell starts at the lane's edge
+    expect(hit(100 + 85, 30)).toEqual({ row: 0, part: "program", index: 0 }); // 90 - 4 wide: last dp is 85
+    expect(hit(100 + 90, 30)).toEqual({ row: 0, part: "program", index: 1 });
+    expect(hit(100 + 200, 30)).toEqual({ row: 0, part: "program", index: 2 });
+    expect(hit(100 + 5, 90)).toEqual({ row: 1, part: "program", index: 0 }); // began before the lane: clamped to start at the gap
+  });
+
+  test("nothing under a gap between cells, a row's margin above and below its cells, or past the last cell and row", () => {
+    expect(hit(100 + 87, 30)).toBeNull();
+    expect(hit(100 + 20, 5)).toBeNull();
+    expect(hit(100 + 20, 56)).toBeNull();
+    expect(hit(100 + 590, 30)).toBeNull(); // past the last cell's right edge (60..120 min = 180..360, plus the lane's empty end)
+    expect(hit(100 + 20, 400)).toBeNull(); // past the last row
+    expect(hit(-1, 10)).toBeNull();
+    expect(hit(10, -1)).toBeNull();
+  });
+
+  test("a cell is where it is drawn: below the row's 1 dp top rule and its margin, down to the margin above the row's end", () => {
+    // The lane starts under the rule, so a cell spans y = 1 + 6 = 7 up to 60 - 6 + 1 = 55 inside the row.
+    expect(hit(100 + 20, 6)).toBeNull(); // the margin's last row
+    expect(hit(100 + 20, 7)).toEqual({ row: 0, part: "program", index: 0 }); // the cell's first row
+    expect(hit(100 + 20, 55)).toEqual({ row: 0, part: "program", index: 0 }); // its last
+    expect(hit(100 + 20, 56)).toBeNull();
+    expect(hit(100 + 20, 60 + 6)).toBeNull(); // the same in the next row
+    expect(hit(100 + 20, 60 + 7)).toEqual({ row: 1, part: "program", index: 0 });
+  });
+
+  test("the scroll offset moves the rows under the tap", () => {
+    expect(hit(100 + 20, 30, 60)).toEqual({ row: 1, part: "program", index: 0 });
+    expect(hit(50, 30, 90)).toEqual({ row: 2, part: "rail" }); // 30 + 90 = 120: row 2
+  });
+
+  test("a degenerate row height hits nothing", () => {
+    expect(hitRow(10, 10, { scrollY: 0, rowPx: 0, railPx: 100, top: 1, inset: 6, lane, programsAt: (r) => rows[r] })).toBeNull();
   });
 });
