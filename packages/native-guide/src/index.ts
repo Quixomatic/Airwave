@@ -51,6 +51,11 @@ type NativeGuideModule = {
   setLineup(lineupId: string, json: string): number;
   /** Drops the lineup store `lineupId` (those native rows unmounted); other stores are untouched. */
   clearLineup(lineupId: string): void;
+  /** Registers icons the rows can draw: a JSON object of lucide icon nodes (`[tag, attributes][]`, as `lucide-react-native`
+   *  holds them) by icon-set id (`{ "lucide:Radio": [["path", { "d": "..." }], ...] }`). Idempotent; returns how many icons
+   *  it read. A channel whose icon was never registered draws `lucide:Radio`'s, and the favorite heart is `lucide:Heart`: register
+   *  both. */
+  setGlyphs(json: string): number;
 };
 
 export const nativeGuide: NativeGuideModule | null = requireOptionalNativeModule<NativeGuideModule>("NativeGuide");

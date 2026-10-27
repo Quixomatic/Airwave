@@ -17,7 +17,6 @@ import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
 import kotlin.math.ceil
-import kotlin.math.floor
 import kotlin.math.min
 
 /**
@@ -226,7 +225,8 @@ class NativeGuideView(context: Context, appContext: AppContext) : ExpoView(conte
     } else {
       for (i in visible) {
         canvas.save()
-        canvas.translate(0f, (i * rowHpx - scrollY).toFloat())
+        // Rows start on a whole pixel, as the React Native rows' layout puts them.
+        canvas.translate(0f, PixelGrid.snap(i * rowHpx - scrollY).toFloat())
         painter.drawRow(canvas, rows[i], RowState.of(i, focusRow, focusProgramId, zone, miniFocused), frame)
         canvas.restore()
       }
@@ -244,13 +244,13 @@ class NativeGuideView(context: Context, appContext: AppContext) : ExpoView(conte
    */
   @RequiresApi(Build.VERSION_CODES.Q)
   private fun drawFromRecordings(nodes: RowNodes, canvas: Canvas, rows: Array<GuideRow>, visible: IntRange, scrollY: Double, rowHpx: Double, frame: GuideFrame) {
-    val epoch = painter.epoch
+    val epoch = painter.epoch + (LucideGlyphs.version.toLong() shl 32)
     val rowH = ceil(rowHpx).toInt()
     Trace.beginSection("NativeGuide.rows")
     try {
       nodes.beginFrame()
       for (i in visible) {
-        val top = floor(i * rowHpx - scrollY + 0.5).toInt()
+        val top = PixelGrid.snap(i * rowHpx - scrollY)
         nodes.draw(canvas, i, rows[i], RowState.of(i, focusRow, focusProgramId, zone, miniFocused), top, width, rowH, epoch, backdrop, painter, frame, images)
       }
       nodes.retain(visible.first, visible.last)
@@ -313,7 +313,7 @@ class NativeGuideView(context: Context, appContext: AppContext) : ExpoView(conte
     Trace.beginSection("NativeGuide.recordAhead")
     try {
       painter.beginFrame(frame)
-      val epoch = painter.epoch
+      val epoch = painter.epoch + (LucideGlyphs.version.toLong() shl 32)
       val state = RowState.of(next.row, next.row, next.programId, next.zone, false)
       val rowH = ceil(rowHpx).toInt()
       nodes.recordAhead(next.row, rows[next.row], state, width, rowH, epoch, backdrop, painter, frame, images)

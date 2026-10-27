@@ -124,15 +124,7 @@ interface GuidePainter {
   fun release() = Unit
 }
 
-/** The painter the view uses. */
+/** The painter the view uses: the Aurora rows. */
 object GuidePainters {
-  fun create(kit: PainterKit): GuidePainter = StubPainter()
-}
-
-/** Draws nothing: the view's engine (props, lineup, scrolling, images, errors) runs against it until the real
- *  painter replaces it in [GuidePainters.create]. */
-internal class StubPainter : GuidePainter {
-  override fun setTokens(json: String) = Unit
-
-  override fun drawRow(canvas: Canvas, row: GuideRow, state: RowState, frame: GuideFrame) = Unit
+  fun create(kit: PainterKit): GuidePainter = AuroraPainter(kit)
 }

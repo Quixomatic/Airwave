@@ -17,6 +17,10 @@ class NativeGuideModule : Module() {
 
     Function("clearLineup") { lineupId: String -> LineupStores.clear(lineupId) }
 
+    // The icons the rail's circle can draw, as lucide icon nodes keyed by icon-set id. JS sends each one once; adding is
+    // idempotent. Returns how many it read.
+    Function("setGlyphs") { json: String -> LucideGlyphs.register(json) }
+
     View(NativeGuideView::class) {
       Events("onRenderError")
       Prop("lineupId") { view: NativeGuideView, v: String -> view.setLineupId(v) }

@@ -1,12 +1,21 @@
-// Regenerates android/src/test/resources/geometry-fixture.json from the guide's TypeScript geometry:
+// Regenerates the fixtures the Kotlin JVM tests read from the guide's TypeScript:
 //   bun packages/native-guide/scripts/gen-geometry-fixture.ts
-// The Kotlin geometry's JVM tests must reproduce every `out` and `kept` here, and apps/tv-native's geometry.test.ts checks the
-// TypeScript still does, so the two renderers can't drift. Seeded, so a rerun only changes the file when the geometry does.
+//  - android/src/test/resources/geometry-fixture.json: the cell, live-fill and artwork-box geometry. The Kotlin geometry's
+//    tests must reproduce every `out` and `kept`, and apps/tv-native's geometry.test.ts checks the TypeScript still does, so the two
+//    renderers can't drift.
+//  - android/src/test/resources/aurora-fixture.json: the `geo` and `tokens` JSON the Aurora rows send the native view, built
+//    by the real functions, so the Kotlin tests can check the painter reads every field JS sends (and JS sends every field
+//    the painter reads). apps/tv-native's native-rows-geo.test.ts checks the file is current.
+// Seeded, so a rerun only changes a file when what it is generated from does.
 import { writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { artBox, cellBox, isVisible, liveFill, MIN, WINDOW_MIN } from "../../../apps/tv-native/src/features/guide/geometry";
+import { AURORA } from "../../../apps/tv-native/src/features/guide/guide-tokens";
+import { auroraGeo, rowTokens, type Scalers } from "../../../apps/tv-native/src/features/guide/native-rows-geo";
 
-const OUT = new URL("../android/src/test/resources/geometry-fixture.json", import.meta.url);
+const OUT = fileURLToPath(new URL("../android/src/test/resources/geometry-fixture.json", import.meta.url).href);
+const AURORA_OUT = fileURLToPath(new URL("../android/src/test/resources/aurora-fixture.json", import.meta.url).href);
 
 let seed = 20261026;
 const rnd = () => {
@@ -60,8 +69,36 @@ export function buildFixture() {
   return { cells, liveFills, artBoxes };
 }
 
+/**
+ * The Aurora rows' `geo` and `tokens` JSON for an Android TV screen: 960 dp wide at 2x density (a 1080p panel), where
+ * CHROME_SCALE is 0.5. The three scalers repeat the formulas of features/guide/layout.ts (which can't be loaded outside
+ * React Native): vw = px / 2560 * width, cs = px * CHROME_SCALE, line = cs snapped to a physical pixel, never below one.
+ */
+export function buildAuroraFixture() {
+  const width = 960;
+  const pixelRatio = 2;
+  const chrome = Math.max(0.5, Math.min(1, width / 1920));
+  const scalers: Scalers = {
+    vw: (px) => (px / 2560) * width,
+    cs: (px) => px * chrome,
+    line: (px) => Math.max(1 / pixelRatio, Math.round(px * chrome * pixelRatio) / pixelRatio),
+  };
+  const colW = width - 92;
+  const railPx = (colW * 212) / 2560;
+  const laneW = colW - railPx;
+  const originMs = 1_760_000_000_000;
+  const geo = auroraGeo(
+    { rowPx: (width * 168) / 2560, railPx, laneW, ppm: laneW / WINDOW_MIN, originMs, gap: scalers.cs(6), featureScale: 0.76 },
+    scalers,
+    AURORA,
+  );
+  return { geo, tokens: rowTokens(AURORA), density: pixelRatio, widthDp: width };
+}
+
 const about =
   "Generated from apps/tv-native/src/features/guide/geometry.ts by packages/native-guide/scripts/gen-geometry-fixture.ts. The Kotlin geometry must reproduce every `out` (a null `out` means no cell is drawn) and `kept` (whether the per-channel filter keeps the program); geometry.test.ts checks the TypeScript still does.";
+const auroraAbout =
+  "Generated from apps/tv-native/src/features/guide/native-rows-geo.ts by packages/native-guide/scripts/gen-geometry-fixture.ts: the `geo` and `tokens` JSON the Aurora rows send the native view, for a 960 dp wide screen at density 2. native-rows-geo.test.ts checks it is current.";
 
 if (import.meta.main) {
   const sections = buildFixture();
@@ -70,4 +107,6 @@ if (import.meta.main) {
     .join(",\n");
   writeFileSync(OUT, `{\n  "about": ${JSON.stringify(about)},\n${body}\n}\n`);
   console.log(`geometry-fixture.json: ${sections.cells.length} cells (${sections.cells.filter((c) => !c.out).length} culled), ${sections.liveFills.length} fills, ${sections.artBoxes.length} art boxes`);
+  writeFileSync(AURORA_OUT, `${JSON.stringify({ about: auroraAbout, ...buildAuroraFixture() }, null, 2)}\n`);
+  console.log("aurora-fixture.json written");
 }
