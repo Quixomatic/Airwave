@@ -1,6 +1,6 @@
 import { Slot, usePathname, useRouter } from "expo-router";
 import { ArrowLeft, Cpu, Info, LayoutGrid, Server as ServerIcon, SlidersHorizontal, UserRound, Volume2 } from "lucide-react-native";
-import { useCallback, useRef, useState } from "react";
+import { type ReactNode, useCallback, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 
 import { TvPressable as Pressable } from "@/components/tv-pressable";
@@ -46,6 +46,8 @@ export default function SettingsShell() {
   const pathname = usePathname();
   const activeKey = KEY_BY_PATH[pathname] ?? "general";
   const [zone, setZone] = useState<"rail" | "content">("content");
+  // A page can park a panel beside its content (the Guide page's theme preview); it stays put while the page scrolls.
+  const [dock, setDock] = useState<ReactNode | null>(null);
   const [sel, setSel] = useState(() => Math.max(1, NAV.findIndex((n) => n.key === activeKey)));
 
   const returnToRail = useCallback(() => setZone("rail"), []);
@@ -155,11 +157,12 @@ export default function SettingsShell() {
               it's a stable measurement root: a focused row's y measured against this view maps 1:1 to the
               scroll offset. */}
           <View ref={contentRef} style={scaled({ maxWidth: 1024, width: "100%", alignSelf: "center", paddingVertical: 40, paddingHorizontal: 48 })}>
-            <SettingsCtx.Provider value={{ active: zone === "content", returnToRail, ensureVisible, scrollToTop }}>
+            <SettingsCtx.Provider value={{ active: zone === "content", returnToRail, ensureVisible, scrollToTop, setDock }}>
               <Slot />
             </SettingsCtx.Provider>
           </View>
         </ScrollView>
+        {dock && <View style={scaled({ paddingTop: 40, paddingRight: 36 })}>{dock}</View>}
       </View>
 
       {expanded && <Pressable onPress={() => setZone("content")} style={{ position: "absolute", inset: 0, backgroundColor: "rgba(6,10,20,0.5)", zIndex: 24 }} />}

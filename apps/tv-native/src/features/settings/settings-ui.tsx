@@ -21,8 +21,10 @@ export type SettingsCtxValue = {
   ensureVisible: (node: View | null) => void;
   /** Scroll the content pane to the very top — used at the first option to reveal the header above it. */
   scrollToTop: () => void;
+  /** Show `node` in a panel beside the page, outside its scrolling (the Guide page's preview of a theme); `null` clears it. */
+  setDock: (node: ReactNode | null) => void;
 };
-export const SettingsCtx = createContext<SettingsCtxValue>({ active: false, returnToRail: () => {}, ensureVisible: () => {}, scrollToTop: () => {} });
+export const SettingsCtx = createContext<SettingsCtxValue>({ active: false, returnToRail: () => {}, ensureVisible: () => {}, scrollToTop: () => {}, setDock: () => {} });
 
 /**
  * `opts.onBack` sees the selected index when Left or Back is pressed and returns true to handle it itself (a page with a

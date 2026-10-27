@@ -1,21 +1,25 @@
-import { Fragment, type ReactNode } from "react";
-import { View } from "react-native";
+import { Fragment, type ReactNode, useContext, useEffect, useMemo } from "react";
+import { Text, useWindowDimensions, View } from "react-native";
 
+import { GuidePreview } from "@/features/guide/guide-preview";
 import { rendererNote } from "@/features/guide/guide-renderer";
 import { findGuideTheme, findGuideVariant, GUIDE_THEMES, guideSwatch, resolveGuideTokens, variantIndex } from "@/features/guide/guide-themes";
-import { scaled } from "@/features/guide/layout";
+import type { GuideTokens } from "@/features/guide/guide-tokens";
+import { cs, scaled } from "@/features/guide/layout";
 import { marksOptions } from "@/features/guide/marks-options";
 import { GUIDE_ROWS_SETTING, useGuideRenderer } from "@/features/guide/use-guide-renderer";
-import { PageHeader, Pill, SectionLabel, SettingNote, SettingRow, useSettingsPage } from "@/features/settings/settings-ui";
+import { PageHeader, Pill, SectionLabel, SettingNote, SettingRow, SettingsCtx, useSettingsPage } from "@/features/settings/settings-ui";
 import { useGuide } from "@/hooks/queries";
 import { type GuideArt, type GuideRows, setGuidePrefs, useGuidePrefs } from "@/lib/guide-prefs";
+import { useSettled } from "@/lib/use-settled";
 
 /**
  * /settings/guide: how the channel guide looks and draws on this device. A per-device setting (see `lib/guide-prefs.ts`).
  *
  *  - Theme and Color restyle the guide screen at once, in two steps: pick a theme, then (for a theme that comes in more than one)
  *    one of its colors, which are listed right under the themes. Choosing a theme moves the D-pad to its colors, and Back from
- *    there returns to the theme list. The settings screens themselves keep the standard look.
+ *    there returns to the theme list. The settings screens themselves keep the standard look. A preview of the guide sits beside the
+ *    page and shows whatever the D-pad is on, a theme or a color, before it is chosen.
  *  - Channel marks picks the icon or the channel's logo for the rail. Both are always listed, so the list never changes under the
  *    D-pad as the guide loads; Logos can be chosen once a channel has a logo (they are set in the admin).
  *  - Program art shows each program's artwork behind its title (off by default: it costs memory and network).
@@ -43,8 +47,23 @@ const ROWS_HELP = "Native draws the guide directly on Android for smoother scrol
 const FOOTER =
   "These settings only change this device. Your channels and schedule aren't affected. A theme restyles the guide screen; Settings and the player keep the standard look.";
 
-/** One selectable row on this page. Rows with the same `group` sit under one small heading, and with the same `section` under one big one. */
-type Option = { section: string; group: string; label: string; sublabel: string; selected: boolean; apply: () => void; extra?: ReactNode; disabled?: boolean };
+/** One selectable row on this page. Rows with the same `group` sit under one small heading, and with the same `section` under one big one. `look` is the theme and color the preview shows while the row is focused (the look in use for a row that is not a look). */
+type Option = { section: string; group: string; label: string; sublabel: string; selected: boolean; apply: () => void; extra?: ReactNode; look?: { theme: string; variant: string }; disabled?: boolean };
+
+/** The preview beside the page: the guide in a look, and its name. */
+function PreviewDock({ tokens, caption }: { tokens: GuideTokens; caption: string }) {
+  const { width } = useWindowDimensions();
+  const w = Math.round(width * 0.34);
+  return (
+    <View style={{ width: w }}>
+      <Text style={scaled({ fontSize: 13, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", color: "#64748b", marginBottom: 10 })}>Preview</Text>
+      <View style={{ borderRadius: cs(8), overflow: "hidden", borderWidth: 1, borderColor: "rgba(148,163,184,0.3)" }}>
+        <GuidePreview tokens={tokens} width={w - 2} />
+      </View>
+      <Text style={scaled({ marginTop: 10, fontSize: 15, color: "#cbd5e1" })}>{caption}</Text>
+    </View>
+  );
+}
 
 /** A band of small squares: what a theme or color looks like. */
 function Swatch({ colors }: { colors: readonly string[] }) {
@@ -56,6 +75,9 @@ function Swatch({ colors }: { colors: readonly string[] }) {
     </View>
   );
 }
+
+/** How long the D-pad rests on a look before the preview shows it. */
+const PREVIEW_SETTLE_MS = 150;
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -78,6 +100,7 @@ export default function GuideSettings() {
         label: t.name,
         sublabel: t.description,
         selected: theme.id === t.id,
+        look: { theme: t.id, variant: theme.id === t.id ? variant.id : t.defaultVariant },
         extra: (
           <>
             <Swatch colors={[ground, accent, ink]} />
@@ -99,6 +122,7 @@ export default function GuideSettings() {
           label: v.name,
           sublabel: v.description,
           selected: variant.id === v.id,
+          look: { theme: theme.id, variant: v.id },
           extra: <Swatch colors={guideSwatch(resolveGuideTokens(theme.id, v.id))} />,
           apply: () => setGuidePrefs({ variant: v.id }),
         }))
@@ -143,6 +167,22 @@ export default function GuideSettings() {
       return true;
     },
   });
+
+  // The preview shows the look the D-pad is on, or the look in use while it is on something else (or on the rail).
+  const { setDock } = useContext(SettingsCtx);
+  const look = options[sel]?.look ?? { theme: theme.id, variant: variant.id };
+  // The preview rebuilds a whole sample guide for the look (and makes its grain), which is too much for a TV to do at every D-pad step down the
+  // list: it follows the look once the D-pad has rested on it for a moment. (The settled value is the look's key: ids have no "/".)
+  const settled = useSettled(`${look.theme}/${look.variant}`, PREVIEW_SETTLE_MS);
+  const [settledTheme = "", settledVariant = ""] = settled.split("/");
+  const previewTheme = findGuideTheme(settledTheme);
+  const previewVariant = findGuideVariant(previewTheme, settledVariant);
+  const previewTokens = useMemo(() => resolveGuideTokens(previewTheme.id, previewVariant.id), [previewTheme.id, previewVariant.id]);
+  const caption = previewTheme.variants.length > 1 ? `${previewTheme.name} · ${previewVariant.name}` : previewTheme.name;
+  useEffect(() => {
+    setDock(<PreviewDock tokens={previewTokens} caption={caption} />);
+    return () => setDock(null);
+  }, [setDock, previewTokens, caption]);
 
   return (
     <View>
