@@ -85,7 +85,8 @@ export function scaled<T extends TextStyle>(style: T): T {
   return out as T;
 }
 
-export const ACCENTS = ["#2f9e8f", "#4a9fe0", "#3b82f6", "#8b5cf6", "#3fa66a", "#d08b2f", "#d0587e", "#7c8aa3"];
+// The fallback accents live in ./accents (no react-native imports, so the theme tests can load them).
+export { ACCENTS, accentOf } from "./accents";
 
 export const CH_FRAC = 212 / DESIGN_W; // channel rail = this fraction of the guide column width
 export const ROW_FRAC = 168 / DESIGN_W; // row height fraction (of screen width)
@@ -97,8 +98,6 @@ export const MIN_VISIBLE_PX = 24; // cull program blocks narrower than this
 
 export const SIDEBAR_SLIVER_W = 92;
 export const SIDEBAR_EXPANDED_W = 300;
-
-export const accentOf = (i: number) => ACCENTS[i % ACCENTS.length]!;
 
 /** hex (#rrggbb) + alpha → rgba(). */
 export function hexA(hex: string, a: number): string {

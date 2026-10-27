@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 
 import { hasLogoPlate, logoSource } from "./channel-logo";
 import { AURORA } from "./guide-tokens";
+import { deepMerge, GUIDE_THEMES, resolveGuideTokens } from "./guide-themes";
 
 const SERVER = "https://tv.example.com";
 
@@ -70,9 +71,12 @@ describe("hasLogoPlate", () => {
     expect(hasLogoPlate("rgba(29,36,48,0.9)")).toBe(true);
     expect(hasLogoPlate("#1d2430")).toBe(true);
     expect(hasLogoPlate("#1d243080")).toBe(true);
+    expect(hasLogoPlate("#000000")).toBe(true);
   });
 
-  test("Aurora has no plate", () => {
+  test("Aurora has no plate, and neither has any theme yet; one that adds a plate gets its logos inset", () => {
     expect(hasLogoPlate(AURORA.logoPlate)).toBe(false);
+    expect(GUIDE_THEMES.flatMap((t) => t.variants.filter((v) => hasLogoPlate(resolveGuideTokens(t.id, v.id).logoPlate)).map((v) => `${t.id}/${v.id}`))).toEqual([]);
+    expect(hasLogoPlate(deepMerge(AURORA, { logoPlate: "rgba(29,36,48,0.9)" }).logoPlate)).toBe(true);
   });
 });

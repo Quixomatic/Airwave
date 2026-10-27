@@ -19,7 +19,7 @@ import { hasLogoPlate, logoSource } from "./channel-logo";
 import { artBox, artUrl, cellBox, isVisible, liveFill, programArtPath, timelineOrigin, type Lane } from "./geometry";
 import { GuideGhost } from "./guide-ghost";
 import { reportNativeGuideError } from "./guide-renderer";
-import { type GuideTokens, useGuideTokens } from "./guide-tokens";
+import { accentFg, type GuideTokens } from "./guide-tokens";
 import { GuideSidebar, buildSidebarItems, lensEquals, type Lens } from "./guide-sidebar";
 import {
   accentOf,
@@ -44,6 +44,10 @@ import {
 import { NativeRows } from "./native-rows";
 import { classicFollow, classicHandOver, type NativeScroll } from "./native-rows-logic";
 import { useGuideRenderer } from "./use-guide-renderer";
+import { useGuideTokens } from "./use-guide-tokens";
+
+/** `line()` for a width or radius a theme may set to 0 (a borderless cell, a square bar): 0 stays 0 instead of snapping up to a hairline. */
+const ln = (px: number) => (px > 0 ? line(px) : 0);
 
 const is4K = (res?: string) => res === "4k";
 const isHD = (res?: string) => !!res && res !== "sd" && res !== "480";
@@ -471,10 +475,10 @@ function TimeHeader({ T0, railPx, laneX, vw }: { T0: Date; railPx: number; laneX
   const ticks = Array.from({ length: Math.ceil(WINDOW_MIN / 30) + 1 }, (_, i) => new Date(T0.getTime() + i * 30 * MIN));
   return (
     <View style={{ position: "relative", height: vw(52), flexShrink: 0, marginTop: vw(56), marginBottom: vw(20) }}>
-      <Text style={{ position: "absolute", left: vw(40), top: vw(6), fontSize: vw(32), fontWeight: "600", color: tk.headerDay }}>{fmtDay(T0)}</Text>
+      <Text style={{ position: "absolute", left: vw(40), top: vw(6), fontSize: vw(32) * tk.fontScale, fontWeight: "600", color: tk.headerDay }}>{fmtDay(T0)}</Text>
       <View style={{ position: "absolute", left: railPx, right: 0, top: 0, bottom: 0 }}>
         {ticks.map((t, i) => (
-          <Text key={i} style={{ position: "absolute", left: laneX(t), top: vw(6), fontSize: vw(32), fontWeight: "600", color: tk.headerTick }}>
+          <Text key={i} style={{ position: "absolute", left: laneX(t), top: vw(6), fontSize: vw(32) * tk.fontScale, fontWeight: "600", color: tk.headerTick }}>
             {fmtTime(t)}
           </Text>
         ))}
@@ -536,13 +540,20 @@ function Row({
   const logoSrc = marks === "logos" ? logoSource(channel.logo, getServerUrl()) : null;
   const [failedLogo, setFailedLogo] = useState<string | null>(null);
   const showLogo = logoSrc !== null && failedLogo !== logoSrc && !railFocused;
+  // The accent as a mark (glyph, bars, circle border). Tints below stay the raw accent at their alphas.
+  const fg = accentFg(tk, accent);
+  const fs = tk.fontScale;
+  const lf = tk.liveFill;
+  const selectedProgram = tk.ringOuter && focusedProgramId ? channel.programs.find((p) => p.id === focusedProgramId) : undefined;
+  const selectedBox = selectedProgram ? cellBox(selectedProgram, lane) : null;
+  const outerRing = tk.ringOuter && selectedBox ? { ...selectedBox, color: tk.ringOuter.color, w: ln(tk.ringOuter.w) } : null;
 
   return (
     <View style={{ height: rowPx, flexDirection: "row", borderTopWidth: 1, borderTopColor: tk.rowBorder }}>
       {/* Rail — tap to focus; tap again (rail-focused) toggles favorite. The circle mirrors tv-web:
           when rail-focused it becomes the favorite heart (filled red if favorited, else outline). */}
       <Pressable onPress={() => onRailTap(index)} focusable={!Platform.isTV} style={{ width: railPx, paddingVertical: vw(18), paddingHorizontal: vw(20), justifyContent: "space-between", backgroundColor: focused ? hexA(accent, tk.railFocusAlpha) : "transparent" }}>
-        {focused && <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: vw(4), backgroundColor: accent }} />}
+        {focused && <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: vw(4), backgroundColor: fg }} />}
         <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
           {showLogo ? (
             <View style={{ flex: 1, height: circle, marginRight: vw(8) }}>
@@ -568,11 +579,11 @@ function Row({
               )}
             </View>
           ) : (
-            <View style={{ width: circle, height: circle, borderRadius: circle / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, tk.circle.fillA), borderWidth: railFocused ? line(tk.ringW) : line(1), borderColor: railFocused ? tk.ring : hexA(accent, tk.circle.borderA) }}>
+            <View style={{ width: circle, height: circle, borderRadius: circle / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, tk.circle.fillA), borderWidth: railFocused ? line(tk.ringW) : line(1), borderColor: railFocused ? tk.ring : hexA(fg, tk.circle.borderA) }}>
               {railFocused ? (
                 <Heart size={vw(34 * FEATURE_SCALE)} color={favorited ? tk.fav : tk.heartOff} fill={favorited ? tk.fav : "none"} />
               ) : (
-                <Icon size={vw(34 * FEATURE_SCALE)} color={accent} />
+                <Icon size={vw(34 * FEATURE_SCALE)} color={fg} />
               )}
               {favorited && !railFocused && (
                 <View style={{ position: "absolute", right: -vw(4), bottom: -vw(4) }}>
@@ -581,9 +592,9 @@ function Row({
               )}
             </View>
           )}
-          <Text style={{ fontSize: vw(34), fontWeight: tk.numberWeight, color: focused ? tk.numberFocused : tk.number }}>{channel.number}</Text>
+          <Text style={{ fontSize: vw(34) * fs, fontWeight: tk.numberWeight, color: focused ? tk.numberFocused : tk.number }}>{channel.number}</Text>
         </View>
-        <Text numberOfLines={2} style={{ fontSize: vw(23), color: tk.name, lineHeight: vw(23) * 1.2 }}>
+        <Text numberOfLines={2} style={{ fontSize: vw(23) * fs, color: tk.name, lineHeight: vw(23) * fs * 1.2 }}>
           {channel.name}
         </Text>
       </Pressable>
@@ -598,8 +609,8 @@ function Row({
           const startMs = new Date(p.startsAt).getTime();
           const live = now.getTime() >= startMs && now.getTime() < startMs + p.durationSeconds * 1000;
           const fillPct = liveFill(nowX, left, cw);
-          const fillA = hexA(accent, tk.liveFill.elapsed);
-          const fillB = hexA(accent, tk.liveFill.remain);
+          const fillA = lf.mode === "tint" ? hexA(accent, lf.elapsed) : lf.elapsed;
+          const fillB = lf.mode === "tint" ? hexA(accent, lf.remain) : lf.remain;
           return (
             <ProgramCell
               key={p.id}
@@ -614,7 +625,7 @@ function Row({
               fillA={fillA}
               fillB={fillB}
               fillPct={fillPct}
-              accent={accent}
+              fg={fg}
               tk={tk}
               art={art}
               rowPx={rowPx}
@@ -623,6 +634,24 @@ function Row({
             />
           );
         })}
+        {/* A theme's double ring: a second outline just outside the selected cell's own. It is drawn here rather than on
+            the cell because the cell clips its contents; the gap between cells and the row's margin leave it room. */}
+        {outerRing && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              top: vw(6) - outerRing.w,
+              left: outerRing.left - outerRing.w,
+              width: outerRing.width + 2 * outerRing.w,
+              height: rowPx - vw(12) + 2 * outerRing.w,
+              borderRadius: cs(tk.cellRadius) + outerRing.w,
+              borderWidth: outerRing.w,
+              borderColor: outerRing.color,
+              zIndex: 5,
+            }}
+          />
+        )}
       </View>
     </View>
   );
@@ -643,8 +672,8 @@ type ProgramCellProps = {
   fillA: string;
   fillB: string;
   fillPct: number;
-  /** The row's accent (the live bar). */
-  accent: string;
+  /** The row's accent as a mark (the live bar). */
+  fg: string;
   tk: GuideTokens;
   /** Program art is on: the cell shows its artwork when it has one. */
   art: boolean;
@@ -659,7 +688,8 @@ type ProgramCellProps = {
  * the cell's size rounded up to a 64 px step, the same URL the native rows ask for. A cell with no artwork, or whose image
  * failed to load, is a plain cell. With art off the cell is exactly what it was before art existed.
  */
-function ProgramCell({ program: p, programIndex: pi, channelId, index, left, width: cw, selected, live, fillA, fillB, fillPct, accent, tk, art, rowPx, vw, onProgramTap }: ProgramCellProps) {
+function ProgramCell({ program: p, programIndex: pi, channelId, index, left, width: cw, selected, live, fillA, fillB, fillPct, fg, tk, art, rowPx, vw, onProgramTap }: ProgramCellProps) {
+  const fs = tk.fontScale;
   const base = art ? imageUrl(channelId, programArtPath(p.guide)) : null;
   const src = base ? artUrl(base, artBox(cw, rowPx - vw(12), PixelRatio.get())) : null;
   // The image that failed to load, so a changed URL (another size) gets a fresh try.
@@ -677,7 +707,7 @@ function ProgramCell({ program: p, programIndex: pi, channelId, index, left, wid
         height: rowPx - vw(12),
         borderRadius: cs(tk.cellRadius),
         overflow: "hidden",
-        borderWidth: selected ? line(tk.ringW) : line(tk.cellBorderW),
+        borderWidth: selected ? line(tk.ringW) : ln(tk.cellBorderW),
         borderColor: selected ? tk.ring : tk.cellBorder,
         backgroundColor: live ? tk.liveCellBg : tk.cellBg,
         zIndex: selected ? 4 : 1,
@@ -698,12 +728,12 @@ function ProgramCell({ program: p, programIndex: pi, channelId, index, left, wid
           style={{ position: "absolute", inset: 0 }}
         />
       )}
-      {live && <View style={{ position: "absolute", left: vw(3), top: vw(10), bottom: vw(10), width: line(tk.liveBar.w), borderRadius: line(tk.liveBar.r), backgroundColor: accent }} />}
+      {live && <View style={{ position: "absolute", left: vw(3), top: vw(10), bottom: vw(10), width: ln(tk.liveBar.w), borderRadius: ln(tk.liveBar.r), backgroundColor: fg }} />}
       <View style={{ paddingTop: vw(20), paddingHorizontal: vw(20) }}>
-        <Text numberOfLines={1} style={{ fontSize: vw(34), fontWeight: tk.titleWeight, color: showArt ? tk.artTitle : tk.title }}>
+        <Text numberOfLines={1} style={{ fontSize: vw(34) * fs, fontWeight: tk.titleWeight, color: showArt ? tk.artTitle : tk.title }}>
           {p.guide.showTitle ?? p.guide.title}
         </Text>
-        <Text numberOfLines={1} style={{ marginTop: vw(12), fontSize: vw(26), color: showArt ? tk.artSub : tk.sub }}>
+        <Text numberOfLines={1} style={{ marginTop: vw(12), fontSize: vw(26) * fs, color: showArt ? tk.artSub : tk.sub }}>
           {subLine(p.guide)}
         </Text>
       </View>
@@ -740,6 +770,7 @@ function FeaturedPanel({ channel, program, now, accent, vw, onTune }: { channel:
   const f = tk.featured;
   const Icon = channelIcon(channel.icon ?? channel.package?.icon);
   const tile = fv(64);
+  const fg = accentFg(tk, accent);
 
   // The mini feed docks into a slot on the right of the featured panel (like tv-web). Reserve the
   // slot when a mini feed is playing, measure its screen rect, and hand it to the player — the
@@ -775,11 +806,11 @@ function FeaturedPanel({ channel, program, now, accent, vw, onTune }: { channel:
     <Pressable onPress={onTune} focusable={!Platform.isTV} style={{ flexDirection: "row", alignItems: "flex-start", paddingTop: fv(40), paddingHorizontal: fv(64) }}>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: fv(22) }}>
-          <View style={{ width: tile, height: tile, borderRadius: tile / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, tk.circle.fillA), borderWidth: line(1), borderColor: hexA(accent, tk.circle.borderA) }}>
-            <Icon size={fv(34)} color={accent} />
+          <View style={{ width: tile, height: tile, borderRadius: tile / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, tk.circle.fillA), borderWidth: line(1), borderColor: hexA(fg, tk.circle.borderA) }}>
+            <Icon size={fv(34)} color={fg} />
           </View>
-          <Text style={{ fontSize: fv(44), fontWeight: "700", color: hexA(accent, f.numberA) }}>{channel.number}</Text>
-          <Text numberOfLines={1} style={{ fontSize: fv(44), fontWeight: "700", color: accent, flexShrink: 1 }}>
+          <Text style={{ fontSize: fv(44), fontWeight: "700", color: hexA(fg, f.numberA) }}>{channel.number}</Text>
+          <Text numberOfLines={1} style={{ fontSize: fv(44), fontWeight: "700", color: fg, flexShrink: 1 }}>
             {channel.name}
           </Text>
         </View>
@@ -827,7 +858,7 @@ function FeaturedPanel({ channel, program, now, accent, vw, onTune }: { channel:
           <Text style={{ fontSize: fv(34), color: f.status }}>{status}</Text>
         </View>
         <View style={{ marginTop: fv(16), height: fv(8), borderRadius: 999, backgroundColor: f.track, overflow: "hidden" }}>
-          <View style={{ height: "100%", borderRadius: 999, backgroundColor: accent, width: `${pct}%` }} />
+          <View style={{ height: "100%", borderRadius: 999, backgroundColor: fg, width: `${pct}%` }} />
         </View>
       </View>
 

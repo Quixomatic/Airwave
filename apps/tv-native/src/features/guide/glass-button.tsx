@@ -4,14 +4,15 @@ import { type LayoutChangeEvent, Text, View } from "react-native";
 import { TvPressable as Pressable } from "@/components/tv-pressable";
 import { DEFAULT_ACCENT } from "@/lib/tint";
 
-import { useGuideTokens } from "./guide-tokens";
+import { accentFg, AURORA, type GuideTokens } from "./guide-tokens";
 import { cs, hexA } from "./layout";
 
 /**
  * The glassmorphism circle icon button, ported from tv-web's `glass-button.tsx` — the sidebar's
  * circles. `focused` = D-pad focus (accent tint + ring), `active` = persistent lit. Circle only;
  * when `expanded`, a label sits BESIDE it (a row: circle on the left, label column on the right —
- * exactly like tv-web).
+ * exactly like tv-web). `tokens` is the guide's theme; without it the button keeps the standard look, which is what
+ * the Settings sidebar (which uses this button too) wants.
  */
 export function GlassCircleButton({
   icon,
@@ -22,6 +23,7 @@ export function GlassCircleButton({
   active = false,
   accent = DEFAULT_ACCENT,
   size = 54,
+  tokens,
   onPress,
   onLayout,
 }: {
@@ -33,11 +35,14 @@ export function GlassCircleButton({
   active?: boolean;
   accent?: string;
   size?: number;
+  tokens?: GuideTokens;
   onPress?: () => void;
   /** Forwarded to the root — lets the sidebar measure each circle's y for D-pad snap-scroll. */
   onLayout?: (e: LayoutChangeEvent) => void;
 }) {
-  const tk = useGuideTokens();
+  const tk = tokens ?? AURORA;
+  // The ring and the lit border are marks, so they take the theme's shade of the accent; the lit fill is a tint.
+  const fg = accentFg(tk, accent);
   const lit = focused || active;
   // Chrome-scaled for Android TV's 960dp space (identity on iPad/Apple TV) — the circle must shrink with
   // the sidebar width, else a 54px circle overflows the ~46px sliver.
@@ -58,7 +63,7 @@ export function GlassCircleButton({
                 height: s + ring,
                 borderRadius: (s + ring) / 2,
                 borderWidth: 2,
-                borderColor: hexA(accent, tk.glass.ringA),
+                borderColor: hexA(fg, tk.glass.ringA),
               }}
             />
           )}
@@ -70,7 +75,7 @@ export function GlassCircleButton({
               alignItems: "center",
               justifyContent: "center",
               borderWidth: 1,
-              borderColor: lit ? hexA(accent, tk.glass.litBorderA) : tk.glass.idleBorder,
+              borderColor: lit ? hexA(fg, tk.glass.litBorderA) : tk.glass.idleBorder,
               backgroundColor: lit ? hexA(accent, tk.glass.litFillA) : tk.glass.idleFill,
             }}
           >

@@ -1,6 +1,6 @@
 import { Text, View } from "react-native";
 
-import { useGuideTokens } from "./guide-tokens";
+import { useGuideTokens } from "./use-guide-tokens";
 
 /**
  * The guide's own structure as static skeletons behind a centered message — ported from tv-web's

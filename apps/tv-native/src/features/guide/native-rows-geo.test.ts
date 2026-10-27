@@ -64,7 +64,7 @@ describe("auroraGeo", () => {
   });
 
   test("follows the tokens it is given", () => {
-    const geo2 = auroraGeo(input, scalers, { ...AURORA, ringW: 4, cellBorderW: 2, cellRadius: 12, liveBar: { w: 5, r: 6 } });
+    const geo2 = auroraGeo(input, scalers, { ...AURORA, ringW: 4, cellBorderW: 2, cellRadius: 12, liveBar: { ...AURORA.liveBar, w: 5, r: 6 } });
     expect([geo2.cellRing, geo2.circleRing, geo2.cellBorder, geo2.cellRadius, geo2.liveBarW, geo2.liveBarR]).toEqual([2, 2, 1, 6, 2.5, 3]);
   });
 

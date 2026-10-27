@@ -10,8 +10,9 @@ import type { Package } from "@/lib/api";
 import { accentVivid } from "@/lib/accent-palette";
 
 import { GlassCircleButton } from "./glass-button";
-import { useGuideTokens, type GuideTokens } from "./guide-tokens";
+import type { GuideTokens } from "./guide-tokens";
 import { cs, SIDEBAR_EXPANDED_W, SIDEBAR_SLIVER_W } from "./layout";
+import { useGuideTokens } from "./use-guide-tokens";
 
 /**
  * The guide's left sidebar, ported from tv-web — a collapsed sliver of glass circles that expands to
@@ -170,7 +171,7 @@ export const GuideSidebar = memo(function GuideSidebar({
     // Interactive circles + labels; the lens list scrolls (packages exceed the screen).
     <View style={{ flex: 1, gap, paddingVertical: padV, paddingHorizontal: padH }}>
       {actions.map((it, i) => (
-        <GlassCircleButton key={it.key} icon={it.icon} label={it.label} expanded focused={focused && sel === i} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(i)} />
+        <GlassCircleButton key={it.key} tokens={tk} icon={it.icon} label={it.label} expanded focused={focused && sel === i} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(i)} />
       ))}
       <View style={{ height: 1, backgroundColor: tk.sidebar.rule, marginVertical: cs(4) }} />
       <ScrollView
@@ -189,6 +190,7 @@ export const GuideSidebar = memo(function GuideSidebar({
           return (
             <GlassCircleButton
               key={it.key}
+              tokens={tk}
               onLayout={(e) => { offsetsRef.current[i] = { y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height }; }}
               icon={it.icon}
               label={it.label}
@@ -209,10 +211,10 @@ export const GuideSidebar = memo(function GuideSidebar({
     // fire). The FILTER circle expands to reveal the lenses (no single lens to apply from collapsed).
     <Pressable onPress={onExpand} style={{ flex: 1, gap, paddingVertical: padV, paddingHorizontal: padH }}>
       {actions.map((it, i) => (
-        <GlassCircleButton key={it.key} icon={it.icon} expanded={false} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(i)} />
+        <GlassCircleButton key={it.key} tokens={tk} icon={it.icon} expanded={false} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(i)} />
       ))}
       <View style={{ height: 1, backgroundColor: tk.sidebar.rule, marginVertical: cs(4) }} />
-      <GlassCircleButton icon={<ListFilter size={cs(24)} color={tk.sidebar.icon} />} expanded={false} active={!!activeFilter} accent={activeFilter?.accent} onPress={onExpand} />
+      <GlassCircleButton tokens={tk} icon={<ListFilter size={cs(24)} color={tk.sidebar.icon} />} expanded={false} active={!!activeFilter} accent={activeFilter?.accent} onPress={onExpand} />
     </Pressable>
   );
 

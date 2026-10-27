@@ -7,9 +7,9 @@ import { getServerUrl } from "@/lib/auth";
 import { useGuidePrefs } from "@/lib/guide-prefs";
 import { channelTint } from "@/lib/tint";
 
-import { isVisible, type Lane, programArtPath } from "./geometry";
-import { useGuideTokens } from "./guide-tokens";
+import { useGuideTokens } from "./use-guide-tokens";
 import { logoSource } from "./channel-logo";
+import { isVisible, type Lane, programArtPath } from "./geometry";
 import { accentOf, cs, FEATURE_SCALE, line, subLine } from "./layout";
 import { GLYPH_FALLBACK, GLYPH_HEART, iconNodeOf, resolveIconId, type IconNode } from "./lucide-nodes";
 import { auroraGeo, ROW_BORDER_TOP, rowTokens } from "./native-rows-geo";
