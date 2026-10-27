@@ -1,6 +1,6 @@
 import { hasLogoPlate } from "./channel-logo";
 import { WINDOW_MIN } from "./geometry";
-import type { GuideTokens } from "./guide-tokens";
+import { type GuideTokens, railGround } from "./guide-tokens";
 
 /**
  * What the native rows are told about the Aurora row: its dimensions (`auroraGeo`, dp) and its colors (`rowTokens`).
@@ -39,10 +39,20 @@ export type AuroraGeoInput = {
 /** The row's top rule, in dp: `borderTopWidth: 1` in the React Native row, a plain dp (not `line(1)`). The cells and the rail sit below it, which a tap's hit test has to know too. */
 export const ROW_BORDER_TOP = 1;
 
-/** The JSON object the native view's `geo` prop carries. Sizes are dp. */
+/**
+ * The JSON object the native view's `geo` prop carries. Sizes are dp.
+ *
+ * A theme can set a width or radius to 0 (a borderless cell, a square bar, no outer ring): 0 stays 0 rather than snapping up
+ * to a hairline, as `ln` in aurora-grid.tsx does. `fontScale` scales the text sizes only; every position stays where it is.
+ */
 export function auroraGeo(i: AuroraGeoInput, s: Scalers, tk: GuideTokens) {
   const { vw, cs, line } = s;
+  const ln = (px: number) => (px > 0 ? line(px) : 0);
+  const fs = tk.fontScale;
   return {
+    // dp per design px: what `vw(1)` is on this screen. The sizes a theme adds (shadows, progress, textures, ...) travel in the
+    // tokens in design px, and the painter multiplies them by this.
+    unit: vw(1),
     // The lane's coordinate system: the same inputs `cellBox` takes in JS, so both cull and place cells identically.
     rowH: i.rowPx,
     railW: i.railPx,
@@ -68,24 +78,25 @@ export function auroraGeo(i: AuroraGeoInput, s: Scalers, tk: GuideTokens) {
     logoGap: vw(8),
     logoPad: hasLogoPlate(tk.logoPlate) ? vw(4) : 0,
     logoRadius: cs(6),
-    numberSize: vw(34),
-    nameSize: vw(23),
-    nameLine: vw(23) * 1.2,
+    numberSize: vw(34) * fs,
+    nameSize: vw(23) * fs,
+    nameLine: vw(23) * fs * 1.2,
 
     // Cells.
     cellTop: vw(6),
     cellInset: vw(12), // a cell is the row's height less this
     cellRadius: cs(tk.cellRadius),
-    cellBorder: line(tk.cellBorderW),
+    cellBorder: ln(tk.cellBorderW),
     cellRing: line(tk.ringW),
+    ringOuterW: tk.ringOuter ? ln(tk.ringOuter.w) : 0, // the selected cell's second ring, drawn outside its box
     liveBarX: vw(3),
     liveBarInset: vw(10),
-    liveBarW: line(tk.liveBar.w),
-    liveBarR: line(tk.liveBar.r),
+    liveBarW: ln(tk.liveBar.w),
+    liveBarR: ln(tk.liveBar.r),
     padTop: vw(20),
     padX: vw(20),
-    titleSize: vw(34),
-    subSize: vw(26),
+    titleSize: vw(34) * fs,
+    subSize: vw(26) * fs,
     subGap: vw(12),
   };
 }
@@ -93,18 +104,29 @@ export function auroraGeo(i: AuroraGeoInput, s: Scalers, tk: GuideTokens) {
 export type AuroraGeo = ReturnType<typeof auroraGeo>;
 
 /**
- * The JSON object the native view's `tokens` prop carries: the colors, accent alphas and weights the rows draw with. A
- * program's art is a URL in the lineup, not a token: the painter draws it when there is one, with `artScrim` over it and
- * `artTitle` / `artSub` for the text.
+ * The JSON object the native view's `tokens` prop carries: the colors, accent alphas and weights the rows draw with, and what a
+ * theme adds to them.
+ * `liveFill` is the accent at two alphas (mode "tint") or two fixed colors (mode "neutral"); `ringOuter` is the selected cell's
+ * second ring (`{ color, gap, dash }`; its width is `ringOuterW` in `geo`), or null; a row's mark color comes from `accentShade`,
+ * `accentFixed` and `title` the way `accentFg` derives it. A program's art is a URL in the lineup, not a token: the painter
+ * draws it when there is one, with `artScrim` over it and `artTitle` / `artSub` for the text.
+ *
+ * What themes added goes over as it is in the token set (`GuideLook` in packages/native-guide reads it): sizes in it are design
+ * px, which the painter turns into dp with `geo.unit`. Every field is sent whether or not the painter draws it, so the two sides
+ * read one token set; the colors and sizes of the featured panel, sidebar and time header's own fields (featured, badge, sidebar,
+ * glass, ghost, headerDay, headerTick) stay in JS.
  */
 export function rowTokens(tk: GuideTokens) {
   return {
+    // What the rail sits on, opaque: the rail's own color over the guide's ground. An `auto` glyph's ink is decided against it, as `circleColors` does here.
+    railGround: railGround(tk),
     rowBorder: tk.rowBorder,
     cellBg: tk.cellBg,
     liveCellBg: tk.liveCellBg,
     cellBorder: tk.cellBorder,
     ring: tk.ring,
-    liveFill: { elapsed: tk.liveFill.elapsed, remain: tk.liveFill.remain },
+    ringOuter: tk.ringOuter ? { color: tk.ringOuter.color, gap: tk.ringOuter.gap, dash: tk.ringOuter.dash } : null,
+    liveFill: { mode: tk.liveFill.mode, elapsed: tk.liveFill.elapsed, remain: tk.liveFill.remain },
     title: tk.title,
     titleWeight: tk.titleWeight,
     sub: tk.sub,
@@ -116,10 +138,43 @@ export function rowTokens(tk: GuideTokens) {
     numberFocused: tk.numberFocused,
     numberWeight: tk.numberWeight,
     name: tk.name,
+    accentShade: tk.accentShade,
+    accentFixed: tk.accentFixed,
     logoPlate: tk.logoPlate,
     // Program art, when the cells show it: the scrim over it (left to right) and the text colors on it.
     artScrim: [tk.artScrim[0], tk.artScrim[1]],
     artTitle: tk.artTitle,
     artSub: tk.artSub,
+    // What themes added.
+    typeStyle: tk.typeStyle,
+    accentMode: tk.accentMode,
+    accentCycle: tk.accentCycle,
+    rowBorderW: tk.rowBorderW,
+    railBg: tk.railBg,
+    railFocus: tk.railFocus,
+    railBar: tk.railBar,
+    railDivider: tk.railDivider,
+    railLayout: tk.railLayout,
+    circleStyle: tk.circleStyle,
+    glyphStroke: tk.glyphStroke,
+    cellFocusBg: tk.cellFocusBg,
+    focusText: tk.focusText,
+    liveText: tk.liveText,
+    cellBorderDash: tk.cellBorderDash,
+    cellRule: tk.cellRule,
+    shadow: tk.shadow,
+    shadowFocus: tk.shadowFocus,
+    highlight: tk.highlight,
+    halo: tk.halo,
+    progress: tk.progress,
+    statusLabel: tk.statusLabel,
+    art: tk.art,
+    patterns: tk.patterns,
+    misregister: tk.misregister,
+    headerStyle: tk.headerStyle,
+    featuredName: tk.featuredName,
+    featuredPlate: tk.featuredPlate,
+    favStroke: tk.favStroke,
+    liveBar: { x: tk.liveBar.x, inset: tk.liveBar.inset, color: tk.liveBar.color },
   };
 }

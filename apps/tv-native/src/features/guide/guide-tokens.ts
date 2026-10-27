@@ -1,6 +1,6 @@
 import { C } from "@/lib/theme";
 
-import { mixColors } from "./color";
+import { mixColors, over, toHex } from "./color";
 
 /**
  * The guide's look as data: every color, accent alpha, stroke width, corner radius, typeface and texture the guide
@@ -595,6 +595,15 @@ export function rowAccent(tk: Pick<GuideTokens, "accentMode" | "accentFixed" | "
   }
   return channelAccent;
 }
+
+/**
+ * `color` laid over the guide's ground, as an opaque `#rrggbb`: what something painted in `color` actually shows against. An `auto`
+ * glyph's ink is decided against this (`autoInk` needs an opaque color under the circle's fill).
+ */
+export const onGround = (tk: Pick<GuideTokens, "bg">, color: string): string => toHex(over(color, tk.bg));
+
+/** What the rail sits on, opaque: the rail's own color over the guide's ground (Aurora's rail is transparent, so it is the ground itself). */
+export const railGround = (tk: Pick<GuideTokens, "bg" | "railBg">): string => onGround(tk, tk.railBg);
 
 /** `T` with every field optional, all the way down. Arrays, tuples and null replace wholesale (see `deepMerge`). */
 export type DeepPartial<T> = T extends readonly unknown[] ? T : T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;

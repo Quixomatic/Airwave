@@ -187,6 +187,36 @@ class AuroraLayoutTest {
     assertEquals(plain.right, ring.right)
   }
 
+  @Test fun aThemesOuterRingGrowsTheSelectedCellsBoxByItsWidthOnEverySide() {
+    val ringGeo = GuideGeo(
+      """{"rowH": 63, "railW": 72, "laneW": 800, "ppm": 4, "originMs": 0, "nowMs": 0, "windowMin": 180, "gap": 3,
+          "borderTop": 1, "padV": 6.75, "padH": 7.5, "barW": 1.5,
+          "circle": 18, "circleBorder": 0.5, "circleRing": 1, "glyph": 9.5, "badge": 8, "badgeOff": 1.5,
+          "numberSize": 12.75, "nameSize": 8.6, "nameLine": 10.3,
+          "cellTop": 2.25, "cellInset": 4.5, "cellRadius": 4, "cellBorder": 0.5, "cellRing": 1, "ringOuterW": 1,
+          "liveBarX": 1.1, "liveBarInset": 3.75, "liveBarW": 0.5, "liveBarR": 1,
+          "padTop": 7.5, "padX": 7.5, "titleSize": 12.75, "subSize": 9.75, "subGap": 4.5}""",
+    )
+    val l = AuroraLayout(ringGeo, 2.0, 1760.0, titleLineH = 20)
+    val box = GuideGeometry.CellBox(100.0, 200.0)
+    val cell = CellRect()
+    val ring = CellRect()
+    l.placeCell(box, selected = true, out = cell)
+    l.placeOuterRing(box, ring)
+    assertEquals(2.0, l.ringOuterW, 0.0)
+    // The cell is 344..744 by 7..124; the ring is 2 px outside it all round: x 342..746 (relative 198, rounded), and
+    // y from 2 + round(2.5) = 5 to 5 + (round(4.5 + 117 + 4) - round(4.5)) = 5 + (126 - 5) = 126.
+    assertEquals(342, ring.left)
+    assertEquals(746, ring.right)
+    assertEquals(5, ring.top)
+    assertEquals(126, ring.bottom)
+    assertEquals(2f, ring.border, 0f)
+    assertEquals(344, cell.left)
+    assertEquals(744, cell.right)
+    // Without a ring width in geo the ring has no width.
+    assertEquals(0.0, layout.ringOuterW, 0.0)
+  }
+
   private fun logoGeo(logoPad: Double) = GuideGeo(
     """{"rowH": 63, "railW": 72, "laneW": 800, "ppm": 4, "originMs": 0, "nowMs": 0, "windowMin": 180, "gap": 3,
         "borderTop": 1, "padV": 6.75, "padH": 7.5, "barW": 1.5,
@@ -286,6 +316,14 @@ class AuroraLayoutTest {
     assertEquals("nothing is on air after p2", 0L, AuroraLayout.clockOf(geo, programs, (90 * min).toDouble()))
     assertEquals("a live program the row does not draw (past the window) does not count", 0L, AuroraLayout.clockOf(geo, arrayOf(programs[2]), (410 * min).toDouble()))
     assertEquals("no programs", 0L, AuroraLayout.clockOf(geo, emptyArray(), (10 * min).toDouble()))
+  }
+
+  @Test fun aSizeInDesignPxIsLaidOutAtTheScreensUnit() {
+    // 0.375 dp per design px (a 960 dp wide screen) at density 2: one design px is 0.75 px.
+    val l = AuroraLayout(GuideGeo(geoJson.replace("{\"rowH\"", "{\"unit\": 0.375, \"rowH\"")), 2.0, 1760.0, titleLineH = 20)
+    assertEquals(0.75, l.vw(1.0), 1e-12)
+    assertEquals(6.0, l.vw(8.0), 1e-12)
+    assertEquals(0.0, layout.vw(8.0), 0.0) // a geo without a unit lays nothing out (and never divides by it)
   }
 
   @Test fun theRadiusNeverExceedsHalfTheShortSide() {

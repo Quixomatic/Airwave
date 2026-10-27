@@ -123,11 +123,19 @@ class LogoRect {
  * from the same `vw`, `cs` and `line` scalers the rows use) and is multiplied by `density` here; all coordinates are
  * relative to the row's top-left corner.
  *
+ * The selected cell may carry a second ring just outside its own ([placeOuterRing]).
+ *
  * `titleLineH` is the title's line height in px (the sub-line is stacked under it).
  */
 class AuroraLayout(private val geo: GuideGeo, density: Double, val widthPx: Double, titleLineH: Int) {
   private val d = density
   private fun px(key: String) = geo.dp(key) * d
+
+  private val unitPx = px("unit")
+
+  /** `designPx` (a size on the 2560-wide reference screen, what the TypeScript calls `vw()`) in pixels: how the sizes a theme added
+   *  to the tokens, which are kept in design px, are laid out ([GuideLook]). */
+  fun vw(designPx: Double): Double = designPx * unitPx
 
   val rowH = geo.rowH * d
   val railW = geo.railW * d
@@ -251,6 +259,9 @@ class AuroraLayout(private val geo: GuideGeo, density: Double, val widthPx: Doub
 
   /** The pixel width artwork is requested at for the cell `box` (see [artH]). */
   fun artW(box: GuideGeometry.CellBox): Int = GuideGeometry.artSide(box.width, d, GuideGeometry.ART_MAX)
+
+  /** The width of a theme's second, outer ring on the selected cell (0 for none). */
+  val ringOuterW = px("ringOuterW")
   private val barX = px("liveBarX")
   private val barInset = px("liveBarInset")
   private val barW = px("liveBarW")
@@ -297,13 +308,31 @@ class AuroraLayout(private val geo: GuideGeo, density: Double, val widthPx: Doub
     out.subTop = innerTop + PixelGrid.snap(titlePadTop + titleH + subGap)
   }
 
+  /**
+   * Places the selected cell's outer ring into `out` (left, top, right, bottom, and `border`, its width): the cell's border
+   * box grown by the ring's width on every side, positioned like the absolutely placed box the React Native rows draw for it,
+   * so its edges land on the same pixels. `box` is the selected cell's [GuideGeometry.CellBox].
+   */
+  fun placeOuterRing(box: GuideGeometry.CellBox, out: CellRect) {
+    val w = ringOuterW
+    val relX = box.left * d - w
+    val absX = railW + relX
+    out.left = lane.start + PixelGrid.snap(relX)
+    out.right = out.left + PixelGrid.snap(absX + box.width * d + 2 * w) - PixelGrid.snap(absX)
+    val relY = cellTop - w
+    val absY = borderTop + relY
+    out.top = body.start + PixelGrid.snap(relY)
+    out.bottom = out.top + PixelGrid.snap(absY + cellH + 2 * w) - PixelGrid.snap(absY)
+    out.border = w.toFloat()
+  }
+
   companion object {
     /** The `geo` fields this layout reads besides [GuideGeo]'s own (`rowH`, `railW`, ...): JS has to send every one. */
     val KEYS = listOf(
-      "borderTop", "padV", "padH", "barW",
+      "unit", "borderTop", "padV", "padH", "barW",
       "circle", "circleBorder", "circleRing", "glyph", "badge", "badgeOff", "logoGap", "logoPad", "logoRadius",
       "numberSize", "nameSize", "nameLine",
-      "cellTop", "cellInset", "cellRadius", "cellBorder", "cellRing",
+      "cellTop", "cellInset", "cellRadius", "cellBorder", "cellRing", "ringOuterW",
       "liveBarX", "liveBarInset", "liveBarW", "liveBarR",
       "padTop", "padX", "titleSize", "subSize", "subGap",
     )

@@ -1,5 +1,6 @@
 package expo.modules.nativeguide
 
+import kotlin.math.floor
 import kotlin.math.roundToInt
 
 /**
@@ -36,6 +37,22 @@ object GuideColor {
 
   /** The color with its alpha channel set to `a` (0..1). */
   fun alpha(color: Int, a: Double): Int = argb((a * 255).roundToInt(), (color shr 16) and 0xff, (color shr 8) and 0xff, color and 0xff)
+
+  /**
+   * `a` moved toward `b` by `t` (0 = a, 1 = b), opaque, as tv-native's `mixColors` computes it: each channel is
+   * `p + (q - p) * t` in double precision, rounded to the nearest integer with halves going up (JavaScript's `Math.round`),
+   * so JS and native shade an accent to the same color. Alpha is ignored; both colors are meant to be opaque.
+   */
+  fun mix(a: Int, b: Int, t: Double): Int {
+    fun channel(shift: Int): Int {
+      val p = (a shr shift) and 0xff
+      val q = (b shr shift) and 0xff
+      val x = p + (q - p) * t
+      val whole = floor(x)
+      return (if (x - whole >= 0.5) whole + 1 else whole).toInt()
+    }
+    return argb(255, channel(16), channel(8), channel(0))
+  }
 
   fun argb(a: Int, r: Int, g: Int, b: Int): Int =
     (a.coerceIn(0, 255) shl 24) or (r.coerceIn(0, 255) shl 16) or (g.coerceIn(0, 255) shl 8) or b.coerceIn(0, 255)

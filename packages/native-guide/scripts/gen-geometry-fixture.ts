@@ -6,16 +6,22 @@
 //  - android/src/test/resources/aurora-fixture.json: the `geo` and `tokens` JSON the Aurora rows send the native view, built
 //    by the real functions, so the Kotlin tests can check the painter reads every field JS sends (and JS sends every field
 //    the painter reads). apps/tv-native's native-rows-geo.test.ts checks the file is current.
+//  - android/src/test/resources/themes-fixture.json: the same `geo` and `tokens` for every guide theme (its default variant), and the
+//    `tokens` of every color variant of every theme with the mark color (`accentFg`) it gives each accent a row can carry, so the
+//    Kotlin tests can check the painter reads every variant's tokens and shades accents exactly as the React Native rows do.
 // Seeded, so a rerun only changes a file when what it is generated from does.
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { artBox, artUrl, cellBox, isVisible, liveFill, MIN, WINDOW_MIN } from "../../../apps/tv-native/src/features/guide/geometry";
-import { AURORA } from "../../../apps/tv-native/src/features/guide/guide-tokens";
+import { GUIDE_THEMES, resolveGuideTokens } from "../../../apps/tv-native/src/features/guide/guide-themes";
+import { AURORA, accentFg, type GuideTokens } from "../../../apps/tv-native/src/features/guide/guide-tokens";
 import { auroraGeo, rowTokens, type Scalers } from "../../../apps/tv-native/src/features/guide/native-rows-geo";
+import { ACCENT_SAMPLES } from "../../../apps/tv-native/src/features/guide/theme-contrast";
 
 const OUT = fileURLToPath(new URL("../android/src/test/resources/geometry-fixture.json", import.meta.url).href);
 const AURORA_OUT = fileURLToPath(new URL("../android/src/test/resources/aurora-fixture.json", import.meta.url).href);
+const THEMES_OUT = fileURLToPath(new URL("../android/src/test/resources/themes-fixture.json", import.meta.url).href);
 
 let seed = 20261026;
 const rnd = () => {
@@ -85,7 +91,7 @@ export function buildFixture() {
  * CHROME_SCALE is 0.5. The three scalers repeat the formulas of features/guide/layout.ts (which can't be loaded outside
  * React Native): vw = px / 2560 * width, cs = px * CHROME_SCALE, line = cs snapped to a physical pixel, never below one.
  */
-export function buildAuroraFixture() {
+function androidTvRow(tk: GuideTokens) {
   const width = 960;
   const pixelRatio = 2;
   const chrome = Math.max(0.5, Math.min(1, width / 1920));
@@ -101,15 +107,46 @@ export function buildAuroraFixture() {
   const geo = auroraGeo(
     { rowPx: (width * 168) / 2560, railPx, laneW, ppm: laneW / WINDOW_MIN, originMs, gap: scalers.cs(6), featureScale: 0.76 },
     scalers,
-    AURORA,
+    tk,
   );
-  return { geo, tokens: rowTokens(AURORA), density: pixelRatio, widthDp: width };
+  return { geo, tokens: rowTokens(tk), density: pixelRatio, widthDp: width };
+}
+
+export function buildAuroraFixture() {
+  return androidTvRow(AURORA);
+}
+
+/** Each guide theme's row (its default variant), and every variant's tokens with the mark color it draws every accent in. */
+export function buildThemesFixture() {
+  return {
+    accents: ACCENT_SAMPLES,
+    themes: GUIDE_THEMES.map((t) => ({ id: t.id, variant: t.defaultVariant, ...androidTvRow(resolveGuideTokens(t.id, t.defaultVariant)) })),
+    variants: GUIDE_THEMES.flatMap((t) =>
+      t.variants.map((v) => {
+        const tk = resolveGuideTokens(t.id, v.id);
+        return { theme: t.id, variant: v.id, tokens: rowTokens(tk), marks: ACCENT_SAMPLES.map((a) => accentFg(tk, a)) };
+      }),
+    ),
+  };
+}
+
+/** JSON with each element of an array of objects on a line of its own, so a theme's change is one line in the diff. */
+function lines(o: Record<string, unknown>): string {
+  const body = Object.entries(o)
+    .map(([k, v]) =>
+      Array.isArray(v) && v.length > 0 && typeof v[0] === "object" ? `  ${JSON.stringify(k)}: [\n${v.map((x) => `    ${JSON.stringify(x)}`).join(",\n")}\n  ]` : `  ${JSON.stringify(k)}: ${JSON.stringify(v)}`,
+    )
+    .join(",\n");
+  return `{\n${body}\n}\n`;
 }
 
 const about =
   "Generated from apps/tv-native/src/features/guide/geometry.ts by packages/native-guide/scripts/gen-geometry-fixture.ts. The Kotlin geometry must reproduce every `out` (a null `out` means no cell is drawn) and `kept` (whether the per-channel filter keeps the program); geometry.test.ts checks the TypeScript still does.";
 const auroraAbout =
   "Generated from apps/tv-native/src/features/guide/native-rows-geo.ts by packages/native-guide/scripts/gen-geometry-fixture.ts: the `geo` and `tokens` JSON the Aurora rows send the native view, for a 960 dp wide screen at density 2. native-rows-geo.test.ts checks it is current.";
+
+const themesAbout =
+  "Generated from apps/tv-native/src/features/guide/{guide-themes,native-rows-geo}.ts by packages/native-guide/scripts/gen-geometry-fixture.ts: each theme's `geo` and `tokens` JSON (its default variant) for a 960 dp wide screen at density 2, and for every color variant its `tokens` and `marks`, the color accentFg gives each of `accents`. native-rows-geo.test.ts checks it is current.";
 
 if (import.meta.main) {
   const sections = buildFixture();
@@ -120,4 +157,6 @@ if (import.meta.main) {
   console.log(`geometry-fixture.json: ${sections.cells.length} cells (${sections.cells.filter((c) => !c.out).length} culled), ${sections.liveFills.length} fills, ${sections.artBoxes.length} art boxes, ${sections.artUrls.length} art URLs`);
   writeFileSync(AURORA_OUT, `${JSON.stringify({ about: auroraAbout, ...buildAuroraFixture() }, null, 2)}\n`);
   console.log("aurora-fixture.json written");
+  writeFileSync(THEMES_OUT, lines({ about: themesAbout, ...buildThemesFixture() }));
+  console.log("themes-fixture.json written");
 }

@@ -71,6 +71,7 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
   private val inner = RectF()
   private val clip = Path()
   private val cell = CellRect()
+  private val outerRing = CellRect()
 
   // Program art: the image paint (alpha is the fade), the scrim's gradient (a unit one, placed per cell by a matrix) and scratch.
   private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
@@ -84,6 +85,9 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
   // Channel logos: the box laid out for the row being drawn, and the fitted size of the image inside it.
   private val logoRect = LogoRect()
   private val fit = DoubleArray(2)
+
+  /** The row being drawn: its accent as a mark (glyph, bars, circle border). Set by `drawRow`. */
+  private var mark = 0
 
   private data class NameKey(val text: String, val width: Int, val size: Float, val face: Int, val lineHeight: Int)
 
@@ -145,6 +149,7 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
 
   override fun drawRow(canvas: Canvas, row: GuideRow, state: RowState, frame: GuideFrame) {
     val l = layout ?: return
+    mark = tk.mark(row.accent)
     // The row's top rule.
     fill.color = tk.rowBorder
     canvas.drawRect(0f, 0f, frame.widthPx, l.borderTopPx, fill)
@@ -160,7 +165,7 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
     if (state.focused) {
       fill.color = GuideColor.alpha(accent, tk.railFocusA)
       canvas.drawRect(l.rail.start.toFloat(), bodyTop, l.rail.end.toFloat(), bodyBottom, fill)
-      fill.color = accent
+      fill.color = mark
       canvas.drawRect(l.rail.start.toFloat(), bodyTop, l.railBarEnd.toFloat(), bodyBottom, fill)
     }
 
@@ -199,8 +204,9 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
     val radius = AuroraLayout.radius(l.circleD / 2, rect.width(), rect.height())
     fill.color = GuideColor.alpha(accent, tk.circleFillA)
     canvas.drawRoundRect(rect, radius, radius, fill)
-    if (bw > 0f) {
-      stroke.color = if (ringed) tk.ring else GuideColor.alpha(accent, tk.circleBorderA)
+    val circleStroke = if (ringed) tk.ring else GuideColor.alpha(mark, tk.circleBorderA)
+    if (bw > 0f && circleStroke ushr 24 != 0) {
+      stroke.color = circleStroke
       stroke.strokeWidth = bw
       inner.set(rect.left + bw / 2, rect.top + bw / 2, rect.right - bw / 2, rect.bottom - bw / 2)
       val innerRadius = max(0f, radius - bw / 2)
@@ -215,7 +221,7 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
       }
     } else {
       LucideGlyphs.get(row.channel.icon)?.let {
-        glyphs.draw(canvas, it, l.glyphX.start.toFloat(), l.glyphY.start.toFloat(), (l.glyphX.end - l.glyphX.start).toFloat(), accent)
+        glyphs.draw(canvas, it, l.glyphX.start.toFloat(), l.glyphY.start.toFloat(), (l.glyphX.end - l.glyphX.start).toFloat(), mark)
       }
       // A favorite's badge on the circle's corner: drawn over the circle's border and past its edge.
       if (row.fav) {
@@ -315,9 +321,30 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
         if (p.id != selectedId) continue
         val box = g.cellBox(p) ?: continue
         drawCell(canvas, row, p, box, true, g, l, frame)
+        drawOuterRing(canvas, box, l)
       }
     }
     canvas.restore()
+  }
+
+  /** A theme's second ring, just outside the selected cell's own and over its neighbors: a stroke inside the grown box, the
+   *  way a React Native border is drawn. Nothing when the theme has none. */
+  private fun drawOuterRing(canvas: Canvas, box: GuideGeometry.CellBox, l: AuroraLayout) {
+    val color = tk.ringOuter ?: return
+    if (l.ringOuterW <= 0.0 || color ushr 24 == 0) return
+    val r = outerRing
+    l.placeOuterRing(box, r)
+    val w = (r.right - r.left).toFloat()
+    val h = (r.bottom - r.top).toFloat()
+    if (w <= 0f || h <= 0f) return
+    val bw = r.border
+    rect.set(r.left.toFloat(), r.top.toFloat(), r.right.toFloat(), r.bottom.toFloat())
+    val radius = AuroraLayout.radius(l.cellRadius + l.ringOuterW, w, h)
+    stroke.color = color
+    stroke.strokeWidth = bw
+    inner.set(rect.left + bw / 2, rect.top + bw / 2, rect.right - bw / 2, rect.bottom - bw / 2)
+    val innerRadius = max(0f, radius - bw / 2)
+    canvas.drawRoundRect(inner, innerRadius, innerRadius, stroke)
   }
 
   private fun drawCell(canvas: Canvas, row: GuideRow, p: GuideProgram, box: GuideGeometry.CellBox, selected: Boolean, g: GuideGeo, l: AuroraLayout, frame: GuideFrame) {
@@ -359,17 +386,24 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
       if (art != null) drawArt(canvas, art, c, frame)
     }
     if (live) {
-      // Two tones with a hard edge where "now" falls, like a gradient whose stops sit at the same position.
+      // Two tones with a hard edge where "now" falls, like a gradient whose stops sit at the same position: the row's accent
+      // at two alphas, or (a neutral theme) two fixed colors that don't depend on the channel.
       val pct = GuideGeometry.liveFill(frame.nowMs, g.originMs, g.ppm, box.left, box.width)
       val edge = c.padLeft + (pct * (c.padRight - c.padLeft)).roundToInt()
-      fill.color = GuideColor.alpha(row.accent, tk.liveElapsedA)
-      canvas.drawRect(c.padLeft, c.padTop, edge, c.padBottom, fill)
-      fill.color = GuideColor.alpha(row.accent, tk.liveRemainA)
-      canvas.drawRect(edge, c.padTop, c.padRight, c.padBottom, fill)
+      val elapsed = if (tk.liveNeutral) tk.liveElapsedColor else GuideColor.alpha(row.accent, tk.liveElapsedA)
+      val remain = if (tk.liveNeutral) tk.liveRemainColor else GuideColor.alpha(row.accent, tk.liveRemainA)
+      if (elapsed ushr 24 != 0) {
+        fill.color = elapsed
+        canvas.drawRect(c.padLeft, c.padTop, edge, c.padBottom, fill)
+      }
+      if (remain ushr 24 != 0) {
+        fill.color = remain
+        canvas.drawRect(edge, c.padTop, c.padRight, c.padBottom, fill)
+      }
       // The bar's corners round to at most half its width.
       rect.set(c.barLeft.toFloat(), c.barTop.toFloat(), c.barRight.toFloat(), c.barBottom.toFloat())
       val barRadius = AuroraLayout.radius(l.barRadius, rect.width(), rect.height())
-      fill.color = row.accent
+      fill.color = mark
       canvas.drawRoundRect(rect, barRadius, barRadius, fill)
     }
     if (live || art != null) canvas.restore()

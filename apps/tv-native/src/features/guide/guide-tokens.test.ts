@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 
 import { parseColor } from "./color";
 import { tokenProblems } from "./guide-token-checks";
-import { AURORA, accentFg, rowAccent, type GuideTokens } from "./guide-tokens";
+import { AURORA, accentFg, onGround, railGround, rowAccent, type GuideTokens } from "./guide-tokens";
 
 // The literals the guide components drew with before the look moved into tokens (aurora-grid,
 // guide-sidebar, glass-button, guide-ghost and the `C` palette entries they read). The on-now fill and bar had fewer
@@ -153,5 +153,20 @@ describe("rowAccent", () => {
     expect(rowAccent({ accentMode: "fixed", accentFixed: null, accentCycle: null }, channel, 3)).toBe(channel);
     expect(rowAccent({ accentMode: "cycle", accentFixed: null, accentCycle: null }, channel, 3)).toBe(channel);
     expect(rowAccent({ accentMode: "cycle", accentFixed: null, accentCycle: [] }, channel, 3)).toBe(channel);
+  });
+});
+
+describe("onGround and railGround", () => {
+  test("a color over the guide's ground comes out opaque, the ground's own where the color is clear", () => {
+    expect(onGround({ bg: "#102030" }, "transparent")).toBe("#102030");
+    expect(onGround({ bg: "#102030" }, "#ff0000")).toBe("#ff0000");
+    expect(onGround({ bg: "#000000" }, "rgba(255, 255, 255, 0.5)")).toBe("#808080");
+    expect(onGround({ bg: "#ffffff" }, "#00000080")).toBe("#7f7f7f");
+  });
+
+  test("the rail's ground is its own color over the guide's: Aurora's transparent rail is the ground", () => {
+    expect(railGround(AURORA)).toBe(onGround(AURORA, AURORA.railBg));
+    expect(railGround({ bg: "#060a14", railBg: "transparent" })).toBe("#060a14");
+    expect(railGround({ bg: "#060a14", railBg: "#ffffff" })).toBe("#ffffff");
   });
 });
