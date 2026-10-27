@@ -382,6 +382,9 @@ importers:
       expo-dev-client:
         specifier: ~55.0.37
         version: 55.0.37(expo@55.0.28)
+      expo-font:
+        specifier: ~55.0.8
+        version: 55.0.8(expo@55.0.28)(react-native-tvos@0.83.6-0)(react@19.2.0)
       expo-linear-gradient:
         specifier: ~55.0.16
         version: 55.0.16(expo@55.0.28)(react-native-tvos@0.83.6-0)(react@19.2.0)

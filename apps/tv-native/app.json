@@ -35,6 +35,118 @@
       "expo-router",
       "expo-secure-store",
       [
+        "expo-font",
+        {
+          "android": {
+            "fonts": [
+              {
+                "fontFamily": "Atkinson Hyperlegible",
+                "fontDefinitions": [
+                  { "path": "./assets/fonts/Atkinson-Hyperlegible/AtkinsonHyperlegible-Regular.ttf", "weight": 400 },
+                  { "path": "./assets/fonts/Atkinson-Hyperlegible/AtkinsonHyperlegible-Bold.ttf", "weight": 700 }
+                ]
+              },
+              {
+                "fontFamily": "Bangers",
+                "fontDefinitions": [
+                  { "path": "./assets/fonts/Bangers/Bangers-Regular.ttf", "weight": 400 }
+                ]
+              },
+              {
+                "fontFamily": "Bricolage Grotesque",
+                "fontDefinitions": [
+                  { "path": "./assets/fonts/Bricolage-Grotesque/BricolageGrotesque-Regular.ttf", "weight": 400 },
+                  { "path": "./assets/fonts/Bricolage-Grotesque/BricolageGrotesque-Medium.ttf", "weight": 500 },
+                  { "path": "./assets/fonts/Bricolage-Grotesque/BricolageGrotesque-SemiBold.ttf", "weight": 600 },
+                  { "path": "./assets/fonts/Bricolage-Grotesque/BricolageGrotesque-Bold.ttf", "weight": 700 },
+                  { "path": "./assets/fonts/Bricolage-Grotesque/BricolageGrotesque-ExtraBold.ttf", "weight": 800 }
+                ]
+              },
+              {
+                "fontFamily": "Comic Neue",
+                "fontDefinitions": [
+                  { "path": "./assets/fonts/Comic-Neue/ComicNeue-Regular.ttf", "weight": 400 },
+                  { "path": "./assets/fonts/Comic-Neue/ComicNeue-Bold.ttf", "weight": 700 }
+                ]
+              },
+              {
+                "fontFamily": "Epilogue",
+                "fontDefinitions": [
+                  { "path": "./assets/fonts/Epilogue/Epilogue-Regular.ttf", "weight": 400 },
+                  { "path": "./assets/fonts/Epilogue/Epilogue-Medium.ttf", "weight": 500 },
+                  { "path": "./assets/fonts/Epilogue/Epilogue-Bold.ttf", "weight": 700 },
+                  { "path": "./assets/fonts/Epilogue/Epilogue-ExtraBold.ttf", "weight": 800 },
+                  { "path": "./assets/fonts/Epilogue/Epilogue-Black.ttf", "weight": 900 }
+                ]
+              },
+              {
+                "fontFamily": "Fraunces",
+                "fontDefinitions": [
+                  { "path": "./assets/fonts/Fraunces/Fraunces-Bold.ttf", "weight": 700 },
+                  { "path": "./assets/fonts/Fraunces/Fraunces-SemiBoldItalic.ttf", "weight": 600, "style": "italic" }
+                ]
+              },
+              {
+                "fontFamily": "IBM Plex Sans Condensed",
+                "fontDefinitions": [
+                  { "path": "./assets/fonts/IBM-Plex-Sans-Condensed/IBMPlexSansCondensed-Regular.ttf", "weight": 400 },
+                  { "path": "./assets/fonts/IBM-Plex-Sans-Condensed/IBMPlexSansCondensed-SemiBold.ttf", "weight": 600 },
+                  { "path": "./assets/fonts/IBM-Plex-Sans-Condensed/IBMPlexSansCondensed-Bold.ttf", "weight": 700 }
+                ]
+              },
+              {
+                "fontFamily": "Inter Tight",
+                "fontDefinitions": [
+                  { "path": "./assets/fonts/Inter-Tight/InterTight-Regular.ttf", "weight": 400 },
+                  { "path": "./assets/fonts/Inter-Tight/InterTight-Medium.ttf", "weight": 500 },
+                  { "path": "./assets/fonts/Inter-Tight/InterTight-Bold.ttf", "weight": 700 },
+                  { "path": "./assets/fonts/Inter-Tight/InterTight-ExtraBold.ttf", "weight": 800 }
+                ]
+              },
+              {
+                "fontFamily": "Source Sans 3",
+                "fontDefinitions": [
+                  { "path": "./assets/fonts/Source-Sans-3/SourceSans3-Regular.ttf", "weight": 400 },
+                  { "path": "./assets/fonts/Source-Sans-3/SourceSans3-SemiBold.ttf", "weight": 600 },
+                  { "path": "./assets/fonts/Source-Sans-3/SourceSans3-Bold.ttf", "weight": 700 }
+                ]
+              }
+            ]
+          },
+          "ios": {
+            "fonts": [
+              "./assets/fonts/Atkinson-Hyperlegible/AtkinsonHyperlegible-Regular.ttf",
+              "./assets/fonts/Atkinson-Hyperlegible/AtkinsonHyperlegible-Bold.ttf",
+              "./assets/fonts/Bangers/Bangers-Regular.ttf",
+              "./assets/fonts/Bricolage-Grotesque/BricolageGrotesque-Regular.ttf",
+              "./assets/fonts/Bricolage-Grotesque/BricolageGrotesque-Medium.ttf",
+              "./assets/fonts/Bricolage-Grotesque/BricolageGrotesque-SemiBold.ttf",
+              "./assets/fonts/Bricolage-Grotesque/BricolageGrotesque-Bold.ttf",
+              "./assets/fonts/Bricolage-Grotesque/BricolageGrotesque-ExtraBold.ttf",
+              "./assets/fonts/Comic-Neue/ComicNeue-Regular.ttf",
+              "./assets/fonts/Comic-Neue/ComicNeue-Bold.ttf",
+              "./assets/fonts/Epilogue/Epilogue-Regular.ttf",
+              "./assets/fonts/Epilogue/Epilogue-Medium.ttf",
+              "./assets/fonts/Epilogue/Epilogue-Bold.ttf",
+              "./assets/fonts/Epilogue/Epilogue-ExtraBold.ttf",
+              "./assets/fonts/Epilogue/Epilogue-Black.ttf",
+              "./assets/fonts/Fraunces/Fraunces-Bold.ttf",
+              "./assets/fonts/Fraunces/Fraunces-SemiBoldItalic.ttf",
+              "./assets/fonts/IBM-Plex-Sans-Condensed/IBMPlexSansCondensed-Regular.ttf",
+              "./assets/fonts/IBM-Plex-Sans-Condensed/IBMPlexSansCondensed-SemiBold.ttf",
+              "./assets/fonts/IBM-Plex-Sans-Condensed/IBMPlexSansCondensed-Bold.ttf",
+              "./assets/fonts/Inter-Tight/InterTight-Regular.ttf",
+              "./assets/fonts/Inter-Tight/InterTight-Medium.ttf",
+              "./assets/fonts/Inter-Tight/InterTight-Bold.ttf",
+              "./assets/fonts/Inter-Tight/InterTight-ExtraBold.ttf",
+              "./assets/fonts/Source-Sans-3/SourceSans3-Regular.ttf",
+              "./assets/fonts/Source-Sans-3/SourceSans3-SemiBold.ttf",
+              "./assets/fonts/Source-Sans-3/SourceSans3-Bold.ttf"
+            ]
+          }
+        }
+      ],
+      [
         "@react-native-tvos/config-tv",
         {
           "androidTVRequired": true,
