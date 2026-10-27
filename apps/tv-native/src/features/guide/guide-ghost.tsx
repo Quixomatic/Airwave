@@ -1,5 +1,7 @@
 import { Text, View } from "react-native";
 
+import { useGuideTokens } from "./guide-tokens";
+
 /**
  * The guide's own structure as static skeletons behind a centered message — ported from tv-web's
  * GuideGhost. Shown when the (filtered) channel list is empty (fresh install, or an empty
@@ -15,7 +17,8 @@ const GHOST_ROWS = [
 ];
 
 function GBlock({ w, h, r, style }: { w: number | string; h: number | string; r?: number; style?: object }) {
-  return <View style={[{ width: w as number, height: h as number, borderRadius: r ?? 10, backgroundColor: "rgba(148,163,184,0.09)" }, style]} />;
+  const tk = useGuideTokens();
+  return <View style={[{ width: w as number, height: h as number, borderRadius: r ?? 10, backgroundColor: tk.ghost.block }, style]} />;
 }
 
 export function GuideGhost({
@@ -33,6 +36,7 @@ export function GuideGhost({
   message: string;
   sub?: string;
 }) {
+  const tk = useGuideTokens();
   return (
     <View style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
       <View style={{ position: "absolute", inset: 0, opacity: 0.55 }}>
@@ -63,8 +67,8 @@ export function GuideGhost({
       </View>
       {/* centered message */}
       <View style={{ position: "absolute", inset: 0, alignItems: "center", justifyContent: "center", padding: vw(48) }}>
-        <Text style={{ fontSize: vw(56), fontWeight: "800", color: "#e2e8f0", textAlign: "center" }}>{message}</Text>
-        {sub && <Text style={{ marginTop: vw(16), fontSize: vw(30), color: "#94a3b8", maxWidth: vw(1200), lineHeight: vw(30) * 1.45, textAlign: "center" }}>{sub}</Text>}
+        <Text style={{ fontSize: vw(56), fontWeight: "800", color: tk.ghost.title, textAlign: "center" }}>{message}</Text>
+        {sub && <Text style={{ marginTop: vw(16), fontSize: vw(30), color: tk.ghost.sub, maxWidth: vw(1200), lineHeight: vw(30) * 1.45, textAlign: "center" }}>{sub}</Text>}
       </View>
     </View>
   );

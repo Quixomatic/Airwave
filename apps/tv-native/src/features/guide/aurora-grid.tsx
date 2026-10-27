@@ -10,12 +10,12 @@ import { TvPressable as Pressable } from "@/components/tv-pressable";
 import { usePlayer } from "@/features/watch/player-ctx";
 import type { GuideGridChannel, GuideGridProgram, GuideMeta } from "@/lib/api";
 import { LAYER, setBackExitsApp, useKeyLayer } from "@/lib/input";
-import { C } from "@/lib/theme";
 import { channelTint } from "@/lib/tint";
 import { usePackages } from "@/hooks/queries";
 
 import { cellBox, isVisible, liveFill, timelineOrigin, type Lane } from "./geometry";
 import { GuideGhost } from "./guide-ghost";
+import { useGuideTokens } from "./guide-tokens";
 import { GuideSidebar, buildSidebarItems, lensEquals, type Lens } from "./guide-sidebar";
 import {
   accentOf,
@@ -30,7 +30,6 @@ import {
   line,
   liveProgramIndex,
   MIN,
-  PROGRESS_FILL_ELAPSED_STRONGER,
   ROW_FRAC,
   SIDEBAR_SLIVER_W,
   subLine,
@@ -64,6 +63,7 @@ export function AuroraGrid({
 }) {
   const { width } = useWindowDimensions();
   const vw = useCallback((px: number) => vwOf(width, px), [width]);
+  const tk = useGuideTokens();
 
   const now = useMemo(() => new Date(serverTime), [serverTime]);
   const T0 = useMemo(() => timelineOrigin(now), [now]);
@@ -83,7 +83,7 @@ export function AuroraGrid({
   // Sidebar lens + package list.
   const [lens, setLens] = useState<Lens>({ type: "all" });
   const { data: pkgData } = usePackages();
-  const sidebarItems = useMemo(() => buildSidebarItems(pkgData?.packages ?? [], lens), [pkgData, lens]);
+  const sidebarItems = useMemo(() => buildSidebarItems(pkgData?.packages ?? [], lens, tk), [pkgData, lens, tk]);
   // The zone machine — grid ↔ rail ↔ sidebar, ported from tv-web's aurora-grid. Both touch and the
   // D-pad dispatcher drive this same state (sidebar expanded ⇔ zone === "sidebar").
   const [zone, setZone] = useState<"grid" | "rail" | "sidebar">("grid");
@@ -307,7 +307,7 @@ export function AuroraGrid({
   }, [fc, zone, channels.length, rowPx]);
 
   return (
-    <View style={{ flex: 1, flexDirection: "row", backgroundColor: C.bg }}>
+    <View style={{ flex: 1, flexDirection: "row", backgroundColor: tk.bg }}>
       {/* The guide column — the layout reserves only the sliver width; the sidebar overlays it. Must use
           the SAME chrome-scaled width as the sidebar (cs), or the content sits offset by the old width. */}
       <View style={{ width: cs(SIDEBAR_SLIVER_W), flexShrink: 0 }} />
@@ -380,7 +380,7 @@ export function AuroraGrid({
                 borderTopWidth: vw(14),
                 borderLeftColor: "transparent",
                 borderRightColor: "transparent",
-                borderTopColor: C.now,
+                borderTopColor: tk.now,
                 zIndex: 7,
               }}
             />
@@ -390,7 +390,7 @@ export function AuroraGrid({
 
       {/* Scrim behind the expanded sidebar — tap to collapse. */}
       {sidebarExpanded && (
-        <Pressable onPress={() => setZone("grid")} focusable={!Platform.isTV} style={{ position: "absolute", inset: 0, backgroundColor: "rgba(6,10,20,0.55)", zIndex: 24 }} />
+        <Pressable onPress={() => setZone("grid")} focusable={!Platform.isTV} style={{ position: "absolute", inset: 0, backgroundColor: tk.scrim, zIndex: 24 }} />
       )}
 
       <GuideSidebar
@@ -407,13 +407,14 @@ export function AuroraGrid({
 }
 
 function TimeHeader({ T0, railPx, laneX, vw }: { T0: Date; railPx: number; laneX: (d: Date) => number; vw: (px: number) => number }) {
+  const tk = useGuideTokens();
   const ticks = Array.from({ length: Math.ceil(WINDOW_MIN / 30) + 1 }, (_, i) => new Date(T0.getTime() + i * 30 * MIN));
   return (
     <View style={{ position: "relative", height: vw(52), flexShrink: 0, marginTop: vw(56), marginBottom: vw(20) }}>
-      <Text style={{ position: "absolute", left: vw(40), top: vw(6), fontSize: vw(32), fontWeight: "600", color: "#e6eaf1" }}>{fmtDay(T0)}</Text>
+      <Text style={{ position: "absolute", left: vw(40), top: vw(6), fontSize: vw(32), fontWeight: "600", color: tk.headerDay }}>{fmtDay(T0)}</Text>
       <View style={{ position: "absolute", left: railPx, right: 0, top: 0, bottom: 0 }}>
         {ticks.map((t, i) => (
-          <Text key={i} style={{ position: "absolute", left: laneX(t), top: vw(6), fontSize: vw(32), fontWeight: "600", color: "#c3c9d4" }}>
+          <Text key={i} style={{ position: "absolute", left: laneX(t), top: vw(6), fontSize: vw(32), fontWeight: "600", color: tk.headerTick }}>
             {fmtTime(t)}
           </Text>
         ))}
@@ -459,31 +460,32 @@ function Row({
   nowX: number;
   vw: (px: number) => number;
 }) {
+  const tk = useGuideTokens();
   const Icon = channelIcon(channel.icon ?? channel.package?.icon);
   const circle = vw(64 * FEATURE_SCALE);
 
   return (
-    <View style={{ height: rowPx, flexDirection: "row", borderTopWidth: 1, borderTopColor: C.rowBorder }}>
+    <View style={{ height: rowPx, flexDirection: "row", borderTopWidth: 1, borderTopColor: tk.rowBorder }}>
       {/* Rail — tap to focus; tap again (rail-focused) toggles favorite. The circle mirrors tv-web:
           when rail-focused it becomes the favorite heart (filled red if favorited, else outline). */}
-      <Pressable onPress={() => onRailTap(index)} focusable={!Platform.isTV} style={{ width: railPx, paddingVertical: vw(18), paddingHorizontal: vw(20), justifyContent: "space-between", backgroundColor: focused ? hexA(accent, 0.12) : "transparent" }}>
+      <Pressable onPress={() => onRailTap(index)} focusable={!Platform.isTV} style={{ width: railPx, paddingVertical: vw(18), paddingHorizontal: vw(20), justifyContent: "space-between", backgroundColor: focused ? hexA(accent, tk.railFocusAlpha) : "transparent" }}>
         {focused && <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: vw(4), backgroundColor: accent }} />}
         <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
-          <View style={{ width: circle, height: circle, borderRadius: circle / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, 0.2), borderWidth: railFocused ? line(2) : line(1), borderColor: railFocused ? C.ring : hexA(accent, 0.35) }}>
+          <View style={{ width: circle, height: circle, borderRadius: circle / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, tk.circle.fillA), borderWidth: railFocused ? line(tk.ringW) : line(1), borderColor: railFocused ? tk.ring : hexA(accent, tk.circle.borderA) }}>
             {railFocused ? (
-              <Heart size={vw(34 * FEATURE_SCALE)} color={favorited ? C.fav : "#c3c9d4"} fill={favorited ? C.fav : "none"} />
+              <Heart size={vw(34 * FEATURE_SCALE)} color={favorited ? tk.fav : tk.heartOff} fill={favorited ? tk.fav : "none"} />
             ) : (
               <Icon size={vw(34 * FEATURE_SCALE)} color={accent} />
             )}
             {favorited && !railFocused && (
               <View style={{ position: "absolute", right: -vw(4), bottom: -vw(4) }}>
-                <Heart size={vw(22)} color={C.fav} fill={C.fav} />
+                <Heart size={vw(22)} color={tk.fav} fill={tk.fav} />
               </View>
             )}
           </View>
-          <Text style={{ fontSize: vw(34), fontWeight: "700", color: focused ? "#e6eaf1" : C.mutedFg }}>{channel.number}</Text>
+          <Text style={{ fontSize: vw(34), fontWeight: tk.numberWeight, color: focused ? tk.numberFocused : tk.number }}>{channel.number}</Text>
         </View>
-        <Text numberOfLines={2} style={{ fontSize: vw(23), color: C.mutedFg, lineHeight: vw(23) * 1.2 }}>
+        <Text numberOfLines={2} style={{ fontSize: vw(23), color: tk.name, lineHeight: vw(23) * 1.2 }}>
           {channel.name}
         </Text>
       </Pressable>
@@ -498,7 +500,8 @@ function Row({
           const startMs = new Date(p.startsAt).getTime();
           const live = now.getTime() >= startMs && now.getTime() < startMs + p.durationSeconds * 1000;
           const fillPct = liveFill(nowX, left, cw);
-          const [fillA, fillB] = PROGRESS_FILL_ELAPSED_STRONGER ? [hexA(accent, 0.32), hexA(accent, 0.1)] : [hexA(accent, 0.1), hexA(accent, 0.32)];
+          const fillA = hexA(accent, tk.liveFill.elapsed);
+          const fillB = hexA(accent, tk.liveFill.remain);
           return (
             <Pressable
               key={p.id}
@@ -510,11 +513,11 @@ function Row({
                 left,
                 width: cw,
                 height: rowPx - vw(12),
-                borderRadius: cs(8),
+                borderRadius: cs(tk.cellRadius),
                 overflow: "hidden",
-                borderWidth: selected ? line(2) : line(1),
-                borderColor: selected ? C.ring : C.cellBorder,
-                backgroundColor: live ? "transparent" : "rgba(148,163,184,0.05)",
+                borderWidth: selected ? line(tk.ringW) : line(tk.cellBorderW),
+                borderColor: selected ? tk.ring : tk.cellBorder,
+                backgroundColor: live ? tk.liveCellBg : tk.cellBg,
                 zIndex: selected ? 4 : 1,
               }}
             >
@@ -527,12 +530,12 @@ function Row({
                   style={{ position: "absolute", inset: 0 }}
                 />
               )}
-              {live && <View style={{ position: "absolute", left: vw(3), top: vw(10), bottom: vw(10), width: line(3), borderRadius: line(4), backgroundColor: accent }} />}
+              {live && <View style={{ position: "absolute", left: vw(3), top: vw(10), bottom: vw(10), width: line(tk.liveBar.w), borderRadius: line(tk.liveBar.r), backgroundColor: accent }} />}
               <View style={{ paddingTop: vw(20), paddingHorizontal: vw(20) }}>
-                <Text numberOfLines={1} style={{ fontSize: vw(34), fontWeight: "600", color: "#f1f5f9" }}>
+                <Text numberOfLines={1} style={{ fontSize: vw(34), fontWeight: tk.titleWeight, color: tk.title }}>
                   {p.guide.showTitle ?? p.guide.title}
                 </Text>
-                <Text numberOfLines={1} style={{ marginTop: vw(12), fontSize: vw(26), color: C.mutedFg }}>
+                <Text numberOfLines={1} style={{ marginTop: vw(12), fontSize: vw(26), color: tk.sub }}>
                   {subLine(p.guide)}
                 </Text>
               </View>
@@ -543,12 +546,6 @@ function Row({
     </View>
   );
 }
-
-const BADGE_GRAD = {
-  res: ["#7fd6de", "#4bb8c9"] as const,
-  hdr: ["#f0c14b", "#e0a020"] as const,
-  audio: ["#1e293b", "#334155"] as const,
-};
 
 function Badge({ label, colors, textColor, fv }: { label: string; colors: readonly [string, string]; textColor: string; fv: (px: number) => number }) {
   return (
@@ -575,6 +572,8 @@ function FeaturedPanel({ channel, program, now, accent, vw, onTune }: { channel:
   const audio = audioBadge(g.audioChannels);
   const isEpisode = !!g.showTitle && g.season != null && g.episode != null;
   const fv = (px: number) => vw(px * FEATURE_SCALE);
+  const tk = useGuideTokens();
+  const f = tk.featured;
   const Icon = channelIcon(channel.icon ?? channel.package?.icon);
   const tile = fv(64);
 
@@ -612,58 +611,58 @@ function FeaturedPanel({ channel, program, now, accent, vw, onTune }: { channel:
     <Pressable onPress={onTune} focusable={!Platform.isTV} style={{ flexDirection: "row", alignItems: "flex-start", paddingTop: fv(40), paddingHorizontal: fv(64) }}>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: fv(22) }}>
-          <View style={{ width: tile, height: tile, borderRadius: tile / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, 0.2), borderWidth: line(1), borderColor: hexA(accent, 0.35) }}>
+          <View style={{ width: tile, height: tile, borderRadius: tile / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, tk.circle.fillA), borderWidth: line(1), borderColor: hexA(accent, tk.circle.borderA) }}>
             <Icon size={fv(34)} color={accent} />
           </View>
-          <Text style={{ fontSize: fv(44), fontWeight: "700", color: hexA(accent, 0.75) }}>{channel.number}</Text>
+          <Text style={{ fontSize: fv(44), fontWeight: "700", color: hexA(accent, f.numberA) }}>{channel.number}</Text>
           <Text numberOfLines={1} style={{ fontSize: fv(44), fontWeight: "700", color: accent, flexShrink: 1 }}>
             {channel.name}
           </Text>
         </View>
 
         {(g.genres?.length || g.tagline) && (
-          <Text style={{ marginTop: fv(14), fontSize: fv(30), color: "#64748b" }}>
+          <Text style={{ marginTop: fv(14), fontSize: fv(30), color: f.tagline }}>
             {[g.genres?.slice(0, 2).join(" · "), g.tagline].filter(Boolean).join(" · ")}
           </Text>
         )}
 
-        <View style={{ height: 1, backgroundColor: C.border, marginTop: fv(22), marginBottom: fv(26) }} />
+        <View style={{ height: 1, backgroundColor: f.rule, marginTop: fv(22), marginBottom: fv(26) }} />
 
         <View style={{ flexDirection: "row", alignItems: "center", gap: fv(28) }}>
-          <Text style={{ flex: 1, fontSize: fv(60), fontWeight: "700", lineHeight: fv(60) * 1.05, color: "#f1f5f9" }}>
+          <Text style={{ flex: 1, fontSize: fv(60), fontWeight: "700", lineHeight: fv(60) * 1.05, color: f.title }}>
             {isEpisode ? g.showTitle : g.title}
-            {isEpisode && <Text style={{ fontWeight: "400", color: "#c3c9d4" }}> S{g.season}, E{g.episode}{g.title ? ` · ${g.title}` : ""}</Text>}
+            {isEpisode && <Text style={{ fontWeight: "400", color: f.episode }}> S{g.season}, E{g.episode}{g.title ? ` · ${g.title}` : ""}</Text>}
           </Text>
           <View style={{ flexDirection: "row", gap: fv(14) }}>
-            {is4K(g.resolution) ? <Badge label="4K" colors={BADGE_GRAD.res} textColor="#06222a" fv={fv} /> : isHD(g.resolution) ? <Badge label="HD" colors={BADGE_GRAD.res} textColor="#06222a" fv={fv} /> : null}
-            {g.hdr && <Badge label={g.hdr === "Dolby Vision" ? "DV" : "HDR"} colors={BADGE_GRAD.hdr} textColor="#2a1e00" fv={fv} />}
-            {audio && <Badge label={audio} colors={BADGE_GRAD.audio} textColor="#dfe4ec" fv={fv} />}
-            {g.dynamicAudio && <Badge label={g.dynamicAudio === "Atmos" ? "ATMOS" : g.dynamicAudio} colors={BADGE_GRAD.audio} textColor="#dfe4ec" fv={fv} />}
+            {is4K(g.resolution) ? <Badge label="4K" colors={tk.badge.res.grad} textColor={tk.badge.res.text} fv={fv} /> : isHD(g.resolution) ? <Badge label="HD" colors={tk.badge.res.grad} textColor={tk.badge.res.text} fv={fv} /> : null}
+            {g.hdr && <Badge label={g.hdr === "Dolby Vision" ? "DV" : "HDR"} colors={tk.badge.hdr.grad} textColor={tk.badge.hdr.text} fv={fv} />}
+            {audio && <Badge label={audio} colors={tk.badge.audio.grad} textColor={tk.badge.audio.text} fv={fv} />}
+            {g.dynamicAudio && <Badge label={g.dynamicAudio === "Atmos" ? "ATMOS" : g.dynamicAudio} colors={tk.badge.audio.grad} textColor={tk.badge.audio.text} fv={fv} />}
           </View>
         </View>
 
         <View style={{ marginTop: fv(22), flexDirection: "row", alignItems: "center", gap: fv(16) }}>
-          {g.year != null && <Text style={{ fontSize: fv(34), color: "#c3c9d4" }}>{g.year}</Text>}
-          {g.year != null && g.contentRating && <Text style={{ fontSize: fv(34), color: "#475569" }}>·</Text>}
-          {g.contentRating && <Text style={{ fontSize: fv(34), color: "#c3c9d4" }}>{g.contentRating}</Text>}
+          {g.year != null && <Text style={{ fontSize: fv(34), color: f.meta }}>{g.year}</Text>}
+          {g.year != null && g.contentRating && <Text style={{ fontSize: fv(34), color: f.sep }}>·</Text>}
+          {g.contentRating && <Text style={{ fontSize: fv(34), color: f.meta }}>{g.contentRating}</Text>}
           {g.criticRating != null && (
             <>
-              <Text style={{ fontSize: fv(34), color: "#475569" }}>·</Text>
-              <Star size={fv(34)} color={C.star} fill={C.star} />
-              <Text style={{ fontSize: fv(34), color: "#c3c9d4" }}>{g.criticRating.toFixed(1)}</Text>
+              <Text style={{ fontSize: fv(34), color: f.sep }}>·</Text>
+              <Star size={fv(34)} color={f.star} fill={f.star} />
+              <Text style={{ fontSize: fv(34), color: f.meta }}>{g.criticRating.toFixed(1)}</Text>
             </>
           )}
         </View>
 
-        <Text numberOfLines={2} style={{ marginTop: fv(22), fontSize: fv(36), lineHeight: fv(36) * 1.4, minHeight: fv(36) * 1.4 * 2, color: "#c9cfda" }}>
+        <Text numberOfLines={2} style={{ marginTop: fv(22), fontSize: fv(36), lineHeight: fv(36) * 1.4, minHeight: fv(36) * 1.4 * 2, color: f.summary }}>
           {g.summary ?? ""}
         </Text>
 
         <View style={{ marginTop: fv(26), flexDirection: "row", justifyContent: "space-between" }}>
-          <Text style={{ fontSize: fv(34), color: "#c3c9d4" }}>{fmtTime(start)} - {fmtTime(end)}</Text>
-          <Text style={{ fontSize: fv(34), color: "#e6eaf1" }}>{status}</Text>
+          <Text style={{ fontSize: fv(34), color: f.meta }}>{fmtTime(start)} - {fmtTime(end)}</Text>
+          <Text style={{ fontSize: fv(34), color: f.status }}>{status}</Text>
         </View>
-        <View style={{ marginTop: fv(16), height: fv(8), borderRadius: 999, backgroundColor: "rgba(148,163,184,0.18)", overflow: "hidden" }}>
+        <View style={{ marginTop: fv(16), height: fv(8), borderRadius: 999, backgroundColor: f.track, overflow: "hidden" }}>
           <View style={{ height: "100%", borderRadius: 999, backgroundColor: accent, width: `${pct}%` }} />
         </View>
       </View>

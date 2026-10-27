@@ -92,7 +92,6 @@ export const FEATURE_SCALE = 0.76; // featured panel uniformly shrunk so the gri
 // imports so it can be unit-tested; these are re-exported so existing importers keep working.
 export { LEAD_MIN, liveProgramIndex, MIN, WINDOW_MIN } from "./geometry";
 export const MIN_VISIBLE_PX = 24; // cull program blocks narrower than this
-export const PROGRESS_FILL_ELAPSED_STRONGER = true;
 
 export const SIDEBAR_SLIVER_W = 92;
 export const SIDEBAR_EXPANDED_W = 300;
