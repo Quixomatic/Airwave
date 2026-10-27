@@ -4,8 +4,10 @@ import { type LayoutChangeEvent, Text, View } from "react-native";
 import { TvPressable as Pressable } from "@/components/tv-pressable";
 import { DEFAULT_ACCENT } from "@/lib/tint";
 
+import { FIXED_WEIGHTS } from "./guide-fonts";
+import { faceText } from "./guide-style";
 import { accentFg, AURORA, type GuideTokens } from "./guide-tokens";
-import { cs, hexA } from "./layout";
+import { cs, hexA, line } from "./layout";
 
 /**
  * The glassmorphism circle icon button, ported from tv-web's `glass-button.tsx` — the sidebar's
@@ -48,6 +50,8 @@ export function GlassCircleButton({
   // the sidebar width, else a 54px circle overflows the ~46px sliver.
   const s = cs(size);
   const ring = cs(8);
+  // A theme with heavy rules (more than 3 design px) draws the circle's rim heavier too.
+  const rim = tk.rowBorderW !== null && tk.rowBorderW > 3 ? line(2.25) : 1;
   return (
     <Pressable onPress={onPress} onLayout={onLayout} style={({ pressed }) => ({ width: "100%", opacity: pressed ? 0.75 : 1 })}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: expanded ? cs(14) : 0, width: "100%" }}>
@@ -74,7 +78,7 @@ export function GlassCircleButton({
               borderRadius: s / 2,
               alignItems: "center",
               justifyContent: "center",
-              borderWidth: 1,
+              borderWidth: rim,
               borderColor: lit ? hexA(fg, tk.glass.litBorderA) : tk.glass.idleBorder,
               backgroundColor: lit ? hexA(accent, tk.glass.litFillA) : tk.glass.idleFill,
             }}
@@ -86,11 +90,11 @@ export function GlassCircleButton({
         {/* label beside the circle */}
         {expanded && label && (
           <View style={{ flexShrink: 1, minWidth: 0 }}>
-            <Text numberOfLines={1} style={{ fontSize: cs(17), fontWeight: "600", color: lit ? tk.glass.labelLit : tk.glass.label }}>
+            <Text numberOfLines={1} style={{ ...faceText(tk, FIXED_WEIGHTS.glassLabel.face, cs(17), { weight: FIXED_WEIGHTS.glassLabel.weight }), color: lit ? tk.glass.labelLit : tk.glass.label }}>
               {label}
             </Text>
             {sublabel && (
-              <Text numberOfLines={1} style={{ fontSize: cs(13), fontWeight: "500", color: tk.glass.sublabel, marginTop: cs(2) }}>
+              <Text numberOfLines={1} style={{ ...faceText(tk, FIXED_WEIGHTS.glassSub.face, cs(13), { weight: FIXED_WEIGHTS.glassSub.weight }), color: tk.glass.sublabel, marginTop: cs(2) }}>
                 {sublabel}
               </Text>
             )}

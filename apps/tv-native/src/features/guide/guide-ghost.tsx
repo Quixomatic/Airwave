@@ -1,5 +1,7 @@
 import { Text, View } from "react-native";
 
+import { FIXED_WEIGHTS } from "./guide-fonts";
+import { faceText } from "./guide-style";
 import { useGuideTokens } from "./use-guide-tokens";
 
 /**
@@ -67,8 +69,8 @@ export function GuideGhost({
       </View>
       {/* centered message */}
       <View style={{ position: "absolute", inset: 0, alignItems: "center", justifyContent: "center", padding: vw(48) }}>
-        <Text style={{ fontSize: vw(56), fontWeight: "800", color: tk.ghost.title, textAlign: "center" }}>{message}</Text>
-        {sub && <Text style={{ marginTop: vw(16), fontSize: vw(30), color: tk.ghost.sub, maxWidth: vw(1200), lineHeight: vw(30) * 1.45, textAlign: "center" }}>{sub}</Text>}
+        <Text style={{ ...faceText(tk, FIXED_WEIGHTS.ghost.face, vw(56), { weight: FIXED_WEIGHTS.ghost.weight }), color: tk.ghost.title, textAlign: "center" }}>{message}</Text>
+        {sub && <Text style={{ marginTop: vw(16), ...faceText(tk, "text", vw(30)), color: tk.ghost.sub, maxWidth: vw(1200), lineHeight: vw(30) * 1.45, textAlign: "center" }}>{sub}</Text>}
       </View>
     </View>
   );

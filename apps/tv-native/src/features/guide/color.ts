@@ -64,3 +64,33 @@ export function contrastRatio(fg: string | Rgba, bg: string | Rgba): number {
   const l2 = luminance(under);
   return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
 }
+
+/** `rgba(r, g, b, a)` for a color, with the channels rounded and the alpha to three places. */
+export function rgbaCss({ r, g, b, a }: Rgba): string {
+  return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${Math.round(a * 1000) / 1000})`;
+}
+
+/** `top` laid over `under` as one CSS color (`under` may itself be translucent). */
+export const compositeCss = (top: string, under: string): string => rgbaCss(over(top, under));
+
+/** Black or white, whichever reads better on `fill` (a CSS color, laid over the opaque `under` first). */
+export function autoInk(fill: string, under: string): "#000000" | "#ffffff" {
+  const bg = toHex(over(fill, under));
+  return contrastRatio("#000000", bg) >= contrastRatio("#ffffff", bg) ? "#000000" : "#ffffff";
+}
+
+/**
+ * A color (any of the forms above) at alpha `a`, as `rgba()`. A color that has an alpha of its own (`#rrggbbaa`, `rgba()`) keeps it, scaled
+ * by `a`: a 50% color asked for at 50% is 25%. A color this cannot read is returned as it is, so a bad token shows as the CSS it is
+ * (and is caught by the token checks) rather than as `rgba(NaN, ...)`.
+ */
+export function hexA(color: string, a: number): string {
+  let c: Rgba;
+  try {
+    c = parseColor(color);
+  } catch {
+    return color;
+  }
+  const alpha = c.a === 1 ? a : Math.round(a * c.a * 1000) / 1000;
+  return `rgba(${Math.round(c.r)}, ${Math.round(c.g)}, ${Math.round(c.b)}, ${alpha})`;
+}

@@ -5,6 +5,7 @@ import type { TextStyle } from "react-native";
 
 import type { GuideGridProgram } from "@/lib/api";
 
+import { WINDOW_MIN as WINDOW } from "./geometry";
 import { lucideIconFrom } from "./icon-id";
 
 /**
@@ -99,13 +100,20 @@ export const MIN_VISIBLE_PX = 24; // cull program blocks narrower than this
 export const SIDEBAR_SLIVER_W = 92;
 export const SIDEBAR_EXPANDED_W = 300;
 
-/** hex (#rrggbb) + alpha → rgba(). */
-export function hexA(hex: string, a: number): string {
-  const h = hex.replace("#", "");
-  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
-  const n = parseInt(full, 16);
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+/**
+ * The guide's screen geometry at a window `width` (dp): the guide column, the channel rail, a row's height, the lane and how many dp a minute is
+ * along it. The guide and the settings preview of a theme lay themselves out from the same numbers.
+ */
+export function guideMetrics(width: number) {
+  const colW = Math.max(1, width - SIDEBAR_SLIVER_W);
+  const railPx = colW * CH_FRAC * UI_SCALE;
+  const rowPx = width * ROW_FRAC * UI_SCALE;
+  const laneW = Math.max(1, colW - railPx);
+  return { colW, railPx, rowPx, laneW, ppm: laneW / WINDOW };
 }
+
+// `hexA` (hex + alpha -> rgba()) lives in ./color, which has no react-native imports, so the guide's pure style helpers can use it.
+export { hexA } from "./color";
 
 export const fmtTime = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 export const fmtDay = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" });
@@ -121,7 +129,7 @@ export function subLine(g: GuideGridProgram["guide"]): string {
 export const audioBadge = (ch?: number) =>
   ch === 8 ? "7.1" : ch === 6 ? "5.1" : ch === 2 ? "Stereo" : ch ? "Mono" : null;
 
-type IconCmp = ComponentType<{ size?: number; color?: string; fill?: string }>;
+type IconCmp = ComponentType<{ size?: number; color?: string; fill?: string; strokeWidth?: number }>;
 const LUCIDE = LucideIcons as unknown as Record<string, IconCmp>;
 
 /**

@@ -50,6 +50,16 @@ describe("the bundled theme fonts", () => {
     expect([...asked()].filter((a) => !have.has(a))).toEqual([]);
   });
 
+  test("a theme's text face has the bold the status words, badges and kickers are set in", () => {
+    // The React Native rows draw those in the text face at weight 700, whatever weight the theme gives the roles.
+    for (const t of GUIDE_THEMES) {
+      const family = resolveGuideTokens(t.id, t.defaultVariant).typeStyle.text?.family;
+      if (!family) continue;
+      const faces = registered.find((f) => f.fontFamily === family)!.fontDefinitions;
+      expect(faces.some((d) => d.weight === 700 && !d.style), `${t.id}: ${family} 700`).toBe(true);
+    }
+  });
+
   test("every registered family is used by a theme, and the families are the ones the themes name", () => {
     const names = new Set([...asked()].map((a) => a.split("|")[0]));
     expect(registered.map((f) => f.fontFamily).sort()).toEqual([...names].sort());

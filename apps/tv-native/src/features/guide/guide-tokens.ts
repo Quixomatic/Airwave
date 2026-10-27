@@ -215,12 +215,14 @@ export type GuidePatterns = { bg: GuideHalftone | GuideGrid | null; overlay: Gui
 /**
  * Two-ink misregistration: the listed text roles and shapes are drawn twice, the back copy in `color`, offset by (`dx`, `dy`) vw()
  * px, blended with MULTIPLY. Chips that carry ink-B text on an ink-A fill use the pre-computed overprint color instead.
+ * `blend` is "multiply" in every theme; "plain" is only ever made at run time, for a thumbnail (the Settings preview), which draws the
+ * two inks without blending them (see `plainInk`).
  */
 export type GuideMisregister = {
   dx: number;
   dy: number;
   color: string;
-  blend: "multiply";
+  blend: "multiply" | "plain";
   text: readonly ("number" | "title" | "featured" | "header")[];
   shapes: readonly ("circle" | "ring")[];
 };
@@ -270,7 +272,11 @@ export type GuideTokens = {
   cellBorder: string;
   /** line() */
   cellBorderW: number;
-  /** Dashes of the outline of a cell that is neither live nor selected (`[on, off]`, vw()), or null for a solid one. */
+  /**
+   * Dashes of the outline of a cell that is neither live nor selected (`[on, off]`, vw()), or null for a solid one. The React Native
+   * rows draw `borderStyle: "dashed"`, whose dashes follow the outline's width, so a non-null value means dashed there and the exact
+   * lengths are the native painter's.
+   */
   cellBorderDash: readonly [number, number] | null;
   /** Selected cell outline, and the border of the rail circle when the rail is focused. */
   ring: string;
@@ -283,7 +289,7 @@ export type GuideTokens = {
     w: number;
     /** vw(): the gap between the two rings. */
     gap: number;
-    /** `[on, off]` in vw(), or null for a solid ring. */
+    /** `[on, off]` in vw(), or null for a solid ring (the React Native rows draw any dash as `borderStyle: "dashed"`; see `cellBorderDash`). */
     dash: readonly [number, number] | null;
   } | null;
   /** cs() */
