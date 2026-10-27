@@ -88,9 +88,9 @@ export const ACCENTS = ["#2f9e8f", "#4a9fe0", "#3b82f6", "#8b5cf6", "#3fa66a", "
 export const CH_FRAC = 212 / DESIGN_W; // channel rail = this fraction of the guide column width
 export const ROW_FRAC = 168 / DESIGN_W; // row height fraction (of screen width)
 export const FEATURE_SCALE = 0.76; // featured panel uniformly shrunk so the grid keeps room
-export const WINDOW_MIN = 180; // minutes of timeline across the lane
-export const LEAD_MIN = 30; // minutes of "already aired" shown before the grid start
-export const MIN = 60_000;
+// The grid's time geometry (timeline window, lead-in, cell cull) lives in ./geometry, which has no react-native
+// imports so it can be unit-tested; these are re-exported so existing importers keep working.
+export { LEAD_MIN, liveProgramIndex, MIN, WINDOW_MIN } from "./geometry";
 export const MIN_VISIBLE_PX = 24; // cull program blocks narrower than this
 export const PROGRESS_FILL_ELAPSED_STRONGER = true;
 
@@ -120,15 +120,6 @@ export function subLine(g: GuideGridProgram["guide"]): string {
 
 export const audioBadge = (ch?: number) =>
   ch === 8 ? "7.1" : ch === 6 ? "5.1" : ch === 2 ? "Stereo" : ch ? "Mono" : null;
-
-/** Index of the program airing at `nowMs` (else 0) — the "on now" slot. */
-export function liveProgramIndex(programs: GuideGridProgram[], nowMs: number): number {
-  const i = programs.findIndex((p) => {
-    const s = new Date(p.startsAt).getTime();
-    return nowMs >= s && nowMs < s + p.durationSeconds * 1000;
-  });
-  return i >= 0 ? i : 0;
-}
 
 type IconCmp = ComponentType<{ size?: number; color?: string; fill?: string }>;
 const LUCIDE = LucideIcons as unknown as Record<string, IconCmp>;

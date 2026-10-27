@@ -14,6 +14,7 @@ import { C } from "@/lib/theme";
 import { channelTint } from "@/lib/tint";
 import { usePackages } from "@/hooks/queries";
 
+import { cellBox, isVisible, liveFill, timelineOrigin, type Lane } from "./geometry";
 import { GuideGhost } from "./guide-ghost";
 import { GuideSidebar, buildSidebarItems, lensEquals, type Lens } from "./guide-sidebar";
 import {
@@ -26,7 +27,6 @@ import {
   fmtDay,
   fmtTime,
   hexA,
-  LEAD_MIN,
   line,
   liveProgramIndex,
   MIN,
@@ -66,18 +66,16 @@ export function AuroraGrid({
   const vw = useCallback((px: number) => vwOf(width, px), [width]);
 
   const now = useMemo(() => new Date(serverTime), [serverTime]);
-  const T0 = useMemo(() => {
-    const d = new Date(now.getTime() - LEAD_MIN * MIN);
-    const m = d.getMinutes();
-    d.setMinutes(m >= 31 ? 31 : m >= 1 ? 1 : -29, 0, 0);
-    return d;
-  }, [now]);
+  const T0 = useMemo(() => timelineOrigin(now), [now]);
 
   const colW = Math.max(1, width - SIDEBAR_SLIVER_W);
   const railPx = colW * CH_FRAC * UI_SCALE;
   const rowPx = width * ROW_FRAC * UI_SCALE;
   const laneW = Math.max(1, colW - railPx);
   const ppm = laneW / WINDOW_MIN;
+  // `gap` = the raw-dp space between adjacent cells; chrome-scale it so it stays proportional to the (width-scaled)
+  // cells on Android TV's 960dp space — else it reads as too-wide gaps there.
+  const lane = useMemo<Lane>(() => ({ T0, ppm, laneW, gap: cs(6) }), [T0, ppm, laneW]);
   const minsFrom = useCallback((iso: string | Date) => ((typeof iso === "string" ? new Date(iso).getTime() : iso.getTime()) - T0.getTime()) / MIN, [T0]);
   const laneX = useCallback((iso: string | Date) => minsFrom(iso) * ppm, [minsFrom, ppm]);
   const nowMins = minsFrom(now);
@@ -106,18 +104,10 @@ export function AuroraGrid({
     // Cull each channel's programs to what's actually on the visible grid — within the window AND wide
     // enough to render (not a rail-edge sliver) — at the SOURCE, matching tv-web (§7.1). This is what
     // makes the rows cheap: otherwise every row maps the whole day's back-buffer on EVERY keypress (the
-    // guide lag), and `fp` could land on a hidden program. Same math as the Row's inline positioning.
-    const visible = (p: GuideGridProgram): boolean => {
-      const start = minsFrom(p.startsAt);
-      const end = start + p.durationSeconds / 60;
-      if (!(end > 0 && start < WINDOW_MIN)) return false; // ended before the rail, or starts past the window
-      const rawLeft = laneX(p.startsAt);
-      const rawRight = rawLeft + Math.max(laneW * 0.02, (p.durationSeconds / 60) * ppm) - 6;
-      const left = rawLeft < 0 ? 6 : rawLeft;
-      return rawRight - left >= 8; // cull rail-edge slivers (matches the Row's `cw < 8`)
-    };
-    return rawChannels.filter(inLens).map((c): GuideGridChannel => ({ ...c, programs: c.programs.filter(visible) }));
-  }, [rawChannels, lens, favoriteIds, minsFrom, laneX, laneW, ppm]);
+    // guide lag), and `fp` could land on a hidden program. `isVisible` is this filter's own arithmetic, unchanged (its gap is
+    // SOURCE_CULL_GAP, not the Row's `cs(6)`).
+    return rawChannels.filter(inLens).map((c): GuideGridChannel => ({ ...c, programs: c.programs.filter((p) => isVisible(p, lane)) }));
+  }, [rawChannels, lens, favoriteIds, lane]);
 
   const [fc, setFc] = useState(0);
   const [fp, setFp] = useState(0);
@@ -367,10 +357,8 @@ export function AuroraGrid({
                   now={now}
                   rowPx={rowPx}
                   railPx={railPx}
-                  laneX={laneX}
-                  laneW={laneW}
-                  ppm={ppm}
-                  minsFrom={minsFrom}
+                  lane={lane}
+                  nowX={laneX(now)}
                   vw={vw}
                 />
               )}
@@ -451,10 +439,8 @@ function Row({
   now,
   rowPx,
   railPx,
-  laneX,
-  laneW,
-  ppm,
-  minsFrom,
+  lane,
+  nowX,
   vw,
 }: {
   channel: GuideGridChannel;
@@ -469,10 +455,8 @@ function Row({
   now: Date;
   rowPx: number;
   railPx: number;
-  laneX: (d: string | Date) => number;
-  laneW: number;
-  ppm: number;
-  minsFrom: (d: string | Date) => number;
+  lane: Lane;
+  nowX: number;
   vw: (px: number) => number;
 }) {
   const Icon = channelIcon(channel.icon ?? channel.package?.icon);
@@ -507,21 +491,13 @@ function Row({
       {/* Lane */}
       <View style={{ flex: 1, position: "relative", overflow: "hidden" }}>
         {channel.programs.map((p, pi) => {
-          const start = minsFrom(p.startsAt);
-          const end = start + p.durationSeconds / 60;
-          if (!(end > 0 && start < WINDOW_MIN)) return null;
+          const box = cellBox(p, lane);
+          if (!box) return null;
+          const { left, width: cw } = box;
           const selected = p.id === focusedProgramId;
           const startMs = new Date(p.startsAt).getTime();
           const live = now.getTime() >= startMs && now.getTime() < startMs + p.durationSeconds * 1000;
-          const rawLeft = laneX(p.startsAt);
-          // `gap` = the raw-dp space between adjacent cells; chrome-scale it so it stays proportional to
-          // the (width-scaled) cells on Android TV's 960dp space — else it reads as too-wide gaps there.
-          const gap = cs(6);
-          const rawRight = rawLeft + Math.max(laneW * 0.02, (p.durationSeconds / 60) * ppm) - gap;
-          const left = rawLeft < 0 ? gap : rawLeft;
-          const cw = rawRight - left;
-          if (cw < 8) return null;
-          const fillPct = Math.max(0, Math.min(1, (laneX(now) - left) / cw));
+          const fillPct = liveFill(nowX, left, cw);
           const [fillA, fillB] = PROGRESS_FILL_ELAPSED_STRONGER ? [hexA(accent, 0.32), hexA(accent, 0.1)] : [hexA(accent, 0.1), hexA(accent, 0.32)];
           return (
             <Pressable
