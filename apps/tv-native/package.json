@@ -16,6 +16,7 @@
   "dependencies": {
     "@airwave/key-input": "workspace:*",
     "@airwave/mpv-player": "workspace:*",
+    "@airwave/native-guide": "workspace:*",
     "@better-auth/expo": "^1.6.23",
     "@expo/dom-webview": "55.0.6",
     "@expo/metro-runtime": "~55.0.12",

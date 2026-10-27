@@ -1,0 +1,36 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.airwave.nativeguide'
+version = '0.0.0'
+
+android {
+  namespace 'expo.modules.nativeguide'
+
+  // Gradle 9 / AGP requires versionName/versionCode in a library's defaultConfig (matches stock Expo modules).
+  defaultConfig {
+    versionCode 1
+    versionName '0.0.0'
+  }
+
+  testOptions {
+    // The JVM tests only touch pure Kotlin; any stray android.* call returns a default instead of throwing.
+    unitTests.returnDefaultValues = true
+  }
+}
+
+dependencies {
+  // React Native's own Android library (its version is pinned by the app). The view draws text with React Native's
+  // font manager (so weights and fallbacks match the React Native rows) and loads images through its Fresco
+  // pipeline (an `api` dependency of react-android), so images share the app's caches. Already in every app that
+  // uses this module.
+  implementation 'com.facebook.react:react-android'
+
+  // JVM unit tests (src/test): after `EXPO_TV=1 pnpm exec expo prebuild -p android` in apps/tv-native, run
+  //   cd apps/tv-native/android && ./gradlew :airwave-native-guide:testDebugUnitTest
+  // org.json is the real parser here (android.jar only stubs it in unit tests); the same classes ship with Android.
+  testImplementation 'junit:junit:4.13.2'
+  testImplementation 'org.json:json:20231013'
+}
