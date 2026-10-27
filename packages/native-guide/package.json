@@ -13,6 +13,9 @@
     "check-fast": "bun check",
     "check-types": "tsc --noEmit"
   },
+  "dependencies": {
+    "@expo/config-plugins": "^54.0.0"
+  },
   "peerDependencies": {
     "expo": "*",
     "react": "*",
