@@ -94,14 +94,22 @@ describe("packChannel", () => {
   test("packs a program's art URL when program art is on, and null for a program without one", () => {
     const c = channel("c1", [prog("a", 0, 30, { art: "/library/metadata/1/art/9" }), prog("b", 30, 30)]);
     const art = (ch: GuideGridChannel, p: GuideGridProgram) => (p.guide.art ? `https://s.example/img/${ch.id}?path=${encodeURIComponent(p.guide.art)}` : null);
-    const packed = packChannel(c, "lucide:Radio", FROM, resolvers.sub, art)[5];
+    const packed = packChannel(c, "lucide:Radio", FROM, resolvers.sub, { art })[5];
     expect(packed.map((p) => p[4])).toEqual(["https://s.example/img/c1?path=%2Flibrary%2Fmetadata%2F1%2Fart%2F9", null]);
   });
 
   test("packs no art when program art is off, whatever the programs carry", () => {
     const c = channel("c1", [prog("a", 0, 30, { art: "/library/metadata/1/art/9", thumb: "/library/metadata/1/thumb/9" })]);
     expect(packChannel(c, "lucide:Radio", FROM, resolvers.sub)[5].map((p) => p[4])).toEqual([null]);
-    expect(packChannel(c, "lucide:Radio", FROM, resolvers.sub, () => "")[5].map((p) => p[4])).toEqual([null]); // an empty URL is none
+    expect(packChannel(c, "lucide:Radio", FROM, resolvers.sub, { art: () => "" })[5].map((p) => p[4])).toEqual([null]); // an empty URL is none
+  });
+
+  test("packs the channel's logo address, and null when it has none", () => {
+    const c = channel("c1");
+    expect(packChannel(c, "lucide:Radio", FROM, resolvers.sub, { logo: "https://logos.example.com/a.png" })[4]).toBe("https://logos.example.com/a.png");
+    expect(packChannel(c, "lucide:Radio", FROM, resolvers.sub, { logo: null })[4]).toBeNull();
+    expect(packChannel(c, "lucide:Radio", FROM, resolvers.sub, { logo: "" })[4]).toBeNull();
+    expect(packChannel(c, "lucide:Radio", FROM, resolvers.sub)[4]).toBeNull();
   });
 
   test("a missing program list, name or number packs as empty", () => {
@@ -198,6 +206,23 @@ describe("LineupSync", () => {
     sync.accepted(3);
     const off = parse(sync.update([art], NONE, resolvers, FROM));
     expect(off.add.map(([, ch]) => ch[5].map((p) => p[4]))).toEqual([[null]]);
+  });
+
+  test("choosing logos, or a channel's logo changing, repacks that channel only", () => {
+    const withLogos: LineupResolvers = { ...resolvers, logo: (ch) => (ch.id === "c1" ? "https://logos.example.com/c1.png" : null) };
+    const sync = new LineupSync("s1");
+    sync.update([a, b], NONE, resolvers, FROM);
+    sync.accepted(1);
+    const on = parse(sync.update([a, b], NONE, withLogos, FROM));
+    // Only c1 has a logo to pack, so only c1 is packed again; c2's key (icon, art setting, no logo) is unchanged.
+    expect(on.add.map(([, ch]) => [ch[0], ch[4]])).toEqual([["c1", "https://logos.example.com/c1.png"]]);
+    sync.accepted(2);
+    expect(sync.update([a, b], NONE, withLogos, FROM)).toBeNull();
+    const moved = parse(sync.update([a, b], NONE, { ...resolvers, logo: (ch) => (ch.id === "c1" ? "https://logos.example.com/new.png" : null) }, FROM));
+    expect(moved.add.map(([, ch]) => [ch[0], ch[4]])).toEqual([["c1", "https://logos.example.com/new.png"]]);
+    sync.accepted(3);
+    const off = parse(sync.update([a, b], NONE, resolvers, FROM));
+    expect(off.add.map(([, ch]) => [ch[0], ch[4]])).toEqual([["c1", null]]);
   });
 
   test("a timeline that now starts earlier than what a channel was packed from repacks it", () => {

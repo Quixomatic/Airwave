@@ -3,8 +3,9 @@ import { describe, expect, test } from "bun:test";
 
 import { AURORA, type GuideTokens, useGuideTokens } from "./guide-tokens";
 
-// What program art (opt-in) draws with: new with art, so not among the literals the guide drew with before tokens.
+// What the opt-in program art and channel logos draw with: new with them, so not among the literals the guide drew with before tokens.
 const ART_TOKENS = {
+  logoPlate: "transparent",
   artScrim: ["rgba(6,10,20,0.88)", "rgba(6,10,20,0.8)"] as const,
   artTitle: "#f1f5f9",
   artSub: "#e6ebf2",

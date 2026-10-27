@@ -28,7 +28,8 @@ import kotlin.math.roundToInt
  *
  *  - the rail: a tinted background and an accent bar while the row is focused; a circle in the row's accent holding the
  *    channel's lucide icon (the favorite heart while the rail itself has focus) with a heart badge on its corner for a
- *    favorite; the channel number at the top right and the name along the bottom (two lines at most);
+ *    favorite, or the channel's logo in its place when it has one and it loaded; the channel number at the top right and the
+ *    name along the bottom (two lines at most);
  *  - the lane: a rounded, bordered cell per program (the selected one drawn last, with the focus ring), an on-now cell's
  *    two-tone progress fill and accent bar, then its title and sub-line. With program art on (a program carries an art URL),
  *    the artwork fills the cell centre cropped, under a scrim, and the text takes the theme's art colors; a cell whose image
@@ -79,6 +80,10 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
   private val artSrc = Rect()
   private val artDst = RectF()
   private val crop = IntArray(4)
+
+  // Channel logos: the box laid out for the row being drawn, and the fitted size of the image inside it.
+  private val logoRect = LogoRect()
+  private val fit = DoubleArray(2)
 
   private data class NameKey(val text: String, val width: Int, val size: Float, val face: Int, val lineHeight: Int)
 
@@ -143,12 +148,12 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
     // The row's top rule.
     fill.color = tk.rowBorder
     canvas.drawRect(0f, 0f, frame.widthPx, l.borderTopPx, fill)
-    drawRail(canvas, row, state, l)
+    drawRail(canvas, row, state, l, frame)
     drawLane(canvas, row, state, frame, l)
   }
 
   // The rail.
-  private fun drawRail(canvas: Canvas, row: GuideRow, state: RowState, l: AuroraLayout) {
+  private fun drawRail(canvas: Canvas, row: GuideRow, state: RowState, l: AuroraLayout, frame: GuideFrame) {
     val accent = row.accent
     val bodyTop = l.body.start.toFloat()
     val bodyBottom = l.body.end.toFloat()
@@ -159,7 +164,35 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
       canvas.drawRect(l.rail.start.toFloat(), bodyTop, l.railBarEnd.toFloat(), bodyBottom, fill)
     }
 
-    // The circle: tinted fill and border, or the focus ring while the rail has focus.
+    val number = row.channel.number
+    val numberW = if (number.isNotEmpty()) ceil(numberPaint.measureText(number)).toInt() else 0
+
+    // A channel's logo stands in for its circle, unless the rail has focus (the circle is then the favorite heart) or the logo
+    // failed to load. While it loads, the box is empty (or just its plate).
+    val logo = if (state.railFocused) null else logoFor(row.channel, l)
+    if (logo != null) drawLogo(canvas, row, logo, numberW, l, frame) else drawCircle(canvas, row, state, l)
+
+    // The channel number, right-aligned beside the circle or the logo.
+    if (number.isNotEmpty()) {
+      numberPaint.color = if (state.focused) tk.numberFocused else tk.number
+      val left = if (logo != null) l.numberLeftBesideLogo(numberW) else l.numberLeft(numberW)
+      canvas.drawText(number, left.toFloat(), (l.numberTop + numberTopOffset).toFloat(), numberPaint)
+    }
+
+    // The name, up to two lines, ending at the rail's bottom padding.
+    nameLayout(row.channel.name, l)?.let {
+      namePaint.color = tk.name
+      canvas.save()
+      canvas.translate(l.nameLeft.toFloat(), l.nameTop(it.height).toFloat())
+      it.draw(canvas)
+      canvas.restore()
+    }
+  }
+
+  /** The circle: tinted fill and border, or the focus ring while the rail has focus, with the channel's icon (the favorite
+   *  heart while the rail has focus) and a favorite's badge. */
+  private fun drawCircle(canvas: Canvas, row: GuideRow, state: RowState, l: AuroraLayout) {
+    val accent = row.accent
     val ringed = state.railFocused
     val bw = (if (ringed) l.circleRing else l.circleBorder).toFloat()
     rect.set(l.circleX.start.toFloat(), l.circleY.start.toFloat(), l.circleX.end.toFloat(), l.circleY.end.toFloat())
@@ -191,22 +224,53 @@ internal class AuroraPainter(private val kit: PainterKit) : GuidePainter {
         }
       }
     }
+  }
 
-    // The channel number, right-aligned beside the circle.
-    val number = row.channel.number
-    if (number.isNotEmpty()) {
-      numberPaint.color = if (state.focused) tk.numberFocused else tk.number
-      val width = ceil(numberPaint.measureText(number)).toInt()
-      canvas.drawText(number, l.numberLeft(width).toFloat(), (l.numberTop + numberTopOffset).toFloat(), numberPaint)
+  /**
+   * The channel's logo image, or null when it has none or it failed to load (the circle is drawn instead). Logos are decoded
+   * down to the box a logo can fill, one size for every channel.
+   */
+  private fun logoFor(channel: GuideChannel, l: AuroraLayout): GuideImages.Entry? {
+    val url = channel.logo ?: return null
+    return kit.images.get(url, l.logoDecodeW, l.logoDecodeH).takeIf { !it.failed }
+  }
+
+  /** The logo in its box beside the number: the theme's plate behind it (if any), the image fitted inside and centered, fading in
+   *  over 300 ms when it just arrived, and a favorite's badge on the box's corner. */
+  private fun drawLogo(canvas: Canvas, row: GuideRow, logo: GuideImages.Entry, numberW: Int, l: AuroraLayout, frame: GuideFrame) {
+    val r = logoRect
+    l.placeLogo(numberW, r)
+    if (r.right > r.left && r.bottom > r.top) {
+      rect.set(r.left.toFloat(), r.top.toFloat(), r.right.toFloat(), r.bottom.toFloat())
+      val radius = AuroraLayout.radius(l.logoRadius, rect.width(), rect.height())
+      if (tk.logoPlate ushr 24 != 0) {
+        fill.color = tk.logoPlate
+        canvas.drawRoundRect(rect, radius, radius, fill)
+      }
+      val bitmap = logo.bitmap
+      if (bitmap != null) {
+        GuideGeometry.containFit(bitmap.width, bitmap.height, (r.imgRight - r.imgLeft).toDouble(), (r.imgBottom - r.imgTop).toDouble(), fit)
+        if (fit[0] > 0 && fit[1] > 0) {
+          val cx = (r.imgLeft + r.imgRight) / 2
+          val cy = (r.imgTop + r.imgBottom) / 2
+          artDst.set(cx - fit[0].toFloat() / 2, cy - fit[1].toFloat() / 2, cx + fit[0].toFloat() / 2, cy + fit[1].toFloat() / 2)
+          val fade = GuideImages.fade(logo.arrivedAt, frame.uptimeMs)
+          bitmapPaint.alpha = (fade * 255).roundToInt()
+          // The box clips its logo to the plate's rounded corners.
+          canvas.save()
+          clip.rewind()
+          clip.addRoundRect(rect, radius, radius, Path.Direction.CW)
+          canvas.clipPath(clip)
+          canvas.drawBitmap(bitmap, null, artDst, bitmapPaint)
+          canvas.restore()
+          if (fade < 1f) frame.animating = true
+        }
+      }
     }
-
-    // The name, up to two lines, ending at the rail's bottom padding.
-    nameLayout(row.channel.name, l)?.let {
-      namePaint.color = tk.name
-      canvas.save()
-      canvas.translate(l.nameLeft.toFloat(), l.nameTop(it.height).toFloat())
-      it.draw(canvas)
-      canvas.restore()
+    if (row.fav) {
+      heart()?.let {
+        glyphs.draw(canvas, it, r.badgeLeft.toFloat(), r.badgeTop.toFloat(), (r.badgeRight - r.badgeLeft).toFloat(), tk.fav, tk.fav)
+      }
     }
   }
 

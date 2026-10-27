@@ -18,6 +18,9 @@
     "glyph": 9.69,
     "badge": 8.25,
     "badgeOff": 1.5,
+    "logoGap": 3,
+    "logoPad": 0,
+    "logoRadius": 3,
     "numberSize": 12.75,
     "nameSize": 8.625,
     "nameLine": 10.35,
@@ -60,6 +63,7 @@
     "numberFocused": "#e6eaf1",
     "numberWeight": "700",
     "name": "#94a3b8",
+    "logoPlate": "transparent",
     "artScrim": [
       "rgba(6,10,20,0.88)",
       "rgba(6,10,20,0.8)"

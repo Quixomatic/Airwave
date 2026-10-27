@@ -29,7 +29,13 @@ export type LineupResolvers = {
   /** What `art` yields (the server its URLs point at), so channels packed for another art setting or server are packed again.
    *  "" or absent with art off. */
   artKey?: string;
+  /** The address a channel's logo is loaded from (already resolved: see `logoSource`), or null for none. Absent while Channel
+   *  marks is Icons: no logo is packed, so none is fetched. */
+  logo?: (ch: GuideGridChannel) => string | null;
 };
+
+/** What a channel is packed with besides its own data: the art resolver, and the channel's logo address. */
+export type PackExtras = { art?: LineupResolvers["art"]; logo?: string | null };
 
 /** A value as a string for the packed arrays (the native reader takes strings where it expects strings). */
 const str = (v: unknown): string => (v == null ? "" : String(v));
@@ -39,9 +45,10 @@ const str = (v: unknown): string => (v == null ? "" : String(v));
  * the server sends: a missing title packs as "", a non-integer duration is rounded, a negative or non-finite one
  * becomes 0, and a program whose start doesn't parse is dropped (it has no place on the time axis, and the React Native
  * rows can't place it either). Programs that ended before `fromMs` are left out: the timeline only moves forward, so
- * they are never drawn again. `art`, when program art is on, gives each program's artwork URL (null packs as no art).
+ * they are never drawn again. `extras.art`, when program art is on, gives each program's artwork URL, and `extras.logo` is the
+ * channel's logo address when Channel marks is Logos (null packs as none).
  */
-export function packChannel(ch: GuideGridChannel, icon: string, fromMs: number, sub: LineupResolvers["sub"], art?: LineupResolvers["art"]): PackedChannel {
+export function packChannel(ch: GuideGridChannel, icon: string, fromMs: number, sub: LineupResolvers["sub"], extras: PackExtras = {}): PackedChannel {
   const programs: PackedProgram[] = [];
   for (const p of ch.programs ?? []) {
     if (!p) continue;
@@ -50,9 +57,9 @@ export function packChannel(ch: GuideGridChannel, icon: string, fromMs: number, 
     const durationSeconds = Number.isFinite(p.durationSeconds) ? Math.max(0, Math.round(p.durationSeconds)) : 0;
     if (startMs + durationSeconds * 1000 <= fromMs) continue;
     const g = p.guide ?? ({} as GuideMeta);
-    programs.push([str(p.id), startMs, durationSeconds, str(g.showTitle ?? g.title), art?.(ch, p) || null, sub(g)]);
+    programs.push([str(p.id), startMs, durationSeconds, str(g.showTitle ?? g.title), extras.art?.(ch, p) || null, sub(g)]);
   }
-  return [str(ch.id), str(ch.number), str(ch.name), icon, null, programs];
+  return [str(ch.id), str(ch.number), str(ch.name), icon, extras.logo || null, programs];
 }
 
 type Held = { tok: string; key: string; from: number };
@@ -106,17 +113,18 @@ export class LineupSync {
     for (let i = 0; i < channels.length; i++) {
       const ch = channels[i]!;
       const icon = r.icon(ch);
-      const key = `${icon}|${r.artKey ?? ""}`;
+      const logo = r.logo?.(ch) ?? null;
+      const key = `${icon}|${r.artKey ?? ""}|${logo ?? ""}`;
       let h = this.tokens.get(ch);
-      // Repack when what it was packed with changed (the resolved icon, the art setting), or when the timeline now starts
-      // earlier than the programs this was packed from.
+      // Repack when what it was packed with changed (the resolved icon, the art setting, the logo), or when the timeline now
+      // starts earlier than the programs this was packed from.
       if (!h || h.key !== key || fromMs < h.from) {
         h = { tok: `${this.next++}`, key, from: fromMs };
         this.tokens.set(ch, h);
       }
       if (!this.held.has(h.tok) && !adding.has(h.tok)) {
         adding.add(h.tok);
-        add.push([h.tok, packChannel(ch, icon, h.from, r.sub, r.art)]);
+        add.push([h.tok, packChannel(ch, icon, h.from, r.sub, { art: r.art, logo })]);
       }
       order.push(h.tok);
       accent.push(r.accent(ch, i));

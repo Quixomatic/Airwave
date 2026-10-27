@@ -9,11 +9,13 @@ import { TvPressable as Pressable } from "@/components/tv-pressable";
 
 import { usePlayer } from "@/features/watch/player-ctx";
 import { type GuideGridChannel, type GuideGridProgram, type GuideMeta, imageUrl } from "@/lib/api";
+import { getServerUrl } from "@/lib/auth";
 import { useGuidePrefs } from "@/lib/guide-prefs";
 import { LAYER, setBackExitsApp, useKeyLayer } from "@/lib/input";
 import { channelTint } from "@/lib/tint";
 import { usePackages } from "@/hooks/queries";
 
+import { hasLogoPlate, logoSource } from "./channel-logo";
 import { artBox, artUrl, cellBox, isVisible, liveFill, programArtPath, timelineOrigin, type Lane } from "./geometry";
 import { GuideGhost } from "./guide-ghost";
 import { reportNativeGuideError } from "./guide-renderer";
@@ -525,9 +527,15 @@ function Row({
   vw: (px: number) => number;
 }) {
   const tk = useGuideTokens();
-  const art = useGuidePrefs().art === "on";
+  const { art: artPref, marks } = useGuidePrefs();
+  const art = artPref === "on";
   const Icon = channelIcon(channel.icon ?? channel.package?.icon);
   const circle = vw(64 * FEATURE_SCALE);
+  // With Channel marks set to Logos, a channel that has a logo shows it in place of its icon circle (until the focused rail
+  // turns the circle into the favorite heart); a logo that fails to load leaves the circle.
+  const logoSrc = marks === "logos" ? logoSource(channel.logo, getServerUrl()) : null;
+  const [failedLogo, setFailedLogo] = useState<string | null>(null);
+  const showLogo = logoSrc !== null && failedLogo !== logoSrc && !railFocused;
 
   return (
     <View style={{ height: rowPx, flexDirection: "row", borderTopWidth: 1, borderTopColor: tk.rowBorder }}>
@@ -536,18 +544,43 @@ function Row({
       <Pressable onPress={() => onRailTap(index)} focusable={!Platform.isTV} style={{ width: railPx, paddingVertical: vw(18), paddingHorizontal: vw(20), justifyContent: "space-between", backgroundColor: focused ? hexA(accent, tk.railFocusAlpha) : "transparent" }}>
         {focused && <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: vw(4), backgroundColor: accent }} />}
         <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
-          <View style={{ width: circle, height: circle, borderRadius: circle / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, tk.circle.fillA), borderWidth: railFocused ? line(tk.ringW) : line(1), borderColor: railFocused ? tk.ring : hexA(accent, tk.circle.borderA) }}>
-            {railFocused ? (
-              <Heart size={vw(34 * FEATURE_SCALE)} color={favorited ? tk.fav : tk.heartOff} fill={favorited ? tk.fav : "none"} />
-            ) : (
-              <Icon size={vw(34 * FEATURE_SCALE)} color={accent} />
-            )}
-            {favorited && !railFocused && (
-              <View style={{ position: "absolute", right: -vw(4), bottom: -vw(4) }}>
-                <Heart size={vw(22)} color={tk.fav} fill={tk.fav} />
+          {showLogo ? (
+            <View style={{ flex: 1, height: circle, marginRight: vw(8) }}>
+              <View
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  borderRadius: cs(6),
+                  backgroundColor: tk.logoPlate,
+                  padding: hasLogoPlate(tk.logoPlate) ? vw(4) : 0,
+                  overflow: "hidden",
+                }}
+              >
+                <Image source={{ uri: logoSrc }} resizeMode="contain" onError={() => setFailedLogo(logoSrc)} style={{ flex: 1 }} />
               </View>
-            )}
-          </View>
+              {favorited && (
+                <View style={{ position: "absolute", right: -vw(4), bottom: -vw(4) }}>
+                  <Heart size={vw(22)} color={tk.fav} fill={tk.fav} />
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={{ width: circle, height: circle, borderRadius: circle / 2, alignItems: "center", justifyContent: "center", backgroundColor: hexA(accent, tk.circle.fillA), borderWidth: railFocused ? line(tk.ringW) : line(1), borderColor: railFocused ? tk.ring : hexA(accent, tk.circle.borderA) }}>
+              {railFocused ? (
+                <Heart size={vw(34 * FEATURE_SCALE)} color={favorited ? tk.fav : tk.heartOff} fill={favorited ? tk.fav : "none"} />
+              ) : (
+                <Icon size={vw(34 * FEATURE_SCALE)} color={accent} />
+              )}
+              {favorited && !railFocused && (
+                <View style={{ position: "absolute", right: -vw(4), bottom: -vw(4) }}>
+                  <Heart size={vw(22)} color={tk.fav} fill={tk.fav} />
+                </View>
+              )}
+            </View>
+          )}
           <Text style={{ fontSize: vw(34), fontWeight: tk.numberWeight, color: focused ? tk.numberFocused : tk.number }}>{channel.number}</Text>
         </View>
         <Text numberOfLines={2} style={{ fontSize: vw(23), color: tk.name, lineHeight: vw(23) * 1.2 }}>

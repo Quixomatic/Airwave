@@ -17,7 +17,7 @@ mock.module("@react-native-async-storage/async-storage", () => ({
 const prefs = await import("./guide-prefs");
 
 const KEY = "cg-guide-prefs";
-const DEFAULTS = { art: "off", rows: "native" } as const;
+const DEFAULTS = { marks: "icons", art: "off", rows: "native" } as const;
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 beforeEach(async () => {
@@ -27,7 +27,7 @@ beforeEach(async () => {
 });
 
 describe("parseGuidePrefs", () => {
-  test("the defaults are no program art and the native rows", () => {
+  test("the defaults are icons, no program art and the native rows", () => {
     expect(prefs.DEFAULT_GUIDE_PREFS).toEqual(DEFAULTS);
     expect(prefs.parseGuidePrefs(null)).toEqual(DEFAULTS);
     expect(prefs.parseGuidePrefs(undefined)).toEqual(DEFAULTS);
@@ -38,14 +38,15 @@ describe("parseGuidePrefs", () => {
     expect(prefs.parseGuidePrefs('{"rows":"classic"}')).toEqual({ ...DEFAULTS, rows: "classic" });
     expect(prefs.parseGuidePrefs('{"rows":"native"}')).toEqual(DEFAULTS);
     expect(prefs.parseGuidePrefs('{"art":"on"}')).toEqual({ ...DEFAULTS, art: "on" });
+    expect(prefs.parseGuidePrefs('{"marks":"logos"}')).toEqual({ ...DEFAULTS, marks: "logos" });
   });
 
   test("an unknown or invalid value falls back to the default", () => {
     expect(prefs.parseGuidePrefs('{"rows":"turbo"}')).toEqual(DEFAULTS);
     expect(prefs.parseGuidePrefs('{"rows":42}')).toEqual(DEFAULTS);
     expect(prefs.parseGuidePrefs('{"rows":null}')).toEqual(DEFAULTS);
-    for (const bad of ['{"art":true}', '{"art":"yes"}', '{"art":1}', '{"art":null}']) expect(prefs.parseGuidePrefs(bad)).toEqual(DEFAULTS);
-    expect(prefs.parseGuidePrefs('{"rows":"turbo","art":"on"}')).toEqual({ art: "on", rows: "native" }); // each field on its own
+    for (const bad of ['{"art":true}', '{"art":"yes"}', '{"art":1}', '{"art":null}', '{"marks":"logo"}', '{"marks":true}']) expect(prefs.parseGuidePrefs(bad)).toEqual(DEFAULTS);
+    expect(prefs.parseGuidePrefs('{"rows":"turbo","art":"on"}')).toEqual({ ...DEFAULTS, art: "on" }); // each field on its own
     expect(prefs.parseGuidePrefs('{"other":"x"}')).toEqual(DEFAULTS);
   });
 
@@ -80,7 +81,7 @@ describe("the pref store", () => {
   test("a change persists and survives a relaunch", async () => {
     prefs.setGuidePrefs({ rows: "classic" });
     await flush();
-    expect(JSON.parse(disk.get(KEY)!)).toEqual({ art: "off", rows: "classic" });
+    expect(JSON.parse(disk.get(KEY)!)).toEqual({ marks: "icons", art: "off", rows: "classic" });
     await prefs.hydrateGuidePrefs();
     expect(prefs.getGuidePrefs().rows).toBe("classic");
   });
@@ -103,12 +104,20 @@ describe("the pref store", () => {
     expect(calls).toBe(2);
   });
 
+  test("channel marks are icons until logos are chosen, and choosing them touches nothing else", () => {
+    expect(prefs.getGuidePrefs().marks).toBe("icons");
+    prefs.setGuidePrefs({ marks: "logos" });
+    expect(prefs.getGuidePrefs()).toEqual({ ...DEFAULTS, marks: "logos" });
+    prefs.setGuidePrefs({ marks: "badges" as never });
+    expect(prefs.getGuidePrefs().marks).toBe("logos");
+  });
+
   test("program art is off until it is turned on, and turning it on touches nothing else", async () => {
     expect(prefs.getGuidePrefs().art).toBe("off");
     prefs.setGuidePrefs({ art: "on" });
     await flush();
     expect(prefs.getGuidePrefs()).toEqual({ ...DEFAULTS, art: "on" });
-    expect(JSON.parse(disk.get(KEY)!)).toEqual({ art: "on", rows: "native" });
+    expect(JSON.parse(disk.get(KEY)!)).toEqual({ marks: "icons", art: "on", rows: "native" });
     prefs.setGuidePrefs({ art: true as never });
     expect(prefs.getGuidePrefs().art).toBe("on");
   });

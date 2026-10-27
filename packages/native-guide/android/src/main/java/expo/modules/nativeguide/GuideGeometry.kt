@@ -117,6 +117,22 @@ object GuideGeometry {
     out[3] = (top + h).roundToInt().coerceIn(out[1], srcH)
   }
 
+  /**
+   * The size a `srcW` x `srcH` image is drawn at to fit entirely inside a `dstW` x `dstH` box, centered (a React Native image's
+   * `resizeMode="contain"`): [width, height] written to `out`, never larger than the box and never upscaled past what the
+   * box asks for. An image or box with no size draws nothing.
+   */
+  fun containFit(srcW: Int, srcH: Int, dstW: Double, dstH: Double, out: DoubleArray) {
+    if (srcW <= 0 || srcH <= 0 || dstW <= 0 || dstH <= 0) {
+      out[0] = 0.0
+      out[1] = 0.0
+      return
+    }
+    val scale = min(dstW / srcW, dstH / srcH)
+    out[0] = srcW * scale
+    out[1] = srcH * scale
+  }
+
   /** `base` (the artwork URL up to its query) with the requested pixel box appended. */
   fun artUrl(base: String, box: IntArray): String = "$base${if (base.contains('?')) "&" else "?"}w=${box[0]}&h=${box[1]}"
 }

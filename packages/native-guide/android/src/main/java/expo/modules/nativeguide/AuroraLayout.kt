@@ -1,6 +1,7 @@
 package expo.modules.nativeguide
 
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
@@ -94,6 +95,27 @@ class CellRect {
   var subTop = 0
 }
 
+/** One channel logo's boxes, in px (see [AuroraLayout.placeLogo]). Reused from row to row: it is filled in place. */
+class LogoRect {
+  /** The logo's box (the plate, when a theme has one). */
+  var left = 0
+  var top = 0
+  var right = 0
+  var bottom = 0
+
+  /** The area the logo itself is fitted into: the box less the plate's padding. */
+  var imgLeft = 0f
+  var imgTop = 0f
+  var imgRight = 0f
+  var imgBottom = 0f
+
+  /** A favorite's badge, hung off the box's bottom right corner. */
+  var badgeLeft = 0
+  var badgeTop = 0
+  var badgeRight = 0
+  var badgeBottom = 0
+}
+
 /**
  * Aurora's row, in px, laid out the way the React Native rows lay it out (tv-native `features/guide/aurora-grid.tsx`
  * `Row`): a 1 dp top border; a rail that holds the circle and channel number on top and the channel name along the bottom;
@@ -144,6 +166,18 @@ class AuroraLayout(private val geo: GuideGeo, density: Double, val widthPx: Doub
   val glyphY = circleY.child((circleD - glyphD) / 2, glyphD)
   private val badgeD = px("badge")
 
+  // A channel's logo, in place of the circle: a box as tall as the circle and as wide as the rail leaves beside the number.
+  private val logoGap = px("logoGap")
+  private val logoPad = px("logoPad")
+
+  /** The corner radius of a logo's plate. */
+  val logoRadius = px("logoRadius")
+
+  /** A logo is decoded down to a box this many px (rounded up to 32, so one decode serves every channel number width): the
+   *  logo's largest possible area, the rail's inner width by the circle's height. */
+  val logoDecodeW = step32(max(1.0, railW - 2 * padH - 2 * logoPad))
+  val logoDecodeH = step32(max(1.0, circleD - 2 * logoPad))
+
   /** The badge sits `badgeOff` outside the circle's inner (padding) edge at its bottom right, over the circle's border. */
   private val badgeRel = circleD - circleBorder + px("badgeOff") - badgeD
   val badgeX = circleX.child(badgeRel, badgeD)
@@ -165,6 +199,37 @@ class AuroraLayout(private val geo: GuideGeo, density: Double, val widthPx: Doub
     val containerW = railW - 2 * padH
     val rel = if (circleD + textW > containerW) circleD else containerW - textW
     return topRow.start + PixelGrid.snap(rel)
+  }
+
+  /** The number's left edge when a logo sits beside it: always against the rail's right padding. */
+  fun numberLeftBesideLogo(textW: Int): Int = topRow.start + PixelGrid.snap(railW - 2 * padH - textW)
+
+  /**
+   * Places a channel's logo into `out`, given the width of the channel number's text in px. The logo's box starts where the
+   * circle does, is as tall as the circle, and ends a gap before the number; the logo is fitted inside it less the plate's
+   * padding; a favorite's badge hangs off its bottom right corner like the circle's.
+   */
+  fun placeLogo(numberW: Int, out: LogoRect) {
+    val boxW = max(0.0, railW - 2 * padH - numberW - logoGap)
+    val x = rail.child(padH, boxW)
+    val y = circleY
+    out.left = x.start
+    out.right = x.end
+    out.top = y.start
+    out.bottom = y.end
+    val ix = x.child(logoPad, max(0.0, boxW - 2 * logoPad))
+    val iy = y.child(logoPad, max(0.0, circleD - 2 * logoPad))
+    out.imgLeft = ix.start.toFloat()
+    out.imgRight = ix.end.toFloat()
+    out.imgTop = iy.start.toFloat()
+    out.imgBottom = iy.end.toFloat()
+    val off = px("badgeOff")
+    val bx = x.child(boxW + off - badgeD, badgeD)
+    val by = y.child(circleD + off - badgeD, badgeD)
+    out.badgeLeft = bx.start
+    out.badgeRight = bx.end
+    out.badgeTop = by.start
+    out.badgeBottom = by.end
   }
 
   /** The number's top, which is also the top of the circle. */
@@ -236,12 +301,14 @@ class AuroraLayout(private val geo: GuideGeo, density: Double, val widthPx: Doub
     /** The `geo` fields this layout reads besides [GuideGeo]'s own (`rowH`, `railW`, ...): JS has to send every one. */
     val KEYS = listOf(
       "borderTop", "padV", "padH", "barW",
-      "circle", "circleBorder", "circleRing", "glyph", "badge", "badgeOff",
+      "circle", "circleBorder", "circleRing", "glyph", "badge", "badgeOff", "logoGap", "logoPad", "logoRadius",
       "numberSize", "nameSize", "nameLine",
       "cellTop", "cellInset", "cellRadius", "cellBorder", "cellRing",
       "liveBarX", "liveBarInset", "liveBarW", "liveBarR",
       "padTop", "padX", "titleSize", "subSize", "subGap",
     )
+
+    private fun step32(px: Double): Int = (ceil(px / 32.0) * 32).toInt()
 
     /** The rounded-corner radius for a box `w` x `h` px: the radius asked for, but never more than half the short side. */
     fun radius(requested: Double, w: Float, h: Float): Float = min(requested.toFloat(), min(w, h) / 2f).coerceAtLeast(0f)

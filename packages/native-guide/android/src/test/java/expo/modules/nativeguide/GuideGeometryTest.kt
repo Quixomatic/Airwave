@@ -171,6 +171,25 @@ class GuideGeometryTest {
     assertEquals(listOf(0, 0, 400, 300), crop(400, 300, 0.0, 50.0))
   }
 
+  private fun fit(srcW: Int, srcH: Int, dstW: Double, dstH: Double): List<Double> = DoubleArray(2).also { GuideGeometry.containFit(srcW, srcH, dstW, dstH, it) }.toList()
+
+  @Test fun aWideLogoFitsTheBoxsWidthAndATallOneItsHeight() {
+    assertEquals(listOf(72.0, 18.0), fit(400, 100, 72.0, 30.0)) // 4:1 into 72 x 30: width-bound
+    assertEquals(listOf(10.0, 30.0), fit(100, 300, 72.0, 30.0)) // 1:3: height-bound
+    assertEquals(listOf(30.0, 30.0), fit(64, 64, 72.0, 30.0))
+  }
+
+  @Test fun aLogoThatIsSmallerThanItsBoxIsScaledUpToFillIt() {
+    // A React Native image with resizeMode="contain" scales a small image up to the box, as this does.
+    assertEquals(listOf(60.0, 30.0), fit(20, 10, 72.0, 30.0))
+  }
+
+  @Test fun noSizeDrawsNothing() {
+    assertEquals(listOf(0.0, 0.0), fit(0, 10, 72.0, 30.0))
+    assertEquals(listOf(0.0, 0.0), fit(10, 10, 0.0, 30.0))
+    assertEquals(listOf(0.0, 0.0), fit(10, 10, 72.0, -1.0))
+  }
+
   @Test fun artUrlAppendsTheBoxToTheQuery() {
     val box = intArrayOf(512, 128)
     assertEquals("http://s/img/c1?path=%2Fa&w=512&h=128", GuideGeometry.artUrl("http://s/img/c1?path=%2Fa", box))

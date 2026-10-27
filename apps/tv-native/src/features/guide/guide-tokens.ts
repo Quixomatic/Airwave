@@ -62,6 +62,9 @@ export type GuideTokens = {
   numberWeight: GuideFontWeight;
   name: string;
 
+  /** Plate behind a channel logo image, so a white or light logo stays visible. `transparent` for none. */
+  logoPlate: string;
+
   // Program art (when the cells show artwork)
   /** Scrim over the art, left to right: the alpha fades between these two colors. */
   artScrim: readonly [string, string];
@@ -140,6 +143,8 @@ export const AURORA: GuideTokens = {
   numberFocused: "#e6eaf1",
   numberWeight: "700",
   name: C.mutedFg,
+
+  logoPlate: "transparent",
 
   artScrim: ["rgba(6,10,20,0.88)", "rgba(6,10,20,0.8)"],
   artTitle: "#f1f5f9",

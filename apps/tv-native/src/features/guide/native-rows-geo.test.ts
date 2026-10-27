@@ -68,6 +68,14 @@ describe("auroraGeo", () => {
     expect([geo2.cellRing, geo2.circleRing, geo2.cellBorder, geo2.cellRadius, geo2.liveBarW, geo2.liveBarR]).toEqual([2, 2, 1, 6, 2.5, 3]);
   });
 
+  test("a channel logo's box is sized by AuroraGrid's own expressions; a plate insets the logo, none leaves it flush", () => {
+    const vw = scalers.vw;
+    expect(geo.logoGap).toBe(vw(8));
+    expect(geo.logoRadius).toBe(3); // cs(6)
+    expect(geo.logoPad).toBe(0); // no plate
+    expect(auroraGeo(input, scalers, { ...AURORA, logoPlate: "rgba(29,36,48,0.9)" }).logoPad).toBe(vw(4));
+  });
+
   test("is JSON the native side can parse back unchanged", () => {
     expect(JSON.parse(JSON.stringify(geo))).toEqual(geo);
   });
@@ -93,10 +101,16 @@ describe("rowTokens", () => {
       numberFocused: "#e6eaf1",
       numberWeight: "700",
       name: "#94a3b8",
+      logoPlate: "transparent",
       artScrim: ["rgba(6,10,20,0.88)", "rgba(6,10,20,0.8)"],
       artTitle: "#f1f5f9",
       artSub: "#e6ebf2",
     });
+  });
+
+  test("the plate behind a logo is a token", () => {
+    expect(rowTokens(AURORA).logoPlate).toBe("transparent");
+    expect(rowTokens({ ...AURORA, logoPlate: "rgba(29,36,48,0.9)" }).logoPlate).toBe("rgba(29,36,48,0.9)");
   });
 
   test("only what the painter draws with: nothing from the featured panel, sidebar or time header", () => {

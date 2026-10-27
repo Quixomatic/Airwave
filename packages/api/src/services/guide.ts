@@ -14,6 +14,7 @@ const guideChannelSelect = {
   name: true,
   callsign: true,
   icon: true,
+  logo: true,
   tint: true,
   package: { select: { id: true, key: true, icon: true, tint: true, name: true } },
 } as const;

@@ -39,6 +39,8 @@ class GuideTokens private constructor(
   val numberFocused: Int,
   val numberWeight: Int,
   val name: Int,
+  /** The plate painted behind a channel's logo so a white or light logo stays visible; transparent for none. */
+  val logoPlate: Int,
   /** Over a program's art, left to right: the two ends of the scrim (translucent colors of one hue). */
   val artScrimStart: Int,
   val artScrimEnd: Int,
@@ -68,6 +70,7 @@ class GuideTokens private constructor(
       numberFocused = GuideColor.parse("#e6eaf1"),
       numberWeight = 700,
       name = GuideColor.parse("#94a3b8"),
+      logoPlate = GuideColor.TRANSPARENT,
       artScrimStart = GuideColor.parse("rgba(6,10,20,0.88)"),
       artScrimEnd = GuideColor.parse("rgba(6,10,20,0.8)"),
       artTitle = GuideColor.parse("#f1f5f9"),
@@ -101,6 +104,7 @@ class GuideTokens private constructor(
         numberFocused = color(o, "numberFocused", a.numberFocused),
         numberWeight = weight(o, "numberWeight", a.numberWeight),
         name = color(o, "name", a.name),
+        logoPlate = color(o, "logoPlate", a.logoPlate),
         artScrimStart = (scrim?.opt(0) as? String)?.let { GuideColor.parse(it) } ?: a.artScrimStart,
         artScrimEnd = (scrim?.opt(1) as? String)?.let { GuideColor.parse(it) } ?: a.artScrimEnd,
         artTitle = color(o, "artTitle", a.artTitle),

@@ -6,6 +6,8 @@ import { useSyncExternalStore } from "react";
  * AsyncStorage and hydrated once at launch into a module variable so `getGuidePrefs()` is synchronous (the same pattern as
  * `audio-pref.ts`). A small external store notifies the guide and the settings page when it changes.
  *
+ *  - `marks`: "icons" (the default) shows each channel's icon in a colored circle. "logos" shows a channel's logo where one is
+ *    set (the admin gives a channel a logo address) and keeps the icon for the rest, and for a logo that fails to load.
  *  - `art`: "off" (the default) draws plain program cells; "on" draws each program's artwork behind its title (served by
  *    the server's image route, sized to the cell). It costs memory and network, which is why it is opt-in.
  *  - `rows`: "native" (the default) draws the guide's rows in one native view, on Android TV and only when the app build
@@ -15,18 +17,21 @@ import { useSyncExternalStore } from "react";
  */
 export type GuideRows = "classic" | "native";
 export type GuideArt = "off" | "on";
+export type GuideMarks = "icons" | "logos";
 
 export type GuidePrefs = {
+  marks: GuideMarks;
   art: GuideArt;
   rows: GuideRows;
 };
 
-export const DEFAULT_GUIDE_PREFS: GuidePrefs = { art: "off", rows: "native" };
+export const DEFAULT_GUIDE_PREFS: GuidePrefs = { marks: "icons", art: "off", rows: "native" };
 
 const KEY = "cg-guide-prefs";
 
 /** One validator per field: a stored value it doesn't accept falls back to the field's default. */
 const VALID: { [K in keyof GuidePrefs]: (v: unknown) => v is GuidePrefs[K] } = {
+  marks: (v): v is GuideMarks => v === "icons" || v === "logos",
   art: (v): v is GuideArt => v === "off" || v === "on",
   rows: (v): v is GuideRows => v === "classic" || v === "native",
 };

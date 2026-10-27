@@ -187,6 +187,73 @@ class AuroraLayoutTest {
     assertEquals(plain.right, ring.right)
   }
 
+  private fun logoGeo(logoPad: Double) = GuideGeo(
+    """{"rowH": 63, "railW": 72, "laneW": 800, "ppm": 4, "originMs": 0, "nowMs": 0, "windowMin": 180, "gap": 3,
+        "borderTop": 1, "padV": 6.75, "padH": 7.5, "barW": 1.5,
+        "circle": 18, "circleBorder": 0.5, "circleRing": 1, "glyph": 9.5, "badge": 8, "badgeOff": 1.5,
+        "logoGap": 3, "logoPad": $logoPad, "logoRadius": 3,
+        "numberSize": 12.75, "nameSize": 8.6, "nameLine": 10.3,
+        "cellTop": 2.25, "cellInset": 4.5, "cellRadius": 4, "cellBorder": 0.5, "cellRing": 1,
+        "liveBarX": 1.1, "liveBarInset": 3.75, "liveBarW": 0.5, "liveBarR": 1,
+        "padTop": 7.5, "padX": 7.5, "titleSize": 12.75, "subSize": 9.75, "subGap": 4.5}""",
+  )
+
+  @Test fun aLogoFillsTheRailBesideTheNumberFromWhereTheCircleStarts() {
+    val l = AuroraLayout(logoGeo(logoPad = 1.5), 2.0, 1760.0, titleLineH = 20)
+    val r = LogoRect()
+    l.placeLogo(numberW = 30, out = r)
+    // The rail's inner width is 144 - 30 = 114 px; less the 30 px number and the 6 px gap, the box is 78 px wide: x 15..93.
+    assertEquals(15, r.left)
+    assertEquals(93, r.right)
+    assertEquals(l.circleY.start, r.top) // as tall as the circle, level with it
+    assertEquals(l.circleY.end, r.bottom)
+    // The logo sits inside the plate's 3 px padding.
+    assertEquals(18f, r.imgLeft, 0f)
+    assertEquals(90f, r.imgRight, 0f)
+    assertEquals(19f, r.imgTop, 0f)
+    assertEquals(49f, r.imgBottom, 0f)
+    // A favorite's badge hangs 3 px off the box's bottom right corner, like the circle's.
+    assertEquals(80, r.badgeLeft)
+    assertEquals(96, r.badgeRight)
+    assertEquals(39, r.badgeTop)
+    assertEquals(55, r.badgeBottom)
+    assertTrue(r.badgeRight > r.right && r.badgeBottom > r.bottom)
+    // The number stays against the right padding, as it does beside the circle.
+    assertEquals(99, l.numberLeftBesideLogo(30))
+    assertEquals(l.numberLeft(30), l.numberLeftBesideLogo(30))
+  }
+
+  @Test fun withoutAPlateTheLogoFillsItsBoxFlush() {
+    val l = AuroraLayout(logoGeo(logoPad = 0.0), 2.0, 1760.0, titleLineH = 20)
+    val r = LogoRect()
+    l.placeLogo(30, r)
+    assertEquals(r.left.toFloat(), r.imgLeft, 0f)
+    assertEquals(r.right.toFloat(), r.imgRight, 0f)
+    assertEquals(r.top.toFloat(), r.imgTop, 0f)
+    assertEquals(r.bottom.toFloat(), r.imgBottom, 0f)
+  }
+
+  @Test fun aWiderNumberLeavesTheLogoANarrowerBoxAndAnEnormousOneLeavesNone() {
+    val l = AuroraLayout(logoGeo(0.0), 2.0, 1760.0, titleLineH = 20)
+    val narrow = LogoRect()
+    val wide = LogoRect()
+    l.placeLogo(20, narrow)
+    l.placeLogo(60, wide)
+    assertEquals(narrow.right - 40, wide.right)
+    val none = LogoRect()
+    l.placeLogo(500, none)
+    assertEquals(none.left, none.right) // no room: an empty box, never a negative one
+  }
+
+  @Test fun aLogoIsDecodedDownToTheLargestBoxItCanFillInStepsOf32() {
+    val plated = AuroraLayout(logoGeo(1.5), 2.0, 1760.0, titleLineH = 20)
+    assertEquals(128, plated.logoDecodeW) // 144 - 30 - 6 = 108 px -> 128
+    assertEquals(32, plated.logoDecodeH) // 36 - 6 = 30 px -> 32
+    val flush = AuroraLayout(logoGeo(0.0), 2.0, 1760.0, titleLineH = 20)
+    assertEquals(128, flush.logoDecodeW) // 114 -> 128
+    assertEquals(64, flush.logoDecodeH) // 36 -> 64
+  }
+
   @Test fun artworkIsRequestedAtTheCellsSizeRoundedUpToTheStep() {
     // Density 2: a 200 dp wide cell is 400 px -> 448; the cell is 63 - 4.5 = 58.5 dp tall, 117 px -> 128.
     assertEquals(448, layout.artW(GuideGeometry.CellBox(100.0, 200.0)))

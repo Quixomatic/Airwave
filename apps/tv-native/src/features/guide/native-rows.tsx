@@ -9,6 +9,7 @@ import { channelTint } from "@/lib/tint";
 
 import { isVisible, type Lane, programArtPath } from "./geometry";
 import { useGuideTokens } from "./guide-tokens";
+import { logoSource } from "./channel-logo";
 import { accentOf, cs, FEATURE_SCALE, line, subLine } from "./layout";
 import { GLYPH_FALLBACK, GLYPH_HEART, iconNodeOf, resolveIconId, type IconNode } from "./lucide-nodes";
 import { auroraGeo, ROW_BORDER_TOP, rowTokens } from "./native-rows-geo";
@@ -131,9 +132,17 @@ export const NativeRows = memo(function NativeRows({
   const tk = useGuideTokens();
   // This instance's own native lineup store and hand-over state: see the header.
   const [handover] = useState(newHandover);
-  const artOn = useGuidePrefs().art === "on";
+  const { art, marks } = useGuidePrefs();
   const serverUrl = getServerUrl();
-  const lineupResolvers = useMemo<LineupResolvers>(() => (artOn ? { ...resolvers, ...artResolvers, artKey: serverUrl } : resolvers), [artOn, serverUrl]);
+  // What the lineup is packed with: program art and channel logos are only packed (so only fetched) when they are chosen.
+  const lineupResolvers = useMemo<LineupResolvers>(() => {
+    if (art !== "on" && marks !== "logos") return resolvers;
+    return {
+      ...resolvers,
+      ...(art === "on" ? { ...artResolvers, artKey: serverUrl } : {}),
+      ...(marks === "logos" ? { logo: (ch: GuideGridChannel) => logoSource(ch.logo, serverUrl) } : {}),
+    };
+  }, [art, marks, serverUrl]);
   // Bumped when the instance commits (and again if it is remounted), to send the lineup: see `Handover`.
   const [generation, setGeneration] = useState(0);
   // Synchronous on purpose, once the instance has committed: the native store must hold this lineup before the view's next frame, so the view

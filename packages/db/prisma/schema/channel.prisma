@@ -62,6 +62,9 @@ model Channel {
   callsign    String? // short memorable code, e.g. "EVRTV" (uppercase, ≤6 chars)
   description String?
   icon        String? // "lucide:Sparkles" / "phosphor:Television" — overrides the package icon
+  // Optional logo image for the TV guide's channel column: an https:// URL, or a path on this server. The TV
+  // loads it directly and shows it in place of the icon when the device's Channel marks setting is Logos.
+  logo        String?
   tint        String? // TintedIconTile tint token — overrides the package tint
   enabled     Boolean          @default(true)
   sortIndex   Int              @default(0)

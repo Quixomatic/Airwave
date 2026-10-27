@@ -44,6 +44,7 @@ import { trpc } from "@/utils/trpc";
 
 import { FilterBuilder, type FilterGroup, normalizeFilter } from "./filter-builder";
 import { encodeFilter } from "./filter-clipboard";
+import { isLogoAddress, LOGO_ADDRESS_HINT, LOGO_FORMAT_HINT } from "./channel-logo";
 import { ImportFilterDialog } from "./import-filter-dialog";
 import { ManualBuilder } from "./manual-builder";
 import { MembershipBuilder, type MembershipSource } from "./membership-builder";
@@ -75,11 +76,16 @@ export type ChannelFormValues = {
   sortDir: "asc" | "desc";
   packageId: string | null;
   icon: string | null;
+  /** An https:// image address (or a path on this server) the TV guide can show instead of the icon; null for none. */
+  logo: string | null;
   tint: string | null;
   description: string | null;
   enabled: boolean;
   bumperMode: BumperMode;
 };
+
+/** How long typing in the logo field has to pause before the preview loads it (an `<img>` fetches every address it is given). */
+const LOGO_PREVIEW_DELAY_MS = 400;
 
 /** The live pool definition the form reports upward (via `onPreviewInputChange`) so a preview panel can resolve
  *  the UNSAVED filter/membership source — see channels.previewFilter / previewMembership (GitHub #12). */
@@ -233,6 +239,14 @@ export function ChannelForm({
   const [sortDir, setSortDir] = useState<"asc" | "desc">(initial?.sortDir ?? "asc");
   const [packageId, setPackageId] = useState<string>(initial?.packageId ?? "");
   const [icon, setIcon] = useState<string | null>(initial?.icon ?? null);
+  const [logo, setLogo] = useState(initial?.logo ?? "");
+  // The preview follows the field once typing pauses: an <img> fetches every address it is given, and a half-typed one asks the host for a logo that is not there.
+  const logoAddress = logo.trim();
+  const [previewLogo, setPreviewLogo] = useState(logoAddress);
+  useEffect(() => {
+    const id = setTimeout(() => setPreviewLogo(logoAddress), LOGO_PREVIEW_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [logoAddress]);
   const [tint, setTint] = useState<string | null>(initial?.tint ?? null);
   const [description, setDescription] = useState(initial?.description ?? "");
   const [enabled, setEnabled] = useState(initial?.enabled ?? true);
@@ -377,6 +391,7 @@ export function ChannelForm({
       sortDir,
       packageId: packageId || null,
       icon,
+      logo: logo.trim() || null,
       tint,
       description: description.trim() || null,
       enabled,
@@ -570,6 +585,38 @@ export function ChannelForm({
           {selectedPackage && !tint && !icon && (
             <p className="text-muted-foreground text-xs">
               Inherits “{selectedPackage.name}” — pick an icon or tint to override.
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="clogo">Logo</Label>
+          <div className="flex items-center gap-3">
+            <Input
+              id="clogo"
+              inputMode="url"
+              value={logo}
+              onChange={(e) => setLogo(e.target.value)}
+              placeholder="https://… (optional)"
+            />
+            {isLogoAddress(logoAddress) && isLogoAddress(previewLogo) && (
+              <img
+                key={previewLogo}
+                src={previewLogo}
+                alt=""
+                className="h-9 max-w-24 shrink-0 object-contain"
+                onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+              />
+            )}
+          </div>
+          {logoAddress && !isLogoAddress(logoAddress) ? (
+            <p className="text-destructive text-xs">{LOGO_ADDRESS_HINT}</p>
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              Optional. A TV shows it in the guide&apos;s channel column, in place of the icon, when its Channel marks setting is Logos; without
+              one the icon is used. Use an https:// image address, or a path on this server. Each TV loads the image from that address itself.
+              {" "}
+              {LOGO_FORMAT_HINT}
             </p>
           )}
         </div>

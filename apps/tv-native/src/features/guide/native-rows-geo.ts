@@ -1,3 +1,4 @@
+import { hasLogoPlate } from "./channel-logo";
 import { WINDOW_MIN } from "./geometry";
 import type { GuideTokens } from "./guide-tokens";
 
@@ -62,6 +63,11 @@ export function auroraGeo(i: AuroraGeoInput, s: Scalers, tk: GuideTokens) {
     glyph: vw(34 * i.featureScale),
     badge: vw(22),
     badgeOff: vw(4),
+    // A channel's logo, in place of the circle: a box as tall as the circle, as wide as the rail leaves beside the number. A
+    // theme's plate behind it insets the logo by `logoPad`.
+    logoGap: vw(8),
+    logoPad: hasLogoPlate(tk.logoPlate) ? vw(4) : 0,
+    logoRadius: cs(6),
     numberSize: vw(34),
     nameSize: vw(23),
     nameLine: vw(23) * 1.2,
@@ -110,6 +116,7 @@ export function rowTokens(tk: GuideTokens) {
     numberFocused: tk.numberFocused,
     numberWeight: tk.numberWeight,
     name: tk.name,
+    logoPlate: tk.logoPlate,
     // Program art, when the cells show it: the scrim over it (left to right) and the text colors on it.
     artScrim: [tk.artScrim[0], tk.artScrim[1]],
     artTitle: tk.artTitle,

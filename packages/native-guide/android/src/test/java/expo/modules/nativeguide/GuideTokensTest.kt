@@ -42,6 +42,7 @@ class GuideTokensTest {
     assertEquals(argb("#e6eaf1"), a.numberFocused)
     assertEquals(700, a.numberWeight)
     assertEquals(argb("#94a3b8"), a.name)
+    assertEquals(GuideColor.TRANSPARENT, a.logoPlate)
     assertEquals(argb("rgba(6,10,20,0.88)"), a.artScrimStart)
     assertEquals(argb("rgba(6,10,20,0.8)"), a.artScrimEnd)
     assertEquals(argb("#f1f5f9"), a.artTitle)
