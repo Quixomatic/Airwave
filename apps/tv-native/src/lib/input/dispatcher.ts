@@ -103,7 +103,10 @@ export function useTVInput() {
         dispatchKey(e.eventKeyAction === 1 ? "holdEnd" : et === "longLeft" ? "leftHold" : "rightHold");
         return;
       }
-      dispatchKey(tvEventToKey(et));
+      const key = tvEventToKey(et, RN.Platform.OS === "ios" && RN.Platform.isTV);
+      const handled = dispatchKey(key);
+      // Development diagnostics contain input vocabulary only, never server/media/credential data.
+      if (__DEV__ && et.startsWith("swipe")) console.debug("[tv-input]", et, key, handled ? "handled" : "unhandled");
     });
   }
 }
