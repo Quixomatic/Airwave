@@ -25,6 +25,9 @@ interface MpvCoreDelegate {
    *  view's aspect letterbox. Fires as the size settles after load, because the first `dwidth`/`dheight` read
    *  can be a placeholder (e.g. 960x540 on a Fire TV) before the real frame decodes. */
   fun mpvVideoSize(width: Int, height: Int)
+  /** The video output switched between `mediacodec_embed` and a GL renderer (`MpvCore.isEmbed` changed). Fires
+   *  before the new program's load, so the view can re-fit its surface to the VO that will actually render it. */
+  fun mpvVoChanged()
   fun mpvFirstFrame()
   fun mpvProgress(time: Double, duration: Double)
   fun mpvBuffering(buffering: Boolean)
@@ -36,7 +39,9 @@ interface MpvCoreDelegate {
  * A focused libmpv wrapper — the Android twin of `ios/MpvCore.swift`. Binds the `dev.jdtech.mpv.MpvPlayer`
  * coroutine API (from the edde746/libmpv-android AAR): `create` + pre-init options, `loadfile … -1
  * start=<offset>` (the fast ffmpeg-estimated seek), and property/event Flow collection → delegate events.
- * Renders via the Android `gpu-next` VO into a caller-supplied Surface (a SurfaceView).
+ * Renders into a caller-supplied Surface (a SurfaceView): via the Android `gpu-next` VO by default (`gpu` on
+ * the NVIDIA Shield), and via `mediacodec_embed` for HDR programs and, on the SoCs listed in `needsEmbedForSdr`,
+ * for SDR programs too (see `sdrVo` and `applyVoForLoad`). `isEmbed` reports the VO currently in use.
  *
  * Everything the JS contract exposes matches the iOS module 1:1, so tv-web/tv-native's effectiveTime/DVR
  * clock maps onto it unchanged. The Android *surface lifecycle* + *HDR* follow the two canonical mpv-Android
@@ -54,7 +59,24 @@ class MpvCore(private val appContext: Context) {
   // there. HDR is unaffected — it uses mediacodec_embed (a different path that already works on the Shield),
   // so ONLY the SDR VO changes, and ONLY on the Shield. HDR was never gpu-next's job on Android (that VO
   // can't passthrough HDR — it tone-maps; the real HDR path is mediacodec_embed, see applyVoForLoad).
-  private val sdrVo = if (isNvidiaShield()) "gpu" else "gpu-next"
+  //
+  // The SoCs listed in `needsEmbedForSdr` (currently only the mt5889 in the TCL QM8) render SDR through
+  // mediacodec_embed too. On that chip the mpv core wedges when the surface is resized — docking the
+  // full-screen player into the guide's mini preview: decoded frames and `time-pos` stop, the picture stays on
+  // the last frame, and the app keeps running. The suspected cause is gpu-next's MediaCodec→GL interop
+  // (`aimagereader`); mediacodec_embed has no GL path to wedge, and with the same VO for SDR and HDR programs
+  // applyVoForLoad never has to switch VOs between them. The view letterboxes it like the HDR path (see
+  // MpvPlayerView.applyAspect). Trade-offs: no software-decode fallback, and nothing mpv draws itself
+  // (subtitles/OSD, panscan crop) — the same limits the HDR path has.
+  //
+  // This says what the DEVICE does with SDR; it is not "the VO in use right now" (an HDR program is on embed
+  // everywhere). The view asks `isEmbed` for that, and uses this only for the "cover" rule (see `embedLetterboxRatio`).
+  internal val sdrIsEmbed = needsEmbedForSdr(Build.HARDWARE, Build.BOARD)
+  private val sdrVo = when {
+    isNvidiaShield() -> "gpu"
+    sdrIsEmbed -> "mediacodec_embed"
+    else -> "gpu-next"
+  }
 
   // The video output, chosen UP FRONT per program (see applyVoForLoad + .plans/android-hdr-vo-predetect.md).
   // On Android, gpu-next's OpenGL-ES path CANNOT passthrough HDR — it ALWAYS tone-maps HDR→SDR (findroid #645,
@@ -67,8 +89,22 @@ class MpvCore(private val appContext: Context) {
   // the plan.) Because each program is its own loadfile, there is NO mid-stream switch → no restart, no churn.
   // `currentVo` is a var: applyVoForLoad updates it per program, and `attachSurface` restores IT (not a const)
   // so an HDR program on mediacodec_embed survives a surface reposition (mini↔full). (Do NOT global-force
-  // `mediacodec_embed` — tried v0.9.1, reverted v0.9.2: it regresses SDR, which must stay on mpv's renderer.)
+  // `mediacodec_embed` — tried v0.9.1, reverted v0.9.2: it regresses SDR, which must stay on mpv's renderer.
+  // The one exception is the SoCs in `needsEmbedForSdr`, see `sdrIsEmbed`.)
   private var currentVo = sdrVo
+
+  /**
+   * True while the VO in use is `mediacodec_embed`: an HDR program anywhere, or any program on a device where SDR
+   * is embed too. This is what the view lays the surface out from (embed ignores mpv's keepaspect/panscan, so the
+   * view has to letterbox it). It reads `currentVo`, so it stays right when a load leaves the VO alone
+   * (`dynamicRange=null`) after an HDR program. It changes in `applyVoForLoad`, which notifies the delegate.
+   */
+  val isEmbed: Boolean get() = currentVo == "mediacodec_embed"
+
+  init {
+    // One line per player, so a bug report shows what this device matched and which SDR VO it got.
+    android.util.Log.i("MpvCore", "device hardware='${Build.HARDWARE}' board='${Build.BOARD}' sdrIsEmbed=$sdrIsEmbed sdrVo=$sdrVo")
+  }
 
   // The panel's HDR capability (from the client's display probe / TvDevice.hdr). PLUMBED but NOT yet
   // consulted — the VO decision currently uses CONTENT HDR only. Gating the passthrough on the display later
@@ -117,7 +153,11 @@ class MpvCore(private val appContext: Context) {
           setOption("vo", currentVo)
           setOption("gpu-context", "android")
           setOption("opengl-es", "yes")
-          setOption("hwdec", "mediacodec,mediacodec-copy")
+          setOption("hwdec", hwdecFor(currentVo))
+          // mediacodec_embed can only show MediaCodec output, so a codec mpv would software-decode (by default
+          // that includes MPEG-2 and MPEG-4 Part 2) ends with audio but no picture. Let every codec try the
+          // hardware decoder first; only set where SDR is embed, so other devices keep mpv's own default.
+          if (sdrIsEmbed) setOption("hwdec-codecs", "all")
           setOption("ao", "audiotrack")
           // Audio-only capability (bumper music bed + future radio) folded into this ONE engine — harmless
           // to single-file video. `append` + these make radio handoffs gapless.
@@ -212,7 +252,8 @@ class MpvCore(private val appContext: Context) {
   /**
    * Choose the video output for a load UP FRONT, from the program's known dynamic range (§2/§2a of
    * .plans/android-hdr-vo-predetect.md). HDR → `vo=mediacodec_embed` (+ zero-copy `hwdec=mediacodec`) = real
-   * HDR10/HLG/DV passthrough; SDR → `sdrVo` (mpv's gpu-next, or `gpu` on the Shield). Set BEFORE the loadfile
+   * HDR10/HLG/DV passthrough; SDR → `sdrVo` (mpv's gpu-next, `gpu` on the Shield, mediacodec_embed on the SoCs in
+   * `needsEmbedForSdr` — there both branches pick the same VO, so this never switches). Set BEFORE the loadfile
    * (no active decode at that moment) so there is no mid-stream switch, no destructive re-open, and no
    * surface-reconfigure churn — the fatal flaws of the old first-frame detect + `loadfile replace` approach.
    *
@@ -221,6 +262,9 @@ class MpvCore(private val appContext: Context) {
    * `HDR program → bumper → HDR program` stays on mediacodec_embed the whole way, with zero switches (matches
    * iOS; avoids pointless HDR↔SDR churn across an interstitial). `supportsHdr` (the panel's HDR capability) is
    * plumbed but not yet consulted here — see the plan's §7 stretch goal.
+   *
+   * When the VO does change, the delegate is told (`mpvVoChanged`) so the view re-fits its surface to the new VO:
+   * the view's aspect is derived from `isEmbed`, and the view may have computed it before this switch ran.
    */
   private suspend fun applyVoForLoad(p: MpvPlayer, mode: String, dynamicRange: String?) {
     if (mode == "audio" || dynamicRange == null) return
@@ -229,10 +273,13 @@ class MpvCore(private val appContext: Context) {
     if (neededVo == currentVo) return
     android.util.Log.i("MpvCore", "VO up-front: dynamicRange=$dynamicRange → vo=$neededVo (was $currentVo)")
     currentVo = neededVo
-    // Embed needs the direct (zero-copy) mediacodec decoder; gpu-next uses the copy fallback too.
-    p.setProperty("hwdec", if (isHdr) "mediacodec" else "mediacodec,mediacodec-copy")
+    p.setProperty("hwdec", hwdecFor(neededVo))
     p.setProperty("vo", neededVo)
+    delegate?.mpvVoChanged()
   }
+
+  /** Embed needs the direct (zero-copy) mediacodec decoder; the GL renderers use the copy fallback too. */
+  private fun hwdecFor(vo: String) = if (vo == "mediacodec_embed") "mediacodec" else "mediacodec,mediacodec-copy"
 
   /**
    * `mode` is the ONLY place content-type branches (see `.plans/mpv-hybrid-core.md`). On this ONE shared
@@ -371,11 +418,12 @@ class MpvCore(private val appContext: Context) {
     //
     // surfaceDestroyed() runs on the MAIN thread and must return promptly. The wrapper's setProperty
     // round-trips through mpv's core, and gpu-next's GL/`aimagereader` teardown STALLS that round-trip on
-    // some devices (MediaTek / Google TV Streamer) — it waits for MediaCodec frames that never arrive once
-    // the clip is paused ("Waiting for frame timed out"). Doing it inline hangs the main thread past
-    // Android's 5s input-dispatch timeout → ANR → SIGKILL (reproduced closing the SDR mini player; a
-    // coroutine `withTimeoutOrNull` did NOT help — the stall is inside a non-cancellable native call;
-    // mediacodec_embed/HDR has no GL path so it never stalled). So run the ordered teardown
+    // some devices (seen on the Google TV Streamer, which still renders SDR through gpu-next) — it waits for
+    // MediaCodec frames that never arrive once the clip is paused ("Waiting for frame timed out"). Doing it
+    // inline hangs the main thread past Android's 5s input-dispatch timeout → ANR → SIGKILL (reproduced
+    // closing the SDR mini player; a coroutine `withTimeoutOrNull` did NOT help — the stall is inside a
+    // non-cancellable native call; mediacodec_embed has no GL path so it never stalled, which includes SDR on
+    // the SoCs in `needsEmbedForSdr`, where gpu-next is no longer used). So run the ordered teardown
     // (vo=null → force-window=no → detach) on a BACKGROUND thread: the main thread returns instantly and
     // the teardown can block there as long as the GL deinit needs. The video is paused when the mini
     // closes, so mpv isn't rendering and there's no live frame to hit the just-destroyed surface. This is

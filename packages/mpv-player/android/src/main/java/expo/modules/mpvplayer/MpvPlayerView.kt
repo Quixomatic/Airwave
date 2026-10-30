@@ -26,8 +26,9 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   // ignores Android layout_gravity → the old AspectRatioFrameLayout landed off-center: bars only on the right/
   // bottom), and we do NOT rely on requestLayout() (it doesn't propagate inside an RN view subtree, so an
   // aspect change stuck until a full remount). The container fills; only the SurfaceView is letterboxed, and
-  // ONLY on the HDR path (see applyAspect). SDR/mini → the SurfaceView fills = the pre-0.13.19 full surface,
-  // so mpv's gpu-next handles the letterbox exactly as it always did.
+  // ONLY while the core's VO is mediacodec_embed (HDR programs, plus every program on the SoCs in
+  // needsEmbedForSdr — see applyAspect). Otherwise (SDR on gpu-next, mini) the SurfaceView fills = the
+  // pre-0.13.19 full surface, so mpv's gpu-next handles the letterbox exactly as it always did.
   private val videoContainer = VideoContainer(context)
 
   private var didSetup = false
@@ -52,7 +53,8 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   // cinema → +4% taller). The container letterboxes it. The real display size arrives via `mpvVideoSize` (the
   // core watches mpv's dwidth/dheight as they settle — the first read can be a placeholder like 960x540 before
   // the frame decodes). That updates videoW/videoH and re-letterboxes (applyAspect → videoContainer.targetRatio,
-  // which centers the SurfaceView). SDR leaves the surface full-screen so mpv's gpu-next letterboxes it itself.
+  // which centers the SurfaceView). Only the embed VO needs it (`MpvCore.isEmbed`, the VO actually in use —
+  // not the program's declared range); on gpu-next the surface stays full-screen and mpv letterboxes it itself.
   private var videoW = 0
   private var videoH = 0
   private var contentFit = "contain"
@@ -103,20 +105,38 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   }
 
   /**
-   * Feed the video's display aspect to the container — but ONLY on the HDR path. The HDR VO
+   * Feed the video's display aspect to the container — but ONLY while the core's VO is `mediacodec_embed`
+   * (`MpvCore.isEmbed`): HDR programs, and every program on the SoCs in `needsEmbedForSdr`. That is the VO the
+   * core actually picked, not the program's declared dynamic range, so it stays right when a load leaves the VO
+   * alone (an HDR program followed by a load with no range is still on embed).
    * `mediacodec_embed` renders the MediaCodec surface directly and ignores mpv's keepaspect/panscan
    * (mpv-android#486), so a full-screen surface stretches non-16:9 content → we letterbox at the view layer.
    * On SDR, mpv's own renderer (gpu-next) letterboxes correctly inside the full-screen surface via
    * keepaspect/panscan, so we leave the container FILLING (ratio 0) and let mpv handle it — no view-layer
-   * constraint, and no surface-resize churn from resizing the SurfaceView off full-screen. "cover"/"fill" (or
-   * unknown dims) → 0 = fill even on HDR. `VideoContainer.targetRatio` only re-lays-out when the ratio actually
-   * changes (once per video), so no per-event churn.
+   * constraint, and no surface-resize churn from resizing the SurfaceView off full-screen. "fill" (or unknown
+   * dims) → 0 = fill even on embed. "cover" needs a crop that embed can't do: HDR on other devices fills (as
+   * before), but where SDR is embed too it letterboxes like "contain" — mpv's panscan used to crop that
+   * content, and stretching it would distort every non-16:9 program in the mini preview.
+   * `VideoContainer.targetRatio` only re-lays-out when the ratio actually changes (once per video), so no
+   * per-event churn.
+   *
+   * Unknown size: where every program is embed (`core.sdrIsEmbed`), a new program's size is unknown until its
+   * first frame. Falling back to fill meanwhile would resize the surface twice on a channel change between
+   * same-shaped programs (letterbox → full → letterbox), and on that chip a surface resize is what triggered the
+   * freeze under gpu-next. So the previous ratio is kept until the new size arrives. Everywhere else an unknown
+   * size still fills, as before.
+   *
+   * Timing: `MpvCore.applyVoForLoad` picks the VO after the view has queued the load, while the previous file is
+   * still playing. A call made before the switch (a new source with unknown dims, a fit change) can see the
+   * previous VO, which is harmless while the size is unknown; `mpvVoChanged` re-runs this once the VO actually
+   * changes. A known, pre-existing edge case remains: `load()` zeroes the core's size dedup baseline before that
+   * switch, so re-initialising the VO can re-fire the dwidth/dheight observers and push the outgoing file's size to
+   * the view, which then applies it under the new VO's rule. The next size report for the new file corrects it.
    */
   private fun applyAspect() {
-    val hdr = pendingDynamicRange == "hdr"
-    val forceFill = contentFit == "cover" || contentFit == "fill"
-    val ratio = if (hdr && !forceFill && videoW > 0 && videoH > 0) videoW.toFloat() / videoH.toFloat() else 0f
-    android.util.Log.i("MpvCore", "applyAspect ratio=$ratio (video=${videoW}x${videoH} fit=$contentFit hdr=$hdr)")
+    val embed = core.isEmbed
+    val ratio = embedLetterboxRatio(embed, core.sdrIsEmbed, contentFit, videoW, videoH, videoContainer.targetRatio)
+    android.util.Log.i("MpvCore", "applyAspect ratio=$ratio (video=${videoW}x${videoH} fit=$contentFit embed=$embed)")
     videoContainer.targetRatio = ratio
   }
 
@@ -125,7 +145,8 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   fun setPendingSource(source: String?) {
     pendingSource = source
     // New program → dims unknown until its first frame; reset so applyAspect re-fits once the size is reported
-    // (via mpvVideoSize), rather than reusing the previous program's.
+    // (via mpvVideoSize), rather than reusing the previous program's. Meanwhile applyAspect keeps the current
+    // letterbox where every program is embed (no fill-then-refit resize on a same-shape channel change).
     videoW = 0
     videoH = 0
     applyAspect()
@@ -156,7 +177,7 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
   fun setContentFit(fit: String) {
     contentFit = fit
     core.setContentFit(fit) // keepaspect/panscan for the SDR gpu-next path
-    applyAspect() // container letterbox for the HDR mediacodec_embed path
+    applyAspect() // container letterbox for the mediacodec_embed path
   }
   fun setPaused(paused: Boolean) {
     // Keep the screen awake only while a video is actually playing; release it on pause so the device can
@@ -221,8 +242,17 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
 
   // MARK: MpvCoreDelegate → JS events
 
+  /**
+   * `onLoad`'s size is the codec's `width`/`height` whenever mpv has no display size yet (see
+   * `MpvCore.maybeEmitLoad`): storage size, not PAR-corrected. Where every program is embed (`core.sdrIsEmbed`) it
+   * must not move the letterbox: an anamorphic 720x480 would be letterboxed at 1.5 and then re-fit to 1.78 when
+   * `mpvVideoSize` brings the real display size, which is a second surface resize. There the aspect is driven by
+   * `mpvVideoSize` alone (the dwidth/dheight observers, plus a read at every `PlaybackRestart`; `load()` zeroes the
+   * dedup baseline, so a new file's display size is pushed even when it equals the previous file's). Elsewhere
+   * `onLoad` still feeds it, as before. The event to JS is unchanged either way.
+   */
   override fun mpvDidLoad(duration: Double, width: Int, height: Int) {
-    if (width > 0 && height > 0 && (width != videoW || height != videoH)) {
+    if (loadSizeDrivesAspect(core.sdrIsEmbed) && width > 0 && height > 0 && (width != videoW || height != videoH)) {
       videoW = width
       videoH = height
       applyAspect()
@@ -241,6 +271,11 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
       videoH = height
       applyAspect()
     }
+  }
+
+  /** The core switched VOs (`isEmbed` changed): re-fit the surface to the VO that will render the program. */
+  override fun mpvVoChanged() {
+    applyAspect()
   }
 
   override fun mpvFirstFrame() {
@@ -275,13 +310,47 @@ class MpvPlayerView(context: Context, appContext: AppContext) :
 }
 
 /**
+ * The aspect ratio to letterbox the SurfaceView to, or 0 to let it fill (see `MpvPlayerView.applyAspect`).
+ * `isEmbed` is the VO actually in use (`MpvCore.isEmbed`); only `mediacodec_embed` needs the view to letterbox.
+ * `sdrIsEmbed` (`MpvCore.sdrIsEmbed`) says every program on this device is embed, not just HDR ones.
+ * - "fill" fills.
+ * - "cover" needs a crop that embed cannot do: it fills unless `sdrIsEmbed` (HDR-only embed, as before), where it
+ *   letterboxes like "contain" because stretching would distort all non-16:9 content in the mini preview.
+ * - Otherwise a known size gives `videoW:videoH`. An unknown size (a new program before its first frame) keeps
+ *   `previousRatio` when `sdrIsEmbed`, so a channel change between same-shaped programs does not resize the
+ *   surface twice; everywhere else it fills, as before.
+ * A pure function so the combinations can be unit-tested on the JVM.
+ */
+internal fun embedLetterboxRatio(
+  isEmbed: Boolean,
+  sdrIsEmbed: Boolean,
+  contentFit: String,
+  videoW: Int,
+  videoH: Int,
+  previousRatio: Float = 0f,
+): Float {
+  if (!isEmbed) return 0f
+  val fills = contentFit == "fill" || (contentFit == "cover" && !sdrIsEmbed)
+  if (fills) return 0f
+  if (videoW > 0 && videoH > 0) return videoW.toFloat() / videoH.toFloat()
+  return if (sdrIsEmbed) previousRatio else 0f
+}
+
+/**
+ * Whether `onLoad`'s size (`MpvPlayerView.mpvDidLoad`) may set the letterbox. Not where every program is embed
+ * (`sdrIsEmbed`): there only `mpvVideoSize`'s PAR-correct display size does, so the letterbox is not set from the
+ * codec's storage size first. A pure function so the rule can be unit-tested on the JVM.
+ */
+internal fun loadSizeDrivesAspect(sdrIsEmbed: Boolean): Boolean = !sdrIsEmbed
+
+/**
  * A full-size FrameLayout that sizes + CENTERS its single child (the SurfaceView) itself.
  *
  * `targetRatio == 0` → the child fills the container (the pre-0.13.19 full-screen surface: mpv's own
  * gpu-next renderer letterboxes SDR correctly inside it). `targetRatio > 0` → the child is letterboxed to
- * that aspect and centered — used ONLY for the HDR VO `mediacodec_embed`, which renders the MediaCodec
- * surface directly and ignores mpv's keepaspect/panscan (mpv-android#486), so it must be shaped at the view
- * layer.
+ * that aspect and centered — used ONLY for the VO `mediacodec_embed` (HDR, and all content on the SoCs in
+ * `needsEmbedForSdr`), which renders the MediaCodec surface directly and ignores mpv's keepaspect/panscan (mpv-android#486), so it
+ * must be shaped at the view layer.
  *
  * Two things this deliberately does NOT rely on, because both fail inside a React Native native view:
  *  - **Parent gravity.** We center the child explicitly (child.layout), not via layout_gravity — RN lays a
