@@ -83,4 +83,7 @@ dependencies {
   // The AAR is a raw file (no POM), so its coroutines dependency isn't resolved
   // transitively — add it ourselves or MpvPlayer NoClassDefFoundErrors at runtime.
   implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'
+
+  // JVM unit tests (src/test) — pure Kotlin helpers only; nothing that touches the Android framework or libmpv.
+  testImplementation 'junit:junit:4.13.2'
 }
