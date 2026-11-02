@@ -21,16 +21,24 @@ export type SettingsCtxValue = {
   ensureVisible: (node: View | null) => void;
   /** Scroll the content pane to the very top — used at the first option to reveal the header above it. */
   scrollToTop: () => void;
+  /** Show `node` in a panel beside the page, outside its scrolling (the Guide page's preview of a theme); `null` clears it. */
+  setDock: (node: ReactNode | null) => void;
 };
-export const SettingsCtx = createContext<SettingsCtxValue>({ active: false, returnToRail: () => {}, ensureVisible: () => {}, scrollToTop: () => {} });
+export const SettingsCtx = createContext<SettingsCtxValue>({ active: false, returnToRail: () => {}, ensureVisible: () => {}, scrollToTop: () => {}, setDock: () => {} });
 
-export function useSettingsPage(count: number, onActivate: (i: number) => void) {
+/**
+ * `opts.onBack` sees the selected index when Left or Back is pressed and returns true to handle it itself (a page with a
+ * sub-list steps back to the list above it); false leaves the key to return to the rail as usual. `setSel` moves the selection.
+ */
+export function useSettingsPage(count: number, onActivate: (i: number) => void, opts?: { onBack?: (sel: number) => boolean }) {
   const { active, returnToRail, scrollToTop } = useContext(SettingsCtx);
   const [sel, setSel] = useState(0);
   const selRef = useRef(0);
   selRef.current = sel;
   const cbRef = useRef(onActivate);
   cbRef.current = onActivate;
+  const backRef = useRef(opts?.onBack);
+  backRef.current = opts?.onBack;
 
   useEffect(() => {
     if (active) setSel((s) => Math.min(s, Math.max(0, count - 1)));
@@ -61,14 +69,14 @@ export function useSettingsPage(count: number, onActivate: (i: number) => void) 
           return true;
         case "left":
         case "back":
-          returnToRail();
+          if (!backRef.current?.(selRef.current)) returnToRail();
           return true;
       }
       return false;
     },
   });
 
-  return { sel: active ? sel : -1 };
+  return { sel: active ? sel : -1, setSel };
 }
 
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
@@ -125,6 +133,36 @@ export function SettingRow({
       </View>
       {right}
     </Pressable>
+  );
+}
+
+/**
+ * A line of explanatory text under a setting that the D-pad can stop on. Text a remote cannot focus is never scrolled to, so
+ * a note below the last row of a long page would sit off the screen for good; as one more stop in the page's list it is
+ * scrolled into view and read like a row. Pass `dim` for fine print.
+ */
+export function SettingNote({ children, focused, dim }: { children: ReactNode; focused: boolean; dim?: boolean }) {
+  const ref = useRef<View>(null);
+  const { ensureVisible } = useContext(SettingsCtx);
+  useEffect(() => {
+    if (focused) ensureVisible(ref.current);
+  }, [focused, ensureVisible]);
+  return (
+    <View
+      ref={ref}
+      style={scaled({
+        marginTop: dim ? 18 : 4,
+        marginBottom: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 22,
+        borderRadius: 14,
+        borderWidth: 2,
+        borderColor: focused ? SETTINGS_ACCENT : "transparent",
+        backgroundColor: focused ? "rgba(74,159,224,0.10)" : "transparent",
+      })}
+    >
+      <Text style={scaled({ fontSize: 14, lineHeight: 21, color: dim ? "#64748b" : "#94a3b8", maxWidth: 640 })}>{children}</Text>
+    </View>
   );
 }
 

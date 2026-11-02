@@ -1,0 +1,229 @@
+{
+  "about": "Generated from apps/tv-native/src/features/guide/native-rows-geo.ts by packages/native-guide/scripts/gen-geometry-fixture.ts: the `geo` and `tokens` JSON the Aurora rows send the native view, for a 960 dp wide screen at density 2. native-rows-geo.test.ts checks it is current.",
+  "geo": {
+    "unit": 0.375,
+    "rowH": 63,
+    "railW": 71.88125,
+    "laneW": 796.11875,
+    "ppm": 4.422881944444445,
+    "originMs": 1760000000000,
+    "windowMin": 180,
+    "gap": 3,
+    "borderTop": 1,
+    "padV": 6.75,
+    "padH": 7.5,
+    "barW": 1.5,
+    "circle": 18.24,
+    "circleBorder": 0.5,
+    "circleRing": 1,
+    "glyph": 9.69,
+    "badge": 8.25,
+    "badgeOff": 1.5,
+    "logoGap": 3,
+    "logoPad": 0,
+    "logoRadius": 3,
+    "numberSize": 12.75,
+    "nameSize": 8.625,
+    "nameLine": 10.35,
+    "cellTop": 2.25,
+    "cellInset": 4.5,
+    "cellRadius": 4,
+    "cellBorder": 0.5,
+    "cellRing": 1,
+    "ringOuterW": 0,
+    "liveBarX": 1.125,
+    "liveBarInset": 3.75,
+    "liveBarW": 1.5,
+    "liveBarR": 2,
+    "padTop": 7.5,
+    "padX": 7.5,
+    "titleSize": 12.75,
+    "subSize": 9.75,
+    "subGap": 4.5,
+    "kickerSize": 7.5,
+    "plateSize": 8.25
+  },
+  "tokens": {
+    "railGround": "#060a14",
+    "rowBorder": "rgba(148,163,184,0.12)",
+    "cellBg": "rgba(148,163,184,0.05)",
+    "liveCellBg": "transparent",
+    "cellBorder": "rgba(148,163,184,0.10)",
+    "ring": "#3b82f6",
+    "ringOuter": null,
+    "liveFill": {
+      "mode": "tint",
+      "elapsed": 0.32,
+      "remain": 0.1
+    },
+    "title": "#f1f5f9",
+    "titleWeight": "600",
+    "sub": "#94a3b8",
+    "railFocusAlpha": 0.12,
+    "circle": {
+      "fillA": 0.2,
+      "borderA": 0.35
+    },
+    "heartOff": "#c3c9d4",
+    "fav": "#fb7185",
+    "number": "#94a3b8",
+    "numberFocused": "#e6eaf1",
+    "numberWeight": "700",
+    "name": "#94a3b8",
+    "accentShade": 0,
+    "accentFixed": null,
+    "logoPlate": "transparent",
+    "now": "#ef4444",
+    "artScrim": [
+      "rgba(6,10,20,0.88)",
+      "rgba(6,10,20,0.8)"
+    ],
+    "artTitle": "#f1f5f9",
+    "artSub": "#e6ebf2",
+    "typeStyle": {
+      "display": null,
+      "text": null,
+      "title": {
+        "font": "text",
+        "weight": "600",
+        "case": "none",
+        "track": 0,
+        "scale": 1,
+        "italic": false
+      },
+      "sub": {
+        "font": "text",
+        "weight": "400",
+        "case": "none",
+        "track": 0,
+        "scale": 1,
+        "italic": false
+      },
+      "number": {
+        "font": "text",
+        "weight": "700",
+        "case": "none",
+        "track": 0,
+        "scale": 1,
+        "italic": false
+      },
+      "name": {
+        "font": "text",
+        "weight": "400",
+        "case": "none",
+        "track": 0,
+        "scale": 1,
+        "italic": false
+      },
+      "header": {
+        "font": "text",
+        "weight": "600",
+        "case": "none",
+        "track": 0,
+        "scale": 1,
+        "italic": false
+      },
+      "day": {
+        "font": "text",
+        "weight": "600",
+        "case": "none",
+        "track": 0,
+        "scale": 1,
+        "italic": false
+      },
+      "featured": {
+        "font": "text",
+        "weight": "700",
+        "case": "none",
+        "track": 0,
+        "scale": 1,
+        "italic": false
+      }
+    },
+    "accentMode": "channel",
+    "accentCycle": null,
+    "rowBorderW": null,
+    "railBg": "transparent",
+    "railFocus": null,
+    "railBar": {
+      "w": 4,
+      "r": 0,
+      "color": null
+    },
+    "railDivider": null,
+    "railLayout": "aurora",
+    "circleStyle": {
+      "radius": 0.5,
+      "scale": 1,
+      "fill": "accent",
+      "border": "accent",
+      "borderW": null,
+      "glyph": "accent",
+      "marks": null
+    },
+    "glyphStroke": 2,
+    "cellFocusBg": null,
+    "focusText": null,
+    "liveText": null,
+    "cellBorderDash": null,
+    "cellRule": null,
+    "shadow": null,
+    "shadowFocus": null,
+    "highlight": null,
+    "halo": null,
+    "progress": {
+      "style": "none",
+      "h": 8,
+      "r": 4,
+      "inset": 20,
+      "bottom": 16,
+      "track": "rgba(148,163,184,0.18)",
+      "fill": "accent",
+      "trackBorder": null,
+      "remainPattern": null,
+      "ticks": null
+    },
+    "statusLabel": {
+      "mode": "none"
+    },
+    "art": {
+      "layout": "full",
+      "sideFrac": 0.38,
+      "frameW": 0,
+      "frameColor": "transparent",
+      "placeholder": {
+        "angle": 135,
+        "stops": [
+          [
+            "#f59e0b",
+            0
+          ],
+          [
+            "#db2777",
+            0.5
+          ],
+          [
+            "#4338ca",
+            1
+          ]
+        ]
+      }
+    },
+    "patterns": {
+      "bg": null,
+      "overlay": null
+    },
+    "misregister": null,
+    "headerStyle": null,
+    "featuredName": "accent",
+    "featuredPlate": null,
+    "favStroke": null,
+    "liveBar": {
+      "x": 3,
+      "inset": 10,
+      "color": null
+    }
+  },
+  "density": 2,
+  "widthDp": 960
+}

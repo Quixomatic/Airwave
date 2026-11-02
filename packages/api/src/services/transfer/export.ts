@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@airwave/db";
 
+import { portableChannelLogo } from "../../lib/channel-logo";
 import { getMembershipMemberKeys } from "../plex/client";
 import type { ResolveSource } from "../plex/resolve";
 import { decryptToken } from "../plex/token";
@@ -111,6 +112,9 @@ export async function exportLineup(prisma: PrismaClient, selection: ExportSelect
         callsign: c.callsign,
         description: c.description,
         icon: c.icon,
+        // An https logo travels; a path on this server (`/img/<channelId>?…`) names something that exists only here, so it is left out
+        // and the channel imports with its icon. (schema 1.3)
+        logo: portableChannelLogo(c.logo),
         tint: c.tint,
         enabled: c.enabled,
         sortIndex: c.sortIndex,

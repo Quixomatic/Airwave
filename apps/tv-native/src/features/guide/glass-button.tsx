@@ -4,13 +4,17 @@ import { type LayoutChangeEvent, Text, View } from "react-native";
 import { TvPressable as Pressable } from "@/components/tv-pressable";
 import { DEFAULT_ACCENT } from "@/lib/tint";
 
-import { cs, hexA } from "./layout";
+import { FIXED_WEIGHTS } from "./guide-fonts";
+import { faceText } from "./guide-style";
+import { accentFg, AURORA, type GuideTokens } from "./guide-tokens";
+import { cs, hexA, line } from "./layout";
 
 /**
  * The glassmorphism circle icon button, ported from tv-web's `glass-button.tsx` — the sidebar's
  * circles. `focused` = D-pad focus (accent tint + ring), `active` = persistent lit. Circle only;
  * when `expanded`, a label sits BESIDE it (a row: circle on the left, label column on the right —
- * exactly like tv-web).
+ * exactly like tv-web). `tokens` is the guide's theme; without it the button keeps the standard look, which is what
+ * the Settings sidebar (which uses this button too) wants.
  */
 export function GlassCircleButton({
   icon,
@@ -21,6 +25,7 @@ export function GlassCircleButton({
   active = false,
   accent = DEFAULT_ACCENT,
   size = 54,
+  tokens,
   onPress,
   onLayout,
 }: {
@@ -32,15 +37,21 @@ export function GlassCircleButton({
   active?: boolean;
   accent?: string;
   size?: number;
+  tokens?: GuideTokens;
   onPress?: () => void;
   /** Forwarded to the root — lets the sidebar measure each circle's y for D-pad snap-scroll. */
   onLayout?: (e: LayoutChangeEvent) => void;
 }) {
+  const tk = tokens ?? AURORA;
+  // The ring and the lit border are marks, so they take the theme's shade of the accent; the lit fill is a tint.
+  const fg = accentFg(tk, accent);
   const lit = focused || active;
   // Chrome-scaled for Android TV's 960dp space (identity on iPad/Apple TV) — the circle must shrink with
   // the sidebar width, else a 54px circle overflows the ~46px sliver.
   const s = cs(size);
   const ring = cs(8);
+  // A theme with heavy rules (more than 3 design px) draws the circle's rim heavier too.
+  const rim = tk.rowBorderW !== null && tk.rowBorderW > 3 ? line(2.25) : 1;
   return (
     <Pressable onPress={onPress} onLayout={onLayout} style={({ pressed }) => ({ width: "100%", opacity: pressed ? 0.75 : 1 })}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: expanded ? cs(14) : 0, width: "100%" }}>
@@ -56,7 +67,7 @@ export function GlassCircleButton({
                 height: s + ring,
                 borderRadius: (s + ring) / 2,
                 borderWidth: 2,
-                borderColor: hexA(accent, 0.7),
+                borderColor: hexA(fg, tk.glass.ringA),
               }}
             />
           )}
@@ -67,9 +78,9 @@ export function GlassCircleButton({
               borderRadius: s / 2,
               alignItems: "center",
               justifyContent: "center",
-              borderWidth: 1,
-              borderColor: lit ? hexA(accent, 0.4) : "rgba(255,255,255,0.12)",
-              backgroundColor: lit ? hexA(accent, 0.28) : "rgba(18,24,38,0.55)",
+              borderWidth: rim,
+              borderColor: lit ? hexA(fg, tk.glass.litBorderA) : tk.glass.idleBorder,
+              backgroundColor: lit ? hexA(accent, tk.glass.litFillA) : tk.glass.idleFill,
             }}
           >
             {icon}
@@ -79,11 +90,11 @@ export function GlassCircleButton({
         {/* label beside the circle */}
         {expanded && label && (
           <View style={{ flexShrink: 1, minWidth: 0 }}>
-            <Text numberOfLines={1} style={{ fontSize: cs(17), fontWeight: "600", color: lit ? "#f8fafc" : "#c3c9d4" }}>
+            <Text numberOfLines={1} style={{ ...faceText(tk, FIXED_WEIGHTS.glassLabel.face, cs(17), { weight: FIXED_WEIGHTS.glassLabel.weight }), color: lit ? tk.glass.labelLit : tk.glass.label }}>
               {label}
             </Text>
             {sublabel && (
-              <Text numberOfLines={1} style={{ fontSize: cs(13), fontWeight: "500", color: "#64748b", marginTop: cs(2) }}>
+              <Text numberOfLines={1} style={{ ...faceText(tk, FIXED_WEIGHTS.glassSub.face, cs(13), { weight: FIXED_WEIGHTS.glassSub.weight }), color: tk.glass.sublabel, marginTop: cs(2) }}>
                 {sublabel}
               </Text>
             )}

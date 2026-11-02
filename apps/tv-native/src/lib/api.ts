@@ -108,6 +108,8 @@ export type GuideChannel = {
   name: string;
   callsign: string | null;
   icon: string | null;
+  /** An https:// image address, or a path on the server, for the channel's logo; null or absent when it has none. */
+  logo?: string | null;
   tint: string | null;
   package: { id: string; key: string; icon: string | null; tint: string | null; name: string } | null;
 };

@@ -340,6 +340,9 @@ importers:
       '@airwave/mpv-player':
         specifier: workspace:*
         version: link:../../packages/mpv-player
+      '@airwave/native-guide':
+        specifier: workspace:*
+        version: link:../../packages/native-guide
       '@better-auth/expo':
         specifier: ^1.6.23
         version: 1.6.23(43c3653ed6a82f972d9a0d284a5eb2f3)
@@ -379,6 +382,9 @@ importers:
       expo-dev-client:
         specifier: ~55.0.37
         version: 55.0.37(expo@55.0.28)
+      expo-font:
+        specifier: ~55.0.8
+        version: 55.0.8(expo@55.0.28)(react-native-tvos@0.83.6-0)(react@19.2.0)
       expo-linear-gradient:
         specifier: ~55.0.16
         version: 55.0.16(expo@55.0.28)(react-native-tvos@0.83.6-0)(react@19.2.0)
@@ -947,6 +953,28 @@ importers:
         version: 6.0.3
 
   packages/mpv-player:
+    dependencies:
+      '@expo/config-plugins':
+        specifier: ^54.0.0
+        version: 54.0.5
+    devDependencies:
+      '@types/react':
+        specifier: ~19.2.17
+        version: 19.2.17
+      expo:
+        specifier: ~55.0.28
+        version: 55.0.28(@babel/core@7.29.7)(@expo/dom-webview@57.0.1)(@expo/metro-runtime@55.0.12)(expo-router@55.0.17)(react-dom@19.2.7(react@19.2.0))(react-native-worklets@0.7.4(@babel/core@7.29.7)(react-native@0.83.6(@babel/core@7.29.7)(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.0))(react@19.2.0))(react-native@0.83.6(@babel/core@7.29.7)(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.0))(react@19.2.0)(typescript@6.0.3)
+      react:
+        specifier: 19.2.0
+        version: 19.2.0
+      react-native:
+        specifier: 0.83.6
+        version: 0.83.6(@babel/core@7.29.7)(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.0)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  packages/native-guide:
     dependencies:
       '@expo/config-plugins':
         specifier: ^54.0.0
