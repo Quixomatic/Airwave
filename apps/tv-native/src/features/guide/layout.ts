@@ -5,6 +5,8 @@ import type { TextStyle } from "react-native";
 
 import type { GuideGridProgram } from "@/lib/api";
 
+import { lucideIconFrom } from "./icon-id";
+
 /**
  * The Aurora grid's layout constants + helpers, ported verbatim from tv-web's `aurora-grid.tsx`.
  * The design is authored at 2560px wide and used as a PROPORTION guide: `vw(px)` converts a spec
@@ -88,11 +90,10 @@ export const ACCENTS = ["#2f9e8f", "#4a9fe0", "#3b82f6", "#8b5cf6", "#3fa66a", "
 export const CH_FRAC = 212 / DESIGN_W; // channel rail = this fraction of the guide column width
 export const ROW_FRAC = 168 / DESIGN_W; // row height fraction (of screen width)
 export const FEATURE_SCALE = 0.76; // featured panel uniformly shrunk so the grid keeps room
-export const WINDOW_MIN = 180; // minutes of timeline across the lane
-export const LEAD_MIN = 30; // minutes of "already aired" shown before the grid start
-export const MIN = 60_000;
+// The grid's time geometry (timeline window, lead-in, cell cull) lives in ./geometry, which has no react-native
+// imports so it can be unit-tested; these are re-exported so existing importers keep working.
+export { LEAD_MIN, liveProgramIndex, MIN, WINDOW_MIN } from "./geometry";
 export const MIN_VISIBLE_PX = 24; // cull program blocks narrower than this
-export const PROGRESS_FILL_ELAPSED_STRONGER = true;
 
 export const SIDEBAR_SLIVER_W = 92;
 export const SIDEBAR_EXPANDED_W = 300;
@@ -121,24 +122,19 @@ export function subLine(g: GuideGridProgram["guide"]): string {
 export const audioBadge = (ch?: number) =>
   ch === 8 ? "7.1" : ch === 6 ? "5.1" : ch === 2 ? "Stereo" : ch ? "Mono" : null;
 
-/** Index of the program airing at `nowMs` (else 0) — the "on now" slot. */
-export function liveProgramIndex(programs: GuideGridProgram[], nowMs: number): number {
-  const i = programs.findIndex((p) => {
-    const s = new Date(p.startsAt).getTime();
-    return nowMs >= s && nowMs < s + p.durationSeconds * 1000;
-  });
-  return i >= 0 ? i : 0;
-}
-
 type IconCmp = ComponentType<{ size?: number; color?: string; fill?: string }>;
 const LUCIDE = LucideIcons as unknown as Record<string, IconCmp>;
 
-/** Resolve a channel's stored icon id (`lucide:Radio`) to its lucide component. */
+/**
+ * Resolve a channel's stored icon id (`lucide:Radio`) to its lucide component: the icon the id points at (`lucideIconFrom`: the name, and that it
+ * is an icon at all, which is the rule the native rows read an id with too, so both draw the same ids), else Radio. It looks the component up and
+ * nothing more: the native rows' extraction of lucide's drawing instructions is not on this path, so a library release that breaks it cannot change
+ * these rows.
+ */
 export function channelIcon(id?: string | null): IconCmp {
-  if (id && id.startsWith("lucide:")) return LUCIDE[id.slice(7)] ?? LucideIcons.Radio;
-  return LucideIcons.Radio;
+  return lucideIconFrom<IconCmp>(LUCIDE, id) ?? LucideIcons.Radio;
 }
+/** A package's icon, by the same rule as a channel's (`channelIcon`), else a folder. */
 export function pkgIconCmp(id?: string | null): IconCmp {
-  if (id && id.startsWith("lucide:")) return LUCIDE[id.slice(7)] ?? LucideIcons.Folder;
-  return LucideIcons.Folder;
+  return lucideIconFrom<IconCmp>(LUCIDE, id) ?? LucideIcons.Folder;
 }

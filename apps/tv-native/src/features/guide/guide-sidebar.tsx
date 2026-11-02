@@ -1,16 +1,16 @@
 import * as LucideIcons from "lucide-react-native";
 import { History, LayoutGrid, ListFilter, Menu, Settings as SettingsIcon, Star, User } from "lucide-react-native";
 import type { ReactNode } from "react";
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import { ScrollView, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
 import { TvPressable as Pressable } from "@/components/tv-pressable";
 import type { Package } from "@/lib/api";
-import { C } from "@/lib/theme";
 import { accentVivid } from "@/lib/accent-palette";
 
 import { GlassCircleButton } from "./glass-button";
+import { useGuideTokens, type GuideTokens } from "./guide-tokens";
 import { cs, SIDEBAR_EXPANDED_W, SIDEBAR_SLIVER_W } from "./layout";
 
 /**
@@ -38,14 +38,14 @@ export type SidebarItem = {
 
 const LU = LucideIcons as unknown as Record<string, React.ComponentType<{ size?: number; color?: string }>>;
 // cs() keeps the icons proportional to the (chrome-scaled) circles on Android TV; identity on iPad/Apple TV.
-function pkgIcon(id: string | null): ReactNode {
+function pkgIcon(id: string | null, color: string): ReactNode {
   const Comp = id && id.startsWith("lucide:") ? LU[id.slice(7)] ?? LucideIcons.Folder : LucideIcons.Folder;
-  return <Comp size={cs(24)} color="#f1f5f9" />;
+  return <Comp size={cs(24)} color={color} />;
 }
-const ic = (Cmp: React.ComponentType<{ size?: number; color?: string }>) => <Cmp size={cs(24)} color="#f1f5f9" />;
 
-export function buildSidebarItems(packages: Package[], lens: Lens): SidebarItem[] {
+export function buildSidebarItems(packages: Package[], lens: Lens, tk: GuideTokens): SidebarItem[] {
   const filtered = lens.type !== "all";
+  const ic = (Cmp: React.ComponentType<{ size?: number; color?: string }>) => <Cmp size={cs(24)} color={tk.sidebar.icon} />;
   return [
     { key: "guide", label: "Guide", icon: ic(Menu), kind: "lens", lens: { type: "all" }, group: "action" },
     { key: "settings", label: "Settings", icon: ic(SettingsIcon), kind: "settings", group: "action" },
@@ -59,7 +59,7 @@ export function buildSidebarItems(packages: Package[], lens: Lens): SidebarItem[
       key: `pkg:${p.id}`,
       label: p.name,
       sublabel: `${p.channelCount} ${p.channelCount === 1 ? "channel" : "channels"}`,
-      icon: pkgIcon(p.icon),
+      icon: pkgIcon(p.icon, tk.sidebar.icon),
       kind: "lens",
       lens: { type: "packages", ids: [p.id] },
       group: "filter",
@@ -76,7 +76,7 @@ export function lensEquals(a: Lens | undefined, b: Lens): boolean {
   return true;
 }
 
-export function GuideSidebar({
+export const GuideSidebar = memo(function GuideSidebar({
   items,
   expanded,
   focused,
@@ -95,6 +95,7 @@ export function GuideSidebar({
   /** Touch: tapping the collapsed sliver expands it to reveal the lenses. */
   onExpand: () => void;
 }) {
+  const tk = useGuideTokens();
   const actions = items.filter((i) => i.group === "action");
   const filters = items.filter((i) => i.group === "filter");
   const activeFilter = filters.find((f) => f.lens && lensEquals(f.lens, lens));
@@ -171,7 +172,7 @@ export function GuideSidebar({
       {actions.map((it, i) => (
         <GlassCircleButton key={it.key} icon={it.icon} label={it.label} expanded focused={focused && sel === i} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(i)} />
       ))}
-      <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: cs(4) }} />
+      <View style={{ height: 1, backgroundColor: tk.sidebar.rule, marginVertical: cs(4) }} />
       <ScrollView
         ref={scrollRef}
         style={{ flex: 1, marginLeft: -RING_ROOM, marginTop: -RING_ROOM }}
@@ -210,8 +211,8 @@ export function GuideSidebar({
       {actions.map((it, i) => (
         <GlassCircleButton key={it.key} icon={it.icon} expanded={false} active={it.lens ? lensEquals(it.lens, lens) : false} accent={it.accent} onPress={() => onActivate(i)} />
       ))}
-      <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: cs(4) }} />
-      <GlassCircleButton icon={<ListFilter size={cs(24)} color="#f1f5f9" />} expanded={false} active={!!activeFilter} accent={activeFilter?.accent} onPress={onExpand} />
+      <View style={{ height: 1, backgroundColor: tk.sidebar.rule, marginVertical: cs(4) }} />
+      <GlassCircleButton icon={<ListFilter size={cs(24)} color={tk.sidebar.icon} />} expanded={false} active={!!activeFilter} accent={activeFilter?.accent} onPress={onExpand} />
     </Pressable>
   );
 
@@ -220,11 +221,11 @@ export function GuideSidebar({
   return (
     <Animated.View
       style={[
-        { position: "absolute", left: 0, top: 0, bottom: 0, zIndex: 25, shadowColor: "#000", shadowOffset: { width: 24, height: 0 }, shadowRadius: 30, elevation: expanded ? 16 : 0 },
+        { position: "absolute", left: 0, top: 0, bottom: 0, zIndex: 25, shadowColor: tk.sidebar.shadow, shadowOffset: { width: 24, height: 0 }, shadowRadius: 30, elevation: expanded ? 16 : 0 },
         outerStyle,
       ]}
     >
-      <View style={{ flex: 1, overflow: "hidden", backgroundColor: C.sidebarBg, borderRightWidth: 1, borderRightColor: C.border }}>{content}</View>
+      <View style={{ flex: 1, overflow: "hidden", backgroundColor: tk.sidebar.bg, borderRightWidth: 1, borderRightColor: tk.sidebar.border }}>{content}</View>
     </Animated.View>
   );
-}
+});

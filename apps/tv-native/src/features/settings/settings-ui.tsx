@@ -128,6 +128,36 @@ export function SettingRow({
   );
 }
 
+/**
+ * A line of explanatory text under a setting that the D-pad can stop on. Text a remote cannot focus is never scrolled to, so
+ * a note below the last row of a long page would sit off the screen for good; as one more stop in the page's list it is
+ * scrolled into view and read like a row. Pass `dim` for fine print.
+ */
+export function SettingNote({ children, focused, dim }: { children: ReactNode; focused: boolean; dim?: boolean }) {
+  const ref = useRef<View>(null);
+  const { ensureVisible } = useContext(SettingsCtx);
+  useEffect(() => {
+    if (focused) ensureVisible(ref.current);
+  }, [focused, ensureVisible]);
+  return (
+    <View
+      ref={ref}
+      style={scaled({
+        marginTop: dim ? 18 : 4,
+        marginBottom: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 22,
+        borderRadius: 14,
+        borderWidth: 2,
+        borderColor: focused ? SETTINGS_ACCENT : "transparent",
+        backgroundColor: focused ? "rgba(74,159,224,0.10)" : "transparent",
+      })}
+    >
+      <Text style={scaled({ fontSize: 14, lineHeight: 21, color: dim ? "#64748b" : "#94a3b8", maxWidth: 640 })}>{children}</Text>
+    </View>
+  );
+}
+
 export function SectionLabel({ children, small }: { children: ReactNode; small?: boolean }) {
   return (
     <Text

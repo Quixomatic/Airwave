@@ -1,5 +1,5 @@
 import { Slot, usePathname, useRouter } from "expo-router";
-import { ArrowLeft, Cpu, Info, Server as ServerIcon, SlidersHorizontal, UserRound, Volume2 } from "lucide-react-native";
+import { ArrowLeft, Cpu, Info, LayoutGrid, Server as ServerIcon, SlidersHorizontal, UserRound, Volume2 } from "lucide-react-native";
 import { useCallback, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 
@@ -8,6 +8,7 @@ import { TvPressable as Pressable } from "@/components/tv-pressable";
 import { SettingsSidebar } from "@/features/settings/settings-sidebar";
 import { SettingsCtx } from "@/features/settings/settings-ui";
 import { cs, scaled, SIDEBAR_SLIVER_W } from "@/features/guide/layout";
+import { GUIDE_ROWS_SETTING } from "@/features/guide/use-guide-renderer";
 import { LAYER, useKeyLayer } from "@/lib/input";
 import { StatusBarBand } from "@/lib/ipad-status-bar";
 import { C } from "@/lib/theme";
@@ -25,6 +26,8 @@ const NAV = [
   { key: "user", label: "User", icon: ic(UserRound), to: "/settings/user" as const },
   { key: "server", label: "Server", icon: ic(ServerIcon), to: "/settings/server" as const },
   { key: "device", label: "Device", icon: ic(Cpu), to: "/settings/device" as const },
+  // The Guide page has a single setting for now (Guide rendering, Android TV only): no page where there is nothing to choose.
+  ...(GUIDE_ROWS_SETTING ? [{ key: "guide-look", label: "Guide", icon: ic(LayoutGrid), to: "/settings/guide" as const }] : []),
   { key: "audio", label: "Audio", icon: ic(Volume2), to: "/settings/audio" as const },
   { key: "about", label: "About", icon: ic(Info), to: "/settings/about" as const },
 ];
@@ -34,6 +37,7 @@ const KEY_BY_PATH: Record<string, string> = {
   "/settings/user": "user",
   "/settings/server": "server",
   "/settings/device": "device",
+  "/settings/guide": "guide-look",
   "/settings/audio": "audio",
   "/settings/about": "about",
 };

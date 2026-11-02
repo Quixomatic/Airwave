@@ -1,0 +1,28 @@
+{
+  "name": "@airwave/native-guide",
+  "version": "0.0.0",
+  "description": "The TV guide's channel rows drawn natively on one Android Canvas (tv-native's native guide rows). Android only; every other platform keeps the React Native rows.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "private": true,
+  "expo": {
+    "name": "native-guide",
+    "platforms": ["android"]
+  },
+  "scripts": {
+    "check-fast": "bun check",
+    "check-types": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.17",
+    "expo": "~55.0.28",
+    "react": "19.2.0",
+    "react-native": "0.83.6",
+    "typescript": "catalog:"
+  }
+}
