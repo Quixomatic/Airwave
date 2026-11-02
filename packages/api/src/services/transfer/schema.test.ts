@@ -109,3 +109,39 @@ describe("migrateToCurrent", () => {
     }
   });
 });
+
+describe("schema 1.3: the optional channel logo", () => {
+  const ch = (logo?: string | null) => [{ number: 1, name: "News", ...(logo === undefined ? {} : { logo }) } as never];
+
+  test("CURRENT is 1.3, the minor that adds `logo` (an additive field)", () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe("1.3");
+  });
+
+  test("a reader at 1.2 takes a 1.3 file as a newer minor: it reads what it knows and ignores the logo", () => {
+    expect(classifyVersion("1.3", "1.2")).toBe("newer-minor");
+  });
+
+  test("a 1.2 file (no logo field) imports as CURRENT, with no logo", () => {
+    const r = migrateToCurrent(base({ schemaVersion: "1.2", channels: ch() }));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.relation).toBe("older");
+      expect(r.doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+      expect((r.doc.channels[0] as Record<string, unknown>).logo).toBeUndefined();
+    }
+  });
+
+  test("a 1.3 file keeps its logo, and so does a newer minor", () => {
+    for (const v of [CURRENT_SCHEMA_VERSION, "1.4"]) {
+      const r = migrateToCurrent(base({ schemaVersion: v, channels: ch("https://logos.example.com/news.png") }));
+      expect(r.ok).toBe(true);
+      if (r.ok) expect((r.doc.channels[0] as Record<string, unknown>).logo).toBe("https://logos.example.com/news.png");
+    }
+  });
+
+  test("a null logo is a channel with none", () => {
+    const r = migrateToCurrent(base({ schemaVersion: CURRENT_SCHEMA_VERSION, channels: ch(null) }));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect((r.doc.channels[0] as Record<string, unknown>).logo).toBeNull();
+  });
+});

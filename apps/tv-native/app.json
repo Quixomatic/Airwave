@@ -53,6 +53,7 @@
         }
       ],
       "@airwave/mpv-player",
+      "@airwave/native-guide",
       [
         "expo-build-properties",
         {

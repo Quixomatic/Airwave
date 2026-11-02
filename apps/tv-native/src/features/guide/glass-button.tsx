@@ -4,6 +4,7 @@ import { type LayoutChangeEvent, Text, View } from "react-native";
 import { TvPressable as Pressable } from "@/components/tv-pressable";
 import { DEFAULT_ACCENT } from "@/lib/tint";
 
+import { useGuideTokens } from "./guide-tokens";
 import { cs, hexA } from "./layout";
 
 /**
@@ -36,6 +37,7 @@ export function GlassCircleButton({
   /** Forwarded to the root — lets the sidebar measure each circle's y for D-pad snap-scroll. */
   onLayout?: (e: LayoutChangeEvent) => void;
 }) {
+  const tk = useGuideTokens();
   const lit = focused || active;
   // Chrome-scaled for Android TV's 960dp space (identity on iPad/Apple TV) — the circle must shrink with
   // the sidebar width, else a 54px circle overflows the ~46px sliver.
@@ -56,7 +58,7 @@ export function GlassCircleButton({
                 height: s + ring,
                 borderRadius: (s + ring) / 2,
                 borderWidth: 2,
-                borderColor: hexA(accent, 0.7),
+                borderColor: hexA(accent, tk.glass.ringA),
               }}
             />
           )}
@@ -68,8 +70,8 @@ export function GlassCircleButton({
               alignItems: "center",
               justifyContent: "center",
               borderWidth: 1,
-              borderColor: lit ? hexA(accent, 0.4) : "rgba(255,255,255,0.12)",
-              backgroundColor: lit ? hexA(accent, 0.28) : "rgba(18,24,38,0.55)",
+              borderColor: lit ? hexA(accent, tk.glass.litBorderA) : tk.glass.idleBorder,
+              backgroundColor: lit ? hexA(accent, tk.glass.litFillA) : tk.glass.idleFill,
             }}
           >
             {icon}
@@ -79,11 +81,11 @@ export function GlassCircleButton({
         {/* label beside the circle */}
         {expanded && label && (
           <View style={{ flexShrink: 1, minWidth: 0 }}>
-            <Text numberOfLines={1} style={{ fontSize: cs(17), fontWeight: "600", color: lit ? "#f8fafc" : "#c3c9d4" }}>
+            <Text numberOfLines={1} style={{ fontSize: cs(17), fontWeight: "600", color: lit ? tk.glass.labelLit : tk.glass.label }}>
               {label}
             </Text>
             {sublabel && (
-              <Text numberOfLines={1} style={{ fontSize: cs(13), fontWeight: "500", color: "#64748b", marginTop: cs(2) }}>
+              <Text numberOfLines={1} style={{ fontSize: cs(13), fontWeight: "500", color: tk.glass.sublabel, marginTop: cs(2) }}>
                 {sublabel}
               </Text>
             )}

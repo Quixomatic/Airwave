@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { adminProcedure, router } from "../index";
+import { channelLogoField } from "../lib/channel-logo";
 import { toAccentKey } from "../services/accents";
 import { getGuideGrid } from "../services/guide";
 import { runJob } from "../services/jobs/scheduler";
@@ -214,6 +215,7 @@ export const channelsRouter = router({
       mediaSourceId: channel.mediaSourceId,
       packageId: channel.packageId,
       icon: channel.icon,
+      logo: channel.logo,
       tint: channel.tint,
       generated: channel.generated,
       aiGenerated: channel.aiGenerated,
@@ -305,6 +307,7 @@ export const channelsRouter = router({
         sortDir: z.enum(["asc", "desc"]).optional(),
         packageId: z.string().nullish(),
         icon: z.string().nullish(),
+        logo: channelLogoField,
         tint: z.string().nullish().transform((v) => (v ? toAccentKey(v) : null)), // coerce to a valid accent key
         description: z.string().nullish(),
         enabled: z.boolean().optional(),
@@ -355,6 +358,7 @@ export const channelsRouter = router({
           sortDir: input.sortDir ?? "asc",
           packageId: input.packageId ?? null,
           icon: input.icon ?? null,
+          logo: input.logo ?? null,
           tint: input.tint ?? null,
           description: input.description ?? null,
           enabled: input.enabled ?? true,
@@ -405,6 +409,7 @@ export const channelsRouter = router({
         sortDir: z.enum(["asc", "desc"]).optional(),
         packageId: z.string().nullish(),
         icon: z.string().nullish(),
+        logo: channelLogoField,
         tint: z.string().nullish().transform((v) => (v ? toAccentKey(v) : null)), // coerce to a valid accent key
         description: z.string().nullish(),
         enabled: z.boolean().optional(),
@@ -441,6 +446,8 @@ export const channelsRouter = router({
           sortDir: input.sortDir ?? "asc",
           packageId: input.packageId ?? null,
           icon: input.icon ?? null,
+          // Omitted = leave the logo as it is; null = clear it.
+          ...(input.logo === undefined ? {} : { logo: input.logo }),
           tint: input.tint ?? null,
           description: input.description ?? null,
           ...(input.enabled === undefined ? {} : { enabled: input.enabled }),

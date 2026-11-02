@@ -17,7 +17,7 @@ import { z } from "zod";
  * Legacy: the pre-semver exports carried an integer `version: 1`. That maps to `"1.0"` (see
  * {@link readSchemaVersion}), so every lineup ever exported still imports.
  */
-export const CURRENT_SCHEMA_VERSION = "1.2" as const;
+export const CURRENT_SCHEMA_VERSION = "1.3" as const;
 
 /* ---------------- Envelope zod (tolerant: nested contents stay loose, extras pass through) ---------- */
 
@@ -64,6 +64,8 @@ export const channelSchema = z
     callsign: z.string().nullish(),
     description: z.string().nullish(),
     icon: z.string().nullish(),
+    // schema 1.3 — an optional https logo address (a path on the exporting server is not exported: it would not exist elsewhere).
+    logo: z.string().nullish(),
     tint: z.string().nullish(),
     enabled: z.boolean().optional(),
     sortIndex: z.number().optional(),

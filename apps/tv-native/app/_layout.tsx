@@ -13,6 +13,7 @@ import { PlayerProvider } from "@/features/watch/player-context";
 import { getToken, hasServerUrl, loadSession } from "@/lib/auth";
 import { loadDevice } from "@/lib/device";
 import { hydrateAudioMode } from "@/lib/audio-pref";
+import { hydrateGuidePrefs } from "@/lib/guide-prefs";
 import { notifyInputActivity, useAndroidBack, useHardwareKeyInput, useTVInput } from "@/lib/input";
 import { hydrateNetwork, probeConnection } from "@/lib/plex-connection";
 import { C } from "@/lib/theme";
@@ -70,7 +71,7 @@ export default function RootLayout() {
   useAndroidBack();
 
   useEffect(() => {
-    void Promise.all([loadSession(), loadDevice(), hydrateNetwork(), hydrateAudioMode()]).finally(() => {
+    void Promise.all([loadSession(), loadDevice(), hydrateNetwork(), hydrateAudioMode(), hydrateGuidePrefs()]).finally(() => {
       setReady(true);
       // Refresh which Plex connection this device can actually reach (local → remote → relay) so
       // off-network playback streams from the right URL. Non-blocking; the first media request uses

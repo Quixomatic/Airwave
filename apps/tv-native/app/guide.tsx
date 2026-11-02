@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { ActivityIndicator, View } from "react-native";
 
 import { AuroraGrid } from "@/features/guide/aurora-grid";
@@ -20,7 +20,8 @@ export default function GuideRoute() {
   const { data: favData } = useFavorites();
   const setFavorite = useSetFavorite();
 
-  const favoriteIds = new Set(favData?.channelIds ?? []);
+  // Stable while the favourites are: a new Set on every render would defeat the memos below it (the lens, the native lineup) and re-send the lineup.
+  const favoriteIds = useMemo(() => new Set(favData?.channelIds ?? []), [favData?.channelIds]);
 
   // First sign-in (or a server switch) → run the capability diagnostic so the server has this
   // device's profile before playback (else /media can't pick direct-play vs HLS correctly).

@@ -1,5 +1,6 @@
 import { Prisma, type PrismaClient } from "@airwave/db";
 
+import { portableChannelLogo } from "../../lib/channel-logo";
 import { normalizeCallsign } from "../generator/callsign";
 import type { FilterNode } from "../plex/filter-fields";
 import { type ResolveSource, resolveFilter } from "../plex/resolve";
@@ -32,6 +33,7 @@ export type ImportedChannel = {
   callsign?: string | null;
   description?: string | null;
   icon?: string | null;
+  logo?: string | null;
   tint?: string | null;
   enabled?: boolean;
   sortIndex?: number;
@@ -755,6 +757,11 @@ export async function executeChannelPlan(
         number: plan.assignedNumber,
         description: plan.source.description ?? null,
         icon: plan.source.icon ?? null,
+        // A file is untrusted input: a logo that isn't a usable address is dropped, not stored. So is a path on a server (`/img/…`): an
+        // export leaves those out, and a file that has one was made elsewhere, where it named something that is not here. An https logo
+        // is kept whatever host it names, on purpose: an admin imports their own files, and every TV loads a logo itself, so a file from
+        // someone else can point the TVs at a host of its choosing (a tracker). Review a file you did not make before importing it.
+        logo: portableChannelLogo(plan.source.logo),
         tint: plan.source.tint ?? null,
         // Import disabled if there's nothing to schedule, else honor the file (default enabled).
         enabled: plan.disabled ? false : (plan.source.enabled ?? true),
